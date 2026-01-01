@@ -1,0 +1,15 @@
+{
+  "solc_args": "--base-path .",
+  "filter_paths": [
+    "node_modules",
+    "lib",
+    "out",
+    "cache",
+    "dist"
+  ],
+  "exclude_low": false,
+  "exclude_medium": false,
+  "exclude_high": false,
+  "disable_color": true,
+  "triage_mode": true
+}
