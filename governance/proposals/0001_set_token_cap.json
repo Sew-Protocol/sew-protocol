@@ -1,0 +1,24 @@
+{
+  "id": "0001_set_token_cap",
+  "title": "Set Token Cap for USDC",
+  "description": "\nSet a cap of 10M USDC for Aave yield generation.\n\nThis proposal sets a maximum exposure limit for USDC deposits in the Aave yield generation module.\nThis helps manage risk by limiting the total amount of USDC that can be deposited into Aave.\n\n**Parameters:**\n- Token: USDC (0x...)\n- Cap: 10,000,000 USDC (6 decimals)\n  ",
+  "lane": "standard",
+  "calls": [
+    {
+      "target": "0xPLACEHOLDER_AAVEYIELDGENERATIONMODULE",
+      "contractName": "AaveYieldGenerationModule",
+      "functionName": "setTokenCap",
+      "args": [
+        "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "10000000000000"
+      ],
+      "description": "Set USDC cap to 10000000 (10000000000000 wei)"
+    }
+  ],
+  "metadata": {
+    "author": "unknown",
+    "created": "2026-01-02T13:15:54.441Z",
+    "network": "hardhat",
+    "references": []
+  }
+}

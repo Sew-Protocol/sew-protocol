@@ -3,6 +3,7 @@ import { ethers } from "hardhat";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { EscrowVault } from "../typechain-types";
 import { ERC20Mock } from "../typechain-types";
+import { setupResolutionModule } from "../helpers/setupResolutionModule";
 
 describe("EscrowVault", function () {
   let escrowVault: EscrowVault;
@@ -34,8 +35,12 @@ describe("EscrowVault", function () {
     token2 = (await tokenFactory.deploy("Token 2", "TKN2", owner.address, ethers.parseEther("1000000"))) as ERC20Mock;
     await token2.waitForDeployment();
     
-    // Set resolver
-    await escrowVault.setAuthorizedResolver(resolver.address);
+    // Phase 2: Grant ROLE_TIMELOCK to owner
+    const ROLE_TIMELOCK = await escrowVault.ROLE_TIMELOCK();
+    await escrowVault.grantRole(ROLE_TIMELOCK, owner.address);
+    
+    // Phase 7: Setup resolution module (required for escrow creation)
+    await setupResolutionModule(escrowVault, owner, resolver.address);
     
     // Transfer tokens to sender
     await token1.transfer(sender.address, ethers.parseEther("1000"));
@@ -44,7 +49,9 @@ describe("EscrowVault", function () {
 
   describe("Deployment", function () {
     it("Should set the right owner", async function () {
-      expect(await escrowVault.owner()).to.equal(owner.address);
+      // Phase 2: Migrated from Ownable to AccessControl
+      const DEFAULT_ADMIN_ROLE = await escrowVault.DEFAULT_ADMIN_ROLE();
+      expect(await escrowVault.hasRole(DEFAULT_ADMIN_ROLE, owner.address)).to.be.true;
     });
 
     it("Should set the right escrow fee", async function () {
@@ -224,7 +231,7 @@ describe("EscrowVault", function () {
 
   describe("Dispute Resolution", function () {
     beforeEach(async function () {
-      await escrowVault.setAuthorizedResolver(resolver.address);
+      // Phase 7: Resolution module already set up in main beforeEach
     });
 
     it("Should allow raising dispute", async function () {
@@ -260,7 +267,7 @@ describe("EscrowVault", function () {
 
   describe("resolve() Function", function () {
     beforeEach(async function () {
-      await escrowVault.setAuthorizedResolver(resolver.address);
+      // Phase 7: Resolution module already set up in main beforeEach
     });
 
     it("Should resolve with single payout", async function () {

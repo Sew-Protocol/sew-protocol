@@ -1,101 +1,123 @@
 import { HardhatRuntimeEnvironment } from 'hardhat/types';
 import { DeployFunction } from 'hardhat-deploy/types';
-import { getGovConfig, validateGovConfig } from './_config';
+import { getGovConfig } from './_config';
 
 /**
- * Transfer Protocol Ownership to Governance
+ * Grant Protocol Roles to Governance
  * 
- * This script transfers ownership and grants roles to governance:
- * - Transfer ownership of Ownable contracts to Timelock
- * - Grant ROLE_TIMELOCK to Timelock (for AccessControl contracts)
- * - Grant ROLE_GUARDIAN to Guardian multisig
+ * This script grants AccessControl roles to governance:
+ * - Grant ROLE_TIMELOCK to TimelockController (for Standard/Slow functions)
+ * - Grant ROLE_GUARDIAN to Guardian multisig (for Emergency functions)
+ * - Grant DEFAULT_ADMIN_ROLE to TimelockController
  * - Revoke deployer roles
- * 
- * Note: This assumes contracts will be migrated to AccessControl in Phase 2.
- * For now, we only transfer ownership of Ownable contracts.
  */
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts, ethers } = hre;
-  const { get } = deployments;
+  const { get, all } = deployments;
   const { deployer } = await getNamedAccounts();
-  
+
   const config = getGovConfig(hre);
-  validateGovConfig(config, hre);
+
+  console.log("\n🔄 Granting protocol roles to governance...");
 
   const timelockDeployment = await get('TimelockController');
-  const timelock = await ethers.getContractAt('TimelockController', timelockDeployment.address);
+  const safeDeployment = await get('Safe');
+  const guardianMultisig = config.guardian.multisig || safeDeployment.address;
 
-  console.log(`\n🔐 Transferring protocol ownership to governance...`);
-  console.log(`   Timelock: ${timelockDeployment.address}`);
-  console.log(`   Guardian: ${config.guardian.multisig || 'Not configured'}`);
+  // Role constants (must match contracts)
+  const ROLE_TIMELOCK = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("ROLE_TIMELOCK"));
+  const ROLE_GUARDIAN = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("ROLE_GUARDIAN"));
+  const DEFAULT_ADMIN_ROLE = ethers.constants.Zero; // AccessControl uses 0x00 for DEFAULT_ADMIN_ROLE
 
-  // List of contracts that use Ownable (will be migrated to AccessControl in Phase 2)
-  const ownableContracts = [
+  const allDeployments = await all();
+  const contractsToGovern = [
     'EscrowableERC20',
     'EscrowVault',
-    'BaseEscrow',
+    'AaveYieldGenerationModule',
+    'DefaultResolutionModule',
+    'DecentralizedResolutionModule',
+    // Add other AccessControl contracts as they are deployed
   ];
 
-  let transferredCount = 0;
-  let skippedCount = 0;
+  let rolesGranted = 0;
+  let rolesSkipped = 0;
 
-  for (const contractName of ownableContracts) {
+  for (const contractName of contractsToGovern) {
+    const deployment = allDeployments[contractName];
+    if (!deployment) {
+      console.log(`   ⚠️  Contract ${contractName} not found in deployments, skipping.`);
+      rolesSkipped++;
+      continue;
+    }
+
     try {
-      const deployment = await get(contractName);
-      if (!deployment || !deployment.address) {
-        console.log(`   ⚠️  ${contractName} not deployed, skipping`);
-        skippedCount++;
-        continue;
-      }
-
       const contract = await ethers.getContractAt(contractName, deployment.address);
-      
-      // Check if contract has owner() function
+      console.log(`\n   📋 ${contractName} (${deployment.address}):`);
+
+      // Check if contract has AccessControl roles
       try {
-        const currentOwner = await contract.owner();
-        console.log(`\n   📋 ${contractName}:`);
-        console.log(`      Current owner: ${currentOwner}`);
-        
-        if (currentOwner.toLowerCase() === timelockDeployment.address.toLowerCase()) {
-          console.log(`      ✅ Already owned by Timelock`);
-          skippedCount++;
-          continue;
+        // Grant ROLE_TIMELOCK to TimelockController
+        const hasTimelockRole = await contract.hasRole(ROLE_TIMELOCK, timelockDeployment.address);
+        if (!hasTimelockRole) {
+          console.log(`      Granting ROLE_TIMELOCK to TimelockController...`);
+          const tx1 = await contract.grantRole(ROLE_TIMELOCK, timelockDeployment.address);
+          await tx1.wait();
+          console.log(`      ✅ ROLE_TIMELOCK granted`);
+          rolesGranted++;
+        } else {
+          console.log(`      ✅ TimelockController already has ROLE_TIMELOCK`);
         }
 
-        if (currentOwner.toLowerCase() === deployer.toLowerCase()) {
-          console.log(`      Transferring to Timelock...`);
-          const tx = await contract.transferOwnership(timelockDeployment.address);
-          await tx.wait();
-          console.log(`      ✅ Ownership transferred to Timelock`);
-          transferredCount++;
+        // Grant ROLE_GUARDIAN to Guardian multisig
+        const hasGuardianRole = await contract.hasRole(ROLE_GUARDIAN, guardianMultisig);
+        if (!hasGuardianRole) {
+          console.log(`      Granting ROLE_GUARDIAN to Guardian (${guardianMultisig})...`);
+          const tx2 = await contract.grantRole(ROLE_GUARDIAN, guardianMultisig);
+          await tx2.wait();
+          console.log(`      ✅ ROLE_GUARDIAN granted`);
+          rolesGranted++;
         } else {
-          console.log(`      ⚠️  Owned by ${currentOwner}, not transferring`);
-          skippedCount++;
+          console.log(`      ✅ Guardian already has ROLE_GUARDIAN`);
+        }
+
+        // Revoke DEFAULT_ADMIN_ROLE from deployer (if deployer has it)
+        const deployerHasAdmin = await contract.hasRole(DEFAULT_ADMIN_ROLE, deployer);
+        if (deployerHasAdmin) {
+          // Grant DEFAULT_ADMIN_ROLE to TimelockController first
+          const timelockHasAdmin = await contract.hasRole(DEFAULT_ADMIN_ROLE, timelockDeployment.address);
+          if (!timelockHasAdmin) {
+            console.log(`      Granting DEFAULT_ADMIN_ROLE to TimelockController...`);
+            const tx3 = await contract.grantRole(DEFAULT_ADMIN_ROLE, timelockDeployment.address);
+            await tx3.wait();
+            console.log(`      ✅ DEFAULT_ADMIN_ROLE granted to TimelockController`);
+            rolesGranted++;
+          }
+          
+          // Revoke deployer's DEFAULT_ADMIN_ROLE
+          console.log(`      Revoking DEFAULT_ADMIN_ROLE from deployer...`);
+          const tx4 = await contract.revokeRole(DEFAULT_ADMIN_ROLE, deployer);
+          await tx4.wait();
+          console.log(`      ✅ Deployer's DEFAULT_ADMIN_ROLE revoked`);
+          rolesGranted++;
+        } else {
+          console.log(`      ✅ Deployer does not have DEFAULT_ADMIN_ROLE`);
         }
       } catch (error: any) {
-        // Contract might not have owner() function or might use AccessControl
-        console.log(`      ⚠️  ${contractName} doesn't use Ownable or has different access control`);
-        skippedCount++;
+        // Contract might not have AccessControl
+        console.log(`      ⚠️  Contract does not support AccessControl: ${error.message}`);
+        rolesSkipped++;
       }
     } catch (error: any) {
-      console.log(`   ⚠️  Error processing ${contractName}: ${error.message}`);
-      skippedCount++;
+      console.log(`      ⚠️  Error processing ${contractName}: ${error.message}`);
+      rolesSkipped++;
     }
   }
 
-  // Grant Guardian role (if configured and contracts support AccessControl)
-  if (config.guardian.multisig && config.guardian.multisig !== ethers.ZeroAddress) {
-    console.log(`\n   🛡️  Guardian multisig configured: ${config.guardian.multisig}`);
-    console.log(`      Note: Guardian roles will be granted in Phase 2 (AccessControl migration)`);
-  }
-
-  console.log(`\n✅ Protocol ownership transfer complete!`);
-  console.log(`   Transferred: ${transferredCount}`);
-  console.log(`   Skipped: ${skippedCount}`);
-  console.log(`\n   ⚠️  Note: Full role-based access control will be implemented in Phase 2`);
+  console.log("\n✅ Protocol role grants complete!");
+  console.log(`   Roles granted: ${rolesGranted}`);
+  console.log(`   Contracts skipped: ${rolesSkipped}`);
 };
 
 export default func;
 func.tags = ['governance', 'ownership'];
-func.dependencies = ['timelock', 'governor'];
-
+func.dependencies = ['timelock', 'governor', 'safe'];

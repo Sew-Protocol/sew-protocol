@@ -1,0 +1,21 @@
+{
+  "id": "0004_emergency_pause",
+  "title": "Emergency Pause Protocol",
+  "description": "\nPause the protocol in case of emergency.\n\nThis proposal pauses all escrow operations. This is an emergency action that:\n- Can be executed immediately (no delay)\n- Requires Guardian role (multisig)\n- Can be reversed by Timelock via unpause()\n\n**Warning**: Only use in genuine emergencies. This will halt all escrow operations.\n  ",
+  "lane": "emergency",
+  "calls": [
+    {
+      "target": "0xPLACEHOLDER_ESCROWABLEERC20",
+      "contractName": "EscrowableERC20",
+      "functionName": "pause",
+      "args": [],
+      "description": "Emergency pause EscrowableERC20"
+    }
+  ],
+  "metadata": {
+    "author": "unknown",
+    "created": "2026-01-02T13:19:07.582Z",
+    "network": "hardhat",
+    "references": []
+  }
+}

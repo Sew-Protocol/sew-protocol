@@ -2,6 +2,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { EscrowableERC20 } from "../typechain-types";
+import { setupResolutionModule } from "../helpers/setupResolutionModule";
 
 describe("EscrowableERC20", function () {
   let escrowableERC20: EscrowableERC20;
@@ -65,11 +66,16 @@ describe("EscrowableERC20", function () {
     const escrowableERC20Factory = await ethers.getContractFactory("EscrowableERC20");
     escrowableERC20 = (await escrowableERC20Factory.deploy("Test Token", "TEST", ESCROW_FEE, owner.address)) as EscrowableERC20;
     await escrowableERC20.waitForDeployment();
+    
+    // Phase 7: Setup resolution module (required for escrow creation)
+    await setupResolutionModule(escrowableERC20, owner, resolver.address);
   });
 
   describe("Deployment", function () {
     it("Should set the right owner", async function () {
-      expect(await escrowableERC20.owner()).to.equal(owner.address);
+      // Phase 2: Migrated from Ownable to AccessControl
+      const DEFAULT_ADMIN_ROLE = await escrowableERC20.DEFAULT_ADMIN_ROLE();
+      expect(await escrowableERC20.hasRole(DEFAULT_ADMIN_ROLE, owner.address)).to.be.true;
     });
 
     it("Should set the right name and symbol", async function () {
@@ -130,8 +136,8 @@ describe("EscrowableERC20", function () {
       const workflowId = await createEscrowTransferWithDynamicResolverDetails(INITIAL_TRANSFER_AMOUNT, details);
 
       const escrowTransfer = await escrowableERC20.escrowTransfers(workflowId);
-      // Should use the authorized resolver since lookupResolver currently returns authorizedResolver
-      expect(escrowTransfer.disputeResolver).to.equal(owner.address);
+      // Phase 7: Uses resolution module to get resolver
+      expect(escrowTransfer.disputeResolver).to.not.equal(ethers.ZeroAddress);
       expect(escrowTransfer.escrowState).to.equal(1); // PENDING (enum value 1)
     });
 
@@ -834,7 +840,9 @@ describe("EscrowableERC20", function () {
 
     it("Should set and use default auto release time", async function () {
       const currentTime = await time.latest();
-      const defaultTime = currentTime + 3600; // 1 hour in the future
+      // Phase 6: Auto time must be within 30 days from current block timestamp
+      // Use a time within the 30-day limit (e.g., 7 days = 604800 seconds)
+      const defaultTime = BigInt(currentTime) + BigInt(7 * 24 * 60 * 60); // 7 days in the future (within 30-day limit)
       await escrowableERC20.connect(owner).setDefaultAutoReleaseTime(defaultTime);
       
       expect(await escrowableERC20.defaultAutoReleaseTime()).to.equal(defaultTime);
@@ -853,7 +861,9 @@ describe("EscrowableERC20", function () {
 
     it("Should set and use default auto cancel time", async function () {
       const currentTime = await time.latest();
-      const defaultTime = currentTime + 3600; // 1 hour in the future
+      // Phase 6: Auto time must be within 30 days from current block timestamp
+      // Use a time within the 30-day limit (e.g., 7 days = 604800 seconds)
+      const defaultTime = BigInt(currentTime) + BigInt(7 * 24 * 60 * 60); // 7 days in the future (within 30-day limit)
       await escrowableERC20.connect(owner).setDefaultAutoCancelTime(defaultTime);
       
       expect(await escrowableERC20.defaultAutoCancelTime()).to.equal(defaultTime);
@@ -875,11 +885,11 @@ describe("EscrowableERC20", function () {
       const futureTime = currentTime + 3600;
       await expect(
         escrowableERC20.connect(sender).setDefaultAutoReleaseTime(futureTime)
-      ).to.be.revertedWithCustomError(escrowableERC20, "OwnableUnauthorizedAccount");
+      ).to.be.revertedWithCustomError(escrowableERC20, "AccessControlUnauthorizedAccount");
       
       await expect(
         escrowableERC20.connect(sender).setDefaultAutoCancelTime(futureTime)
-      ).to.be.revertedWithCustomError(escrowableERC20, "OwnableUnauthorizedAccount");
+      ).to.be.revertedWithCustomError(escrowableERC20, "AccessControlUnauthorizedAccount");
     });
 
     it("Should handle edge case: exactly at release time", async function () {

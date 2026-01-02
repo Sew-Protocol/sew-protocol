@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "./BaseEscrow.sol";
+import "./governance/SlowLaneQueueActivate.sol";
 import "./interfaces/IReleaseStrategy.sol";
 import "./interfaces/IResolutionModule.sol";
 import "./interfaces/IYieldGenerationModule.sol";
@@ -29,21 +30,17 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
     uint256 public constant INITIAL_SUPPLY = 1000000000000000000000000; // 1,000,000 tokens with 18 decimals
     uint256 public totalHeldInEscrow = 0;
     
-    // Module registries
-    mapping(uint256 => address) public releaseStrategyForEscrow;
-    mapping(uint256 => address) public resolutionModuleForEscrow;
-    
-    // Yield generation module registries
-    mapping(uint256 => address) public yieldGenerationModuleForEscrow;
-    IYieldGenerationModule public defaultYieldGenerationModule;
-    
-    // Yield distribution module registries
-    mapping(uint256 => address) public yieldDistributionModuleForEscrow;
-    IYieldDistributionModule public defaultYieldDistributionModule;
-    
-    // Default module instances (other modules)
+    // Default module instances (per-escrow overrides removed in Phase 5 for mainnet credibility)
     IReleaseStrategy public defaultReleaseStrategy;
-    IResolutionModule public defaultResolutionModule; 
+    IResolutionModule public defaultResolutionModule;
+    IYieldGenerationModule public defaultYieldGenerationModule;
+    IYieldDistributionModule public defaultYieldDistributionModule;
+
+    // Slow lane pending changes (Phase 3)
+    PendingAddress private _pendingDefaultReleaseStrategy;
+    PendingAddress private _pendingDefaultResolutionModule;
+    PendingAddress private _pendingDefaultYieldGenerationModule;
+    PendingAddress private _pendingDefaultYieldDistributionModule; 
     
 
     // Events specific to EscrowableERC20 (without token parameter)
@@ -52,11 +49,19 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
     event EscrowTransferCancelled(uint256 indexed workflowId, address indexed from, uint256 amount);
     event FeesWithdrawn(uint256 amount);
     
-    // Module events
-    event YieldGenerationModuleSet(uint256 indexed workflowId, address indexed module);
+    // Module events (per-escrow events removed in Phase 5)
     event DefaultYieldGenerationModuleSet(address indexed module);
-    event YieldDistributionModuleSet(uint256 indexed workflowId, address indexed module);
     event DefaultYieldDistributionModuleSet(address indexed module);
+
+    // Slow lane queue/activate events (Phase 3)
+    event DefaultReleaseStrategyQueued(address indexed oldStrategy, address indexed newStrategy, uint64 eta);
+    event DefaultReleaseStrategyActivated(address indexed oldStrategy, address indexed newStrategy);
+    event DefaultResolutionModuleQueued(address indexed oldModule, address indexed newModule, uint64 eta);
+    event DefaultResolutionModuleActivated(address indexed oldModule, address indexed newModule);
+    event DefaultYieldGenerationModuleQueued(address indexed oldModule, address indexed newModule, uint64 eta);
+    event DefaultYieldGenerationModuleActivated(address indexed oldModule, address indexed newModule);
+    event DefaultYieldDistributionModuleQueued(address indexed oldModule, address indexed newModule, uint64 eta);
+    event DefaultYieldDistributionModuleActivated(address indexed oldModule, address indexed newModule);
 
 
     constructor(
@@ -64,7 +69,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         string memory symbol,
         uint256 _escrowFee,
         address _escrowFeeAddress
-    ) ERC20(name, symbol) Ownable(_msgSender()) {
+    ) ERC20(name, symbol) {
         if (_escrowFee > ESCROW_FEE_DENOMINATOR) {
             revert InvalidEscrowFee(_escrowFee, ESCROW_FEE_DENOMINATOR);
         }
@@ -73,7 +78,11 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         }
         escrowFee = _escrowFee;
         escrowFeeAddress = _escrowFeeAddress;
-        authorizedResolver = _msgSender();
+        // Phase 7: authorizedResolver removed - resolver gate eliminated
+        
+        // Grant DEFAULT_ADMIN_ROLE to deployer so roles can be granted later
+        _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
+        
         // Mint initial supply to deployer
         _mint(_msgSender(), INITIAL_SUPPLY);
     }
@@ -142,7 +151,12 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
                 autoReleaseTime: 0, // Will be set by _applyEscrowSettings
                 autoCancelTime: 0, // Will be set by _applyEscrowSettings
                 attachmentURIs: new string[](0),
-                attachmentHashes: new bytes32[](0)
+                attachmentHashes: new bytes32[](0),
+                // Phase 7: Initialize module snapshots (will be set after escrow is created)
+                snapshotResolutionModule: address(0),
+                snapshotReleaseStrategy: address(0),
+                snapshotYieldGenerationModule: address(0),
+                snapshotYieldDistributionModule: address(0)
             }));
         
         // Assert workflowId consistency: struct ID should match array index
@@ -155,6 +169,15 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         
         // Apply settings (this will set auto times correctly, applying defaults only if both are 0)
         _applyEscrowSettings(workflowId, settings);
+        
+        // Phase 7: Snapshot module addresses at creation time
+        _snapshotModulesForEscrow(
+            workflowId,
+            address(getResolutionModule(workflowId)),
+            address(getReleaseStrategy(workflowId)),
+            address(getYieldGenerationModule(workflowId)),
+            address(getYieldDistributionModule(workflowId))
+        );
         
         // Phase 2: If yieldEnabled, deposit to Aave (handled in BaseEscrow._depositToAave)
         if (settings.yieldEnabled) {
@@ -301,13 +324,39 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
     }
 
     /**
+     * @dev Get the release strategy for an escrow
+     * @param workflowId The escrow transfer ID
+     * @return The release strategy module
+     * @dev Phase 7: Returns snapshot module to ensure module changes only affect new escrows
+     */
+    function _getReleaseStrategy(uint256 workflowId) internal view returns (IReleaseStrategy) {
+        EscrowTransfer storage et = escrowTransfers[workflowId];
+        address snapshot = et.snapshotReleaseStrategy;
+        return snapshot != address(0) ? IReleaseStrategy(snapshot) : defaultReleaseStrategy;
+    }
+
+    /**
+     * @dev Get the resolution module for an escrow
+     * @param workflowId The escrow transfer ID
+     * @return The resolution module
+     * @dev Phase 7: Returns snapshot module to ensure module changes only affect new escrows
+     */
+    function _getResolutionModule(uint256 workflowId) internal view returns (IResolutionModule) {
+        EscrowTransfer storage et = escrowTransfers[workflowId];
+        address snapshot = et.snapshotResolutionModule;
+        return snapshot != address(0) ? IResolutionModule(snapshot) : defaultResolutionModule;
+    }
+
+    /**
      * @dev Get the yield generation module for an escrow (override from BaseEscrow)
      * @param workflowId The escrow transfer ID
      * @return The yield generation module interface
-     * @dev Overrides BaseEscrow._getYieldGenerationModule. Returns escrow-specific module or default.
+     * @dev Phase 7: Returns snapshot module to ensure module changes only affect new escrows
      */
     function _getYieldGenerationModule(uint256 workflowId) internal view override returns (IYieldGenerationModule) {
-        return getYieldGenerationModule(workflowId);
+        EscrowTransfer storage et = escrowTransfers[workflowId];
+        address snapshot = et.snapshotYieldGenerationModule;
+        return snapshot != address(0) ? IYieldGenerationModule(snapshot) : defaultYieldGenerationModule;
     }
 
     /**
@@ -332,10 +381,12 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
      * @dev Get the yield distribution module for an escrow (override from BaseEscrow)
      * @param workflowId The escrow transfer ID
      * @return The yield distribution module interface
-     * @dev Overrides BaseEscrow._getYieldDistributionModule. Returns escrow-specific module or default.
+     * @dev Phase 7: Returns snapshot module to ensure module changes only affect new escrows
      */
     function _getYieldDistributionModule(uint256 workflowId) internal view override returns (IYieldDistributionModule) {
-        return getYieldDistributionModule(workflowId);
+        EscrowTransfer storage et = escrowTransfers[workflowId];
+        address snapshot = et.snapshotYieldDistributionModule;
+        return snapshot != address(0) ? IYieldDistributionModule(snapshot) : defaultYieldDistributionModule;
     }
 
     // Module getter functions
@@ -344,131 +395,127 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
      * @param workflowId The escrow transfer ID
      * @return The release strategy module (or default if not set)
      */
+    /**
+     * @notice Get the release strategy for an escrow
+     * @param workflowId The escrow transfer ID (unused, kept for interface compatibility)
+     * @return The default release strategy module
+     * @dev Per-escrow overrides removed in Phase 5. All escrows use default modules.
+     */
     function getReleaseStrategy(uint256 workflowId) public view returns (IReleaseStrategy) {
-        address module = releaseStrategyForEscrow[workflowId];
-        return module != address(0) ? IReleaseStrategy(module) : defaultReleaseStrategy;
+        workflowId; // Silence unused parameter warning
+        return defaultReleaseStrategy;
     }
 
     /**
      * @notice Get the resolution module for an escrow
-     * @param workflowId The escrow transfer ID
-     * @return The resolution module (or default if not set)
+     * @param workflowId The escrow transfer ID (unused, kept for interface compatibility)
+     * @return The default resolution module
+     * @dev Per-escrow overrides removed in Phase 5. All escrows use default modules.
      */
     function getResolutionModule(uint256 workflowId) public view returns (IResolutionModule) {
-        address module = resolutionModuleForEscrow[workflowId];
-        return module != address(0) ? IResolutionModule(module) : defaultResolutionModule;
+        workflowId; // Silence unused parameter warning
+        return defaultResolutionModule;
     }
 
     /**
      * @notice Get the yield generation module for an escrow
-     * @param workflowId The escrow transfer ID
-     * @return The yield generation module (or default if not set)
+     * @param workflowId The escrow transfer ID (unused, kept for interface compatibility)
+     * @return The default yield generation module
+     * @dev Per-escrow overrides removed in Phase 5. All escrows use default modules.
      */
     function getYieldGenerationModule(uint256 workflowId) public view returns (IYieldGenerationModule) {
-        address module = yieldGenerationModuleForEscrow[workflowId];
-        return module != address(0) ? IYieldGenerationModule(module) : defaultYieldGenerationModule;
+        workflowId; // Silence unused parameter warning
+        return defaultYieldGenerationModule;
     }
 
     /**
      * @notice Get the yield distribution module for an escrow
-     * @param workflowId The escrow transfer ID
-     * @return The yield distribution module (or default if not set)
+     * @param workflowId The escrow transfer ID (unused, kept for interface compatibility)
+     * @return The default yield distribution module
+     * @dev Per-escrow overrides removed in Phase 5. All escrows use default modules.
      */
     function getYieldDistributionModule(uint256 workflowId) public view returns (IYieldDistributionModule) {
-        address module = yieldDistributionModuleForEscrow[workflowId];
-        return module != address(0) ? IYieldDistributionModule(module) : defaultYieldDistributionModule;
+        workflowId; // Silence unused parameter warning
+        return defaultYieldDistributionModule;
     }
 
     // Module setter functions (only owner)
+    // Per-escrow override functions removed in Phase 5 for mainnet credibility.
+    // No governance actor can modify the rules of an existing escrow.
+    // All escrows use the default modules configured via queue/activate pattern.
+
     /**
-     * @notice Set the release strategy for a specific escrow
-     * @param workflowId The escrow transfer ID
+     * @notice Queue a new default release strategy (Slow lane: 7-day delay)
      * @param strategy The release strategy module address
+     * @dev After 7 days, call activateDefaultReleaseStrategy() to apply the change
      */
-    function setReleaseStrategyForEscrow(uint256 workflowId, address strategy) public onlyOwner {
-        if (strategy != address(0) && strategy.code.length == 0) {
-            revert InvalidAddress("Release strategy must be a contract or zero", strategy);
-        }
-        releaseStrategyForEscrow[workflowId] = strategy;
-    }
-
-    /**
-     * @notice Set the resolution module for a specific escrow
-     * @param workflowId The escrow transfer ID
-     * @param module The resolution module address
-     */
-    function setResolutionModuleForEscrow(uint256 workflowId, address module) public onlyOwner {
-        if (module != address(0) && module.code.length == 0) {
-            revert InvalidAddress("Resolution module must be a contract or zero", module);
-        }
-        resolutionModuleForEscrow[workflowId] = module;
-    }
-
-    /**
-     * @notice Set the yield generation module for a specific escrow
-     * @param workflowId The escrow transfer ID
-     * @param module The yield generation module address
-     */
-    function setYieldGenerationModuleForEscrow(uint256 workflowId, address module) public onlyOwner {
-        if (module != address(0)) {
-            // Validate module implements IYieldGenerationModule via ERC-165
-            if (module.code.length == 0) {
-                revert InvalidAddress("Yield generation module must be a contract or zero", module);
-            }
-            if (!IERC165(module).supportsInterface(type(IYieldGenerationModule).interfaceId)) {
-                revert InvalidAddress("Module does not implement IYieldGenerationModule", module);
-            }
-        }
-        yieldGenerationModuleForEscrow[workflowId] = module;
-        emit YieldGenerationModuleSet(workflowId, module);
-    }
-
-    /**
-     * @notice Set the yield distribution module for a specific escrow
-     * @param workflowId The escrow transfer ID
-     * @param module The yield distribution module address
-     */
-    function setYieldDistributionModuleForEscrow(uint256 workflowId, address module) public onlyOwner {
-        if (module != address(0)) {
-            // Validate module implements IYieldDistributionModule via ERC-165
-            if (module.code.length == 0) {
-                revert InvalidAddress("Yield distribution module must be a contract or zero", module);
-            }
-            if (!IERC165(module).supportsInterface(type(IYieldDistributionModule).interfaceId)) {
-                revert InvalidAddress("Module does not implement IYieldDistributionModule", module);
-            }
-        }
-        yieldDistributionModuleForEscrow[workflowId] = module;
-        emit YieldDistributionModuleSet(workflowId, module);
-    }
-
-    /**
-     * @notice Set the default release strategy
-     * @param strategy The release strategy module address
-     */
-    function setDefaultReleaseStrategy(address strategy) public onlyOwner {
+    function queueDefaultReleaseStrategy(address strategy) public onlyRole(ROLE_TIMELOCK) {
         if (strategy == address(0) || strategy.code.length == 0) {
             revert InvalidAddress("Default release strategy must be a contract", strategy);
         }
-        defaultReleaseStrategy = IReleaseStrategy(strategy);
+        _queueAddress(_pendingDefaultReleaseStrategy, strategy);
+        emit DefaultReleaseStrategyQueued(address(defaultReleaseStrategy), strategy, _pendingDefaultReleaseStrategy.eta);
     }
 
     /**
-     * @notice Set the default resolution module
-     * @param module The resolution module address
+     * @notice Activate the queued default release strategy
+     * @dev Reverts if no pending change or 7-day delay has not elapsed
      */
-    function setDefaultResolutionModule(address module) public onlyOwner {
+    function activateDefaultReleaseStrategy() public onlyRole(ROLE_TIMELOCK) {
+        address oldStrategy = address(defaultReleaseStrategy);
+        defaultReleaseStrategy = IReleaseStrategy(_activateAddress(_pendingDefaultReleaseStrategy));
+        emit DefaultReleaseStrategyActivated(oldStrategy, address(defaultReleaseStrategy));
+    }
+
+    /**
+     * @notice Get pending default release strategy change (if any)
+     * @return value Pending strategy address
+     * @return eta Timestamp when activation is allowed
+     * @return exists Whether a pending change exists
+     */
+    function getPendingDefaultReleaseStrategy() public view returns (address value, uint64 eta, bool exists) {
+        return (getPendingAddress(_pendingDefaultReleaseStrategy));
+    }
+
+    /**
+     * @notice Queue a new default resolution module (Slow lane: 7-day delay)
+     * @param module The resolution module address
+     * @dev After 7 days, call activateDefaultResolutionModule() to apply the change
+     */
+    function queueDefaultResolutionModule(address module) public onlyRole(ROLE_TIMELOCK) {
         if (module == address(0) || module.code.length == 0) {
             revert InvalidAddress("Default resolution module must be a contract", module);
         }
-        defaultResolutionModule = IResolutionModule(module);
+        _queueAddress(_pendingDefaultResolutionModule, module);
+        emit DefaultResolutionModuleQueued(address(defaultResolutionModule), module, _pendingDefaultResolutionModule.eta);
     }
 
     /**
-     * @notice Set the default yield generation module
-     * @param module The yield generation module address
+     * @notice Activate the queued default resolution module
+     * @dev Reverts if no pending change or 7-day delay has not elapsed
      */
-    function setDefaultYieldGenerationModule(address module) public onlyOwner {
+    function activateDefaultResolutionModule() public onlyRole(ROLE_TIMELOCK) {
+        address oldModule = address(defaultResolutionModule);
+        defaultResolutionModule = IResolutionModule(_activateAddress(_pendingDefaultResolutionModule));
+        emit DefaultResolutionModuleActivated(oldModule, address(defaultResolutionModule));
+    }
+
+    /**
+     * @notice Get pending default resolution module change (if any)
+     * @return value Pending module address
+     * @return eta Timestamp when activation is allowed
+     * @return exists Whether a pending change exists
+     */
+    function getPendingDefaultResolutionModule() public view returns (address value, uint64 eta, bool exists) {
+        return (getPendingAddress(_pendingDefaultResolutionModule));
+    }
+
+    /**
+     * @notice Queue a new default yield generation module (Slow lane: 7-day delay)
+     * @param module The yield generation module address
+     * @dev After 7 days, call activateDefaultYieldGenerationModule() to apply the change
+     */
+    function queueDefaultYieldGenerationModule(address module) public onlyRole(ROLE_TIMELOCK) {
         if (module == address(0)) {
             revert InvalidAddress("Default yield generation module cannot be zero", module);
         }
@@ -479,15 +526,37 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         if (!IERC165(module).supportsInterface(type(IYieldGenerationModule).interfaceId)) {
             revert InvalidAddress("Module does not implement IYieldGenerationModule", module);
         }
-        defaultYieldGenerationModule = IYieldGenerationModule(module);
-        emit DefaultYieldGenerationModuleSet(module);
+        _queueAddress(_pendingDefaultYieldGenerationModule, module);
+        emit DefaultYieldGenerationModuleQueued(address(defaultYieldGenerationModule), module, _pendingDefaultYieldGenerationModule.eta);
     }
 
     /**
-     * @notice Set the default yield distribution module
-     * @param module The yield distribution module address
+     * @notice Activate the queued default yield generation module
+     * @dev Reverts if no pending change or 7-day delay has not elapsed
      */
-    function setDefaultYieldDistributionModule(address module) public onlyOwner {
+    function activateDefaultYieldGenerationModule() public onlyRole(ROLE_TIMELOCK) {
+        address oldModule = address(defaultYieldGenerationModule);
+        defaultYieldGenerationModule = IYieldGenerationModule(_activateAddress(_pendingDefaultYieldGenerationModule));
+        emit DefaultYieldGenerationModuleActivated(oldModule, address(defaultYieldGenerationModule));
+        emit DefaultYieldGenerationModuleSet(address(defaultYieldGenerationModule));
+    }
+
+    /**
+     * @notice Get pending default yield generation module change (if any)
+     * @return value Pending module address
+     * @return eta Timestamp when activation is allowed
+     * @return exists Whether a pending change exists
+     */
+    function getPendingDefaultYieldGenerationModule() public view returns (address value, uint64 eta, bool exists) {
+        return (getPendingAddress(_pendingDefaultYieldGenerationModule));
+    }
+
+    /**
+     * @notice Queue a new default yield distribution module (Slow lane: 7-day delay)
+     * @param module The yield distribution module address
+     * @dev After 7 days, call activateDefaultYieldDistributionModule() to apply the change
+     */
+    function queueDefaultYieldDistributionModule(address module) public onlyRole(ROLE_TIMELOCK) {
         if (module == address(0)) {
             revert InvalidAddress("Default yield distribution module cannot be zero", module);
         }
@@ -498,8 +567,29 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         if (!IERC165(module).supportsInterface(type(IYieldDistributionModule).interfaceId)) {
             revert InvalidAddress("Module does not implement IYieldDistributionModule", module);
         }
-        defaultYieldDistributionModule = IYieldDistributionModule(module);
-        emit DefaultYieldDistributionModuleSet(module);
+        _queueAddress(_pendingDefaultYieldDistributionModule, module);
+        emit DefaultYieldDistributionModuleQueued(address(defaultYieldDistributionModule), module, _pendingDefaultYieldDistributionModule.eta);
+    }
+
+    /**
+     * @notice Activate the queued default yield distribution module
+     * @dev Reverts if no pending change or 7-day delay has not elapsed
+     */
+    function activateDefaultYieldDistributionModule() public onlyRole(ROLE_TIMELOCK) {
+        address oldModule = address(defaultYieldDistributionModule);
+        defaultYieldDistributionModule = IYieldDistributionModule(_activateAddress(_pendingDefaultYieldDistributionModule));
+        emit DefaultYieldDistributionModuleActivated(oldModule, address(defaultYieldDistributionModule));
+        emit DefaultYieldDistributionModuleSet(address(defaultYieldDistributionModule));
+    }
+
+    /**
+     * @notice Get pending default yield distribution module change (if any)
+     * @return value Pending module address
+     * @return eta Timestamp when activation is allowed
+     * @return exists Whether a pending change exists
+     */
+    function getPendingDefaultYieldDistributionModule() public view returns (address value, uint64 eta, bool exists) {
+        return (getPendingAddress(_pendingDefaultYieldDistributionModule));
     }
 
     /**

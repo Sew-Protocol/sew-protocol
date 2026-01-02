@@ -25,11 +25,12 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   console.log(`   Timelock: ${timelockDeployment.address}`);
   console.log(`   Governor: ${governorDeployment.address}`);
 
-  // Get role constants
+  // Get role constants (these are view functions that return bytes32)
   const PROPOSER_ROLE = await timelock.PROPOSER_ROLE();
   const EXECUTOR_ROLE = await timelock.EXECUTOR_ROLE();
   const CANCELLER_ROLE = await timelock.CANCELLER_ROLE();
-  const TIMELOCK_ADMIN_ROLE = await timelock.TIMELOCK_ADMIN_ROLE();
+  // TIMELOCK_ADMIN_ROLE is the DEFAULT_ADMIN_ROLE in TimelockController
+  const TIMELOCK_ADMIN_ROLE = await timelock.DEFAULT_ADMIN_ROLE();
 
   // Check current roles
   const hasProposerRole = await timelock.hasRole(PROPOSER_ROLE, governorDeployment.address);

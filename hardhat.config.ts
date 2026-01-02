@@ -1,7 +1,8 @@
 import { HardhatUserConfig } from 'hardhat/config';
-import '@nomicfoundation/hardhat-toolbox';
 import '@nomicfoundation/hardhat-ethers'; // Required by hardhat-deploy-ethers (v3.x)
 import '@nomicfoundation/hardhat-verify';
+import '@nomicfoundation/hardhat-chai-matchers'; // For testing with chai
+import '@typechain/hardhat'; // For TypeScript type generation
 import '@openzeppelin/hardhat-upgrades';
 import 'hardhat-deploy';
 import 'hardhat-deploy-ethers'; // Extends hardhat-deploy with ethers integration - MUST come after hardhat-deploy

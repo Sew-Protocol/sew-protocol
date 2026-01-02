@@ -25,7 +25,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const timelockDeployment = await get('TimelockController');
   
   const token = await ethers.getContractAt('SewToken', tokenDeployment.address);
-  const timelock = await ethers.getContractAt('TimelockController', timelockDeployment.address);
 
   console.log(`\n📦 Deploying GovGovernor...`);
   console.log(`   Name: Sew Protocol DAO`);
@@ -42,11 +41,11 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     from: deployer,
     args: [
       tokenDeployment.address, // token
-      timelock, // timelock (contract instance, not address)
+      timelockDeployment.address, // timelock (address - will be cast to TimelockController in Solidity)
       config.governor.votingDelayBlocks, // votingDelay
       config.governor.votingPeriodBlocks, // votingPeriod
       config.governor.proposalThreshold, // proposalThreshold
-      config.governor.quorumBps, // quorumBps
+      config.governor.quorumBps / 100, // quorumNumerator (convert from basis points to percentage: 400 bps = 4%)
     ],
     log: true,
   });
@@ -59,17 +58,19 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     const votingDelay = await governor.votingDelay();
     const votingPeriod = await governor.votingPeriod();
     const proposalThreshold = await governor.proposalThreshold();
-    const quorum = await governor.quorum(await ethers.provider.getBlockNumber());
     const timelockAddress = await governor.timelock();
+    const quorumNumerator = await governor.quorumNumerator();
     
     console.log(`\n📊 Governor Configuration:`);
     console.log(`   Voting Delay: ${votingDelay.toString()} blocks`);
     console.log(`   Voting Period: ${votingPeriod.toString()} blocks`);
     const thresholdFormatted = (proposalThreshold / BigInt(10 ** 18)).toString();
-    const quorumFormatted = (quorum / BigInt(10 ** 18)).toString();
     console.log(`   Proposal Threshold: ${thresholdFormatted} tokens`);
-    console.log(`   Quorum: ${quorumFormatted} tokens`);
+    console.log(`   Quorum Numerator: ${quorumNumerator.toString()}% (denominator: 100)`);
     console.log(`   Timelock: ${timelockAddress}`);
+    
+    // Note: quorum() requires checkpoints to exist, so we can't call it immediately after deployment
+    // The quorum will be calculated as: totalSupply * quorumNumerator / 100
   } else {
     console.log(`✅ GovGovernor already deployed at: ${governorDeployment.address}`);
   }

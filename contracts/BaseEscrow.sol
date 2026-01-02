@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/utils/Context.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -20,6 +20,7 @@ import "./libraries/YieldDistributionLibrary.sol";
 import "./libraries/EscrowEncodingLibrary.sol";
 import "./libraries/ResolverLogicLibrary.sol";
 import "./types/EscrowTypes.sol";
+import "./governance/SlowLaneQueueActivate.sol";
 
 // Aave interfaces and types have been moved to AaveYieldGenerationModule
 // BaseEscrow no longer needs direct Aave integration
@@ -29,10 +30,11 @@ error InsufficientTokenBalance(uint256 balance, uint256 required);
 error InvalidWorkflowId(uint256 workflowId, uint256 maxWorkflowId);
 error TransferNotPending(uint256 workflowId, EscrowState currentStatus);
 error NotAuthorizedResolver(address caller, address expectedResolver);
-error NotDaoOrOwner(address caller, address owner, address dao);
+error NotDaoOrOwner(address caller, address owner, address dao); // Deprecated - will be removed after migration
 error ResolutionModuleNotReady(uint256 currentTime, uint256 eta);
 error ResolutionModuleReturnedZeroAddress();
 error ResolutionModuleCallFailed();
+error ResolutionModuleNotConfigured();
 error TransferNotInDispute(uint256 workflowId, EscrowState currentStatus);
 error NotParticipant(uint256 workflowId, address caller, address sender, address recipient);
 // Errors moved to EscrowTypes.sol: InvalidAddress, InvalidAmount, ArrayLengthMismatch, CannotSetBothAutoTimes
@@ -89,6 +91,11 @@ struct EscrowTransfer {
     uint256 autoCancelTime;
     string[] attachmentURIs;
     bytes32[] attachmentHashes;
+    // Phase 7: Module snapshots (ensures module changes only affect new escrows)
+    address snapshotResolutionModule;    // Resolution module at creation time
+    address snapshotReleaseStrategy;     // Release strategy at creation time
+    address snapshotYieldGenerationModule;  // Yield generation module at creation time
+    address snapshotYieldDistributionModule; // Yield distribution module at creation time
 }
 
 /**
@@ -96,9 +103,13 @@ struct EscrowTransfer {
  * @notice Abstract base contract containing shared escrow logic
  * @dev This contract contains common functionality for both EscrowableERC20 and EscrowVault
  */
-abstract contract BaseEscrow is Context, Ownable, ReentrancyGuard, Pausable, ERC165 {
+abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLaneQueueActivate {
     using SafeERC20 for IERC20;
     using Address for address;
+    
+    // Role constants for governance
+    bytes32 public constant ROLE_TIMELOCK = keccak256("ROLE_TIMELOCK");
+    bytes32 public constant ROLE_GUARDIAN = keccak256("ROLE_GUARDIAN");
     
     uint256 public escrowFee;
     uint256 public constant ESCROW_FEE_DENOMINATOR = 10000;
@@ -110,7 +121,9 @@ abstract contract BaseEscrow is Context, Ownable, ReentrancyGuard, Pausable, ERC
     uint256 public maxAttachments = 10;
     uint256 public constant MAX_AUTOMATION_RANGE = 100; // Maximum escrows to process in one batch
     
-    address public authorizedResolver;
+    // Phase 7: authorizedResolver deprecated - resolver gate eliminated for mainnet credibility.
+    // Kept as address(0) for backward compatibility, but no longer used in authorization checks.
+    address private _deprecatedAuthorizedResolver;
     /// @notice Optional DAO address for governance-controlled upgrades (non-proxy).
     /// @dev For March 1 release you can transfer ownership to a multisig; this is an additional hook.
     address public dao;
@@ -133,6 +146,11 @@ abstract contract BaseEscrow is Context, Ownable, ReentrancyGuard, Pausable, ERC
     // Yield distribution (prepared for Phase 2)
     YieldDistribution public defaultYieldDistribution;
     mapping(uint256 => YieldDistribution) public escrowYieldDistribution;
+
+    // Slow lane pending changes (Phase 3)
+    PendingAddress private _pendingFeeRecipient;
+    PendingUint private _pendingEscrowFee;
+    PendingAddress private _pendingDao;
 
     // Common events
     // Phase 1: Core lifecycle events (all have workflowId indexed for indexability)
@@ -166,13 +184,30 @@ abstract contract BaseEscrow is Context, Ownable, ReentrancyGuard, Pausable, ERC
     // Configuration events
     event EscrowFeeUpdated(uint256 oldFee, uint256 newFee);
     event EscrowFeeAddressUpdated(address oldAddress, address newAddress);
-    event AuthorizedResolverUpdated(address oldResolver, address newResolver);
+    // Phase 7: AuthorizedResolverUpdated event deprecated (resolver gate removed)
     event DaoUpdated(address indexed oldDao, address indexed newDao);
     event ResolutionModuleDelayUpdated(uint256 oldDelay, uint256 newDelay);
     event ResolutionModuleProposed(address indexed proposedModule, uint256 eta);
     event ResolutionModuleActivated(address indexed oldModule, address indexed newModule);
     event MaxAttachmentsUpdated(uint256 oldMax, uint256 newMax);
     event EscrowSettingsUpdated(uint256 indexed workflowId, EscrowSettings settings);
+    
+    // Phase 7: Module snapshot events
+    event EscrowModuleSnapshot(
+        uint256 indexed workflowId,
+        address resolutionModule,
+        address releaseStrategy,
+        address yieldGenerationModule,
+        address yieldDistributionModule
+    );
+    
+    // Slow lane queue/activate events (Phase 3)
+    event EscrowFeeAddressQueued(address indexed oldAddress, address indexed newAddress, uint64 eta);
+    event EscrowFeeAddressActivated(address indexed oldAddress, address indexed newAddress);
+    event EscrowFeeQueued(uint256 oldFee, uint256 newFee, uint64 eta);
+    event EscrowFeeActivated(uint256 oldFee, uint256 newFee);
+    event DaoQueued(address indexed oldDao, address indexed newDao, uint64 eta);
+    event DaoActivated(address indexed oldDao, address indexed newDao);
     
     // Yield distribution events
     event YieldDistributed(uint256 indexed workflowId, address indexed recipient, uint256 amount);
@@ -184,8 +219,8 @@ abstract contract BaseEscrow is Context, Ownable, ReentrancyGuard, Pausable, ERC
      * @notice Set the default auto-cancel time for new escrows
      * @param time Timestamp when escrow should auto-cancel (0 means no auto-cancel)
      */
-    function setDefaultAutoCancelTime(uint256 time) public onlyOwner {
-        _validateAutoTime(time, "Default auto cancel time");
+    function setDefaultAutoCancelTime(uint256 time) public onlyRole(ROLE_TIMELOCK) {
+        SettingsValidationLibrary.validateAutoCancel(time);
         defaultAutoCancelTime = time;
     }
 
@@ -193,42 +228,84 @@ abstract contract BaseEscrow is Context, Ownable, ReentrancyGuard, Pausable, ERC
      * @notice Set the default auto-release time for new escrows
      * @param time Timestamp when escrow should auto-release (0 means no auto-release)
      */
-    function setDefaultAutoReleaseTime(uint256 time) public onlyOwner {
-        _validateAutoTime(time, "Default auto release time");
+    function setDefaultAutoReleaseTime(uint256 time) public onlyRole(ROLE_TIMELOCK) {
+        SettingsValidationLibrary.validateAutoRelease(time);
         defaultAutoReleaseTime = time;
     }
     
     /**
-     * @notice Set the address that receives escrow fees
+     * @notice Queue a new escrow fee recipient address (Slow lane: 7-day delay)
      * @param feeAddress Address to receive fees (cannot be zero address)
+     * @dev After 7 days, call activateEscrowFeeAddress() to apply the change
      */
-    function setEscrowFeeAddress(address feeAddress) public onlyOwner {
-        if (feeAddress == address(0)) {
-            revert InvalidAddress("Zero address not allowed", feeAddress);
-        }
+    function queueEscrowFeeAddress(address feeAddress) public onlyRole(ROLE_TIMELOCK) {
+        SettingsValidationLibrary.validateNonZero(feeAddress, "feeAddress");
+        _queueAddress(_pendingFeeRecipient, feeAddress);
+        emit EscrowFeeAddressQueued(escrowFeeAddress, feeAddress, _pendingFeeRecipient.eta);
+    }
+
+    /**
+     * @notice Activate the queued escrow fee recipient address
+     * @dev Reverts if no pending change or 7-day delay has not elapsed
+     */
+    function activateEscrowFeeAddress() public onlyRole(ROLE_TIMELOCK) {
         address oldAddress = escrowFeeAddress;
-        escrowFeeAddress = feeAddress;
-        emit EscrowFeeAddressUpdated(oldAddress, feeAddress);
+        escrowFeeAddress = _activateAddress(_pendingFeeRecipient);
+        emit EscrowFeeAddressActivated(oldAddress, escrowFeeAddress);
+        emit EscrowFeeAddressUpdated(oldAddress, escrowFeeAddress);
+    }
+
+    /**
+     * @notice Get pending fee recipient change (if any)
+     * @return value Pending address value
+     * @return eta Timestamp when activation is allowed
+     * @return exists Whether a pending change exists
+     */
+    function getPendingFeeRecipient() public view returns (address value, uint64 eta, bool exists) {
+        return (getPendingAddress(_pendingFeeRecipient));
     }
     
     /**
-     * @notice Update the escrow fee percentage
+     * @notice Queue a new escrow fee percentage (Slow lane: 7-day delay)
      * @param newFee New fee in basis points (e.g., 100 = 1%, max 10000 = 100%)
+     * @dev After 7 days, call activateEscrowFee() to apply the change
      */
-    function setEscrowFee(uint256 newFee) public onlyOwner {
-        if (newFee > ESCROW_FEE_DENOMINATOR) {
-            revert InvalidEscrowFee(newFee, ESCROW_FEE_DENOMINATOR);
-        }
+    function queueEscrowFee(uint256 newFee) public onlyRole(ROLE_TIMELOCK) {
+        // Phase 6: Validate fee is within bounds (0 <= newFee <= 200 bps = 2%)
+        // Note: ESCROW_FEE_DENOMINATOR is 10_000, but we limit to 200 bps (2%) for safety
+        SettingsValidationLibrary.validateFeeBps(newFee);
+        _queueUint(_pendingEscrowFee, newFee);
+        emit EscrowFeeQueued(escrowFee, newFee, _pendingEscrowFee.eta);
+    }
+
+    /**
+     * @notice Activate the queued escrow fee percentage
+     * @dev Reverts if no pending change or 7-day delay has not elapsed
+     */
+    function activateEscrowFee() public onlyRole(ROLE_TIMELOCK) {
         uint256 oldFee = escrowFee;
-        escrowFee = newFee;
-        emit EscrowFeeUpdated(oldFee, newFee);
+        escrowFee = _activateUint(_pendingEscrowFee);
+        emit EscrowFeeActivated(oldFee, escrowFee);
+        emit EscrowFeeUpdated(oldFee, escrowFee);
+    }
+
+    /**
+     * @notice Get pending escrow fee change (if any)
+     * @return value Pending fee value
+     * @return eta Timestamp when activation is allowed
+     * @return exists Whether a pending change exists
+     */
+    function getPendingEscrowFee() public view returns (uint256 value, uint64 eta, bool exists) {
+        return (getPendingUint(_pendingEscrowFee));
     }
     
     /**
      * @notice Set the maximum number of attachments allowed per escrow
      * @param newMax New maximum number of attachments
+     * @dev Phase 6: Bounds enforced: 0 <= newMax <= 20
      */
-    function setMaxAttachments(uint256 newMax) public onlyOwner {
+    function setMaxAttachments(uint256 newMax) public onlyRole(ROLE_TIMELOCK) {
+        SettingsValidationLibrary.validateMaxAttachments(newMax);
         uint256 oldMax = maxAttachments;
         maxAttachments = newMax;
         emit MaxAttachmentsUpdated(oldMax, newMax);
@@ -236,15 +313,17 @@ abstract contract BaseEscrow is Context, Ownable, ReentrancyGuard, Pausable, ERC
     
     /**
      * @notice Pause all escrow operations (emergency stop)
+     * @dev Guardian can pause immediately for emergency situations
      */
-    function pause() public onlyOwner {
+    function pause() public onlyRole(ROLE_GUARDIAN) {
         _pause();
     }
     
     /**
      * @notice Unpause escrow operations
+     * @dev Only Timelock can unpause (not Guardian) to prevent abuse
      */
-    function unpause() public onlyOwner {
+    function unpause() public onlyRole(ROLE_TIMELOCK) {
         _unpause();
     }
 
@@ -432,37 +511,62 @@ abstract contract BaseEscrow is Context, Ownable, ReentrancyGuard, Pausable, ERC
     /**
      * @notice Set the authorized resolver address for disputes
      * @param resolver Address of the authorized resolver
+     * @dev Phase 7: DEPRECATED - This function is kept for backward compatibility but does nothing.
+     *      Resolver gate removed for mainnet credibility. Resolution now uses module snapshots only.
      */
-    function setAuthorizedResolver(address resolver) public onlyOwner {
-        if (resolver == address(0)) {
-            revert InvalidAddress("Zero address not allowed", resolver);
-        }
-        address oldResolver = authorizedResolver;
-        authorizedResolver = resolver;
-        emit AuthorizedResolverUpdated(oldResolver, resolver);
+    function setAuthorizedResolver(address resolver) public onlyRole(ROLE_TIMELOCK) {
+        resolver; // Silence unused parameter warning
+        // Phase 7: Function disabled - resolver gate removed
+        // No-op for backward compatibility
     }
 
     modifier onlyDaoOrOwner() {
-        if (_msgSender() != owner() && _msgSender() != dao) {
-            revert NotDaoOrOwner(_msgSender(), owner(), dao);
+        // Deprecated - kept for backward compatibility during migration
+        // Will be removed after all contracts are migrated
+        if (!hasRole(ROLE_TIMELOCK, _msgSender()) && _msgSender() != dao) {
+            revert NotDaoOrOwner(_msgSender(), address(0), dao);
         }
         _;
     }
 
     /**
-     * @notice Set the DAO address (optional). DAO shares governance authority with owner.
-     * @dev For March 1 release, simplest path is to transfer ownership to a multisig.
+     * @notice Queue a new DAO address (Slow lane: 7-day delay)
+     * @param newDao New DAO address
+     * @dev After 7 days, call activateDao() to apply the change
      */
-    function setDao(address newDao) external onlyOwner {
+    function queueDao(address newDao) external onlyRole(ROLE_TIMELOCK) {
+        _queueAddress(_pendingDao, newDao);
+        emit DaoQueued(dao, newDao, _pendingDao.eta);
+    }
+
+    /**
+     * @notice Activate the queued DAO address
+     * @dev Reverts if no pending change or 7-day delay has not elapsed
+     */
+    function activateDao() external onlyRole(ROLE_TIMELOCK) {
         address oldDao = dao;
-        dao = newDao;
-        emit DaoUpdated(oldDao, newDao);
+        dao = _activateAddress(_pendingDao);
+        emit DaoActivated(oldDao, dao);
+        emit DaoUpdated(oldDao, dao);
+    }
+
+    /**
+     * @notice Get pending DAO change (if any)
+     * @return value Pending DAO address
+     * @return eta Timestamp when activation is allowed
+     * @return exists Whether a pending change exists
+     */
+    function getPendingDao() public view returns (address value, uint64 eta, bool exists) {
+        return (getPendingAddress(_pendingDao));
     }
 
     /**
      * @notice Set the delay (in seconds) between proposing and activating a new resolution module.
+     * @param newDelay Delay in seconds
+     * @dev Phase 6: Bounds enforced: 48h <= newDelay <= 30 days
      */
-    function setResolutionModuleDelay(uint256 newDelay) external onlyDaoOrOwner {
+    function setResolutionModuleDelay(uint256 newDelay) external onlyRole(ROLE_TIMELOCK) {
+        SettingsValidationLibrary.validateResolutionDelay(newDelay);
         uint256 oldDelay = resolutionModuleDelay;
         resolutionModuleDelay = newDelay;
         emit ResolutionModuleDelayUpdated(oldDelay, newDelay);
@@ -472,7 +576,7 @@ abstract contract BaseEscrow is Context, Ownable, ReentrancyGuard, Pausable, ERC
      * @notice Propose a new dispute resolution module. After the delay, it can be activated.
      * @dev New escrows will pin their disputeResolver using the active module.
      */
-    function proposeResolutionModule(address newModule) external onlyDaoOrOwner {
+    function proposeResolutionModule(address newModule) external onlyRole(ROLE_TIMELOCK) {
         pendingResolutionModule = newModule;
         pendingResolutionModuleEta = block.timestamp + resolutionModuleDelay;
         emit ResolutionModuleProposed(newModule, pendingResolutionModuleEta);
@@ -481,7 +585,7 @@ abstract contract BaseEscrow is Context, Ownable, ReentrancyGuard, Pausable, ERC
     /**
      * @notice Activate the previously proposed resolution module after the delay has elapsed.
      */
-    function activateResolutionModule() external onlyDaoOrOwner {
+    function activateResolutionModule() external onlyRole(ROLE_TIMELOCK) {
         if (block.timestamp < pendingResolutionModuleEta) {
             revert ResolutionModuleNotReady(block.timestamp, pendingResolutionModuleEta);
         }
@@ -731,8 +835,11 @@ abstract contract BaseEscrow is Context, Ownable, ReentrancyGuard, Pausable, ERC
     function _isAuthorizedResolver(uint256 workflowId, address resolver) internal view returns (bool) {
         EscrowTransfer storage et = escrowTransfers[workflowId];
         
-        // If resolution module is active, check authorization with module
-        if (address(resolutionModule) != address(0)) {
+        // Phase 7: Use snapshot resolution module (not current module)
+        address snapshotModule = et.snapshotResolutionModule;
+        
+        // If snapshot resolution module exists, check authorization with snapshot module
+        if (snapshotModule != address(0)) {
             bytes memory escrowData = _encodeResolutionData(
                 et.token,
                 et.from,
@@ -741,7 +848,7 @@ abstract contract BaseEscrow is Context, Ownable, ReentrancyGuard, Pausable, ERC
                 et.originalAmount
             );
             
-            try IResolutionModule(resolutionModule).isAuthorizedResolver(
+            try IResolutionModule(snapshotModule).isAuthorizedResolver(
                 workflowId,
                 resolver,
                 escrowData
@@ -754,8 +861,8 @@ abstract contract BaseEscrow is Context, Ownable, ReentrancyGuard, Pausable, ERC
             }
         }
         
-        // Fallback: check against stored resolver or global authorized resolver
-        return resolver == et.disputeResolver || resolver == authorizedResolver;
+        // Fallback: check against stored resolver (Phase 7: removed authorizedResolver gate)
+        return resolver == et.disputeResolver;
     }
 
     function _encodeResolutionData(
@@ -780,8 +887,9 @@ abstract contract BaseEscrow is Context, Ownable, ReentrancyGuard, Pausable, ERC
         uint256 amount,
         uint256 originalAmount
     ) internal view returns (address) {
+        // Phase 7: Always use resolution module (authorizedResolver gate removed)
         if (resolutionModule == address(0)) {
-            return authorizedResolver;
+            revert ResolutionModuleNotConfigured();
         }
 
         bytes memory escrowData = _encodeResolutionData(token, from, to, amount, originalAmount);
@@ -1112,7 +1220,7 @@ abstract contract BaseEscrow is Context, Ownable, ReentrancyGuard, Pausable, ERC
         EscrowTransfer storage et = escrowTransfers[workflowId];
         
         // Only sender or owner can update settings
-        if (et.from != _msgSender() && _msgSender() != owner()) {
+        if (et.from != _msgSender() && !hasRole(ROLE_TIMELOCK, _msgSender())) {
             revert NotParticipant(workflowId, _msgSender(), et.from, et.to);
         }
         
@@ -1339,6 +1447,38 @@ abstract contract BaseEscrow is Context, Ownable, ReentrancyGuard, Pausable, ERC
      */
     function _getYieldDistributionModule(uint256 workflowId) internal view virtual returns (IYieldDistributionModule);
 
+    /**
+     * @notice Snapshot module addresses at escrow creation (Phase 7)
+     * @param workflowId The escrow transfer ID
+     * @param resolutionModuleAddr Resolution module address
+     * @param releaseStrategyAddr Release strategy address
+     * @param yieldGenerationModuleAddr Yield generation module address
+     * @param yieldDistributionModuleAddr Yield distribution module address
+     * @dev Stores current module addresses in escrow struct to ensure module changes only affect new escrows
+     */
+    function _snapshotModulesForEscrow(
+        uint256 workflowId,
+        address resolutionModuleAddr,
+        address releaseStrategyAddr,
+        address yieldGenerationModuleAddr,
+        address yieldDistributionModuleAddr
+    ) internal {
+        EscrowTransfer storage et = escrowTransfers[workflowId];
+        
+        // Snapshot current module addresses
+        et.snapshotResolutionModule = resolutionModuleAddr;
+        et.snapshotReleaseStrategy = releaseStrategyAddr;
+        et.snapshotYieldGenerationModule = yieldGenerationModuleAddr;
+        et.snapshotYieldDistributionModule = yieldDistributionModuleAddr;
+        
+        emit EscrowModuleSnapshot(
+            workflowId,
+            resolutionModuleAddr,
+            releaseStrategyAddr,
+            yieldGenerationModuleAddr,
+            yieldDistributionModuleAddr
+        );
+    }
 
     /**
      * @dev Encode yield distribution data for module
@@ -1395,7 +1535,8 @@ abstract contract BaseEscrow is Context, Ownable, ReentrancyGuard, Pausable, ERC
      *      or percentages don't sum to 10000 (100%).
      */
     function _validateYieldDistribution(address[] memory recipients, uint256[] memory percentages) internal pure {
-        YieldDistributionLibrary.validateYieldDistribution(recipients, percentages);
+        // Phase 6: Use SettingsValidationLibrary for bounds enforcement
+        SettingsValidationLibrary.validateYieldDistribution(recipients, percentages);
     }
 
     /**
@@ -1406,7 +1547,7 @@ abstract contract BaseEscrow is Context, Ownable, ReentrancyGuard, Pausable, ERC
     function setDefaultYieldDistribution(
         address[] memory recipients,
         uint256[] memory percentages
-    ) public onlyOwner {
+    ) public onlyRole(ROLE_TIMELOCK) {
         _validateYieldDistribution(recipients, percentages);
         defaultYieldDistribution = YieldDistribution({
             recipients: recipients,
@@ -1432,7 +1573,7 @@ abstract contract BaseEscrow is Context, Ownable, ReentrancyGuard, Pausable, ERC
         EscrowTransfer storage et = escrowTransfers[workflowId];
         
         // Only sender or owner can set yield distribution
-        if (et.from != _msgSender() && _msgSender() != owner()) {
+        if (et.from != _msgSender() && !hasRole(ROLE_TIMELOCK, _msgSender())) {
             revert NotParticipant(workflowId, _msgSender(), et.from, et.to);
         }
         

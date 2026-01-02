@@ -1,0 +1,23 @@
+{
+  "id": "0002_queue_fee_address",
+  "title": "Queue New Escrow Fee Address",
+  "description": "\nQueue a new address to receive escrow fees.\n\nThis proposal queues a change to the escrow fee recipient address. After execution:\n1. The change is queued with a 7-day delay\n2. After 7 days, call activateEscrowFeeAddress() to apply the change\n\n**Parameters:**\n- New Fee Address: 0x...\n  ",
+  "lane": "slow",
+  "calls": [
+    {
+      "target": "0xPLACEHOLDER_ESCROWABLEERC20",
+      "contractName": "EscrowableERC20",
+      "functionName": "queueEscrowFeeAddress",
+      "args": [
+        "0xPLACEHOLDER_NEW_FEE_ADDRESS"
+      ],
+      "description": "Queue new fee address: 0xPLACEHOLDER_NEW_FEE_ADDRESS (REPLACE WITH ACTUAL ADDRESS)"
+    }
+  ],
+  "metadata": {
+    "author": "unknown",
+    "created": "2026-01-02T13:15:53.500Z",
+    "network": "hardhat",
+    "references": []
+  }
+}

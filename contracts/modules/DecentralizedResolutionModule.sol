@@ -2,8 +2,9 @@
 pragma solidity ^0.8.28;
 
 import "../interfaces/IResolutionModule.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "../governance/SlowLaneQueueActivate.sol";
 
 /**
  * @title DecentralizedResolutionModule
@@ -15,7 +16,9 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  *      - Escalation paths (resolver → senior resolver → external)
  *      - Dynamic resolution table (based on escrow characteristics)
  */
-contract DecentralizedResolutionModule is Ownable, ReentrancyGuard, IResolutionModule {
+contract DecentralizedResolutionModule is AccessControl, ReentrancyGuard, IResolutionModule, SlowLaneQueueActivate {
+    // Role constants for governance
+    bytes32 public constant ROLE_TIMELOCK = keccak256("ROLE_TIMELOCK");
     // ============ Resolver Roles ============
     
     enum ResolverRole {
@@ -62,6 +65,15 @@ contract DecentralizedResolutionModule is Ownable, ReentrancyGuard, IResolutionM
     }
     mapping(uint8 => EscalationConfig) public escalationConfig;
     
+    // Slow lane pending changes (Phase 3)
+    struct PendingEscalationConfig {
+        uint8 level;
+        EscalationConfig config;
+        uint64 eta;
+        bool exists;
+    }
+    mapping(uint8 => PendingEscalationConfig) private _pendingEscalationConfig;
+    
     // Resolution table
     struct ResolutionTableEntry {
         address initialResolver;      // Initial resolver for this category
@@ -92,6 +104,10 @@ contract DecentralizedResolutionModule is Ownable, ReentrancyGuard, IResolutionM
     event EscalationConfigUpdated(uint8 level, EscalationConfig config);
     event ExternalResolverUpdated(address indexed oldResolver, address indexed newResolver);
     
+    // Slow lane queue/activate events (Phase 3)
+    event EscalationConfigQueued(uint8 level, EscalationConfig config, uint64 eta);
+    event EscalationConfigActivated(uint8 level, EscalationConfig oldConfig, EscalationConfig newConfig);
+    
     // ============ Modifiers ============
     
     modifier onlySeniorResolver() {
@@ -109,7 +125,10 @@ contract DecentralizedResolutionModule is Ownable, ReentrancyGuard, IResolutionM
     
     // ============ Constructor ============
     
-    constructor(address initialOwner) Ownable(initialOwner) {
+    constructor(address initialOwner) {
+        // Grant DEFAULT_ADMIN_ROLE to initialOwner so roles can be granted later
+        _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
+        
         // Initialize escalation configs
         escalationConfig[0] = EscalationConfig({
             resolver: address(0), // Dynamic based on resolution table
@@ -169,7 +188,7 @@ contract DecentralizedResolutionModule is Ownable, ReentrancyGuard, IResolutionM
         address resolver,
         string memory name,
         string memory description
-    ) external onlyOwner {
+    ) external onlyRole(ROLE_TIMELOCK) {
         require(resolver != address(0), "Zero address");
         require(!isApprovedResolver[resolver] && !isApprovedSeniorResolver[resolver], "Already a resolver");
         
@@ -195,7 +214,7 @@ contract DecentralizedResolutionModule is Ownable, ReentrancyGuard, IResolutionM
     function removeResolver(address resolver) external {
         require(isApprovedResolver[resolver], "Not a resolver");
         require(
-            resolverMetadata[resolver].appointedBy == _msgSender() || _msgSender() == owner(),
+            resolverMetadata[resolver].appointedBy == _msgSender() || hasRole(ROLE_TIMELOCK, _msgSender()),
             "Not authorized to remove"
         );
         
@@ -219,7 +238,7 @@ contract DecentralizedResolutionModule is Ownable, ReentrancyGuard, IResolutionM
      * @notice Remove a senior resolver (only owner can do this)
      * @param resolver Address of the senior resolver to remove
      */
-    function removeSeniorResolver(address resolver) external onlyOwner {
+    function removeSeniorResolver(address resolver) external onlyRole(ROLE_TIMELOCK) {
         require(isApprovedSeniorResolver[resolver], "Not a senior resolver");
         
         resolverRoles[resolver] = ResolverRole.NONE;
@@ -250,7 +269,7 @@ contract DecentralizedResolutionModule is Ownable, ReentrancyGuard, IResolutionM
         string memory description
     ) external {
         require(
-            resolverMetadata[resolver].appointedBy == _msgSender() || _msgSender() == owner(),
+            resolverMetadata[resolver].appointedBy == _msgSender() || hasRole(ROLE_TIMELOCK, _msgSender()),
             "Not authorized"
         );
         require(
@@ -476,7 +495,7 @@ contract DecentralizedResolutionModule is Ownable, ReentrancyGuard, IResolutionM
     function setResolutionTableEntry(
         bytes32 categoryKey,
         ResolutionTableEntry memory entry
-    ) external onlyOwner {
+    ) external onlyRole(ROLE_TIMELOCK) {
         resolutionTable[categoryKey] = entry;
         emit ResolutionTableEntrySet(categoryKey, entry);
     }
@@ -530,21 +549,62 @@ contract DecentralizedResolutionModule is Ownable, ReentrancyGuard, IResolutionM
     // ============ Escalation Configuration ============
     
     /**
-     * @notice Set escalation configuration for a level
+     * @notice Queue a new escalation configuration for a level (Slow lane: 7-day delay)
      * @param level Escalation level (0-2)
      * @param config Escalation configuration
+     * @dev After 7 days, call activateEscalationConfig() to apply the change
      */
-    function setEscalationConfig(uint8 level, EscalationConfig memory config) external onlyOwner {
+    function queueEscalationConfig(uint8 level, EscalationConfig memory config) external onlyRole(ROLE_TIMELOCK) {
         require(level <= 2, "Invalid level");
-        escalationConfig[level] = config;
-        emit EscalationConfigUpdated(level, config);
+        _pendingEscalationConfig[level] = PendingEscalationConfig({
+            level: level,
+            config: config,
+            eta: uint64(block.timestamp + SLOW_DELAY),
+            exists: true
+        });
+        emit EscalationConfigQueued(level, config, _pendingEscalationConfig[level].eta);
+    }
+
+    /**
+     * @notice Activate the queued escalation configuration
+     * @param level Escalation level (0-2)
+     * @dev Reverts if no pending change or 7-day delay has not elapsed
+     */
+    function activateEscalationConfig(uint8 level) external onlyRole(ROLE_TIMELOCK) {
+        require(level <= 2, "Invalid level");
+        PendingEscalationConfig storage pending = _pendingEscalationConfig[level];
+        if (!pending.exists) {
+            revert NoPending();
+        }
+        if (block.timestamp < pending.eta) {
+            revert NotReady(pending.eta);
+        }
+        EscalationConfig memory oldConfig = escalationConfig[level];
+        escalationConfig[level] = pending.config;
+        emit EscalationConfigActivated(level, oldConfig, pending.config);
+        emit EscalationConfigUpdated(level, pending.config);
+        
+        // Clear pending
+        delete _pendingEscalationConfig[level];
+    }
+
+    /**
+     * @notice Get pending escalation config change (if any)
+     * @param level Escalation level (0-2)
+     * @return config Pending config
+     * @return eta Timestamp when activation is allowed
+     * @return exists Whether a pending change exists
+     */
+    function getPendingEscalationConfig(uint8 level) public view returns (EscalationConfig memory config, uint64 eta, bool exists) {
+        PendingEscalationConfig storage pending = _pendingEscalationConfig[level];
+        return (pending.config, pending.eta, pending.exists);
     }
     
     /**
      * @notice Set external resolver (e.g., Kleros)
      * @param resolver External resolver address
      */
-    function setExternalResolver(address resolver) external onlyOwner {
+    function setExternalResolver(address resolver) external onlyRole(ROLE_TIMELOCK) {
         address oldResolver = externalResolver;
         externalResolver = resolver;
         

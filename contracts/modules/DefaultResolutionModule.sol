@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import "../interfaces/IResolutionModule.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 
 /**
  * @title DefaultResolutionModule
@@ -10,16 +10,20 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  * @dev Pluggable module intended to be selected by governance and used by the escrow contract
  *      to choose the per-escrow disputeResolver at escrow creation time.
  */
-contract DefaultResolutionModule is Ownable, IResolutionModule {
+contract DefaultResolutionModule is AccessControl, IResolutionModule {
+    // Role constants for governance
+    bytes32 public constant ROLE_TIMELOCK = keccak256("ROLE_TIMELOCK");
     address public resolver;
 
     event ResolverUpdated(address indexed oldResolver, address indexed newResolver);
 
-    constructor(address initialOwner, address initialResolver) Ownable(initialOwner) {
+    constructor(address initialOwner, address initialResolver) {
         resolver = initialResolver;
+        // Grant DEFAULT_ADMIN_ROLE to initialOwner so roles can be granted later
+        _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
     }
 
-    function setResolver(address newResolver) external onlyOwner {
+    function setResolver(address newResolver) external onlyRole(ROLE_TIMELOCK) {
         address oldResolver = resolver;
         resolver = newResolver;
         emit ResolverUpdated(oldResolver, newResolver);

@@ -89,17 +89,35 @@ describe("Aave Integration", function () {
     aaveModule = await aaveModuleFactory.deploy(owner.address);
     await aaveModule.waitForDeployment();
 
-    // Configure Aave in the module
-    await aaveModule.setAavePoolAddressesProvider(await mockPoolAddressesProvider.getAddress());
+    // Phase 2: Grant ROLE_TIMELOCK to owner for Aave module
+    const ROLE_TIMELOCK = await aaveModule.ROLE_TIMELOCK();
+    await aaveModule.grantRole(ROLE_TIMELOCK, owner.address);
+    
+    // Phase 3: Use queue/activate for slow lane functions
+    await aaveModule.connect(owner).queueAavePoolProvider(await mockPoolAddressesProvider.getAddress());
+    // Fast-forward time for testing (skip 7-day delay)
+    const [, eta] = await aaveModule.getPendingAavePoolProvider();
+    await time.increaseTo(Number(eta) + 1);
+    await aaveModule.connect(owner).activateAavePoolProvider();
+    
     await aaveModule.setAaveEnabled(true);
     // Register EscrowableERC20's token (the contract itself) for Aave
     await aaveModule.registerTokenForAave(await escrowableERC20.getAddress(), await escrowTokenAToken.getAddress());
 
-    // Set the module as default yield generation module
-    await escrowableERC20.setDefaultYieldGenerationModule(await aaveModule.getAddress());
+    // Phase 3: Set the module as default yield generation module (queue/activate pattern)
+    await escrowableERC20.connect(owner).queueDefaultYieldGenerationModule(await aaveModule.getAddress());
+    // Fast-forward time for testing (skip 7-day delay)
+    const [, etaYield] = await escrowableERC20.getPendingDefaultYieldGenerationModule();
+    await time.increaseTo(Number(etaYield) + 1);
+    await escrowableERC20.connect(owner).activateDefaultYieldGenerationModule();
 
-    // Set resolver
-    await escrowableERC20.setAuthorizedResolver(resolver.address);
+    // Phase 2: Grant ROLE_TIMELOCK to owner for escrowableERC20
+    const ROLE_TIMELOCK_ERC20 = await escrowableERC20.ROLE_TIMELOCK();
+    await escrowableERC20.grantRole(ROLE_TIMELOCK_ERC20, owner.address);
+    
+    // Phase 7: Setup resolution module (required for escrow creation)
+    const { setupResolutionModule } = await import("../helpers/setupResolutionModule");
+    await setupResolutionModule(escrowableERC20, owner, resolver.address);
 
     // Set default yield distribution for yield distribution tests
     const defaultRecipients = [yieldRecipient1.address, yieldRecipient2.address];
@@ -169,7 +187,7 @@ describe("Aave Integration", function () {
     it("Should not allow non-owner to configure Aave", async function () {
       await expect(
         aaveModule.connect(sender).setAavePoolAddressesProvider(ethers.ZeroAddress)
-      ).to.be.revertedWithCustomError(escrowableERC20, "OwnableUnauthorizedAccount");
+      ).to.be.revertedWithCustomError(escrowableERC20, "AccessControlUnauthorizedAccount");
     });
   });
 

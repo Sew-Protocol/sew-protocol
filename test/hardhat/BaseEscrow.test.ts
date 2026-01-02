@@ -2,6 +2,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { EscrowableERC20 } from "../typechain-types";
+import { setupResolutionModule } from "../helpers/setupResolutionModule";
 
 describe("BaseEscrow", function () {
   let escrowableERC20: EscrowableERC20;
@@ -22,20 +23,27 @@ describe("BaseEscrow", function () {
     escrowableERC20 = (await escrowableERC20Factory.deploy("Test Token", "TEST", ESCROW_FEE, feeAddress.address)) as EscrowableERC20;
     await escrowableERC20.waitForDeployment();
     
-    // Set fee address
-    await escrowableERC20.setEscrowFeeAddress(feeAddress.address);
-    await escrowableERC20.setAuthorizedResolver(resolver.address);
-
-    const defaultResolutionModuleFactory: any = await ethers.getContractFactory("DefaultResolutionModule");
-    defaultResolutionModule = await defaultResolutionModuleFactory.deploy(owner.address, resolver.address);
-    await defaultResolutionModule.waitForDeployment();
+    // Phase 2: Grant ROLE_TIMELOCK to owner for admin functions
+    const ROLE_TIMELOCK = await escrowableERC20.ROLE_TIMELOCK();
+    const DEFAULT_ADMIN_ROLE = await escrowableERC20.DEFAULT_ADMIN_ROLE();
+    await escrowableERC20.grantRole(ROLE_TIMELOCK, owner.address);
+    
+    // Phase 3: Use queue/activate for slow lane functions
+    await escrowableERC20.connect(owner).queueEscrowFeeAddress(feeAddress.address);
+    // Fast-forward time for testing (skip 7-day delay)
+    const [, eta] = await escrowableERC20.getPendingFeeRecipient();
+    await time.increaseTo(Number(eta) + 1);
+    await escrowableERC20.connect(owner).activateEscrowFeeAddress();
+    
+    // Phase 7: Setup resolution module (required for escrow creation)
+    defaultResolutionModule = await setupResolutionModule(escrowableERC20, owner, resolver.address);
   });
 
   describe("Governance resolution-module hook (affects only NEW escrows)", function () {
     it("Should pin disputeResolver at creation time and not change old escrows after module activation", async function () {
       await escrowableERC20.transfer(sender.address, INITIAL_TRANSFER_AMOUNT * 2n);
 
-      // Create escrow BEFORE module activation -> should pin to current authorizedResolver
+      // Create escrow BEFORE module activation -> should pin to current resolution module resolver
       const id0Tx = await escrowableERC20.connect(sender).escrowTransfer(recipient.address, INITIAL_TRANSFER_AMOUNT);
       await id0Tx.wait();
       const workflowId0 = Number(await escrowableERC20.nextWorkflowId()) - 1;
@@ -44,8 +52,12 @@ describe("BaseEscrow", function () {
 
       // Activate module (governance hook)
       const escrowGov: any = escrowableERC20.connect(owner);
-      await escrowGov.setResolutionModuleDelay(0);
+      // Phase 6: Minimum resolution delay is 48 hours (MIN_RESOLUTION_DELAY)
+      const MIN_DELAY = 48 * 60 * 60; // 48 hours
+      await escrowGov.setResolutionModuleDelay(MIN_DELAY);
       await escrowGov.proposeResolutionModule(await defaultResolutionModule.getAddress());
+      // Fast-forward time to allow activation
+      await time.increase(MIN_DELAY + 1);
       await escrowGov.activateResolutionModule();
 
       // Create escrow AFTER module activation -> should pin to module resolver
@@ -55,8 +67,16 @@ describe("BaseEscrow", function () {
       const et1 = await escrowableERC20.escrowTransfers(workflowId1);
       expect(et1.disputeResolver).to.equal(resolver.address); // same in this module, but pinned via module path
 
-      // Now change authorizedResolver to a different address; existing escrows should NOT change
-      await escrowableERC20.connect(owner).setAuthorizedResolver(owner.address);
+      // Phase 7: authorizedResolver removed - test that module changes don't affect existing escrows
+      // Deploy new resolution module and swap to it
+      const newResolutionModuleFactory = await ethers.getContractFactory("DefaultResolutionModule");
+      const newResolutionModule = await newResolutionModuleFactory.deploy(owner.address, owner.address);
+      await newResolutionModule.waitForDeployment();
+      await escrowableERC20.connect(owner).proposeResolutionModule(await newResolutionModule.getAddress());
+      // Wait for resolution module delay before activating
+      const resolutionDelay = await escrowableERC20.resolutionModuleDelay();
+      await time.increase(Number(resolutionDelay) + 1);
+      await escrowableERC20.connect(owner).activateResolutionModule();
       const et0After = await escrowableERC20.escrowTransfers(workflowId0);
       const et1After = await escrowableERC20.escrowTransfers(workflowId1);
       expect(et0After.disputeResolver).to.equal(resolver.address);

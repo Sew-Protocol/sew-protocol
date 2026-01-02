@@ -155,7 +155,9 @@ describe("Mainnet Release Sequence", function () {
       
       // Verify modules are deployed
       // Note: DefaultReleaseStrategy and DefaultYieldDistributionModule don't have owners
-      expect(await defaultResolutionModule.owner()).to.equal(deployer.address);
+      // Phase 2: AccessControl instead of Ownable
+      const DEFAULT_ADMIN_ROLE = await defaultResolutionModule.DEFAULT_ADMIN_ROLE();
+      expect(await defaultResolutionModule.hasRole(DEFAULT_ADMIN_ROLE, deployer.address)).to.be.true;
       expect(await defaultResolutionModule.resolver()).to.equal(resolver.address);
     });
 
@@ -204,18 +206,31 @@ describe("Mainnet Release Sequence", function () {
         await defaultYieldDistributionModule.waitForDeployment();
       }
       
-      // Wire modules to contracts
-      await escrowableERC20.setDefaultReleaseStrategy(await defaultReleaseStrategy.getAddress());
-      await escrowableERC20.setDefaultResolutionModule(await defaultResolutionModule.getAddress());
-      await escrowableERC20.setDefaultYieldDistributionModule(await defaultYieldDistributionModule.getAddress());
+      // Phase 2: Grant ROLE_TIMELOCK to deployer
+      const ROLE_TIMELOCK_ERC20 = await escrowableERC20.ROLE_TIMELOCK();
+      const ROLE_TIMELOCK_VAULT = await escrowVault.ROLE_TIMELOCK();
+      await escrowableERC20.grantRole(ROLE_TIMELOCK_ERC20, deployer.address);
+      await escrowVault.grantRole(ROLE_TIMELOCK_VAULT, deployer.address);
       
-      await escrowVault.setDefaultReleaseStrategy(await defaultReleaseStrategy.getAddress());
-      await escrowVault.setDefaultResolutionModule(await defaultResolutionModule.getAddress());
-      await escrowVault.setDefaultYieldDistributionModule(await defaultYieldDistributionModule.getAddress());
+      // Wire modules to contracts (Phase 3: queue/activate pattern for EscrowableERC20)
+      await escrowableERC20.connect(deployer).queueDefaultReleaseStrategy(await defaultReleaseStrategy.getAddress());
+      await escrowableERC20.connect(deployer).queueDefaultResolutionModule(await defaultResolutionModule.getAddress());
+      await escrowableERC20.connect(deployer).queueDefaultYieldDistributionModule(await defaultYieldDistributionModule.getAddress());
+      // Fast-forward time for testing
+      await time.increase(7 * 24 * 60 * 60 + 1);
+      await escrowableERC20.connect(deployer).activateDefaultReleaseStrategy();
+      await escrowableERC20.connect(deployer).activateDefaultResolutionModule();
+      await escrowableERC20.connect(deployer).activateDefaultYieldDistributionModule();
       
-      // Verify deployment
-      expect(await escrowableERC20.owner()).to.equal(deployer.address);
-      expect(await escrowVault.owner()).to.equal(deployer.address);
+      // EscrowVault uses direct setters (Standard lane)
+      await escrowVault.connect(deployer).setDefaultReleaseStrategy(await defaultReleaseStrategy.getAddress());
+      await escrowVault.connect(deployer).setDefaultResolutionModule(await defaultResolutionModule.getAddress());
+      await escrowVault.connect(deployer).setDefaultYieldDistributionModule(await defaultYieldDistributionModule.getAddress());
+      
+      // Verify deployment (Phase 2: AccessControl instead of Ownable)
+      const DEFAULT_ADMIN_ROLE = await escrowableERC20.DEFAULT_ADMIN_ROLE();
+      expect(await escrowableERC20.hasRole(DEFAULT_ADMIN_ROLE, deployer.address)).to.be.true;
+      expect(await escrowVault.hasRole(DEFAULT_ADMIN_ROLE, deployer.address)).to.be.true;
     });
   });
 
@@ -265,28 +280,58 @@ describe("Mainnet Release Sequence", function () {
     });
 
     it("Should transfer ownership of contracts to Safe multisig", async function () {
-      // Transfer ownership to multisig
-      // Note: OpenZeppelin Ownable (v5) transfers ownership immediately (no acceptOwnership needed)
-      await escrowableERC20.transferOwnership(multisigAddress);
-      await escrowVault.transferOwnership(multisigAddress);
+      // Phase 2: Transfer roles instead of ownership
+      const DEFAULT_ADMIN_ROLE_ERC20 = await escrowableERC20.DEFAULT_ADMIN_ROLE();
+      const DEFAULT_ADMIN_ROLE_VAULT = await escrowVault.DEFAULT_ADMIN_ROLE();
+      const ROLE_TIMELOCK_ERC20 = await escrowableERC20.ROLE_TIMELOCK();
+      const ROLE_TIMELOCK_VAULT = await escrowVault.ROLE_TIMELOCK();
       
-      // Also transfer module ownership (only DefaultResolutionModule has owner)
-      await defaultResolutionModule.transferOwnership(multisigAddress);
+      await escrowableERC20.grantRole(DEFAULT_ADMIN_ROLE_ERC20, multisigAddress);
+      await escrowableERC20.grantRole(ROLE_TIMELOCK_ERC20, multisigAddress);
+      await escrowVault.grantRole(DEFAULT_ADMIN_ROLE_VAULT, multisigAddress);
+      await escrowVault.grantRole(ROLE_TIMELOCK_VAULT, multisigAddress);
+      await escrowableERC20.revokeRole(DEFAULT_ADMIN_ROLE_ERC20, deployer.address);
+      await escrowVault.revokeRole(DEFAULT_ADMIN_ROLE_VAULT, deployer.address);
       
-      // Verify ownership transfer (immediate in Ownable v5)
-      expect(await escrowableERC20.owner()).to.equal(multisigAddress);
-      expect(await escrowVault.owner()).to.equal(multisigAddress);
-      expect(await defaultResolutionModule.owner()).to.equal(multisigAddress);
-      // Note: DefaultReleaseStrategy and DefaultYieldDistributionModule don't have owners
+      // Transfer roles of modules
+      const DEFAULT_ADMIN_ROLE_MODULE = await defaultResolutionModule.DEFAULT_ADMIN_ROLE();
+      await defaultResolutionModule.grantRole(DEFAULT_ADMIN_ROLE_MODULE, multisigAddress);
+      await defaultResolutionModule.revokeRole(DEFAULT_ADMIN_ROLE_MODULE, deployer.address);
+      
+      // Verify role transfer
+      expect(await escrowableERC20.hasRole(DEFAULT_ADMIN_ROLE_ERC20, multisigAddress)).to.be.true;
+      expect(await escrowVault.hasRole(DEFAULT_ADMIN_ROLE_VAULT, multisigAddress)).to.be.true;
+      expect(await defaultResolutionModule.hasRole(DEFAULT_ADMIN_ROLE_MODULE, multisigAddress)).to.be.true;
     });
 
     it("Should verify multisig can perform owner-only operations", async function () {
-      // Multisig should be able to set authorized resolver
-      await escrowableERC20.connect(multisigOwner1).setAuthorizedResolver(resolver.address);
-      expect(await escrowableERC20.authorizedResolver()).to.equal(resolver.address);
+      // Phase 7: authorizedResolver removed - multisig can configure resolution module instead
+      // Grant ROLE_TIMELOCK to multisig if not already granted
+      const ROLE_TIMELOCK_ERC20 = await escrowableERC20.ROLE_TIMELOCK();
+      const ROLE_TIMELOCK_VAULT = await escrowVault.ROLE_TIMELOCK();
+      if (!(await escrowableERC20.hasRole(ROLE_TIMELOCK_ERC20, multisigAddress))) {
+        await escrowableERC20.grantRole(ROLE_TIMELOCK_ERC20, multisigAddress);
+      }
+      if (!(await escrowVault.hasRole(ROLE_TIMELOCK_VAULT, multisigAddress))) {
+        await escrowVault.grantRole(ROLE_TIMELOCK_VAULT, multisigAddress);
+      }
       
-      await escrowVault.connect(multisigOwner1).setAuthorizedResolver(resolver.address);
-      expect(await escrowVault.authorizedResolver()).to.equal(resolver.address);
+      // Deploy and set resolution module
+      const ResolutionModuleFactory = await ethers.getContractFactory("DefaultResolutionModule");
+      const newResolutionModule = await ResolutionModuleFactory.deploy(multisigAddress, resolver.address);
+      await newResolutionModule.waitForDeployment();
+      
+      await escrowableERC20.connect(multisigOwner1).proposeResolutionModule(await newResolutionModule.getAddress());
+      await escrowVault.connect(multisigOwner1).proposeResolutionModule(await newResolutionModule.getAddress());
+      // Fast-forward time for activation
+      const { time } = await import("@nomicfoundation/hardhat-network-helpers");
+      await time.increase(48 * 60 * 60 + 1); // 48 hours + 1 second
+      await escrowableERC20.connect(multisigOwner1).activateResolutionModule();
+      await escrowVault.connect(multisigOwner1).activateResolutionModule();
+      
+      // Verify resolution module is set
+      expect(await escrowableERC20.resolutionModule()).to.equal(await newResolutionModule.getAddress());
+      expect(await escrowVault.resolutionModule()).to.equal(await newResolutionModule.getAddress());
     });
   });
 
@@ -345,23 +390,32 @@ describe("Mainnet Release Sequence", function () {
         return;
       }
       
-      // Ensure contracts are owned by multisig first
-      if (await escrowableERC20.owner() !== multisigAddress) {
-        await escrowableERC20.transferOwnership(multisigAddress);
-      }
-      if (await escrowVault.owner() !== multisigAddress) {
-        await escrowVault.transferOwnership(multisigAddress);
-      }
-      
-      // Multisig transfers ownership to Timelock
-      // Note: OpenZeppelin Ownable transfers immediately (no acceptOwnership needed)
-      await escrowableERC20.connect(multisigOwner1).transferOwnership(await timelock.getAddress());
-      await escrowVault.connect(multisigOwner1).transferOwnership(await timelock.getAddress());
-      
-      // Verify Timelock is now owner (immediate transfer)
+      // Phase 2: Ensure contracts have roles granted to multisig first
+      const DEFAULT_ADMIN_ROLE_ERC20 = await escrowableERC20.DEFAULT_ADMIN_ROLE();
+      const DEFAULT_ADMIN_ROLE_VAULT = await escrowVault.DEFAULT_ADMIN_ROLE();
+      const ROLE_TIMELOCK_ERC20 = await escrowableERC20.ROLE_TIMELOCK();
+      const ROLE_TIMELOCK_VAULT = await escrowVault.ROLE_TIMELOCK();
       const timelockAddress = await timelock.getAddress();
-      expect(await escrowableERC20.owner()).to.equal(timelockAddress);
-      expect(await escrowVault.owner()).to.equal(timelockAddress);
+      
+      if (!(await escrowableERC20.hasRole(DEFAULT_ADMIN_ROLE_ERC20, multisigAddress))) {
+        await escrowableERC20.grantRole(DEFAULT_ADMIN_ROLE_ERC20, multisigAddress);
+        await escrowableERC20.grantRole(ROLE_TIMELOCK_ERC20, multisigAddress);
+      }
+      if (!(await escrowVault.hasRole(DEFAULT_ADMIN_ROLE_VAULT, multisigAddress))) {
+        await escrowVault.grantRole(DEFAULT_ADMIN_ROLE_VAULT, multisigAddress);
+        await escrowVault.grantRole(ROLE_TIMELOCK_VAULT, multisigAddress);
+      }
+      
+      // Multisig transfers roles to Timelock
+      
+      await escrowableERC20.connect(multisigOwner1).grantRole(DEFAULT_ADMIN_ROLE_ERC20, timelockAddress);
+      await escrowableERC20.connect(multisigOwner1).grantRole(ROLE_TIMELOCK_ERC20, timelockAddress);
+      await escrowVault.connect(multisigOwner1).grantRole(DEFAULT_ADMIN_ROLE_VAULT, timelockAddress);
+      await escrowVault.connect(multisigOwner1).grantRole(ROLE_TIMELOCK_VAULT, timelockAddress);
+      
+      // Verify Timelock has roles
+      expect(await escrowableERC20.hasRole(DEFAULT_ADMIN_ROLE_ERC20, timelockAddress)).to.be.true;
+      expect(await escrowVault.hasRole(DEFAULT_ADMIN_ROLE_VAULT, timelockAddress)).to.be.true;
     });
 
     it("Should trigger timelocked upgrade with Safe multisig", async function () {
@@ -370,13 +424,18 @@ describe("Mainnet Release Sequence", function () {
         return;
       }
       
-      // Ensure contract is owned by timelock
+      // Phase 2: Ensure contract has roles granted to timelock
       const timelockAddress = await timelock.getAddress();
-      if (await escrowableERC20.owner() !== timelockAddress) {
-        if (await escrowableERC20.owner() !== multisigAddress) {
-          await escrowableERC20.transferOwnership(multisigAddress);
+      const DEFAULT_ADMIN_ROLE_ERC20 = await escrowableERC20.DEFAULT_ADMIN_ROLE();
+      const ROLE_TIMELOCK_ERC20 = await escrowableERC20.ROLE_TIMELOCK();
+      
+      if (!(await escrowableERC20.hasRole(DEFAULT_ADMIN_ROLE_ERC20, timelockAddress))) {
+        if (!(await escrowableERC20.hasRole(DEFAULT_ADMIN_ROLE_ERC20, multisigAddress))) {
+          await escrowableERC20.grantRole(DEFAULT_ADMIN_ROLE_ERC20, multisigAddress);
+          await escrowableERC20.grantRole(ROLE_TIMELOCK_ERC20, multisigAddress);
         }
-        await escrowableERC20.connect(multisigOwner1).transferOwnership(timelockAddress);
+        await escrowableERC20.connect(multisigOwner1).grantRole(DEFAULT_ADMIN_ROLE_ERC20, timelockAddress);
+        await escrowableERC20.connect(multisigOwner1).grantRole(ROLE_TIMELOCK_ERC20, timelockAddress);
       }
       
       // This test demonstrates a timelocked upgrade
@@ -388,7 +447,7 @@ describe("Mainnet Release Sequence", function () {
       const currentFeeAddress = await escrowableERC20.escrowFeeAddress();
       
       const setFeeAddressData = escrowableERC20.interface.encodeFunctionData(
-        "setEscrowFeeAddress",
+        "queueEscrowFeeAddress",
         [newFeeAddress]
       );
       
@@ -545,17 +604,27 @@ describe("Mainnet Release Sequence", function () {
       
       // Ensure contracts are owned by Timelock
       const timelockAddress = await timelock.getAddress();
-      if (await escrowableERC20.owner() !== timelockAddress) {
-        if (await escrowableERC20.owner() !== multisigAddress) {
-          await escrowableERC20.transferOwnership(multisigAddress);
+      // Phase 2: Check and grant roles instead of ownership
+      const DEFAULT_ADMIN_ROLE_ERC20 = await escrowableERC20.DEFAULT_ADMIN_ROLE();
+      const DEFAULT_ADMIN_ROLE_VAULT = await escrowVault.DEFAULT_ADMIN_ROLE();
+      const ROLE_TIMELOCK_ERC20 = await escrowableERC20.ROLE_TIMELOCK();
+      const ROLE_TIMELOCK_VAULT = await escrowVault.ROLE_TIMELOCK();
+      
+      if (!(await escrowableERC20.hasRole(DEFAULT_ADMIN_ROLE_ERC20, timelockAddress))) {
+        if (!(await escrowableERC20.hasRole(DEFAULT_ADMIN_ROLE_ERC20, multisigAddress))) {
+          await escrowableERC20.grantRole(DEFAULT_ADMIN_ROLE_ERC20, multisigAddress);
+          await escrowableERC20.grantRole(ROLE_TIMELOCK_ERC20, multisigAddress);
         }
-        await escrowableERC20.connect(multisigOwner1).transferOwnership(timelockAddress);
+        await escrowableERC20.connect(multisigOwner1).grantRole(DEFAULT_ADMIN_ROLE_ERC20, timelockAddress);
+        await escrowableERC20.connect(multisigOwner1).grantRole(ROLE_TIMELOCK_ERC20, timelockAddress);
       }
-      if (await escrowVault.owner() !== timelockAddress) {
-        if (await escrowVault.owner() !== multisigAddress) {
-          await escrowVault.transferOwnership(multisigAddress);
+      if (!(await escrowVault.hasRole(DEFAULT_ADMIN_ROLE_VAULT, timelockAddress))) {
+        if (!(await escrowVault.hasRole(DEFAULT_ADMIN_ROLE_VAULT, multisigAddress))) {
+          await escrowVault.grantRole(DEFAULT_ADMIN_ROLE_VAULT, multisigAddress);
+          await escrowVault.grantRole(ROLE_TIMELOCK_VAULT, multisigAddress);
         }
-        await escrowVault.connect(multisigOwner1).transferOwnership(timelockAddress);
+        await escrowVault.connect(multisigOwner1).grantRole(DEFAULT_ADMIN_ROLE_VAULT, timelockAddress);
+        await escrowVault.connect(multisigOwner1).grantRole(ROLE_TIMELOCK_VAULT, timelockAddress);
       }
       
       // The contracts are already owned by Timelock
@@ -563,9 +632,9 @@ describe("Mainnet Release Sequence", function () {
       
       // This is already set up - Timelock owns contracts, Governor controls Timelock
       // No additional transfer needed, but we verify the setup
-      
-      expect(await escrowableERC20.owner()).to.equal(timelockAddress);
-      expect(await escrowVault.owner()).to.equal(timelockAddress);
+      // (Using variables already declared above)
+      expect(await escrowableERC20.hasRole(DEFAULT_ADMIN_ROLE_ERC20, timelockAddress)).to.be.true;
+      expect(await escrowVault.hasRole(DEFAULT_ADMIN_ROLE_VAULT, timelockAddress)).to.be.true;
       
       // Verify Governor has proposer role
       const PROPOSER_ROLE = await timelock.PROPOSER_ROLE();
@@ -579,12 +648,16 @@ describe("Mainnet Release Sequence", function () {
       
       const newFeeAddress = tokenHolder2.address;
       const setFeeAddressData = escrowableERC20.interface.encodeFunctionData(
-        "setEscrowFeeAddress",
+        "queueEscrowFeeAddress",
         [newFeeAddress]
       );
       
       // Create proposal
       const proposalDescription = "Change escrow fee address to tokenHolder2";
+      if (!governor) {
+        this.skip();
+        return;
+      }
       const proposalId = await governor.hashProposal(
         [await escrowableERC20.getAddress()],
         [0],
@@ -646,11 +719,16 @@ describe("Mainnet Release Sequence", function () {
       // This test shows a complete upgrade flow via DAO governance
       // In production, this would upgrade the implementation contract
       
-      // For demonstration, we'll change a parameter that requires governance
-      const newResolver = tokenHolder3.address;
+      // Phase 7: authorizedResolver removed - change resolution module instead
+      // Deploy new resolution module
+      const ResolutionModuleFactory = await ethers.getContractFactory("DefaultResolutionModule");
+      const timelockAddress = await timelock.getAddress();
+      const newResolutionModule = await ResolutionModuleFactory.deploy(timelockAddress, tokenHolder3.address);
+      await newResolutionModule.waitForDeployment();
+      
       const setResolverData = escrowableERC20.interface.encodeFunctionData(
-        "setAuthorizedResolver",
-        [newResolver]
+        "proposeResolutionModule",
+        [await newResolutionModule.getAddress()]
       );
       
       const proposalDescription = "Change authorized resolver via DAO governance";
@@ -706,8 +784,15 @@ describe("Mainnet Release Sequence", function () {
         ethers.id(proposalDescription)
       );
       
-      // Verify
-      expect(await escrowableERC20.authorizedResolver()).to.equal(newResolver);
+      // Verify - proposal queues the module change, need to activate after delay
+      // Fast-forward past resolution module delay
+      const resolutionDelay = await escrowableERC20.resolutionModuleDelay();
+      await time.increase(Number(resolutionDelay) + 1);
+      await escrowableERC20.connect(await ethers.getSigner(await timelock.getAddress())).activateResolutionModule();
+      
+      // Phase 7: authorizedResolver removed - check resolution module instead
+      const resolutionModule = await escrowableERC20.resolutionModule();
+      expect(resolutionModule).to.equal(await newResolutionModule.getAddress());
     });
   });
 
@@ -737,8 +822,12 @@ describe("Mainnet Release Sequence", function () {
       
       // Stage 2: Transfer to multisig
       // Note: OpenZeppelin Ownable transfers ownership immediately (no acceptOwnership needed)
-      await escrowToken.transferOwnership(multisigAddress);
-      expect(await escrowToken.owner()).to.equal(multisigAddress);
+      // EscrowableERC20 uses AccessControl, so grant roles instead of transferOwnership
+      const DEFAULT_ADMIN_ROLE = await escrowToken.DEFAULT_ADMIN_ROLE();
+      const ROLE_TIMELOCK = await escrowToken.ROLE_TIMELOCK();
+      await escrowToken.grantRole(DEFAULT_ADMIN_ROLE, multisigAddress);
+      await escrowToken.grantRole(ROLE_TIMELOCK, multisigAddress);
+      expect(await escrowToken.hasRole(DEFAULT_ADMIN_ROLE, multisigAddress)).to.be.true;
       
       // Stage 3: Setup Timelock
       let timelockController: any;
@@ -755,9 +844,13 @@ describe("Mainnet Release Sequence", function () {
         );
         await timelockController.waitForDeployment();
         
-        // Transfer to Timelock (immediate transfer with Ownable)
-        await escrowToken.connect(multisigOwner1).transferOwnership(await timelockController.getAddress());
-        expect(await escrowToken.owner()).to.equal(await timelockController.getAddress());
+        // Transfer to Timelock - EscrowableERC20 uses AccessControl, so grant roles instead
+        const DEFAULT_ADMIN_ROLE = await escrowToken.DEFAULT_ADMIN_ROLE();
+        const ROLE_TIMELOCK = await escrowToken.ROLE_TIMELOCK();
+        const timelockAddr = await timelockController.getAddress();
+        await escrowToken.connect(multisigOwner1).grantRole(DEFAULT_ADMIN_ROLE, timelockAddr);
+        await escrowToken.connect(multisigOwner1).grantRole(ROLE_TIMELOCK, timelockAddr);
+        expect(await escrowToken.hasRole(DEFAULT_ADMIN_ROLE, timelockAddr)).to.be.true;
       } catch (error: any) {
         // If TimelockController isn't available, use a mock
         console.log("Using simplified Timelock setup for testing:", error.message);
@@ -804,7 +897,8 @@ describe("Mainnet Release Sequence", function () {
       // Verify final state
       if (timelockController && typeof timelockController.getAddress === 'function') {
         const timelockAddr = await timelockController.getAddress();
-        expect(await escrowToken.owner()).to.equal(timelockAddr);
+        const DEFAULT_ADMIN_ROLE = await escrowToken.DEFAULT_ADMIN_ROLE();
+        expect(await escrowToken.hasRole(DEFAULT_ADMIN_ROLE, timelockAddr)).to.be.true;
         // Check if timelockController has PROPOSER_ROLE method (real contract) or is a mock
         try {
           if (typeof timelockController.PROPOSER_ROLE === 'function') {
@@ -819,7 +913,8 @@ describe("Mainnet Release Sequence", function () {
         }
       } else {
         // Simplified setup - just verify ownership transfer worked
-        expect(await escrowToken.owner()).to.equal(multisigAddress);
+        const DEFAULT_ADMIN_ROLE = await escrowToken.DEFAULT_ADMIN_ROLE();
+        expect(await escrowToken.hasRole(DEFAULT_ADMIN_ROLE, multisigAddress)).to.be.true;
       }
       
       // System is now fully decentralized and DAO-controlled

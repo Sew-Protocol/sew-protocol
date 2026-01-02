@@ -1,0 +1,21 @@
+{
+  "id": "0003_activate_fee_address",
+  "title": "Activate Queued Escrow Fee Address",
+  "description": "\nActivate a previously queued escrow fee address change.\n\nThis proposal activates a fee address change that was queued at least 7 days ago.\nThe change will take effect immediately upon execution.\n\n**Prerequisites:**\n- Fee address must have been queued via proposal 0002_queue_fee_address\n- 7 days must have elapsed since the queue transaction\n  ",
+  "lane": "slow",
+  "calls": [
+    {
+      "target": "0xPLACEHOLDER_ESCROWABLEERC20",
+      "contractName": "EscrowableERC20",
+      "functionName": "activateEscrowFeeAddress",
+      "args": [],
+      "description": "Activate queued fee address for EscrowableERC20"
+    }
+  ],
+  "metadata": {
+    "author": "unknown",
+    "created": "2026-01-02T13:18:33.502Z",
+    "network": "hardhat",
+    "references": []
+  }
+}

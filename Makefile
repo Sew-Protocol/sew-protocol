@@ -1,7 +1,10 @@
-.PHONY: install test hh forge deploy export
+.PHONY: install compile test hh forge deploy export
 
 install:
 	pnpm i
+
+compile:
+	pnpm compile
 
 test:
 	pnpm test

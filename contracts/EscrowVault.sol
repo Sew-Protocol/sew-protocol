@@ -27,21 +27,11 @@ contract EscrowVault is BaseEscrow {
     // Track escrow balance per token (replaces totalHeldInEscrow)
     mapping(address => uint256) public totalHeldInEscrowPerToken;
     
-    // Module registries
-    mapping(uint256 => address) public releaseStrategyForEscrow;
-    mapping(uint256 => address) public resolutionModuleForEscrow;
-    
-    // Yield generation module registries
-    mapping(uint256 => address) public yieldGenerationModuleForEscrow;
-    IYieldGenerationModule public defaultYieldGenerationModule;
-    
-    // Yield distribution module registries
-    mapping(uint256 => address) public yieldDistributionModuleForEscrow;
-    IYieldDistributionModule public defaultYieldDistributionModule;
-    
-    // Default module instances (other modules)
+    // Default module instances (per-escrow overrides removed in Phase 5 for mainnet credibility)
     IReleaseStrategy public defaultReleaseStrategy;
     IResolutionModule public defaultResolutionModule;
+    IYieldGenerationModule public defaultYieldGenerationModule;
+    IYieldDistributionModule public defaultYieldDistributionModule;
 
     // Events specific to EscrowVault (with token parameter)
     event EscrowTransferCreated(uint256 indexed workflowId, address indexed token, address indexed from, address to, uint256 amount);
@@ -50,12 +40,11 @@ contract EscrowVault is BaseEscrow {
     event FeesWithdrawn(address indexed token, uint256 amount);
     
     // Module events
-    event YieldGenerationModuleSet(uint256 indexed workflowId, address indexed module);
+    // Module events (per-escrow events removed in Phase 5)
     event DefaultYieldGenerationModuleSet(address indexed module);
-    event YieldDistributionModuleSet(uint256 indexed workflowId, address indexed module);
     event DefaultYieldDistributionModuleSet(address indexed module);
 
-    constructor(uint256 _escrowFee, address _escrowFeeAddress) Ownable(_msgSender()) {
+    constructor(uint256 _escrowFee, address _escrowFeeAddress) {
         if (_escrowFee > ESCROW_FEE_DENOMINATOR) {
             revert InvalidEscrowFee(_escrowFee, ESCROW_FEE_DENOMINATOR);
         }
@@ -64,7 +53,10 @@ contract EscrowVault is BaseEscrow {
         }
         escrowFee = _escrowFee;
         escrowFeeAddress = _escrowFeeAddress;
-        authorizedResolver = _msgSender();
+        // Phase 7: authorizedResolver removed - resolver gate eliminated
+        
+        // Grant DEFAULT_ADMIN_ROLE to deployer so roles can be granted later
+        _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
     }
 
     // createEscrowWithPermit() removed for contract size reduction - see docs/PERMIT_FUNCTIONALITY_REMOVED.md
@@ -146,7 +138,12 @@ contract EscrowVault is BaseEscrow {
                 autoReleaseTime: 0, // Will be set by _applyEscrowSettings
                 autoCancelTime: 0, // Will be set by _applyEscrowSettings
                 attachmentURIs: new string[](0),
-                attachmentHashes: new bytes32[](0)
+                attachmentHashes: new bytes32[](0),
+                // Phase 7: Initialize module snapshots (will be set after escrow is created)
+                snapshotResolutionModule: address(0),
+                snapshotReleaseStrategy: address(0),
+                snapshotYieldGenerationModule: address(0),
+                snapshotYieldDistributionModule: address(0)
             }));
         
         // Assert workflowId consistency: struct ID should match array index
@@ -160,6 +157,15 @@ contract EscrowVault is BaseEscrow {
         
         // Apply settings (this will override defaults set above)
         _applyEscrowSettings(workflowId, settings);
+        
+        // Phase 7: Snapshot module addresses at creation time
+        _snapshotModulesForEscrow(
+            workflowId,
+            address(getResolutionModule(workflowId)),
+            address(getReleaseStrategy(workflowId)),
+            address(getYieldGenerationModule(workflowId)),
+            address(getYieldDistributionModule(workflowId))
+        );
         
         // Phase 2: If yieldEnabled, deposit to Aave (handled in BaseEscrow._depositToAave)
         if (settings.yieldEnabled) {
@@ -293,23 +299,51 @@ contract EscrowVault is BaseEscrow {
     }
 
     /**
+     * @dev Get the release strategy for an escrow
+     * @param workflowId The escrow transfer ID
+     * @return The release strategy module
+     * @dev Phase 7: Returns snapshot module to ensure module changes only affect new escrows
+     */
+    function _getReleaseStrategy(uint256 workflowId) internal view returns (IReleaseStrategy) {
+        EscrowTransfer storage et = escrowTransfers[workflowId];
+        address snapshot = et.snapshotReleaseStrategy;
+        return snapshot != address(0) ? IReleaseStrategy(snapshot) : defaultReleaseStrategy;
+    }
+
+    /**
+     * @dev Get the resolution module for an escrow
+     * @param workflowId The escrow transfer ID
+     * @return The resolution module
+     * @dev Phase 7: Returns snapshot module to ensure module changes only affect new escrows
+     */
+    function _getResolutionModule(uint256 workflowId) internal view returns (IResolutionModule) {
+        EscrowTransfer storage et = escrowTransfers[workflowId];
+        address snapshot = et.snapshotResolutionModule;
+        return snapshot != address(0) ? IResolutionModule(snapshot) : defaultResolutionModule;
+    }
+
+    /**
      * @dev Get the yield generation module for an escrow (override from BaseEscrow)
      * @param workflowId The escrow transfer ID
      * @return The yield generation module interface
-     * @dev Overrides BaseEscrow._getYieldGenerationModule. Returns escrow-specific module or default.
+     * @dev Phase 7: Returns snapshot module to ensure module changes only affect new escrows
      */
     function _getYieldGenerationModule(uint256 workflowId) internal view override returns (IYieldGenerationModule) {
-        return getYieldGenerationModule(workflowId);
+        EscrowTransfer storage et = escrowTransfers[workflowId];
+        address snapshot = et.snapshotYieldGenerationModule;
+        return snapshot != address(0) ? IYieldGenerationModule(snapshot) : defaultYieldGenerationModule;
     }
 
     /**
      * @dev Get the yield distribution module for an escrow (override from BaseEscrow)
      * @param workflowId The escrow transfer ID
      * @return The yield distribution module interface
-     * @dev Overrides BaseEscrow._getYieldDistributionModule. Returns escrow-specific module or default.
+     * @dev Phase 7: Returns snapshot module to ensure module changes only affect new escrows
      */
     function _getYieldDistributionModule(uint256 workflowId) internal view override returns (IYieldDistributionModule) {
-        return getYieldDistributionModule(workflowId);
+        EscrowTransfer storage et = escrowTransfers[workflowId];
+        address snapshot = et.snapshotYieldDistributionModule;
+        return snapshot != address(0) ? IYieldDistributionModule(snapshot) : defaultYieldDistributionModule;
     }
 
     // Module getter functions
@@ -318,109 +352,59 @@ contract EscrowVault is BaseEscrow {
      * @param workflowId The escrow transfer ID
      * @return The release strategy module (or default if not set)
      */
+    /**
+     * @notice Get the release strategy for an escrow
+     * @param workflowId The escrow transfer ID (unused, kept for interface compatibility)
+     * @return The default release strategy module
+     * @dev Per-escrow overrides removed in Phase 5. All escrows use default modules.
+     */
     function getReleaseStrategy(uint256 workflowId) public view returns (IReleaseStrategy) {
-        address module = releaseStrategyForEscrow[workflowId];
-        return module != address(0) ? IReleaseStrategy(module) : defaultReleaseStrategy;
+        workflowId; // Silence unused parameter warning
+        return defaultReleaseStrategy;
     }
 
     /**
      * @notice Get the resolution module for an escrow
-     * @param workflowId The escrow transfer ID
-     * @return The resolution module (or default if not set)
+     * @param workflowId The escrow transfer ID (unused, kept for interface compatibility)
+     * @return The default resolution module
+     * @dev Per-escrow overrides removed in Phase 5. All escrows use default modules.
      */
     function getResolutionModule(uint256 workflowId) public view returns (IResolutionModule) {
-        address module = resolutionModuleForEscrow[workflowId];
-        return module != address(0) ? IResolutionModule(module) : defaultResolutionModule;
+        workflowId; // Silence unused parameter warning
+        return defaultResolutionModule;
     }
 
     /**
      * @notice Get the yield generation module for an escrow
-     * @param workflowId The escrow transfer ID
-     * @return The yield generation module (or default if not set)
+     * @param workflowId The escrow transfer ID (unused, kept for interface compatibility)
+     * @return The default yield generation module
+     * @dev Per-escrow overrides removed in Phase 5. All escrows use default modules.
      */
     function getYieldGenerationModule(uint256 workflowId) public view returns (IYieldGenerationModule) {
-        address module = yieldGenerationModuleForEscrow[workflowId];
-        return module != address(0) ? IYieldGenerationModule(module) : defaultYieldGenerationModule;
+        workflowId; // Silence unused parameter warning
+        return defaultYieldGenerationModule;
     }
 
     /**
      * @notice Get the yield distribution module for an escrow
-     * @param workflowId The escrow transfer ID
-     * @return The yield distribution module (or default if not set)
+     * @param workflowId The escrow transfer ID (unused, kept for interface compatibility)
+     * @return The default yield distribution module
+     * @dev Per-escrow overrides removed in Phase 5. All escrows use default modules.
      */
     function getYieldDistributionModule(uint256 workflowId) public view returns (IYieldDistributionModule) {
-        address module = yieldDistributionModuleForEscrow[workflowId];
-        return module != address(0) ? IYieldDistributionModule(module) : defaultYieldDistributionModule;
+        workflowId; // Silence unused parameter warning
+        return defaultYieldDistributionModule;
     }
 
-    // Module setter functions (only owner)
-    /**
-     * @notice Set the release strategy for a specific escrow
-     * @param workflowId The escrow transfer ID
-     * @param strategy The release strategy module address
-     */
-    function setReleaseStrategyForEscrow(uint256 workflowId, address strategy) public onlyOwner {
-        if (strategy != address(0) && strategy.code.length == 0) {
-            revert InvalidAddress("Release strategy must be a contract or zero", strategy);
-        }
-        releaseStrategyForEscrow[workflowId] = strategy;
-    }
-
-    /**
-     * @notice Set the resolution module for a specific escrow
-     * @param workflowId The escrow transfer ID
-     * @param module The resolution module address
-     */
-    function setResolutionModuleForEscrow(uint256 workflowId, address module) public onlyOwner {
-        if (module != address(0) && module.code.length == 0) {
-            revert InvalidAddress("Resolution module must be a contract or zero", module);
-        }
-        resolutionModuleForEscrow[workflowId] = module;
-    }
-
-    /**
-     * @notice Set the yield generation module for a specific escrow
-     * @param workflowId The escrow transfer ID
-     * @param module The yield generation module address
-     */
-    function setYieldGenerationModuleForEscrow(uint256 workflowId, address module) public onlyOwner {
-        if (module != address(0)) {
-            // Validate module implements IYieldGenerationModule via ERC-165
-            if (module.code.length == 0) {
-                revert InvalidAddress("Yield generation module must be a contract or zero", module);
-            }
-            if (!IERC165(module).supportsInterface(type(IYieldGenerationModule).interfaceId)) {
-                revert InvalidAddress("Module does not implement IYieldGenerationModule", module);
-            }
-        }
-        yieldGenerationModuleForEscrow[workflowId] = module;
-        emit YieldGenerationModuleSet(workflowId, module);
-    }
-
-    /**
-     * @notice Set the yield distribution module for a specific escrow
-     * @param workflowId The escrow transfer ID
-     * @param module The yield distribution module address
-     */
-    function setYieldDistributionModuleForEscrow(uint256 workflowId, address module) public onlyOwner {
-        if (module != address(0)) {
-            // Validate module implements IYieldDistributionModule via ERC-165
-            if (module.code.length == 0) {
-                revert InvalidAddress("Yield distribution module must be a contract or zero", module);
-            }
-            if (!IERC165(module).supportsInterface(type(IYieldDistributionModule).interfaceId)) {
-                revert InvalidAddress("Module does not implement IYieldDistributionModule", module);
-            }
-        }
-        yieldDistributionModuleForEscrow[workflowId] = module;
-        emit YieldDistributionModuleSet(workflowId, module);
-    }
+    // Per-escrow override functions removed in Phase 5 for mainnet credibility.
+    // No governance actor can modify the rules of an existing escrow.
+    // All escrows use the default modules configured via queue/activate pattern.
 
     /**
      * @notice Set the default release strategy
      * @param strategy The release strategy module address
      */
-    function setDefaultReleaseStrategy(address strategy) public onlyOwner {
+    function setDefaultReleaseStrategy(address strategy) public onlyRole(ROLE_TIMELOCK) {
         if (strategy == address(0) || strategy.code.length == 0) {
             revert InvalidAddress("Default release strategy must be a contract", strategy);
         }
@@ -431,7 +415,7 @@ contract EscrowVault is BaseEscrow {
      * @notice Set the default resolution module
      * @param module The resolution module address
      */
-    function setDefaultResolutionModule(address module) public onlyOwner {
+    function setDefaultResolutionModule(address module) public onlyRole(ROLE_TIMELOCK) {
         if (module == address(0) || module.code.length == 0) {
             revert InvalidAddress("Default resolution module must be a contract", module);
         }
@@ -442,7 +426,7 @@ contract EscrowVault is BaseEscrow {
      * @notice Set the default yield generation module
      * @param module The yield generation module address
      */
-    function setDefaultYieldGenerationModule(address module) public onlyOwner {
+    function setDefaultYieldGenerationModule(address module) public onlyRole(ROLE_TIMELOCK) {
         if (module == address(0)) {
             revert InvalidAddress("Default yield generation module cannot be zero", module);
         }
@@ -461,7 +445,7 @@ contract EscrowVault is BaseEscrow {
      * @notice Set the default yield distribution module
      * @param module The yield distribution module address
      */
-    function setDefaultYieldDistributionModule(address module) public onlyOwner {
+    function setDefaultYieldDistributionModule(address module) public onlyRole(ROLE_TIMELOCK) {
         if (module == address(0)) {
             revert InvalidAddress("Default yield distribution module cannot be zero", module);
         }

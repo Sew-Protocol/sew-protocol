@@ -4,8 +4,9 @@ pragma solidity ^0.8.28;
 import "../interfaces/IYieldGenerationModule.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
+import "../governance/SlowLaneQueueActivate.sol";
 
 // Aave V3 interfaces
 interface IPoolAddressesProvider {
@@ -29,6 +30,7 @@ error InvalidATokenAddress(address token, address aToken);
 error InvalidAddress(string reason, address addr);
 error ArrayLengthMismatch(uint256 expectedLength, uint256 actualLength);
 error AaveWithdrawalFailed(uint256 workflowId, address token);
+error CapExceeded(address token, uint256 requested, uint256 cap);
 
 /**
  * @title AaveYieldGenerationModule
@@ -36,7 +38,10 @@ error AaveWithdrawalFailed(uint256 workflowId, address token);
  * @dev Handles Aave-specific yield generation: deposits, withdrawals, yield calculation, and configuration.
  *      Distribution is handled separately by IYieldDistributionModule.
  */
-contract AaveYieldGenerationModule is IYieldGenerationModule, Ownable, ERC165 {
+contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, SlowLaneQueueActivate {
+    // Role constants for governance
+    bytes32 public constant ROLE_TIMELOCK = keccak256("ROLE_TIMELOCK");
+    bytes32 public constant ROLE_GUARDIAN = keccak256("ROLE_GUARDIAN");
     using SafeERC20 for IERC20;
 
     // Aave configuration
@@ -47,11 +52,19 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, Ownable, ERC165 {
     // Token support mapping
     mapping(address => address) public tokenToAToken; // token => aToken address
     mapping(address => uint256) public totalDepositedToAave; // token => total amount
+    
+    // Exposure tracking and caps (Phase 4)
+    mapping(address => uint256) public tokenCap; // token => maximum exposure per token
+    mapping(address => uint256) public globalCap; // token => global maximum exposure
+    mapping(address => uint256) public currentExposure; // token => current exposure
 
     // Per-escrow tracking (escrow contract address => workflowId => data)
     mapping(address => mapping(uint256 => bool)) public escrowInAave; // escrowContract => workflowId => is in Aave
     mapping(address => mapping(uint256 => uint256)) public escrowATokenBalance; // escrowContract => workflowId => aToken balance at deposit
     mapping(address => mapping(uint256 => uint256)) public escrowOriginalDeposit; // escrowContract => workflowId => original deposit amount
+
+    // Slow lane pending changes (Phase 3)
+    PendingAddress private _pendingPoolProvider;
 
     // Events
     event EscrowDepositedToAave(uint256 indexed workflowId, address indexed token, uint256 amount, uint256 aTokenBalance);
@@ -60,8 +73,23 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, Ownable, ERC165 {
     event AavePoolConfigured(address indexed provider, address indexed pool);
     event AaveEnabledUpdated(bool enabled);
     event TokenRegisteredForAave(address indexed token, address indexed aToken);
+    
+    // Slow lane queue/activate events (Phase 3)
+    event AavePoolProviderQueued(address indexed oldProvider, address indexed newProvider, uint64 eta);
+    event AavePoolProviderActivated(address indexed oldProvider, address indexed newProvider);
+    
+    // Guardian emergency control events (Phase 4)
+    event AaveDisabledByGuardian();
+    event TokenCapLowered(address indexed token, uint256 oldCap, uint256 newCap);
+    event GlobalCapLowered(address indexed token, uint256 oldCap, uint256 newCap);
+    event TokenCapSet(address indexed token, uint256 oldCap, uint256 newCap);
+    event GlobalCapSet(address indexed token, uint256 oldCap, uint256 newCap);
+    event ExposureUpdated(address indexed token, uint256 oldExposure, uint256 newExposure);
 
-    constructor(address initialOwner) Ownable(initialOwner) {}
+    constructor(address initialOwner) {
+        // Grant DEFAULT_ADMIN_ROLE to initialOwner so roles can be granted later
+        _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
+    }
 
     /**
      * @notice Deposit funds to Aave for yield generation
@@ -92,6 +120,9 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, Ownable, ERC165 {
         if (address(aavePool) == address(0)) {
             revert AavePoolNotConfigured();
         }
+
+        // Check exposure caps before depositing (Phase 4)
+        _checkAndAccrueExposure(token, amount);
 
         address escrowContract = msg.sender; // BaseEscrow contract calling this
 
@@ -161,6 +192,9 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, Ownable, ERC165 {
         if (totalDepositedToAave[token] >= originalAmount) {
             totalDepositedToAave[token] -= originalAmount;
         }
+
+        // Reduce exposure (Phase 4)
+        _reduceExposure(token, originalAmount);
 
         // Withdraw from Aave (withdraws all aTokens for this escrow)
         // Use low-level call for error handling
@@ -233,6 +267,9 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, Ownable, ERC165 {
         if (totalDepositedToAave[token] >= amount) {
             totalDepositedToAave[token] -= amount;
         }
+
+        // Reduce exposure (Phase 4)
+        _reduceExposure(token, amount);
 
         // Withdraw proportional amount from Aave
         // Use low-level call for error handling
@@ -323,7 +360,7 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, Ownable, ERC165 {
     /**
      * @notice ERC-165 interface support
      */
-    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165, IERC165) returns (bool) {
+    function supportsInterface(bytes4 interfaceId) public view virtual override(AccessControl, IERC165) returns (bool) {
         return
             interfaceId == type(IYieldGenerationModule).interfaceId ||
             super.supportsInterface(interfaceId);
@@ -332,29 +369,51 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, Ownable, ERC165 {
     // ============ Aave Configuration Functions ============
 
     /**
-     * @notice Set Aave Pool Addresses Provider
+     * @notice Queue a new Aave Pool Addresses Provider (Slow lane: 7-day delay)
      * @param provider Address of the Aave Pool Addresses Provider
-     * @dev Sets the Aave Pool Addresses Provider and automatically retrieves the Pool address.
-     *      Enables Aave integration if pool address is valid. Reverts if provider is zero address.
+     * @dev After 7 days, call activateAavePoolProvider() to apply the change
      */
-    function setAavePoolAddressesProvider(address provider) public onlyOwner {
+    function queueAavePoolProvider(address provider) public onlyRole(ROLE_TIMELOCK) {
         if (provider == address(0)) {
             revert InvalidAddress("Provider address cannot be zero", provider);
         }
-        aavePoolAddressesProvider = IPoolAddressesProvider(provider);
+        _queueAddress(_pendingPoolProvider, provider);
+        emit AavePoolProviderQueued(address(aavePoolAddressesProvider), provider, _pendingPoolProvider.eta);
+    }
+
+    /**
+     * @notice Activate the queued Aave Pool Addresses Provider
+     * @dev Reverts if no pending change or 7-day delay has not elapsed
+     */
+    function activateAavePoolProvider() public onlyRole(ROLE_TIMELOCK) {
+        address oldProvider = address(aavePoolAddressesProvider);
+        address newProvider = _activateAddress(_pendingPoolProvider);
+        aavePoolAddressesProvider = IPoolAddressesProvider(newProvider);
         // Get pool address first (external call)
         address poolAddress = aavePoolAddressesProvider.getPool();
         // Then update state (checks-effects-interactions pattern)
         aavePool = IPool(poolAddress);
         aaveEnabled = poolAddress != address(0);
-        emit AavePoolConfigured(provider, poolAddress);
+        emit AavePoolProviderActivated(oldProvider, newProvider);
+        emit AavePoolConfigured(newProvider, poolAddress);
+    }
+
+    /**
+     * @notice Get pending Aave Pool Provider change (if any)
+     * @return value Pending provider address
+     * @return eta Timestamp when activation is allowed
+     * @return exists Whether a pending change exists
+     */
+    function getPendingAavePoolProvider() public view returns (address value, uint64 eta, bool exists) {
+        return (getPendingAddress(_pendingPoolProvider));
     }
 
     /**
      * @notice Enable or disable Aave integration
      * @param enabled True to enable, false to disable
+     * @dev Only Timelock can enable Aave. Guardian can disable via guardianDisableAave().
      */
-    function setAaveEnabled(bool enabled) public onlyOwner {
+    function setAaveEnabled(bool enabled) public onlyRole(ROLE_TIMELOCK) {
         if (enabled && address(aavePool) == address(0)) {
             revert AavePoolNotConfigured();
         }
@@ -363,11 +422,21 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, Ownable, ERC165 {
     }
 
     /**
+     * @notice Guardian emergency function: Disable Aave integration
+     * @dev Guardian can only disable (down-only). Cannot enable. Timelock must enable via setAaveEnabled(true).
+     */
+    function guardianDisableAave() public onlyRole(ROLE_GUARDIAN) {
+        aaveEnabled = false;
+        emit AaveDisabledByGuardian();
+        emit AaveEnabledUpdated(false);
+    }
+
+    /**
      * @notice Register a token for Aave support
      * @param token ERC20 token address
      * @param aToken Corresponding aToken address
      */
-    function registerTokenForAave(address token, address aToken) public onlyOwner {
+    function registerTokenForAave(address token, address aToken) public onlyRole(ROLE_TIMELOCK) {
         if (token == address(0)) {
             revert InvalidAddress("Token address cannot be zero", token);
         }
@@ -397,7 +466,7 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, Ownable, ERC165 {
      * @param tokens Array of ERC20 token addresses
      * @param aTokens Array of corresponding aToken addresses
      */
-    function batchRegisterTokensForAave(address[] memory tokens, address[] memory aTokens) public onlyOwner {
+    function batchRegisterTokensForAave(address[] memory tokens, address[] memory aTokens) public onlyRole(ROLE_TIMELOCK) {
         if (tokens.length != aTokens.length) {
             revert ArrayLengthMismatch(tokens.length, aTokens.length);
         }
@@ -414,6 +483,101 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, Ownable, ERC165 {
      */
     function isTokenSupportedByAave(address token) public view returns (bool) {
         return tokenToAToken[token] != address(0);
+    }
+
+    // ============ Guardian Emergency Controls (Phase 4) ============
+
+    /**
+     * @notice Guardian emergency function: Lower token-specific cap (down-only)
+     * @param token Token address
+     * @param newCap New cap value (must be <= current cap)
+     * @dev Guardian can only lower caps, not raise them. This is a down-only control.
+     */
+    function guardianLowerTokenCap(address token, uint256 newCap) public onlyRole(ROLE_GUARDIAN) {
+        uint256 currentCap = tokenCap[token];
+        require(newCap <= currentCap, "Guardian can only lower caps");
+        tokenCap[token] = newCap;
+        emit TokenCapLowered(token, currentCap, newCap);
+    }
+
+    /**
+     * @notice Guardian emergency function: Lower global cap (down-only)
+     * @param token Token address
+     * @param newCap New cap value (must be <= current cap)
+     * @dev Guardian can only lower caps, not raise them. This is a down-only control.
+     */
+    function guardianLowerGlobalCap(address token, uint256 newCap) public onlyRole(ROLE_GUARDIAN) {
+        uint256 currentCap = globalCap[token];
+        require(newCap <= currentCap, "Guardian can only lower caps");
+        globalCap[token] = newCap;
+        emit GlobalCapLowered(token, currentCap, newCap);
+    }
+
+    // ============ Timelock Cap Management (Phase 4) ============
+
+    /**
+     * @notice Set token-specific exposure cap
+     * @param token Token address
+     * @param newCap New cap value
+     * @dev Timelock can set caps within bounds. Guardian can only lower via guardianLowerTokenCap().
+     */
+    function setTokenCap(address token, uint256 newCap) public onlyRole(ROLE_TIMELOCK) {
+        uint256 oldCap = tokenCap[token];
+        tokenCap[token] = newCap;
+        emit TokenCapSet(token, oldCap, newCap);
+    }
+
+    /**
+     * @notice Set global exposure cap for a token
+     * @param token Token address
+     * @param newCap New cap value
+     * @dev Timelock can set caps within bounds. Guardian can only lower via guardianLowerGlobalCap().
+     */
+    function setGlobalCap(address token, uint256 newCap) public onlyRole(ROLE_TIMELOCK) {
+        uint256 oldCap = globalCap[token];
+        globalCap[token] = newCap;
+        emit GlobalCapSet(token, oldCap, newCap);
+    }
+
+    /**
+     * @notice Internal function to check and update exposure
+     * @param token Token address
+     * @param amount Amount to add to exposure
+     * @dev Reverts if caps would be exceeded
+     */
+    function _checkAndAccrueExposure(address token, uint256 amount) internal {
+        uint256 newExposure = currentExposure[token] + amount;
+        
+        // Check token-specific cap
+        uint256 tokenCapValue = tokenCap[token];
+        if (tokenCapValue > 0 && newExposure > tokenCapValue) {
+            revert CapExceeded(token, newExposure, tokenCapValue);
+        }
+        
+        // Check global cap
+        uint256 globalCapValue = globalCap[token];
+        if (globalCapValue > 0 && newExposure > globalCapValue) {
+            revert CapExceeded(token, newExposure, globalCapValue);
+        }
+        
+        uint256 oldExposure = currentExposure[token];
+        currentExposure[token] = newExposure;
+        emit ExposureUpdated(token, oldExposure, newExposure);
+    }
+
+    /**
+     * @notice Internal function to reduce exposure on withdrawal
+     * @param token Token address
+     * @param amount Amount to subtract from exposure
+     */
+    function _reduceExposure(address token, uint256 amount) internal {
+        uint256 oldExposure = currentExposure[token];
+        if (amount > oldExposure) {
+            currentExposure[token] = 0;
+        } else {
+            currentExposure[token] = oldExposure - amount;
+        }
+        emit ExposureUpdated(token, oldExposure, currentExposure[token]);
     }
 
     /**

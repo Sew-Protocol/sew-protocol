@@ -1,6 +1,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { EscrowableERC20 } from "../typechain-types";
+import { setupResolutionModule } from "../helpers/setupResolutionModule";
 
 describe("Error Handling", function () {
   let escrowableERC20: EscrowableERC20;
@@ -19,8 +20,12 @@ describe("Error Handling", function () {
     escrowableERC20 = await EscrowableERC20Factory.deploy("Test Token", "TEST", ESCROW_FEE, owner.address);
     await escrowableERC20.waitForDeployment();
 
-    // Set resolver
-    await escrowableERC20.setAuthorizedResolver(resolver.address);
+    // Phase 2: Grant ROLE_TIMELOCK to owner
+    const ROLE_TIMELOCK = await escrowableERC20.ROLE_TIMELOCK();
+    await escrowableERC20.grantRole(ROLE_TIMELOCK, owner.address);
+    
+    // Phase 7: Setup resolution module (required for escrow creation)
+    await setupResolutionModule(escrowableERC20, owner, resolver.address);
 
     // Transfer some tokens to user1 for testing
     await escrowableERC20.transfer(user1.address, ethers.parseEther("100"));
