@@ -44,7 +44,10 @@ describe("BaseEscrow", function () {
       await escrowableERC20.transfer(sender.address, INITIAL_TRANSFER_AMOUNT * 2n);
 
       // Create escrow BEFORE module activation -> should pin to current resolution module resolver
-      const id0Tx = await escrowableERC20.connect(sender).escrowTransfer(recipient.address, INITIAL_TRANSFER_AMOUNT);
+      const id0Tx = await escrowableERC20
+        .connect(sender)
+        .getFunction("createEscrow(address,uint256)")
+        .send(recipient.address, INITIAL_TRANSFER_AMOUNT);
       await id0Tx.wait();
       const workflowId0 = Number(await escrowableERC20.nextWorkflowId()) - 1;
       const et0 = await escrowableERC20.escrowTransfers(workflowId0);
@@ -61,7 +64,10 @@ describe("BaseEscrow", function () {
       await escrowGov.activateResolutionModule();
 
       // Create escrow AFTER module activation -> should pin to module resolver
-      const id1Tx = await escrowableERC20.connect(sender).escrowTransfer(recipient.address, INITIAL_TRANSFER_AMOUNT);
+      const id1Tx = await escrowableERC20
+        .connect(sender)
+        .getFunction("createEscrow(address,uint256)")
+        .send(recipient.address, INITIAL_TRANSFER_AMOUNT);
       await id1Tx.wait();
       const workflowId1 = Number(await escrowableERC20.nextWorkflowId()) - 1;
       const et1 = await escrowableERC20.escrowTransfers(workflowId1);
@@ -99,11 +105,10 @@ describe("BaseEscrow", function () {
         escrowType: 0 // STANDARD
       };
       
-      const tx = await escrowableERC20.connect(sender).createEscrow(
-        recipient.address,
-        INITIAL_TRANSFER_AMOUNT,
-        settings
-      );
+      const tx = await escrowableERC20
+        .connect(sender)
+        .getFunction("createEscrow(address,uint256,(address,bool,uint256,uint256,uint8))")
+        .send(recipient.address, INITIAL_TRANSFER_AMOUNT, settings);
       await tx.wait();
       
       const workflowId = Number(await escrowableERC20.nextWorkflowId()) - 1;
@@ -167,7 +172,10 @@ describe("BaseEscrow", function () {
       };
       
       await expect(
-        escrowableERC20.connect(sender).createEscrow(recipient.address, INITIAL_TRANSFER_AMOUNT, settings)
+        escrowableERC20
+          .connect(sender)
+          .getFunction("createEscrow(address,uint256,(address,bool,uint256,uint256,uint8))")
+          .send(recipient.address, INITIAL_TRANSFER_AMOUNT, settings)
       ).to.be.revertedWithCustomError(escrowableERC20, "AutoTimeExceedsMaxLimit");
     });
   });
@@ -287,12 +295,10 @@ describe("BaseEscrow", function () {
       const currentTime = await time.latest();
       const autoReleaseTime = currentTime + 60;
       
-      const tx = await escrowableERC20.connect(sender).timedEscrowTransfer(
-        recipient.address,
-        INITIAL_TRANSFER_AMOUNT,
-        autoReleaseTime,
-        0
-      );
+      const tx = await escrowableERC20
+        .connect(sender)
+        .getFunction("createEscrow(address,uint256,uint256,uint256)")
+        .send(recipient.address, INITIAL_TRANSFER_AMOUNT, autoReleaseTime, 0);
       await tx.wait();
       
       const workflowId = Number(await escrowableERC20.nextWorkflowId()) - 1;
@@ -311,12 +317,10 @@ describe("BaseEscrow", function () {
       const currentTime = await time.latest();
       const autoReleaseTime = currentTime + 60;
       
-      await escrowableERC20.connect(sender).timedEscrowTransfer(
-        recipient.address,
-        INITIAL_TRANSFER_AMOUNT,
-        autoReleaseTime,
-        0
-      );
+      await escrowableERC20
+        .connect(sender)
+        .getFunction("createEscrow(address,uint256,uint256,uint256)")
+        .send(recipient.address, INITIAL_TRANSFER_AMOUNT, autoReleaseTime, 0);
       
       const workflowId = Number(await escrowableERC20.nextWorkflowId()) - 1;
       await time.increase(120);
@@ -330,7 +334,7 @@ describe("BaseEscrow", function () {
 
   describe("resolve() Function", function () {
     beforeEach(async function () {
-      await escrowableERC20.setAuthorizedResolver(resolver.address);
+      // setAuthorizedResolver is deprecated - resolution module is already set up in main beforeEach
     });
 
     it("Should resolve with single payout (full release)", async function () {
@@ -338,7 +342,7 @@ describe("BaseEscrow", function () {
       await escrowableERC20.connect(sender).raiseDispute(workflowId);
       
       const escrowTransfer = await escrowableERC20.escrowTransfers(workflowId);
-      const payoutAmount = escrowTransfer.amount;
+      const payoutAmount = escrowTransfer.remainingBalance;
       
       const payouts = [{
         recipient: recipient.address,
@@ -347,7 +351,10 @@ describe("BaseEscrow", function () {
       
       const recipientBalanceBefore = await escrowableERC20.balanceOf(recipient.address);
       
-      await escrowableERC20.connect(resolver).resolve(workflowId, payouts, ethers.ZeroHash);
+      await escrowableERC20
+        .connect(resolver)
+        .getFunction("resolve(uint256,(address,uint256)[],bytes32)")
+        .send(workflowId, payouts, ethers.ZeroHash);
       
       const transfer = await escrowableERC20.escrowTransfers(workflowId);
       expect(transfer.escrowState).to.equal(5); // RESOLVED
@@ -361,7 +368,7 @@ describe("BaseEscrow", function () {
       await escrowableERC20.connect(sender).raiseDispute(workflowId);
       
       const escrowTransfer = await escrowableERC20.escrowTransfers(workflowId);
-      const totalAmount = escrowTransfer.amount;
+      const totalAmount = escrowTransfer.remainingBalance;
       const halfAmount = totalAmount / 2n;
       
       const payouts = [
@@ -372,7 +379,10 @@ describe("BaseEscrow", function () {
       const recipientBalanceBefore = await escrowableERC20.balanceOf(recipient.address);
       const senderBalanceBefore = await escrowableERC20.balanceOf(sender.address);
       
-      await escrowableERC20.connect(resolver).resolve(workflowId, payouts, ethers.ZeroHash);
+      await escrowableERC20
+        .connect(resolver)
+        .getFunction("resolve(uint256,(address,uint256)[],bytes32)")
+        .send(workflowId, payouts, ethers.ZeroHash);
       
       const transfer = await escrowableERC20.escrowTransfers(workflowId);
       expect(transfer.escrowState).to.equal(5); // RESOLVED
@@ -391,13 +401,16 @@ describe("BaseEscrow", function () {
       const escrowTransfer = await escrowableERC20.escrowTransfers(workflowId);
       const payouts = [{
         recipient: recipient.address,
-        amount: escrowTransfer.amount
+        amount: escrowTransfer.remainingBalance
       }];
       
       const resolutionHash = ethers.keccak256(ethers.toUtf8Bytes("resolution"));
       
       await expect(
-        escrowableERC20.connect(resolver).resolve(workflowId, payouts, resolutionHash)
+        escrowableERC20
+          .connect(resolver)
+          .getFunction("resolve(uint256,(address,uint256)[],bytes32)")
+          .send(workflowId, payouts, resolutionHash)
       ).to.emit(escrowableERC20, "EscrowResolved")
         .withArgs(workflowId, resolver.address, resolutionHash);
     });
@@ -409,11 +422,14 @@ describe("BaseEscrow", function () {
       const escrowTransfer = await escrowableERC20.escrowTransfers(workflowId);
       const payouts = [{
         recipient: recipient.address,
-        amount: escrowTransfer.amount
+        amount: escrowTransfer.remainingBalance
       }];
       
       await expect(
-        escrowableERC20.connect(sender).resolve(workflowId, payouts, ethers.ZeroHash)
+        escrowableERC20
+          .connect(sender)
+          .getFunction("resolve(uint256,(address,uint256)[],bytes32)")
+          .send(workflowId, payouts, ethers.ZeroHash)
       ).to.be.revertedWithCustomError(escrowableERC20, "NotAuthorizedResolver");
     });
 
@@ -422,7 +438,7 @@ describe("BaseEscrow", function () {
       await escrowableERC20.connect(sender).raiseDispute(workflowId);
       
       const escrowTransfer = await escrowableERC20.escrowTransfers(workflowId);
-      const wrongAmount = escrowTransfer.amount + ethers.parseEther("0.1");
+      const wrongAmount = escrowTransfer.remainingBalance + ethers.parseEther("0.1");
       
       const payouts = [{
         recipient: recipient.address,
@@ -475,7 +491,7 @@ describe("BaseEscrow", function () {
   // Helper function
   async function createEscrowTransfer(amount: bigint) {
     await escrowableERC20.transfer(sender.address, amount);
-    const tx = await escrowableERC20.connect(sender).escrowTransfer(recipient.address, amount);
+    const tx = await escrowableERC20.connect(sender).createEscrow(recipient.address, amount);
     await tx.wait();
     const workflowId = Number(await escrowableERC20.nextWorkflowId()) - 1;
     return workflowId;

@@ -13,16 +13,22 @@
 
 import { expect } from "chai";
 import { ethers } from "hardhat";
+import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { 
   EscrowableERC20,
   EscrowVault,
-  AaveYieldGenerationModule
+  AaveYieldGenerationModule,
+  MockAavePool,
+  MockPoolAddressesProvider
 } from "../../typechain-types";
+import { time } from "@nomicfoundation/hardhat-network-helpers";
 
 describe("Guardian Controls", function () {
   let escrowableERC20: EscrowableERC20;
   let escrowVault: EscrowVault;
   let aaveModule: AaveYieldGenerationModule;
+  let mockAavePool: MockAavePool;
+  let mockPoolAddressesProvider: MockPoolAddressesProvider;
   let deployer: any;
   let timelock: any;
   let guardian: any;
@@ -56,6 +62,15 @@ describe("Guardian Controls", function () {
     const AaveModuleFactory = await ethers.getContractFactory("AaveYieldGenerationModule");
     aaveModule = await AaveModuleFactory.deploy(deployer.address);
     await aaveModule.waitForDeployment();
+
+    // Deploy mock Aave Pool and Provider
+    const poolFactory = await ethers.getContractFactory("MockAavePool");
+    mockAavePool = (await poolFactory.deploy()) as MockAavePool;
+    await mockAavePool.waitForDeployment();
+
+    const providerFactory = await ethers.getContractFactory("MockPoolAddressesProvider");
+    mockPoolAddressesProvider = (await providerFactory.deploy(await mockAavePool.getAddress())) as MockPoolAddressesProvider;
+    await mockPoolAddressesProvider.waitForDeployment();
 
     // Grant roles
     const ROLE_TIMELOCK = await escrowableERC20.ROLE_TIMELOCK();
@@ -102,6 +117,12 @@ describe("Guardian Controls", function () {
   describe("Aave Module Guardian Controls", function () {
     beforeEach(async function () {
       // Set up Aave module with initial state
+      // First, configure the Aave pool provider (required before enabling)
+      await aaveModule.connect(timelock).queueAavePoolProvider(await mockPoolAddressesProvider.getAddress());
+      const [, eta] = await aaveModule.getPendingAavePoolProvider();
+      await time.increaseTo(Number(eta) + 1);
+      await aaveModule.connect(timelock).activateAavePoolProvider();
+      
       const token = ethers.ZeroAddress; // Use zero address as token key
       await aaveModule.connect(timelock).setAaveEnabled(true);
       await aaveModule.connect(timelock).setTokenCap(token, ethers.parseEther("10000"));

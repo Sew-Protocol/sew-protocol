@@ -104,16 +104,16 @@ describe("Aave Integration", function () {
     // Register EscrowableERC20's token (the contract itself) for Aave
     await aaveModule.registerTokenForAave(await escrowableERC20.getAddress(), await escrowTokenAToken.getAddress());
 
+    // Phase 2: Grant ROLE_TIMELOCK to owner for escrowableERC20 (must be before queueDefaultYieldGenerationModule)
+    const ROLE_TIMELOCK_ERC20 = await escrowableERC20.ROLE_TIMELOCK();
+    await escrowableERC20.grantRole(ROLE_TIMELOCK_ERC20, owner.address);
+
     // Phase 3: Set the module as default yield generation module (queue/activate pattern)
     await escrowableERC20.connect(owner).queueDefaultYieldGenerationModule(await aaveModule.getAddress());
     // Fast-forward time for testing (skip 7-day delay)
     const [, etaYield] = await escrowableERC20.getPendingDefaultYieldGenerationModule();
     await time.increaseTo(Number(etaYield) + 1);
     await escrowableERC20.connect(owner).activateDefaultYieldGenerationModule();
-
-    // Phase 2: Grant ROLE_TIMELOCK to owner for escrowableERC20
-    const ROLE_TIMELOCK_ERC20 = await escrowableERC20.ROLE_TIMELOCK();
-    await escrowableERC20.grantRole(ROLE_TIMELOCK_ERC20, owner.address);
     
     // Phase 7: Setup resolution module (required for escrow creation)
     const { setupResolutionModule } = await import("../helpers/setupResolutionModule");
@@ -186,8 +186,8 @@ describe("Aave Integration", function () {
 
     it("Should not allow non-owner to configure Aave", async function () {
       await expect(
-        aaveModule.connect(sender).setAavePoolAddressesProvider(ethers.ZeroAddress)
-      ).to.be.revertedWithCustomError(escrowableERC20, "AccessControlUnauthorizedAccount");
+        aaveModule.connect(sender).queueAavePoolProvider(ethers.ZeroAddress)
+      ).to.be.revertedWithCustomError(aaveModule, "AccessControlUnauthorizedAccount");
     });
   });
 
@@ -201,11 +201,10 @@ describe("Aave Integration", function () {
         escrowType: 0
       };
 
-      const tx = await escrowableERC20.connect(sender).createEscrow(
-        recipient.address,
-        INITIAL_TRANSFER_AMOUNT,
-        settings
-      );
+      const tx = await escrowableERC20
+        .connect(sender)
+        .getFunction("createEscrow(address,uint256,(address,bool,uint256,uint256,uint8))")
+        .send(recipient.address, INITIAL_TRANSFER_AMOUNT, settings);
       await tx.wait();
 
       const workflowId = Number(await escrowableERC20.nextWorkflowId()) - 1;
@@ -220,9 +219,9 @@ describe("Aave Integration", function () {
       const amountAfterFee = INITIAL_TRANSFER_AMOUNT - fee;
       expect(aTokenBalance).to.equal(amountAfterFee);
 
-      // Check original deposit
+      // Check original deposit (this returns the amount before fee deduction)
       const originalDeposit = await escrowableERC20.getEscrowOriginalDeposit(workflowId);
-      expect(originalDeposit).to.equal(amountAfterFee);
+      expect(originalDeposit).to.equal(INITIAL_TRANSFER_AMOUNT);
     });
 
     it("Should not deposit to Aave when yield is disabled", async function () {
@@ -234,11 +233,10 @@ describe("Aave Integration", function () {
         escrowType: 0
       };
 
-      const tx = await escrowableERC20.connect(sender).createEscrow(
-        recipient.address,
-        INITIAL_TRANSFER_AMOUNT,
-        settings
-      );
+      const tx = await escrowableERC20
+        .connect(sender)
+        .getFunction("createEscrow(address,uint256,(address,bool,uint256,uint256,uint8))")
+        .send(recipient.address, INITIAL_TRANSFER_AMOUNT, settings);
       await tx.wait();
 
       const workflowId = Number(await escrowableERC20.nextWorkflowId()) - 1;
@@ -258,11 +256,10 @@ describe("Aave Integration", function () {
         escrowType: 0
       };
 
-      const tx = await escrowableERC20.connect(sender).createEscrow(
-        recipient.address,
-        INITIAL_TRANSFER_AMOUNT,
-        settings
-      );
+      const tx = await escrowableERC20
+        .connect(sender)
+        .getFunction("createEscrow(address,uint256,(address,bool,uint256,uint256,uint8))")
+        .send(recipient.address, INITIAL_TRANSFER_AMOUNT, settings);
       await tx.wait();
 
       const workflowId = Number(await escrowableERC20.nextWorkflowId()) - 1;
@@ -283,11 +280,10 @@ describe("Aave Integration", function () {
         escrowType: 0
       };
 
-      const tx = await escrowableERC20.connect(sender).createEscrow(
-        recipient.address,
-        INITIAL_TRANSFER_AMOUNT,
-        settings
-      );
+      const tx = await escrowableERC20
+        .connect(sender)
+        .getFunction("createEscrow(address,uint256,(address,bool,uint256,uint256,uint8))")
+        .send(recipient.address, INITIAL_TRANSFER_AMOUNT, settings);
       await tx.wait();
       
       // After creating escrow, tokens are deposited to Aave (transferred to MockAavePool)
@@ -371,11 +367,10 @@ describe("Aave Integration", function () {
         escrowType: 0
       };
 
-      const tx = await escrowableERC20.connect(sender).createEscrow(
-        recipient.address,
-        INITIAL_TRANSFER_AMOUNT,
-        settings
-      );
+      const tx = await escrowableERC20
+        .connect(sender)
+        .getFunction("createEscrow(address,uint256,(address,bool,uint256,uint256,uint8))")
+        .send(recipient.address, INITIAL_TRANSFER_AMOUNT, settings);
       await tx.wait();
     });
 
@@ -387,10 +382,12 @@ describe("Aave Integration", function () {
       
       // Note: _calculateYield is internal, so we test it indirectly through withdrawal
       const originalDeposit = await escrowableERC20.getEscrowOriginalDeposit(workflowId);
+      const fee = (originalDeposit * BigInt(ESCROW_FEE)) / BigInt(ESCROW_FEE_DENOMINATOR);
+      const amountAfterFee = originalDeposit - fee;
       const aTokenBalance = await aaveModule.escrowATokenBalance(await escrowableERC20.getAddress(), workflowId);
       
-      // aToken balance should be higher than original due to yield
-      expect(aTokenBalance).to.be.gte(originalDeposit);
+      // aToken balance should be higher than amount after fee due to yield
+      expect(aTokenBalance).to.be.gte(amountAfterFee);
     });
   });
 
@@ -415,11 +412,10 @@ describe("Aave Integration", function () {
         escrowType: 0
       };
 
-      const tx = await escrowableERC20.connect(sender).createEscrow(
-        recipient.address,
-        INITIAL_TRANSFER_AMOUNT,
-        settings
-      );
+      const tx = await escrowableERC20
+        .connect(sender)
+        .getFunction("createEscrow(address,uint256,(address,bool,uint256,uint256,uint8))")
+        .send(recipient.address, INITIAL_TRANSFER_AMOUNT, settings);
       await tx.wait();
     });
 
@@ -485,11 +481,10 @@ describe("Aave Integration", function () {
         escrowType: 0
       };
 
-      const tx = await escrowableERC20.connect(sender).createEscrow(
-        recipient.address,
-        INITIAL_TRANSFER_AMOUNT,
-        settings
-      );
+      const tx = await escrowableERC20
+        .connect(sender)
+        .getFunction("createEscrow(address,uint256,(address,bool,uint256,uint256,uint8))")
+        .send(recipient.address, INITIAL_TRANSFER_AMOUNT, settings);
       await tx.wait();
     });
 
@@ -502,7 +497,7 @@ describe("Aave Integration", function () {
       await mockAavePool.simulateYield(await escrowableERC20.getAddress(), 100);
       
       const escrowTransfer = await escrowableERC20.escrowTransfers(workflowId);
-      const halfAmount = escrowTransfer.amount / 2n;
+      const halfAmount = escrowTransfer.remainingBalance / 2n;
       
       const recipientBalanceBefore = await escrowableERC20.balanceOf(recipient.address);
       
@@ -524,7 +519,7 @@ describe("Aave Integration", function () {
       await mockAavePool.simulateYield(await escrowableERC20.getAddress(), 100);
       
       const escrowTransfer = await escrowableERC20.escrowTransfers(workflowId);
-      const halfAmount = escrowTransfer.amount / 2n;
+      const halfAmount = escrowTransfer.remainingBalance / 2n;
       
       const senderBalanceBefore = await escrowableERC20.balanceOf(sender.address);
       
@@ -553,11 +548,10 @@ describe("Aave Integration", function () {
         escrowType: 0
       };
 
-      const tx = await escrowableERC20.connect(sender).createEscrow(
-        recipient.address,
-        INITIAL_TRANSFER_AMOUNT,
-        settings
-      );
+      const tx = await escrowableERC20
+        .connect(sender)
+        .getFunction("createEscrow(address,uint256,(address,bool,uint256,uint256,uint8))")
+        .send(recipient.address, INITIAL_TRANSFER_AMOUNT, settings);
       await tx.wait();
 
       const workflowId = Number(await escrowableERC20.nextWorkflowId()) - 1;
@@ -593,11 +587,10 @@ describe("Aave Integration", function () {
 
       const totalBefore = await aaveModule.getTotalDepositedToAave(await escrowableERC20.getAddress());
       
-      const tx = await escrowableERC20.connect(sender).createEscrow(
-        recipient.address,
-        INITIAL_TRANSFER_AMOUNT,
-        settings
-      );
+      const tx = await escrowableERC20
+        .connect(sender)
+        .getFunction("createEscrow(address,uint256,(address,bool,uint256,uint256,uint8))")
+        .send(recipient.address, INITIAL_TRANSFER_AMOUNT, settings);
       await tx.wait();
 
       const totalAfter = await aaveModule.getTotalDepositedToAave(await escrowableERC20.getAddress());

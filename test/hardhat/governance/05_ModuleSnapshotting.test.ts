@@ -113,6 +113,24 @@ describe("Module Snapshotting", function () {
       await escrowableERC20.connect(deployer).queueDefaultYieldGenerationModule(yieldGenAAddress);
     }
     await escrowableERC20.connect(deployer).queueDefaultYieldDistributionModule(await yieldDistA.getAddress());
+    
+    // Fast-forward time to allow activation (7 days = 604800 seconds)
+    const [, etaRelease] = await escrowableERC20.getPendingDefaultReleaseStrategy();
+    const [, etaResolution] = await escrowableERC20.getPendingDefaultResolutionModule();
+    const [, etaYieldDist] = await escrowableERC20.getPendingDefaultYieldDistributionModule();
+    const maxEta = Math.max(Number(etaRelease), Number(etaResolution), Number(etaYieldDist));
+    await ethers.provider.send("evm_setNextBlockTimestamp", [maxEta + 1]);
+    await ethers.provider.send("evm_mine", []);
+    
+    await escrowableERC20.connect(deployer).activateDefaultReleaseStrategy();
+    await escrowableERC20.connect(deployer).activateDefaultResolutionModule();
+    if (yieldGenAAddress !== ethers.ZeroAddress) {
+      const [, etaYieldGen] = await escrowableERC20.getPendingDefaultYieldGenerationModule();
+      await ethers.provider.send("evm_setNextBlockTimestamp", [Number(etaYieldGen) + 1]);
+      await ethers.provider.send("evm_mine", []);
+      await escrowableERC20.connect(deployer).activateDefaultYieldGenerationModule();
+    }
+    await escrowableERC20.connect(deployer).activateDefaultYieldDistributionModule();
 
     // EscrowVault uses direct setters (Standard lane)
     // Phase 8: EscrowVault now uses Slow lane (queue/activate) for consistency
@@ -128,9 +146,17 @@ describe("Module Snapshotting", function () {
     await escrowVault.connect(deployer).activateDefaultResolutionModule();
     const yieldGenAAddressVault = typeof yieldGenA.getAddress === 'function' ? await yieldGenA.getAddress() : yieldGenA;
     if (yieldGenAAddressVault !== ethers.ZeroAddress) {
-      await escrowVault.connect(deployer).setDefaultYieldGenerationModule(yieldGenAAddressVault);
+      await escrowVault.connect(deployer).queueDefaultYieldGenerationModule(yieldGenAAddressVault);
+      const [, etaYieldGen] = await escrowVault.getPendingDefaultYieldGenerationModule();
+      await ethers.provider.send("evm_setNextBlockTimestamp", [Number(etaYieldGen) + 1]);
+      await ethers.provider.send("evm_mine", []);
+      await escrowVault.connect(deployer).activateDefaultYieldGenerationModule();
     }
-    await escrowVault.connect(deployer).setDefaultYieldDistributionModule(await yieldDistA.getAddress());
+    await escrowVault.connect(deployer).queueDefaultYieldDistributionModule(await yieldDistA.getAddress());
+    const [, etaYieldDistVault] = await escrowVault.getPendingDefaultYieldDistributionModule();
+    await ethers.provider.send("evm_setNextBlockTimestamp", [Number(etaYieldDistVault) + 1]);
+    await ethers.provider.send("evm_mine", []);
+    await escrowVault.connect(deployer).activateDefaultYieldDistributionModule();
 
     // Set resolution module for BaseEscrow (required for escrow creation after Phase 7)
     await escrowVault.connect(deployer).proposeResolutionModule(await moduleA.getAddress());
@@ -162,11 +188,11 @@ describe("Module Snapshotting", function () {
       // For EscrowableERC20, modules are queued but may not be activated
       // The snapshot will capture what getResolutionModule() returns at creation time
       // Create escrow
-      await escrowableERC20.connect(sender).createEscrow(
-        recipient.address,
-        ESCROW_AMOUNT,
-        { customResolver: ethers.ZeroAddress, yieldEnabled: false, autoReleaseTime: 0, autoCancelTime: 0, escrowType: 0 }
-      );
+      const settings = { customResolver: ethers.ZeroAddress, yieldEnabled: false, autoReleaseTime: 0, autoCancelTime: 0, escrowType: 0 };
+      await escrowableERC20
+        .connect(sender)
+        .getFunction("createEscrow(address,uint256,(address,bool,uint256,uint256,uint8))")
+        .send(recipient.address, ESCROW_AMOUNT, settings);
 
       const workflowId = 0;
       const escrow = await escrowableERC20.escrowTransfers(workflowId);
@@ -181,11 +207,14 @@ describe("Module Snapshotting", function () {
 
     it("Should emit EscrowModuleSnapshot event", async function () {
       await expect(
-        escrowableERC20.connect(sender).escrowTransfer(
-          recipient.address,
-          ESCROW_AMOUNT,
-          { customResolver: ethers.ZeroAddress, yieldEnabled: false, autoReleaseTime: 0, autoCancelTime: 0, escrowType: 0 }
-        )
+        escrowableERC20
+          .connect(sender)
+          .getFunction("createEscrow(address,uint256,(address,bool,uint256,uint256,uint8))")
+          .send(
+            recipient.address,
+            ESCROW_AMOUNT,
+            { customResolver: ethers.ZeroAddress, yieldEnabled: false, autoReleaseTime: 0, autoCancelTime: 0, escrowType: 0 }
+          )
       ).to.emit(escrowableERC20, "EscrowModuleSnapshot")
         .withArgs(
           0, // workflowId
@@ -205,20 +234,22 @@ describe("Module Snapshotting", function () {
       await token.transfer(sender.address, INITIAL_SUPPLY);
       await token.connect(sender).approve(await escrowVault.getAddress(), INITIAL_SUPPLY);
 
-      await escrowVault.connect(sender).createEscrow(
-        await token.getAddress(),
-        recipient.address,
-        ESCROW_AMOUNT,
-        { customResolver: ethers.ZeroAddress, yieldEnabled: false, autoReleaseTime: 0, autoCancelTime: 0, escrowType: 0 }
-      );
+      const settings = { customResolver: ethers.ZeroAddress, yieldEnabled: false, autoReleaseTime: 0, autoCancelTime: 0, escrowType: 0 };
+      await escrowVault
+        .connect(sender)
+        .getFunction("createEscrow(address,address,uint256,(address,bool,uint256,uint256,uint8))")
+        .send(await token.getAddress(), recipient.address, ESCROW_AMOUNT, settings);
 
       const workflowId = 0;
       const snapshotBefore = await escrowVault.escrowTransfers(workflowId);
       const snapshotModuleA = snapshotBefore.snapshotResolutionModule;
 
-      // Swap to Module B
-      await escrowVault.connect(timelock).proposeResolutionModule(await moduleB.getAddress());
-      await escrowVault.connect(timelock).activateResolutionModule();
+      // Swap to Module B (use queue/activate pattern for defaultResolutionModule)
+      await escrowVault.connect(timelock).queueDefaultResolutionModule(await moduleB.getAddress());
+      const [, eta] = await escrowVault.getPendingDefaultResolutionModule();
+      await ethers.provider.send("evm_setNextBlockTimestamp", [Number(eta) + 1]);
+      await ethers.provider.send("evm_mine", []);
+      await escrowVault.connect(timelock).activateDefaultResolutionModule();
 
       // Verify existing escrow still uses Module A snapshot
       const escrowAfter = await escrowVault.escrowTransfers(workflowId);
@@ -236,26 +267,33 @@ describe("Module Snapshotting", function () {
       await token.connect(sender).approve(await escrowVault.getAddress(), INITIAL_SUPPLY);
 
       // Create escrow with Module A
-      await escrowVault.connect(sender).createEscrow(
-        await token.getAddress(),
-        recipient.address,
-        ESCROW_AMOUNT,
-        { customResolver: ethers.ZeroAddress, yieldEnabled: false, autoReleaseTime: 0, autoCancelTime: 0, escrowType: 0 }
-      );
+      const settings1 = { customResolver: ethers.ZeroAddress, yieldEnabled: false, autoReleaseTime: 0, autoCancelTime: 0, escrowType: 0 };
+      await escrowVault
+        .connect(sender)
+        .getFunction("createEscrow(address,address,uint256,(address,bool,uint256,uint256,uint8))")
+        .send(await token.getAddress(), recipient.address, ESCROW_AMOUNT, settings1);
 
-      // Swap to Module B
-      await escrowVault.connect(timelock).proposeResolutionModule(await moduleB.getAddress());
-      await escrowVault.connect(timelock).activateResolutionModule();
+      // Swap to Module B (use queue/activate pattern for defaultResolutionModule)
+      await escrowVault.connect(timelock).queueDefaultResolutionModule(await moduleB.getAddress());
+      const [, eta] = await escrowVault.getPendingDefaultResolutionModule();
+      await ethers.provider.send("evm_setNextBlockTimestamp", [Number(eta) + 1]);
+      await ethers.provider.send("evm_mine", []);
+      await escrowVault.connect(timelock).activateDefaultResolutionModule();
+
+      // Verify defaultResolutionModule is now Module B
+      const currentDefaultModule = await escrowVault.defaultResolutionModule();
+      expect(currentDefaultModule).to.equal(await moduleB.getAddress());
 
       // Create new escrow
-      await escrowVault.connect(sender).createEscrow(
-        await token.getAddress(),
-        recipient.address,
-        ESCROW_AMOUNT,
-        { customResolver: ethers.ZeroAddress, yieldEnabled: false, autoReleaseTime: 0, autoCancelTime: 0, escrowType: 0 }
-      );
+      const nextWorkflowIdBefore = await escrowVault.nextWorkflowId();
+      const settings2 = { customResolver: ethers.ZeroAddress, yieldEnabled: false, autoReleaseTime: 0, autoCancelTime: 0, escrowType: 0 };
+      const tx = await escrowVault
+        .connect(sender)
+        .getFunction("createEscrow(address,address,uint256,(address,bool,uint256,uint256,uint8))")
+        .send(await token.getAddress(), recipient.address, ESCROW_AMOUNT, settings2);
+      await tx.wait();
 
-      const newWorkflowId = 1;
+      const newWorkflowId = Number(nextWorkflowIdBefore);
       const newEscrow = await escrowVault.escrowTransfers(newWorkflowId);
 
       // Verify new escrow uses Module B
@@ -265,11 +303,11 @@ describe("Module Snapshotting", function () {
 
     it("_getResolutionModule should return snapshot module", async function () {
       // Create escrow
-      await escrowableERC20.connect(sender).createEscrow(
-        recipient.address,
-        ESCROW_AMOUNT,
-        { customResolver: ethers.ZeroAddress, yieldEnabled: false, autoReleaseTime: 0, autoCancelTime: 0, escrowType: 0 }
-      );
+      const settings = { customResolver: ethers.ZeroAddress, yieldEnabled: false, autoReleaseTime: 0, autoCancelTime: 0, escrowType: 0 };
+      await escrowableERC20
+        .connect(sender)
+        .getFunction("createEscrow(address,uint256,(address,bool,uint256,uint256,uint8))")
+        .send(recipient.address, ESCROW_AMOUNT, settings);
 
       const workflowId = 0;
       const escrow = await escrowableERC20.escrowTransfers(workflowId);
@@ -299,12 +337,11 @@ describe("Module Snapshotting", function () {
 
     it("Should snapshot modules at escrow creation", async function () {
       // Create escrow
-      await escrowVault.connect(sender).createEscrow(
-        await token.getAddress(),
-        recipient.address,
-        ESCROW_AMOUNT,
-        { customResolver: ethers.ZeroAddress, yieldEnabled: false, autoReleaseTime: 0, autoCancelTime: 0, escrowType: 0 }
-      );
+      const settings = { customResolver: ethers.ZeroAddress, yieldEnabled: false, autoReleaseTime: 0, autoCancelTime: 0, escrowType: 0 };
+      await escrowVault
+        .connect(sender)
+        .getFunction("createEscrow(address,address,uint256,(address,bool,uint256,uint256,uint8))")
+        .send(await token.getAddress(), recipient.address, ESCROW_AMOUNT, settings);
 
       const workflowId = 0;
       const escrow = await escrowVault.escrowTransfers(workflowId);
@@ -321,19 +358,21 @@ describe("Module Snapshotting", function () {
 
     it("Existing escrow should use snapshot modules after swap", async function () {
       // Create escrow with Module A
-      await escrowVault.connect(sender).createEscrow(
-        await token.getAddress(),
-        recipient.address,
-        ESCROW_AMOUNT,
-        { customResolver: ethers.ZeroAddress, yieldEnabled: false, autoReleaseTime: 0, autoCancelTime: 0, escrowType: 0 }
-      );
+      const settings = { customResolver: ethers.ZeroAddress, yieldEnabled: false, autoReleaseTime: 0, autoCancelTime: 0, escrowType: 0 };
+      await escrowVault
+        .connect(sender)
+        .getFunction("createEscrow(address,address,uint256,(address,bool,uint256,uint256,uint8))")
+        .send(await token.getAddress(), recipient.address, ESCROW_AMOUNT, settings);
 
       const workflowId = 0;
       const snapshotModuleA = (await escrowVault.escrowTransfers(workflowId)).snapshotResolutionModule;
 
-      // Swap to Module B
-      await escrowVault.connect(timelock).proposeResolutionModule(await moduleB.getAddress());
-      await escrowVault.connect(timelock).activateResolutionModule();
+      // Swap to Module B (use queue/activate pattern for defaultResolutionModule)
+      await escrowVault.connect(timelock).queueDefaultResolutionModule(await moduleB.getAddress());
+      const [, eta] = await escrowVault.getPendingDefaultResolutionModule();
+      await ethers.provider.send("evm_setNextBlockTimestamp", [Number(eta) + 1]);
+      await ethers.provider.send("evm_mine", []);
+      await escrowVault.connect(timelock).activateDefaultResolutionModule();
 
       // Verify existing escrow still uses Module A
       const escrowAfter = await escrowVault.escrowTransfers(workflowId);
@@ -343,26 +382,33 @@ describe("Module Snapshotting", function () {
 
     it("New escrow should use new modules after swap", async function () {
       // Create escrow with Module A
-      await escrowVault.connect(sender).createEscrow(
-        await token.getAddress(),
-        recipient.address,
-        ESCROW_AMOUNT,
-        { customResolver: ethers.ZeroAddress, yieldEnabled: false, autoReleaseTime: 0, autoCancelTime: 0, escrowType: 0 }
-      );
+      const settings1 = { customResolver: ethers.ZeroAddress, yieldEnabled: false, autoReleaseTime: 0, autoCancelTime: 0, escrowType: 0 };
+      await escrowVault
+        .connect(sender)
+        .getFunction("createEscrow(address,address,uint256,(address,bool,uint256,uint256,uint8))")
+        .send(await token.getAddress(), recipient.address, ESCROW_AMOUNT, settings1);
 
-      // Swap to Module B
-      await escrowVault.connect(timelock).proposeResolutionModule(await moduleB.getAddress());
-      await escrowVault.connect(timelock).activateResolutionModule();
+      // Swap to Module B (use queue/activate pattern for defaultResolutionModule)
+      await escrowVault.connect(timelock).queueDefaultResolutionModule(await moduleB.getAddress());
+      const [, eta] = await escrowVault.getPendingDefaultResolutionModule();
+      await ethers.provider.send("evm_setNextBlockTimestamp", [Number(eta) + 1]);
+      await ethers.provider.send("evm_mine", []);
+      await escrowVault.connect(timelock).activateDefaultResolutionModule();
+
+      // Verify defaultResolutionModule is now Module B
+      const currentDefaultModule = await escrowVault.defaultResolutionModule();
+      expect(currentDefaultModule).to.equal(await moduleB.getAddress());
 
       // Create new escrow
-      await escrowVault.connect(sender).createEscrow(
-        await token.getAddress(),
-        recipient.address,
-        ESCROW_AMOUNT,
-        { customResolver: ethers.ZeroAddress, yieldEnabled: false, autoReleaseTime: 0, autoCancelTime: 0, escrowType: 0 }
-      );
+      const nextWorkflowIdBefore = await escrowVault.nextWorkflowId();
+      const settings2 = { customResolver: ethers.ZeroAddress, yieldEnabled: false, autoReleaseTime: 0, autoCancelTime: 0, escrowType: 0 };
+      const tx = await escrowVault
+        .connect(sender)
+        .getFunction("createEscrow(address,address,uint256,(address,bool,uint256,uint256,uint8))")
+        .send(await token.getAddress(), recipient.address, ESCROW_AMOUNT, settings2);
+      await tx.wait();
 
-      const newWorkflowId = 1;
+      const newWorkflowId = Number(nextWorkflowIdBefore);
       const newEscrow = await escrowVault.escrowTransfers(newWorkflowId);
 
       // Verify new escrow uses Module B
@@ -372,11 +418,11 @@ describe("Module Snapshotting", function () {
 
   describe("Multiple Module Types Snapshotting", function () {
     it("Should snapshot all module types", async function () {
-      await escrowableERC20.connect(sender).createEscrow(
-        recipient.address,
-        ESCROW_AMOUNT,
-        { customResolver: ethers.ZeroAddress, yieldEnabled: false, autoReleaseTime: 0, autoCancelTime: 0, escrowType: 0 }
-      );
+      const settings = { customResolver: ethers.ZeroAddress, yieldEnabled: false, autoReleaseTime: 0, autoCancelTime: 0, escrowType: 0 };
+      await escrowableERC20
+        .connect(sender)
+        .getFunction("createEscrow(address,uint256,(address,bool,uint256,uint256,uint8))")
+        .send(recipient.address, ESCROW_AMOUNT, settings);
 
       const workflowId = 0;
       const escrow = await escrowableERC20.escrowTransfers(workflowId);

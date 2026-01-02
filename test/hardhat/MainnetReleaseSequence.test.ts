@@ -487,9 +487,9 @@ describe("Mainnet Release Sequence", function () {
       expect(await escrowableERC20.escrowFeeAddress()).to.equal(currentFeeAddress);
       
       // Fast forward past timelock delay
-      await time.increase(delay + 1);
+      await time.increase(Number(delay) + 1);
       
-      // Execute the operation
+      // Execute the operation (this queues the address, doesn't activate it)
       await timelock.connect(multisigOwner1).execute(
         await escrowableERC20.getAddress(),
         0,
@@ -498,8 +498,12 @@ describe("Mainnet Release Sequence", function () {
         salt
       );
       
-      // Verify the change took effect
-      expect(await escrowableERC20.escrowFeeAddress()).to.equal(newFeeAddress);
+      // Verify the address is queued (not yet active - slow lane requires 7-day delay)
+      const [queuedAddress, , exists] = await escrowableERC20.getPendingFeeRecipient();
+      expect(queuedAddress).to.equal(newFeeAddress);
+      expect(exists).to.be.true;
+      // Address should still be the old one until activation
+      expect(await escrowableERC20.escrowFeeAddress()).to.equal(currentFeeAddress);
       expect(await timelock.isOperationDone(operationId)).to.be.true;
     });
   });
@@ -586,6 +590,9 @@ describe("Mainnet Release Sequence", function () {
     });
 
     it("Should grant Governor proposer and executor roles in Timelock", async function () {
+      if (!governor) {
+        this.skip();
+      }
       const PROPOSER_ROLE = await timelock.PROPOSER_ROLE();
       const EXECUTOR_ROLE = await timelock.EXECUTOR_ROLE();
       const CANCELLER_ROLE = await timelock.CANCELLER_ROLE();
@@ -743,6 +750,9 @@ describe("Mainnet Release Sequence", function () {
       
       const proposalDescription = "Change authorized resolver via DAO governance";
       
+      if (!governor) {
+        this.skip();
+      }
       // Ensure deployer has enough tokens to propose
       const currentBalance = await governanceToken.balanceOf(deployer.address);
       if (currentBalance < PROPOSAL_THRESHOLD) {

@@ -67,7 +67,7 @@ describe("EscrowVault", function () {
     it("Should create escrow for token1", async function () {
       await token1.connect(sender).approve(await escrowVault.getAddress(), INITIAL_TRANSFER_AMOUNT);
       
-      const tx = await escrowVault.connect(sender).escrowTransfer(
+      const tx = await escrowVault.connect(sender).createEscrow(
         await token1.getAddress(),
         recipient.address,
         INITIAL_TRANSFER_AMOUNT
@@ -86,7 +86,7 @@ describe("EscrowVault", function () {
     it("Should create escrow for token2", async function () {
       await token2.connect(sender).approve(await escrowVault.getAddress(), INITIAL_TRANSFER_AMOUNT);
       
-      const tx = await escrowVault.connect(sender).escrowTransfer(
+      const tx = await escrowVault.connect(sender).createEscrow(
         await token2.getAddress(),
         recipient.address,
         INITIAL_TRANSFER_AMOUNT
@@ -102,7 +102,7 @@ describe("EscrowVault", function () {
     it("Should track escrow balance per token", async function () {
       await token1.connect(sender).approve(await escrowVault.getAddress(), INITIAL_TRANSFER_AMOUNT * 2n);
       
-      await escrowVault.connect(sender).escrowTransfer(
+      await escrowVault.connect(sender).createEscrow(
         await token1.getAddress(),
         recipient.address,
         INITIAL_TRANSFER_AMOUNT
@@ -122,7 +122,7 @@ describe("EscrowVault", function () {
     it("Should release escrow for correct token", async function () {
       await token1.connect(sender).approve(await escrowVault.getAddress(), INITIAL_TRANSFER_AMOUNT);
       
-      const tx = await escrowVault.connect(sender).escrowTransfer(
+      const tx = await escrowVault.connect(sender).createEscrow(
         await token1.getAddress(),
         recipient.address,
         INITIAL_TRANSFER_AMOUNT
@@ -146,7 +146,7 @@ describe("EscrowVault", function () {
     it("Should track fees per token", async function () {
       await token1.connect(sender).approve(await escrowVault.getAddress(), INITIAL_TRANSFER_AMOUNT);
       
-      await escrowVault.connect(sender).escrowTransfer(
+      await escrowVault.connect(sender).createEscrow(
         await token1.getAddress(),
         recipient.address,
         INITIAL_TRANSFER_AMOUNT
@@ -165,7 +165,7 @@ describe("EscrowVault", function () {
     it("Should withdraw fees for specific token", async function () {
       await token1.connect(sender).approve(await escrowVault.getAddress(), INITIAL_TRANSFER_AMOUNT);
       
-      await escrowVault.connect(sender).escrowTransfer(
+      await escrowVault.connect(sender).createEscrow(
         await token1.getAddress(),
         recipient.address,
         INITIAL_TRANSFER_AMOUNT
@@ -211,12 +211,10 @@ describe("EscrowVault", function () {
         escrowType: 0
       };
       
-      const tx = await escrowVault.connect(sender).createEscrow(
-        await token1.getAddress(),
-        recipient.address,
-        INITIAL_TRANSFER_AMOUNT,
-        settings
-      );
+      const tx = await escrowVault
+        .connect(sender)
+        .getFunction("createEscrow(address,address,uint256,(address,bool,uint256,uint256,uint8))")
+        .send(await token1.getAddress(), recipient.address, INITIAL_TRANSFER_AMOUNT, settings);
       await tx.wait();
       
       const workflowId = Number(await escrowVault.nextWorkflowId()) - 1;
@@ -279,24 +277,27 @@ describe("EscrowVault", function () {
       const escrowTransfer = await escrowVault.escrowTransfers(workflowId);
       const payouts = [{
         recipient: recipient.address,
-        amount: escrowTransfer.amount
+        amount: escrowTransfer.remainingBalance
       }];
       
       const recipientBalanceBefore = await token1.balanceOf(recipient.address);
       
-      await escrowVault.connect(resolver).resolve(workflowId, payouts, ethers.ZeroHash);
+      await escrowVault
+        .connect(resolver)
+        .getFunction("resolve(uint256,(address,uint256)[],bytes32)")
+        .send(workflowId, payouts, ethers.ZeroHash);
       
       const transfer = await escrowVault.escrowTransfers(workflowId);
       expect(transfer.escrowState).to.equal(5); // RESOLVED
       
       const recipientBalanceAfter = await token1.balanceOf(recipient.address);
-      expect(recipientBalanceAfter - recipientBalanceBefore).to.equal(escrowTransfer.amount);
+      expect(recipientBalanceAfter - recipientBalanceBefore).to.equal(escrowTransfer.remainingBalance);
     });
   });
 
   // Helper function
   async function createEscrowTransfer(token: string, amount: bigint) {
-    const tx = await escrowVault.connect(sender).escrowTransfer(token, recipient.address, amount);
+    const tx = await escrowVault.connect(sender).createEscrow(token, recipient.address, amount);
     await tx.wait();
     const workflowId = Number(await escrowVault.nextWorkflowId()) - 1;
     return workflowId;

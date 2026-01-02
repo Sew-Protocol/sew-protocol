@@ -36,7 +36,7 @@ describe("Error Handling", function () {
       const largeAmount = ethers.parseEther("1000"); // More than user1 has
       
       await expect(
-        escrowableERC20.connect(user1).escrowTransfer(user2.address, largeAmount)
+        escrowableERC20.connect(user1).createEscrow(user2.address, largeAmount)
       ).to.be.revertedWithCustomError(escrowableERC20, "InsufficientTokenBalance")
         .withArgs(ethers.parseEther("100"), largeAmount);
     });
@@ -45,7 +45,7 @@ describe("Error Handling", function () {
       const amount = ethers.parseEther("50");
       
       await expect(
-        escrowableERC20.connect(user1).escrowTransfer(user2.address, amount)
+        escrowableERC20.connect(user1).createEscrow(user2.address, amount)
       ).to.not.be.reverted;
     });
   });
@@ -74,7 +74,7 @@ describe("Error Handling", function () {
     it("should provide user-friendly error for non-pending transfer", async function () {
       // Create a transfer
       const amount = ethers.parseEther("10");
-      const tx = await escrowableERC20.connect(user1).escrowTransfer(user2.address, amount);
+      const tx = await escrowableERC20.connect(user1).createEscrow(user2.address, amount);
       await tx.wait();
       const workflowId = Number(await escrowableERC20.nextWorkflowId()) - 1;
       
@@ -93,7 +93,10 @@ describe("Error Handling", function () {
     it("should provide user-friendly error for unauthorized resolver", async function () {
       // Create a transfer
       const amount = ethers.parseEther("10");
-      const tx = await escrowableERC20.connect(user1).escrowTransfer(user2.address, amount);
+      const tx = await escrowableERC20
+        .connect(user1)
+        .getFunction("createEscrow(address,uint256)")
+        .send(user2.address, amount);
       await tx.wait();
       const workflowId = Number(await escrowableERC20.nextWorkflowId()) - 1;
       
@@ -113,7 +116,7 @@ describe("Error Handling", function () {
       const largeAmount = ethers.parseEther("1000");
       
       try {
-        await escrowableERC20.connect(user1).escrowTransfer(user2.address, largeAmount);
+        await escrowableERC20.connect(user1).createEscrow(user2.address, largeAmount);
       } catch (error: any) {
         // Check that the error contains useful information
         expect(error.message).to.include("InsufficientTokenBalance");

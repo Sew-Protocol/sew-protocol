@@ -81,8 +81,8 @@ struct EscrowTransfer {
     address token; // ERC20 token address (for EscrowVault) or address(this) for EscrowableERC20
     address to;
     address from;
-    uint256 amount; // amount held in escrow
-    uint256 originalAmount; // original amount of the transfer
+    uint256 remainingBalance; // remaining balance held in escrow (may be less than totalDeposited if partially released/cancelled)
+    uint256 totalDeposited; // total amount originally deposited (before any releases/cancellations)
     EscrowState escrowState;
     SenderStatus senderStatus;
     RecipientStatus recipientStatus;
@@ -91,6 +91,7 @@ struct EscrowTransfer {
     uint256 autoCancelTime;
     string[] attachmentURIs;
     bytes32[] attachmentHashes;
+    bytes metadata; // optional metadata (IPFS hash, JSON, custom data)
     // Phase 7: Module snapshots (ensures module changes only affect new escrows)
     address snapshotResolutionModule;    // Resolution module at creation time
     address snapshotReleaseStrategy;     // Release strategy at creation time
@@ -361,7 +362,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
             _releaseEscrowTransfer(workflowId);
             // Phase 1: Emit timeout executed event (0 = RELEASE)
             emit TimeoutExecuted(workflowId, 0);
-            // Amount is 0 after release (et.amount was set to 0 in _releaseEscrowTransfer)
+            // Amount is 0 after release (et.remainingBalance was set to 0 in _releaseEscrowTransfer)
             emit EscrowTransferAutoReleased(workflowId, to, 0);
             return true;
         } else if(et.autoCancelTime > 0 && block.timestamp >= et.autoCancelTime) {
@@ -369,7 +370,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
             _cancelAndRefund(workflowId);
             // Phase 1: Emit timeout executed event (1 = CANCEL)
             emit TimeoutExecuted(workflowId, 1);
-            // Amount is 0 after cancel (et.amount was set to 0 in _cancelAndRefund)
+            // Amount is 0 after cancel (et.remainingBalance was set to 0 in _cancelAndRefund)
             emit EscrowTransferAutoCancelled(workflowId, from, 0);
             return true;
         }
@@ -624,7 +625,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         
         // Phase 1: Capture old status for state change event
         EscrowState oldStatus = et.escrowState;
-        uint256 originalAmount = et.originalAmount;
+        uint256 originalAmount = et.totalDeposited;
         
         _cancelAndRefund(workflowId);
         et.escrowState = EscrowState.RESOLVED;
@@ -658,15 +659,15 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         
         // Save values before state changes
         EscrowState oldStatus = et.escrowState;
-        uint256 amount = et.amount;
+        uint256 amount = et.remainingBalance;
         address token = et.token;
         address to = et.to;
         address from = et.from;
-        uint256 originalEscrowAmount = et.originalAmount;
+        uint256 originalEscrowAmount = et.totalDeposited;
         
         // State changes BEFORE external calls (checks-effects-interactions)
         // Update escrow state first to prevent reentrancy
-        et.amount = 0;
+        et.remainingBalance = 0;
         et.escrowState = EscrowState.RESOLVED;
         _updateEscrowBalance(token, amount, false);
         totalEscrowsPending--;
@@ -711,24 +712,24 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         if (amount == 0) {
             revert InvalidAmount("Amount must be greater than zero");
         }
-        if (amount > et.amount) {
-            revert AmountExceedsTransfer(workflowId, amount, et.amount);
+        if (amount > et.remainingBalance) {
+            revert AmountExceedsTransfer(workflowId, amount, et.remainingBalance);
         }
         
         // Save values and calculate yield before state changes
         address releaseTo = et.to;
         address from = et.from;
-        uint256 originalAmount = et.originalAmount;
+        uint256 originalAmount = et.totalDeposited;
         address token = et.token;
         uint256 actualAmount = amount;
         uint256 yieldToDistribute = 0;
         
         IYieldGenerationModule genModule = _getYieldGenerationModule(workflowId);
         uint256 totalYield = address(genModule) == address(0) ? 0 : genModule.calculateYield(workflowId, token);
-        yieldToDistribute = ResolverLogicLibrary.calculateProportionalYield(totalYield, amount, et.amount);
+        yieldToDistribute = ResolverLogicLibrary.calculateProportionalYield(totalYield, amount, et.remainingBalance);
         
-        et.amount -= amount;
-        bool isComplete = (et.amount == 0);
+        et.remainingBalance -= amount;
+        bool isComplete = (et.remainingBalance == 0);
         if (isComplete) {
             et.escrowState = EscrowState.RESOLVED;
             totalEscrowsPending--;
@@ -736,7 +737,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         
         uint256 proportionalOriginalDeposit = amount;
         // Use the original full deposit amount for proportional calculation, not the partial amount
-        uint256 originalDeposit = et.originalAmount;
+        uint256 originalDeposit = et.totalDeposited;
         if (address(genModule) != address(0)) {
             (bool success, uint256 amt) = genModule.withdrawProportional(workflowId, token, amount, originalDeposit);
             if (success) actualAmount = amt;
@@ -784,24 +785,24 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         if (amount == 0) {
             revert InvalidAmount("Amount must be greater than zero");
         }
-        if (amount > et.amount) {
-            revert AmountExceedsTransfer(workflowId, amount, et.amount);
+        if (amount > et.remainingBalance) {
+            revert AmountExceedsTransfer(workflowId, amount, et.remainingBalance);
         }
         
         // Save values and calculate yield before state changes
         address refundTo = et.from;
         address to = et.to;
-        uint256 originalAmount = et.originalAmount;
+        uint256 originalAmount = et.totalDeposited;
         address token = et.token;
         uint256 actualAmount = amount;
         uint256 yieldToDistribute = 0;
         
         IYieldGenerationModule genModule = _getYieldGenerationModule(workflowId);
         uint256 totalYield = address(genModule) == address(0) ? 0 : genModule.calculateYield(workflowId, token);
-        yieldToDistribute = ResolverLogicLibrary.calculateProportionalYield(totalYield, amount, et.amount);
+        yieldToDistribute = ResolverLogicLibrary.calculateProportionalYield(totalYield, amount, et.remainingBalance);
         
-        et.amount -= amount;
-        bool isComplete = (et.amount == 0);
+        et.remainingBalance -= amount;
+        bool isComplete = (et.remainingBalance == 0);
         if (isComplete) {
             EscrowState oldStatus = et.escrowState;
             et.escrowState = EscrowState.RESOLVED;
@@ -811,7 +812,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         
         uint256 proportionalOriginalDeposit = amount;
         // Use the original full deposit amount for proportional calculation, not the partial amount
-        uint256 originalDeposit = et.originalAmount;
+        uint256 originalDeposit = et.totalDeposited;
         if (address(genModule) != address(0)) {
             (bool success, uint256 amt) = genModule.withdrawProportional(workflowId, token, amount, originalDeposit);
             if (success) actualAmount = amt;
@@ -853,8 +854,8 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
                 et.token,
                 et.from,
                 et.to,
-                et.amount,
-                et.originalAmount
+                et.remainingBalance,
+                et.totalDeposited
             );
             
             try IResolutionModule(snapshotModule).isAuthorizedResolver(
@@ -895,7 +896,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         address to,
         uint256 amount,
         uint256 originalAmount
-    ) internal view returns (address) {
+    ) internal view virtual returns (address) {
         // Phase 7: Always use resolution module (authorizedResolver gate removed)
         if (resolutionModule == address(0)) {
             revert ResolutionModuleNotConfigured();
@@ -944,11 +945,11 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         // Phase 1: Emit state change and dispute opened events
         emit EscrowStateChanged(workflowId, oldStatus, EscrowState.DISPUTED);
         emit DisputeOpened(workflowId, _msgSender(), resolver);
-        emit EscrowTransferDisputed(workflowId, et.from, et.to, et.amount);
+        emit EscrowTransferDisputed(workflowId, et.from, et.to, et.remainingBalance);
         
         // Phase 2: Initialize dispute in resolution module if active
         if (address(resolutionModule) != address(0)) {
-            bytes memory escrowData = _encodeResolutionData(et.token, et.from, et.to, et.amount, et.originalAmount);
+            bytes memory escrowData = _encodeResolutionData(et.token, et.from, et.to, et.remainingBalance, et.totalDeposited);
             
             // Get resolver from module (may update resolver if module has dynamic assignment)
             try IResolutionModule(resolutionModule).getResolver(workflowId, escrowData) returns (address moduleResolver, uint8 /* escalationLevel */) {
@@ -960,7 +961,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
                 
                 // Try to initialize dispute in module (if it supports it)
                 // This is optional - module may handle initialization internally
-                _initializeDisputeInModule(workflowId, resolver, et.token, et.amount);
+                _initializeDisputeInModule(workflowId, resolver, et.token, et.remainingBalance);
             } catch {
                 // Module call failed, use existing resolver
             }
@@ -1071,7 +1072,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         }
         
         // Get current escalation level from module
-        bytes memory escrowData = _encodeResolutionData(et.token, et.from, et.to, et.amount, et.originalAmount);
+        bytes memory escrowData = _encodeResolutionData(et.token, et.from, et.to, et.remainingBalance, et.totalDeposited);
         (, uint8 currentLevel) = IResolutionModule(resolutionModule).getResolver(
             workflowId,
             escrowData
@@ -1291,17 +1292,51 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
     }
 
     /**
+     * @notice Get the total amount originally deposited
+     * @param workflowId The escrow transfer ID
+     * @return Total amount originally deposited (before any releases/cancellations)
+     * @dev Returns totalDeposited from EscrowTransfer struct.
+     *      For yield tracking, query the yield generation module directly.
+     */
+    function getTotalDeposited(uint256 workflowId) public view returns (uint256) {
+        _validateWorkflowId(workflowId);
+        return escrowTransfers[workflowId].totalDeposited;
+    }
+    
+    /**
+     * @notice Get the remaining balance in escrow
+     * @param workflowId The escrow transfer ID
+     * @return Remaining balance (may be less than totalDeposited if partially released/cancelled)
+     * @dev Returns remainingBalance from EscrowTransfer struct.
+     */
+    function getRemainingBalance(uint256 workflowId) public view returns (uint256) {
+        _validateWorkflowId(workflowId);
+        return escrowTransfers[workflowId].remainingBalance;
+    }
+    
+    /**
+     * @notice Get the current escrow amount for a transfer
+     * @param workflowId The escrow transfer ID
+     * @return Current amount held in escrow (may be less than totalDeposited if partially released/cancelled)
+     * @dev Reverts if workflowId is invalid
+     * @dev NOTE: Consider using getRemainingBalance() instead for clearer naming
+     */
+    function getEscrowAmount(uint256 workflowId) public view returns (uint256) {
+        _validateWorkflowId(workflowId);
+        return escrowTransfers[workflowId].remainingBalance;
+    }
+    
+    /**
      * @notice Get escrow's original deposit amount (for yield calculation)
      * @param workflowId The escrow transfer ID
      * @return Original deposit amount
-     * @dev Returns the current escrow amount as the original deposit.
+     * @dev Returns the total amount originally deposited.
      *      For yield tracking, query the yield generation module directly.
+     * @dev NOTE: Consider using getTotalDeposited() instead for clearer naming
      */
     function getEscrowOriginalDeposit(uint256 workflowId) public view returns (uint256) {
         _validateWorkflowId(workflowId);
-        // Return current amount as original deposit
-        // For actual original deposit tracking, query the yield generation module
-        return escrowTransfers[workflowId].amount;
+        return escrowTransfers[workflowId].totalDeposited;
     }
 
     /**
@@ -1318,15 +1353,15 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         EscrowState oldStatus = et.escrowState;
         
         // Save values before state changes
-        uint256 amount = et.amount;
+        uint256 amount = et.remainingBalance;
         address from = et.from;
-        uint256 originalAmount = et.originalAmount;
+        uint256 originalAmount = et.totalDeposited;
         address token = et.token;
         
         // State changes BEFORE external calls (checks-effects-interactions)
         // Update escrow state first to prevent reentrancy
         et.escrowState = EscrowState.REFUNDED;
-        et.amount = 0;
+        et.remainingBalance = 0;
         totalEscrowsPending--;
         
         emit EscrowStateChanged(workflowId, oldStatus, EscrowState.REFUNDED);
@@ -1362,16 +1397,16 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         EscrowState oldStatus = et.escrowState;
         
         // Save values before state changes
-        uint256 amount = et.amount;
+        uint256 amount = et.remainingBalance;
         address to = et.to;
-        uint256 originalAmount = et.originalAmount;
+        uint256 originalAmount = et.totalDeposited;
         address token = et.token;
         uint256 yield = 0;
         
         // State changes BEFORE external calls (checks-effects-interactions)
         // Update escrow state first to prevent reentrancy
         et.escrowState = EscrowState.RELEASED;
-        et.amount = 0;
+        et.remainingBalance = 0;
         totalEscrowsPending--;
         
         emit EscrowStateChanged(workflowId, oldStatus, EscrowState.RELEASED);
@@ -1684,6 +1719,31 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
     }
     
     /**
+     * @notice Get the current status of an escrow transfer
+     * @param workflowId The escrow transfer ID
+     * @return EscrowState The current state of the escrow
+     * @dev Reverts if workflowId is invalid
+     */
+    function getEscrowStatus(uint256 workflowId) public view returns (EscrowState) {
+        _validateWorkflowId(workflowId);
+        return escrowTransfers[workflowId].escrowState;
+    }
+    
+    /**
+     * @notice Check if an escrow is in an active state (PENDING or DISPUTED)
+     * @param workflowId The escrow transfer ID
+     * @return True if escrow is active (PENDING or DISPUTED), false otherwise
+     * @dev Returns false for invalid workflowId
+     */
+    function isEscrowActive(uint256 workflowId) public view returns (bool) {
+        if (workflowId >= nextWorkflowId) {
+            return false;
+        }
+        EscrowState state = escrowTransfers[workflowId].escrowState;
+        return state == EscrowState.PENDING || state == EscrowState.DISPUTED;
+    }
+    
+    /**
      * @notice Check if an escrow transfer is in PENDING state
      * @param workflowId The escrow transfer ID
      * @return True if escrow is pending, false otherwise (including invalid workflowId)
@@ -1693,17 +1753,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
             return false;
         }
         return escrowTransfers[workflowId].escrowState == EscrowState.PENDING;
-    }
-    
-    /**
-     * @notice Get the current escrow amount for a transfer
-     * @param workflowId The escrow transfer ID
-     * @return Current amount held in escrow (may be less than originalAmount if partially released/cancelled)
-     * @dev Reverts if workflowId is invalid
-     */
-    function getEscrowAmount(uint256 workflowId) public view returns (uint256) {
-        _validateWorkflowId(workflowId);
-        return escrowTransfers[workflowId].amount;
     }
     
     /**
@@ -1836,7 +1885,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
             revert TransferNotInDispute(workflowId, et.escrowState);
         }
 
-        uint256 totalPayout = ResolverLogicLibrary.validatePayouts(payouts, et.amount);
+        uint256 totalPayout = ResolverLogicLibrary.validatePayouts(payouts, et.remainingBalance);
 
         EscrowState oldStatus = et.escrowState;
 
@@ -1844,7 +1893,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         
         IYieldGenerationModule genModule = _getYieldGenerationModule(workflowId);
         uint256 totalYield = address(genModule) == address(0) ? 0 : genModule.calculateYield(workflowId, et.token);
-        uint256 yieldToDistribute = ResolverLogicLibrary.calculateTotalYieldToDistribute(totalYield, payoutAmounts, et.amount);
+        uint256 yieldToDistribute = ResolverLogicLibrary.calculateTotalYieldToDistribute(totalYield, payoutAmounts, et.remainingBalance);
         
         uint256 originalDeposit = totalPayout;
         uint256 actualTotalPayout = totalPayout;
@@ -1859,10 +1908,10 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         }
 
         // State changes before external calls (checks-effects-interactions)
-        et.amount -= totalPayout;
+        et.remainingBalance -= totalPayout;
         _updateEscrowBalance(et.token, totalPayout, false);
         
-        bool isComplete = (et.amount == 0);
+        bool isComplete = (et.remainingBalance == 0);
         if (isComplete) {
             et.escrowState = EscrowState.RESOLVED;
             totalEscrowsPending--;
@@ -1890,7 +1939,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         
         // Also emit legacy event for backward compatibility
         if (isComplete) {
-            emit EscrowTransferResolved(workflowId, et.from, et.to, et.originalAmount);
+            emit EscrowTransferResolved(workflowId, et.from, et.to, et.totalDeposited);
         }
 
         return true;

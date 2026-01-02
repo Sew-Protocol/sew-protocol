@@ -10,10 +10,10 @@ library EscrowEncodingLibrary {
     /**
      * @dev Encode escrow transfer data
      * @param token Token address
-     * @param from Sender address
-     * @param to Recipient address
-     * @param amount Current amount
-     * @param originalAmount Original amount
+     * @param from Sender address (buyer)
+     * @param to Recipient address (seller)
+     * @param amount Remaining balance (current amount in escrow)
+     * @param originalAmount Total deposited (original amount)
      * @return Encoded data as bytes
      */
     function encodeEscrowTransferData(
@@ -30,10 +30,10 @@ library EscrowEncodingLibrary {
      * @dev Decode escrow transfer data
      * @param data Encoded data
      * @return token Token address
-     * @return from Sender address
-     * @return to Recipient address
-     * @return amount Current amount
-     * @return originalAmount Original amount
+     * @return from Sender address (buyer)
+     * @return to Recipient address (seller)
+     * @return amount Remaining balance (current amount in escrow)
+     * @return originalAmount Total deposited (original amount)
      */
     function decodeEscrowTransferData(
         bytes memory data

@@ -89,7 +89,8 @@ describe("Bounds Enforcement", function () {
 
     it("Should revert if exceeds 30 days", async function () {
       const currentTime = await time.latest();
-      const invalidTime = BigInt(currentTime) + BigInt(MAX_AUTO_TIME_DAYS) + 1n;
+      // Add a large buffer (1 day) to ensure it definitely exceeds the limit even if block.timestamp advances
+      const invalidTime = BigInt(currentTime) + BigInt(MAX_AUTO_TIME_DAYS) + BigInt(86400); // +1 day
       await expect(
         escrowableERC20.connect(timelock).setDefaultAutoCancelTime(invalidTime)
       ).to.be.revertedWithCustomError(escrowableERC20, "OutOfBounds");
@@ -113,7 +114,8 @@ describe("Bounds Enforcement", function () {
 
     it("Should revert if exceeds 30 days", async function () {
       const currentTime = await time.latest();
-      const invalidTime = BigInt(currentTime) + BigInt(MAX_AUTO_TIME_DAYS) + 1n;
+      // Add a large buffer (1 day) to ensure it definitely exceeds the limit even if block.timestamp advances
+      const invalidTime = BigInt(currentTime) + BigInt(MAX_AUTO_TIME_DAYS) + BigInt(86400); // +1 day
       await expect(
         escrowableERC20.connect(timelock).setDefaultAutoReleaseTime(invalidTime)
       ).to.be.revertedWithCustomError(escrowableERC20, "OutOfBounds");
@@ -234,10 +236,10 @@ describe("Bounds Enforcement", function () {
 
     it("Should accept 1 recipient with 100%", async function () {
       const recipients = [recipient1.address];
-      const percentages = [BPS_DENOMINATOR];
+      const percentages = [BigInt(BPS_DENOMINATOR)];
       
       await escrowableERC20.connect(timelock).setDefaultYieldDistribution(recipients, percentages);
-      const distribution = await escrowableERC20.defaultYieldDistribution();
+      const distribution = await escrowableERC20.getDefaultYieldDistribution();
       expect(distribution.recipients.length).to.equal(1);
       expect(distribution.isSet).to.be.true;
     });
@@ -248,10 +250,10 @@ describe("Bounds Enforcement", function () {
         recipient5.address, recipient6.address, recipient7.address, recipient8.address,
         recipient9.address, recipient10.address
       ];
-      const percentages = Array(10).fill(BPS_DENOMINATOR / 10); // 10% each
+      const percentages = Array(10).fill(1000n); // 10% each (1000 bps = 10%)
       
       await escrowableERC20.connect(timelock).setDefaultYieldDistribution(recipients, percentages);
-      const distribution = await escrowableERC20.defaultYieldDistribution();
+      const distribution = await escrowableERC20.getDefaultYieldDistribution();
       expect(distribution.recipients.length).to.equal(10);
     });
 
@@ -270,7 +272,9 @@ describe("Bounds Enforcement", function () {
         recipient5.address, recipient6.address, recipient7.address, recipient8.address,
         recipient9.address, recipient10.address, recipient11.address
       ];
-      const percentages = Array(11).fill(BPS_DENOMINATOR / 11);
+      // 11 recipients would require dividing 10000 by 11, which doesn't divide evenly
+      // Use approximate values that sum to 10000
+      const percentages = [909n, 909n, 909n, 909n, 909n, 909n, 909n, 909n, 909n, 909n, 910n]; // Sum = 10000
       
       await expect(
         escrowableERC20.connect(timelock).setDefaultYieldDistribution(recipients, percentages)
@@ -279,7 +283,7 @@ describe("Bounds Enforcement", function () {
 
     it("Should revert if array lengths mismatch", async function () {
       const recipients = [recipient1.address, recipient2.address];
-      const percentages = [BPS_DENOMINATOR]; // Only 1 percentage
+      const percentages = [BigInt(BPS_DENOMINATOR)]; // Only 1 percentage
       
       await expect(
         escrowableERC20.connect(timelock).setDefaultYieldDistribution(recipients, percentages)
@@ -288,7 +292,7 @@ describe("Bounds Enforcement", function () {
 
     it("Should revert if sum doesn't equal 10000", async function () {
       const recipients = [recipient1.address, recipient2.address];
-      const percentages = [5000, 4999]; // Sum = 9999, not 10000
+      const percentages = [5000n, 4999n]; // Sum = 9999, not 10000
       
       await expect(
         escrowableERC20.connect(timelock).setDefaultYieldDistribution(recipients, percentages)
@@ -297,7 +301,7 @@ describe("Bounds Enforcement", function () {
 
     it("Should revert if sum exceeds 10000", async function () {
       const recipients = [recipient1.address, recipient2.address];
-      const percentages = [5000, 5001]; // Sum = 10001
+      const percentages = [5000n, 5001n]; // Sum = 10001
       
       await expect(
         escrowableERC20.connect(timelock).setDefaultYieldDistribution(recipients, percentages)
@@ -306,7 +310,7 @@ describe("Bounds Enforcement", function () {
 
     it("Should revert if recipient is zero address", async function () {
       const recipients = [ethers.ZeroAddress];
-      const percentages = [BPS_DENOMINATOR];
+      const percentages = [BigInt(BPS_DENOMINATOR)];
       
       await expect(
         escrowableERC20.connect(timelock).setDefaultYieldDistribution(recipients, percentages)
@@ -315,7 +319,7 @@ describe("Bounds Enforcement", function () {
 
     it("Should revert if duplicate recipients", async function () {
       const recipients = [recipient1.address, recipient1.address];
-      const percentages = [5000, 5000];
+      const percentages = [5000n, 5000n];
       
       await expect(
         escrowableERC20.connect(timelock).setDefaultYieldDistribution(recipients, percentages)
@@ -324,10 +328,10 @@ describe("Bounds Enforcement", function () {
 
     it("Should accept valid distribution with multiple recipients", async function () {
       const recipients = [recipient1.address, recipient2.address, recipient3.address];
-      const percentages = [4000, 3000, 3000]; // Sum = 10000
+      const percentages = [4000n, 3000n, 3000n]; // Sum = 10000
       
       await escrowableERC20.connect(timelock).setDefaultYieldDistribution(recipients, percentages);
-      const distribution = await escrowableERC20.defaultYieldDistribution();
+      const distribution = await escrowableERC20.getDefaultYieldDistribution();
       expect(distribution.recipients.length).to.equal(3);
       expect(distribution.isSet).to.be.true;
     });
@@ -342,7 +346,8 @@ describe("Bounds Enforcement", function () {
 
       // Test auto cancel time
       const currentTime = await time.latest();
-      const invalidTime = BigInt(currentTime) + BigInt(MAX_AUTO_TIME_DAYS) + 1n;
+      // Add a large buffer (1 day) to ensure it definitely exceeds the limit even if block.timestamp advances
+      const invalidTime = BigInt(currentTime) + BigInt(MAX_AUTO_TIME_DAYS) + BigInt(86400); // +1 day
       await expect(
         escrowVault.connect(timelock).setDefaultAutoCancelTime(invalidTime)
       ).to.be.revertedWithCustomError(escrowVault, "OutOfBounds");

@@ -31,16 +31,17 @@ contract DefaultResolutionModule is AccessControl, IResolutionModule {
 
     /**
      * @notice Check if address is authorized resolver
-     * @dev In default implementation, checks against authorizedResolver
-     * This is a placeholder - actual check happens in main contract
+     * @dev In default implementation, checks against stored resolver
      */
     function isAuthorizedResolver(
         uint256 /* workflowId */,
-        address /* resolver */,
+        address checkResolver,
         bytes calldata /* escrowData */
-    ) external pure override returns (bool authorized, uint8 role) {
-        // Advisory only; escrow contract should authorize based on the escrow's stored disputeResolver.
-        return (true, 0);
+    ) external view override returns (bool authorized, uint8 role) {
+        // Check if the resolver matches the stored resolver
+        authorized = (checkResolver == resolver);
+        role = 0;
+        return (authorized, role);
     }
 
     /**

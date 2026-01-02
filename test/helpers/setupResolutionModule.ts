@@ -6,6 +6,7 @@
  */
 
 import { ethers } from "hardhat";
+import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { 
   EscrowableERC20,
   EscrowVault,
@@ -39,27 +40,31 @@ export async function setupResolutionModule(
     }
   }
 
-  // Set resolution module delay to 0 for testing (instant activation)
-  try {
-    await contract.connect(deployer).setResolutionModuleDelay(0);
-  } catch (error: any) {
-    // If already set or fails, continue
-  }
-
   // Set default resolution module
   // Phase 8: EscrowVault now uses Slow lane (queue/activate) like EscrowableERC20
   if ("queueDefaultResolutionModule" in contract) {
-    // EscrowableERC20 or EscrowVault (after Phase 8 fix)
+    // EscrowableERC20 or EscrowVault (after Phase 8 fix) - uses 7-day delay
     await contract.connect(deployer).queueDefaultResolutionModule(await resolutionModule.getAddress());
-    const [, eta] = await contract.getPendingDefaultResolutionModule();
-    // Fast-forward time to allow activation
-    const { ethers } = await import("hardhat");
-    await ethers.provider.send("evm_setNextBlockTimestamp", [Number(eta) + 1]);
-    await ethers.provider.send("evm_mine", []);
+    const [, eta, exists] = await contract.getPendingDefaultResolutionModule();
+    if (!exists) {
+      throw new Error("Failed to queue resolution module");
+    }
+    // Fast-forward time to allow activation (7 days = 604800 seconds)
+    await time.increaseTo(Number(eta) + 1);
     await contract.connect(deployer).activateDefaultResolutionModule();
   } else if ("proposeResolutionModule" in contract) {
-    // BaseEscrow pattern (two-step with delay)
+    // BaseEscrow pattern (two-step with delay) - uses resolutionModuleDelay (min 48 hours)
+    // Set minimum delay for testing
+    const MIN_DELAY = 48 * 60 * 60; // 48 hours
+    try {
+      await contract.connect(deployer).setResolutionModuleDelay(MIN_DELAY);
+    } catch (error: any) {
+      // If already set or fails, continue
+    }
     await contract.connect(deployer).proposeResolutionModule(await resolutionModule.getAddress());
+    const delay = await contract.resolutionModuleDelay();
+    const currentTime = await time.latest();
+    await time.increaseTo(Number(currentTime) + Number(delay) + 1);
     await contract.connect(deployer).activateResolutionModule();
   } else {
     throw new Error("Contract does not have a method to set default resolution module.");

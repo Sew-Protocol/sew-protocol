@@ -200,7 +200,7 @@ describe("Slow Lane Queue/Activate", function () {
     it("Should revert on zero address", async function () {
       await expect(
         escrowableERC20.connect(timelock).queueDao(ethers.ZeroAddress)
-      ).to.be.revertedWithCustomError(escrowableERC20, "InvalidAddressKey");
+      ).to.be.revertedWithCustomError(escrowableERC20, "InvalidValue");
     });
   });
 

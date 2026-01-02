@@ -1,17 +1,23 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
+import { setupResolutionModule } from "../helpers/setupResolutionModule";
 
 describe("Simple Error Test", function () {
   let escrowableERC20: any;
   let owner: any;
   let user1: any;
   let user2: any;
+  let resolver: any;
 
   beforeEach(async function () {
-    [owner, user1, user2] = await ethers.getSigners();
+    [owner, user1, user2, resolver] = await ethers.getSigners();
 
     const EscrowableERC20Factory = await ethers.getContractFactory("EscrowableERC20");
     escrowableERC20 = await EscrowableERC20Factory.deploy("Test Token", "TEST", 100, owner.address);
+    await escrowableERC20.waitForDeployment();
+
+    // Phase 7: Setup resolution module (required for escrow creation)
+    await setupResolutionModule(escrowableERC20, owner, resolver.address);
 
     // Transfer some tokens to user1 for testing
     await escrowableERC20.transfer(user1.address, ethers.parseEther("100"));
@@ -26,7 +32,7 @@ describe("Simple Error Test", function () {
     console.log("Required amount:", ethers.formatEther(largeAmount));
     
     try {
-      await escrowableERC20.connect(user1).escrowTransfer(user2.address, largeAmount);
+      await escrowableERC20.connect(user1).createEscrow(user2.address, largeAmount);
       expect.fail("Expected transaction to revert");
     } catch (error: any) {
       console.log("Error caught:", error.message);
@@ -39,7 +45,7 @@ describe("Simple Error Test", function () {
     const amount = ethers.parseEther("50");
     
     await expect(
-      escrowableERC20.connect(user1).escrowTransfer(user2.address, amount)
+      escrowableERC20.connect(user1).createEscrow(user2.address, amount)
     ).to.not.be.reverted;
   });
 

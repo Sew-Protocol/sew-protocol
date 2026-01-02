@@ -91,19 +91,19 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
 
     /**
      * @notice Create a new escrow with custom settings
-     * @param to Recipient address
+     * @param seller Recipient address (seller)
      * @param amount Amount to escrow (fee will be deducted)
      * @param settings Escrow settings (custom resolver, yield, timing, etc.)
      * @return workflowId The ID of the created escrow transfer
      */
     function createEscrow(
-        address to,
+        address seller,
         uint256 amount,
         EscrowSettings memory settings
     ) public nonReentrant whenNotPaused returns (uint256) {
         // Input validation
-        if (to == address(0)) {
-            revert InvalidAddress("Recipient address cannot be zero", to);
+        if (seller == address(0)) {
+            revert InvalidAddress("Seller address cannot be zero", seller);
         }
         if (amount == 0) {
             revert InvalidAmount("Amount must be greater than zero");
@@ -132,7 +132,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
             workflowId,
             address(this),
             _msgSender(),
-            to,
+            seller,
             amountAfterFee,
             amount
         );
@@ -140,10 +140,10 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
             {
                 workflowId: workflowId,
                 token: address(this), // This contract's token
-                to: to, 
+                to: seller, 
                 from: _msgSender(), 
-                amount: amountAfterFee,
-                originalAmount: amount,
+                remainingBalance: amountAfterFee,
+                totalDeposited: amount,
                 escrowState: EscrowState.PENDING,
                 senderStatus: SenderStatus.NONE,
                 recipientStatus: RecipientStatus.NONE,
@@ -152,6 +152,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
                 autoCancelTime: 0, // Will be set by _applyEscrowSettings
                 attachmentURIs: new string[](0),
                 attachmentHashes: new bytes32[](0),
+                metadata: "",
                 // Phase 7: Initialize module snapshots (will be set after escrow is created)
                 snapshotResolutionModule: address(0),
                 snapshotReleaseStrategy: address(0),
@@ -196,36 +197,36 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         
         // Phase 1: Emit state change event (creation -> PENDING)
         emit EscrowStateChanged(workflowId, EscrowState.PENDING, EscrowState.PENDING);
-        emit EscrowTransferCreated(workflowId, to, _msgSender(), amount);
+        emit EscrowTransferCreated(workflowId, seller, _msgSender(), amount);
         return workflowId;
     }
 
     /**
-     * @notice Create an escrow transfer with custom auto-release or auto-cancel time
-     * @param to Recipient address
+     * @notice Create an escrow with custom auto-release or auto-cancel time
+     * @param seller Recipient address (seller)
      * @param amount Amount to escrow (after fee deduction)
      * @param autoReleaseTime Timestamp for automatic release (0 = no auto-release)
      * @param autoCancelTime Timestamp for automatic cancel (0 = no auto-cancel)
      * @return workflowId The ID of the created escrow transfer
-     * @dev Backward compatibility wrapper for createEscrow
+     * @dev Convenience function for createEscrow with custom timing
      */
-    function timedEscrowTransfer(address to, uint256 amount, uint256 autoReleaseTime, uint256 autoCancelTime) public whenNotPaused returns (uint256) {
+    function createEscrow(address seller, uint256 amount, uint256 autoReleaseTime, uint256 autoCancelTime) public whenNotPaused returns (uint256) {
         EscrowSettings memory settings = _getDefaultSettings();
         settings.autoReleaseTime = autoReleaseTime;
         settings.autoCancelTime = autoCancelTime;
-        return createEscrow(to, amount, settings);
+        return createEscrow(seller, amount, settings);
     }
 
     /**
-     * @notice Create a new escrow transfer
-     * @param to Recipient address
+     * @notice Create a new escrow with default settings
+     * @param seller Recipient address (seller)
      * @param amount Amount to escrow (fee will be deducted)
      * @return workflowId The ID of the created escrow transfer
-     * @dev Backward compatibility wrapper for createEscrow with default settings
+     * @dev Convenience function for createEscrow with default settings
      */
-    function escrowTransfer(address to, uint256 amount) public whenNotPaused returns (uint256) {
+    function createEscrow(address seller, uint256 amount) public whenNotPaused returns (uint256) {
         EscrowSettings memory settings = _getDefaultSettings();
-        return createEscrow(to, amount, settings);
+        return createEscrow(seller, amount, settings);
     }
 
 
@@ -345,6 +346,40 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         EscrowTransfer storage et = escrowTransfers[workflowId];
         address snapshot = et.snapshotResolutionModule;
         return snapshot != address(0) ? IResolutionModule(snapshot) : defaultResolutionModule;
+    }
+
+    /**
+     * @dev Override BaseEscrow's _getDisputeResolverForNewEscrow to use defaultResolutionModule
+     * @param workflowId The escrow transfer ID
+     * @param token Token address
+     * @param from Sender address
+     * @param to Recipient address
+     * @param amount Amount after fee
+     * @param originalAmount Original amount before fee
+     * @return resolver The dispute resolver address
+     */
+    function _getDisputeResolverForNewEscrow(
+        uint256 workflowId,
+        address token,
+        address from,
+        address to,
+        uint256 amount,
+        uint256 originalAmount
+    ) internal view override returns (address) {
+        // Phase 7: Always use defaultResolutionModule (authorizedResolver gate removed)
+        if (address(defaultResolutionModule) == address(0)) {
+            revert ResolutionModuleNotConfigured();
+        }
+
+        bytes memory escrowData = _encodeResolutionData(token, from, to, amount, originalAmount);
+        try IResolutionModule(defaultResolutionModule).getResolver(workflowId, escrowData) returns (address resolver, uint8 /* escalationLevel */) {
+            if (resolver == address(0)) {
+                revert ResolutionModuleReturnedZeroAddress();
+            }
+            return resolver;
+        } catch {
+            revert ResolutionModuleCallFailed();
+        }
     }
 
     /**
