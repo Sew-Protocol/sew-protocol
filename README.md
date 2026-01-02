@@ -40,3 +40,35 @@ PROXY_KIND=uups pnpm deploy --network baseSepolia
 - Gate upgrades behind **Safe + Timelock**.
 - Require **storage layout checks** on every upgrade.
 - Never leave upgrade authority on an EOA.
+
+## Governance
+
+The protocol uses onchain governance with TimelockController and OpenZeppelin Governor. See governance documentation:
+
+- [Governance Model](docs/governance.md) - Overview of governance structure
+- [Governance Surface Map](docs/GOVERNANCE_SURFACE_MAP.md) - Complete function → role → lane mapping
+- [Module Map](docs/MODULE_MAP.md) - Module interface → implementation mapping
+- [Upgrade Policy](docs/UPGRADE_POLICY.md) - Upgrade procedures and ossification plan
+- [Emergency Policy](docs/EMERGENCY_POLICY.md) - Emergency controls and procedures
+- [Governance Process](docs/GOVERNANCE_PROCESS.md) - Step-by-step governance workflow
+
+### Governance Tooling
+
+```bash
+# Build a proposal
+pnpm gov:build governance/payloads/0001_set_token_cap.ts
+
+# Simulate on fork
+pnpm gov:sim governance/proposals/0001_set_token_cap.json --fork-url=$BASE_RPC
+
+# Stage on testnet/mainnet
+pnpm gov:stage governance/proposals/0001_set_token_cap.json --stage=propose --network baseSepolia
+
+# Check execution
+pnpm gov:check governance/proposals/0001_set_token_cap.json --network baseMainnet
+
+# Emergency actions (Guardian only)
+pnpm gov:emergency pause --contract EscrowableERC20 --network baseMainnet
+```
+
+See [Phase 8 Documentation](docs/PHASE_8_COMPLETE.md) for complete tooling overview.
