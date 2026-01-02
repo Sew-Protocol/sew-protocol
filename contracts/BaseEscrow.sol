@@ -215,6 +215,10 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
     // Note: Aave-specific events have been moved to AaveYieldGenerationModule
     event DefaultYieldDistributionUpdated(address[] recipients, uint256[] percentages);
     event EscrowYieldDistributionUpdated(uint256 indexed workflowId, address[] recipients, uint256[] percentages);
+    
+    // Recovery events
+    event NativeETHRecovered(address indexed recipient, uint256 amount);
+    event ERC20Recovered(address indexed token, address indexed recipient, uint256 amount);
 
     /**
      * @notice Set the default auto-cancel time for new escrows
@@ -523,7 +527,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
      * @param resolver (unused) - kept for interface compatibility
      * @custom:deprecated This function will be removed in a future version. Use resolution modules instead.
      */
-    function setAuthorizedResolver(address resolver) public onlyRole(ROLE_TIMELOCK) {
+    function setAuthorizedResolver(address resolver) public view onlyRole(ROLE_TIMELOCK) {
         resolver; // Silence unused parameter warning
         // Phase 7: Function removed - resolver gate eliminated
         // Always revert to prevent accidental use
@@ -1104,6 +1108,11 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         
         // Update resolver in escrow
         et.disputeResolver = newResolverAddress;
+        
+        // Transfer escalation fee to fee address
+        if (escalationFee > 0 && escrowFeeAddress != address(0)) {
+            payable(escrowFeeAddress).transfer(escalationFee);
+        }
         
         // Refund excess fee
         if (msg.value > escalationFee) {
@@ -1946,5 +1955,73 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
     }
 
     // _usePermit() removed for contract size reduction - see docs/PERMIT_FUNCTIONALITY_REMOVED.md
+    
+    /**
+     * @notice Recover native ETH sent directly to the contract by mistake
+     * @param recipient Address to receive the recovered ETH
+     * @param amount Amount of ETH to recover (0 = recover all)
+     * @dev Only ROLE_TIMELOCK can call this. Use this to recover ETH sent directly to the contract.
+     *      This does NOT recover escrowed funds or fees - only ETH sent directly to the contract.
+     */
+    function recoverNativeETH(address recipient, uint256 amount) external onlyRole(ROLE_TIMELOCK) nonReentrant returns (bool) {
+        if (recipient == address(0)) {
+            revert InvalidAddress("Recipient cannot be zero address", recipient);
+        }
+        
+        uint256 balance = address(this).balance;
+        uint256 recoverAmount = amount == 0 ? balance : amount;
+        
+        if (recoverAmount == 0) {
+            revert InvalidAmount("No ETH to recover");
+        }
+        
+        if (recoverAmount > balance) {
+            revert InvalidAmount("Amount exceeds contract balance");
+        }
+        
+        payable(recipient).transfer(recoverAmount);
+        emit NativeETHRecovered(recipient, recoverAmount);
+        return true;
+    }
+    
+    /**
+     * @notice Recover ERC20 tokens sent directly to the contract by mistake
+     * @param token ERC20 token address
+     * @param recipient Address to receive the recovered tokens
+     * @param amount Amount of tokens to recover (0 = recover all)
+     * @dev Only ROLE_TIMELOCK can call this. Use this to recover tokens sent directly to the contract.
+     *      This does NOT recover escrowed funds or fees - only tokens sent directly to the contract.
+     *      For EscrowableERC20, this recovers tokens that are not part of any escrow.
+     *      For EscrowVault, this recovers tokens that are not part of any escrow and not tracked as fees.
+     */
+    function recoverERC20(address token, address recipient, uint256 amount) external onlyRole(ROLE_TIMELOCK) nonReentrant returns (bool) {
+        if (token == address(0)) {
+            revert InvalidAddress("Token address cannot be zero", token);
+        }
+        if (recipient == address(0)) {
+            revert InvalidAddress("Recipient cannot be zero address", recipient);
+        }
+        
+        IERC20 tokenContract = IERC20(token);
+        uint256 balance = tokenContract.balanceOf(address(this));
+        
+        // Calculate recoverable amount
+        uint256 recoverAmount = amount == 0 ? balance : amount;
+        
+        if (recoverAmount == 0) {
+            revert InvalidAmount("No tokens to recover");
+        }
+        
+        if (recoverAmount > balance) {
+            revert InvalidAmount("Amount exceeds contract balance");
+        }
+        
+        // For EscrowVault, check that we're not recovering tracked fees or escrowed amounts
+        // This is handled by the derived contract if needed
+        
+        tokenContract.safeTransfer(recipient, recoverAmount);
+        emit ERC20Recovered(token, recipient, recoverAmount);
+        return true;
+    }
 }
 

@@ -40,7 +40,7 @@ contract GovGovernor is
      * @param votingDelayBlocks Voting delay in blocks
      * @param votingPeriodBlocks Voting period in blocks
      * @param proposalThresholdTokens Minimum tokens needed to propose
-     * @param quorumBps Quorum in basis points (e.g., 400 = 4%)
+     * @param quorumBps Quorum numerator (denominator is 100, so 4 = 4%)
      */
     constructor(
         address token,

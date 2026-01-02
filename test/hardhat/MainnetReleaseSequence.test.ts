@@ -20,18 +20,17 @@ import {
   DefaultReleaseStrategy,
   DefaultResolutionModule,
   DefaultYieldDistributionModule,
-  ERC20Mock
+  SewToken,
+  GovGovernor
 } from "../typechain-types";
 
 // OpenZeppelin contracts - using any for now since types may not be generated
 // In production, these would be properly typed from @openzeppelin/contracts
 type TimelockController = any;
-type GovernorContract = any;
-type ERC20Votes = any;
 
 describe("Mainnet Release Sequence", function () {
   // Governance token for token holders
-  let governanceToken: ERC20Mock;
+  let governanceToken: SewToken;
   
   // Main contracts
   let escrowableERC20: EscrowableERC20;
@@ -44,7 +43,7 @@ describe("Mainnet Release Sequence", function () {
   
   // Governance infrastructure
   let timelock: TimelockController;
-  let governor: GovernorContract;
+  let governor: GovGovernor;
   
   // Simple multisig mock (using a simple 2-of-3 multisig pattern)
   let multisigOwner1: any;
@@ -88,26 +87,30 @@ describe("Mainnet Release Sequence", function () {
   });
 
   describe("Stage 0: Initial Deployment - Governance Token", function () {
-    it("Should deploy governance token (ERC20) for token holders", async function () {
-      // Deploy a simple ERC20 token with voting capabilities
-      // In production, this would be a full ERC20Votes token
-      const TokenFactory = await ethers.getContractFactory("ERC20Mock");
+    it("Should deploy governance token (SewToken) for token holders", async function () {
+      // Deploy SewToken (ERC20Votes) for governance
+      const TokenFactory = await ethers.getContractFactory("SewToken");
       governanceToken = await TokenFactory.deploy(
-        "Governance Token",
-        "GOV",
+        "Sew Token",
+        "SEW",
         deployer.address,
         INITIAL_TOKEN_SUPPLY
-      ) as ERC20Mock;
+      ) as SewToken;
       await governanceToken.waitForDeployment();
       
-      expect(await governanceToken.name()).to.equal("Governance Token");
-      expect(await governanceToken.symbol()).to.equal("GOV");
+      expect(await governanceToken.name()).to.equal("Sew Token");
+      expect(await governanceToken.symbol()).to.equal("SEW");
       expect(await governanceToken.totalSupply()).to.equal(INITIAL_TOKEN_SUPPLY);
       
-      // Distribute tokens to holders
+      // Distribute tokens to holders and delegate voting power
       await governanceToken.transfer(tokenHolder1.address, ethers.parseEther("1000000"));
       await governanceToken.transfer(tokenHolder2.address, ethers.parseEther("2000000"));
       await governanceToken.transfer(tokenHolder3.address, ethers.parseEther("3000000"));
+      
+      // Delegate voting power to themselves (required for ERC20Votes)
+      await governanceToken.connect(tokenHolder1).delegate(tokenHolder1.address);
+      await governanceToken.connect(tokenHolder2).delegate(tokenHolder2.address);
+      await governanceToken.connect(tokenHolder3).delegate(tokenHolder3.address);
       
       expect(await governanceToken.balanceOf(tokenHolder1.address)).to.equal(ethers.parseEther("1000000"));
       expect(await governanceToken.balanceOf(tokenHolder2.address)).to.equal(ethers.parseEther("2000000"));
@@ -553,37 +556,31 @@ describe("Mainnet Release Sequence", function () {
     });
 
     it("Should deploy OpenZeppelin Governor with Timelock", async function () {
-      // Deploy Governor contract
-      // Using GovernorTimelockControl for full integration
-      // Note: This requires @openzeppelin/contracts to be available
-      // For testing, we'll use getContractFactory with the contract name
+      // Deploy GovGovernor contract (production Governor implementation)
+      // GovGovernor constructor: (token, timelock, votingDelayBlocks, votingPeriodBlocks, proposalThresholdTokens, quorumBps)
       
       try {
-        // Try to get the contract factory - this will work if OpenZeppelin contracts are compiled
-        const GovernorFactory = await ethers.getContractFactory(
-          "@openzeppelin/contracts/governance/GovernorTimelockControl.sol:GovernorTimelockControl"
-        );
+        const GovernorFactory = await ethers.getContractFactory("GovGovernor");
         
-        // Note: In production, you'd use ERC20Votes token
-        // For testing, we'll use a simplified setup
-        // Governor constructor: (name, token, votingDelay, votingPeriod, proposalThreshold, timelock)
+        // Quorum: 4% (numerator is 4, denominator is 100 by default in GovernorVotesQuorumFraction)
+        const QUORUM_NUMERATOR = 4n; // 4%
         
         governor = await GovernorFactory.deploy(
-          "EscrowDAO",
           await governanceToken.getAddress(),
+          await timelock.getAddress(),
           VOTING_DELAY,
           VOTING_PERIOD,
           PROPOSAL_THRESHOLD,
-          await timelock.getAddress()
-        ) as unknown as GovernorContract;
+          QUORUM_NUMERATOR
+        ) as GovGovernor;
         await governor.waitForDeployment();
         
-        expect(await governor.name()).to.equal("EscrowDAO");
+        expect(await governor.name()).to.equal("Sew Protocol DAO");
         expect(await governor.votingDelay()).to.equal(VOTING_DELAY);
         expect(await governor.votingPeriod()).to.equal(VOTING_PERIOD);
+        expect(await governor.proposalThreshold()).to.equal(PROPOSAL_THRESHOLD);
       } catch (error: any) {
         // If Governor contracts aren't available, skip this test
-        // This is expected if OpenZeppelin governance contracts aren't in the compilation
         console.log("Skipping Governor deployment test - contracts may not be available:", error.message);
         this.skip();
       }
@@ -660,8 +657,7 @@ describe("Mainnet Release Sequence", function () {
 
     it("Should create and execute DAO proposal to change contract parameter", async function () {
       // Token holder creates a proposal
-      // First, they need to delegate voting power to themselves (if using ERC20Votes)
-      // For ERC20Mock, we'll simulate by having them hold tokens
+      // With ERC20Votes (SewToken), users need to delegate voting power to themselves
       
       const newFeeAddress = tokenHolder2.address;
       const setFeeAddressData = escrowableERC20.interface.encodeFunctionData(
@@ -675,19 +671,13 @@ describe("Mainnet Release Sequence", function () {
         this.skip();
         return;
       }
-      const proposalId = await governor.hashProposal(
-        [await escrowableERC20.getAddress()],
-        [0],
-        [setFeeAddressData],
-        ethers.id(proposalDescription)
-      );
       
-      // Propose (requires PROPOSAL_THRESHOLD tokens)
-      // In production, tokenHolder would need to delegate and have enough tokens
-      // For testing, we'll use deployer who has tokens
+      // Propose (requires PROPOSAL_THRESHOLD tokens with delegated voting power)
+      // Transfer tokens to deployer and delegate voting power
       await governanceToken.transfer(deployer.address, PROPOSAL_THRESHOLD);
+      await governanceToken.connect(deployer).delegate(deployer.address);
       
-      const proposeTx = await governor.propose(
+      const proposeTx = await governor.connect(deployer).propose(
         [await escrowableERC20.getAddress()],
         [0],
         [setFeeAddressData],
@@ -695,17 +685,28 @@ describe("Mainnet Release Sequence", function () {
       );
       await proposeTx.wait();
       
-      // Fast forward past voting delay
-      await time.advanceBlocks(VOTING_DELAY + 1);
+      const proposalId = await governor.hashProposal(
+        [await escrowableERC20.getAddress()],
+        [0],
+        [setFeeAddressData],
+        ethers.id(proposalDescription)
+      );
+      
+      // Fast forward past voting delay (mine blocks)
+      for (let i = 0; i < Number(VOTING_DELAY) + 1; i++) {
+        await ethers.provider.send("evm_mine", []);
+      }
       
       // Vote on proposal
-      // In production, token holders would vote
-      // For testing, we'll simulate votes
-      const voteTx = await governor.castVote(proposalId, 1); // 1 = For
+      // With ERC20Votes, voters need to have delegated voting power
+      // Deployer already delegated to themselves, so they can vote
+      const voteTx = await governor.connect(deployer).castVote(proposalId, 1); // 1 = For
       await voteTx.wait();
       
-      // Fast forward past voting period
-      await time.advanceBlocks(VOTING_PERIOD + 1);
+      // Fast forward past voting period (mine blocks)
+      for (let i = 0; i < Number(VOTING_PERIOD) + 1; i++) {
+        await ethers.provider.send("evm_mine", []);
+      }
       
       // Queue proposal in Timelock
       const queueTx = await governor.queue(
@@ -719,7 +720,7 @@ describe("Mainnet Release Sequence", function () {
       // Fast forward past timelock delay
       await time.increase(TIMELOCK_DELAY + 1);
       
-      // Execute proposal
+      // Execute proposal (this queues the fee address change)
       const executeTx = await governor.execute(
         [await escrowableERC20.getAddress()],
         [0],
@@ -727,6 +728,24 @@ describe("Mainnet Release Sequence", function () {
         ethers.id(proposalDescription)
       );
       await executeTx.wait();
+      
+      // After execution, the change is queued. We need to wait 7 days and then activate it.
+      // Fast-forward past the 7-day slow lane delay
+      const SLOW_LANE_DELAY = 7 * 24 * 60 * 60; // 7 days
+      await time.increase(SLOW_LANE_DELAY + 1);
+      
+      // Activate the queued change
+      // For testing, temporarily grant ROLE_TIMELOCK to deployer to activate
+      // (In production, this would be done via another DAO proposal or by the timelock)
+      const ROLE_TIMELOCK_ERC20 = await escrowableERC20.ROLE_TIMELOCK();
+      const timelockAddress = await timelock.getAddress();
+      const DEFAULT_ADMIN_ROLE = await escrowableERC20.DEFAULT_ADMIN_ROLE();
+      
+      // Timelock has DEFAULT_ADMIN_ROLE, so it can grant ROLE_TIMELOCK to deployer temporarily
+      // Then deployer activates, then we revoke the role
+      await escrowableERC20.connect(multisigOwner1).grantRole(ROLE_TIMELOCK_ERC20, deployer.address);
+      await escrowableERC20.connect(deployer).activateEscrowFeeAddress();
+      await escrowableERC20.connect(multisigOwner1).revokeRole(ROLE_TIMELOCK_ERC20, deployer.address);
       
       // Verify the change took effect
       expect(await escrowableERC20.escrowFeeAddress()).to.equal(newFeeAddress);
@@ -753,14 +772,16 @@ describe("Mainnet Release Sequence", function () {
       if (!governor) {
         this.skip();
       }
-      // Ensure deployer has enough tokens to propose
+      // Ensure deployer has enough tokens to propose and has delegated voting power
       const currentBalance = await governanceToken.balanceOf(deployer.address);
       if (currentBalance < PROPOSAL_THRESHOLD) {
         await governanceToken.transfer(deployer.address, PROPOSAL_THRESHOLD);
       }
+      // Delegate voting power to deployer (required for ERC20Votes)
+      await governanceToken.connect(deployer).delegate(deployer.address);
       
       // Create proposal
-      const proposeTx = await governor.propose(
+      const proposeTx = await governor.connect(deployer).propose(
         [await escrowableERC20.getAddress()],
         [0],
         [setResolverData],
@@ -776,14 +797,18 @@ describe("Mainnet Release Sequence", function () {
         ethers.id(proposalDescription)
       );
       
-      // Fast forward past voting delay
-      await time.advanceBlocks(VOTING_DELAY + 1);
+      // Fast forward past voting delay (mine blocks)
+      for (let i = 0; i < Number(VOTING_DELAY) + 1; i++) {
+        await ethers.provider.send("evm_mine", []);
+      }
       
-      // Vote
-      await governor.castVote(proposalId, 1);
+      // Vote (deployer has delegated voting power)
+      await governor.connect(deployer).castVote(proposalId, 1);
       
-      // Fast forward past voting period
-      await time.advanceBlocks(VOTING_PERIOD + 1);
+      // Fast forward past voting period (mine blocks)
+      for (let i = 0; i < Number(VOTING_PERIOD) + 1; i++) {
+        await ethers.provider.send("evm_mine", []);
+      }
       
       // Queue
       await governor.queue(
@@ -808,7 +833,13 @@ describe("Mainnet Release Sequence", function () {
       // Fast-forward past resolution module delay
       const resolutionDelay = await escrowableERC20.resolutionModuleDelay();
       await time.increase(Number(resolutionDelay) + 1);
-      await escrowableERC20.connect(await ethers.getSigner(await timelock.getAddress())).activateResolutionModule();
+      
+      // Activate the queued resolution module change
+      // For testing, temporarily grant ROLE_TIMELOCK to deployer to activate
+      const ROLE_TIMELOCK_ERC20 = await escrowableERC20.ROLE_TIMELOCK();
+      await escrowableERC20.connect(multisigOwner1).grantRole(ROLE_TIMELOCK_ERC20, deployer.address);
+      await escrowableERC20.connect(deployer).activateResolutionModule();
+      await escrowableERC20.connect(multisigOwner1).revokeRole(ROLE_TIMELOCK_ERC20, deployer.address);
       
       // Phase 7: authorizedResolver removed - check resolution module instead
       const resolutionModule = await escrowableERC20.resolutionModule();
@@ -820,15 +851,18 @@ describe("Mainnet Release Sequence", function () {
     it("Should execute complete sequence from deployment to DAO governance", async function () {
       // This is a comprehensive test that runs through all stages
       
-      // Stage 0: Deploy governance token
-      const TokenFactory = await ethers.getContractFactory("ERC20Mock");
+      // Stage 0: Deploy governance token (SewToken)
+      const TokenFactory = await ethers.getContractFactory("SewToken");
       const govToken = await TokenFactory.deploy(
-        "Governance Token",
-        "GOV",
+        "Sew Token",
+        "SEW",
         deployer.address,
         INITIAL_TOKEN_SUPPLY
-      );
+      ) as SewToken;
       await govToken.waitForDeployment();
+      
+      // Delegate voting power to deployer (required for ERC20Votes)
+      await govToken.connect(deployer).delegate(deployer.address);
       
       // Stage 1: Deploy contracts and modules
       const EscrowableERC20Factory = await ethers.getContractFactory("EscrowableERC20");
@@ -877,22 +911,20 @@ describe("Mainnet Release Sequence", function () {
         timelockController = { getAddress: () => Promise.resolve(multisigAddress) };
       }
       
-      // Stage 4: Setup DAO
-      // Note: This requires OpenZeppelin Governor contracts
-      // For testing, we'll simulate the setup
-      let daoGovernor: any;
+      // Stage 4: Setup DAO (GovGovernor)
+      let daoGovernor: GovGovernor | any;
       try {
-        const GovernorFactory = await ethers.getContractFactory(
-          "@openzeppelin/contracts/governance/GovernorTimelockControl.sol:GovernorTimelockControl"
-        );
+        const GovernorFactory = await ethers.getContractFactory("GovGovernor");
+        // Quorum: 4% (numerator is 4, denominator is 100 by default in GovernorVotesQuorumFraction)
+        const QUORUM_NUMERATOR = 4n; // 4%
         daoGovernor = await GovernorFactory.deploy(
-          "EscrowDAO",
           await govToken.getAddress(),
+          await timelockController.getAddress(),
           VOTING_DELAY,
           VOTING_PERIOD,
           PROPOSAL_THRESHOLD,
-          await timelockController.getAddress()
-        );
+          QUORUM_NUMERATOR
+        ) as GovGovernor;
         await daoGovernor.waitForDeployment();
       } catch (error: any) {
         // If Governor contracts aren't available, use a mock

@@ -88,6 +88,9 @@ contract DecentralizedResolutionModule is AccessControl, ReentrancyGuard, IResol
     // External resolver (e.g., Kleros)
     address public externalResolver;
     
+    // Registered escrow contracts that can call initializeDispute and setEscrowCategory
+    mapping(address => bool) public registeredEscrowContracts;
+    
     // ============ Events ============
     
     event ResolverAppointed(address indexed resolver, ResolverRole role, address indexed appointedBy);
@@ -103,6 +106,8 @@ contract DecentralizedResolutionModule is AccessControl, ReentrancyGuard, IResol
     event ResolverAssigned(uint256 indexed workflowId, address indexed resolver, bytes32 category);
     event EscalationConfigUpdated(uint8 level, EscalationConfig config);
     event ExternalResolverUpdated(address indexed oldResolver, address indexed newResolver);
+    event EscrowContractRegistered(address indexed escrowContract);
+    event EscrowContractUnregistered(address indexed escrowContract);
     
     // Slow lane queue/activate events (Phase 3)
     event EscalationConfigQueued(uint8 level, EscalationConfig config, uint64 eta);
@@ -120,6 +125,11 @@ contract DecentralizedResolutionModule is AccessControl, ReentrancyGuard, IResol
             isApprovedResolver[_msgSender()] || isApprovedSeniorResolver[_msgSender()],
             "Not authorized resolver"
         );
+        _;
+    }
+    
+    modifier onlyEscrowContract() {
+        require(registeredEscrowContracts[_msgSender()], "Not registered escrow contract");
         _;
     }
     
@@ -513,9 +523,9 @@ contract DecentralizedResolutionModule is AccessControl, ReentrancyGuard, IResol
      * @notice Set category for an escrow (called when escrow is created or dispute is raised)
      * @param workflowId Escrow ID
      * @param categoryKey Category key
+     * @dev Only registered escrow contracts can call this
      */
-    function setEscrowCategory(uint256 workflowId, bytes32 categoryKey) external {
-        // In production, this should be restricted to the escrow contract
+    function setEscrowCategory(uint256 workflowId, bytes32 categoryKey) external onlyEscrowContract {
         escrowCategory[workflowId] = categoryKey;
     }
     
@@ -624,13 +634,13 @@ contract DecentralizedResolutionModule is AccessControl, ReentrancyGuard, IResol
      * @param workflowId Escrow ID
      * @param resolver Initial resolver
      * @param categoryKey Category key
-     * @dev Can be called by escrow contract or owner for initialization
+     * @dev Only registered escrow contracts can call this
      */
     function initializeDispute(
         uint256 workflowId,
         address resolver,
         bytes32 categoryKey
-    ) external {
+    ) external onlyEscrowContract {
         DisputeMetadata storage dm = disputeMetadata[workflowId];
         require(dm.currentResolver == address(0), "Dispute already initialized");
         require(resolver != address(0), "Zero resolver");
@@ -640,6 +650,40 @@ contract DecentralizedResolutionModule is AccessControl, ReentrancyGuard, IResol
         escrowCategory[workflowId] = categoryKey;
         
         emit ResolverAssigned(workflowId, resolver, categoryKey);
+    }
+    
+    /**
+     * @notice Register an escrow contract to allow it to call initializeDispute and setEscrowCategory
+     * @param escrowContract Address of the escrow contract
+     * @dev Only ROLE_TIMELOCK can register escrow contracts
+     */
+    function registerEscrowContract(address escrowContract) external onlyRole(ROLE_TIMELOCK) {
+        require(escrowContract != address(0), "Zero address");
+        require(!registeredEscrowContracts[escrowContract], "Already registered");
+        
+        registeredEscrowContracts[escrowContract] = true;
+        emit EscrowContractRegistered(escrowContract);
+    }
+    
+    /**
+     * @notice Unregister an escrow contract
+     * @param escrowContract Address of the escrow contract
+     * @dev Only ROLE_TIMELOCK can unregister escrow contracts
+     */
+    function unregisterEscrowContract(address escrowContract) external onlyRole(ROLE_TIMELOCK) {
+        require(registeredEscrowContracts[escrowContract], "Not registered");
+        
+        registeredEscrowContracts[escrowContract] = false;
+        emit EscrowContractUnregistered(escrowContract);
+    }
+    
+    /**
+     * @notice Check if an address is a registered escrow contract
+     * @param escrowContract Address to check
+     * @return True if registered
+     */
+    function isRegisteredEscrowContract(address escrowContract) external view returns (bool) {
+        return registeredEscrowContracts[escrowContract];
     }
 }
 

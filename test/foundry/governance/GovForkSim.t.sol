@@ -183,9 +183,9 @@ contract GovForkSim is Test {
         }
 
         // Check if delay has elapsed
-        uint256 minDelay = timelock.getMinDelay();
         // In a real scenario, we would check the actual execution time
         // For testing, we can warp time if needed
+        // uint256 minDelay = timelock.getMinDelay();
         // vm.warp(block.timestamp + minDelay + 1);
 
         // Load proposal data
@@ -213,16 +213,16 @@ contract GovForkSim is Test {
      * @notice Test invariants after proposal execution
      * @dev Verify that core invariants still hold
      */
-    function testForkInvariants() public {
+    function testForkInvariants() public view {
         if (address(escrowableERC20) == address(0)) {
             return; // Skip test if EscrowableERC20 not deployed
         }
 
         // Invariant 1: Protocol should not be paused unless explicitly paused
         // (This is a simple example - add more invariants as needed)
-        bool paused = escrowableERC20.paused();
         // In a normal state, protocol should not be paused
         // But we can't assert this as it may be paused for testing
+        // bool paused = escrowableERC20.paused();
 
         // Invariant 2: Default modules should be set (not zero address)
         // This would require checking module getters
@@ -238,7 +238,7 @@ contract GovForkSim is Test {
      *      In practice, Foundry doesn't easily support JSON parsing in Solidity.
      *      Consider using a helper script or Hardhat for this.
      */
-    function testReadProposalArtifact() public {
+    function testReadProposalArtifact() public pure {
         // This would require reading a JSON file, which is not straightforward in Foundry
         // Consider using a Hardhat script or TypeScript helper instead
         return; // Skip test - JSON parsing not supported in Foundry
