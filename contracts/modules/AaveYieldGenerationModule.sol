@@ -49,6 +49,10 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
     IPool public aavePool;
     bool public aaveEnabled = false;
 
+    // Cap bounds
+    /// @notice Maximum cap value (type(uint128).max to prevent overflow)
+    uint256 public constant CAP_MAX = type(uint128).max;
+
     // Token support mapping
     mapping(address => address) public tokenToAToken; // token => aToken address
     mapping(address => uint256) public totalDepositedToAave; // token => total amount
@@ -411,7 +415,8 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
     /**
      * @notice Enable or disable Aave integration
      * @param enabled True to enable, false to disable
-     * @dev Only Timelock can enable Aave. Guardian can disable via guardianDisableAave().
+     * @dev Timelock can enable or disable Aave. Guardian can only disable via guardianDisableAave() (down-only).
+     *      This allows Timelock to disable Aave if needed (e.g., for maintenance), while Guardian has emergency disable power.
      */
     function setAaveEnabled(bool enabled) public onlyRole(ROLE_TIMELOCK) {
         if (enabled && address(aavePool) == address(0)) {
@@ -518,10 +523,15 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
     /**
      * @notice Set token-specific exposure cap
      * @param token Token address
-     * @param newCap New cap value
+     * @param newCap New cap value (in raw token units, 0 = disabled)
      * @dev Timelock can set caps within bounds. Guardian can only lower via guardianLowerTokenCap().
+     *      Caps are enforced at deposit time. cap=0 disables deposits for that token.
+     *      Maximum cap is type(uint128).max to prevent overflow.
      */
     function setTokenCap(address token, uint256 newCap) public onlyRole(ROLE_TIMELOCK) {
+        if (newCap > CAP_MAX) {
+            revert CapExceeded(token, newCap, CAP_MAX);
+        }
         uint256 oldCap = tokenCap[token];
         tokenCap[token] = newCap;
         emit TokenCapSet(token, oldCap, newCap);
@@ -530,10 +540,15 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
     /**
      * @notice Set global exposure cap for a token
      * @param token Token address
-     * @param newCap New cap value
+     * @param newCap New cap value (in raw token units, 0 = disabled)
      * @dev Timelock can set caps within bounds. Guardian can only lower via guardianLowerGlobalCap().
+     *      Caps are enforced at deposit time. cap=0 disables deposits for that token.
+     *      Maximum cap is type(uint128).max to prevent overflow.
      */
     function setGlobalCap(address token, uint256 newCap) public onlyRole(ROLE_TIMELOCK) {
+        if (newCap > CAP_MAX) {
+            revert CapExceeded(token, newCap, CAP_MAX);
+        }
         uint256 oldCap = globalCap[token];
         globalCap[token] = newCap;
         emit GlobalCapSet(token, oldCap, newCap);

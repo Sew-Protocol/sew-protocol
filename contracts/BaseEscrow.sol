@@ -514,10 +514,19 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
      * @dev Phase 7: DEPRECATED - This function is kept for backward compatibility but does nothing.
      *      Resolver gate removed for mainnet credibility. Resolution now uses module snapshots only.
      */
+    /**
+     * @notice DEPRECATED: This function has been removed in Phase 7
+     * @dev The authorizedResolver gate was eliminated for mainnet credibility.
+     *      Resolution is now handled entirely through resolution modules.
+     *      This function always reverts to prevent accidental use.
+     * @param resolver (unused) - kept for interface compatibility
+     * @custom:deprecated This function will be removed in a future version. Use resolution modules instead.
+     */
     function setAuthorizedResolver(address resolver) public onlyRole(ROLE_TIMELOCK) {
         resolver; // Silence unused parameter warning
-        // Phase 7: Function disabled - resolver gate removed
-        // No-op for backward compatibility
+        // Phase 7: Function removed - resolver gate eliminated
+        // Always revert to prevent accidental use
+        revert("setAuthorizedResolver: Deprecated and removed. Use resolution modules instead.");
     }
 
     modifier onlyDaoOrOwner() {

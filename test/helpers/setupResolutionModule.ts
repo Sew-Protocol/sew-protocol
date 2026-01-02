@@ -46,9 +46,24 @@ export async function setupResolutionModule(
     // If already set or fails, continue
   }
 
-  // Propose and activate resolution module
-  await contract.connect(deployer).proposeResolutionModule(await resolutionModule.getAddress());
-  await contract.connect(deployer).activateResolutionModule();
+  // Set default resolution module
+  // Phase 8: EscrowVault now uses Slow lane (queue/activate) like EscrowableERC20
+  if ("queueDefaultResolutionModule" in contract) {
+    // EscrowableERC20 or EscrowVault (after Phase 8 fix)
+    await contract.connect(deployer).queueDefaultResolutionModule(await resolutionModule.getAddress());
+    const [, eta] = await contract.getPendingDefaultResolutionModule();
+    // Fast-forward time to allow activation
+    const { ethers } = await import("hardhat");
+    await ethers.provider.send("evm_setNextBlockTimestamp", [Number(eta) + 1]);
+    await ethers.provider.send("evm_mine", []);
+    await contract.connect(deployer).activateDefaultResolutionModule();
+  } else if ("proposeResolutionModule" in contract) {
+    // BaseEscrow pattern (two-step with delay)
+    await contract.connect(deployer).proposeResolutionModule(await resolutionModule.getAddress());
+    await contract.connect(deployer).activateResolutionModule();
+  } else {
+    throw new Error("Contract does not have a method to set default resolution module.");
+  }
 
   return resolutionModule as DefaultResolutionModule;
 }

@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "./BaseEscrow.sol";
+import "./governance/SlowLaneQueueActivate.sol";
 import "./interfaces/IReleaseStrategy.sol";
 import "./interfaces/IResolutionModule.sol";
 import "./interfaces/IYieldGenerationModule.sol";
@@ -33,18 +34,33 @@ contract EscrowVault is BaseEscrow {
     IYieldGenerationModule public defaultYieldGenerationModule;
     IYieldDistributionModule public defaultYieldDistributionModule;
 
+    // Slow lane pending changes (Phase 8: Lane consistency fix)
+    PendingAddress private _pendingDefaultReleaseStrategy;
+    PendingAddress private _pendingDefaultResolutionModule;
+    PendingAddress private _pendingDefaultYieldGenerationModule;
+    PendingAddress private _pendingDefaultYieldDistributionModule;
+
     // Events specific to EscrowVault (with token parameter)
     event EscrowTransferCreated(uint256 indexed workflowId, address indexed token, address indexed from, address to, uint256 amount);
     event EscrowTransferReleased(uint256 indexed workflowId, address indexed token, address indexed to, uint256 amount);
     event EscrowTransferCancelled(uint256 indexed workflowId, address indexed token, address indexed from, uint256 amount);
     event FeesWithdrawn(address indexed token, uint256 amount);
     
-    // Module events
     // Module events (per-escrow events removed in Phase 5)
     event DefaultYieldGenerationModuleSet(address indexed module);
     event DefaultYieldDistributionModuleSet(address indexed module);
 
-    constructor(uint256 _escrowFee, address _escrowFeeAddress) {
+    // Slow lane queue/activate events (Phase 8: Lane consistency fix)
+    event DefaultReleaseStrategyQueued(address indexed oldStrategy, address indexed newStrategy, uint64 eta);
+    event DefaultReleaseStrategyActivated(address indexed oldStrategy, address indexed newStrategy);
+    event DefaultResolutionModuleQueued(address indexed oldModule, address indexed newModule, uint64 eta);
+    event DefaultResolutionModuleActivated(address indexed oldModule, address indexed newModule);
+    event DefaultYieldGenerationModuleQueued(address indexed oldModule, address indexed newModule, uint64 eta);
+    event DefaultYieldGenerationModuleActivated(address indexed oldModule, address indexed newModule);
+    event DefaultYieldDistributionModuleQueued(address indexed oldModule, address indexed newModule, uint64 eta);
+    event DefaultYieldDistributionModuleActivated(address indexed oldModule, address indexed newModule);
+
+    constructor(uint256 _escrowFee, address _escrowFeeAddress) SlowLaneQueueActivate() {
         if (_escrowFee > ESCROW_FEE_DENOMINATOR) {
             revert InvalidEscrowFee(_escrowFee, ESCROW_FEE_DENOMINATOR);
         }
@@ -401,32 +417,79 @@ contract EscrowVault is BaseEscrow {
     // All escrows use the default modules configured via queue/activate pattern.
 
     /**
-     * @notice Set the default release strategy
+     * @notice Queue a new default release strategy (Slow lane: 7-day delay)
      * @param strategy The release strategy module address
+     * @dev After 7 days, call activateDefaultReleaseStrategy() to apply the change
      */
-    function setDefaultReleaseStrategy(address strategy) public onlyRole(ROLE_TIMELOCK) {
+    function queueDefaultReleaseStrategy(address strategy) public onlyRole(ROLE_TIMELOCK) {
         if (strategy == address(0) || strategy.code.length == 0) {
             revert InvalidAddress("Default release strategy must be a contract", strategy);
         }
-        defaultReleaseStrategy = IReleaseStrategy(strategy);
+        _queueAddress(_pendingDefaultReleaseStrategy, strategy);
+        emit DefaultReleaseStrategyQueued(address(defaultReleaseStrategy), strategy, _pendingDefaultReleaseStrategy.eta);
     }
 
     /**
-     * @notice Set the default resolution module
-     * @param module The resolution module address
+     * @notice Activate the queued default release strategy
+     * @dev Reverts if no pending change or 7-day delay has not elapsed
      */
-    function setDefaultResolutionModule(address module) public onlyRole(ROLE_TIMELOCK) {
+    function activateDefaultReleaseStrategy() public onlyRole(ROLE_TIMELOCK) {
+        address oldStrategy = address(defaultReleaseStrategy);
+        defaultReleaseStrategy = IReleaseStrategy(_activateAddress(_pendingDefaultReleaseStrategy));
+        emit DefaultReleaseStrategyActivated(oldStrategy, address(defaultReleaseStrategy));
+    }
+
+    /**
+     * @notice Get pending default release strategy change (if any)
+     * @return value Pending strategy address
+     * @return eta Timestamp when activation is allowed
+     * @return exists Whether a pending change exists
+     */
+    function getPendingDefaultReleaseStrategy() public view returns (address value, uint64 eta, bool exists) {
+        PendingAddress storage pending = _pendingDefaultReleaseStrategy;
+        return (pending.value, pending.eta, pending.exists);
+    }
+
+    /**
+     * @notice Queue a new default resolution module (Slow lane: 7-day delay)
+     * @param module The resolution module address
+     * @dev After 7 days, call activateDefaultResolutionModule() to apply the change
+     */
+    function queueDefaultResolutionModule(address module) public onlyRole(ROLE_TIMELOCK) {
         if (module == address(0) || module.code.length == 0) {
             revert InvalidAddress("Default resolution module must be a contract", module);
         }
-        defaultResolutionModule = IResolutionModule(module);
+        _queueAddress(_pendingDefaultResolutionModule, module);
+        emit DefaultResolutionModuleQueued(address(defaultResolutionModule), module, _pendingDefaultResolutionModule.eta);
     }
 
     /**
-     * @notice Set the default yield generation module
-     * @param module The yield generation module address
+     * @notice Activate the queued default resolution module
+     * @dev Reverts if no pending change or 7-day delay has not elapsed
      */
-    function setDefaultYieldGenerationModule(address module) public onlyRole(ROLE_TIMELOCK) {
+    function activateDefaultResolutionModule() public onlyRole(ROLE_TIMELOCK) {
+        address oldModule = address(defaultResolutionModule);
+        defaultResolutionModule = IResolutionModule(_activateAddress(_pendingDefaultResolutionModule));
+        emit DefaultResolutionModuleActivated(oldModule, address(defaultResolutionModule));
+    }
+
+    /**
+     * @notice Get pending default resolution module change (if any)
+     * @return value Pending module address
+     * @return eta Timestamp when activation is allowed
+     * @return exists Whether a pending change exists
+     */
+    function getPendingDefaultResolutionModule() public view returns (address value, uint64 eta, bool exists) {
+        PendingAddress storage pending = _pendingDefaultResolutionModule;
+        return (pending.value, pending.eta, pending.exists);
+    }
+
+    /**
+     * @notice Queue a new default yield generation module (Slow lane: 7-day delay)
+     * @param module The yield generation module address
+     * @dev After 7 days, call activateDefaultYieldGenerationModule() to apply the change
+     */
+    function queueDefaultYieldGenerationModule(address module) public onlyRole(ROLE_TIMELOCK) {
         if (module == address(0)) {
             revert InvalidAddress("Default yield generation module cannot be zero", module);
         }
@@ -437,15 +500,38 @@ contract EscrowVault is BaseEscrow {
         if (!IERC165(module).supportsInterface(type(IYieldGenerationModule).interfaceId)) {
             revert InvalidAddress("Module does not implement IYieldGenerationModule", module);
         }
-        defaultYieldGenerationModule = IYieldGenerationModule(module);
-        emit DefaultYieldGenerationModuleSet(module);
+        _queueAddress(_pendingDefaultYieldGenerationModule, module);
+        emit DefaultYieldGenerationModuleQueued(address(defaultYieldGenerationModule), module, _pendingDefaultYieldGenerationModule.eta);
     }
 
     /**
-     * @notice Set the default yield distribution module
-     * @param module The yield distribution module address
+     * @notice Activate the queued default yield generation module
+     * @dev Reverts if no pending change or 7-day delay has not elapsed
      */
-    function setDefaultYieldDistributionModule(address module) public onlyRole(ROLE_TIMELOCK) {
+    function activateDefaultYieldGenerationModule() public onlyRole(ROLE_TIMELOCK) {
+        address oldModule = address(defaultYieldGenerationModule);
+        defaultYieldGenerationModule = IYieldGenerationModule(_activateAddress(_pendingDefaultYieldGenerationModule));
+        emit DefaultYieldGenerationModuleActivated(oldModule, address(defaultYieldGenerationModule));
+        emit DefaultYieldGenerationModuleSet(address(defaultYieldGenerationModule));
+    }
+
+    /**
+     * @notice Get pending default yield generation module change (if any)
+     * @return value Pending module address
+     * @return eta Timestamp when activation is allowed
+     * @return exists Whether a pending change exists
+     */
+    function getPendingDefaultYieldGenerationModule() public view returns (address value, uint64 eta, bool exists) {
+        PendingAddress storage pending = _pendingDefaultYieldGenerationModule;
+        return (pending.value, pending.eta, pending.exists);
+    }
+
+    /**
+     * @notice Queue a new default yield distribution module (Slow lane: 7-day delay)
+     * @param module The yield distribution module address
+     * @dev After 7 days, call activateDefaultYieldDistributionModule() to apply the change
+     */
+    function queueDefaultYieldDistributionModule(address module) public onlyRole(ROLE_TIMELOCK) {
         if (module == address(0)) {
             revert InvalidAddress("Default yield distribution module cannot be zero", module);
         }
@@ -456,8 +542,30 @@ contract EscrowVault is BaseEscrow {
         if (!IERC165(module).supportsInterface(type(IYieldDistributionModule).interfaceId)) {
             revert InvalidAddress("Module does not implement IYieldDistributionModule", module);
         }
-        defaultYieldDistributionModule = IYieldDistributionModule(module);
-        emit DefaultYieldDistributionModuleSet(module);
+        _queueAddress(_pendingDefaultYieldDistributionModule, module);
+        emit DefaultYieldDistributionModuleQueued(address(defaultYieldDistributionModule), module, _pendingDefaultYieldDistributionModule.eta);
+    }
+
+    /**
+     * @notice Activate the queued default yield distribution module
+     * @dev Reverts if no pending change or 7-day delay has not elapsed
+     */
+    function activateDefaultYieldDistributionModule() public onlyRole(ROLE_TIMELOCK) {
+        address oldModule = address(defaultYieldDistributionModule);
+        defaultYieldDistributionModule = IYieldDistributionModule(_activateAddress(_pendingDefaultYieldDistributionModule));
+        emit DefaultYieldDistributionModuleActivated(oldModule, address(defaultYieldDistributionModule));
+        emit DefaultYieldDistributionModuleSet(address(defaultYieldDistributionModule));
+    }
+
+    /**
+     * @notice Get pending default yield distribution module change (if any)
+     * @return value Pending module address
+     * @return eta Timestamp when activation is allowed
+     * @return exists Whether a pending change exists
+     */
+    function getPendingDefaultYieldDistributionModule() public view returns (address value, uint64 eta, bool exists) {
+        PendingAddress storage pending = _pendingDefaultYieldDistributionModule;
+        return (pending.value, pending.eta, pending.exists);
     }
 
     /**

@@ -223,9 +223,19 @@ describe("Mainnet Release Sequence", function () {
       await escrowableERC20.connect(deployer).activateDefaultYieldDistributionModule();
       
       // EscrowVault uses direct setters (Standard lane)
-      await escrowVault.connect(deployer).setDefaultReleaseStrategy(await defaultReleaseStrategy.getAddress());
-      await escrowVault.connect(deployer).setDefaultResolutionModule(await defaultResolutionModule.getAddress());
-      await escrowVault.connect(deployer).setDefaultYieldDistributionModule(await defaultYieldDistributionModule.getAddress());
+      // Phase 8: EscrowVault now uses Slow lane (queue/activate) for consistency
+      await escrowVault.connect(deployer).queueDefaultReleaseStrategy(await defaultReleaseStrategy.getAddress());
+      await escrowVault.connect(deployer).queueDefaultResolutionModule(await defaultResolutionModule.getAddress());
+      await escrowVault.connect(deployer).queueDefaultYieldDistributionModule(await defaultYieldDistributionModule.getAddress());
+      
+      // Fast-forward time to allow activation
+      const [, eta] = await escrowVault.getPendingDefaultReleaseStrategy();
+      await ethers.provider.send("evm_setNextBlockTimestamp", [Number(eta) + 1]);
+      await ethers.provider.send("evm_mine", []);
+      
+      await escrowVault.connect(deployer).activateDefaultReleaseStrategy();
+      await escrowVault.connect(deployer).activateDefaultResolutionModule();
+      await escrowVault.connect(deployer).activateDefaultYieldDistributionModule();
       
       // Verify deployment (Phase 2: AccessControl instead of Ownable)
       const DEFAULT_ADMIN_ROLE = await escrowableERC20.DEFAULT_ADMIN_ROLE();

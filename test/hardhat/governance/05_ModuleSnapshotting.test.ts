@@ -115,8 +115,17 @@ describe("Module Snapshotting", function () {
     await escrowableERC20.connect(deployer).queueDefaultYieldDistributionModule(await yieldDistA.getAddress());
 
     // EscrowVault uses direct setters (Standard lane)
-    await escrowVault.connect(deployer).setDefaultReleaseStrategy(await releaseStrategyA.getAddress());
-    await escrowVault.connect(deployer).setDefaultResolutionModule(await moduleA.getAddress());
+    // Phase 8: EscrowVault now uses Slow lane (queue/activate) for consistency
+    await escrowVault.connect(deployer).queueDefaultReleaseStrategy(await releaseStrategyA.getAddress());
+    await escrowVault.connect(deployer).queueDefaultResolutionModule(await moduleA.getAddress());
+    
+    // Fast-forward time to allow activation
+    const [, eta] = await escrowVault.getPendingDefaultReleaseStrategy();
+    await ethers.provider.send("evm_setNextBlockTimestamp", [Number(eta) + 1]);
+    await ethers.provider.send("evm_mine", []);
+    
+    await escrowVault.connect(deployer).activateDefaultReleaseStrategy();
+    await escrowVault.connect(deployer).activateDefaultResolutionModule();
     const yieldGenAAddressVault = typeof yieldGenA.getAddress === 'function' ? await yieldGenA.getAddress() : yieldGenA;
     if (yieldGenAAddressVault !== ethers.ZeroAddress) {
       await escrowVault.connect(deployer).setDefaultYieldGenerationModule(yieldGenAAddressVault);
