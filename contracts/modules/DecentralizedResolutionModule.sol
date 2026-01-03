@@ -58,6 +58,13 @@ contract DecentralizedResolutionModule is AccessControl, ReentrancyGuard, IResol
     }
     mapping(address => ResolverMetadata) public resolverMetadata;
     
+    // Resolution outcome enum
+    enum ResolutionOutcome {
+        NONE,      // 0 - No resolution yet
+        RELEASE,   // 1 - Funds released to recipient
+        CANCEL     // 2 - Funds refunded to sender
+    }
+    
     // Escalation tracking per dispute
     struct DisputeMetadata {
         address currentResolver;      // Current resolver assigned
@@ -66,6 +73,8 @@ contract DecentralizedResolutionModule is AccessControl, ReentrancyGuard, IResol
         uint256 escalationTimestamp;  // When escalated
         uint256 timeoutTimestamp;     // When dispute should auto-escalate (Phase 1: Task 1.3)
         bytes resolutionData;         // Additional resolution data
+        ResolutionOutcome lastResolutionOutcome; // Last resolution decision (for reversal tracking)
+        address lastResolver;          // Resolver who made last decision
     }
     mapping(uint256 => DisputeMetadata) public disputeMetadata;
     
@@ -121,6 +130,7 @@ contract DecentralizedResolutionModule is AccessControl, ReentrancyGuard, IResol
     struct ResolverStats {
         uint256 disputesResolved;           // Number of disputes successfully resolved
         uint256 disputesEscalated;          // Number of disputes escalated away from this resolver
+        uint256 resolutionReversals;        // Number of resolutions reversed by higher-level resolver
         uint256 totalResolutionTime;        // Cumulative resolution time (for average calculation)
         uint256 lastResolutionTimestamp;    // Timestamp of last resolution
         uint256 qualityScore;               // Quality score (0-10000 basis points)
@@ -186,7 +196,18 @@ contract DecentralizedResolutionModule is AccessControl, ReentrancyGuard, IResol
         address indexed resolver,
         uint256 disputesResolved,
         uint256 disputesEscalated,
+        uint256 resolutionReversals,
         uint256 qualityScore
+    );
+    
+    // Resolution reversal tracking events
+    event ResolutionReversed(
+        uint256 indexed workflowId,
+        address indexed resolver,
+        ResolutionOutcome originalOutcome,
+        ResolutionOutcome newOutcome,
+        uint8 originalLevel,
+        uint8 newLevel
     );
     
     // ============ Modifiers ============
@@ -974,6 +995,10 @@ contract DecentralizedResolutionModule is AccessControl, ReentrancyGuard, IResol
         dm.escalationLevel = 0;
         escrowCategory[workflowId] = categoryKey;
         
+        // Initialize resolution tracking fields
+        dm.lastResolutionOutcome = ResolutionOutcome.NONE;
+        dm.lastResolver = address(0);
+        
         // Set timeout timestamp (Phase 1: Task 1.3)
         dm.timeoutTimestamp = block.timestamp + disputeTimeout;
         
@@ -1168,15 +1193,19 @@ contract DecentralizedResolutionModule is AccessControl, ReentrancyGuard, IResol
     
     /**
      * @notice Record resolution outcome for a resolver
+     * @param workflowId The escrow transfer ID
      * @param resolver Resolver address
+     * @param outcome Resolution outcome (RELEASE or CANCEL)
      * @param wasEscalated True if dispute was escalated away from this resolver, false if resolved
      * @param resolutionTime Time taken to resolve (in seconds, 0 if escalated)
      * @dev Phase 4: Task 4.1 - Track resolver performance and calculate quality scores
-     *      Called by escrow contract when dispute is resolved or escalated
+     *      Called by escrow contract when dispute is resolved
+     *      Also tracks resolution reversals when escalation results in opposite outcome
      */
     function recordResolution(
-        uint256 /* workflowId */,
+        uint256 workflowId,
         address resolver,
+        ResolutionOutcome outcome,
         bool wasEscalated,
         uint256 resolutionTime
     ) external onlyEscrowContract {
@@ -1185,7 +1214,35 @@ contract DecentralizedResolutionModule is AccessControl, ReentrancyGuard, IResol
             isApprovedResolver[resolver] || isApprovedSeniorResolver[resolver],
             "Not a resolver"
         );
+        require(outcome != ResolutionOutcome.NONE, "Invalid outcome");
         
+        DisputeMetadata storage dm = disputeMetadata[workflowId];
+        
+        // Check for resolution reversal (if this is an escalated resolution)
+        if (dm.escalationLevel > 0 && dm.lastResolver != address(0) && dm.lastResolver != resolver) {
+            // Previous resolver made a decision, now higher-level resolver made different decision
+            if (dm.lastResolutionOutcome != ResolutionOutcome.NONE && 
+                dm.lastResolutionOutcome != outcome) {
+                // Resolution reversed - previous resolver's decision was contradicted
+                ResolverStats storage previousStats = resolverStats[dm.lastResolver];
+                previousStats.resolutionReversals++;
+                
+                emit ResolutionReversed(
+                    workflowId,
+                    dm.lastResolver,
+                    dm.lastResolutionOutcome,
+                    outcome,
+                    dm.escalationLevel - 1,
+                    dm.escalationLevel
+                );
+            }
+        }
+        
+        // Update dispute metadata with current resolution
+        dm.lastResolutionOutcome = outcome;
+        dm.lastResolver = resolver;
+        
+        // Update resolver statistics
         ResolverStats storage stats = resolverStats[resolver];
         
         if (wasEscalated) {
@@ -1201,10 +1258,17 @@ contract DecentralizedResolutionModule is AccessControl, ReentrancyGuard, IResol
         stats.totalDisputes = stats.disputesResolved + stats.disputesEscalated;
         
         // Calculate quality score (0-10000 basis points)
-        // Quality = (resolved / total) * 10000
-        // Higher score = better resolver
+        // Quality = (resolved / total) * 10000, penalized by reversals
+        // Reversals reduce quality score: each reversal reduces score by 1000 points (10%)
         if (stats.totalDisputes > 0) {
-            stats.qualityScore = (stats.disputesResolved * BASIS_POINTS_DENOMINATOR) / stats.totalDisputes;
+            uint256 baseScore = (stats.disputesResolved * BASIS_POINTS_DENOMINATOR) / stats.totalDisputes;
+            // Penalize reversals: each reversal reduces score by 10% (1000 basis points)
+            uint256 reversalPenalty = stats.resolutionReversals * 1000;
+            if (reversalPenalty > baseScore) {
+                stats.qualityScore = 0;
+            } else {
+                stats.qualityScore = baseScore - reversalPenalty;
+            }
         } else {
             stats.qualityScore = 0;
         }
@@ -1213,6 +1277,7 @@ contract DecentralizedResolutionModule is AccessControl, ReentrancyGuard, IResol
             resolver,
             stats.disputesResolved,
             stats.disputesEscalated,
+            stats.resolutionReversals,
             stats.qualityScore
         );
     }
@@ -1495,11 +1560,12 @@ contract DecentralizedResolutionModule is AccessControl, ReentrancyGuard, IResol
     }
     
     /**
-     * @notice Check if resolver needs attention (low quality score or high escalation rate)
+     * @notice Check if resolver needs attention (low quality score, high escalation rate, or high reversal rate)
      * @param resolver Resolver address
      * @return needsAttention True if resolver needs review
-     * @return reason Reason code (1 = low quality, 2 = high escalation rate, 3 = inactive)
+     * @return reason Reason code (1 = low quality, 2 = high escalation rate, 3 = inactive, 4 = high reversal rate)
      * @dev Phase 6: Task 6.3 - Performance monitoring and alerts
+     *      Updated to include resolution reversal tracking
      */
     function checkResolverNeedsAttention(address resolver)
         external view returns (bool needsAttention, uint8 reason)
@@ -1512,6 +1578,15 @@ contract DecentralizedResolutionModule is AccessControl, ReentrancyGuard, IResol
         
         if (stats.totalDisputes == 0) {
             return (false, 0); // No data yet
+        }
+        
+        // Check for high reversal rate (> 20% of resolved disputes reversed)
+        // This is the clearest indicator of resolver quality issues
+        if (stats.disputesResolved > 0) {
+            uint256 reversalRate = (stats.resolutionReversals * BASIS_POINTS_DENOMINATOR) / stats.disputesResolved;
+            if (reversalRate > 2000) { // > 20% reversal rate
+                return (true, 4); // High reversal rate
+            }
         }
         
         // Check for low quality score (< 50%)

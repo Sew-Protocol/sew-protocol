@@ -137,6 +137,10 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
     uint256 public defaultAutoReleaseTime = 0; // 0 means no auto release
     uint256 public defaultAutoCancelTime = 0; // 0 means no auto cancel
     uint256 public constant MAX_AUTO_TIME_DURATION = 10 * 365 * 24 * 60 * 60; // 10 years in seconds
+    
+    // Dispute safety mechanism: prevent permanently stuck escrows
+    uint256 public maxDisputeDuration = 90 days; // Maximum time a dispute can remain unresolved
+    mapping(uint256 => uint256) public disputeRaisedTimestamp; // workflowId => timestamp when dispute was raised
 
     // Per-escrow settings mapping (gas-efficient alternative to extending struct)
     mapping(uint256 => EscrowSettings) public escrowSettings;
@@ -166,6 +170,10 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
     event DisputeEscalated(uint256 indexed workflowId, uint8 fromLevel, uint8 toLevel, address indexed newResolver, address indexed escalatedBy);
     event EscrowTransferAutoReleased(uint256 indexed workflowId, address indexed to, uint256 amount);
     event EscrowTransferAutoCancelled(uint256 indexed workflowId, address indexed from, uint256 amount);
+    
+    // Dispute safety mechanism events
+    event MaxDisputeDurationUpdated(uint256 newDuration);
+    event DisputeAutoCancelled(uint256 indexed workflowId, address indexed from, uint256 amount, string reason);
     
     // Phase 1: Cancel lifecycle events
     event CancelRequested(uint256 indexed workflowId, address indexed by);
@@ -236,6 +244,81 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
     function setDefaultAutoReleaseTime(uint256 time) public onlyRole(ROLE_TIMELOCK) {
         SettingsValidationLibrary.validateAutoRelease(time);
         defaultAutoReleaseTime = time;
+    }
+    
+    /**
+     * @notice Set maximum dispute duration (safety mechanism to prevent permanently stuck escrows)
+     * @param duration Maximum time a dispute can remain unresolved (in seconds)
+     * @dev Only ROLE_TIMELOCK can set max dispute duration
+     *      Must be between 7 days and 365 days
+     *      After this duration, anyone can call autoCancelDisputedEscrow() to refund sender
+     */
+    function setMaxDisputeDuration(uint256 duration) external onlyRole(ROLE_TIMELOCK) {
+        require(duration >= 7 days, "Too short");
+        require(duration <= 365 days, "Too long");
+        maxDisputeDuration = duration;
+        emit MaxDisputeDurationUpdated(duration);
+    }
+    
+    /**
+     * @notice Auto-cancel disputed escrow if max duration exceeded (safety mechanism)
+     * @param workflowId The escrow transfer ID
+     * @return True if auto-cancel was successful
+     * @dev Anyone can call this after maxDisputeDuration has passed
+     *      Automatically cancels and refunds to sender (safest default)
+     *      Prevents escrows from being permanently stuck if resolution module fails
+     */
+    function autoCancelDisputedEscrow(uint256 workflowId) external nonReentrant returns (bool) {
+        _validateWorkflowId(workflowId);
+        EscrowTransfer storage et = escrowTransfers[workflowId];
+        
+        require(et.escrowState == EscrowState.DISPUTED, "Not in dispute");
+        
+        uint256 disputeTimestamp = disputeRaisedTimestamp[workflowId];
+        require(disputeTimestamp > 0, "Dispute timestamp not set");
+        require(block.timestamp >= disputeTimestamp + maxDisputeDuration, "Not yet timed out");
+        
+        // Auto-cancel: refund to sender (safest default)
+        address from = et.from;
+        uint256 originalAmount = et.totalDeposited;
+        
+        _cancelAndRefund(workflowId);
+        et.escrowState = EscrowState.RESOLVED;
+        
+        // Clear dispute timestamp
+        delete disputeRaisedTimestamp[workflowId];
+        
+        emit EscrowStateChanged(workflowId, EscrowState.DISPUTED, EscrowState.RESOLVED);
+        emit DisputeAutoCancelled(workflowId, from, originalAmount, "Max dispute duration exceeded");
+        emit EscrowTransferResolved(workflowId, from, et.to, originalAmount);
+        
+        return true;
+    }
+    
+    /**
+     * @notice Check if disputed escrow has exceeded max duration
+     * @param workflowId The escrow transfer ID
+     * @return isTimedOut True if max duration exceeded
+     * @return timeRemaining Seconds until timeout (0 if timed out or not in dispute)
+     * @dev View function to check dispute timeout status
+     */
+    function isDisputeTimedOut(uint256 workflowId) external view returns (bool isTimedOut, uint256 timeRemaining) {
+        EscrowTransfer storage et = escrowTransfers[workflowId];
+        if (et.escrowState != EscrowState.DISPUTED) {
+            return (false, 0);
+        }
+        
+        uint256 disputeTimestamp = disputeRaisedTimestamp[workflowId];
+        if (disputeTimestamp == 0) {
+            return (false, 0);
+        }
+        
+        uint256 elapsed = block.timestamp - disputeTimestamp;
+        if (elapsed >= maxDisputeDuration) {
+            return (true, 0);
+        }
+        
+        return (false, maxDisputeDuration - elapsed);
     }
     
     /**
@@ -639,6 +722,12 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         
         // Note: Aave tracking is already cleared by _cancelAndRefund -> _withdrawFromAave
         
+        // Record resolution outcome in resolution module (for reversal tracking)
+        _recordResolutionOutcome(workflowId, _msgSender(), false); // false = CANCEL
+        
+        // Clear dispute timestamp (dispute resolved)
+        delete disputeRaisedTimestamp[workflowId];
+        
         emit EscrowTransferResolved(workflowId, et.from, et.to, originalAmount);
         return true;
     }
@@ -690,6 +779,13 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         }
         
         _transferTokens(token, to, amount);
+        
+        // Record resolution outcome in resolution module (for reversal tracking)
+        _recordResolutionOutcome(workflowId, _msgSender(), true); // true = RELEASE
+        
+        // Clear dispute timestamp (dispute resolved)
+        delete disputeRaisedTimestamp[workflowId];
+        
         emit EscrowTransferResolved(workflowId, from, to, originalEscrowAmount);
         return true;
     }
@@ -737,6 +833,8 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         if (isComplete) {
             et.escrowState = EscrowState.RESOLVED;
             totalEscrowsPending--;
+            // Clear dispute timestamp (dispute fully resolved)
+            delete disputeRaisedTimestamp[workflowId];
         }
         
         uint256 proportionalOriginalDeposit = amount;
@@ -812,6 +910,8 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
             et.escrowState = EscrowState.RESOLVED;
             totalEscrowsPending--;
             emit EscrowStateChanged(workflowId, oldStatus, EscrowState.RESOLVED);
+            // Clear dispute timestamp (dispute fully resolved)
+            delete disputeRaisedTimestamp[workflowId];
         }
         
         uint256 proportionalOriginalDeposit = amount;
@@ -946,6 +1046,9 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
             revert NotParticipant(workflowId, _msgSender(), et.from, et.to);
         }
         
+        // Record dispute timestamp for safety mechanism (prevent permanently stuck escrows)
+        disputeRaisedTimestamp[workflowId] = block.timestamp;
+        
         // Phase 1: Emit state change and dispute opened events
         emit EscrowStateChanged(workflowId, oldStatus, EscrowState.DISPUTED);
         emit DisputeOpened(workflowId, _msgSender(), resolver);
@@ -1020,6 +1123,31 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         
         // If call fails, that's okay - module may handle initialization internally
         // or may not support this function (e.g., DefaultResolutionModule)
+        success; // Silence unused variable warning
+    }
+    
+    /**
+     * @notice Record resolution outcome in resolution module (for reversal tracking)
+     * @param workflowId The escrow transfer ID
+     * @param resolver Resolver address
+     * @param isRelease True if RELEASE, false if CANCEL
+     * @dev Optimized for contract size: minimal bytecode footprint
+     *      Calls recordResolution on DecentralizedResolutionModule if available
+     */
+    function _recordResolutionOutcome(
+        uint256 workflowId,
+        address resolver,
+        bool isRelease
+    ) internal {
+        address module = resolutionModule;
+        if (module == address(0)) return;
+        // ResolutionOutcome: 1 = RELEASE, 2 = CANCEL
+        (bool success, ) = module.call(
+            abi.encodeWithSignature(
+                "recordResolution(uint256,address,uint8,bool,uint256)",
+                workflowId, resolver, isRelease ? 1 : 2, false, 0
+            )
+        );
         success; // Silence unused variable warning
     }
     
