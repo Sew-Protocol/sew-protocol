@@ -92,6 +92,12 @@ contract ResolverIncentiveModule is AccessControl, ReentrancyGuard, SlowLaneQueu
         address indexed previousLibrary
     );
     
+    // Phase 3: Task 3.3 - Event completeness
+    event ZeroPaymentSkipped(
+        uint256 indexed workflowId,
+        address indexed resolver
+    );
+    
     event ResolverSharePercentageQueued(
         uint256 oldPercentage,
         uint256 newPercentage,
@@ -215,6 +221,13 @@ contract ResolverIncentiveModule is AccessControl, ReentrancyGuard, SlowLaneQueu
     ) external onlyEscrowContract {
         require(token != address(0), "Zero token");
         require(amount > 0, "Zero amount");
+        require(amount < type(uint256).max / 2, "Amount too large"); // Prevent overflow (Phase 1: Task 1.8)
+        
+        // Check if dispute exists (Phase 1: Task 1.8)
+        require(
+            disputeResolvers[workflowId].length > 0,
+            "Dispute not initialized"
+        );
         
         disputeEscalationFees[workflowId] += amount; // Accumulate escalation fees
         emit EscalationFeeRecorded(workflowId, token, amount);
@@ -252,6 +265,15 @@ contract ResolverIncentiveModule is AccessControl, ReentrancyGuard, SlowLaneQueu
         
         // Calculate payments (functional - pure library call)
         PaymentOutput memory output = calculatePaymentsWithVersion(input);
+        
+        // Check contract has sufficient balance (Phase 1: Task 1.5)
+        IERC20 tokenContract = IERC20(token);
+        uint256 contractBalance = tokenContract.balanceOf(address(this));
+        require(contractBalance >= output.totalResolverShare, "Insufficient balance");
+        
+        // Phase 2: Task 2.5 - Token transfer pattern clarification
+        // Note: Escrow contract must transfer tokens to this contract before calling onDisputeResolved
+        // The balance check above ensures tokens are available for distribution
         
         // Mark as distributed before external calls
         disputePaymentsDistributed[workflowId] = true;
@@ -301,9 +323,13 @@ contract ResolverIncentiveModule is AccessControl, ReentrancyGuard, SlowLaneQueu
         IERC20 tokenContract = IERC20(token);
         
         // Transfer payments to each resolver
+        // Phase 3: Task 3.3 - Emit event for zero payments
         for (uint256 i = 0; i < output.resolvers.length; i++) {
             if (output.payments[i] > 0 && output.resolvers[i] != address(0)) {
                 tokenContract.safeTransfer(output.resolvers[i], output.payments[i]);
+            } else if (output.resolvers[i] != address(0)) {
+                // Emit event for zero payments (Phase 3: Task 3.3)
+                emit ZeroPaymentSkipped(workflowId, output.resolvers[i]);
             }
         }
         

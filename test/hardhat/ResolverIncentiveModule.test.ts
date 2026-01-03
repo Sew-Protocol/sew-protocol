@@ -146,6 +146,11 @@ describe("ResolverIncentiveModule", function () {
       const fee1 = ethers.parseEther("50");
       const fee2 = ethers.parseEther("30");
       
+      // First initialize the dispute by recording a resolver (required by Phase 1 validation)
+      const [deployer] = await ethers.getSigners();
+      await incentiveModule.connect(escrowContract).recordResolver(workflowId, deployer.address, 0);
+      
+      // Now record escalation fees
       await incentiveModule.connect(escrowContract).recordEscalationFee(workflowId, await token.getAddress(), fee1);
       await incentiveModule.connect(escrowContract).recordEscalationFee(workflowId, await token.getAddress(), fee2);
       

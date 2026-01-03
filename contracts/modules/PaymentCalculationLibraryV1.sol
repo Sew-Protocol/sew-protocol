@@ -11,6 +11,11 @@ import "../interfaces/IPaymentCalculationLibrary.sol";
  *      Implemented as contract (not library) to enable governance-controlled upgrades
  */
 contract PaymentCalculationLibraryV1 is IPaymentCalculationLibrary {
+    // ============ Constants ============
+    uint256 public constant BASIS_POINTS_DENOMINATOR = 10000;
+    
+    // ============ Public Functions ============
+    
     /**
      * @notice Calculate payments using weighted distribution by escalation level
      * @param input Payment calculation input data
@@ -21,15 +26,20 @@ contract PaymentCalculationLibraryV1 is IPaymentCalculationLibrary {
     function calculatePayments(PaymentInput memory input)
         external pure override returns (PaymentOutput memory output)
     {
-        // Validate input
+        // Validate input (Phase 1: Task 1.8)
         require(input.resolvers.length > 0, "No resolvers");
-        require(input.resolverSharePercentage <= 10000, "Invalid percentage");
+        require(input.resolverSharePercentage <= BASIS_POINTS_DENOMINATOR, "Invalid percentage");
+        
+        // Validate resolver addresses are not zero (Phase 1: Task 1.8)
+        for (uint256 i = 0; i < input.resolvers.length; i++) {
+            require(input.resolvers[i].resolver != address(0), "Zero resolver address");
+        }
         
         // Aggregate total fees
         uint256 totalFees = input.escrowFee + input.escalationFees;
         
         // Calculate total resolver share
-        uint256 resolverShare = (totalFees * input.resolverSharePercentage) / 10000;
+        uint256 resolverShare = (totalFees * input.resolverSharePercentage) / BASIS_POINTS_DENOMINATOR;
         
         // Calculate total weight
         uint256 totalWeight = calculateTotalWeight(input.resolvers, input.weights);
@@ -52,9 +62,33 @@ contract PaymentCalculationLibraryV1 is IPaymentCalculationLibrary {
             paymentSum += payments[i];
         }
         
-        // Handle rounding: distribute any remainder to first resolver
+        // Phase 3: Task 3.4 - Distribute remainder proportionally instead of all to first resolver
         if (paymentSum < resolverShare && payments.length > 0) {
-            payments[0] += (resolverShare - paymentSum);
+            uint256 remainder = resolverShare - paymentSum;
+            uint256 distributed = 0;
+            
+            // Distribute remainder proportionally based on existing payment amounts
+            for (uint256 i = 0; i < payments.length && distributed < remainder; i++) {
+                if (payments[i] > 0) {
+                    // Calculate proportional share of remainder
+                    uint256 proportionalShare = (remainder * payments[i]) / resolverShare;
+                    uint256 remainingToDistribute = remainder - distributed;
+                    uint256 add = proportionalShare < remainingToDistribute ? proportionalShare : remainingToDistribute;
+                    
+                    payments[i] += add;
+                    distributed += add;
+                }
+            }
+            
+            // Any final remainder to last resolver with payment
+            if (distributed < remainder) {
+                for (uint256 i = payments.length; i > 0; i--) {
+                    if (payments[i - 1] > 0) {
+                        payments[i - 1] += (remainder - distributed);
+                        break;
+                    }
+                }
+            }
         }
         
         return PaymentOutput({
@@ -82,6 +116,8 @@ contract PaymentCalculationLibraryV1 is IPaymentCalculationLibrary {
         // V1 is always valid if it compiles and implements the interface
         return true;
     }
+    
+    // ============ Private Helper Functions ============
     
     /**
      * @notice Calculate total weight for all resolvers
@@ -116,6 +152,7 @@ contract PaymentCalculationLibraryV1 is IPaymentCalculationLibrary {
     /**
      * @notice Create test input for validation
      * @return testInput Test payment input
+     * @dev Internal helper for testing
      */
     function createTestInput() private pure returns (PaymentInput memory) {
         ResolverRecord[] memory resolvers = new ResolverRecord[](2);
@@ -143,4 +180,3 @@ contract PaymentCalculationLibraryV1 is IPaymentCalculationLibrary {
         });
     }
 }
-
