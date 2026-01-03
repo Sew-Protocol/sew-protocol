@@ -5,6 +5,7 @@ import "../interfaces/IResolutionModule.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "../governance/SlowLaneQueueActivate.sol";
+import "./ResolverIncentiveModule.sol";
 
 /**
  * @title DecentralizedResolutionModule
@@ -76,7 +77,7 @@ contract DecentralizedResolutionModule is AccessControl, ReentrancyGuard, IResol
     
     // Resolution table
     struct ResolutionTableEntry {
-        address initialResolver;      // Initial resolver for this category
+        address initialResolver;      // Initial resolver for this category (deprecated - use round-robin)
         uint8 maxEscalationLevel;     // Maximum escalation level (0-2)
         uint256 escalationFee;        // Fee required for escalation
         bool enabled;                 // Whether this entry is active
@@ -85,11 +86,18 @@ contract DecentralizedResolutionModule is AccessControl, ReentrancyGuard, IResol
     mapping(bytes32 => ResolutionTableEntry) public resolutionTable;
     mapping(uint256 => bytes32) public escrowCategory; // workflowId => category key
     
+    // Round-robin counters for resolver selection (per category)
+    mapping(bytes32 => uint256) public categoryResolverIndex; // Category => next resolver index
+    mapping(bytes32 => uint256) public categorySeniorResolverIndex; // Category => next senior resolver index
+    
     // External resolver (e.g., Kleros)
     address public externalResolver;
     
     // Registered escrow contracts that can call initializeDispute and setEscrowCategory
     mapping(address => bool) public registeredEscrowContracts;
+    
+    // Resolver incentive module (optional - for tracking resolver payments)
+    ResolverIncentiveModule public incentiveModule;
     
     // ============ Events ============
     
@@ -112,6 +120,9 @@ contract DecentralizedResolutionModule is AccessControl, ReentrancyGuard, IResol
     // Slow lane queue/activate events (Phase 3)
     event EscalationConfigQueued(uint8 level, EscalationConfig config, uint64 eta);
     event EscalationConfigActivated(uint8 level, EscalationConfig oldConfig, EscalationConfig newConfig);
+    
+    // Incentive module events
+    event IncentiveModuleUpdated(address indexed oldModule, address indexed newModule);
     
     // ============ Modifiers ============
     
@@ -379,18 +390,25 @@ contract DecentralizedResolutionModule is AccessControl, ReentrancyGuard, IResol
             return (dm.currentResolver, dm.escalationLevel);
         }
         
-        // Otherwise, determine resolver from resolution table or escrow data
+        // Determine resolver using round-robin selection
         bytes32 category = escrowCategory[workflowId];
         if (category != bytes32(0)) {
             ResolutionTableEntry memory entry = resolutionTable[category];
-            if (entry.enabled && entry.initialResolver != address(0)) {
-                return (entry.initialResolver, 0);
+            if (entry.enabled) {
+                // Use round-robin selection for this category
+                address selectedResolver = selectResolverRoundRobin(category, false);
+                if (selectedResolver != address(0)) {
+                    return (selectedResolver, 0);
+                }
             }
         }
         
-        // Fallback: use first available resolver or return address(0)
+        // Fallback: use round-robin from default category (empty category)
         if (approvedResolvers.length > 0) {
-            return (approvedResolvers[0], 0);
+            address selectedResolver = selectResolverRoundRobin(bytes32(0), false);
+            if (selectedResolver != address(0)) {
+                return (selectedResolver, 0);
+            }
         }
         
         return (address(0), 0);
@@ -398,13 +416,14 @@ contract DecentralizedResolutionModule is AccessControl, ReentrancyGuard, IResol
     
     /**
      * @notice Check if escalation is allowed and get next resolver
+     * @param workflowId The escrow transfer ID
      * @param currentLevel Current escalation level
      * @return allowed True if escalation is allowed
      * @return nextResolver Address of next resolver (address(0) if cannot escalate)
      * @return escalationFee Fee required for escalation (0 if none)
      */
     function canEscalate(
-        uint256 /* workflowId */,
+        uint256 workflowId,
         uint8 currentLevel,
         bytes calldata /* escrowData */
     ) external view override returns (
@@ -424,11 +443,15 @@ contract DecentralizedResolutionModule is AccessControl, ReentrancyGuard, IResol
             return (false, address(0), 0);
         }
         
-        // Determine next resolver
+        // Determine next resolver using round-robin
         if (nextLevel == 1) {
-            // Escalate to senior resolver
+            // Escalate to senior resolver - use round-robin
+            bytes32 category = escrowCategory[workflowId];
             if (approvedSeniorResolvers.length > 0) {
-                nextResolver = approvedSeniorResolvers[0]; // Use first available, or implement selection logic
+                nextResolver = selectResolverRoundRobin(category, true); // true = senior resolvers
+                if (nextResolver == address(0)) {
+                    return (false, address(0), 0);
+                }
             } else {
                 return (false, address(0), 0);
             }
@@ -466,6 +489,7 @@ contract DecentralizedResolutionModule is AccessControl, ReentrancyGuard, IResol
         uint8 nextLevel = currentLevel + 1;
         
         // Check if escalation is allowed
+        // Note: escalationFee is returned but recording is handled by escrow contract
         (bool allowed, address nextResolver, ) = this.canEscalate(
             workflowId,
             currentLevel,
@@ -482,7 +506,25 @@ contract DecentralizedResolutionModule is AccessControl, ReentrancyGuard, IResol
         dm.escalatedBy = _msgSender();
         dm.escalationTimestamp = block.timestamp;
         
+        // Advance round-robin counter for senior resolvers if escalating to level 1
+        if (nextLevel == 1) {
+            bytes32 category = escrowCategory[workflowId];
+            advanceRoundRobinCounter(category, true);
+        }
+        
         emit DisputeEscalated(workflowId, currentLevel, nextLevel, nextResolver);
+        
+        // Record new resolver in incentive module (if configured)
+        // Note: Escalation fee recording should be handled by escrow contract
+        // (it has access to token address and can transfer fees)
+        if (address(incentiveModule) != address(0)) {
+            try incentiveModule.recordResolver(workflowId, nextResolver, nextLevel) {
+                // Successfully recorded
+            } catch {
+                // Incentive module call failed, continue anyway
+                // This is non-critical - payment tracking is optional
+            }
+        }
         
         return (true, nextResolver, nextLevel);
     }
@@ -630,6 +672,53 @@ contract DecentralizedResolutionModule is AccessControl, ReentrancyGuard, IResol
     // ============ Internal Helper Functions ============
     
     /**
+     * @notice Select resolver using round-robin algorithm
+     * @param category Category key (bytes32(0) for default)
+     * @param useSeniorResolvers If true, select from senior resolvers; otherwise from standard resolvers
+     * @return selectedResolver Selected resolver address
+     * @dev Round-robin selection ensures fair distribution across resolvers
+     */
+    function selectResolverRoundRobin(bytes32 category, bool useSeniorResolvers)
+        internal view returns (address selectedResolver)
+    {
+        address[] memory resolverList = useSeniorResolvers ? approvedSeniorResolvers : approvedResolvers;
+        
+        if (resolverList.length == 0) {
+            return address(0);
+        }
+        
+        // Get current index for this category
+        uint256 currentIndex = useSeniorResolvers 
+            ? categorySeniorResolverIndex[category] 
+            : categoryResolverIndex[category];
+        
+        // Select resolver at current index (round-robin)
+        selectedResolver = resolverList[currentIndex % resolverList.length];
+        
+        return selectedResolver;
+    }
+    
+    /**
+     * @notice Advance round-robin counter for a category
+     * @param category Category key (bytes32(0) for default)
+     * @param useSeniorResolvers If true, advance senior resolver counter; otherwise standard resolver counter
+     * @dev Called after resolver is selected to advance the counter for next selection
+     */
+    function advanceRoundRobinCounter(bytes32 category, bool useSeniorResolvers) internal {
+        address[] memory resolverList = useSeniorResolvers ? approvedSeniorResolvers : approvedResolvers;
+        
+        if (resolverList.length == 0) {
+            return;
+        }
+        
+        if (useSeniorResolvers) {
+            categorySeniorResolverIndex[category] = (categorySeniorResolverIndex[category] + 1) % resolverList.length;
+        } else {
+            categoryResolverIndex[category] = (categoryResolverIndex[category] + 1) % resolverList.length;
+        }
+    }
+    
+    /**
      * @notice Initialize dispute metadata (called when dispute is raised)
      * @param workflowId Escrow ID
      * @param resolver Initial resolver
@@ -649,7 +738,20 @@ contract DecentralizedResolutionModule is AccessControl, ReentrancyGuard, IResol
         dm.escalationLevel = 0;
         escrowCategory[workflowId] = categoryKey;
         
+        // Advance round-robin counter for this category
+        advanceRoundRobinCounter(categoryKey, false);
+        
         emit ResolverAssigned(workflowId, resolver, categoryKey);
+        
+        // Record resolver in incentive module (if configured)
+        if (address(incentiveModule) != address(0)) {
+            try incentiveModule.recordResolver(workflowId, resolver, 0) {
+                // Successfully recorded
+            } catch {
+                // Incentive module call failed, continue anyway
+                // This is non-critical - payment tracking is optional
+            }
+        }
     }
     
     /**
@@ -684,6 +786,27 @@ contract DecentralizedResolutionModule is AccessControl, ReentrancyGuard, IResol
      */
     function isRegisteredEscrowContract(address escrowContract) external view returns (bool) {
         return registeredEscrowContracts[escrowContract];
+    }
+    
+    // ============ Incentive Module Management ============
+    
+    /**
+     * @notice Set the resolver incentive module
+     * @param _incentiveModule Address of the incentive module (address(0) to disable)
+     * @dev Only ROLE_TIMELOCK can set the incentive module
+     */
+    function setIncentiveModule(address _incentiveModule) external onlyRole(ROLE_TIMELOCK) {
+        address oldModule = address(incentiveModule);
+        incentiveModule = ResolverIncentiveModule(_incentiveModule);
+        emit IncentiveModuleUpdated(oldModule, _incentiveModule);
+    }
+    
+    /**
+     * @notice Get the current incentive module address
+     * @return Address of the incentive module (address(0) if not set)
+     */
+    function getIncentiveModule() external view returns (address) {
+        return address(incentiveModule);
     }
 }
 
