@@ -41,16 +41,15 @@ describe("DecentralizedResolutionModule", function () {
     await paymentLib.waitForDeployment();
 
     const IncentiveModuleFactory = await ethers.getContractFactory("ResolverIncentiveModule");
-    incentiveModule = await IncentiveModuleFactory.deploy(
-      deployer.address,
-      await paymentLib.getAddress()
-    );
+    incentiveModule = await IncentiveModuleFactory.deploy();
     await incentiveModule.waitForDeployment();
+    await incentiveModule.initialize(deployer.address, await paymentLib.getAddress());
 
     // Deploy DecentralizedResolutionModule
     const ModuleFactory = await ethers.getContractFactory("DecentralizedResolutionModule");
-    module = await ModuleFactory.deploy(deployer.address);
+    module = await ModuleFactory.deploy();
     await module.waitForDeployment();
+    await module.initialize(deployer.address);
 
     // Grant ROLE_TIMELOCK
     const ROLE_TIMELOCK = await module.ROLE_TIMELOCK();

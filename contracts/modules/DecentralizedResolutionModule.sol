@@ -2,9 +2,11 @@
 pragma solidity ^0.8.28;
 
 import "../interfaces/IResolutionModule.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "../governance/SlowLaneQueueActivate.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
+import "../governance/SlowLaneQueueActivateUpgradeable.sol";
 import "./ResolverIncentiveModule.sol";
 
 /**
@@ -16,10 +18,18 @@ import "./ResolverIncentiveModule.sol";
  *      - Senior resolver registry (appointed by DAO/owner)
  *      - Escalation paths (resolver → senior resolver → external)
  *      - Dynamic resolution table (based on escrow characteristics)
+ *      - UUPS upgradeable for rapid iteration and bug fixes
  */
-contract DecentralizedResolutionModule is AccessControl, ReentrancyGuard, IResolutionModule, SlowLaneQueueActivate {
+contract DecentralizedResolutionModule is 
+    AccessControlUpgradeable,
+    ReentrancyGuardUpgradeable,
+    IResolutionModule,
+    SlowLaneQueueActivateUpgradeable,
+    UUPSUpgradeable
+{
     // Role constants for governance
     bytes32 public constant ROLE_TIMELOCK = keccak256("ROLE_TIMELOCK");
+    bytes32 public constant ROLE_MODULE_DEVELOPER = keccak256("ROLE_MODULE_DEVELOPER");
     // ============ Constants ============
     
     uint8 public constant MAX_ESCALATION_LEVEL = 2;
@@ -230,11 +240,21 @@ contract DecentralizedResolutionModule is AccessControl, ReentrancyGuard, IResol
         _;
     }
     
-    // ============ Constructor ============
+    // ============ Initialization ============
     
-    constructor(address initialOwner) {
+    /**
+     * @notice Initialize the upgradeable contract
+     * @param initialOwner Address that will receive DEFAULT_ADMIN_ROLE and ROLE_TIMELOCK
+     * @dev Replaces constructor for upgradeable contracts
+     */
+    function initialize(address initialOwner) public initializer {
+        __AccessControl_init();
+        __ReentrancyGuard_init();
+        __UUPSUpgradeable_init();
+        
         // Grant DEFAULT_ADMIN_ROLE to initialOwner so roles can be granted later
         _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
+        _grantRole(ROLE_TIMELOCK, initialOwner);
         
         // Initialize escalation configs
         escalationConfig[0] = EscalationConfig({
@@ -253,6 +273,45 @@ contract DecentralizedResolutionModule is AccessControl, ReentrancyGuard, IResol
             enabled: false // Disabled by default until external resolver is set
         });
     }
+    
+    /**
+     * @notice Authorize upgrade (UUPS pattern)
+     * @param newImplementation Address of new implementation
+     * @dev Allows ROLE_TIMELOCK or ROLE_MODULE_DEVELOPER to upgrade
+     */
+    function _authorizeUpgrade(address newImplementation)
+        internal
+        override
+    {
+        require(
+            hasRole(ROLE_TIMELOCK, _msgSender()) || 
+            hasRole(ROLE_MODULE_DEVELOPER, _msgSender()),
+            "Not authorized to upgrade"
+        );
+        
+        address oldImplementation = ERC1967Utils.getImplementation();
+        
+        emit ModuleUpgraded(
+            oldImplementation,
+            newImplementation,
+            _msgSender(),
+            block.timestamp
+        );
+    }
+    
+    /**
+     * @notice Event emitted when module is upgraded
+     * @param oldImplementation Previous implementation address
+     * @param newImplementation New implementation address
+     * @param upgradedBy Address that executed the upgrade
+     * @param timestamp Block timestamp of upgrade
+     */
+    event ModuleUpgraded(
+        address indexed oldImplementation,
+        address indexed newImplementation,
+        address indexed upgradedBy,
+        uint256 timestamp
+    );
     
     // ============ Resolver Management ============
     
@@ -1602,5 +1661,9 @@ contract DecentralizedResolutionModule is AccessControl, ReentrancyGuard, IResol
         
         return (false, 0);
     }
+    
+    // ============ Storage Gap ============
+    // Reserve storage slots for future upgrades
+    uint256[50] private __gap;
 }
 

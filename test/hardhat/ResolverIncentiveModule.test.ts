@@ -43,11 +43,9 @@ describe("ResolverIncentiveModule", function () {
 
     // Deploy ResolverIncentiveModule
     const IncentiveModuleFactory = await ethers.getContractFactory("ResolverIncentiveModule");
-    incentiveModule = await IncentiveModuleFactory.deploy(
-      deployer.address,
-      await paymentLibV1.getAddress()
-    );
+    incentiveModule = await IncentiveModuleFactory.deploy();
     await incentiveModule.waitForDeployment();
+    await incentiveModule.initialize(deployer.address, await paymentLibV1.getAddress());
 
     // Grant ROLE_TIMELOCK to timelock
     const ROLE_TIMELOCK = await incentiveModule.ROLE_TIMELOCK();

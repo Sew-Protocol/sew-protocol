@@ -2,11 +2,13 @@
 pragma solidity ^0.8.28;
 
 import "../interfaces/IPaymentCalculationLibrary.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "../governance/SlowLaneQueueActivate.sol";
+import "../governance/SlowLaneQueueActivateUpgradeable.sol";
 
 /**
  * @title ResolverIncentiveModule
@@ -14,13 +16,20 @@ import "../governance/SlowLaneQueueActivate.sol";
  * @dev Uses functional library approach with governance-controlled upgrades
  *      - State management: Imperative (in this contract)
  *      - Payment calculations: Functional (in library)
- *      - Library upgrades: Governance-controlled (slow lane)
+ *      - Library upgrades: Governance-controlled (slow lane) or instant (module developer)
+ *      - UUPS upgradeable for rapid iteration and bug fixes
  */
-contract ResolverIncentiveModule is AccessControl, ReentrancyGuard, SlowLaneQueueActivate {
+contract ResolverIncentiveModule is 
+    AccessControlUpgradeable,
+    ReentrancyGuardUpgradeable,
+    SlowLaneQueueActivateUpgradeable,
+    UUPSUpgradeable
+{
     using SafeERC20 for IERC20;
     
     // ============ Role Constants ============
     bytes32 public constant ROLE_TIMELOCK = keccak256("ROLE_TIMELOCK");
+    bytes32 public constant ROLE_MODULE_DEVELOPER = keccak256("ROLE_MODULE_DEVELOPER");
     
     // ============ State Variables ============
     
@@ -92,6 +101,13 @@ contract ResolverIncentiveModule is AccessControl, ReentrancyGuard, SlowLaneQueu
         address indexed previousLibrary
     );
     
+    event PaymentLibrarySwappedInstant(
+        address indexed oldLibrary,
+        address indexed newLibrary,
+        address indexed swappedBy,
+        uint256 timestamp
+    );
+    
     // Phase 3: Task 3.3 - Event completeness
     event ZeroPaymentSkipped(
         uint256 indexed workflowId,
@@ -138,11 +154,21 @@ contract ResolverIncentiveModule is AccessControl, ReentrancyGuard, SlowLaneQueu
         _;
     }
     
-    // ============ Constructor ============
+    // ============ Initialization ============
     
-    constructor(address initialOwner, address initialLibrary) {
+    /**
+     * @notice Initialize the upgradeable contract
+     * @param initialOwner Address that will receive DEFAULT_ADMIN_ROLE and ROLE_TIMELOCK
+     * @param initialLibrary Address of initial payment calculation library
+     * @dev Replaces constructor for upgradeable contracts
+     */
+    function initialize(address initialOwner, address initialLibrary) public initializer {
         require(initialOwner != address(0), "Zero owner");
         require(initialLibrary != address(0), "Zero library");
+        
+        __AccessControl_init();
+        __ReentrancyGuard_init();
+        __UUPSUpgradeable_init();
         
         _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
         _grantRole(ROLE_TIMELOCK, initialOwner);
@@ -151,6 +177,45 @@ contract ResolverIncentiveModule is AccessControl, ReentrancyGuard, SlowLaneQueu
         require(validateLibrary(initialLibrary), "Invalid library");
         currentPaymentLibrary = initialLibrary;
     }
+    
+    /**
+     * @notice Authorize upgrade (UUPS pattern)
+     * @param newImplementation Address of new implementation
+     * @dev Allows ROLE_TIMELOCK or ROLE_MODULE_DEVELOPER to upgrade
+     */
+    function _authorizeUpgrade(address newImplementation)
+        internal
+        override
+    {
+        require(
+            hasRole(ROLE_TIMELOCK, _msgSender()) || 
+            hasRole(ROLE_MODULE_DEVELOPER, _msgSender()),
+            "Not authorized to upgrade"
+        );
+        
+        address oldImplementation = ERC1967Utils.getImplementation();
+        
+        emit IncentiveModuleUpgraded(
+            oldImplementation,
+            newImplementation,
+            _msgSender(),
+            block.timestamp
+        );
+    }
+    
+    /**
+     * @notice Event emitted when incentive module is upgraded
+     * @param oldImplementation Previous implementation address
+     * @param newImplementation New implementation address
+     * @param upgradedBy Address that executed the upgrade
+     * @param timestamp Block timestamp of upgrade
+     */
+    event IncentiveModuleUpgraded(
+        address indexed oldImplementation,
+        address indexed newImplementation,
+        address indexed upgradedBy,
+        uint256 timestamp
+    );
     
     // ============ Core Functions ============
     
@@ -345,7 +410,37 @@ contract ResolverIncentiveModule is AccessControl, ReentrancyGuard, SlowLaneQueu
     // ============ Governance Functions ============
     
     /**
-     * @notice Queue new payment calculation library
+     * @notice Swap payment calculation library instantly (module developer only)
+     * @param newLibrary Address of new library contract
+     * @dev Allows module developer to swap libraries instantly without slow-lane delay
+     *      Requires disclosure and event emission for transparency
+     */
+    function swapPaymentLibraryInstant(address newLibrary)
+        external
+        onlyRole(ROLE_MODULE_DEVELOPER)
+        nonReentrant
+    {
+        require(newLibrary != address(0), "Zero address");
+        require(validateLibrary(newLibrary), "Invalid library");
+        
+        address oldLibrary = currentPaymentLibrary;
+        currentPaymentLibrary = newLibrary;
+        
+        // Clear any pending library (instant swap takes precedence)
+        _pendingPaymentLibrary.value = address(0);
+        _pendingPaymentLibrary.eta = 0;
+        _pendingPaymentLibrary.exists = false;
+        
+        emit PaymentLibrarySwappedInstant(
+            oldLibrary,
+            newLibrary,
+            _msgSender(),
+            block.timestamp
+        );
+    }
+    
+    /**
+     * @notice Queue new payment calculation library (slow-lane, governance-controlled)
      * @param newLibrary Address of new library contract
      * @dev Validates library before queueing, 7-day delay before activation
      */
@@ -611,5 +706,9 @@ contract ResolverIncentiveModule is AccessControl, ReentrancyGuard, SlowLaneQueu
     {
         return disputePaymentsDistributed[workflowId];
     }
+    
+    // ============ Storage Gap ============
+    // Reserve storage slots for future upgrades
+    uint256[50] private __gap;
 }
 
