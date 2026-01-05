@@ -168,6 +168,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
     event EscrowResolved(uint256 indexed workflowId, address indexed resolver, bytes32 resolutionHash);
     // Escalation events
     event DisputeEscalated(uint256 indexed workflowId, uint8 fromLevel, uint8 toLevel, address indexed newResolver, address indexed escalatedBy);
+    event EscalationFeeCollected(uint256 indexed workflowId, uint256 fee, address indexed feeRecipient);
     event EscrowTransferAutoReleased(uint256 indexed workflowId, address indexed to, uint256 amount);
     event EscrowTransferAutoCancelled(uint256 indexed workflowId, address indexed from, uint256 amount);
     
@@ -1226,6 +1227,15 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
             revert InvalidAmount("Insufficient escalation fee");
         }
         
+        // Transfer escalation fee BEFORE escalation (ensures fee is collected, escalation can still revert if needed)
+        if (escalationFee > 0) {
+            if (escrowFeeAddress == address(0)) {
+                revert InvalidAddress("Fee address not set", address(0));
+            }
+            payable(escrowFeeAddress).transfer(escalationFee);
+            emit EscalationFeeCollected(workflowId, escalationFee, escrowFeeAddress);
+        }
+        
         // Execute escalation in module
         (bool escalationSuccess, address newResolverAddress, uint8 newEscalationLevel) = 
             IResolutionModule(resolutionModule).executeEscalation(workflowId, escrowData);
@@ -1236,11 +1246,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         
         // Update resolver in escrow
         et.disputeResolver = newResolverAddress;
-        
-        // Transfer escalation fee to fee address
-        if (escalationFee > 0 && escrowFeeAddress != address(0)) {
-            payable(escrowFeeAddress).transfer(escalationFee);
-        }
         
         // Refund excess fee
         if (msg.value > escalationFee) {
