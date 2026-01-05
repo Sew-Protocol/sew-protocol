@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
+import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+
 /**
  * @title IResolutionModule
  * @notice Interface for dispute resolution modules
  * @dev Handles resolution logic including escalation paths, resolver roles, and dynamic resolution
+ *      All resolution modules must implement ERC-165 for interface detection
  */
-interface IResolutionModule {
+interface IResolutionModule is IERC165 {
     /**
      * @notice Check if an address is authorized to resolve a dispute
      * @param workflowId The escrow transfer ID
@@ -74,6 +77,14 @@ interface IResolutionModule {
      * @return name The module name
      */
     function moduleName() external pure returns (string memory name);
+
+    /**
+     * @notice Get the module version
+     * @return version The module version (semantic versioning, e.g., "1.0.0")
+     * @dev Must follow semantic versioning: MAJOR.MINOR.PATCH
+     *      Major version changes indicate breaking changes
+     */
+    function moduleVersion() external pure returns (string memory version);
 }
 
 

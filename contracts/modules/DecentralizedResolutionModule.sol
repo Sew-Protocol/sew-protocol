@@ -5,6 +5,7 @@ import "../interfaces/IResolutionModule.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 import "../governance/SlowLaneQueueActivateUpgradeable.sol";
 import "./ResolverIncentiveModule.sol";
@@ -743,6 +744,32 @@ contract DecentralizedResolutionModule is
      */
     function moduleName() external pure override returns (string memory name) {
         return "DecentralizedResolution";
+    }
+    
+    /**
+     * @notice Get the module version
+     * @return version The module version (semantic versioning)
+     */
+    function moduleVersion() external pure override returns (string memory version) {
+        return "1.0.0";
+    }
+    
+    /**
+     * @notice Check if contract supports an interface
+     * @param interfaceId The interface identifier
+     * @return supported True if interface is supported
+     * @dev AccessControlUpgradeable already includes ERC165Upgradeable
+     */
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        virtual
+        override(AccessControlUpgradeable, IERC165)
+        returns (bool)
+    {
+        return
+            interfaceId == type(IResolutionModule).interfaceId ||
+            super.supportsInterface(interfaceId);
     }
     
     // ============ Resolution Table Management ============

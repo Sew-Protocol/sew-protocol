@@ -89,6 +89,32 @@ contract DefaultResolutionModule is AccessControl, IResolutionModule {
     function moduleName() external pure override returns (string memory) {
         return "DefaultSingleResolver";
     }
+    
+    /**
+     * @notice Get the module version
+     * @return version The module version (semantic versioning)
+     */
+    function moduleVersion() external pure override returns (string memory version) {
+        return "1.0.0";
+    }
+    
+    /**
+     * @notice Check if contract supports an interface
+     * @param interfaceId The interface identifier
+     * @return supported True if interface is supported
+     * @dev AccessControl already includes ERC165
+     */
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        virtual
+        override(AccessControl, IERC165)
+        returns (bool)
+    {
+        return
+            interfaceId == type(IResolutionModule).interfaceId ||
+            super.supportsInterface(interfaceId);
+    }
 }
 
 
