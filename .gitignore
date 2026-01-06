@@ -6,6 +6,7 @@ cache-foundry
 artifacts
 typechain-types
 deploy-ledger
+coverage
 .DS_Store
 .envq
 lib
@@ -27,3 +28,11 @@ lib
 
 .prettierrc
 .vscode
+
+work
+bugs
+docs/internal/icos.md
+docs/internal/INTRINSIC_CURSOR_OPERATING_SYSTEM.md
+
+docs/archived
+

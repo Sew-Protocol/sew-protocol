@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.33;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -40,7 +40,9 @@ library RecoveryLibrary {
             revert InvalidAmount("Amount exceeds contract balance");
         }
         
-        payable(recipient).transfer(recoverAmount);
+        // Use call instead of transfer to avoid 2300 gas limit
+        (bool success, ) = payable(recipient).call{value: recoverAmount}("");
+        require(success, "ETH transfer failed");
     }
 
     /**

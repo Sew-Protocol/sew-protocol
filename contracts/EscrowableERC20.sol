@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.33;
 
 // Uncomment this line to use console.log
 // import "hardhat/console.sol";
@@ -283,7 +283,10 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         if (add) {
             totalHeldInEscrow += amount;
         } else {
-            // Use unchecked to prevent underflow (amount should never exceed totalHeldInEscrow)
+            // Explicit check: amount should never exceed totalHeldInEscrow (enforced by logic)
+            // This check provides extra safety before using unchecked block
+            require(amount <= totalHeldInEscrow, "Amount exceeds total held in escrow");
+            // Use unchecked after explicit check to prevent underflow
             unchecked {
                 totalHeldInEscrow -= amount;
             }

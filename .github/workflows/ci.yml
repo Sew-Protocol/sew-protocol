@@ -1,36 +1,112 @@
-name: ci
+name: CI
 
 on:
   push:
+    branches: [ main, develop ]
   pull_request:
+    branches: [ main, develop ]
 
 jobs:
-  test:
+  quality-checks:
+    name: Quality Checks
     runs-on: ubuntu-latest
+    
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'pnpm'
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
         with:
-          version: 9
-
-      - name: Install deps
-        run: pnpm i --frozen-lockfile || pnpm i
-
-      - name: Install Foundry
+          version: 8
+      
+      - name: Install dependencies
+        run: pnpm install
+      
+      - name: Check formatting
+        run: |
+          pnpm format
+          if [ -n "$(git diff --name-only)" ]; then
+            echo "Files were not properly formatted. Please run 'pnpm format' and commit the changes."
+            git diff
+            exit 1
+          fi
+      
+      - name: Run linter
+        run: pnpm lint
+      
+      - name: Type check
+        run: pnpm typecheck
+      
+      - name: Compile contracts
+        run: pnpm compile
+      
+      - name: Check contract sizes
+        run: pnpm size:check
+      
+      - name: Run Hardhat tests
+        run: pnpm test:hardhat
+      
+      - name: Setup Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: nightly
-
-      - name: Hardhat tests
-        run: pnpm test:hardhat
-
-      - name: Foundry tests
+      
+      - name: Run Foundry tests
         run: pnpm test:foundry
+
+  test-coverage:
+    name: Test Coverage
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      
+      - name: Install dependencies
+        run: pnpm install
+      
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+      
+      - name: Generate coverage report
+        run: pnpm coverage
+      
+      - name: Upload coverage to artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 30
+      
+      - name: Coverage summary
+        if: always()
+        run: |
+          if [ -f coverage/coverage-summary.json ]; then
+            echo "## Coverage Summary" >> $GITHUB_STEP_SUMMARY
+            echo "| Metric | Coverage |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|----------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Lines | $(jq -r '.total.lines.pct' coverage/coverage-summary.json)% |" >> $GITHUB_STEP_SUMMARY
+            echo "| Statements | $(jq -r '.total.statements.pct' coverage/coverage-summary.json)% |" >> $GITHUB_STEP_SUMMARY
+            echo "| Functions | $(jq -r '.total.functions.pct' coverage/coverage-summary.json)% |" >> $GITHUB_STEP_SUMMARY
+            echo "| Branches | $(jq -r '.total.branches.pct' coverage/coverage-summary.json)% |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Coverage report not found" >> $GITHUB_STEP_SUMMARY
+          fi

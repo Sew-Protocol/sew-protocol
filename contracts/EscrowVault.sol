@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.33;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -8,6 +8,7 @@ import "./BaseEscrow.sol";
 import "./governance/SlowLaneQueueActivate.sol";
 import "./libraries/ModuleManagementLibrary.sol";
 import "./libraries/EscrowCreationLibrary.sol";
+import "./libraries/RecoveryLibrary.sol";
 import "./interfaces/IReleaseStrategy.sol";
 import "./interfaces/IResolutionModule.sol";
 import "./interfaces/IYieldGenerationModule.sol";
@@ -648,5 +649,48 @@ contract EscrowVault is BaseEscrow {
      */
     function getTokenInfo(address token) public view returns (uint256 balance, uint256 fees) {
         return (totalHeldInEscrowPerToken[token], totalFeesPerToken[token]);
+    }
+
+    /**
+     * @notice Recover ERC20 tokens sent directly to the contract by mistake
+     * @param token ERC20 token address
+     * @param recipient Address to receive the recovered tokens
+     * @param amount Amount of tokens to recover (0 = recover all available)
+     * @dev Overrides BaseEscrow.recoverERC20 to add validation that we're not recovering
+     *      tracked fees or escrowed amounts. Only recovers tokens sent directly to the contract.
+     */
+    function recoverERC20(address token, address recipient, uint256 amount) 
+        external override onlyRole(ROLE_TIMELOCK) nonReentrant returns (bool) 
+    {
+        IERC20 tokenContract = IERC20(token);
+        uint256 balance = tokenContract.balanceOf(address(this));
+        uint256 escrowed = totalHeldInEscrowPerToken[token];
+        uint256 fees = totalFeesPerToken[token];
+        
+        // Calculate available amount (balance minus escrowed funds and fees)
+        uint256 available = balance;
+        if (available >= escrowed) {
+            available -= escrowed;
+        } else {
+            // Edge case: balance is less than tracked escrowed (shouldn't happen, but be safe)
+            available = 0;
+        }
+        if (available >= fees) {
+            available -= fees;
+        } else {
+            available = 0;
+        }
+        
+        // Determine recover amount
+        uint256 recoverAmount = amount == 0 ? available : amount;
+        
+        // Validate we're not trying to recover more than available
+        require(recoverAmount <= available, "Cannot recover escrowed funds or fees");
+        require(recoverAmount > 0, "No tokens available to recover");
+        
+        // Use RecoveryLibrary for the actual transfer
+        uint256 actualRecovered = RecoveryLibrary.recoverERC20(token, recipient, recoverAmount, balance);
+        emit ERC20Recovered(token, recipient, actualRecovered);
+        return true;
     }
 }

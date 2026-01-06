@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.33;
 
 import "../interfaces/IYieldModule.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
+import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 // Aave V3 interfaces
 interface IPoolAddressesProvider {
@@ -34,7 +36,7 @@ error AaveWithdrawalFailed(uint256 workflowId, address token);
  * @notice Yield module implementing Aave V3 integration for yield generation
  * @dev Handles all Aave-specific logic: deposits, withdrawals, yield calculation, and configuration
  */
-contract AaveYieldModule is IYieldModule, Ownable {
+contract AaveYieldModule is IYieldModule, Ownable, ERC165 {
     using SafeERC20 for IERC20;
 
     // Aave configuration
@@ -473,6 +475,17 @@ contract AaveYieldModule is IYieldModule, Ownable {
             escrowATokenBalance[escrowContract][workflowId],
             escrowOriginalDeposit[escrowContract][workflowId]
         );
+    }
+
+    /**
+     * @notice ERC165 interface support
+     * @param interfaceId The interface identifier
+     * @return True if the contract supports the interface
+     */
+    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165) returns (bool) {
+        return
+            interfaceId == type(IYieldModule).interfaceId ||
+            super.supportsInterface(interfaceId);
     }
 }
 

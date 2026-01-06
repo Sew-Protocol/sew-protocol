@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.33;
 
 import "../interfaces/IPaymentCalculationLibrary.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
@@ -8,6 +8,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import "../governance/SlowLaneQueueActivateUpgradeable.sol";
 
 /**
@@ -705,6 +706,19 @@ contract ResolverIncentiveModule is
         external view returns (bool)
     {
         return disputePaymentsDistributed[workflowId];
+    }
+    
+    /**
+     * @notice ERC165 interface support
+     * @param interfaceId The interface identifier
+     * @return True if the contract supports the interface
+     * @dev AccessControlUpgradeable already includes ERC165Upgradeable
+     */
+    function supportsInterface(bytes4 interfaceId)
+        public view virtual override(AccessControlUpgradeable)
+        returns (bool)
+    {
+        return super.supportsInterface(interfaceId);
     }
     
     // ============ Storage Gap ============

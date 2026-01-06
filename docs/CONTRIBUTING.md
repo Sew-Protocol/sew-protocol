@@ -1,86 +1,368 @@
-# Welcome to Scaffold-ETH 2 Contributing Guide
+# Contributing Guide
 
-Thank you for investing your time in contributing to Scaffold-ETH 2!
+Thank you for investing your time in contributing to the Escrow Protocol!
 
-This guide aims to provide an overview of the contribution workflow to help us make the contribution process effective for everyone involved.
+This guide provides an overview of the contribution workflow and development practices to help make the contribution process effective for everyone involved.
 
 ## About the Project
 
-Scaffold-ETH 2 is a minimal and forkable repo providing builders with a starter kit to build decentralized applications on Ethereum.
+This is a **hardhat-deploy-hybrid** escrow protocol project that provides:
 
-Read the [README](README.md) to get an overview of the project.
+- **EscrowableERC20**: ERC20 token with built-in escrow functionality
+- **EscrowVault**: Multi-token escrow vault for any ERC20 token
+- **Modular Architecture**: Pluggable release strategies, resolution modules, and yield generation/distribution modules
+- **Governance**: Onchain governance with TimelockController and OpenZeppelin Governor
+- **Hybrid Testing**: Both Hardhat (TypeScript) and Foundry (Solidity) test suites
+
+Read the [README](../README.md) to get an overview of the project.
 
 ### Vision
 
-The goal of Scaffold-ETH 2 is to provide the primary building blocks for a decentralized application.
-
-The repo can be forked to include integrations and more features, but we want to keep the master branch simple and minimal.
+The goal is to provide a secure, modular, and governance-controlled escrow protocol that enables trustless peer-to-peer transactions with built-in dispute resolution, yield generation, and flexible release mechanisms.
 
 ### Project Status
 
-The project is under active development.
+The project is under active development. The protocol is currently deployed on Base Sepolia testnet.
 
-You can view the open Issues, follow the development process and contribute to the project.
+## Getting Started
 
-## Getting started
+### Prerequisites
 
-You can contribute to this repo in many ways:
+- Node.js (v20+)
+- pnpm (v8+)
+- Foundry (for Foundry tests)
 
-- Solve open issues
-- Report bugs or feature requests
-- Improve the documentation
+### Setup
 
-Contributions are made via Issues and Pull Requests (PRs). A few general guidelines for contributions:
+```bash
+# Install dependencies
+pnpm install
 
-- Search for existing Issues and PRs before creating your own.
-- Contributions should only fix/add the functionality in the issue OR address style issues, not both.
-- If you're running into an error, please give context. Explain what you're trying to do and how to reproduce the error.
-- Please use the same formatting in the code repository. You can configure your IDE to do it by using the prettier / linting config files included in each package.
-- If applicable, please edit the README.md file to reflect the changes.
+# Copy environment file
+cp .env.example .env
 
-### Issues
+# Compile contracts
+pnpm compile
 
-Issues should be used to report problems, request a new feature, or discuss potential changes before a PR is created.
+# Run tests
+pnpm test
+```
 
-#### Solve an issue
+### Development Workflow
 
-Scan through our [existing issues](https://github.com/scaffold-eth/scaffold-eth-2/issues) to find one that interests you.
+1. **Create a feature branch** from `main`:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
 
-If a contributor is working on the issue, they will be assigned to the individual. If you find an issue to work on, you are welcome to assign it to yourself and open a PR with a fix for it.
+2. **Make your changes** following the code style guidelines below
 
-#### Create a new issue
+3. **Run tests** to ensure everything works:
+   ```bash
+   # Run all tests
+   pnpm test
+   
+   # Run only Hardhat tests
+   pnpm test:hardhat
+   
+   # Run only Foundry tests
+   pnpm test:foundry
+   ```
 
-If a related issue doesn't exist, you can open a new issue.
+4. **Check contract sizes** (important - we have 24KB limit):
+   ```bash
+   pnpm size:check
+   ```
 
-Some tips to follow when you are creating an issue:
+5. **Format and lint**:
+   ```bash
+   pnpm format
+   pnpm lint
+   ```
 
-- Provide as much context as possible. Over-communicate to give the most details to the reader.
-- Include the steps to reproduce the issue or the reason for adding the feature.
-- Screenshots, videos etc., are highly appreciated.
+6. **Commit your changes** with clear commit messages
 
-### Pull Requests
+7. **Push and create a Pull Request**
 
-#### Pull Request Process
+## Code Style and Conventions
+
+### Solidity
+
+- **Solidity Version**: `^0.8.28`
+- **Style**: Follow OpenZeppelin style guide
+- **Formatting**: Use Prettier (configured in `.prettierrc`)
+- **Naming**:
+  - Functions: `camelCase`
+  - Events: `PascalCase`
+  - Constants: `UPPER_SNAKE_CASE`
+  - Structs: `PascalCase`
+
+### TypeScript/JavaScript
+
+- **Formatting**: Prettier
+- **Linting**: ESLint (configured in project)
+- **Type Safety**: TypeScript strict mode
+
+### Function Naming
+
+**Important**: The protocol uses `createEscrow()` as the primary function name, not `escrowTransfer()`.
+
+- ✅ **Use**: `createEscrow(address seller, uint256 amount)`
+- ❌ **Don't use**: `escrowTransfer()` (deprecated)
+
+For tests with multiple overloads, use `.getFunction()` to disambiguate:
+```typescript
+await contract
+  .connect(sender)
+  .getFunction("createEscrow(address,uint256)")
+  .send(recipient.address, amount);
+```
+
+### Contract Size
+
+**Critical**: Contracts must stay under the 24KB (EIP-170) limit.
+
+- Always check contract size after changes: `pnpm size:check`
+- If approaching limit, consider:
+  - Extracting logic to libraries
+  - Using `internal` functions instead of `public` where possible
+  - Removing unused code
+  - Optimizing with compiler settings
+
+## Testing
+
+### Test Structure
+
+- **Hardhat Tests**: `test/hardhat/` (TypeScript)
+- **Foundry Tests**: `test/foundry/` (Solidity)
+- **Test Helpers**: `test/helpers/`
+
+### Writing Tests
+
+#### Hardhat Tests
+
+```typescript
+import { expect } from "chai";
+import { ethers } from "hardhat";
+import { EscrowableERC20 } from "../typechain-types";
+
+describe("Feature Name", function () {
+  let escrowableERC20: EscrowableERC20;
+  
+  beforeEach(async function () {
+    // Setup
+  });
+  
+  it("Should do something", async function () {
+    // Test implementation
+  });
+});
+```
+
+#### Foundry Tests
+
+```solidity
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.28;
+
+import "forge-std/Test.sol";
+import "../contracts/EscrowableERC20.sol";
+
+contract FeatureTest is Test {
+    EscrowableERC20 escrow;
+    
+    function setUp() public {
+        // Setup
+    }
+    
+    function testSomething() public {
+        // Test implementation
+    }
+}
+```
+
+### Test Coverage
+
+- Aim for high test coverage (>90%)
+- Test both success and failure cases
+- Test edge cases (zero values, max values, boundary conditions)
+- Test access control (roles, permissions)
+- Test state transitions
+
+### Known Test Issues
+
+Some tests may be failing due to:
+- Function name changes (`escrowTransfer` → `createEscrow`)
+- Deprecated functions (`setAuthorizedResolver` is deprecated)
+- Missing module deployments in test setup
+
+When fixing tests:
+1. Update function names to `createEscrow()`
+2. Use `.getFunction()` for overloaded functions
+3. Ensure all required modules are deployed in test setup
+4. Update deprecated function calls
+
+## Architecture Guidelines
+
+### Modular Design
+
+The protocol uses a modular architecture:
+
+- **Release Strategies**: `IReleaseStrategy` - Custom release logic
+- **Resolution Modules**: `IResolutionModule` - Dispute resolution
+- **Yield Generation**: `IYieldGenerationModule` - Yield generation (e.g., Aave)
+- **Yield Distribution**: `IYieldDistributionModule` - Yield distribution
+
+When adding new modules:
+1. Implement the interface
+2. Add to module registry
+3. Update documentation
+4. Add tests
+
+### Governance
+
+All protocol changes go through governance:
+
+1. **Standard Lane**: Immediate execution (e.g., pause, set max attachments)
+2. **Slow Lane**: 7-day delay (e.g., fee changes, module swaps)
+
+See [Governance Documentation](governance.md) for details.
+
+### Security Considerations
+
+- **Reentrancy**: Use `nonReentrant` modifier where appropriate
+- **Access Control**: Use role-based access control (RBAC)
+- **Input Validation**: Validate all inputs
+- **Checks-Effects-Interactions**: Follow CEI pattern
+- **Overflow/Underflow**: Solidity 0.8+ handles automatically, but be aware
+
+## Documentation
+
+### Code Documentation
+
+- **NatSpec**: All public/external functions must have NatSpec comments
+- **Events**: Document all events
+- **Errors**: Document all custom errors
+
+Example:
+```solidity
+/**
+ * @notice Create a new escrow with custom settings
+ * @param seller Recipient address (seller)
+ * @param amount Amount to escrow (fee will be deducted)
+ * @param settings Escrow settings
+ * @return workflowId The ID of the created escrow transfer
+ * @dev Emits EscrowTransferCreated event
+ */
+function createEscrow(
+    address seller,
+    uint256 amount,
+    EscrowSettings memory settings
+) public nonReentrant whenNotPaused returns (uint256 workflowId) {
+    // Implementation
+}
+```
+
+### Documentation Files
+
+- Update relevant documentation in `docs/` when making changes
+- Keep `_DOCUMENT_INDEX.md` updated
+- Document breaking changes in migration guides
+
+## Pull Request Process
 
 We follow the ["fork-and-pull" Git workflow](https://github.com/susam/gitpr)
 
-1. Fork the repo
-2. Clone the project
-3. Create a new branch with a descriptive name
-4. Commit your changes to the new branch
-5. Push changes to your fork
-6. Open a PR in our repository and tag one of the maintainers to review your PR
+### PR Checklist
 
-Here are some tips for a high-quality pull request:
+Before submitting a PR, ensure:
 
-- Create a title for the PR that accurately defines the work done.
-- Structure the description neatly to make it easy to consume by the readers. For example, you can include bullet points and screenshots instead of having one large paragraph.
-- Add the link to the issue if applicable.
-- Have a good commit message that summarises the work done.
+- [ ] All tests pass (`pnpm test`)
+- [ ] Contract sizes are within limits (`pnpm size:check`)
+- [ ] Code is formatted (`pnpm format`)
+- [ ] No linting errors (`pnpm lint`)
+- [ ] TypeScript compiles (`pnpm typecheck`)
+- [ ] Documentation is updated
+- [ ] Commit messages are clear and descriptive
+- [ ] PR description explains the changes and why
 
-Once you submit your PR:
+### PR Description Template
 
-- We may ask questions, request additional information or ask for changes to be made before a PR can be merged. Please note that these are to make the PR clear for everyone involved and aims to create a frictionless interaction process.
-- As you update your PR and apply changes, mark each conversation resolved.
+```markdown
+## Summary
+Brief description of changes
 
-Once the PR is approved, we'll "squash-and-merge" to keep the git commit history clean.
+## Changes
+- Change 1
+- Change 2
+
+## Testing
+- [ ] Unit tests added/updated
+- [ ] Integration tests pass
+- [ ] Manual testing completed
+
+## Contract Size Impact
+- BaseEscrow: +X bytes / -X bytes
+- EscrowVault: +X bytes / -X bytes
+- EscrowableERC20: +X bytes / -X bytes
+
+## Breaking Changes
+- [ ] Yes (describe)
+- [ ] No
+
+## Related Issues
+Closes #123
+```
+
+### Review Process
+
+- PRs require at least one approval
+- All CI checks must pass
+- Code review feedback must be addressed
+- Once approved, PRs are squashed and merged
+
+## Issues
+
+### Reporting Issues
+
+When reporting issues, include:
+
+- **Description**: Clear description of the issue
+- **Steps to Reproduce**: Detailed steps
+- **Expected Behavior**: What should happen
+- **Actual Behavior**: What actually happens
+- **Environment**: Network, contract addresses, etc.
+- **Screenshots/Logs**: If applicable
+
+### Solving Issues
+
+1. Check existing issues to avoid duplicates
+2. Assign yourself if working on an issue
+3. Create a branch from `main`
+4. Implement the fix
+5. Add tests for the fix
+6. Submit a PR with reference to the issue
+
+## Governance Contributions
+
+For governance-related contributions:
+
+- See [Governance Process](GOVERNANCE_PROCESS.md)
+- Follow [Upgrade Policy](UPGRADE_POLICY.md)
+- Review [Emergency Policy](EMERGENCY_POLICY.md)
+- Check [Governance Surface Map](GOVERNANCE_SURFACE_MAP.md)
+
+## Code of Conduct
+
+- Be respectful and inclusive
+- Provide constructive feedback
+- Help others learn and grow
+- Follow security best practices
+
+## Questions?
+
+- Check existing documentation in `docs/`
+- Review [Document Index](_DOCUMENT_INDEX.md)
+- Open an issue for questions or discussions
+
+Thank you for contributing! 🎉

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.33;
 
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
@@ -973,6 +973,24 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
      * @return newLevel New escalation level
      * @dev Only participants (sender or recipient) can escalate. Escrow must be in DISPUTED state.
      *      Fee collection happens in BaseEscrow, escalation logic delegated to module.
+     * 
+     * @dev Escalation Flow:
+     *      1. Validate caller is participant and escrow is in DISPUTED state
+     *      2. Query module for current escalation level and fee requirements
+     *      3. Validate escalation is allowed and sufficient fee provided
+     *      4. Execute escalation via module (module handles resolver selection and state updates)
+     *      5. If escalation fails: refund any fee sent and revert
+     *      6. If escalation succeeds: collect fee, update escrow state, refund excess
+     * 
+     * @dev Fee Handling:
+     *      - Fee is collected AFTER successful escalation (prevents loss if escalation fails)
+     *      - Excess fee is automatically refunded to caller
+     *      - Uses call() instead of transfer() to avoid 2300 gas limit
+     * 
+     * @dev Security:
+     *      - Reentrancy protection via nonReentrant modifier
+     *      - Module validates escalation eligibility and returns new resolver
+     *      - BaseEscrow only updates its own state after module confirms success
      */
     function escalateDispute(uint256 workflowId) public payable nonReentrant returns (
         bool success,
@@ -1020,14 +1038,16 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         if (!escalationSuccess) {
             // Refund any fee sent if escalation fails
             if (msg.value > 0) {
-                payable(_msgSender()).transfer(msg.value);
+                (bool refundSuccess, ) = payable(_msgSender()).call{value: msg.value}("");
+                require(refundSuccess, "ETH refund failed");
             }
             revert ResolutionModuleCallFailed();
         }
         
         // Collect fee AFTER successful escalation (ensures fee is only collected if escalation succeeds)
         if (escalationFee > 0) {
-            payable(escrowFeeAddress).transfer(escalationFee);
+            (bool feeSuccess, ) = payable(escrowFeeAddress).call{value: escalationFee}("");
+            require(feeSuccess, "Escalation fee transfer failed");
             emit EscalationFeeCollected(workflowId, escalationFee, escrowFeeAddress);
         }
         
@@ -1036,7 +1056,8 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         
         // Refund excess fee
         if (msg.value > escalationFee) {
-            payable(_msgSender()).transfer(msg.value - escalationFee);
+            (bool excessRefundSuccess, ) = payable(_msgSender()).call{value: msg.value - escalationFee}("");
+            require(excessRefundSuccess, "Excess ETH refund failed");
         }
         
         emit DisputeEscalated(workflowId, currentLevel, newEscalationLevel, newDisputeResolverAddress, _msgSender());
@@ -1219,6 +1240,16 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
      * @dev Cancels the escrow, changes state to REFUNDED, and transfers funds back to sender.
      *      If escrow was generating yield via Aave, withdraws from Aave first.
      *      Must be implemented by derived contracts to handle token transfers.
+     * 
+     * @dev Execution Flow:
+     *      1. Read escrow data (token, amounts, participants) before state changes
+     *      2. Withdraw yield from generation module (if enabled) - calculates actual amount including yield
+     *      3. Distribute yield via distribution module (if configured)
+     *      4. Transfer remaining balance (original + yield - fees) to sender
+     *      5. Update state to REFUNDED and clear remaining balance
+     * 
+     * @dev Important: Amount is read BEFORE state transition to ensure correct value
+     *      StateManagementLibrary.transitionToRefunded() sets remainingBalance to 0
      */
     function _cancelAndRefund(uint256 workflowId) internal {
         EscrowTransfer storage et = escrowTransfers[workflowId];
@@ -1252,6 +1283,28 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
      * @dev Releases the escrow, changes state to RELEASED, and transfers funds to recipient.
      *      If escrow was generating yield via Aave, withdraws from Aave and distributes yield.
      *      Must be implemented by derived contracts to handle token transfers.
+     * 
+     * @dev Execution Flow:
+     *      1. Read escrow data (token, amounts, participants) before state changes
+     *      2. Withdraw yield from generation module (if enabled) - calculates actual amount including yield
+     *      3. Distribute yield via distribution module (if configured)
+     *      4. Transfer remaining balance (original + yield - fees) to recipient
+     *      5. Update state to RELEASED and clear remaining balance
+     * 
+     * @dev Important: Amount is read BEFORE state transition to ensure correct value
+     *      StateManagementLibrary.transitionToReleased() sets remainingBalance to 0
+     *      Yield is handled separately and distributed according to module configuration
+     * 
+     * @dev Execution Flow:
+     *      1. Read escrow data (token, amounts, participants) before state changes
+     *      2. Withdraw yield from generation module (if enabled) - calculates actual amount including yield
+     *      3. Distribute yield via distribution module (if configured)
+     *      4. Transfer remaining balance (original + yield - fees) to recipient
+     *      5. Update state to RELEASED and clear remaining balance
+     * 
+     * @dev Important: Amount is read BEFORE state transition to ensure correct value
+     *      StateManagementLibrary.transitionToReleased() sets remainingBalance to 0
+     *      Yield is handled separately and distributed according to module configuration
      */
     function _releaseEscrowTransfer(uint256 workflowId) internal {
         EscrowTransfer storage et = escrowTransfers[workflowId];
@@ -1607,7 +1660,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
      *      For EscrowableERC20, this recovers tokens that are not part of any escrow.
      *      For EscrowVault, this recovers tokens that are not part of any escrow and not tracked as fees.
      */
-    function recoverERC20(address token, address recipient, uint256 amount) external onlyRole(ROLE_TIMELOCK) nonReentrant returns (bool) {
+    function recoverERC20(address token, address recipient, uint256 amount) external virtual onlyRole(ROLE_TIMELOCK) nonReentrant returns (bool) {
         IERC20 tokenContract = IERC20(token);
         uint256 balance = tokenContract.balanceOf(address(this));
         

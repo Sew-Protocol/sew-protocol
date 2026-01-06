@@ -6,6 +6,7 @@ import '@typechain/hardhat'; // For TypeScript type generation
 import '@openzeppelin/hardhat-upgrades';
 import 'hardhat-deploy';
 import 'hardhat-deploy-ethers'; // Extends hardhat-deploy with ethers integration - MUST come after hardhat-deploy
+import 'solidity-coverage'; // For test coverage reporting
 import { extendEnvironment } from 'hardhat/config';
 import * as dotenv from 'dotenv';
 
@@ -39,7 +40,7 @@ function accountsOrThrow(networkName: string) {
 
 const config: HardhatUserConfig = {
   solidity: {
-    version: "0.8.28",
+    version: "0.8.33",
     settings: {
       optimizer: {
         enabled: true,

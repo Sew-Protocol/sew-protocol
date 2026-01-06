@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.33;
 
 import "../governance/SlowLaneQueueActivate.sol";
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";

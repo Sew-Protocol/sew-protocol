@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.33;
 
 import "../interfaces/IResolutionModule.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
@@ -40,6 +40,21 @@ contract DecentralizedResolutionModule is
     uint8 public constant INITIAL_ESCALATION_LEVEL = 0;
     uint8 public constant SENIOR_ESCALATION_LEVEL = 1;
     uint8 public constant EXTERNAL_ESCALATION_LEVEL = 2;
+    
+    // ============ Upgrade Delay Constants ============
+    
+    /// @notice Number of instant upgrades allowed before delays apply
+    uint256 public constant INSTANT_UPGRADES_COUNT = 3;
+    /// @notice Launch phase duration (instant or 1 hour delay)
+    uint256 public constant LAUNCH_PHASE_DURATION = 30 days;
+    /// @notice Early phase duration (24 hour delay)
+    uint256 public constant EARLY_PHASE_DURATION = 90 days;
+    /// @notice Launch phase delay (after first 3 upgrades)
+    uint256 public constant LAUNCH_PHASE_DELAY = 1 hours;
+    /// @notice Early phase delay
+    uint256 public constant EARLY_PHASE_DELAY = 24 hours;
+    /// @notice Mature phase delay (same as slow lane)
+    uint256 public constant MATURE_PHASE_DELAY = 7 days;
     
     // ============ Resolver Roles ============
     
@@ -147,6 +162,28 @@ contract DecentralizedResolutionModule is
         uint256 totalDisputes;             // Total disputes handled (resolved + escalated)
     }
     mapping(address => ResolverStats) public resolverStats;
+    
+    // ============ Upgrade Delay State ============
+    
+    /// @notice Timestamp when contract was deployed/initialized
+    uint256 public deploymentTimestamp;
+    /// @notice Number of upgrades performed (tracked for instant upgrade allowance)
+    uint256 public upgradeCount;
+    /// @notice Pending upgrade (for module developer after first 3 upgrades)
+    struct PendingUpgrade {
+        address value;
+        uint64 eta;
+        bool exists;
+    }
+    PendingUpgrade private _pendingUpgrade;
+    /// @notice Configurable delay settings (governance can override defaults)
+    struct UpgradeDelayConfig {
+        uint256 launchPhaseDelay;      // Override for launch phase delay (0 = use default)
+        uint256 earlyPhaseDelay;       // Override for early phase delay (0 = use default)
+        uint256 maturePhaseDelay;      // Override for mature phase delay (0 = use default)
+        bool enabled;                  // Whether config overrides are enabled
+    }
+    UpgradeDelayConfig public upgradeDelayConfig;
     
     // Resolver index mapping for O(1) removal (Phase 1: Task 1.2)
     mapping(address => uint256) public resolverIndex; // Resolver => index in approvedResolvers array
@@ -256,6 +293,10 @@ contract DecentralizedResolutionModule is
         _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
         _grantRole(ROLE_TIMELOCK, initialOwner);
         
+        // Set deployment timestamp for staged delay calculation
+        deploymentTimestamp = block.timestamp;
+        upgradeCount = 0;
+        
         // Initialize escalation configs
         escalationConfig[0] = EscalationConfig({
             resolver: address(0), // Dynamic based on resolution table
@@ -278,6 +319,7 @@ contract DecentralizedResolutionModule is
      * @notice Authorize upgrade (UUPS pattern)
      * @param newImplementation Address of new implementation
      * @dev Allows ROLE_TIMELOCK or ROLE_MODULE_DEVELOPER to upgrade
+     *      Module developer upgrades use staged delays after first 3 instant upgrades
      */
     function _authorizeUpgrade(address newImplementation)
         internal
@@ -291,11 +333,66 @@ contract DecentralizedResolutionModule is
         
         address oldImplementation = ERC1967Utils.getImplementation();
         
+        // ROLE_TIMELOCK: Always allowed (they use slow lane governance anyway)
+        if (hasRole(ROLE_TIMELOCK, _msgSender())) {
+            emit ModuleUpgraded(
+                oldImplementation,
+                newImplementation,
+                _msgSender(),
+                block.timestamp,
+                0, // No delay for timelock
+                "TIMELOCK"
+            );
+            return;
+        }
+        
+        // ROLE_MODULE_DEVELOPER: Staged delay system
+        require(
+            hasRole(ROLE_MODULE_DEVELOPER, _msgSender()),
+            "Not authorized to upgrade"
+        );
+        
+        // First 3 upgrades: instant
+        if (upgradeCount < INSTANT_UPGRADES_COUNT) {
+            upgradeCount++;
+            uint256 delay = 0;
+            string memory phase = "INSTANT";
+            
+            emit ModuleUpgraded(
+                oldImplementation,
+                newImplementation,
+                _msgSender(),
+                block.timestamp,
+                delay,
+                phase
+            );
+            return;
+        }
+        
+        // After first 3 upgrades: must be queued and ETA passed
+        require(
+            _pendingUpgrade.exists && 
+            _pendingUpgrade.value == newImplementation &&
+            block.timestamp >= _pendingUpgrade.eta,
+            "Upgrade not queued or ETA not reached"
+        );
+        
+        // Clear pending upgrade
+        _pendingUpgrade.value = address(0);
+        _pendingUpgrade.eta = 0;
+        _pendingUpgrade.exists = false;
+        
+        upgradeCount++;
+        uint256 actualDelay = getUpgradeDelay();
+        string memory currentPhase = getCurrentPhase();
+        
         emit ModuleUpgraded(
             oldImplementation,
             newImplementation,
             _msgSender(),
-            block.timestamp
+            block.timestamp,
+            actualDelay,
+            currentPhase
         );
     }
     
@@ -305,12 +402,48 @@ contract DecentralizedResolutionModule is
      * @param newImplementation New implementation address
      * @param upgradedBy Address that executed the upgrade
      * @param timestamp Block timestamp of upgrade
+     * @param delay Delay that was enforced (0 for instant)
+     * @param phase Phase name (INSTANT, LAUNCH, EARLY, MATURE, TIMELOCK)
      */
     event ModuleUpgraded(
         address indexed oldImplementation,
         address indexed newImplementation,
         address indexed upgradedBy,
-        uint256 timestamp
+        uint256 timestamp,
+        uint256 delay,
+        string phase
+    );
+    
+    /**
+     * @notice Event emitted when upgrade is queued
+     * @param newImplementation New implementation address
+     * @param queuedBy Address that queued the upgrade
+     * @param eta Timestamp when upgrade can be activated
+     * @param delay Delay period
+     * @param phase Current phase name
+     */
+    event UpgradeQueued(
+        address indexed newImplementation,
+        address indexed queuedBy,
+        uint64 eta,
+        uint256 delay,
+        string phase
+    );
+    
+    /**
+     * @notice Event emitted when upgrade delay config is changed
+     * @param launchPhaseDelay New launch phase delay (0 = use default)
+     * @param earlyPhaseDelay New early phase delay (0 = use default)
+     * @param maturePhaseDelay New mature phase delay (0 = use default)
+     * @param enabled Whether config overrides are enabled
+     * @param changedBy Address that changed the config
+     */
+    event UpgradeDelayConfigChanged(
+        uint256 launchPhaseDelay,
+        uint256 earlyPhaseDelay,
+        uint256 maturePhaseDelay,
+        bool enabled,
+        address indexed changedBy
     );
     
     // ============ Resolver Management ============
@@ -1686,6 +1819,162 @@ contract DecentralizedResolutionModule is
         }
         
         return (false, 0);
+    }
+    
+    // ============ Upgrade Delay Management ============
+    
+    /**
+     * @notice Queue an upgrade (for module developer after first 3 upgrades)
+     * @param newImplementation Address of new implementation
+     * @dev Calculates delay based on time since deployment and queues upgrade
+     */
+    function queueUpgrade(address newImplementation) 
+        external 
+        onlyRole(ROLE_MODULE_DEVELOPER) 
+    {
+        require(newImplementation != address(0), "Invalid implementation");
+        require(newImplementation.code.length > 0, "Implementation must be a contract");
+        
+        // Can only queue if we've used up instant upgrades
+        require(upgradeCount >= INSTANT_UPGRADES_COUNT, "Instant upgrades still available");
+        
+        uint256 delay = getUpgradeDelay();
+        uint64 eta = uint64(block.timestamp + delay);
+        
+        _pendingUpgrade.value = newImplementation;
+        _pendingUpgrade.eta = eta;
+        _pendingUpgrade.exists = true;
+        
+        string memory phase = getCurrentPhase();
+        
+        emit UpgradeQueued(
+            newImplementation,
+            _msgSender(),
+            eta,
+            delay,
+            phase
+        );
+    }
+    
+    /**
+     * @notice Activate a queued upgrade
+     * @param newImplementation Address of new implementation to activate
+     * @dev Calls upgradeTo which triggers _authorizeUpgrade
+     */
+    function activateUpgrade(address newImplementation) 
+        external 
+        onlyRole(ROLE_MODULE_DEVELOPER) 
+    {
+        require(
+            _pendingUpgrade.exists && 
+            _pendingUpgrade.value == newImplementation &&
+            block.timestamp >= _pendingUpgrade.eta,
+            "Upgrade not queued or ETA not reached"
+        );
+        
+        // This will call _authorizeUpgrade which handles the rest
+        upgradeToAndCall(newImplementation, "");
+    }
+    
+    /**
+     * @notice Get current upgrade delay based on time since deployment
+     * @return delay Delay in seconds
+     * @dev Returns 0 for instant upgrades (first 3), then staged delays
+     */
+    function getUpgradeDelay() public view returns (uint256 delay) {
+        // First 3 upgrades are instant
+        if (upgradeCount < INSTANT_UPGRADES_COUNT) {
+            return 0;
+        }
+        
+        uint256 timeSinceDeployment = block.timestamp - deploymentTimestamp;
+        
+        // Use config overrides if enabled, otherwise use defaults
+        uint256 launchDelay = upgradeDelayConfig.enabled && upgradeDelayConfig.launchPhaseDelay > 0
+            ? upgradeDelayConfig.launchPhaseDelay
+            : LAUNCH_PHASE_DELAY;
+        uint256 earlyDelay = upgradeDelayConfig.enabled && upgradeDelayConfig.earlyPhaseDelay > 0
+            ? upgradeDelayConfig.earlyPhaseDelay
+            : EARLY_PHASE_DELAY;
+        uint256 matureDelay = upgradeDelayConfig.enabled && upgradeDelayConfig.maturePhaseDelay > 0
+            ? upgradeDelayConfig.maturePhaseDelay
+            : MATURE_PHASE_DELAY;
+        
+        if (timeSinceDeployment < LAUNCH_PHASE_DURATION) {
+            return launchDelay; // 1 hour
+        } else if (timeSinceDeployment < EARLY_PHASE_DURATION) {
+            return earlyDelay; // 24 hours
+        } else {
+            return matureDelay; // 7 days
+        }
+    }
+    
+    /**
+     * @notice Get current phase name
+     * @return phase Phase name string
+     */
+    function getCurrentPhase() public view returns (string memory phase) {
+        if (upgradeCount < INSTANT_UPGRADES_COUNT) {
+            return "INSTANT";
+        }
+        
+        uint256 timeSinceDeployment = block.timestamp - deploymentTimestamp;
+        
+        if (timeSinceDeployment < LAUNCH_PHASE_DURATION) {
+            return "LAUNCH";
+        } else if (timeSinceDeployment < EARLY_PHASE_DURATION) {
+            return "EARLY";
+        } else {
+            return "MATURE";
+        }
+    }
+    
+    /**
+     * @notice Get pending upgrade information
+     * @return newImplementation Address of pending upgrade
+     * @return eta Timestamp when upgrade can be activated
+     * @return exists Whether a pending upgrade exists
+     */
+    function getPendingUpgrade() 
+        external 
+        view 
+        returns (address newImplementation, uint64 eta, bool exists) 
+    {
+        return (
+            _pendingUpgrade.value,
+            _pendingUpgrade.eta,
+            _pendingUpgrade.exists
+        );
+    }
+    
+    /**
+     * @notice Set upgrade delay configuration (governance override)
+     * @param launchPhaseDelay Launch phase delay (0 = use default)
+     * @param earlyPhaseDelay Early phase delay (0 = use default)
+     * @param maturePhaseDelay Mature phase delay (0 = use default)
+     * @param enabled Whether to use config overrides
+     * @dev Only ROLE_TIMELOCK can configure delays
+     */
+    function setUpgradeDelayConfig(
+        uint256 launchPhaseDelay,
+        uint256 earlyPhaseDelay,
+        uint256 maturePhaseDelay,
+        bool enabled
+    ) external onlyRole(ROLE_TIMELOCK) {
+        upgradeDelayConfig = UpgradeDelayConfig({
+            launchPhaseDelay: launchPhaseDelay,
+            earlyPhaseDelay: earlyPhaseDelay,
+            maturePhaseDelay: maturePhaseDelay,
+            enabled: enabled
+        });
+        
+        emit UpgradeDelayConfigChanged(
+            launchPhaseDelay,
+            earlyPhaseDelay,
+            maturePhaseDelay,
+            enabled,
+            _msgSender()
+        );
     }
     
     // ============ Storage Gap ============
