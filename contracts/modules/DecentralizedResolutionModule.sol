@@ -111,7 +111,6 @@ contract DecentralizedResolutionModule is
     
     // Resolution table
     struct ResolutionTableEntry {
-        address initialResolver;      // Initial resolver for this category (deprecated - use round-robin)
         uint8 maxEscalationLevel;     // Maximum escalation level (0-2)
         uint256 escalationFee;        // Fee required for escalation
         bool enabled;                 // Whether this entry is active
@@ -513,11 +512,11 @@ contract DecentralizedResolutionModule is
     
     /**
      * @notice Get resolver role
-     * @param resolver Address to check
-     * @return Role of the resolver
+     * @param disputeResolver Address to check
+     * @return Role of the dispute resolver
      */
-    function getResolverRole(address resolver) external view returns (ResolverRole) {
-        return resolverRoles[resolver];
+    function getDisputeResolverRole(address disputeResolver) external view returns (ResolverRole) {
+        return resolverRoles[disputeResolver];
     }
     
     /**
@@ -534,69 +533,69 @@ contract DecentralizedResolutionModule is
     /**
      * @notice Check if an address is authorized to resolve a dispute
      * @param workflowId The escrow transfer ID
-     * @param resolver The address attempting to resolve
+     * @param disputeResolver The address attempting to resolve
      * @return authorized True if authorized
-     * @return role The resolver role (0 = standard resolver, 1 = senior resolver, etc.)
+     * @return role The dispute resolver role (0 = standard resolver, 1 = senior resolver, etc.)
      */
-    function isAuthorizedResolver(
+    function isAuthorizedDisputeResolver(
         uint256 workflowId,
-        address resolver,
+        address disputeResolver,
         bytes calldata /* escrowData */
     ) external view override returns (bool authorized, uint8 role) {
         DisputeMetadata memory dm = disputeMetadata[workflowId];
         
-        // Check if resolver matches current resolver for this dispute
-        if (resolver == dm.currentResolver) {
+        // Check if dispute resolver matches current resolver for this dispute
+        if (disputeResolver == dm.currentResolver) {
             return (true, dm.escalationLevel);
         }
         
-        // Check if resolver is in approved list with appropriate role
-        ResolverRole resolverRole = resolverRoles[resolver];
+        // Check if dispute resolver is in approved list with appropriate role
+        ResolverRole resolverRole = resolverRoles[disputeResolver];
         uint8 requiredRole = dm.escalationLevel == 0 ? 
             uint8(ResolverRole.RESOLVER) : 
             uint8(ResolverRole.SENIOR_RESOLVER);
         
         bool isAuthorized = uint8(resolverRole) >= requiredRole && 
-                           (isApprovedResolver[resolver] || isApprovedSeniorResolver[resolver]);
+                           (isApprovedResolver[disputeResolver] || isApprovedSeniorResolver[disputeResolver]);
         
         return (isAuthorized, uint8(resolverRole));
     }
     
     /**
-     * @notice Get the appropriate resolver for a dispute
+     * @notice Get the appropriate dispute resolver for a dispute
      * @param workflowId The escrow transfer ID
-     * @return resolver The resolver address
+     * @return disputeResolver The dispute resolver address
      * @return escalationLevel Current escalation level (0 = initial, 1+ = escalated)
      */
-    function getResolver(
+    function getDisputeResolver(
         uint256 workflowId,
         bytes calldata /* escrowData */
-    ) external view override returns (address resolver, uint8 escalationLevel) {
+    ) external view override returns (address disputeResolver, uint8 escalationLevel) {
         DisputeMetadata memory dm = disputeMetadata[workflowId];
         
-        // If dispute metadata exists, return current resolver
+        // If dispute metadata exists, return current dispute resolver
         if (dm.currentResolver != address(0)) {
             return (dm.currentResolver, dm.escalationLevel);
         }
         
-        // Determine resolver using round-robin selection
+        // Determine dispute resolver using round-robin selection
         bytes32 category = escrowCategory[workflowId];
         if (category != bytes32(0)) {
             ResolutionTableEntry memory entry = resolutionTable[category];
             if (entry.enabled) {
                 // Use round-robin selection for this category
-                address selectedResolver = selectResolverRoundRobin(category, false);
-                if (selectedResolver != address(0)) {
-                    return (selectedResolver, 0);
+                address selectedDisputeResolver = selectResolverRoundRobin(category, false);
+                if (selectedDisputeResolver != address(0)) {
+                    return (selectedDisputeResolver, 0);
                 }
             }
         }
         
         // Fallback: use round-robin from default category (empty category)
         if (approvedResolvers.length > 0) {
-            address selectedResolver = selectResolverRoundRobin(bytes32(0), false);
-            if (selectedResolver != address(0)) {
-                return (selectedResolver, 0);
+            address selectedDisputeResolver = selectResolverRoundRobin(bytes32(0), false);
+            if (selectedDisputeResolver != address(0)) {
+                return (selectedDisputeResolver, 0);
             }
         }
         
@@ -1385,15 +1384,15 @@ contract DecentralizedResolutionModule is
     }
     
     /**
-     * @notice Get resolver statistics
-     * @param resolver Resolver address
-     * @return stats Complete resolver statistics
-     * @dev Phase 4: Task 4.1 - Get all stats for a resolver
+     * @notice Get dispute resolver statistics
+     * @param disputeResolver Dispute resolver address
+     * @return stats Complete dispute resolver statistics
+     * @dev Phase 4: Task 4.1 - Get all stats for a dispute resolver
      */
-    function getResolverStats(address resolver) 
+    function getDisputeResolverStats(address disputeResolver) 
         external view returns (ResolverStats memory stats) 
     {
-        return resolverStats[resolver];
+        return resolverStats[disputeResolver];
     }
     
     // ============ Phase 5: Integration & Advanced Features ============
@@ -1510,13 +1509,13 @@ contract DecentralizedResolutionModule is
             category = escrowCategory[workflowId];
         }
         
-        // Get resolver for this category
-        (resolver, ) = this.getResolver(workflowId, escrowData);
+        // Get dispute resolver for this category
+        (address disputeResolver, ) = this.getDisputeResolver(workflowId, escrowData);
         
-        require(resolver != address(0), "No resolver available");
+        require(disputeResolver != address(0), "No dispute resolver available");
         
         // Initialize dispute
-        this.initializeDispute(workflowId, resolver, category);
+        this.initializeDispute(workflowId, disputeResolver, category);
         
         return (resolver, category);
     }

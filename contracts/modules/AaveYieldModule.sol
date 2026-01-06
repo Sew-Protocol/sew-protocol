@@ -322,6 +322,27 @@ contract AaveYieldModule is IYieldModule, Ownable {
     }
 
     /**
+     * @notice Get the approval target address for a token (if escrow contract needs to approve before deposit)
+     * @param token Token address
+     * @return approvalTarget Address that needs approval (address(0) if no approval needed or handled by module)
+     * @dev For EscrowableERC20: returns the Aave pool address that needs approval
+     *      For EscrowVault: returns address(0) as module handles approvals via forceApprove
+     *      Returns address(0) if Aave is not enabled or token is not supported
+     */
+    function getApprovalTarget(address token) external view override returns (address approvalTarget) {
+        if (!aaveEnabled) {
+            return address(0);
+        }
+        if (tokenToAToken[token] == address(0)) {
+            return address(0); // Token not supported
+        }
+        // For EscrowableERC20, the escrow contract needs to approve the Aave pool
+        // For EscrowVault, the module handles approvals, so return address(0)
+        // We return the pool address - the caller (EscrowableERC20) will handle approval if needed
+        return address(aavePool);
+    }
+
+    /**
      * @notice Get the module name/identifier
      * @return name The module name
      */

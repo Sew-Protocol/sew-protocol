@@ -95,8 +95,8 @@ describe("Module Metadata", function () {
 
     it("Should support IResolutionModule interface", async function () {
       // Calculate interface ID from function selectors (XOR of all function selectors)
-      const isAuthorizedSelector = ethers.id("isAuthorizedResolver(uint256,address,bytes)").slice(0, 10);
-      const getResolverSelector = ethers.id("getResolver(uint256,bytes)").slice(0, 10);
+      const isAuthorizedSelector = ethers.id("isAuthorizedDisputeResolver(uint256,address,bytes)").slice(0, 10);
+      const getResolverSelector = ethers.id("getDisputeResolver(uint256,bytes)").slice(0, 10);
       const canEscalateSelector = ethers.id("canEscalate(uint256,uint8,bytes)").slice(0, 10);
       const executeEscalationSelector = ethers.id("executeEscalation(uint256,bytes)").slice(0, 10);
       const moduleNameSelector = ethers.id("moduleName()").slice(0, 10);
@@ -140,8 +140,8 @@ describe("Module Metadata", function () {
 
     it("Should support IResolutionModule interface", async function () {
       // Calculate interface ID from function selectors (XOR of all function selectors)
-      const isAuthorizedSelector = ethers.id("isAuthorizedResolver(uint256,address,bytes)").slice(0, 10);
-      const getResolverSelector = ethers.id("getResolver(uint256,bytes)").slice(0, 10);
+      const isAuthorizedSelector = ethers.id("isAuthorizedDisputeResolver(uint256,address,bytes)").slice(0, 10);
+      const getResolverSelector = ethers.id("getDisputeResolver(uint256,bytes)").slice(0, 10);
       const canEscalateSelector = ethers.id("canEscalate(uint256,uint8,bytes)").slice(0, 10);
       const executeEscalationSelector = ethers.id("executeEscalation(uint256,bytes)").slice(0, 10);
       const moduleNameSelector = ethers.id("moduleName()").slice(0, 10);

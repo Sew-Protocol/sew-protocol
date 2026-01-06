@@ -128,6 +128,14 @@ contract DefaultYieldModule is IYieldModule {
     }
 
     /**
+     * @notice Get the approval target address for a token
+     * @return approvalTarget Always returns address(0) - no approval needed for default module
+     */
+    function getApprovalTarget(address /* token */) external pure returns (address approvalTarget) {
+        return address(0);
+    }
+
+    /**
      * @notice Get module name
      */
     function moduleName() external pure override returns (string memory) {

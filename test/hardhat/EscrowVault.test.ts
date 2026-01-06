@@ -181,14 +181,16 @@ describe("EscrowVault", function () {
     });
 
     it("Should not allow withdrawing fees for token with no fees", async function () {
-      // First check that owner is the fee address
+      // Get the fee address
       const feeAddress = await escrowVault.escrowFeeAddress();
+      
+      // If owner is not fee address, owner should get NotFeeAddress error
       if (feeAddress.toLowerCase() !== owner.address.toLowerCase()) {
-        // If owner is not fee address, use fee address
         await expect(
           escrowVault.connect(owner).withdrawFees(await token2.getAddress())
         ).to.be.revertedWithCustomError(escrowVault, "NotFeeAddress");
       } else {
+        // Owner is fee address, so should get NoFeesToWithdraw error (no fees for token2)
         await expect(
           escrowVault.connect(owner).withdrawFees(await token2.getAddress())
         ).to.be.revertedWithCustomError(escrowVault, "NoFeesToWithdraw");
@@ -251,7 +253,7 @@ describe("EscrowVault", function () {
       
       const recipientBalanceBefore = await token1.balanceOf(recipient.address);
       
-      await escrowVault.connect(resolver).resolverRelease(workflowId);
+      await escrowVault.connect(resolver).releaseAsDisputeResolver(workflowId);
       
       const escrowTransfer = await escrowVault.escrowTransfers(workflowId);
       expect(escrowTransfer.escrowState).to.equal(5); // RESOLVED

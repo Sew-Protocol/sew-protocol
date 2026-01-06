@@ -64,7 +64,7 @@ describe("Error Handling", function () {
       const invalidWorkflowId = 999;
       
       await expect(
-        escrowableERC20.getAttachmentURIs(invalidWorkflowId)
+        escrowableERC20.getAttachments(invalidWorkflowId)
       ).to.be.revertedWithCustomError(escrowableERC20, "InvalidWorkflowId")
         .withArgs(invalidWorkflowId, 0);
     });
@@ -105,7 +105,7 @@ describe("Error Handling", function () {
       
       // Try to resolve as unauthorized user
       await expect(
-        escrowableERC20.connect(user2).resolverCancel(workflowId)
+        escrowableERC20.connect(user2).cancelAsDisputeResolver(workflowId)
       ).to.be.revertedWithCustomError(escrowableERC20, "NotAuthorizedResolver")
         .withArgs(user2.address, resolver.address); // resolver.address is the authorized resolver
     });

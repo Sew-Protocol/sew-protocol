@@ -281,7 +281,7 @@ describe("Module Snapshotting", function () {
       await escrowVault.connect(timelock).activateDefaultResolutionModule();
 
       // Verify defaultResolutionModule is now Module B
-      const currentDefaultModule = await escrowVault.defaultResolutionModule();
+      const currentDefaultModule = await escrowVault.defaultDisputeResolutionModule();
       expect(currentDefaultModule).to.equal(await moduleB.getAddress());
 
       // Create new escrow
@@ -396,7 +396,7 @@ describe("Module Snapshotting", function () {
       await escrowVault.connect(timelock).activateDefaultResolutionModule();
 
       // Verify defaultResolutionModule is now Module B
-      const currentDefaultModule = await escrowVault.defaultResolutionModule();
+      const currentDefaultModule = await escrowVault.defaultDisputeResolutionModule();
       expect(currentDefaultModule).to.equal(await moduleB.getAddress());
 
       // Create new escrow

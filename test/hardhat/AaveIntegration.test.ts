@@ -119,10 +119,21 @@ describe("Aave Integration", function () {
     const { setupResolutionModule } = await import("../helpers/setupResolutionModule");
     await setupResolutionModule(escrowableERC20, owner, resolver.address);
 
-    // Set default yield distribution for yield distribution tests
-    const defaultRecipients = [yieldRecipient1.address, yieldRecipient2.address];
-    const defaultPercentages = [6000, 4000]; // 60% and 40%
-    await escrowableERC20.setDefaultYieldDistribution(defaultRecipients, defaultPercentages);
+    // Setup yield distribution module (required for yield distribution)
+    // Use TestYieldDistributionModule for testing (allows setting default distribution)
+    const YieldDistFactory = await ethers.getContractFactory("TestYieldDistributionModule");
+    const yieldDistModule = await YieldDistFactory.deploy();
+    await yieldDistModule.waitForDeployment();
+    
+    // Set default distribution for tests (60% to recipient1, 40% to recipient2)
+    const recipients = [yieldRecipient1.address, yieldRecipient2.address];
+    const percentages = [6000, 4000]; // 60% and 40%
+    await yieldDistModule.setDefaultDistribution(recipients, percentages);
+    
+    await escrowableERC20.connect(owner).queueDefaultYieldDistributionModule(await yieldDistModule.getAddress());
+    const [, etaYieldDist] = await escrowableERC20.getPendingDefaultYieldDistributionModule();
+    await time.increaseTo(Number(etaYieldDist) + 1);
+    await escrowableERC20.connect(owner).activateDefaultYieldDistributionModule();
 
     // Transfer tokens to sender
     await escrowableERC20.transfer(sender.address, INITIAL_TRANSFER_AMOUNT);
@@ -220,7 +231,7 @@ describe("Aave Integration", function () {
       expect(aTokenBalance).to.equal(amountAfterFee);
 
       // Check original deposit (this returns the amount before fee deduction)
-      const originalDeposit = await escrowableERC20.getEscrowOriginalDeposit(workflowId);
+      const originalDeposit = await escrowableERC20.getTotalDeposited(workflowId);
       expect(originalDeposit).to.equal(INITIAL_TRANSFER_AMOUNT);
     });
 
@@ -381,7 +392,7 @@ describe("Aave Integration", function () {
       await mockAavePool.simulateYield(await escrowableERC20.getAddress(), 100);
       
       // Note: _calculateYield is internal, so we test it indirectly through withdrawal
-      const originalDeposit = await escrowableERC20.getEscrowOriginalDeposit(workflowId);
+      const originalDeposit = await escrowableERC20.getTotalDeposited(workflowId);
       const fee = (originalDeposit * BigInt(ESCROW_FEE)) / BigInt(ESCROW_FEE_DENOMINATOR);
       const amountAfterFee = originalDeposit - fee;
       const aTokenBalance = await aaveModule.escrowATokenBalance(await escrowableERC20.getAddress(), workflowId);
@@ -397,7 +408,8 @@ describe("Aave Integration", function () {
       const recipients = [yieldRecipient1.address, yieldRecipient2.address];
       const percentages = [6000, 4000]; // 60% and 40%
 
-      await escrowableERC20.setDefaultYieldDistribution(recipients, percentages);
+      // setDefaultYieldDistribution was removed - yield distribution now handled entirely by module
+      // await escrowableERC20.setDefaultYieldDistribution(recipients, percentages);
 
       // Ensure MockAavePool has sufficient tokens for withdrawals (with yield)
       // Transfer enough tokens to cover the escrow amount plus potential yield
@@ -448,11 +460,13 @@ describe("Aave Integration", function () {
     it("Should allow per-escrow yield distribution", async function () {
       const workflowId = Number(await escrowableERC20.nextWorkflowId()) - 1;
       
-      // Set custom yield distribution for this escrow
+      // Set custom yield distribution for this escrow using TestYieldDistributionModule
+      // For this test, we want 100% to recipient1
+      const TestYieldDistFactory = await ethers.getContractFactory("TestYieldDistributionModule");
+      const testYieldDistModule = TestYieldDistFactory.attach(await escrowableERC20.defaultYieldDistributionModule());
       const customRecipients = [yieldRecipient1.address];
       const customPercentages = [10000]; // 100% to recipient1
-      
-      await escrowableERC20.setEscrowYieldDistribution(workflowId, customRecipients, customPercentages);
+      await testYieldDistModule.setDefaultDistribution(customRecipients, customPercentages);
       
       // Simulate yield
       await mockAavePool.simulateYield(await escrowableERC20.getAddress(), 100);
@@ -468,6 +482,11 @@ describe("Aave Integration", function () {
       // Only recipient1 should receive yield
       expect(recipient1BalanceAfter - recipient1BalanceBefore).to.be.gt(0);
       expect(recipient2BalanceAfter - recipient2BalanceBefore).to.equal(0);
+      
+      // Restore default distribution for other tests
+      const recipients = [yieldRecipient1.address, yieldRecipient2.address];
+      const percentages = [6000, 4000]; // 60% and 40%
+      await testYieldDistModule.setDefaultDistribution(recipients, percentages);
     });
   });
 
@@ -501,7 +520,7 @@ describe("Aave Integration", function () {
       
       const recipientBalanceBefore = await escrowableERC20.balanceOf(recipient.address);
       
-      await escrowableERC20.connect(resolver).resolverPartialRelease(workflowId, halfAmount);
+      await escrowableERC20.connect(resolver).partialReleaseAsDisputeResolver(workflowId, halfAmount);
       
       const recipientBalanceAfter = await escrowableERC20.balanceOf(recipient.address);
       const amountReceived = recipientBalanceAfter - recipientBalanceBefore;
@@ -523,7 +542,7 @@ describe("Aave Integration", function () {
       
       const senderBalanceBefore = await escrowableERC20.balanceOf(sender.address);
       
-      await escrowableERC20.connect(resolver).resolverPartialCancel(workflowId, halfAmount);
+      await escrowableERC20.connect(resolver).partialCancelAsDisputeResolver(workflowId, halfAmount);
       
       const senderBalanceAfter = await escrowableERC20.balanceOf(sender.address);
       const amountReceived = senderBalanceAfter - senderBalanceBefore;

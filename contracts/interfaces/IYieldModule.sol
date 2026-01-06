@@ -91,6 +91,13 @@ interface IYieldModule {
     function isTokenSupported(address token) external view returns (bool supported);
 
     /**
+     * @notice Get the approval target address for a token (if escrow contract needs to approve before deposit)
+     * @param token Token address
+     * @return approvalTarget Address that needs approval (address(0) if no approval needed or handled by module)
+     */
+    function getApprovalTarget(address token) external view returns (address approvalTarget);
+
+    /**
      * @notice Get the module name/identifier
      * @return name The module name
      */

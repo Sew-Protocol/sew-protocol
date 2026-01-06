@@ -30,4 +30,50 @@ struct YieldDistribution {
     bool isSet;               // Whether distribution is configured
 }
 
+// Escrow state and status enums (shared across contracts)
+enum EscrowState {
+    NONE,
+    PENDING,
+    RELEASED,
+    REFUNDED,
+    DISPUTED,
+    RESOLVED
+}
+
+enum SenderStatus {
+    NONE,
+    AGREE_TO_CANCEL,
+    RAISE_DISPUTE
+}
+
+enum RecipientStatus {
+    NONE,
+    AGREE_TO_CANCEL,
+    RAISE_DISPUTE
+}
+
+// EscrowTransfer struct (shared across contracts)
+struct EscrowTransfer {
+    uint256 workflowId;
+    address token; // ERC20 token address (for EscrowVault) or address(this) for EscrowableERC20
+    address to;
+    address from;
+    uint256 remainingBalance; // remaining balance held in escrow (may be less than totalDeposited if partially released/cancelled)
+    uint256 totalDeposited; // total amount originally deposited (before any releases/cancellations)
+    EscrowState escrowState;
+    SenderStatus senderStatus;
+    RecipientStatus recipientStatus;
+    address disputeResolver;
+    uint256 autoReleaseTime;
+    uint256 autoCancelTime;
+    string[] attachmentURIs;
+    bytes32[] attachmentHashes;
+    bytes metadata; // optional metadata (IPFS hash, JSON, custom data)
+    // Phase 7: Module snapshots (ensures module changes only affect new escrows)
+    address snapshotResolutionModule;    // Resolution module at creation time
+    address snapshotReleaseStrategy;     // Release strategy at creation time
+    address snapshotYieldGenerationModule;  // Yield generation module at creation time
+    address snapshotYieldDistributionModule; // Yield distribution module at creation time
+}
+
 

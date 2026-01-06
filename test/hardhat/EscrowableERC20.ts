@@ -248,7 +248,7 @@ describe("EscrowableERC20", function () {
       const workflowId = await createEscrowTransfer(INITIAL_TRANSFER_AMOUNT);
       const disputeTx = await escrowableERC20.connect(sender).raiseDispute(workflowId);
       await disputeTx.wait();
-      await escrowableERC20.connect(resolver).resolverRelease(workflowId);
+      await escrowableERC20.connect(resolver).releaseAsDisputeResolver(workflowId);
       const escrowTransfer = await escrowableERC20.escrowTransfers(workflowId);
       expect(escrowTransfer.escrowState).to.equal(5); // RESOLVED (enum value 5, was RESOLVER_OVERRIDDEN)
     });
@@ -257,7 +257,7 @@ describe("EscrowableERC20", function () {
       const workflowId = await createEscrowTransfer(INITIAL_TRANSFER_AMOUNT);
 
       await escrowableERC20.connect(sender).raiseDispute(workflowId);
-      await escrowableERC20.connect(resolver).resolverCancel(workflowId);
+      await escrowableERC20.connect(resolver).cancelAsDisputeResolver(workflowId);
 
       const escrowTransfer = await escrowableERC20.escrowTransfers(workflowId);
       expect(escrowTransfer.escrowState).to.equal(5); // RESOLVED (enum value 5, was RESOLVER_OVERRIDDEN)
@@ -286,11 +286,11 @@ describe("EscrowableERC20", function () {
       const buyerBalanceBefore = await escrowableERC20.balanceOf(sender.address);
       const sellerBalanceBefore = await escrowableERC20.balanceOf(recipient.address);
 
-      await escrowableERC20.connect(resolver).resolverPartialCancel(workflowId, refundAmount);
+      await escrowableERC20.connect(resolver).partialCancelAsDisputeResolver(workflowId, refundAmount);
       let transfer = await escrowableERC20.escrowTransfers(workflowId);
       expect(transfer.escrowState).to.equal(4); // Still DISPUTED while funds remain
 
-      await escrowableERC20.connect(resolver).resolverPartialRelease(workflowId, releaseAmount);
+      await escrowableERC20.connect(resolver).partialReleaseAsDisputeResolver(workflowId, releaseAmount);
       transfer = await escrowableERC20.escrowTransfers(workflowId);
       expect(transfer.escrowState).to.equal(5); // RESOLVED after all funds handled
 
@@ -334,8 +334,8 @@ describe("EscrowableERC20", function () {
 
       await escrowableERC20.connect(sender).addAttachment(workflowId, uri, hash);
 
-      const uris = await escrowableERC20.getAttachmentURIs(workflowId);
-      const hashes = await escrowableERC20.getAttachmentHashes(workflowId);
+      const [uris] = await escrowableERC20.getAttachments(workflowId);
+      const [, hashes] = await escrowableERC20.getAttachments(workflowId);
       expect(uris[0]).to.equal(uri);
       expect(hashes[0]).to.equal(hash);
     });
@@ -350,8 +350,8 @@ describe("EscrowableERC20", function () {
       await escrowableERC20.connect(sender).addAttachment(workflowId, uri1, hash1);
       await escrowableERC20.connect(sender).addAttachment(workflowId, uri2, hash2);
 
-      const uris = await escrowableERC20.getAttachmentURIs(workflowId);
-      const hashes = await escrowableERC20.getAttachmentHashes(workflowId);
+      const [uris] = await escrowableERC20.getAttachments(workflowId);
+      const [, hashes] = await escrowableERC20.getAttachments(workflowId);
       expect(uris[0]).to.equal(uri1);
       expect(uris[1]).to.equal(uri2);
       expect(hashes[0]).to.equal(hash1);
@@ -372,8 +372,8 @@ describe("EscrowableERC20", function () {
         await escrowableERC20.connect(sender).addAttachment(workflowId, uris[i], hashes[i]);
       }
 
-      const returnedUris = await escrowableERC20.getAttachmentURIs(workflowId);
-      const returnedHashes = await escrowableERC20.getAttachmentHashes(workflowId);
+      const [returnedUris] = await escrowableERC20.getAttachments(workflowId);
+      const [, returnedHashes] = await escrowableERC20.getAttachments(workflowId);
 
       expect(returnedUris.length).to.equal(3);
       expect(returnedHashes.length).to.equal(3);
@@ -397,8 +397,8 @@ describe("EscrowableERC20", function () {
       const escrowTransfer = await escrowableERC20.escrowTransfers(workflowId);
       expect(escrowTransfer.escrowState).to.equal(2); // RELEASED (enum value 2)
 
-      const uris = await escrowableERC20.getAttachmentURIs(workflowId);
-      const hashes = await escrowableERC20.getAttachmentHashes(workflowId);
+      const [uris] = await escrowableERC20.getAttachments(workflowId);
+      const [, hashes] = await escrowableERC20.getAttachments(workflowId);
       expect(uris[0]).to.equal(uri);
       expect(hashes[0]).to.equal(hash);
 
@@ -426,8 +426,8 @@ describe("EscrowableERC20", function () {
       const escrowTransfer = await escrowableERC20.escrowTransfers(workflowId);
       expect(escrowTransfer.escrowState).to.equal(2); // RELEASED (enum value 2)
 
-      const returnedUris = await escrowableERC20.getAttachmentURIs(workflowId);
-      const returnedHashes = await escrowableERC20.getAttachmentHashes(workflowId);
+      const [returnedUris] = await escrowableERC20.getAttachments(workflowId);
+      const [, returnedHashes] = await escrowableERC20.getAttachments(workflowId);
       expect(returnedUris.length).to.equal(2);
       expect(returnedHashes.length).to.equal(2);
       expect(returnedUris[0]).to.equal(uris[0]);
@@ -466,8 +466,8 @@ describe("EscrowableERC20", function () {
     it("Should return empty arrays for attachments on new workflow", async function () {
       const workflowId = await createEscrowTransfer(INITIAL_TRANSFER_AMOUNT);
 
-      const uris = await escrowableERC20.getAttachmentURIs(workflowId);
-      const hashes = await escrowableERC20.getAttachmentHashes(workflowId);
+      const [uris] = await escrowableERC20.getAttachments(workflowId);
+      const [, hashes] = await escrowableERC20.getAttachments(workflowId);
 
       expect(uris.length).to.equal(0);
       expect(hashes.length).to.equal(0);
@@ -496,8 +496,8 @@ describe("EscrowableERC20", function () {
       const hash3 = ethers.keccak256(ethers.toUtf8Bytes("test-hash-4"));
       await escrowableERC20.connect(sender).addAttachment(workflowId, uri3, hash3);
 
-      const returnedUris = await escrowableERC20.getAttachmentURIs(workflowId);
-      const returnedHashes = await escrowableERC20.getAttachmentHashes(workflowId);
+      const [returnedUris] = await escrowableERC20.getAttachments(workflowId);
+      const [, returnedHashes] = await escrowableERC20.getAttachments(workflowId);
 
       expect(returnedUris.length).to.equal(4);
       expect(returnedHashes.length).to.equal(4);
@@ -588,7 +588,7 @@ describe("EscrowableERC20", function () {
       await time.increase(120); // 2 minutes
       
       // Call automateTimedActions
-      await escrowableERC20.connect(sender)["automateTimedActions(uint256)"](workflowId);
+      await escrowableERC20.connect(sender)["automateTimedActions(uint256,uint256)"](workflowId, 0);
       
       const escrowTransfer = await escrowableERC20.escrowTransfers(workflowId);
       expect(escrowTransfer.escrowState).to.equal(2); // RELEASED (enum value 2)
@@ -617,7 +617,7 @@ describe("EscrowableERC20", function () {
       await time.increase(120); // 2 minutes
       
       // Call automateTimedActions
-      await escrowableERC20.connect(sender)["automateTimedActions(uint256)"](workflowId);
+      await escrowableERC20.connect(sender)["automateTimedActions(uint256,uint256)"](workflowId, 0);
       
       const escrowTransfer = await escrowableERC20.escrowTransfers(workflowId);
       expect(escrowTransfer.escrowState).to.equal(3); // REFUNDED (enum value 3, was CANCELLED)
@@ -655,7 +655,7 @@ describe("EscrowableERC20", function () {
       expect(currentBlockTime).to.be.lt(autoReleaseTime);
       
       // Call automateTimedActions before time has passed
-      await escrowableERC20.connect(sender)["automateTimedActions(uint256)"](workflowId);
+      await escrowableERC20.connect(sender)["automateTimedActions(uint256,uint256)"](workflowId, 0);
       
       const escrowTransfer = await escrowableERC20.escrowTransfers(workflowId);
       expect(escrowTransfer.escrowState).to.equal(1); // Still PENDING (enum: NONE=0, PENDING=1)
@@ -685,7 +685,7 @@ describe("EscrowableERC20", function () {
       expect(escrowTransferBefore.autoCancelTime).to.equal(autoCancelTime);
       
       // Call automateTimedActions before time has passed
-      await escrowableERC20.connect(sender)["automateTimedActions(uint256)"](workflowId);
+      await escrowableERC20.connect(sender)["automateTimedActions(uint256,uint256)"](workflowId, 0);
       
       const escrowTransfer = await escrowableERC20.escrowTransfers(workflowId);
       expect(escrowTransfer.escrowState).to.equal(1); // Still PENDING (enum: NONE=0, PENDING=1)
@@ -707,7 +707,7 @@ describe("EscrowableERC20", function () {
       await time.increase(120);
       
       await expect(
-        escrowableERC20.connect(sender)["automateTimedActions(uint256)"](workflowId)
+        escrowableERC20.connect(sender).automateTimedActions(workflowId, 0)
       ).to.emit(escrowableERC20, "EscrowTransferAutoReleased")
         .withArgs(workflowId, recipient.address, 0); // amount is 0 after release
     });
@@ -728,7 +728,7 @@ describe("EscrowableERC20", function () {
       await time.increase(120);
       
       await expect(
-        escrowableERC20.connect(sender)["automateTimedActions(uint256)"](workflowId)
+        escrowableERC20.connect(sender).automateTimedActions(workflowId, 0)
       ).to.emit(escrowableERC20, "EscrowTransferAutoCancelled")
         .withArgs(workflowId, sender.address, 0); // amount is 0 after cancelAndRefund
     });
@@ -771,7 +771,7 @@ describe("EscrowableERC20", function () {
       
       
       // Automate all transfers in range
-      await escrowableERC20.connect(sender)["automateTimedActions(uint256,uint256)"](0, 3);
+      await escrowableERC20.connect(sender).automateTimedActions(0, 3);
       
       const transfer0 = await escrowableERC20.escrowTransfers(0);
       const transfer1 = await escrowableERC20.escrowTransfers(1);
@@ -810,8 +810,9 @@ describe("EscrowableERC20", function () {
       // Fast forward time past both auto times
       await time.increase(180); // 3 minutes
       
-      // Automate all transfers
-      await escrowableERC20.connect(sender)["automateTimedActions()"]();
+      // Automate all transfers (0 to nextWorkflowId)
+      const nextId = await escrowableERC20.nextWorkflowId();
+      await escrowableERC20.connect(sender).automateTimedActions(0, nextId);
       
       const transfer0 = await escrowableERC20.escrowTransfers(0);
       const transfer1 = await escrowableERC20.escrowTransfers(1);
@@ -891,7 +892,7 @@ describe("EscrowableERC20", function () {
       // Fast forward to exactly the release time
       await time.increaseTo(autoReleaseTime);
       
-      await escrowableERC20.connect(sender)["automateTimedActions(uint256)"](workflowId);
+      await escrowableERC20.connect(sender)["automateTimedActions(uint256,uint256)"](workflowId, 0);
       
       const escrowTransfer = await escrowableERC20.escrowTransfers(workflowId);
       expect(escrowTransfer.escrowState).to.equal(2); // RELEASED (enum value 2)
@@ -913,7 +914,7 @@ describe("EscrowableERC20", function () {
       // Fast forward to exactly the cancel time
       await time.increaseTo(autoCancelTime);
       
-      await escrowableERC20.connect(sender)["automateTimedActions(uint256)"](workflowId);
+      await escrowableERC20.connect(sender)["automateTimedActions(uint256,uint256)"](workflowId, 0);
       
       const escrowTransfer = await escrowableERC20.escrowTransfers(workflowId);
       expect(escrowTransfer.escrowState).to.equal(3); // REFUNDED (enum value 3, was CANCELLED)
@@ -921,7 +922,7 @@ describe("EscrowableERC20", function () {
 
     it("Should handle partial release", async function () {
       // This test is covered in the dispute resolution section
-      // Testing partial release via resolverPartialRelease
+      // Testing partial release via partialReleaseAsDisputeResolver
     });
   });
 });

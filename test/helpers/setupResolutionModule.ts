@@ -62,7 +62,7 @@ export async function setupResolutionModule(
       // If already set or fails, continue
     }
     await contract.connect(deployer).proposeResolutionModule(await resolutionModule.getAddress());
-    const delay = await contract.resolutionModuleDelay();
+    const delay = await contract.disputeResolutionModuleDelay();
     const currentTime = await time.latest();
     await time.increaseTo(Number(currentTime) + Number(delay) + 1);
     await contract.connect(deployer).activateResolutionModule();

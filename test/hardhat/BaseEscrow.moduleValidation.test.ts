@@ -122,7 +122,7 @@ describe("BaseEscrow Module Validation", function () {
       ).to.emit(escrowableERC20, "DefaultResolutionModuleActivated");
 
       // Verify module is active
-      const activeModule = await escrowableERC20.defaultResolutionModule();
+      const activeModule = await escrowableERC20.defaultDisputeResolutionModule();
       expect(activeModule).to.equal(await decentralizedModule.getAddress());
     });
 
@@ -234,7 +234,7 @@ describe("BaseEscrow Module Validation", function () {
       const workflowId = 0;
 
       // Verify module was used to get resolver
-      const activeModule = await escrowableERC20.defaultResolutionModule();
+      const activeModule = await escrowableERC20.defaultDisputeResolutionModule();
       expect(activeModule).to.equal(await decentralizedModule.getAddress());
 
       // Check that resolver was set (should be standardResolver from resolution table)
@@ -265,7 +265,7 @@ describe("BaseEscrow Module Validation", function () {
         escrowTransfer.totalDeposited
       );
 
-      const [authorized] = await decentralizedModule.isAuthorizedResolver(
+      const [authorized] = await decentralizedModule.isAuthorizedDisputeResolver(
         workflowId,
         resolver.address,
         escrowData
@@ -294,7 +294,7 @@ describe("BaseEscrow Module Validation", function () {
     it("Should handle module upgrade without breaking existing escrows", async function () {
       // Create escrow with first module
       await escrowableERC20.connect(timelock).proposeResolutionModule(await defaultModule.getAddress());
-      let eta = await escrowableERC20.pendingResolutionModuleEta();
+      let eta = await escrowableERC20.pendingDisputeResolutionModuleEta();
       await time.increaseTo(Number(eta) + 1);
       await escrowableERC20.connect(timelock).activateResolutionModule();
 
@@ -361,15 +361,15 @@ describe("BaseEscrow Module Validation", function () {
   // Helper function to calculate IResolutionModule interface ID
   async function getIResolutionModuleInterfaceId(): Promise<string> {
     // Calculate interface ID from function selectors (XOR of all function selectors)
-    const isAuthorizedSelector = ethers.id("isAuthorizedResolver(uint256,address,bytes)").slice(0, 10);
-    const getResolverSelector = ethers.id("getResolver(uint256,bytes)").slice(0, 10);
+    const isAuthorizedSelector = ethers.id("isAuthorizedDisputeResolver(uint256,address,bytes)").slice(0, 10);
+    const getDisputeResolverSelector = ethers.id("getDisputeResolver(uint256,bytes)").slice(0, 10);
     const canEscalateSelector = ethers.id("canEscalate(uint256,uint8,bytes)").slice(0, 10);
     const executeEscalationSelector = ethers.id("executeEscalation(uint256,bytes)").slice(0, 10);
     const moduleNameSelector = ethers.id("moduleName()").slice(0, 10);
     const moduleVersionSelector = ethers.id("moduleVersion()").slice(0, 10);
     
     let calculatedInterfaceId = BigInt(0);
-    for (const selector of [isAuthorizedSelector, getResolverSelector, canEscalateSelector, executeEscalationSelector, moduleNameSelector, moduleVersionSelector]) {
+    for (const selector of [isAuthorizedSelector, getDisputeResolverSelector, canEscalateSelector, executeEscalationSelector, moduleNameSelector, moduleVersionSelector]) {
       calculatedInterfaceId = calculatedInterfaceId ^ BigInt(selector);
     }
     return ethers.toBeHex(calculatedInterfaceId, 4);

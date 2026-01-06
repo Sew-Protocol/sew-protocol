@@ -148,7 +148,7 @@ describe("Timelock Integration", function () {
 
       const newDelay = 7 * 24 * 60 * 60; // 7 days
       await escrowableERC20.connect(timelockSigner).setResolutionModuleDelay(newDelay);
-      const delay = await escrowableERC20.resolutionModuleDelay();
+      const delay = await escrowableERC20.disputeResolutionModuleDelay();
       expect(delay).to.equal(newDelay);
     });
 

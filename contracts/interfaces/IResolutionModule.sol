@@ -13,28 +13,28 @@ interface IResolutionModule is IERC165 {
     /**
      * @notice Check if an address is authorized to resolve a dispute
      * @param workflowId The escrow transfer ID
-     * @param resolver The address attempting to resolve
+     * @param disputeResolver The address attempting to resolve
      * @param escrowData Encoded escrow data
      * @return authorized True if authorized
-     * @return role The resolver role (0 = standard resolver, 1 = senior resolver, etc.)
+     * @return role The dispute resolver role (0 = standard resolver, 1 = senior resolver, etc.)
      */
-    function isAuthorizedResolver(
+    function isAuthorizedDisputeResolver(
         uint256 workflowId,
-        address resolver,
+        address disputeResolver,
         bytes calldata escrowData
     ) external view returns (bool authorized, uint8 role);
 
     /**
-     * @notice Get the appropriate resolver for a dispute
+     * @notice Get the appropriate dispute resolver for a dispute
      * @param workflowId The escrow transfer ID
      * @param escrowData Encoded escrow data
-     * @return resolver The resolver address
+     * @return disputeResolver The dispute resolver address
      * @return escalationLevel Current escalation level (0 = initial, 1+ = escalated)
      */
-    function getResolver(
+    function getDisputeResolver(
         uint256 workflowId,
         bytes calldata escrowData
-    ) external view returns (address resolver, uint8 escalationLevel);
+    ) external view returns (address disputeResolver, uint8 escalationLevel);
 
     /**
      * @notice Check if escalation is allowed and get next resolver
@@ -42,7 +42,7 @@ interface IResolutionModule is IERC165 {
      * @param currentLevel Current escalation level
      * @param escrowData Encoded escrow data
      * @return canEscalate True if escalation is allowed
-     * @return nextResolver Address of next resolver (address(0) if cannot escalate)
+     * @return nextDisputeResolver Address of next dispute resolver (address(0) if cannot escalate)
      * @return escalationFee Fee required for escalation (0 if none)
      */
     function canEscalate(
@@ -51,7 +51,7 @@ interface IResolutionModule is IERC165 {
         bytes calldata escrowData
     ) external view returns (
         bool canEscalate,
-        address nextResolver,
+        address nextDisputeResolver,
         uint256 escalationFee
     );
 
@@ -60,7 +60,7 @@ interface IResolutionModule is IERC165 {
      * @param workflowId The escrow transfer ID
      * @param escrowData Encoded escrow data
      * @return success True if escalation was successful
-     * @return newResolver Address of new resolver
+     * @return newDisputeResolver Address of new dispute resolver
      * @return newLevel New escalation level
      */
     function executeEscalation(
@@ -68,7 +68,7 @@ interface IResolutionModule is IERC165 {
         bytes calldata escrowData
     ) external returns (
         bool success,
-        address newResolver,
+        address newDisputeResolver,
         uint8 newLevel
     );
 

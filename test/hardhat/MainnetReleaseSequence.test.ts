@@ -343,8 +343,8 @@ describe("Mainnet Release Sequence", function () {
       await escrowVault.connect(multisigOwner1).activateResolutionModule();
       
       // Verify resolution module is set
-      expect(await escrowableERC20.resolutionModule()).to.equal(await newResolutionModule.getAddress());
-      expect(await escrowVault.resolutionModule()).to.equal(await newResolutionModule.getAddress());
+      expect(await escrowableERC20.disputeResolutionModule()).to.equal(await newResolutionModule.getAddress());
+      expect(await escrowVault.disputeResolutionModule()).to.equal(await newResolutionModule.getAddress());
     });
   });
 
@@ -831,7 +831,7 @@ describe("Mainnet Release Sequence", function () {
       
       // Verify - proposal queues the module change, need to activate after delay
       // Fast-forward past resolution module delay
-      const resolutionDelay = await escrowableERC20.resolutionModuleDelay();
+      const resolutionDelay = await escrowableERC20.disputeResolutionModuleDelay();
       await time.increase(Number(resolutionDelay) + 1);
       
       // Activate the queued resolution module change
@@ -842,7 +842,7 @@ describe("Mainnet Release Sequence", function () {
       await escrowableERC20.connect(multisigOwner1).revokeRole(ROLE_TIMELOCK_ERC20, deployer.address);
       
       // Phase 7: authorizedResolver removed - check resolution module instead
-      const resolutionModule = await escrowableERC20.resolutionModule();
+      const resolutionModule = await escrowableERC20.disputeResolutionModule();
       expect(resolutionModule).to.equal(await newResolutionModule.getAddress());
     });
   });

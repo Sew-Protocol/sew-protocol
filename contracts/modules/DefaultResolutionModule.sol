@@ -30,27 +30,27 @@ contract DefaultResolutionModule is AccessControl, IResolutionModule {
     }
 
     /**
-     * @notice Check if address is authorized resolver
+     * @notice Check if address is authorized dispute resolver
      * @dev In default implementation, checks against stored resolver
      */
-    function isAuthorizedResolver(
+    function isAuthorizedDisputeResolver(
         uint256 /* workflowId */,
-        address checkResolver,
+        address checkDisputeResolver,
         bytes calldata /* escrowData */
     ) external view override returns (bool authorized, uint8 role) {
-        // Check if the resolver matches the stored resolver
-        authorized = (checkResolver == resolver);
+        // Check if the dispute resolver matches the stored resolver
+        authorized = (checkDisputeResolver == resolver);
         role = 0;
         return (authorized, role);
     }
 
     /**
-     * @notice Get resolver for dispute
+     * @notice Get dispute resolver for dispute
      */
-    function getResolver(
+    function getDisputeResolver(
         uint256 /* workflowId */,
         bytes calldata /* escrowData */
-    ) external view override returns (address resolver_, uint8 escalationLevel) {
+    ) external view override returns (address disputeResolver, uint8 escalationLevel) {
         return (resolver, 0);
     }
 

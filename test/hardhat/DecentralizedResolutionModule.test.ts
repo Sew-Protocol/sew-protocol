@@ -125,10 +125,10 @@ describe("DecentralizedResolutionModule", function () {
       await module.connect(escrowContract).setEscrowCategory(workflowId4, category);
 
       // Get resolvers (should be round-robin)
-      const [resolver1_selected, level1] = await module.getResolver(workflowId1, "0x");
-      const [resolver2_selected, level2] = await module.getResolver(workflowId2, "0x");
-      const [resolver3_selected, level3] = await module.getResolver(workflowId3, "0x");
-      const [resolver4_selected, level4] = await module.getResolver(workflowId4, "0x");
+      const [resolver1_selected, level1] = await module.getDisputeResolver(workflowId1, "0x");
+      const [resolver2_selected, level2] = await module.getDisputeResolver(workflowId2, "0x");
+      const [resolver3_selected, level3] = await module.getDisputeResolver(workflowId3, "0x");
+      const [resolver4_selected, level4] = await module.getDisputeResolver(workflowId4, "0x");
 
       // Initialize disputes to advance round-robin counter
       await module.connect(escrowContract).initializeDispute(workflowId1, resolver1_selected, category);
@@ -136,7 +136,7 @@ describe("DecentralizedResolutionModule", function () {
       await module.connect(escrowContract).initializeDispute(workflowId3, resolver3_selected, category);
 
       // Next resolver should be one of the valid resolvers (randomness from blockhash makes exact selection unpredictable)
-      const [resolver5_selected] = await module.getResolver(workflowId4, "0x");
+      const [resolver5_selected] = await module.getDisputeResolver(workflowId4, "0x");
       expect(resolver5_selected).to.be.oneOf([
         resolver1.address,
         resolver2.address,
@@ -204,8 +204,8 @@ describe("DecentralizedResolutionModule", function () {
       await module.connect(escrowContract).setEscrowCategory(workflowId4, category2);
 
       // Get initial resolvers - both should be valid resolvers (randomness makes exact selection unpredictable)
-      const [resolver1_cat1] = await module.getResolver(workflowId1, "0x");
-      const [resolver1_cat2] = await module.getResolver(workflowId2, "0x");
+      const [resolver1_cat1] = await module.getDisputeResolver(workflowId1, "0x");
+      const [resolver1_cat2] = await module.getDisputeResolver(workflowId2, "0x");
 
       expect(resolver1_cat1).to.be.oneOf([resolver1.address, resolver2.address, resolver3.address]);
       expect(resolver1_cat2).to.be.oneOf([resolver1.address, resolver2.address, resolver3.address]);
@@ -216,8 +216,8 @@ describe("DecentralizedResolutionModule", function () {
       // Get next resolvers - both should be valid resolvers
       // Note: With blockhash randomness, we can't predict exact selection, but both categories
       // should independently select from the same pool of resolvers
-      const [resolver2_cat1] = await module.getResolver(workflowId3, "0x");
-      const [resolver2_cat2] = await module.getResolver(workflowId4, "0x");
+      const [resolver2_cat1] = await module.getDisputeResolver(workflowId3, "0x");
+      const [resolver2_cat2] = await module.getDisputeResolver(workflowId4, "0x");
 
       expect(resolver2_cat1).to.be.oneOf([resolver1.address, resolver2.address, resolver3.address]);
       expect(resolver2_cat2).to.be.oneOf([resolver1.address, resolver2.address, resolver3.address]);
@@ -232,7 +232,7 @@ describe("DecentralizedResolutionModule", function () {
       await module.connect(escrowContract).setEscrowCategory(workflowId, category);
       
       // Get resolver first (round-robin will select one)
-      const [selectedResolver] = await module.getResolver(workflowId, "0x");
+      const [selectedResolver] = await module.getDisputeResolver(workflowId, "0x");
       
       await module.connect(escrowContract).initializeDispute(workflowId, selectedResolver, category);
 
@@ -249,7 +249,7 @@ describe("DecentralizedResolutionModule", function () {
       await module.connect(escrowContract).setEscrowCategory(workflowId, category);
       
       // Get resolver first (round-robin will select one)
-      const [selectedResolver] = await module.getResolver(workflowId, "0x");
+      const [selectedResolver] = await module.getDisputeResolver(workflowId, "0x");
       await module.connect(escrowContract).initializeDispute(workflowId, selectedResolver, category);
 
       // Escalate

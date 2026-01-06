@@ -81,7 +81,7 @@ library SettingsValidationLibrary {
         validateAutoTime(settings.autoReleaseTime, currentTime, "Auto release time");
         validateAutoTime(settings.autoCancelTime, currentTime, "Auto cancel time");
         
-        // Validate custom resolver if set
+        // Validate custom dispute resolver if set
         if (settings.customResolver != address(0)) {
             // Could add additional validation here (e.g., isContract check)
             // For now, just ensure it's not zero address (already checked above)

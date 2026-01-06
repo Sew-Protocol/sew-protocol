@@ -181,20 +181,20 @@ describe("Bounds Enforcement", function () {
   describe("Resolution Delay Bounds", function () {
     it("Should accept min value (48 hours)", async function () {
       await escrowableERC20.connect(timelock).setResolutionModuleDelay(MIN_RESOLUTION_DELAY);
-      const delay = await escrowableERC20.resolutionModuleDelay();
+      const delay = await escrowableERC20.disputeResolutionModuleDelay();
       expect(delay).to.equal(MIN_RESOLUTION_DELAY);
     });
 
     it("Should accept max value (30 days)", async function () {
       await escrowableERC20.connect(timelock).setResolutionModuleDelay(MAX_RESOLUTION_DELAY);
-      const delay = await escrowableERC20.resolutionModuleDelay();
+      const delay = await escrowableERC20.disputeResolutionModuleDelay();
       expect(delay).to.equal(MAX_RESOLUTION_DELAY);
     });
 
     it("Should accept value within bounds", async function () {
       const validDelay = 7 * 24 * 60 * 60; // 7 days
       await escrowableERC20.connect(timelock).setResolutionModuleDelay(validDelay);
-      const delay = await escrowableERC20.resolutionModuleDelay();
+      const delay = await escrowableERC20.disputeResolutionModuleDelay();
       expect(delay).to.equal(validDelay);
     });
 
@@ -213,7 +213,8 @@ describe("Bounds Enforcement", function () {
     });
   });
 
-  describe("Yield Distribution Validation", function () {
+  describe.skip("Yield Distribution Validation", function () {
+    // setDefaultYieldDistribution was removed - yield distribution now handled entirely by module
     let recipient1: any;
     let recipient2: any;
     let recipient3: any;
@@ -234,14 +235,18 @@ describe("Bounds Enforcement", function () {
       ] = await ethers.getSigners();
     });
 
-    it("Should accept 1 recipient with 100%", async function () {
+    it.skip("Should accept 1 recipient with 100%", async function () {
+      // setDefaultYieldDistribution was removed - yield distribution now handled entirely by module
       const recipients = [recipient1.address];
       const percentages = [BigInt(BPS_DENOMINATOR)];
       
-      await escrowableERC20.connect(timelock).setDefaultYieldDistribution(recipients, percentages);
-      const distribution = await escrowableERC20.getDefaultYieldDistribution();
-      expect(distribution.recipients.length).to.equal(1);
-      expect(distribution.isSet).to.be.true;
+      // setDefaultYieldDistribution was removed - yield distribution now handled entirely by module
+      // await escrowableERC20.connect(timelock).setDefaultYieldDistribution(recipients, percentages);
+      // getDefaultYieldDistribution was removed - yield distribution now handled entirely by module
+      // const distribution = await escrowableERC20.getDefaultYieldDistribution();
+      // getDefaultYieldDistribution was removed
+      // expect(distribution.recipients.length).to.equal(1);
+      // expect(distribution.isSet).to.be.true;
     });
 
     it("Should accept max recipients (10)", async function () {
@@ -252,9 +257,12 @@ describe("Bounds Enforcement", function () {
       ];
       const percentages = Array(10).fill(1000n); // 10% each (1000 bps = 10%)
       
-      await escrowableERC20.connect(timelock).setDefaultYieldDistribution(recipients, percentages);
-      const distribution = await escrowableERC20.getDefaultYieldDistribution();
-      expect(distribution.recipients.length).to.equal(10);
+      // setDefaultYieldDistribution was removed - yield distribution now handled entirely by module
+      // await escrowableERC20.connect(timelock).setDefaultYieldDistribution(recipients, percentages);
+      // getDefaultYieldDistribution was removed - yield distribution now handled entirely by module
+      // const distribution = await escrowableERC20.getDefaultYieldDistribution();
+      // getDefaultYieldDistribution was removed
+      // expect(distribution.recipients.length).to.equal(10);
     });
 
     it("Should revert if 0 recipients", async function () {
@@ -262,7 +270,8 @@ describe("Bounds Enforcement", function () {
       const percentages: bigint[] = [];
       
       await expect(
-        escrowableERC20.connect(timelock).setDefaultYieldDistribution(recipients, percentages)
+        // setDefaultYieldDistribution was removed - yield distribution now handled entirely by module
+        // escrowableERC20.connect(timelock).setDefaultYieldDistribution(recipients, percentages)
       ).to.be.revertedWithCustomError(escrowableERC20, "OutOfBounds");
     });
 
@@ -277,7 +286,8 @@ describe("Bounds Enforcement", function () {
       const percentages = [909n, 909n, 909n, 909n, 909n, 909n, 909n, 909n, 909n, 909n, 910n]; // Sum = 10000
       
       await expect(
-        escrowableERC20.connect(timelock).setDefaultYieldDistribution(recipients, percentages)
+        // setDefaultYieldDistribution was removed - yield distribution now handled entirely by module
+        // escrowableERC20.connect(timelock).setDefaultYieldDistribution(recipients, percentages)
       ).to.be.revertedWithCustomError(escrowableERC20, "TooManyRecipients");
     });
 
@@ -286,7 +296,8 @@ describe("Bounds Enforcement", function () {
       const percentages = [BigInt(BPS_DENOMINATOR)]; // Only 1 percentage
       
       await expect(
-        escrowableERC20.connect(timelock).setDefaultYieldDistribution(recipients, percentages)
+        // setDefaultYieldDistribution was removed - yield distribution now handled entirely by module
+        // escrowableERC20.connect(timelock).setDefaultYieldDistribution(recipients, percentages)
       ).to.be.revertedWithCustomError(escrowableERC20, "InvalidArrayLength");
     });
 
@@ -295,7 +306,8 @@ describe("Bounds Enforcement", function () {
       const percentages = [5000n, 4999n]; // Sum = 9999, not 10000
       
       await expect(
-        escrowableERC20.connect(timelock).setDefaultYieldDistribution(recipients, percentages)
+        // setDefaultYieldDistribution was removed - yield distribution now handled entirely by module
+        // escrowableERC20.connect(timelock).setDefaultYieldDistribution(recipients, percentages)
       ).to.be.revertedWithCustomError(escrowableERC20, "InvalidBpsSum");
     });
 
@@ -304,7 +316,8 @@ describe("Bounds Enforcement", function () {
       const percentages = [5000n, 5001n]; // Sum = 10001
       
       await expect(
-        escrowableERC20.connect(timelock).setDefaultYieldDistribution(recipients, percentages)
+        // setDefaultYieldDistribution was removed - yield distribution now handled entirely by module
+        // escrowableERC20.connect(timelock).setDefaultYieldDistribution(recipients, percentages)
       ).to.be.revertedWithCustomError(escrowableERC20, "InvalidBpsSum");
     });
 
@@ -313,7 +326,8 @@ describe("Bounds Enforcement", function () {
       const percentages = [BigInt(BPS_DENOMINATOR)];
       
       await expect(
-        escrowableERC20.connect(timelock).setDefaultYieldDistribution(recipients, percentages)
+        // setDefaultYieldDistribution was removed - yield distribution now handled entirely by module
+        // escrowableERC20.connect(timelock).setDefaultYieldDistribution(recipients, percentages)
       ).to.be.revertedWithCustomError(escrowableERC20, "InvalidAddressKey");
     });
 
@@ -322,7 +336,8 @@ describe("Bounds Enforcement", function () {
       const percentages = [5000n, 5000n];
       
       await expect(
-        escrowableERC20.connect(timelock).setDefaultYieldDistribution(recipients, percentages)
+        // setDefaultYieldDistribution was removed - yield distribution now handled entirely by module
+        // escrowableERC20.connect(timelock).setDefaultYieldDistribution(recipients, percentages)
       ).to.be.revertedWithCustomError(escrowableERC20, "DuplicateRecipient");
     });
 
@@ -330,10 +345,13 @@ describe("Bounds Enforcement", function () {
       const recipients = [recipient1.address, recipient2.address, recipient3.address];
       const percentages = [4000n, 3000n, 3000n]; // Sum = 10000
       
-      await escrowableERC20.connect(timelock).setDefaultYieldDistribution(recipients, percentages);
-      const distribution = await escrowableERC20.getDefaultYieldDistribution();
-      expect(distribution.recipients.length).to.equal(3);
-      expect(distribution.isSet).to.be.true;
+      // setDefaultYieldDistribution was removed - yield distribution now handled entirely by module
+      // await escrowableERC20.connect(timelock).setDefaultYieldDistribution(recipients, percentages);
+      // getDefaultYieldDistribution was removed - yield distribution now handled entirely by module
+      // const distribution = await escrowableERC20.getDefaultYieldDistribution();
+      // getDefaultYieldDistribution was removed
+      // expect(distribution.recipients.length).to.equal(3);
+      // expect(distribution.isSet).to.be.true;
     });
   });
 

@@ -77,6 +77,16 @@ interface IYieldGenerationModule is IERC165 {
     function isTokenSupported(address token) external view returns (bool supported);
 
     /**
+     * @notice Get the approval target address for a token (if escrow contract needs to approve before deposit)
+     * @param token Token address
+     * @return approvalTarget Address that needs approval (address(0) if no approval needed or handled by module)
+     * @dev For EscrowableERC20: returns the pool/contract that needs approval to spend tokens
+     *      For EscrowVault: typically returns address(0) as module handles approvals
+     *      Returns address(0) if approval is not needed or is handled internally by the module
+     */
+    function getApprovalTarget(address token) external view returns (address approvalTarget);
+
+    /**
      * @notice Get the module name/identifier
      * @return name The module name
      */

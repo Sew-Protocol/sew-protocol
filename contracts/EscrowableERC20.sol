@@ -9,6 +9,8 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "./BaseEscrow.sol";
 import "./governance/SlowLaneQueueActivate.sol";
+import "./libraries/ModuleManagementLibrary.sol";
+import "./libraries/YieldHandlingLibrary.sol";
 import "./interfaces/IReleaseStrategy.sol";
 import "./interfaces/IResolutionModule.sol";
 import "./interfaces/IYieldGenerationModule.sol";
@@ -32,7 +34,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
     
     // Default module instances (per-escrow overrides removed in Phase 5 for mainnet credibility)
     IReleaseStrategy public defaultReleaseStrategy;
-    IResolutionModule public defaultResolutionModule;
+    IResolutionModule public defaultDisputeResolutionModule;
     IYieldGenerationModule public defaultYieldGenerationModule;
     IYieldDistributionModule public defaultYieldDistributionModule;
 
@@ -78,7 +80,6 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         }
         escrowFee = _escrowFee;
         escrowFeeAddress = _escrowFeeAddress;
-        // Phase 7: authorizedResolver removed - resolver gate eliminated
         
         // Grant DEFAULT_ADMIN_ROLE to deployer so roles can be granted later
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
@@ -93,7 +94,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
      * @notice Create a new escrow with custom settings
      * @param seller Recipient address (seller)
      * @param amount Amount to escrow (fee will be deducted)
-     * @param settings Escrow settings (custom resolver, yield, timing, etc.)
+     * @param settings Escrow settings (custom dispute resolver, yield, timing, etc.)
      * @return workflowId The ID of the created escrow transfer
      */
     function createEscrow(
@@ -136,42 +137,33 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
             amountAfterFee,
             amount
         );
-        escrowTransfers.push(EscrowTransfer(
-            {
-                workflowId: workflowId,
-                token: address(this), // This contract's token
-                to: seller, 
-                from: _msgSender(), 
-                remainingBalance: amountAfterFee,
-                totalDeposited: amount,
-                escrowState: EscrowState.PENDING,
-                senderStatus: SenderStatus.NONE,
-                recipientStatus: RecipientStatus.NONE,
-                disputeResolver: defaultResolver, // Will be overridden by settings if set
-                autoReleaseTime: 0, // Will be set by _applyEscrowSettings
-                autoCancelTime: 0, // Will be set by _applyEscrowSettings
-                attachmentURIs: new string[](0),
-                attachmentHashes: new bytes32[](0),
-                metadata: "",
-                // Phase 7: Initialize module snapshots (will be set after escrow is created)
-                snapshotResolutionModule: address(0),
-                snapshotReleaseStrategy: address(0),
-                snapshotYieldGenerationModule: address(0),
-                snapshotYieldDistributionModule: address(0)
-            }));
-        
-        // Assert workflowId consistency: struct ID should match array index
+        escrowTransfers.push(EscrowTransfer({
+            workflowId: workflowId,
+            token: address(this),
+            to: seller,
+            from: _msgSender(),
+            remainingBalance: amountAfterFee,
+            totalDeposited: amount,
+            escrowState: EscrowState.PENDING,
+            senderStatus: SenderStatus.NONE,
+            recipientStatus: RecipientStatus.NONE,
+            disputeResolver: defaultResolver,
+            autoReleaseTime: 0,
+            autoCancelTime: 0,
+            attachmentURIs: new string[](0),
+            attachmentHashes: new bytes32[](0),
+            metadata: "",
+            snapshotResolutionModule: address(0),
+            snapshotReleaseStrategy: address(0),
+            snapshotYieldGenerationModule: address(0),
+            snapshotYieldDistributionModule: address(0)
+        }));
         assert(escrowTransfers[workflowId].workflowId == workflowId);
-        
         totalFees += fee;
         totalHeldInEscrow += amountAfterFee;
         totalEscrowsPending++;
         nextWorkflowId++;
-        
-        // Apply settings (this will set auto times correctly, applying defaults only if both are 0)
         _applyEscrowSettings(workflowId, settings);
-        
-        // Phase 7: Snapshot module addresses at creation time
         _snapshotModulesForEscrow(
             workflowId,
             address(getResolutionModule(workflowId)),
@@ -179,17 +171,13 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
             address(getYieldGenerationModule(workflowId)),
             address(getYieldDistributionModule(workflowId))
         );
-        
-        // Phase 2: If yieldEnabled, deposit to Aave (handled in BaseEscrow._depositToAave)
         if (settings.yieldEnabled) {
             IYieldGenerationModule genModule = _getYieldGenerationModule(workflowId);
             if (address(genModule) != address(0) && genModule.isTokenSupported(address(this))) {
-                // Approve Aave pool to spend tokens from this contract
-                // The module's forceApprove sets allowance for the module, not the escrow contract
-                // So we need to approve here using _approve to set allowance for this contract
-                address aavePool = _getAavePoolAddress(genModule);
-                if (aavePool != address(0)) {
-                    _approve(address(this), aavePool, amountAfterFee);
+                // Get approval target from module (generic, not Aave-specific)
+                address approvalTarget = YieldHandlingLibrary.getApprovalTarget(genModule, address(this));
+                if (approvalTarget != address(0)) {
+                    _approve(address(this), approvalTarget, amountAfterFee);
                 }
                 genModule.depositForYield(workflowId, address(this), amountAfterFee);
             }
@@ -208,7 +196,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
      * @param autoReleaseTime Timestamp for automatic release (0 = no auto-release)
      * @param autoCancelTime Timestamp for automatic cancel (0 = no auto-cancel)
      * @return workflowId The ID of the created escrow transfer
-     * @dev Convenience function for createEscrow with custom timing
+     * @dev Convenience function - calls main createEscrow with timing settings
      */
     function createEscrow(address seller, uint256 amount, uint256 autoReleaseTime, uint256 autoCancelTime) public whenNotPaused returns (uint256) {
         EscrowSettings memory settings = _getDefaultSettings();
@@ -222,11 +210,10 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
      * @param seller Recipient address (seller)
      * @param amount Amount to escrow (fee will be deducted)
      * @return workflowId The ID of the created escrow transfer
-     * @dev Convenience function for createEscrow with default settings
+     * @dev Convenience function - calls main createEscrow with default settings
      */
     function createEscrow(address seller, uint256 amount) public whenNotPaused returns (uint256) {
-        EscrowSettings memory settings = _getDefaultSettings();
-        return createEscrow(seller, amount, settings);
+        return createEscrow(seller, amount, _getDefaultSettings());
     }
 
 
@@ -345,18 +332,18 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
     function _getResolutionModule(uint256 workflowId) internal view returns (IResolutionModule) {
         EscrowTransfer storage et = escrowTransfers[workflowId];
         address snapshot = et.snapshotResolutionModule;
-        return snapshot != address(0) ? IResolutionModule(snapshot) : defaultResolutionModule;
+        return snapshot != address(0) ? IResolutionModule(snapshot) : defaultDisputeResolutionModule;
     }
 
     /**
-     * @dev Override BaseEscrow's _getDisputeResolverForNewEscrow to use defaultResolutionModule
+     * @dev Override BaseEscrow's _getDisputeResolverForNewEscrow to use defaultDisputeResolutionModule
      * @param workflowId The escrow transfer ID
      * @param token Token address
      * @param from Sender address
      * @param to Recipient address
      * @param amount Amount after fee
      * @param originalAmount Original amount before fee
-     * @return resolver The dispute resolver address
+     * @return disputeResolver The dispute resolver address
      */
     function _getDisputeResolverForNewEscrow(
         uint256 workflowId,
@@ -366,17 +353,17 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         uint256 amount,
         uint256 originalAmount
     ) internal view override returns (address) {
-        // Phase 7: Always use defaultResolutionModule (authorizedResolver gate removed)
-        if (address(defaultResolutionModule) == address(0)) {
+        // Always use defaultDisputeResolutionModule
+        if (address(defaultDisputeResolutionModule) == address(0)) {
             revert ResolutionModuleNotConfigured();
         }
 
         bytes memory escrowData = _encodeResolutionData(token, from, to, amount, originalAmount);
-        try IResolutionModule(defaultResolutionModule).getResolver(workflowId, escrowData) returns (address resolver, uint8 /* escalationLevel */) {
-            if (resolver == address(0)) {
+        try IResolutionModule(defaultDisputeResolutionModule).getDisputeResolver(workflowId, escrowData) returns (address disputeResolver, uint8 /* escalationLevel */) {
+            if (disputeResolver == address(0)) {
                 revert ResolutionModuleReturnedZeroAddress();
             }
-            return resolver;
+            return disputeResolver;
         } catch {
             revert ResolutionModuleCallFailed();
         }
@@ -394,23 +381,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         return snapshot != address(0) ? IYieldGenerationModule(snapshot) : defaultYieldGenerationModule;
     }
 
-    /**
-     * @dev Get Aave pool address from AaveYieldGenerationModule using low-level call
-     * @param module The yield generation module
-     * @return poolAddress The Aave pool address
-     */
-    function _getAavePoolAddress(IYieldGenerationModule module) internal view returns (address poolAddress) {
-        // Use low-level call to read the public aavePool variable
-        // Public variables have auto-generated getters, so we can call the getter function
-        bytes4 selector = bytes4(keccak256("aavePool()"));
-        (bool success, bytes memory data) = address(module).staticcall(
-            abi.encodeWithSelector(selector)
-        );
-        if (success && data.length >= 32) {
-            return abi.decode(data, (address));
-        }
-        return address(0);
-    }
+    // _getAavePoolAddress removed - now handled generically via IYieldGenerationModule.getApprovalTarget()
 
     /**
      * @dev Get the yield distribution module for an escrow (override from BaseEscrow)
@@ -425,11 +396,6 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
     }
 
     // Module getter functions
-    /**
-     * @notice Get the release strategy for an escrow
-     * @param workflowId The escrow transfer ID
-     * @return The release strategy module (or default if not set)
-     */
     /**
      * @notice Get the release strategy for an escrow
      * @param workflowId The escrow transfer ID (unused, kept for interface compatibility)
@@ -449,7 +415,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
      */
     function getResolutionModule(uint256 workflowId) public view returns (IResolutionModule) {
         workflowId; // Silence unused parameter warning
-        return defaultResolutionModule;
+        return defaultDisputeResolutionModule;
     }
 
     /**
@@ -485,9 +451,12 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
      * @dev After 7 days, call activateDefaultReleaseStrategy() to apply the change
      */
     function queueDefaultReleaseStrategy(address strategy) public onlyRole(ROLE_TIMELOCK) {
-        if (strategy == address(0) || strategy.code.length == 0) {
-            revert InvalidAddress("Default release strategy must be a contract", strategy);
-        }
+        ModuleManagementLibrary.validateModule(strategy, ModuleManagementLibrary.ModuleConfig({
+            requireContract: true,
+            allowZero: false,
+            interfaceId: bytes4(0),
+            moduleName: "release strategy"
+        }));
         _queueAddress(_pendingDefaultReleaseStrategy, strategy);
         emit DefaultReleaseStrategyQueued(address(defaultReleaseStrategy), strategy, _pendingDefaultReleaseStrategy.eta);
     }
@@ -509,7 +478,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
      * @return exists Whether a pending change exists
      */
     function getPendingDefaultReleaseStrategy() public view returns (address value, uint64 eta, bool exists) {
-        return (getPendingAddress(_pendingDefaultReleaseStrategy));
+        return getPendingAddress(_pendingDefaultReleaseStrategy);
     }
 
     /**
@@ -518,11 +487,14 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
      * @dev After 7 days, call activateDefaultResolutionModule() to apply the change
      */
     function queueDefaultResolutionModule(address module) public onlyRole(ROLE_TIMELOCK) {
-        if (module == address(0) || module.code.length == 0) {
-            revert InvalidAddress("Default resolution module must be a contract", module);
-        }
+        ModuleManagementLibrary.validateModule(module, ModuleManagementLibrary.ModuleConfig({
+            requireContract: true,
+            allowZero: false,
+            interfaceId: bytes4(0),
+            moduleName: "resolution module"
+        }));
         _queueAddress(_pendingDefaultResolutionModule, module);
-        emit DefaultResolutionModuleQueued(address(defaultResolutionModule), module, _pendingDefaultResolutionModule.eta);
+        emit DefaultResolutionModuleQueued(address(defaultDisputeResolutionModule), module, _pendingDefaultResolutionModule.eta);
     }
 
     /**
@@ -530,9 +502,9 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
      * @dev Reverts if no pending change or 7-day delay has not elapsed
      */
     function activateDefaultResolutionModule() public onlyRole(ROLE_TIMELOCK) {
-        address oldModule = address(defaultResolutionModule);
-        defaultResolutionModule = IResolutionModule(_activateAddress(_pendingDefaultResolutionModule));
-        emit DefaultResolutionModuleActivated(oldModule, address(defaultResolutionModule));
+        address oldModule = address(defaultDisputeResolutionModule);
+        defaultDisputeResolutionModule = IResolutionModule(_activateAddress(_pendingDefaultResolutionModule));
+        emit DefaultResolutionModuleActivated(oldModule, address(defaultDisputeResolutionModule));
     }
 
     /**
@@ -542,7 +514,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
      * @return exists Whether a pending change exists
      */
     function getPendingDefaultResolutionModule() public view returns (address value, uint64 eta, bool exists) {
-        return (getPendingAddress(_pendingDefaultResolutionModule));
+        return getPendingAddress(_pendingDefaultResolutionModule);
     }
 
     /**
@@ -551,16 +523,12 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
      * @dev After 7 days, call activateDefaultYieldGenerationModule() to apply the change
      */
     function queueDefaultYieldGenerationModule(address module) public onlyRole(ROLE_TIMELOCK) {
-        if (module == address(0)) {
-            revert InvalidAddress("Default yield generation module cannot be zero", module);
-        }
-        if (module.code.length == 0) {
-            revert InvalidAddress("Default yield generation module must be a contract", module);
-        }
-        // Validate module implements IYieldGenerationModule via ERC-165
-        if (!IERC165(module).supportsInterface(type(IYieldGenerationModule).interfaceId)) {
-            revert InvalidAddress("Module does not implement IYieldGenerationModule", module);
-        }
+        ModuleManagementLibrary.validateModule(module, ModuleManagementLibrary.ModuleConfig({
+            requireContract: true,
+            allowZero: false,
+            interfaceId: type(IYieldGenerationModule).interfaceId,
+            moduleName: "yield generation module"
+        }));
         _queueAddress(_pendingDefaultYieldGenerationModule, module);
         emit DefaultYieldGenerationModuleQueued(address(defaultYieldGenerationModule), module, _pendingDefaultYieldGenerationModule.eta);
     }
@@ -583,7 +551,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
      * @return exists Whether a pending change exists
      */
     function getPendingDefaultYieldGenerationModule() public view returns (address value, uint64 eta, bool exists) {
-        return (getPendingAddress(_pendingDefaultYieldGenerationModule));
+        return getPendingAddress(_pendingDefaultYieldGenerationModule);
     }
 
     /**
@@ -592,16 +560,12 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
      * @dev After 7 days, call activateDefaultYieldDistributionModule() to apply the change
      */
     function queueDefaultYieldDistributionModule(address module) public onlyRole(ROLE_TIMELOCK) {
-        if (module == address(0)) {
-            revert InvalidAddress("Default yield distribution module cannot be zero", module);
-        }
-        if (module.code.length == 0) {
-            revert InvalidAddress("Default yield distribution module must be a contract", module);
-        }
-        // Validate module implements IYieldDistributionModule via ERC-165
-        if (!IERC165(module).supportsInterface(type(IYieldDistributionModule).interfaceId)) {
-            revert InvalidAddress("Module does not implement IYieldDistributionModule", module);
-        }
+        ModuleManagementLibrary.validateModule(module, ModuleManagementLibrary.ModuleConfig({
+            requireContract: true,
+            allowZero: false,
+            interfaceId: type(IYieldDistributionModule).interfaceId,
+            moduleName: "yield distribution module"
+        }));
         _queueAddress(_pendingDefaultYieldDistributionModule, module);
         emit DefaultYieldDistributionModuleQueued(address(defaultYieldDistributionModule), module, _pendingDefaultYieldDistributionModule.eta);
     }
@@ -624,7 +588,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
      * @return exists Whether a pending change exists
      */
     function getPendingDefaultYieldDistributionModule() public view returns (address value, uint64 eta, bool exists) {
-        return (getPendingAddress(_pendingDefaultYieldDistributionModule));
+        return getPendingAddress(_pendingDefaultYieldDistributionModule);
     }
 
     /**
