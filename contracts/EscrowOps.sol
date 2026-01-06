@@ -13,17 +13,16 @@ import "./BaseEscrow.sol";
 contract EscrowOps {
     /**
      * @notice Batch release multiple escrow transfers
-     * @param escrowContract The BaseEscrow contract address
-     * @param workflowIds Array of escrow transfer IDs to release
      * @return success True if all releases were successful
      * @dev Only sender can release their own escrows. Reverts if any escrow fails validation.
      *      Users should call releaseEscrowTransfer() directly on BaseEscrow for each escrow.
      *      This contract is provided for convenience but may be less gas efficient.
+     *      Note: Parameters are unused as this function always reverts.
      */
     function batchReleaseEscrow(
-        BaseEscrow escrowContract,
-        uint256[] memory workflowIds
-    ) external returns (bool) {
+        BaseEscrow /* escrowContract */,
+        uint256[] memory /* workflowIds */
+    ) external pure returns (bool) {
         // Note: BaseEscrow.releaseEscrowTransfer() is internal
         // Users should call releaseEscrowTransfer() directly on BaseEscrow
         // This function is a placeholder - actual implementation would require
@@ -33,17 +32,16 @@ contract EscrowOps {
 
     /**
      * @notice Batch cancel multiple escrow transfers (mutual agreement required)
-     * @param escrowContract The BaseEscrow contract address
-     * @param workflowIds Array of escrow transfer IDs to cancel
      * @return success True if batch processing completed
      * @dev Both sender and recipient must agree to cancel (via senderCancel/recipientCancel)
      *      Users should call senderCancel()/recipientCancel() directly on BaseEscrow.
      *      This contract is provided for convenience but may be less gas efficient.
+     *      Note: Parameters are unused as this function always reverts.
      */
     function batchCancelEscrow(
-        BaseEscrow escrowContract,
-        uint256[] memory workflowIds
-    ) external returns (bool) {
+        BaseEscrow /* escrowContract */,
+        uint256[] memory /* workflowIds */
+    ) external pure returns (bool) {
         // Note: Batch cancel logic was removed from BaseEscrow for size reduction
         // Users should call senderCancel()/recipientCancel() directly on BaseEscrow
         revert("Use senderCancel()/recipientCancel() directly on BaseEscrow for each escrow");

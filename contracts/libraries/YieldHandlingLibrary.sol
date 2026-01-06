@@ -137,12 +137,9 @@ library YieldHandlingLibrary {
         // This allows tests to work without full distribution setup
         bytes memory distributionData = "";
         (bool success, ) = distModule.distributeYield(workflowId, token, yieldAmount, distributionData);
-        // Don't revert if distribution fails - yield stays in module
-        // This allows graceful handling when distribution data is not configured
-        if (!success) {
-            // Yield distribution failed or not configured - yield remains in module
-            // This is acceptable behavior when distribution data is empty
-        }
+        // Revert if distribution fails - yield should be properly distributed
+        // This ensures yield is not lost if distribution module has issues
+        require(success, "Yield distribution failed");
     }
 
     /**

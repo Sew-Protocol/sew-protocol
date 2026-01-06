@@ -7,8 +7,7 @@ artifacts
 typechain-types
 deploy-ledger
 .DS_Store
-.env
-docs
+.envq
 lib
 
 

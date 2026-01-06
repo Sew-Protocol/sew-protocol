@@ -2,11 +2,13 @@
  * Slow Lane Queue/Activate Tests
  * 
  * Tests for the slow lane governance pattern (7-day delay):
- * - Queue functions (queueEscrowFee, queueEscrowFeeAddress, queueDao)
+ * - Queue functions (queueEscrowFee, queueEscrowFeeAddress)
  * - ETA enforcement (7-day delay)
  * - Activate functions after ETA
  * - Revert on early activation
  * - Pending state queries
+ * 
+ * Note: queueDao/activateDao tests are skipped - DAO address is now unchangeable
  */
 
 import { expect } from "chai";
@@ -188,7 +190,8 @@ describe("Slow Lane Queue/Activate", function () {
     });
   });
 
-  describe("Queue DAO Address", function () {
+  describe.skip("Queue DAO Address", function () {
+    // Skipped: DAO address is now unchangeable (set in constructor only)
     it("Should queue new DAO address", async function () {
       await escrowableERC20.connect(timelock).queueDao(newFeeAddress.address);
       
@@ -204,7 +207,8 @@ describe("Slow Lane Queue/Activate", function () {
     });
   });
 
-  describe("Activate DAO Address", function () {
+  describe.skip("Activate DAO Address", function () {
+    // Skipped: DAO address is now unchangeable (set in constructor only)
     beforeEach(async function () {
       await escrowableERC20.connect(timelock).queueDao(newFeeAddress.address);
     });

@@ -10,6 +10,7 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "./BaseEscrow.sol";
 import "./governance/SlowLaneQueueActivate.sol";
 import "./libraries/ModuleManagementLibrary.sol";
+import "./libraries/EscrowCreationLibrary.sol";
 import "./libraries/YieldHandlingLibrary.sol";
 import "./interfaces/IReleaseStrategy.sol";
 import "./interfaces/IResolutionModule.sol";
@@ -137,39 +138,41 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
             amountAfterFee,
             amount
         );
-        escrowTransfers.push(EscrowTransfer({
-            workflowId: workflowId,
-            token: address(this),
-            to: seller,
-            from: _msgSender(),
-            remainingBalance: amountAfterFee,
-            totalDeposited: amount,
-            escrowState: EscrowState.PENDING,
-            senderStatus: SenderStatus.NONE,
-            recipientStatus: RecipientStatus.NONE,
-            disputeResolver: defaultResolver,
-            autoReleaseTime: 0,
-            autoCancelTime: 0,
-            attachmentURIs: new string[](0),
-            attachmentHashes: new bytes32[](0),
-            metadata: "",
-            snapshotResolutionModule: address(0),
-            snapshotReleaseStrategy: address(0),
-            snapshotYieldGenerationModule: address(0),
-            snapshotYieldDistributionModule: address(0)
-        }));
+        
+        // Get module addresses for snapshotting (before incrementing nextWorkflowId)
+        address resolutionModule = address(getResolutionModule(workflowId));
+        address releaseStrategy = address(getReleaseStrategy(workflowId));
+        address yieldGenModule = address(getYieldGenerationModule(workflowId));
+        address yieldDistModule = address(getYieldDistributionModule(workflowId));
+        
+        // Create escrow transfer struct using library
+        EscrowTransfer memory newTransfer = EscrowCreationLibrary.createEscrowTransferStruct(
+            workflowId,
+            address(this),
+            seller,
+            _msgSender(),
+            amount,
+            amountAfterFee,
+            defaultResolver,
+            resolutionModule,
+            releaseStrategy,
+            yieldGenModule,
+            yieldDistModule
+        );
+        escrowTransfers.push(newTransfer);
         assert(escrowTransfers[workflowId].workflowId == workflowId);
         totalFees += fee;
         totalHeldInEscrow += amountAfterFee;
         totalEscrowsPending++;
         nextWorkflowId++;
         _applyEscrowSettings(workflowId, settings);
+        // Emit module snapshot event (fields already set in struct)
         _snapshotModulesForEscrow(
             workflowId,
-            address(getResolutionModule(workflowId)),
-            address(getReleaseStrategy(workflowId)),
-            address(getYieldGenerationModule(workflowId)),
-            address(getYieldDistributionModule(workflowId))
+            resolutionModule,
+            releaseStrategy,
+            yieldGenModule,
+            yieldDistModule
         );
         if (settings.yieldEnabled) {
             IYieldGenerationModule genModule = _getYieldGenerationModule(workflowId);

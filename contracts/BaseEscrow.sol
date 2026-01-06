@@ -85,6 +85,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
     
     /// @notice Optional DAO address for governance-controlled upgrades (non-proxy).
     /// @dev For March 1 release you can transfer ownership to a multisig; this is an additional hook.
+    /// @dev DAO address is set in constructor and cannot be changed after deployment.
     address public dao;
 
     /// @notice Optional dispute resolution module. When set, NEW escrows pin `disputeResolver` via module.getDisputeResolver().
@@ -111,7 +112,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
     // Slow lane pending changes (Phase 3)
     PendingAddress private _pendingFeeRecipient;
     PendingUint private _pendingEscrowFee;
-    PendingAddress private _pendingDao;
+    // _pendingDao removed - DAO address is no longer updateable
 
     // Common events
     // Phase 1: Core lifecycle events (all have workflowId indexed for indexability)
@@ -121,9 +122,9 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
     event EscrowTransferResolvedWithPartialRelease(uint256 indexed workflowId, address indexed from, address indexed to, uint256 amount);
     event EscrowTransferResolvedWithPartialCancel(uint256 indexed workflowId, address indexed from, address indexed to, uint256 amount);
     // Phase 2: Standardized resolution event (ERC-ESCR-DISPUTE)
-    event EscrowResolved(uint256 indexed workflowId, address indexed resolver, bytes32 resolutionHash);
+    event EscrowResolved(uint256 indexed workflowId, address indexed disputeResolver, bytes32 resolutionHash);
     // Escalation events
-    event DisputeEscalated(uint256 indexed workflowId, uint8 fromLevel, uint8 toLevel, address indexed newResolver, address indexed escalatedBy);
+    event DisputeEscalated(uint256 indexed workflowId, uint8 fromLevel, uint8 toLevel, address indexed newDisputeResolver, address indexed escalatedBy);
     event EscalationFeeCollected(uint256 indexed workflowId, uint256 fee, address indexed feeRecipient);
     event EscrowTransferAutoReleased(uint256 indexed workflowId, address indexed to, uint256 amount);
     event EscrowTransferAutoCancelled(uint256 indexed workflowId, address indexed from, uint256 amount);
@@ -137,7 +138,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
     event CancelConfirmed(uint256 indexed workflowId, address indexed by);
     
     // Phase 1: Dispute lifecycle events
-    event DisputeOpened(uint256 indexed workflowId, address indexed by, address indexed resolver);
+    event DisputeOpened(uint256 indexed workflowId, address indexed by, address indexed disputeResolver);
     
     // Phase 1: Timeout execution events
     event TimeoutExecuted(uint256 indexed workflowId, uint8 action); // 0 = RELEASE, 1 = CANCEL
@@ -150,7 +151,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
     // Configuration events
     event EscrowFeeUpdated(uint256 oldFee, uint256 newFee);
     event EscrowFeeAddressUpdated(address oldAddress, address newAddress);
-    event DaoUpdated(address indexed oldDao, address indexed newDao);
+    // DaoUpdated event removed - DAO address is no longer updateable
     event ResolutionModuleDelayUpdated(uint256 oldDelay, uint256 newDelay);
     event ResolutionModuleProposed(address indexed proposedModule, uint256 eta);
     event ResolutionModuleActivated(address indexed oldModule, address indexed newModule);
@@ -171,8 +172,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
     event EscrowFeeAddressActivated(address indexed oldAddress, address indexed newAddress);
     event EscrowFeeQueued(uint256 oldFee, uint256 newFee, uint64 eta);
     event EscrowFeeActivated(uint256 oldFee, uint256 newFee);
-    event DaoQueued(address indexed oldDao, address indexed newDao, uint64 eta);
-    event DaoActivated(address indexed oldDao, address indexed newDao);
+    // DaoQueued and DaoActivated events removed - DAO address is no longer updateable
     
     // Yield distribution events removed - now handled by yield distribution module
     
@@ -255,6 +255,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
      * @dev View function to check dispute timeout status
      */
     function isDisputeTimedOut(uint256 workflowId) external view returns (bool isTimedOut, uint256 timeRemaining) {
+        _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
         if (et.escrowState != EscrowState.DISPUTED) {
             return (false, 0);
@@ -536,36 +537,8 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
     // setAuthorizedResolver removed - deprecated function eliminated for size reduction
     // onlyDaoOrOwner modifier removed - deprecated, kept only in derived contracts if needed
 
-    /**
-     * @notice Queue a new DAO address (Slow lane: 7-day delay)
-     * @param newDao New DAO address
-     * @dev After 7 days, call activateDao() to apply the change
-     */
-    function queueDao(address newDao) external onlyRole(ROLE_TIMELOCK) {
-        _queueAddress(_pendingDao, newDao);
-        emit DaoQueued(dao, newDao, _pendingDao.eta);
-    }
-
-    /**
-     * @notice Activate the queued DAO address
-     * @dev Reverts if no pending change or 7-day delay has not elapsed
-     */
-    function activateDao() external onlyRole(ROLE_TIMELOCK) {
-        address oldDao = dao;
-        dao = _activateAddress(_pendingDao);
-        emit DaoActivated(oldDao, dao);
-        emit DaoUpdated(oldDao, dao);
-    }
-
-    /**
-     * @notice Get pending DAO change (if any)
-     * @return value Pending DAO address
-     * @return eta Timestamp when activation is allowed
-     * @return exists Whether a pending change exists
-     */
-    function getPendingDao() public view returns (address value, uint64 eta, bool exists) {
-        return (getPendingAddress(_pendingDao));
-    }
+    // queueDao, activateDao, and getPendingDao removed - DAO address is no longer updateable
+    // DAO address must be set in constructor and cannot be changed after deployment
 
     /**
      * @notice Set the delay (in seconds) between proposing and activating a new resolution module.
@@ -677,7 +650,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         
         // Handle yield using library
         IYieldGenerationModule genModule = _getYieldGenerationModule(workflowId);
-        (uint256 actualAmount, uint256 yield) = YieldHandlingLibrary.withdrawFullWithYield(
+        (, uint256 yield) = YieldHandlingLibrary.withdrawFullWithYield(
             genModule, workflowId, token, amount
         );
         
@@ -1034,21 +1007,28 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
             revert InvalidAmount("Insufficient escalation fee");
         }
         
-        // Collect fee BEFORE escalation (ensures fee is collected, escalation can still revert if needed)
-        if (escalationFee > 0) {
-            if (escrowFeeAddress == address(0)) {
-                revert InvalidAddress("Fee address not set", address(0));
-            }
-            payable(escrowFeeAddress).transfer(escalationFee);
-            emit EscalationFeeCollected(workflowId, escalationFee, escrowFeeAddress);
+        // Validate fee address before proceeding
+        if (escalationFee > 0 && escrowFeeAddress == address(0)) {
+            revert InvalidAddress("Fee address not set", address(0));
         }
         
         // Delegate escalation execution to module (module handles all escalation logic)
+        // Do this BEFORE fee transfer so we can refund if escalation fails
         (bool escalationSuccess, address newDisputeResolverAddress, uint8 newEscalationLevel) = 
             IResolutionModule(disputeResolutionModule).executeEscalation(workflowId, escrowData);
         
         if (!escalationSuccess) {
+            // Refund any fee sent if escalation fails
+            if (msg.value > 0) {
+                payable(_msgSender()).transfer(msg.value);
+            }
             revert ResolutionModuleCallFailed();
+        }
+        
+        // Collect fee AFTER successful escalation (ensures fee is only collected if escalation succeeds)
+        if (escalationFee > 0) {
+            payable(escrowFeeAddress).transfer(escalationFee);
+            emit EscalationFeeCollected(workflowId, escalationFee, escrowFeeAddress);
         }
         
         // Update dispute resolver in escrow (module returns new dispute resolver, BaseEscrow updates state)
@@ -1289,7 +1269,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         
         // Handle yield using library
         IYieldGenerationModule genModule = _getYieldGenerationModule(workflowId);
-        (uint256 actualAmount, uint256 yield) = YieldHandlingLibrary.withdrawFullWithYield(
+        (, uint256 yield) = YieldHandlingLibrary.withdrawFullWithYield(
             genModule, workflowId, token, amount
         );
         

@@ -12,12 +12,11 @@ library StateManagementLibrary {
     /**
      * @dev Transition escrow to RELEASED state
      * @param et EscrowTransfer storage reference
-     * @param workflowId Escrow workflow ID
      * @return oldStatus Previous state
      */
     function transitionToReleased(
         EscrowTransfer storage et,
-        uint256 workflowId
+        uint256 /* workflowId */
     ) internal returns (EscrowState oldStatus) {
         oldStatus = et.escrowState;
         et.escrowState = EscrowState.RELEASED;
@@ -28,12 +27,11 @@ library StateManagementLibrary {
     /**
      * @dev Transition escrow to REFUNDED state
      * @param et EscrowTransfer storage reference
-     * @param workflowId Escrow workflow ID
      * @return oldStatus Previous state
      */
     function transitionToRefunded(
         EscrowTransfer storage et,
-        uint256 workflowId
+        uint256 /* workflowId */
     ) internal returns (EscrowState oldStatus) {
         oldStatus = et.escrowState;
         et.escrowState = EscrowState.REFUNDED;
@@ -44,12 +42,11 @@ library StateManagementLibrary {
     /**
      * @dev Transition escrow to RESOLVED state
      * @param et EscrowTransfer storage reference
-     * @param workflowId Escrow workflow ID
      * @return oldStatus Previous state
      */
     function transitionToResolved(
         EscrowTransfer storage et,
-        uint256 workflowId
+        uint256 /* workflowId */
     ) internal returns (EscrowState oldStatus) {
         oldStatus = et.escrowState;
         et.escrowState = EscrowState.RESOLVED;
@@ -59,13 +56,12 @@ library StateManagementLibrary {
     /**
      * @dev Transition escrow to DISPUTED state
      * @param et EscrowTransfer storage reference
-     * @param workflowId Escrow workflow ID
      * @param isSender True if sender is raising dispute, false if recipient
      * @return oldStatus Previous state
      */
     function transitionToDisputed(
         EscrowTransfer storage et,
-        uint256 workflowId,
+        uint256 /* workflowId */,
         bool isSender
     ) internal returns (EscrowState oldStatus) {
         oldStatus = et.escrowState;

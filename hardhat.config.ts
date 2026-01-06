@@ -44,7 +44,7 @@ const config: HardhatUserConfig = {
       optimizer: {
         enabled: true,
         // https://docs.soliditylang.org/en/latest/using-the-compiler.html#optimizer-options
-        runs: 10000, // Higher runs = smaller code size (but higher gas cost)
+        runs: 50000, // Higher runs = smaller code size (but higher gas cost)
       },
       viaIR: true, // Enable IR-based code generation to reduce contract size
       evmVersion: "cancun", // Use Cancun EVM version to support mcopy instruction
