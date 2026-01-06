@@ -125,12 +125,12 @@ Complete mapping of all governance functions to roles, lanes, and delays.
 | Function | Role | Lane | Delay | Bounds | Notes |
 |----------|------|------|-------|--------|-------|
 | `initialize(address)` | Initializer | N/A | 0h | Non-zero address | Initialize upgradeable contract (one-time) |
-| `upgradeTo(address)` | `ROLE_TIMELOCK` OR `ROLE_MODULE_DEVELOPER` | Module Upgrade | Staged delays | Valid implementation | Upgrade module implementation (UUPS). ROLE_TIMELOCK: instant. ROLE_MODULE_DEVELOPER: first 3 instant, then 1h/24h/7d based on time since deployment |
-| `upgradeToAndCall(address,bytes)` | `ROLE_TIMELOCK` OR `ROLE_MODULE_DEVELOPER` | Module Upgrade | Staged delays | Valid implementation | Upgrade and call (UUPS). ROLE_TIMELOCK: instant. ROLE_MODULE_DEVELOPER: first 3 instant, then 1h/24h/7d based on time since deployment |
-| `queueUpgrade(address)` | `ROLE_MODULE_DEVELOPER` | Module Upgrade | 48h queue | Valid implementation | Queue upgrade (after first 3 upgrades) |
+| `upgradeTo(address)` | `ROLE_TIMELOCK` OR `ROLE_MODULE_DEVELOPER` | Module Upgrade | Staged delays | Valid implementation | Upgrade module implementation (UUPS). ROLE_TIMELOCK: instant. ROLE_MODULE_DEVELOPER: 1h/24h/7d based on time since deployment (instant upgrades disabled) |
+| `upgradeToAndCall(address,bytes)` | `ROLE_TIMELOCK` OR `ROLE_MODULE_DEVELOPER` | Module Upgrade | Staged delays | Valid implementation | Upgrade and call (UUPS). ROLE_TIMELOCK: instant. ROLE_MODULE_DEVELOPER: 1h/24h/7d based on time since deployment (instant upgrades disabled) |
+| `queueUpgrade(address)` | `ROLE_MODULE_DEVELOPER` | Module Upgrade | 48h queue | Valid implementation | Queue upgrade (all upgrades require queuing) |
 | `activateUpgrade()` | `ROLE_MODULE_DEVELOPER` | Module Upgrade | Staged delay | - | Activate queued upgrade after delay |
 | `getUpgradeDelay()` | View | N/A | N/A | - | Get current upgrade delay based on phase |
-| `getCurrentPhase()` | View | N/A | N/A | - | Get current phase name (INSTANT/LAUNCH/EARLY/MATURE) |
+| `getCurrentPhase()` | View | N/A | N/A | - | Get current phase name (LAUNCH/EARLY/MATURE - INSTANT phase disabled) |
 | `getPendingUpgrade()` | View | N/A | N/A | - | Get pending upgrade information |
 | `setUpgradeDelayConfig(...)` | `ROLE_TIMELOCK` | Standard | 48h | Valid config | Configure upgrade delay parameters (governance override) |
 | `addSeniorResolver(address)` | `ROLE_TIMELOCK` | Standard | 48h | Non-zero address | Add senior resolver (affects new disputes only, active disputes use stored resolver) |
@@ -178,16 +178,16 @@ The following functions were **removed from the ABI** in Phase 5 to eliminate pe
 - **Mechanism**: Two-step queue/activate pattern enforced onchain
 
 ### Module Upgrade Lane (Staged Delays)
-- **Delay**: Staged based on time since deployment and upgrade count
-  - First 3 upgrades: Instant (0h)
+- **Delay**: Staged based on time since deployment
+  - Instant upgrades: Disabled (all upgrades require delays)
   - Launch phase (0-30 days): 1 hour
   - Early phase (30-90 days): 24 hours
   - Mature phase (90+ days): 7 days (same as slow lane)
 - **Executor**: TimelockController (instant) OR Module Developer (staged delays)
 - **Scope**: Upgrade DecentralizedResolutionModule and ResolverIncentiveModule implementations
-- **Mechanism**: UUPS proxy upgrade pattern with queue/activate after first 3 upgrades
+- **Mechanism**: UUPS proxy upgrade pattern with queue/activate (all upgrades require queuing)
 - **Restrictions**: Cannot swap modules in BaseEscrow, cannot bypass governance
-- **Rationale**: Allows rapid iteration during early phases while transitioning to conservative upgrades as system matures
+- **Rationale**: All upgrades require time delays from deployment to ensure safety and allow for review
 
 ---
 

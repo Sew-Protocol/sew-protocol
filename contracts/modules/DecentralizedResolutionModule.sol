@@ -44,12 +44,13 @@ contract DecentralizedResolutionModule is
     // ============ Upgrade Delay Constants ============
     
     /// @notice Number of instant upgrades allowed before delays apply
-    uint256 public constant INSTANT_UPGRADES_COUNT = 3;
+    /// @dev Set to 0 to disable instant upgrades - all upgrades require queue/activate pattern
+    uint256 public constant INSTANT_UPGRADES_COUNT = 0;
     /// @notice Launch phase duration (instant or 1 hour delay)
     uint256 public constant LAUNCH_PHASE_DURATION = 30 days;
     /// @notice Early phase duration (24 hour delay)
     uint256 public constant EARLY_PHASE_DURATION = 90 days;
-    /// @notice Launch phase delay (after first 3 upgrades)
+    /// @notice Launch phase delay (1 hour for launch phase)
     uint256 public constant LAUNCH_PHASE_DELAY = 1 hours;
     /// @notice Early phase delay
     uint256 public constant EARLY_PHASE_DELAY = 24 hours;
@@ -167,9 +168,9 @@ contract DecentralizedResolutionModule is
     
     /// @notice Timestamp when contract was deployed/initialized
     uint256 public deploymentTimestamp;
-    /// @notice Number of upgrades performed (tracked for instant upgrade allowance)
+    /// @notice Number of upgrades performed (tracked for upgrade history)
     uint256 public upgradeCount;
-    /// @notice Pending upgrade (for module developer after first 3 upgrades)
+    /// @notice Pending upgrade (for module developer - all upgrades require queuing)
     struct PendingUpgrade {
         address value;
         uint64 eta;
@@ -319,7 +320,7 @@ contract DecentralizedResolutionModule is
      * @notice Authorize upgrade (UUPS pattern)
      * @param newImplementation Address of new implementation
      * @dev Allows ROLE_TIMELOCK or ROLE_MODULE_DEVELOPER to upgrade
-     *      Module developer upgrades use staged delays after first 3 instant upgrades
+     *      Module developer upgrades use staged delays (instant upgrades disabled)
      */
     function _authorizeUpgrade(address newImplementation)
         internal
@@ -352,24 +353,8 @@ contract DecentralizedResolutionModule is
             "Not authorized to upgrade"
         );
         
-        // First 3 upgrades: instant
-        if (upgradeCount < INSTANT_UPGRADES_COUNT) {
-            upgradeCount++;
-            uint256 delay = 0;
-            string memory phase = "INSTANT";
-            
-            emit ModuleUpgraded(
-                oldImplementation,
-                newImplementation,
-                _msgSender(),
-                block.timestamp,
-                delay,
-                phase
-            );
-            return;
-        }
-        
-        // After first 3 upgrades: must be queued and ETA passed
+        // Instant upgrades disabled (INSTANT_UPGRADES_COUNT = 0)
+        // All upgrades must be queued and ETA passed
         require(
             _pendingUpgrade.exists && 
             _pendingUpgrade.value == newImplementation &&
@@ -1824,7 +1809,7 @@ contract DecentralizedResolutionModule is
     // ============ Upgrade Delay Management ============
     
     /**
-     * @notice Queue an upgrade (for module developer after first 3 upgrades)
+     * @notice Queue an upgrade (for module developer - all upgrades require queuing)
      * @param newImplementation Address of new implementation
      * @dev Calculates delay based on time since deployment and queues upgrade
      */
@@ -1835,8 +1820,8 @@ contract DecentralizedResolutionModule is
         require(newImplementation != address(0), "Invalid implementation");
         require(newImplementation.code.length > 0, "Implementation must be a contract");
         
-        // Can only queue if we've used up instant upgrades
-        require(upgradeCount >= INSTANT_UPGRADES_COUNT, "Instant upgrades still available");
+        // Instant upgrades are disabled - all upgrades require queuing
+        // (This check is now always true since INSTANT_UPGRADES_COUNT = 0)
         
         uint256 delay = getUpgradeDelay();
         uint64 eta = uint64(block.timestamp + delay);
@@ -1879,13 +1864,10 @@ contract DecentralizedResolutionModule is
     /**
      * @notice Get current upgrade delay based on time since deployment
      * @return delay Delay in seconds
-     * @dev Returns 0 for instant upgrades (first 3), then staged delays
+     * @dev Returns staged delays based on time since deployment (instant upgrades disabled)
      */
     function getUpgradeDelay() public view returns (uint256 delay) {
-        // First 3 upgrades are instant
-        if (upgradeCount < INSTANT_UPGRADES_COUNT) {
-            return 0;
-        }
+        // Instant upgrades disabled - always use staged delays
         
         uint256 timeSinceDeployment = block.timestamp - deploymentTimestamp;
         
@@ -1914,10 +1896,7 @@ contract DecentralizedResolutionModule is
      * @return phase Phase name string
      */
     function getCurrentPhase() public view returns (string memory phase) {
-        if (upgradeCount < INSTANT_UPGRADES_COUNT) {
-            return "INSTANT";
-        }
-        
+        // Instant upgrades disabled - always use time-based phases
         uint256 timeSinceDeployment = block.timestamp - deploymentTimestamp;
         
         if (timeSinceDeployment < LAUNCH_PHASE_DURATION) {

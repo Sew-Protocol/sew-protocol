@@ -3,7 +3,7 @@
 Complete index of all documentation in the `/docs` folder, organized by category with summaries, status, and next action recommendations.
 
 **Last Updated**: 2025-01-XX  
-**Total Documents**: 129
+**Total Documents**: 130
 
 ---
 
@@ -59,7 +59,8 @@ Complete index of all documentation in the `/docs` folder, organized by category
 | `CONTRACTS_SUMMARY.md` | Concise overview of all contracts and their purposes | Current | Keep updated |
 | `ESCROW_STANDARDIZATION_SUMMARY.md` | Summary of escrow standardization documents | Complete | Archive document |
 | `IMPLEMENTATION_SUMMARY.md` | Summary of implementation status | Outdated | Update or archive |
-| `IMPROVEMENTS_IMPLEMENTATION_SUMMARY.md` | Summary of improvements implementation | Outdated | Update or archive |
+| `IMPROVEMENTS_IMPLEMENTATION_SUMMARY.md` | Summary of improvements implementation | Current | Keep updated |
+| `CONTRIBUTING_ADHERENCE_ASSESSMENT.md` | Assessment of codebase adherence to CONTRIBUTING.md | Current | Keep updated |
 | `MIGRATION_SUMMARY.md` | Summary of migration work | Complete | Archive document |
 | `MODULE_DEVELOPER_ROLE_SUMMARY.md` | Quick reference for module developer role | Current | Keep updated |
 | `PHASE1_SUMMARY.md` | Summary of Phase 1 analysis work | Complete | Archive document |

@@ -2,6 +2,7 @@
   "name": "hardhat-deploy-hybrid",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "test": "pnpm test:hardhat && pnpm test:foundry",
     "test:hardhat": "hardhat test",

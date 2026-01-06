@@ -55,7 +55,7 @@ A decentralized escrow protocol built on Base (Ethereum L2) that enables secure,
 
 **EscrowableERC20.sol** - ERC20 token with built-in escrow:
 - Standard ERC20 functionality
-- Built-in `escrowTransfer()` function
+- Built-in `createEscrow()` function (primary function name)
 - Factory pattern deployment
 - Single-token escrow (token is both payment and escrow medium)
 
@@ -201,4 +201,5 @@ A decentralized escrow protocol built on Base (Ethereum L2) that enables secure,
 ---
 
 *For detailed documentation, see the [Document Index](_DOCUMENT_INDEX.md)*
+
 

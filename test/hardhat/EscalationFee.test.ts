@@ -197,8 +197,8 @@ describe("Escalation Fee Handling", function () {
       expect(et.disputeResolver).to.equal(seniorResolver.address);
     });
 
-    it("Should transfer fee before escalation execution", async function () {
-      // This test verifies that fee is collected even if we can check the balance
+    it("Should transfer fee after successful escalation execution", async function () {
+      // This test verifies that fee is collected after escalation succeeds (safer order)
       const feeAddressBalanceBefore = await ethers.provider.getBalance(feeAddress.address);
       
       // Escalate

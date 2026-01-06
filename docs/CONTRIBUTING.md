@@ -88,7 +88,7 @@ pnpm test
 
 ### Solidity
 
-- **Solidity Version**: `^0.8.28`
+- **Solidity Version**: `^0.8.33`
 - **Style**: Follow OpenZeppelin style guide
 - **Formatting**: Use Prettier (configured in `.prettierrc`)
 - **Naming**:
@@ -163,7 +163,7 @@ describe("Feature Name", function () {
 
 ```solidity
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.33;
 
 import "forge-std/Test.sol";
 import "../contracts/EscrowableERC20.sol";

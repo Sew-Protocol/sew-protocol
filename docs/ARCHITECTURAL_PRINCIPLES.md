@@ -22,9 +22,9 @@
 - Document which functions belong to which domain
 
 **Escrow Domain Functions**:
-- `createEscrow()` / `escrowTransfer()`
+- `createEscrow()` (primary function; `escrowTransfer()` is deprecated)
 - `releaseEscrowTransfer()`
-- `senderCancel()` / `recipientCancel()`
+- `buyerCancel()` / `sellerCancel()` (renamed from `senderCancel()` / `recipientCancel()`)
 - `_cancelAndRefund()`
 - `_releaseEscrowTransfer()`
 - Attachment management

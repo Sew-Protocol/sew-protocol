@@ -38,9 +38,6 @@ contract PaymentCalculationLibraryV1 is IPaymentCalculationLibrary {
         // Aggregate total fees
         uint256 totalFees = input.escrowFee + input.escalationFees;
         
-        // Calculate total resolver share
-        uint256 resolverShare = (totalFees * input.resolverSharePercentage) / BASIS_POINTS_DENOMINATOR;
-        
         // Calculate total weight
         uint256 totalWeight = calculateTotalWeight(input.resolvers, input.weights);
         require(totalWeight > 0, "Zero total weight");
@@ -50,11 +47,17 @@ contract PaymentCalculationLibraryV1 is IPaymentCalculationLibrary {
         address[] memory addresses = new address[](input.resolvers.length);
         
         // Calculate payment for each resolver
+        // Optimized: Multiply first, then divide to preserve precision
+        // Formula: (totalFees * resolverSharePercentage * weight) / (BASIS_POINTS_DENOMINATOR * totalWeight)
         for (uint256 i = 0; i < input.resolvers.length; i++) {
             uint256 weight = getWeightForLevel(input.resolvers[i].level, input.weights);
-            payments[i] = (resolverShare * weight) / totalWeight;
+            // Multiply all numerators first, then divide by all denominators to maximize precision
+            payments[i] = (totalFees * input.resolverSharePercentage * weight) / (BASIS_POINTS_DENOMINATOR * totalWeight);
             addresses[i] = input.resolvers[i].resolver;
         }
+        
+        // Calculate total resolver share for validation and remainder distribution
+        uint256 resolverShare = (totalFees * input.resolverSharePercentage) / BASIS_POINTS_DENOMINATOR;
         
         // Validate payments sum to resolver share (with rounding tolerance)
         uint256 paymentSum = 0;

@@ -585,10 +585,10 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
      */
     function cancelAsDisputeResolver(uint256 workflowId) public nonReentrant returns (bool) {
         _validateWorkflowId(workflowId);
-        if (!_isAuthorizedDisputeResolver(workflowId, _msgSender())) {
-            revert NotAuthorizedResolver(_msgSender(), escrowTransfers[workflowId].disputeResolver);
-        }
         EscrowTransfer storage et = escrowTransfers[workflowId];
+        if (!_isAuthorizedDisputeResolver(workflowId, _msgSender())) {
+            revert NotAuthorizedResolver(_msgSender(), et.disputeResolver);
+        }
         if(et.escrowState != EscrowState.DISPUTED) {
             revert TransferNotInDispute(workflowId, et.escrowState);
         }
@@ -625,10 +625,10 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
      */
     function releaseAsDisputeResolver(uint256 workflowId) public nonReentrant returns (bool) {
         _validateWorkflowId(workflowId);
-        if (!_isAuthorizedDisputeResolver(workflowId, _msgSender())) {
-            revert NotAuthorizedResolver(_msgSender(), escrowTransfers[workflowId].disputeResolver);
-        }
         EscrowTransfer storage et = escrowTransfers[workflowId];
+        if (!_isAuthorizedDisputeResolver(workflowId, _msgSender())) {
+            revert NotAuthorizedResolver(_msgSender(), et.disputeResolver);
+        }
         if(et.escrowState != EscrowState.DISPUTED) {
             revert TransferNotInDispute(workflowId, et.escrowState);
         }
@@ -677,10 +677,10 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
      */
     function partialReleaseAsDisputeResolver(uint256 workflowId, uint256 amount) public nonReentrant returns (bool) {
         _validateWorkflowId(workflowId);
-        if (!_isAuthorizedDisputeResolver(workflowId, _msgSender())) {
-            revert NotAuthorizedResolver(_msgSender(), escrowTransfers[workflowId].disputeResolver);
-        }
         EscrowTransfer storage et = escrowTransfers[workflowId];
+        if (!_isAuthorizedDisputeResolver(workflowId, _msgSender())) {
+            revert NotAuthorizedResolver(_msgSender(), et.disputeResolver);
+        }
         if(et.escrowState != EscrowState.DISPUTED) {
             revert TransferNotInDispute(workflowId, et.escrowState);
         }
@@ -751,10 +751,10 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
      */
     function partialCancelAsDisputeResolver(uint256 workflowId, uint256 amount) public nonReentrant returns (bool) {
         _validateWorkflowId(workflowId);
-        if (!_isAuthorizedDisputeResolver(workflowId, _msgSender())) {
-            revert NotAuthorizedResolver(_msgSender(), escrowTransfers[workflowId].disputeResolver);
-        }
         EscrowTransfer storage et = escrowTransfers[workflowId];
+        if (!_isAuthorizedDisputeResolver(workflowId, _msgSender())) {
+            revert NotAuthorizedResolver(_msgSender(), et.disputeResolver);
+        }
         if(et.escrowState != EscrowState.DISPUTED) {
             revert TransferNotInDispute(workflowId, et.escrowState);
         }
@@ -853,6 +853,17 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         return disputeResolver == et.disputeResolver;
     }
 
+    /**
+     * @notice Encode escrow transfer data for resolution module calls
+     * @param token Token address
+     * @param from Sender address
+     * @param to Recipient address
+     * @param amount Escrow amount
+     * @param originalAmount Original escrow amount (before any partial releases)
+     * @return Encoded bytes data for resolution module
+     * @dev Uses EscrowEncodingLibrary to encode data in a standardized format
+     *      This encoded data is passed to resolution modules for dispute resolver selection
+     */
     function _encodeResolutionData(
         address token,
         address from,
@@ -864,8 +875,19 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
     }
 
     /**
-     * @dev Determine the dispute resolver for a new escrow, pinning the dispute resolver at creation time.
-     *      This ensures that future governance upgrades only affect NEW escrows.
+     * @notice Determine the dispute resolver for a new escrow, pinning the resolver at creation time
+     * @param workflowId The escrow transfer ID
+     * @param token Token address
+     * @param from Sender address
+     * @param to Recipient address
+     * @param amount Escrow amount
+     * @param originalAmount Original escrow amount
+     * @return disputeResolver Address of the dispute resolver assigned to this escrow
+     * @dev This function is called during escrow creation to assign a dispute resolver.
+     *      The resolver is then stored in EscrowTransfer.disputeResolver and cannot be changed.
+     *      This ensures that future governance upgrades (module swaps) only affect NEW escrows.
+     *      Calls the resolution module's getDisputeResolver() function with encoded escrow data.
+     *      Reverts if resolution module is not configured or returns zero address.
      */
     function _getDisputeResolverForNewEscrow(
         uint256 workflowId,
@@ -939,12 +961,18 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
     // _initializeDisputeInModule removed - logic moved to DisputeInitializationLibrary
     
     /**
-     * @notice Record resolution outcome in resolution module (for reversal tracking)
+     * @notice Record resolution outcome in resolution module (for reversal tracking and quality metrics)
      * @param workflowId The escrow transfer ID
-     * @param disputeResolver Dispute resolver address
-     * @param isRelease True if RELEASE, false if CANCEL
-     * @dev Optimized for contract size: minimal bytecode footprint
-     *      Calls recordResolution on DecentralizedResolutionModule if available
+     * @param disputeResolver Dispute resolver address that made the resolution
+     * @param isRelease True if RELEASE (funds to recipient), false if CANCEL (refund to sender)
+     * @dev Optimized for contract size: minimal bytecode footprint.
+     *      Calls recordResolution on DecentralizedResolutionModule if available.
+     *      This allows the resolution module to track:
+     *      - Resolution outcomes for quality metrics
+     *      - Resolution reversals (when escalations overturn decisions)
+     *      - Dispute resolver performance statistics
+     *      Uses low-level call to avoid increasing contract size with interface dependencies.
+     *      Failures are silently ignored (non-critical operation).
      */
     function _recordResolutionOutcome(
         uint256 workflowId,
@@ -1278,11 +1306,12 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
     }
 
     /**
-     * @dev Internal function to release an escrow transfer
+     * @notice Internal function to release an escrow transfer to recipient
      * @param workflowId The escrow transfer ID
-     * @dev Releases the escrow, changes state to RELEASED, and transfers funds to recipient.
-     *      If escrow was generating yield via Aave, withdraws from Aave and distributes yield.
-     *      Must be implemented by derived contracts to handle token transfers.
+     * @dev Releases the escrow and transfers remaining balance to recipient.
+     *      Handles yield withdrawal and distribution if escrow was generating yield.
+     *      Updates escrow state to RELEASED and emits release events.
+     *      This is called by both user-initiated releases and dispute resolver releases.
      * 
      * @dev Execution Flow:
      *      1. Read escrow data (token, amounts, participants) before state changes
@@ -1291,20 +1320,9 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
      *      4. Transfer remaining balance (original + yield - fees) to recipient
      *      5. Update state to RELEASED and clear remaining balance
      * 
-     * @dev Important: Amount is read BEFORE state transition to ensure correct value
-     *      StateManagementLibrary.transitionToReleased() sets remainingBalance to 0
-     *      Yield is handled separately and distributed according to module configuration
-     * 
-     * @dev Execution Flow:
-     *      1. Read escrow data (token, amounts, participants) before state changes
-     *      2. Withdraw yield from generation module (if enabled) - calculates actual amount including yield
-     *      3. Distribute yield via distribution module (if configured)
-     *      4. Transfer remaining balance (original + yield - fees) to recipient
-     *      5. Update state to RELEASED and clear remaining balance
-     * 
-     * @dev Important: Amount is read BEFORE state transition to ensure correct value
-     *      StateManagementLibrary.transitionToReleased() sets remainingBalance to 0
-     *      Yield is handled separately and distributed according to module configuration
+     * @dev Important: Amount is read BEFORE state transition to ensure correct value.
+     *      StateManagementLibrary.transitionToReleased() sets remainingBalance to 0.
+     *      Yield is handled separately and distributed according to module configuration.
      */
     function _releaseEscrowTransfer(uint256 workflowId) internal {
         EscrowTransfer storage et = escrowTransfers[workflowId];

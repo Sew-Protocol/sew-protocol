@@ -249,13 +249,13 @@ Guardian **cannot**:
 **Scope:** Can upgrade `DecentralizedResolutionModule` and `ResolverIncentiveModule` (UUPS upgradeable modules).
 
 **Upgrade Delay System (Staged):**
-- **First 3 upgrades**: Instant (no delay) - Bootstrap phase
+- **Instant upgrades**: Disabled (all upgrades require queue/activate pattern)
 - **Launch phase** (0-30 days since deployment): 1 hour delay
 - **Early phase** (30-90 days since deployment): 24 hours delay  
 - **Mature phase** (90+ days since deployment): 7 days delay (same as slow lane)
 
 **Mechanism:**
-- After first 3 upgrades, uses queue/activate pattern with time-based delays
+- All upgrades use queue/activate pattern with time-based delays
 - `queueUpgrade()` - Queue upgrade with calculated delay
 - `activateUpgrade()` - Activate after delay has passed
 - `getUpgradeDelay()` - View function to check current delay
@@ -267,7 +267,7 @@ Guardian **cannot**:
 - Cannot upgrade non-upgradeable contracts
 - ROLE_TIMELOCK can always upgrade instantly (they use slow lane governance)
 
-**Rationale:** Allows rapid iteration during early phases while transitioning to slower, more conservative upgrades as the system matures. This balances agility during launch with safety as the system stabilizes.
+**Rationale:** All upgrades require time delays from deployment to ensure safety and allow for review. This provides conservative upgrade controls while maintaining the ability to iterate on module implementations.
 
 ---
 

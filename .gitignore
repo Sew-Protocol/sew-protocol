@@ -8,6 +8,7 @@ typechain-types
 deploy-ledger
 coverage
 .DS_Store
+.env
 .envq
 lib
 

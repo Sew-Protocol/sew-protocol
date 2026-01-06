@@ -37,7 +37,7 @@
 **Purpose**: ERC20 token with built-in escrow functionality  
 **Key Features**:
 - Standard ERC20 token
-- Built-in `escrowTransfer()` function
+- Built-in `createEscrow()` function (primary function name)
 - Automatic fee deduction
 - Single-token escrow (token is both payment and escrow medium)
 - Factory pattern for deployment
@@ -333,5 +333,6 @@
 ---
 
 *This summary provides a high-level overview. For detailed implementation, see individual contract files and documentation.*
+
 
 

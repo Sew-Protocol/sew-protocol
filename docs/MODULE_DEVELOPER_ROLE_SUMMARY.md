@@ -8,7 +8,7 @@
 
 ## What Is It?
 
-A new governance role (`ROLE_MODULE_DEVELOPER`) that allows **instant upgrades** of `DecentralizedResolutionModule` (via UUPS proxy) while maintaining security through:
+A new governance role (`ROLE_MODULE_DEVELOPER`) that allows **staged-delay upgrades** of `DecentralizedResolutionModule` (via UUPS proxy) while maintaining security through:
 
 - ✅ DAO-controlled role issuance/revocation
 - ✅ Event emission on every upgrade
@@ -19,10 +19,11 @@ A new governance role (`ROLE_MODULE_DEVELOPER`) that allows **instant upgrades**
 
 ## Key Features
 
-### Instant Upgrades
-- No slow-lane delay (unlike Timelock-controlled upgrades)
+### Staged-Delay Upgrades
+- Time-based delays (1h/24h/7d based on time since deployment)
+- All upgrades require queue/activate pattern (instant upgrades disabled)
 - Suitable for bug fixes, security patches, improvements
-- Maintains security through role management
+- Maintains security through role management and time delays
 
 ### Security Safeguards
 - Role controlled by DAO (`ROLE_TIMELOCK` can grant/revoke)
@@ -182,5 +183,6 @@ event ModuleUpgraded(
 ---
 
 *For complete details, see `MODULE_DEVELOPER_ROLE_DESIGN.md`*
+
 
 
