@@ -11,6 +11,33 @@ This document defines the governance model, upgrade policy, and emergency contro
 
 ---
 
+## Design Principles
+
+### No Proxies for Core Contracts
+**Decision:** Core escrow contracts (BaseEscrow, EscrowVault, EscrowableERC20) are **not upgradeable via proxies**.
+
+**Rationale:**
+- Modular architecture with swappable modules provides flexibility without proxies
+- "New escrows only" semantics allow safe module upgrades
+- Easier to explain and audit: upgrades are "swap module address" (timelocked) rather than "replace arbitrary logic"
+- Reduces "soft-rug" optics around token launches
+- Module swaps are timelocked and publicly observable
+
+**Exception:** Upgradeable modules (`DecentralizedResolutionModule`, `ResolverIncentiveModule`) use UUPS proxies for rapid iteration during early phases, with staged delays transitioning to conservative upgrades.
+
+### Timelock Canceller: Governor-Only
+**Decision:** `CANCELLER_ROLE` on TimelockController is **Governor-only** (Guardian does not have cancellation rights).
+
+**Rationale:**
+- Guardian already has strong emergency tools (pause, disable Aave, lower caps)
+- Cancellation is power over governance intent, not just risk reduction
+- Prevents perception that "guardian can override governance"
+- Clean launch stance: Governor-only cancellation
+
+**Future Consideration:** If guardian cancellation is needed later, it should be constrained (e.g., only for allowlisted selectors, or require 2-of-2 guardian + governor approval).
+
+---
+
 ## Canonical Reference
 
 **The authoritative list of governed functions, lanes, and delays is [`GOVERNANCE_SURFACE_MAP.md`](./GOVERNANCE_SURFACE_MAP.md).**
@@ -216,6 +243,32 @@ Guardian **cannot**:
 - Can withdraw accrued protocol fees only.
 - Has no governance authority.
 
+### Module Developer (ROLE_MODULE_DEVELOPER)
+**Purpose:** Rapid iteration and bug fixes for upgradeable modules during early phases.
+
+**Scope:** Can upgrade `DecentralizedResolutionModule` and `ResolverIncentiveModule` (UUPS upgradeable modules).
+
+**Upgrade Delay System (Staged):**
+- **First 3 upgrades**: Instant (no delay) - Bootstrap phase
+- **Launch phase** (0-30 days since deployment): 1 hour delay
+- **Early phase** (30-90 days since deployment): 24 hours delay  
+- **Mature phase** (90+ days since deployment): 7 days delay (same as slow lane)
+
+**Mechanism:**
+- After first 3 upgrades, uses queue/activate pattern with time-based delays
+- `queueUpgrade()` - Queue upgrade with calculated delay
+- `activateUpgrade()` - Activate after delay has passed
+- `getUpgradeDelay()` - View function to check current delay
+- `getCurrentPhase()` - View function to check current phase
+
+**Restrictions:**
+- Cannot swap modules in BaseEscrow (only Timelock can do this)
+- Cannot bypass governance for other changes
+- Cannot upgrade non-upgradeable contracts
+- ROLE_TIMELOCK can always upgrade instantly (they use slow lane governance)
+
+**Rationale:** Allows rapid iteration during early phases while transitioning to slower, more conservative upgrades as the system matures. This balances agility during launch with safety as the system stabilizes.
+
 ---
 
 ## Governance Lanes
@@ -264,10 +317,16 @@ Both `queueX()` and `activateX()` are timelock-only, meaning governance must:
 
 ## TimelockController Roles (Hardened Posture)
 
-- `PROPOSER_ROLE` → Governor
-- `EXECUTOR_ROLE` → `address(0)` (anyone can execute after delay)
-- `CANCELLER_ROLE` → Governor only
-- `TIMELOCK_ADMIN_ROLE` → TimelockController itself (self-admin)
+- `PROPOSER_ROLE` → Governor (only Governor can propose)
+- `EXECUTOR_ROLE` → `address(0)` (open execution - anyone can execute after delay)
+- `CANCELLER_ROLE` → Governor only (Guardian does not have cancellation rights)
+- `TIMELOCK_ADMIN_ROLE` → TimelockController itself (self-admin, no external admin)
+
+**Rationale for Open Execution:**
+- Open execution (`address(0)`) allows anyone to execute proposals after the delay period
+- This prevents governance deadlock if the executor becomes unavailable
+- The delay period provides sufficient safety (48 hours for Standard lane, ~9 days for Slow lane)
+- Governor retains proposal and cancellation rights, maintaining control over what gets executed
 
 ---
 
@@ -306,8 +365,9 @@ Slow-lane queue/activate MUST be used for:
   - yield generation module
   - yield distribution module
 - Aave pool provider changes
-- DAO address changes (if applicable)
 - decentralized escalation configuration changes
+
+**Note**: DAO address is immutable after deployment (set in constructor only). The `queueDao()` and `activateDao()` functions were removed to ensure DAO address cannot be changed.
 
 Each slow-lane surface emits:
 - `XQueued(oldValue, newValue, eta)`
@@ -446,4 +506,17 @@ Policy changes affect new escrows only.
 ---
 
 ## Change Log
-- Maintain a changelog of governance policy changes and parameter updates.
+
+### 2025-01-27
+- Added Design Principles section (no proxies for core, Governor-only cancellation)
+- Added Module Developer role documentation with staged delay system
+- Enhanced TimelockController roles documentation with rationale
+- Removed DAO address change references (DAO address is immutable)
+- Merged content from gov-details.md
+
+### Previous Updates
+- Module snapshotting implemented at escrow creation
+- Per-escrow override functions removed
+- Slow lane queue/activate pattern implemented
+- Guardian emergency controls implemented
+- Bounds enforcement added to all Standard lane parameters

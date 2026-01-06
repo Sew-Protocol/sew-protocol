@@ -527,7 +527,7 @@ function guardianLowerTokenCap(address token, uint256 newCap)
 
 ## Appendix: Implementation Status Update
 
-**Last Updated**: 2026-01-02
+**Last Updated**: 2025-01-27
 
 ### Summary
 Phases 1-7 are complete. Phase 8 core tooling is complete. See details below.
@@ -578,6 +578,11 @@ Module snapshotting implemented at escrow creation. BaseEscrow resolver gate rem
 5. New escrows only enforcement working
 6. Per-escrow overrides removed
 7. Core governance tooling ready for use
+
+### Recent Updates (2025-01-27)
+- ✅ Module Developer role implemented with staged delay system
+- ✅ DAO address made immutable (queueDao/activateDao removed)
+- ✅ Governance documentation updated and consolidated
 
 ### Next Steps
 1. Optional: Complete Phase 8 documentation
