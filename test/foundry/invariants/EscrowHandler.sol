@@ -2,12 +2,12 @@
 pragma solidity 0.8.33;
 
 import "forge-std/Test.sol";
-import "../../../contracts/EscrowVault.sol";
-import "../../../contracts/EscrowableERC20.sol";
+import "../../../contracts/core/EscrowVault.sol";
+import "../../../contracts/core/EscrowableERC20.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
 
 // Note: ERC20Mock constructor signature may differ - adjust if needed
-import "../../../contracts/modules/DefaultResolutionModule.sol";
+import "../../../contracts/core/modules/DefaultResolutionModule.sol";
 import "../../../contracts/modules/DefaultReleaseStrategy.sol";
 import "../../../contracts/modules/DefaultYieldModule.sol";
 import "../../../contracts/modules/DefaultYieldDistributionModule.sol";

@@ -61,9 +61,9 @@ The protocol consists of:
 
 2. **Resolution Modules** (modular, swappable):
    - `DefaultResolutionModule`: Simple resolver-based resolution
-   - `DecentralizedResolutionModule`: Multi-level escalation with senior resolvers (designed for UUPS upgradeability when swapped in)
+   - `DecentralizedResolutionModule`: Multi-level escalation with senior resolvers (in separate package, can be swapped in via governance once proven)
 
-3. **Resolver Incentive Module**:
+3. **Resolver Incentive Module** (in separate package with DecentralizedResolutionModule):
    - `ResolverIncentiveModule`: Tracks resolver activity and distributes fees
    - Payment calculation libraries: `PaymentCalculationLibraryV1` (swappable)
 
@@ -95,8 +95,8 @@ The protocol consists of:
 - Protocol evolution is achieved via **governed module swaps** that apply to **new escrows only**.
 
 **Upgradeable components (future swap-in):**
-- `DecentralizedResolutionModule` is designed to be **UUPS upgradeable**, and is intended to be swapped in later via governance.
-- If/when deployed behind a proxy, upgrades must be executed via governance lanes and rehearsed on Base Sepolia + fork prior to mainnet execution.
+- `DecentralizedResolutionModule` (in separate package) is **UUPS upgradeable** and can be swapped in via slow-lane governance once proven.
+- If/when deployed and swapped in, upgrades must be executed via standard governance lanes (ROLE_TIMELOCK) and rehearsed on Base Sepolia + fork prior to mainnet execution.
 
 **Non-upgradeable components (initial deployment):**
 - `BaseEscrow`, `EscrowVault`, `EscrowableERC20` are deployed **immutably** (no proxies).

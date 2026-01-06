@@ -204,7 +204,7 @@ This assessment evaluates the repository against the Mainnet-Ready Contracts Rep
 - **Status:** ✅ **COMPLETE**
 - **Evidence:**
   - Core flows: `test/hardhat/BaseEscrow.test.ts`, `test/hardhat/EscrowableERC20.ts` ✅
-  - Dispute flows: `test/hardhat/DecentralizedResolutionModule.test.ts` ✅
+  - Dispute flows: `test/hardhat/decentralized-resolution-module/DecentralizedResolutionModule.test.ts` ✅ (in separate package)
   - Edge cases: `test/hardhat/ErrorHandling.ts`, `test/hardhat/EscalationFee.test.ts` ✅
   - Pause states: `test/hardhat/governance/04_GuardianControls.test.ts` ✅
   - Mainnet release sequence: `test/hardhat/MainnetReleaseSequence.test.ts` ✅

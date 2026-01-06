@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.33;
 
-import "./BaseEscrow.sol";
+import "./core/BaseEscrow.sol";
 
 /**
  * @title EscrowOps

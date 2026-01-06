@@ -576,7 +576,7 @@ function executeUpgrade() external onlyDAO {
 
 **Additional Features Implemented**:
 - ✅ Slow lane governance (7-day delay) for critical changes
-- ✅ Module developer role (ROLE_MODULE_DEVELOPER) for instant upgrades
+- ✅ Module developer role removed (all upgrades via ROLE_TIMELOCK for consistency)
 - ✅ UUPS upgradeable pattern
 - ✅ Upgrade authorization and events
 - ✅ Escalation config changes via slow lane
@@ -868,7 +868,7 @@ function escalateToKleros(uint256 workflowId, bytes calldata evidence)
 - [x] Upgrade mechanism implemented (UUPS)
 - [x] Tests written
 - [x] Documentation updated
-- [x] Module developer role for instant upgrades
+- [x] Module developer role removed (extracted to separate package, all upgrades via ROLE_TIMELOCK)
 - [x] Upgrade authorization and events
 
 ### Phase 6: Kleros Integration ⚠️ PARTIALLY COMPLETE

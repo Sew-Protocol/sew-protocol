@@ -23,7 +23,7 @@ This document defines the governance model, upgrade policy, and emergency contro
 - Reduces "soft-rug" optics around token launches
 - Module swaps are timelocked and publicly observable
 
-**Exception:** Upgradeable modules (`DecentralizedResolutionModule`, `ResolverIncentiveModule`) use UUPS proxies for rapid iteration during early phases, with staged delays transitioning to conservative upgrades.
+**Note:** `DecentralizedResolutionModule` and `ResolverIncentiveModule` are in a separate package and can be swapped in via governance once proven. If/when swapped in, they use UUPS proxies with all upgrades requiring `ROLE_TIMELOCK` via standard governance lanes.
 
 ### Timelock Canceller: Governor-Only
 **Decision:** `CANCELLER_ROLE` on TimelockController is **Governor-only** (Guardian does not have cancellation rights).
@@ -243,33 +243,6 @@ Guardian **cannot**:
 - Can withdraw accrued protocol fees only.
 - Has no governance authority.
 
-### Module Developer (ROLE_MODULE_DEVELOPER)
-**Purpose:** Rapid iteration and bug fixes for upgradeable modules during early phases.
-
-**Scope:** Can upgrade `DecentralizedResolutionModule` and `ResolverIncentiveModule` (UUPS upgradeable modules).
-
-**Upgrade Delay System (Staged):**
-- **Instant upgrades**: Disabled (all upgrades require queue/activate pattern)
-- **Launch phase** (0-30 days since deployment): 1 hour delay
-- **Early phase** (30-90 days since deployment): 24 hours delay  
-- **Mature phase** (90+ days since deployment): 7 days delay (same as slow lane)
-
-**Mechanism:**
-- All upgrades use queue/activate pattern with time-based delays
-- `queueUpgrade()` - Queue upgrade with calculated delay
-- `activateUpgrade()` - Activate after delay has passed
-- `getUpgradeDelay()` - View function to check current delay
-- `getCurrentPhase()` - View function to check current phase
-
-**Restrictions:**
-- Cannot swap modules in BaseEscrow (only Timelock can do this)
-- Cannot bypass governance for other changes
-- Cannot upgrade non-upgradeable contracts
-- ROLE_TIMELOCK can always upgrade instantly (they use slow lane governance)
-
-**Rationale:** All upgrades require time delays from deployment to ensure safety and allow for review. This provides conservative upgrade controls while maintaining the ability to iterate on module implementations.
-
----
 
 ## Governance Lanes
 
@@ -509,7 +482,7 @@ Policy changes affect new escrows only.
 
 ### 2025-01-27
 - Added Design Principles section (no proxies for core, Governor-only cancellation)
-- Added Module Developer role documentation with staged delay system
+- Removed Module Developer role (DecentralizedResolutionModule extracted to separate package, all upgrades via ROLE_TIMELOCK)
 - Enhanced TimelockController roles documentation with rationale
 - Removed DAO address change references (DAO address is immutable)
 - Merged content from gov-details.md

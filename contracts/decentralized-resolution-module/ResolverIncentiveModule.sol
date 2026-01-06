@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.33;
 
-import "../interfaces/IPaymentCalculationLibrary.sol";
+import "./IPaymentCalculationLibrary.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
-import "../governance/SlowLaneQueueActivateUpgradeable.sol";
+import "../shared/governance/SlowLaneQueueActivateUpgradeable.sol";
 
 /**
  * @title ResolverIncentiveModule
@@ -30,7 +30,6 @@ contract ResolverIncentiveModule is
     
     // ============ Role Constants ============
     bytes32 public constant ROLE_TIMELOCK = keccak256("ROLE_TIMELOCK");
-    bytes32 public constant ROLE_MODULE_DEVELOPER = keccak256("ROLE_MODULE_DEVELOPER");
     
     // ============ State Variables ============
     
@@ -182,15 +181,14 @@ contract ResolverIncentiveModule is
     /**
      * @notice Authorize upgrade (UUPS pattern)
      * @param newImplementation Address of new implementation
-     * @dev Allows ROLE_TIMELOCK or ROLE_MODULE_DEVELOPER to upgrade
+     * @dev Only ROLE_TIMELOCK can upgrade (via standard governance lanes)
      */
     function _authorizeUpgrade(address newImplementation)
         internal
         override
     {
         require(
-            hasRole(ROLE_TIMELOCK, _msgSender()) || 
-            hasRole(ROLE_MODULE_DEVELOPER, _msgSender()),
+            hasRole(ROLE_TIMELOCK, _msgSender()),
             "Not authorized to upgrade"
         );
         
@@ -410,35 +408,6 @@ contract ResolverIncentiveModule is
     
     // ============ Governance Functions ============
     
-    /**
-     * @notice Swap payment calculation library instantly (module developer only)
-     * @param newLibrary Address of new library contract
-     * @dev Allows module developer to swap libraries instantly without slow-lane delay
-     *      Requires disclosure and event emission for transparency
-     */
-    function swapPaymentLibraryInstant(address newLibrary)
-        external
-        onlyRole(ROLE_MODULE_DEVELOPER)
-        nonReentrant
-    {
-        require(newLibrary != address(0), "Zero address");
-        require(validateLibrary(newLibrary), "Invalid library");
-        
-        address oldLibrary = currentPaymentLibrary;
-        currentPaymentLibrary = newLibrary;
-        
-        // Clear any pending library (instant swap takes precedence)
-        _pendingPaymentLibrary.value = address(0);
-        _pendingPaymentLibrary.eta = 0;
-        _pendingPaymentLibrary.exists = false;
-        
-        emit PaymentLibrarySwappedInstant(
-            oldLibrary,
-            newLibrary,
-            _msgSender(),
-            block.timestamp
-        );
-    }
     
     /**
      * @notice Queue new payment calculation library (slow-lane, governance-controlled)

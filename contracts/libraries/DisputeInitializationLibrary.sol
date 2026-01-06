@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.33;
 
-import "../interfaces/IResolutionModule.sol";
+import "../shared/interfaces/IResolutionModule.sol";
 import "../interfaces/IResolver.sol";
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 

@@ -62,6 +62,7 @@
 
 ### DecentralizedResolutionModule.sol
 **Purpose**: Advanced decentralized resolution with multiple resolvers and escalation  
+**Status**: In separate package (`contracts/decentralized-resolution-module/`), can be swapped into protocol via slow-lane governance once proven through testing  
 **Key Features**:
 - Resolver registry (standard and senior resolvers)
 - Round-robin resolver selection (fair distribution)
@@ -70,6 +71,8 @@
 - Integration with ResolverIncentiveModule
 
 **Use Case**: Complex disputes requiring multiple resolvers, escalation paths, and fair workload distribution
+
+**Note**: This module is developed and tested in isolation before mainnet integration. All upgrades require `ROLE_TIMELOCK` (standard governance lanes).
 
 ---
 

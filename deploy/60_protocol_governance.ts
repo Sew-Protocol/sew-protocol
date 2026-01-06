@@ -35,7 +35,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     'EscrowVault',
     'AaveYieldGenerationModule',
     'DefaultResolutionModule',
-    'DecentralizedResolutionModule',
+    // DecentralizedResolutionModule is in separate package
     // Add other AccessControl contracts as they are deployed
   ];
 

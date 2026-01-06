@@ -766,20 +766,17 @@ proxy.upgradeTo(address(impl2)); // All escrows see upgrade
 
 ---
 
-## Module Developer Role for Instant Upgrades
+## Module Developer Role (REMOVED)
 
-### New Governance Model
+**Status:** The module developer role has been removed for governance consistency. DecentralizedResolutionModule is now in a separate package (`contracts/decentralized-resolution-module/`), and all upgrades require `ROLE_TIMELOCK` via standard governance lanes.
 
-To provide flexibility for rapid iteration, a new role **"module developer - mainnet ops"** (`ROLE_MODULE_DEVELOPER`) is introduced. This role allows **instant upgrades** of DecentralizedResolutionModule (via UUPS proxy) while maintaining security through event emission and disclosure requirements.
+**Rationale:**
+- Aligns with "test in isolation first" strategy
+- Module should be proven before mainnet swap
+- Consistent governance model (Standard/Slow/Emergency lanes only)
+- Reduced security surface
 
-**Key Design**:
-- ✅ Role issued by DAO (`ROLE_TIMELOCK` can grant/revoke)
-- ✅ Instant upgrades (no slow-lane delay)
-- ✅ Events emitted on every upgrade
-- ✅ Well-defined disclosure process
-- ✅ Maintains security through role management
-
-**See**: `MODULE_DEVELOPER_ROLE_DESIGN.md` for complete design.
+**See**: `archived/MODULE_DEVELOPER_ROLE_DESIGN.md` for historical design.
 
 ---
 

@@ -63,13 +63,13 @@ A decentralized escrow protocol built on Base (Ethereum L2) that enables secure,
 
 **Resolution Modules**:
 - `DefaultResolutionModule` - Simple single-resolver system
-- `DecentralizedResolutionModule` - Advanced multi-resolver with round-robin selection, 3-level escalation (standard → senior → external)
+- `DecentralizedResolutionModule` - Advanced multi-resolver with round-robin selection, 3-level escalation (standard → senior → external). In separate package (`contracts/decentralized-resolution-module/`), can be swapped in via governance once proven.
 
 **Yield Modules**:
 - `AaveYieldGenerationModule` - Generates yield on escrowed funds via Aave
 - `DefaultYieldDistributionModule` - Configurable yield distribution to recipients
 
-**Incentive System**:
+**Incentive System** (in separate package with DecentralizedResolutionModule):
 - `ResolverIncentiveModule` - Tracks and distributes payments to resolvers
 - `PaymentCalculationLibraryV1` - Weighted payment calculation (pluggable, upgradeable)
 

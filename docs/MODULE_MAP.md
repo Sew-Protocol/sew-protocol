@@ -38,8 +38,8 @@ Each module type has an interface, and multiple implementations can exist. The p
 
 | Implementation | Contract | Status | Change Mechanism |
 |----------------|----------|--------|------------------|
-| DefaultResolutionModule | `contracts/modules/DefaultResolutionModule.sol` | ✅ Active | Slow lane (queue/activate) |
-| DecentralizedResolutionModule | `contracts/modules/DecentralizedResolutionModule.sol` | ✅ Active | Slow lane (queue/activate) |
+| DefaultResolutionModule | `contracts/core/modules/DefaultResolutionModule.sol` | ✅ Active | Slow lane (queue/activate) |
+| DecentralizedResolutionModule | `contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol` | 🔄 Separate Package | Can be swapped in via slow-lane governance once proven |
 
 **Interface Methods**:
 - `isAuthorizedResolver(uint256 workflowId, address resolver, bytes calldata escrowData) → (bool, uint8)`
@@ -55,8 +55,7 @@ Each module type has an interface, and multiple implementations can exist. The p
 
 **Module-Specific Configuration**:
 - `DefaultResolutionModule.setResolver(address)` - Standard lane (48h)
-- `DecentralizedResolutionModule.addSeniorResolver(address)` - Standard lane (48h)
-- `DecentralizedResolutionModule.queueEscalationConfig(uint8, EscalationConfig)` / `activateEscalationConfig(uint8)` - Slow lane
+- `DecentralizedResolutionModule` (when swapped in): All configuration functions require `ROLE_TIMELOCK` via standard governance lanes
 
 ---
 

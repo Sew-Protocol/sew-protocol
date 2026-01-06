@@ -53,8 +53,9 @@ This document outlines the deployment plan for production contracts to mainnet, 
 4. **DefaultYieldDistributionModule**
    - Constructor: `(address initialOwner)`
 
-5. **DecentralizedResolutionModule** (optional, for advanced dispute resolution)
+5. **DecentralizedResolutionModule** (in separate package, optional for advanced dispute resolution)
    - Constructor: `(address initialOwner)`
+   - Note: Can be swapped in via slow-lane governance once proven through testing
 
 ## Deployment Plan
 

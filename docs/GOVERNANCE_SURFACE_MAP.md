@@ -120,25 +120,7 @@ Complete mapping of all governance functions to roles, lanes, and delays.
 | `registerEscrowContract(address)` | `ROLE_TIMELOCK` | Standard | 48h | Non-zero address | Register escrow contract |
 | `unregisterEscrowContract(address)` | `ROLE_TIMELOCK` | Standard | 48h | - | Unregister escrow contract |
 
-### DecentralizedResolutionModule.sol
-
-| Function | Role | Lane | Delay | Bounds | Notes |
-|----------|------|------|-------|--------|-------|
-| `initialize(address)` | Initializer | N/A | 0h | Non-zero address | Initialize upgradeable contract (one-time) |
-| `upgradeTo(address)` | `ROLE_TIMELOCK` OR `ROLE_MODULE_DEVELOPER` | Module Upgrade | Staged delays | Valid implementation | Upgrade module implementation (UUPS). ROLE_TIMELOCK: instant. ROLE_MODULE_DEVELOPER: 1h/24h/7d based on time since deployment (instant upgrades disabled) |
-| `upgradeToAndCall(address,bytes)` | `ROLE_TIMELOCK` OR `ROLE_MODULE_DEVELOPER` | Module Upgrade | Staged delays | Valid implementation | Upgrade and call (UUPS). ROLE_TIMELOCK: instant. ROLE_MODULE_DEVELOPER: 1h/24h/7d based on time since deployment (instant upgrades disabled) |
-| `queueUpgrade(address)` | `ROLE_MODULE_DEVELOPER` | Module Upgrade | 48h queue | Valid implementation | Queue upgrade (all upgrades require queuing) |
-| `activateUpgrade()` | `ROLE_MODULE_DEVELOPER` | Module Upgrade | Staged delay | - | Activate queued upgrade after delay |
-| `getUpgradeDelay()` | View | N/A | N/A | - | Get current upgrade delay based on phase |
-| `getCurrentPhase()` | View | N/A | N/A | - | Get current phase name (LAUNCH/EARLY/MATURE - INSTANT phase disabled) |
-| `getPendingUpgrade()` | View | N/A | N/A | - | Get pending upgrade information |
-| `setUpgradeDelayConfig(...)` | `ROLE_TIMELOCK` | Standard | 48h | Valid config | Configure upgrade delay parameters (governance override) |
-| `addSeniorResolver(address)` | `ROLE_TIMELOCK` | Standard | 48h | Non-zero address | Add senior resolver (affects new disputes only, active disputes use stored resolver) |
-| `removeSeniorResolver(address)` | `ROLE_TIMELOCK` | Standard | 48h | - | Remove senior resolver (affects new disputes only, active disputes use stored resolver) |
-| `setResolutionTableEntry(...)` | `ROLE_TIMELOCK` | Standard | 48h | - | Set resolution table entry |
-| `setExternalResolver(address)` | `ROLE_TIMELOCK` | Standard | 48h | Non-zero address | Set external resolver |
-| `queueEscalationConfig(uint8, EscalationConfig)` | `ROLE_TIMELOCK` | Slow | 48h queue | Valid level | Queue escalation config |
-| `activateEscalationConfig(uint8)` | `ROLE_TIMELOCK` | Slow | 7d + 48h | - | Activate queued config |
+**Note:** `DecentralizedResolutionModule` is in a separate package (`contracts/decentralized-resolution-module/`) and can be swapped into the protocol via slow-lane governance once proven through testing. All upgrades of the module require `ROLE_TIMELOCK` (standard governance lanes).
 
 ---
 
@@ -177,17 +159,6 @@ The following functions were **removed from the ABI** in Phase 5 to eliminate pe
 - **Scope**: High-impact changes (module swaps, fee recipient, governance infrastructure)
 - **Mechanism**: Two-step queue/activate pattern enforced onchain
 
-### Module Upgrade Lane (Staged Delays)
-- **Delay**: Staged based on time since deployment
-  - Instant upgrades: Disabled (all upgrades require delays)
-  - Launch phase (0-30 days): 1 hour
-  - Early phase (30-90 days): 24 hours
-  - Mature phase (90+ days): 7 days (same as slow lane)
-- **Executor**: TimelockController (instant) OR Module Developer (staged delays)
-- **Scope**: Upgrade DecentralizedResolutionModule and ResolverIncentiveModule implementations
-- **Mechanism**: UUPS proxy upgrade pattern with queue/activate (all upgrades require queuing)
-- **Restrictions**: Cannot swap modules in BaseEscrow, cannot bypass governance
-- **Rationale**: All upgrades require time delays from deployment to ensure safety and allow for review
 
 ---
 

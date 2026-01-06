@@ -580,7 +580,7 @@ Module snapshotting implemented at escrow creation. BaseEscrow resolver gate rem
 7. Core governance tooling ready for use
 
 ### Recent Updates (2025-01-27)
-- ✅ Module Developer role implemented with staged delay system
+- ✅ Module Developer role removed (all upgrades now via ROLE_TIMELOCK for consistency)
 - ✅ DAO address made immutable (queueDao/activateDao removed)
 - ✅ Governance documentation updated and consolidated
 

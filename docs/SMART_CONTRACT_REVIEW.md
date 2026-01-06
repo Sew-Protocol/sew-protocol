@@ -75,11 +75,10 @@
 - Uses OpenZeppelin `AccessControl`
 - Role-based permissions (ROLE_TIMELOCK, ROLE_GUARDIAN)
 - Slow lane governance (7-day delay) for critical changes
-- Module developer role for instant upgrades (DecentralizedResolutionModule)
+- ~~Module developer role~~ **REMOVED** - DecentralizedResolutionModule extracted to separate package, all upgrades via ROLE_TIMELOCK
 
 **⚠️ Concerns:**
 - `dao` address is optional and can be set by ROLE_TIMELOCK
-- Module developer role can upgrade DecentralizedResolutionModule instantly (by design, but high privilege)
 
 ### 2.2 Reentrancy Protection
 
@@ -413,10 +412,9 @@ require(success, "Yield distribution failed");
    - If module is compromised, yield could be lost
    - **Mitigation:** Use trusted modules, add recovery mechanism
 
-2. **Module Developer Role**
-   - Can upgrade DecentralizedResolutionModule instantly
-   - High privilege, but by design
-   - **Mitigation:** Ensure role is granted carefully, monitor upgrades
+2. **Module Developer Role (REMOVED)**
+   - ~~Can upgrade DecentralizedResolutionModule instantly~~
+   - **Status:** Role removed. DecentralizedResolutionModule is in separate package, all upgrades require ROLE_TIMELOCK via standard governance lanes.
 
 3. **Dispute Safety Mechanism**
    - Anyone can call `autoCancelDisputedEscrow` after timeout
@@ -570,7 +568,7 @@ require(success, "Yield distribution failed");
 - [x] Role-based access control implemented
 - [x] Slow lane governance for critical changes
 - [x] Guardian role for emergency pauses
-- [x] Module developer role scoped appropriately
+- [x] Module developer role removed (all upgrades via ROLE_TIMELOCK for consistency)
 
 ### Reentrancy Protection ✅
 - [x] `nonReentrant` on all state-changing functions

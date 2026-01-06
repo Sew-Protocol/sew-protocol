@@ -1,2 +1,5 @@
 forge-std/=lib/forge-std/src/
 @openzeppelin/=node_modules/@openzeppelin/
+@core/=contracts/core/
+@decentralized-resolution-module/=contracts/decentralized-resolution-module/
+@shared/=contracts/shared/

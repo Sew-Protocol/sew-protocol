@@ -5,7 +5,7 @@ import {Test, console} from "forge-std/Test.sol";
 import {GovGovernor} from "../../../contracts/governance/GovGovernor.sol";
 import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
 import {SewToken} from "../../../contracts/token/SewToken.sol";
-import {EscrowableERC20} from "../../../contracts/EscrowableERC20.sol";
+import {EscrowableERC20} from "../../../contracts/core/EscrowableERC20.sol";
 
 /**
  * @title GovForkSim

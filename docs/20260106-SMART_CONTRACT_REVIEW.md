@@ -96,7 +96,7 @@ ResolverIncentiveModule (UUPS Upgradeable)
 - ✅ Module metadata (name, version) for off-chain discovery
 
 **Concerns:**
-- ⚠️ Module developer role can upgrade DecentralizedResolutionModule instantly (by design, but high privilege)
+- ✅ Module developer role removed - DecentralizedResolutionModule extracted to separate package, all upgrades via ROLE_TIMELOCK
 - ⚠️ Module validation relies on ERC-165, but some modules may not implement it correctly
 
 ### 1.3 Storage Layout
@@ -129,7 +129,7 @@ ResolverIncentiveModule (UUPS Upgradeable)
 - `DEFAULT_ADMIN_ROLE` - Full administrative control
 - `ROLE_TIMELOCK` - Slow lane governance (7-day delay)
 - `ROLE_GUARDIAN` - Emergency controls (pause only)
-- `ROLE_MODULE_DEVELOPER` - Instant module upgrades (DecentralizedResolutionModule only)
+- ~~`ROLE_MODULE_DEVELOPER`~~ - **REMOVED** (DecentralizedResolutionModule extracted to separate package, all upgrades now via ROLE_TIMELOCK)
 
 **Strengths:**
 - ✅ Role-based access control properly implemented
@@ -139,13 +139,12 @@ ResolverIncentiveModule (UUPS Upgradeable)
 
 **Findings:**
 - ✅ **GOOD:** `dao` address cannot be changed after deployment (removed updateability)
-- ✅ **GOOD:** Module developer role is scoped to specific module only
-- ⚠️ **MEDIUM:** Module developer role can upgrade instantly (by design, but requires trust)
+- ✅ **GOOD:** Module developer role removed for governance consistency
+- ✅ **GOOD:** All upgrades now require ROLE_TIMELOCK (standard governance lanes)
 - ✅ **GOOD:** Guardian cannot unpause (only timelock can)
 
 **Recommendations:**
 - Consider adding events for all role grants/revokes
-- Document the trust model for module developer role clearly
 
 ### 2.2 Reentrancy Protection
 
@@ -660,15 +659,9 @@ function _updateEscrowBalance(address /* token */, uint256 amount, bool add) int
 
 **Status:** Acceptable with current fallback
 
-#### 5.4.2 Module Developer Role Trust
+#### 5.4.2 Module Developer Role (REMOVED)
 
-**Issue:** Module developer role can upgrade instantly (by design)
-
-**Location:** `DecentralizedResolutionModule._authorizeUpgrade`
-
-**Risk:** Low (by design, requires trust in module developer)
-
-**Status:** Documented and intentional
+**Status:** Module developer role has been removed. DecentralizedResolutionModule is now in a separate package, and all upgrades require ROLE_TIMELOCK via standard governance lanes for consistency.
 
 ---
 
@@ -710,8 +703,8 @@ function _updateEscrowBalance(address /* token */, uint256 amount, bool add) int
 - `ResolverIncentiveModule` - UUPS upgradeable
 
 **Access Control:**
-- `ROLE_TIMELOCK` - Standard upgrades (slow lane)
-- `ROLE_MODULE_DEVELOPER` - Instant upgrades (DecentralizedResolutionModule only)
+- `ROLE_TIMELOCK` - All upgrades (standard governance lanes)
+- ~~`ROLE_MODULE_DEVELOPER`~~ - **REMOVED** (DecentralizedResolutionModule extracted, all upgrades via timelock)
 
 **Strengths:**
 - ✅ UUPS pattern correctly implemented

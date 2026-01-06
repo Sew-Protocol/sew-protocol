@@ -62,7 +62,7 @@ Complete index of all documentation in the `/docs` folder, organized by category
 | `IMPROVEMENTS_IMPLEMENTATION_SUMMARY.md` | Summary of improvements implementation | Current | Keep updated |
 | `CONTRIBUTING_ADHERENCE_ASSESSMENT.md` | Assessment of codebase adherence to CONTRIBUTING.md | Current | Keep updated |
 | `MIGRATION_SUMMARY.md` | Summary of migration work | Complete | Archive document |
-| `MODULE_DEVELOPER_ROLE_SUMMARY.md` | Quick reference for module developer role | Current | Keep updated |
+| `archived/MODULE_DEVELOPER_ROLE_SUMMARY.md` | Quick reference for module developer role | Archived | Extracted module - role removed |
 | `PHASE1_SUMMARY.md` | Summary of Phase 1 analysis work | Complete | Archive document |
 | `STATUS_SUMMARY.md` | Overall status summary | Outdated | Update or archive |
 | `WHITEPAPER.md` | Comprehensive whitepaper for the protocol | Current | Keep updated |
@@ -101,7 +101,7 @@ Complete index of all documentation in the `/docs` folder, organized by category
 | `GOVERNANCE_PROCESS.md` | Governance process documentation | Current | Keep updated |
 | `GOVERNANCE_SURFACE_ANALYSIS.md` | Analysis of governance surface | Complete | Archive document |
 | `GOVERNANCE_SURFACE_MAP.md` | Complete mapping of governance functions | Current | Keep updated |
-| `MODULE_DEVELOPER_ROLE_DESIGN.md` | Design document for module developer role | Current | Keep updated |
+| `archived/MODULE_DEVELOPER_ROLE_DESIGN.md` | Design document for module developer role | Archived | Extracted module - role removed |
 | `UPGRADE_POLICY.md` | Upgrade policy documentation | Current | Keep updated |
 
 ---

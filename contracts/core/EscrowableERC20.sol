@@ -8,14 +8,14 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "./BaseEscrow.sol";
-import "./governance/SlowLaneQueueActivate.sol";
-import "./libraries/ModuleManagementLibrary.sol";
-import "./libraries/EscrowCreationLibrary.sol";
-import "./libraries/YieldHandlingLibrary.sol";
-import "./interfaces/IReleaseStrategy.sol";
-import "./interfaces/IResolutionModule.sol";
-import "./interfaces/IYieldGenerationModule.sol";
-import "./interfaces/IYieldDistributionModule.sol";
+import "../governance/SlowLaneQueueActivate.sol";
+import "../libraries/ModuleManagementLibrary.sol";
+import "../libraries/EscrowCreationLibrary.sol";
+import "../libraries/YieldHandlingLibrary.sol";
+import "../interfaces/IReleaseStrategy.sol";
+import "../shared/interfaces/IResolutionModule.sol";
+import "../interfaces/IYieldGenerationModule.sol";
+import "../interfaces/IYieldDistributionModule.sol";
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 // Additional errors specific to EscrowableERC20 (if any needed)

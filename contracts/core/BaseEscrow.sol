@@ -11,22 +11,22 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 // IERC20Permit removed for contract size reduction - see docs/PERMIT_FUNCTIONALITY_REMOVED.md
-import "./interfaces/IResolver.sol";
-import "./interfaces/IResolutionModule.sol";
-import "./interfaces/IYieldGenerationModule.sol";
-import "./interfaces/IYieldDistributionModule.sol";
-import "./libraries/SettingsValidationLibrary.sol";
+import "../interfaces/IResolver.sol";
+import "../shared/interfaces/IResolutionModule.sol";
+import "../interfaces/IYieldGenerationModule.sol";
+import "../interfaces/IYieldDistributionModule.sol";
+import "../libraries/SettingsValidationLibrary.sol";
 // YieldDistributionLibrary removed - yield distribution now handled entirely by module
-import "./libraries/EscrowEncodingLibrary.sol";
-import "./libraries/ResolverLogicLibrary.sol";
-import "./libraries/RecoveryLibrary.sol";
-import "./libraries/ModuleProposalLibrary.sol";
-import "./libraries/YieldHandlingLibrary.sol";
-import "./libraries/ResolverActionLibrary.sol";
-import "./libraries/StateManagementLibrary.sol";
-import "./libraries/DisputeInitializationLibrary.sol";
-import "./types/EscrowTypes.sol";
-import "./governance/SlowLaneQueueActivate.sol";
+import "../libraries/EscrowEncodingLibrary.sol";
+import "../libraries/ResolverLogicLibrary.sol";
+import "../libraries/RecoveryLibrary.sol";
+import "../libraries/ModuleProposalLibrary.sol";
+import "../libraries/YieldHandlingLibrary.sol";
+import "../libraries/ResolverActionLibrary.sol";
+import "../libraries/StateManagementLibrary.sol";
+import "../libraries/DisputeInitializationLibrary.sol";
+import "../types/EscrowTypes.sol";
+import "../governance/SlowLaneQueueActivate.sol";
 
 // Aave interfaces and types have been moved to AaveYieldGenerationModule
 // BaseEscrow no longer needs direct Aave integration
@@ -966,7 +966,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
      * @param disputeResolver Dispute resolver address that made the resolution
      * @param isRelease True if RELEASE (funds to recipient), false if CANCEL (refund to sender)
      * @dev Optimized for contract size: minimal bytecode footprint.
-     *      Calls recordResolution on DecentralizedResolutionModule if available.
+     *      Calls recordResolution on the active resolution module if it supports the interface.
      *      This allows the resolution module to track:
      *      - Resolution outcomes for quality metrics
      *      - Resolution reversals (when escalations overturn decisions)
