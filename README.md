@@ -41,6 +41,11 @@ PROXY_KIND=uups pnpm deploy --network baseSepolia
 - Require **storage layout checks** on every upgrade.
 - Never leave upgrade authority on an EOA.
 
+## Security
+
+- [Security Policy](SECURITY.md) - Security contact and responsible disclosure policy
+- [Security Model](docs/SECURITY_MODEL.md) - Comprehensive security model and threat analysis
+
 ## Governance
 
 The protocol uses onchain governance with TimelockController and OpenZeppelin Governor. See governance documentation:
@@ -48,6 +53,7 @@ The protocol uses onchain governance with TimelockController and OpenZeppelin Go
 - [Governance Model](docs/governance.md) - Overview of governance structure
 - [Governance Surface Map](docs/GOVERNANCE_SURFACE_MAP.md) - Complete function → role → lane mapping
 - [Module Map](docs/MODULE_MAP.md) - Module interface → implementation mapping
+- [Operational Runbooks](governance/runbooks/) - Step-by-step procedures for operations
 - [Upgrade Policy](docs/UPGRADE_POLICY.md) - Upgrade procedures and ossification plan
 - [Emergency Policy](docs/EMERGENCY_POLICY.md) - Emergency controls and procedures
 - [Governance Process](docs/GOVERNANCE_PROCESS.md) - Step-by-step governance workflow

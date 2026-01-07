@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 import "../governance/SlowLaneQueueActivate.sol";
+import "../types/EscrowTypes.sol";
 
 // Aave V3 interfaces
 interface IPoolAddressesProvider {
@@ -27,8 +28,7 @@ interface IAToken {
 error AavePoolNotConfigured();
 error TokenNotSupportedByAave(address token);
 error InvalidATokenAddress(address token, address aToken);
-error InvalidAddress(string reason, address addr);
-error ArrayLengthMismatch(uint256 expectedLength, uint256 actualLength);
+// InvalidAddress and ArrayLengthMismatch imported from EscrowTypes.sol
 error AaveWithdrawalFailed(uint256 workflowId, address token);
 error CapExceeded(address token, uint256 requested, uint256 cap);
 

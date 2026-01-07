@@ -254,6 +254,9 @@ Conduct emergency drills regularly (e.g., monthly):
 - `governance.md` - Governance model
 - `GOVERNANCE_SURFACE_MAP.md` - Function mapping
 - `scripts/gov/emergency.ts` - Emergency tooling
+- `governance/runbooks/emergency.md` - **Step-by-step emergency procedures**
+- `governance/runbooks/recovery.md` - **Step-by-step recovery procedures**
+- `docs/DRILLS_AND_REHEARSALS.md` - Drill documentation and results
 
 
 
