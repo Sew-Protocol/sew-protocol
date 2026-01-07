@@ -423,3 +423,4 @@
 
 **Bottom line:** The role was designed for rapid iteration, but the extraction strategy is to test in isolation first. Once proven, the module can be swapped in via standard governance. The role adds complexity without clear benefit and contradicts the conservative approach.
 
+

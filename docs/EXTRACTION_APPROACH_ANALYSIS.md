@@ -512,3 +512,4 @@ This provides:
 
 **Avoid separate repos** unless there's a strong reason (different teams, different release cycles, different ownership) - the Cursor/AI effectiveness loss is significant.
 
+
