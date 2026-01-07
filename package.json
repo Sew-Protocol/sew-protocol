@@ -23,7 +23,8 @@
     "gov:surface:check": "ts-node scripts/gov/check-surface.ts",
     "size": "ts-node scripts/print-contract-sizes.ts",
     "size:check": "hardhat compile && ts-node scripts/print-contract-sizes.ts",
-    "coverage": "hardhat coverage"
+    "coverage": "hardhat coverage",
+    "coverage:report": "ts-node scripts/generate-coverage-report.ts"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.1.0",

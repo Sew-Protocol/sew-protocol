@@ -135,6 +135,10 @@ jobs:
       - name: Generate coverage report
         run: pnpm coverage
 
+      - name: Generate comprehensive coverage report
+        run: pnpm coverage:report
+        continue-on-error: true
+
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
@@ -147,7 +151,20 @@ jobs:
 
       - name: Coverage summary
         run: |
+          if [ -f "coverage/COVERAGE_REPORT.md" ]; then
+            echo "📊 Test Coverage Report:"
+            head -50 coverage/COVERAGE_REPORT.md
+          fi
           if [ -f "coverage/coverage-summary.json" ]; then
-            echo "📊 Coverage Summary:"
+            echo ""
+            echo "📊 Coverage Summary (Legacy):"
             cat coverage/coverage-summary.json | grep -A 5 '"total"' || true
           fi
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: coverage/
+          retention-days: 30
+        continue-on-error: true
