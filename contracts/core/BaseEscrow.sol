@@ -21,12 +21,12 @@ import "../libraries/EscrowEncodingLibrary.sol";
 import "../libraries/ResolverLogicLibrary.sol";
 import "../libraries/RecoveryLibrary.sol";
 import "../libraries/ModuleProposalLibrary.sol";
-import "../libraries/YieldHandlingLibrary.sol";
 import "../libraries/ResolverActionLibrary.sol";
 import "../libraries/StateManagementLibrary.sol";
 import "../libraries/DisputeInitializationLibrary.sol";
 import "../types/EscrowTypes.sol";
 import "../governance/SlowLaneQueueActivate.sol";
+import "../YieldOps.sol";
 
 // Aave interfaces and types have been moved to AaveYieldGenerationModule
 // BaseEscrow no longer needs direct Aave integration
@@ -108,6 +108,9 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
     // BaseEscrow now uses yield generation modules for all yield operations
 
     // Yield distribution removed - now handled entirely by yield distribution module
+    
+    // Phase 1 size optimization: External yield operations contract
+    YieldOps public yieldOps;
 
     // Slow lane pending changes (Phase 3)
     PendingAddress private _pendingFeeRecipient;
@@ -648,15 +651,16 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         totalEscrowsPending--;
         emit EscrowStateChanged(workflowId, oldStatus, EscrowState.RESOLVED);
         
-        // Handle yield using library
-        IYieldGenerationModule genModule = _getYieldGenerationModule(workflowId);
-        (, uint256 yield) = YieldHandlingLibrary.withdrawFullWithYield(
-            genModule, workflowId, token, amount
-        );
-        
-        if (yield > 0) {
-            IYieldDistributionModule distModule = _getYieldDistributionModule(workflowId);
-            YieldHandlingLibrary.distributeYield(distModule, workflowId, token, yield);
+        // Handle yield via YieldOps (Phase 1 size optimization)
+        // Non-blocking: yield failures won't prevent release (try/catch pattern)
+        if (address(yieldOps) != address(0)) {
+            try yieldOps.handleFullYield(
+                _getYieldGenerationModule(workflowId),
+                _getYieldDistributionModule(workflowId),
+                workflowId,
+                token,
+                amount
+            ) {} catch {}
         }
         
         _transferTokens(token, to, amount);
@@ -725,10 +729,18 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         // Update escrow balance
         _updateEscrowBalance(token, amount, false);
         
-        // Distribute yield if any
-        if (result.yieldToDistribute > 0) {
-            IYieldDistributionModule distModule = _getYieldDistributionModule(workflowId);
-            YieldHandlingLibrary.distributeYield(distModule, workflowId, token, result.yieldToDistribute);
+        // Distribute yield if any (via YieldOps - Phase 1 size optimization)
+        // Non-blocking: yield failures won't prevent partial release
+        if (result.yieldToDistribute > 0 && address(yieldOps) != address(0)) {
+            try yieldOps.handlePartialYield(
+                _getYieldGenerationModule(workflowId),
+                _getYieldDistributionModule(workflowId),
+                workflowId,
+                token,
+                amount,
+                params.remainingBalance,
+                params.totalDeposited
+            ) {} catch {}
         }
         
         // Transfer tokens
@@ -801,10 +813,18 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         // Update escrow balance
         _updateEscrowBalance(token, amount, false);
         
-        // Distribute yield if any
-        if (result.yieldToDistribute > 0) {
-            IYieldDistributionModule distModule = _getYieldDistributionModule(workflowId);
-            YieldHandlingLibrary.distributeYield(distModule, workflowId, token, result.yieldToDistribute);
+        // Distribute yield if any (via YieldOps - Phase 1 size optimization)
+        // Non-blocking: yield failures won't prevent partial cancel
+        if (result.yieldToDistribute > 0 && address(yieldOps) != address(0)) {
+            try yieldOps.handlePartialYield(
+                _getYieldGenerationModule(workflowId),
+                _getYieldDistributionModule(workflowId),
+                workflowId,
+                token,
+                amount,
+                params.remainingBalance,
+                params.totalDeposited
+            ) {} catch {}
         }
         
         // Transfer tokens
@@ -1293,15 +1313,21 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         totalEscrowsPending--;
         emit EscrowStateChanged(workflowId, oldStatus, EscrowState.REFUNDED);
         
-        // Handle yield using library
-        IYieldGenerationModule genModule = _getYieldGenerationModule(workflowId);
-        (uint256 actualAmount, ) = YieldHandlingLibrary.withdrawFullWithYield(
-            genModule, workflowId, token, amount
-        );
+        // Handle yield via YieldOps (Phase 1 size optimization)
+        // Non-blocking: yield failures won't prevent refund
+        if (address(yieldOps) != address(0)) {
+            try yieldOps.handleFullYield(
+                _getYieldGenerationModule(workflowId),
+                _getYieldDistributionModule(workflowId),
+                workflowId,
+                token,
+                amount
+            ) {} catch {}
+        }
         
         _updateEscrowBalance(token, amount, false);
-        // Transfer actualAmount (includes yield if any, or original amount if no yield)
-        _transferTokens(token, from, actualAmount);
+        // Transfer amount to sender (yield distributed separately via YieldOps)
+        _transferTokens(token, from, amount);
         _emitEscrowTransferCancelled(workflowId, token, from, originalAmount);
     }
 
@@ -1338,18 +1364,19 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         totalEscrowsPending--;
         emit EscrowStateChanged(workflowId, oldStatus, EscrowState.RELEASED);
         
-        // Handle yield using library
-        IYieldGenerationModule genModule = _getYieldGenerationModule(workflowId);
-        (, uint256 yield) = YieldHandlingLibrary.withdrawFullWithYield(
-            genModule, workflowId, token, amount
-        );
+        // Handle yield via YieldOps (Phase 1 size optimization)
+        // Non-blocking: yield failures won't prevent release
+        if (address(yieldOps) != address(0)) {
+            try yieldOps.handleFullYield(
+                _getYieldGenerationModule(workflowId),
+                _getYieldDistributionModule(workflowId),
+                workflowId,
+                token,
+                amount
+            ) {} catch {}
+        }
         
         _updateEscrowBalance(token, amount, false);
-        
-        if (yield > 0) {
-            IYieldDistributionModule distModule = _getYieldDistributionModule(workflowId);
-            YieldHandlingLibrary.distributeYield(distModule, workflowId, token, yield);
-        }
         
         // Transfer amount (original escrow amount) to recipient
         // Yield has already been distributed to recipients via the distribution module
@@ -1630,10 +1657,19 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
             emit EscrowStateChanged(workflowId, oldStatus, EscrowState.RESOLVED);
         }
 
-        // Distribute yield if any
-        if (yieldToDistribute > 0) {
-            IYieldDistributionModule distModule = _getYieldDistributionModule(workflowId);
-            YieldHandlingLibrary.distributeYield(distModule, workflowId, et.token, yieldToDistribute);
+        // Distribute yield if any (via YieldOps - Phase 1 size optimization)
+        // Non-blocking: yield failures won't prevent dispute resolution
+        if (yieldToDistribute > 0 && address(yieldOps) != address(0)) {
+            // For resolveDispute with payouts, we handle this as proportional yield
+            try yieldOps.handlePartialYield(
+                _getYieldGenerationModule(workflowId),
+                _getYieldDistributionModule(workflowId),
+                workflowId,
+                et.token,
+                totalPayout,
+                et.remainingBalance + totalPayout, // Before withdrawal
+                et.totalDeposited
+            ) {} catch {}
         }
 
         // External calls after state changes - execute payouts

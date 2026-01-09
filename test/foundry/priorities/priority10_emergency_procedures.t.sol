@@ -46,7 +46,7 @@ contract Priority10_EmergencyProcedures is Test {
         releaseStrategy = new DefaultReleaseStrategy();
         
         token = new ERC20Mock("Test Token", "TEST", owner, 10000000e18);
-        vault = new EscrowVault(ESCROW_FEE, feeAddress);
+        vault = new EscrowVault(ESCROW_FEE, feeAddress, address(0));
         
         aavePool = new MockAavePool();
         aToken = new MockAToken(address(token), "aToken", "aTKN");

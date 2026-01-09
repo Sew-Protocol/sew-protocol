@@ -45,7 +45,7 @@ contract EscrowVaultComprehensive is Test {
         
         token1 = new ERC20Mock("Token 1", "TKN1", owner, 10000000e18);
         token2 = new ERC20Mock("Token 2", "TKN2", owner, 10000000e18);
-        vault = new EscrowVault(ESCROW_FEE, feeAddress);
+        vault = new EscrowVault(ESCROW_FEE, feeAddress, address(0));
         
         bytes32 ROLE_TIMELOCK = vault.ROLE_TIMELOCK();
         vault.grantRole(ROLE_TIMELOCK, owner);

@@ -33,7 +33,7 @@ contract DoSVectorsTest is Test {
         revertingToken = new MockNonStandardERC20("RVT", "RVT", address(this), 100_000_000 ether);
         
         uint256 escrowFee = 100; // 1%
-        vault = new EscrowVault(escrowFee, feeRecipient);
+        vault = new EscrowVault(escrowFee, feeRecipient, address(0));
         
         ROLE_TIMELOCK = vault.ROLE_TIMELOCK();
 

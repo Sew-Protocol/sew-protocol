@@ -46,7 +46,7 @@ contract Priority4_CapsEnforcement is Test {
         yieldModule = new AaveYieldGenerationModule(owner);
         
         token = new ERC20Mock("Test Token", "TEST", owner, 10000000e18);
-        vault = new EscrowVault(ESCROW_FEE, feeAddress);
+        vault = new EscrowVault(ESCROW_FEE, feeAddress, address(0));
         
         bytes32 ROLE_TIMELOCK = vault.ROLE_TIMELOCK();
         bytes32 ROLE_GUARDIAN = vault.ROLE_GUARDIAN();

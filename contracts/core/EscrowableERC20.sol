@@ -71,7 +71,8 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         string memory name,
         string memory symbol,
         uint256 _escrowFee,
-        address _escrowFeeAddress
+        address _escrowFeeAddress,
+        address _yieldOps
     ) ERC20(name, symbol) {
         if (_escrowFee > ESCROW_FEE_DENOMINATOR) {
             revert InvalidEscrowFee(_escrowFee, ESCROW_FEE_DENOMINATOR);
@@ -81,6 +82,9 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         }
         escrowFee = _escrowFee;
         escrowFeeAddress = _escrowFeeAddress;
+        
+        // Phase 1 size optimization: Set YieldOps contract
+        yieldOps = YieldOps(_yieldOps);
         
         // Grant DEFAULT_ADMIN_ROLE to deployer so roles can be granted later
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
@@ -634,14 +638,16 @@ contract EscrowableERC20Factory {
      * @param symbol Token symbol
      * @param escrowFee Escrow fee in basis points (e.g., 100 = 1%)
      * @param escrowFeeAddress Address to receive escrow fees
+     * @param yieldOps Address of YieldOps contract
      * @return Address of the newly deployed EscrowableERC20 contract
      */
     function createEscrowableERC20(
         string memory name,
         string memory symbol,
         uint256 escrowFee,
-        address escrowFeeAddress
+        address escrowFeeAddress,
+        address yieldOps
     ) public returns (address) {
-        return address(new EscrowableERC20(name, symbol, escrowFee, escrowFeeAddress));
+        return address(new EscrowableERC20(name, symbol, escrowFee, escrowFeeAddress, yieldOps));
     }
 }

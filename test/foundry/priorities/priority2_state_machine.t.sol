@@ -35,7 +35,7 @@ contract Priority2_StateMachine is StdInvariant, Test {
         releaseStrategy = new DefaultReleaseStrategy();
         
         token = new ERC20Mock("Test Token", "TEST", owner, 10000000e18);
-        vault = new EscrowVault(ESCROW_FEE, feeAddress);
+        vault = new EscrowVault(ESCROW_FEE, feeAddress, address(0));
         
         bytes32 ROLE_TIMELOCK = vault.ROLE_TIMELOCK();
         vault.grantRole(ROLE_TIMELOCK, owner);

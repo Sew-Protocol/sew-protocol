@@ -40,7 +40,7 @@ contract EscrowableERC20Comprehensive is Test {
         releaseStrategy = new DefaultReleaseStrategy();
         yieldDistributionModule = new DefaultYieldDistributionModule();
         
-        token = new EscrowableERC20("Test Token", "TEST", ESCROW_FEE, feeAddress);
+        token = new EscrowableERC20("Test Token", "TEST", ESCROW_FEE, feeAddress, address(0));
         
         bytes32 ROLE_TIMELOCK = token.ROLE_TIMELOCK();
         token.grantRole(ROLE_TIMELOCK, owner);

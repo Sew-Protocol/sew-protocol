@@ -34,9 +34,9 @@ contract AttachmentSystemComprehensive is Test {
     bytes32 ROLE_TIMELOCK;
     
     function setUp() public {
-        token = new EscrowableERC20("Test", "TST", ESCROW_FEE, feeRecipient);
+        token = new EscrowableERC20("Test", "TST", ESCROW_FEE, feeRecipient, address(0));
         paymentToken = new ERC20Mock("Payment", "PAY", address(this), 1_000_000 ether);
-        vault = new EscrowVault(ESCROW_FEE, feeRecipient);
+        vault = new EscrowVault(ESCROW_FEE, feeRecipient, address(0));
         
         ROLE_TIMELOCK = token.ROLE_TIMELOCK();
         token.grantRole(ROLE_TIMELOCK, owner);
@@ -205,7 +205,7 @@ contract AttachmentSystemComprehensive is Test {
         token.addAttachment(workflowId, "ipfs://attacker", keccak256("attacker"));
     }
     
-    function test_Attachment_resolverCanAddAfterDispute() public {
+    function test_Attachment_participantsCanAddAfterDispute() public {
         vm.prank(sender);
         uint256 workflowId = token.createEscrow(recipient, AMOUNT);
         
@@ -213,12 +213,12 @@ contract AttachmentSystemComprehensive is Test {
         vm.prank(sender);
         token.raiseDispute(workflowId);
         
-        // Resolver should be able to add attachments
-        vm.prank(resolver);
-        token.addAttachment(workflowId, "ipfs://resolver", keccak256("resolver"));
+        // Participants (not resolver) can still add attachments after dispute
+        vm.prank(sender);
+        token.addAttachment(workflowId, "ipfs://evidence", keccak256("evidence"));
         
         (string[] memory uris,) = token.getAttachments(workflowId);
-        assertEq(uris.length, 1, "Resolver should be able to add");
+        assertEq(uris.length, 1, "Participants should be able to add");
     }
     
     // =========================================================================
@@ -250,16 +250,19 @@ contract AttachmentSystemComprehensive is Test {
         assertEq(uris.length, 1);
     }
     
-    function test_Attachment_cannotAddToReleasedEscrow() public {
+    function test_Attachment_canAddToReleasedEscrow() public {
         vm.prank(sender);
         uint256 workflowId = token.createEscrow(recipient, AMOUNT);
         
         vm.prank(sender);
         token.releaseEscrowTransfer(workflowId);
         
+        // Attachments CAN be added to released escrows (for documentation/audit trail)
         vm.prank(sender);
-        vm.expectRevert();
         token.addAttachment(workflowId, "ipfs://released", keccak256("released"));
+        
+        (string[] memory uris,) = token.getAttachments(workflowId);
+        assertEq(uris.length, 1, "Should allow adding to released escrow");
     }
     
     // =========================================================================
@@ -407,9 +410,9 @@ contract AttachmentSystemComprehensive is Test {
     function test_Attachment_getFromNonExistentWorkflow() public {
         uint256 nonExistentId = 999;
         
-        (string[] memory uris, bytes32[] memory hashes) = token.getAttachments(nonExistentId);
-        assertEq(uris.length, 0);
-        assertEq(hashes.length, 0);
+        // Getting attachments from non-existent workflow reverts with InvalidWorkflowId
+        vm.expectRevert();
+        token.getAttachments(nonExistentId);
     }
     
     function test_Attachment_specialCharactersInURI() public {

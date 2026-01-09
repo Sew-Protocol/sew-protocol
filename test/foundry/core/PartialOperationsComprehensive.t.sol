@@ -35,9 +35,9 @@ contract PartialOperationsComprehensive is Test {
     bytes32 ROLE_TIMELOCK;
     
     function setUp() public {
-        token = new EscrowableERC20("Test", "TST", ESCROW_FEE, feeRecipient);
+        token = new EscrowableERC20("Test", "TST", ESCROW_FEE, feeRecipient, address(0));
         paymentToken = new ERC20Mock("Payment", "PAY", address(this), 1_000_000 ether);
-        vault = new EscrowVault(ESCROW_FEE, feeRecipient);
+        vault = new EscrowVault(ESCROW_FEE, feeRecipient, address(0));
         
         ROLE_TIMELOCK = token.ROLE_TIMELOCK();
         token.grantRole(ROLE_TIMELOCK, owner);
@@ -119,9 +119,10 @@ contract PartialOperationsComprehensive is Test {
         vm.prank(sender);
         token.raiseDispute(workflowId);
         
-        // Release full amount as partial
+        // Release full remaining balance (after fee deduction: 99% of AMOUNT)
+        uint256 actualBalance = (AMOUNT * (10000 - ESCROW_FEE)) / 10000;
         vm.prank(resolver);
-        bool success = token.partialReleaseAsDisputeResolver(workflowId, AMOUNT);
+        bool success = token.partialReleaseAsDisputeResolver(workflowId, actualBalance);
         assertTrue(success);
     }
     
@@ -203,8 +204,10 @@ contract PartialOperationsComprehensive is Test {
         vm.prank(sender);
         token.raiseDispute(workflowId);
         
+        // Cancel full remaining balance (after fee deduction)
+        uint256 actualBalance = (AMOUNT * (10000 - ESCROW_FEE)) / 10000;
         vm.prank(resolver);
-        bool success = token.partialCancelAsDisputeResolver(workflowId, AMOUNT);
+        bool success = token.partialCancelAsDisputeResolver(workflowId, actualBalance);
         assertTrue(success);
     }
     
@@ -424,10 +427,14 @@ contract PartialOperationsComprehensive is Test {
         vm.prank(sender);
         token.raiseDispute(workflowId);
         
+        // Calculate actual balance after fee (99% of AMOUNT = 9.9 ether)
+        uint256 actualBalance = (AMOUNT * (10000 - ESCROW_FEE)) / 10000;
+        uint256 partAmount = actualBalance / 10; // Split into 10 parts
+        
         // Release entire amount in small parts
         vm.startPrank(resolver);
         for (uint256 i = 0; i < 10; i++) {
-            token.partialReleaseAsDisputeResolver(workflowId, 1 ether);
+            token.partialReleaseAsDisputeResolver(workflowId, partAmount);
         }
         vm.stopPrank();
     }
@@ -439,10 +446,14 @@ contract PartialOperationsComprehensive is Test {
         vm.prank(sender);
         token.raiseDispute(workflowId);
         
+        // Calculate actual balance after fee (99% of AMOUNT = 9.9 ether)
+        uint256 actualBalance = (AMOUNT * (10000 - ESCROW_FEE)) / 10000;
+        uint256 partAmount = actualBalance / 10; // Split into 10 parts
+        
         // Cancel entire amount in small parts
         vm.startPrank(resolver);
         for (uint256 i = 0; i < 10; i++) {
-            token.partialCancelAsDisputeResolver(workflowId, 1 ether);
+            token.partialCancelAsDisputeResolver(workflowId, partAmount);
         }
         vm.stopPrank();
     }

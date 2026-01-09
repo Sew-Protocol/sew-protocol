@@ -63,7 +63,7 @@ contract EscrowVault is BaseEscrow {
     event DefaultYieldDistributionModuleQueued(address indexed oldModule, address indexed newModule, uint64 eta);
     event DefaultYieldDistributionModuleActivated(address indexed oldModule, address indexed newModule);
 
-    constructor(uint256 _escrowFee, address _escrowFeeAddress) SlowLaneQueueActivate() {
+    constructor(uint256 _escrowFee, address _escrowFeeAddress, address _yieldOps) SlowLaneQueueActivate() {
         if (_escrowFee > ESCROW_FEE_DENOMINATOR) {
             revert InvalidEscrowFee(_escrowFee, ESCROW_FEE_DENOMINATOR);
         }
@@ -72,6 +72,9 @@ contract EscrowVault is BaseEscrow {
         }
         escrowFee = _escrowFee;
         escrowFeeAddress = _escrowFeeAddress;
+        
+        // Phase 1 size optimization: Set YieldOps contract
+        yieldOps = YieldOps(_yieldOps);
         
         // Grant DEFAULT_ADMIN_ROLE to deployer so roles can be granted later
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());

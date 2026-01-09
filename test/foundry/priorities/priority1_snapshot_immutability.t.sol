@@ -52,8 +52,8 @@ contract Priority1_SnapshotImmutability is StdInvariant, Test {
         
         token = new ERC20Mock("Test Token", "TEST", owner, 10000000e18);
         
-        vault = new EscrowVault(ESCROW_FEE, feeAddress);
-        escrowableERC20 = new EscrowableERC20("Escrow Token", "ESCROW", ESCROW_FEE, feeAddress);
+        vault = new EscrowVault(ESCROW_FEE, feeAddress, address(0));
+        escrowableERC20 = new EscrowableERC20("Escrow Token", "ESCROW", ESCROW_FEE, feeAddress, address(0));
         
         // Grant ROLE_TIMELOCK to owner
         bytes32 ROLE_TIMELOCK = vault.ROLE_TIMELOCK();

@@ -31,7 +31,7 @@ contract BaseEscrowSecuritySimple is Test {
     
     function setUp() public {
         // Deploy contracts
-        token = new EscrowableERC20("Test Token", "TEST", ESCROW_FEE, feeRecipient);
+        token = new EscrowableERC20("Test Token", "TEST", ESCROW_FEE, feeRecipient, address(0));
         
         // Get roles
         ROLE_TIMELOCK = token.ROLE_TIMELOCK();
@@ -101,10 +101,10 @@ contract BaseEscrowSecuritySimple is Test {
         // Give sender a large amount
         uint256 largeAmount = 50 ether;
         
-        // Should handle large amounts
+        // Should handle large amounts successfully
         vm.prank(sender);
         uint256 workflowId = token.createEscrow(recipient, largeAmount);
-        assertGt(workflowId, 0, "Should create escrow with large amount");
+        assertTrue(workflowId == 0, "Should create first escrow with ID 0");
     }
     
     function test_Security_balanceNeverUnderflows() public {
@@ -160,6 +160,7 @@ contract BaseEscrowSecuritySimple is Test {
         token.releaseEscrowTransfer(workflowId);
         
         // Try to release again - should fail
+        vm.expectRevert();
         vm.prank(sender);
         token.releaseEscrowTransfer(workflowId);
     }
@@ -174,6 +175,7 @@ contract BaseEscrowSecuritySimple is Test {
         token.releaseEscrowTransfer(workflowId);
         
         // Try to dispute released escrow - should fail
+        vm.expectRevert();
         vm.prank(sender);
         token.raiseDispute(workflowId);
     }
@@ -195,6 +197,7 @@ contract BaseEscrowSecuritySimple is Test {
         uint256 nextId = token.nextWorkflowId();
         
         // Should fail with future ID
+        vm.expectRevert();
         vm.prank(sender);
         token.releaseEscrowTransfer(nextId);
     }
@@ -241,19 +244,14 @@ contract BaseEscrowSecuritySimple is Test {
     
     function test_Security_handleMaxFee() public {
         // Create new token with max fee (100%)
-        EscrowableERC20 maxFeeToken = new EscrowableERC20("Max Fee", "MAX", 10000, feeRecipient);
+        EscrowableERC20 maxFeeToken = new EscrowableERC20("Max Fee", "MAX", 10000, feeRecipient, address(0));
         
         // Setup
         maxFeeToken.grantRole(ROLE_TIMELOCK, owner);
-        vm.startPrank(owner);
-        maxFeeToken.queueEscrowFeeAddress(feeRecipient);
-        vm.warp(block.timestamp + 7 days + 1);
-        maxFeeToken.activateEscrowFeeAddress();
         
         maxFeeToken.queueDefaultResolutionModule(address(resolutionModule));
-        vm.warp(block.timestamp + 7 days + 1);
+        vm.warp(block.timestamp + 14 days + 1);
         maxFeeToken.activateDefaultResolutionModule();
-        vm.stopPrank();
         
         // Transfer and create escrow
         maxFeeToken.transfer(sender, 10 ether);
@@ -263,7 +261,7 @@ contract BaseEscrowSecuritySimple is Test {
         // Should handle 100% fee
         vm.prank(sender);
         uint256 workflowId = maxFeeToken.createEscrow(recipient, 1 ether);
-        assertGt(workflowId, 0, "Should create escrow with max fee");
+        assertEq(workflowId, 0, "Should create escrow with max fee");
     }
     
     function test_Security_feeRoundingConsistency() public {
@@ -276,7 +274,7 @@ contract BaseEscrowSecuritySimple is Test {
         for (uint256 i = 0; i < amounts.length; i++) {
             vm.prank(sender);
             uint256 workflowId = token.createEscrow(recipient, amounts[i]);
-            assertGt(workflowId, 0, "Should create escrow");
+            assertEq(workflowId, i, "Should create escrow with sequential ID");
         }
     }
     
@@ -284,11 +282,11 @@ contract BaseEscrowSecuritySimple is Test {
     // Settings Validation Tests
     // =========================================================================
     
-    function test_Security_handleZeroAddressRecipient() public {
-        // Should be able to create escrow even with zero address recipient
+    function test_Security_rejectZeroAddressRecipient() public {
+        // Zero address recipient is NOT allowed (contract validates this)
         vm.prank(sender);
-        uint256 workflowId = token.createEscrow(address(0), AMOUNT);
-        assertGt(workflowId, 0, "Should create escrow with zero address");
+        vm.expectRevert(); // Expects InvalidAddress error
+        token.createEscrow(address(0), AMOUNT);
     }
     
     function test_Revert_Security_rejectInvalidTimeLimits() public {
@@ -320,7 +318,7 @@ contract BaseEscrowSecuritySimple is Test {
     
     function test_Security_workflowIdStartsAtZero() public {
         // Deploy fresh token
-        EscrowableERC20 freshToken = new EscrowableERC20("Fresh", "FRH", ESCROW_FEE, feeRecipient);
+        EscrowableERC20 freshToken = new EscrowableERC20("Fresh", "FRH", ESCROW_FEE, feeRecipient, address(0));
         assertEq(freshToken.nextWorkflowId(), 0, "First workflow ID should be 0");
     }
 }
