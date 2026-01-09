@@ -22,9 +22,7 @@
     "gov:emergency": "ts-node scripts/gov/emergency.ts",
     "gov:surface:check": "ts-node scripts/gov/check-surface.ts",
     "size": "ts-node scripts/print-contract-sizes.ts",
-    "size:check": "hardhat compile && ts-node scripts/print-contract-sizes.ts",
-    "coverage": "hardhat coverage",
-    "coverage:report": "ts-node scripts/generate-coverage-report.ts"
+    "size:check": "hardhat compile && ts-node scripts/print-contract-sizes.ts"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.1.0",
@@ -45,7 +43,6 @@
     "hardhat-network-helpers^1.1.2": "link:@nomicfoundation/hardhat-network-helpers^1.1.2",
     "prettier": "^3.7.4",
     "prettier-plugin-solidity": "^1.4.3",
-    "solidity-coverage": "^0.8.17",
     "typechain": "^8.3.0",
     "typescript": "^5.9.3"
   }

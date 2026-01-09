@@ -6,7 +6,6 @@ import '@typechain/hardhat'; // For TypeScript type generation
 import '@openzeppelin/hardhat-upgrades';
 import 'hardhat-deploy';
 import 'hardhat-deploy-ethers'; // Extends hardhat-deploy with ethers integration - MUST come after hardhat-deploy
-import 'solidity-coverage'; // For test coverage reporting
 import { extendEnvironment } from 'hardhat/config';
 import * as dotenv from 'dotenv';
 
