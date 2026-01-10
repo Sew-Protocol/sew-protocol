@@ -55,8 +55,8 @@ contract EscrowInvariants is StdInvariant, Test {
         token = new ERC20Mock("Test Token", "TEST", owner, 10000000e18);
         
         // Deploy escrow contracts
-        vault = new EscrowVault(ESCROW_FEE, feeAddress, address(0));
-        escrowableERC20 = new EscrowableERC20("Escrow Token", "ESCROW", ESCROW_FEE, feeAddress, address(0));
+        vault = new EscrowVault(ESCROW_FEE, feeAddress, address(0), address(0));
+        escrowableERC20 = new EscrowableERC20("Escrow Token", "ESCROW", ESCROW_FEE, feeAddress, address(0), address(0));
         
         // Grant ROLE_TIMELOCK to owner for module setup
         bytes32 ROLE_TIMELOCK = vault.ROLE_TIMELOCK();

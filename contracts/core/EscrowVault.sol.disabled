@@ -1,0 +1,106 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.33;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
+import "./BaseEscrow.sol";
+import "../governance/SlowLaneQueueActivate.sol";
+import "../libraries/ModuleManagementLibrary.sol";
+import "../libraries/EscrowCreationLibrary.sol";
+import "../libraries/RecoveryLibrary.sol";
+import "../interfaces/IReleaseStrategy.sol";
+import "../shared/interfaces/IResolutionModule.sol";
+import "../interfaces/IYieldGenerationModule.sol";
+import "../interfaces/IYieldDistributionModule.sol";
+import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+
+contract EscrowVault is BaseEscrow {
+    using SafeERC20 for IERC20;
+
+    mapping(address => uint256) public totalFeesPerToken;
+    mapping(address => uint256) public totalHeldInEscrowPerToken;
+    
+    IReleaseStrategy public defaultReleaseStrategy;
+    IResolutionModule public defaultDisputeResolutionModule;
+    IYieldGenerationModule public defaultYieldGenerationModule;
+    IYieldDistributionModule public defaultYieldDistributionModule;
+
+    PendingAddress private _pendingDefaultReleaseStrategy;
+    PendingAddress private _pendingDefaultResolutionModule;
+    PendingAddress private _pendingDefaultYieldGenerationModule;
+    PendingAddress private _pendingDefaultYieldDistributionModule;
+
+    event EscrowTransferCreated(uint256 indexed workflowId, address indexed token, address indexed from, address to, uint256 amount);
+    event EscrowTransferReleased(uint256 indexed workflowId, address indexed token, address indexed to, uint256 amount);
+    event EscrowTransferCancelled(uint256 indexed workflowId, address indexed token, address indexed from, uint256 amount);
+    event FeesWithdrawn(address indexed token, uint256 amount);
+    event DefaultYieldGenerationModuleSet(address indexed module);
+    event DefaultYieldDistributionModuleSet(address indexed module);
+
+    constructor(uint256 _escrowFee, address _escrowFeeAddress, address _yieldOps, address _disputeOps) SlowLaneQueueActivate() {
+        escrowFee = _escrowFee; escrowFeeAddress = _escrowFeeAddress; yieldOps = YieldOps(_yieldOps); disputeOps = DisputeOps(_disputeOps);
+        _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
+    }
+
+    function createEscrow(address token, address seller, uint256 amount, uint256 autoReleaseTime, uint256 autoCancelTime) public nonReentrant whenNotPaused returns (uint256) {
+        EscrowSettings memory settings = getDefaultSettings(); settings.autoReleaseTime = autoReleaseTime; settings.autoCancelTime = autoCancelTime;
+        return createEscrow(token, seller, amount, settings);
+    }
+
+    function createEscrow(address token, address seller, uint256 amount) public whenNotPaused returns (uint256) {
+        return createEscrow(token, seller, amount, getDefaultSettings());
+    }
+
+    function releaseEscrowTransfer(uint256 workflowId) public nonReentrant whenNotPaused returns (bool) {
+        _requirePending(workflowId);
+        if (escrowTransfers[workflowId].from != _msgSender()) revert NotSender(workflowId, _msgSender(), escrowTransfers[workflowId].from);
+        _releaseEscrowTransfer(workflowId); return true;
+    }
+
+    function _pullTokens(address token, address from, uint256 amount) internal override { IERC20(token).safeTransferFrom(from, address(this), amount); }
+    function _recordFee(address token, uint256 amount) internal override { totalFeesPerToken[token] += amount; }
+    function _depositForYield(IYieldGenerationModule genModule, uint256 workflowId, address token, uint256 amount) internal override { genModule.depositForYield(workflowId, token, amount); }
+    function _emitEscrowTransferCreated(uint256 workflowId, address token, address from, address to, uint256 amount) internal override { emit EscrowTransferCreated(workflowId, token, from, to, amount); }
+    function _transferTokens(address token, address to, uint256 amount) internal override { IERC20(token).safeTransfer(to, amount); }
+    function _updateEscrowBalance(address token, uint256 amount, bool add) internal override { if (add) totalHeldInEscrowPerToken[token] += amount; else totalHeldInEscrowPerToken[token] -= amount; }
+    function _emitEscrowTransferCancelled(uint256 workflowId, address token, address from, uint256 originalAmount) internal override { emit EscrowTransferCancelled(workflowId, token, from, originalAmount); }
+    function _emitEscrowTransferReleased(uint256 workflowId, address token, address to, uint256 originalAmount) internal override { emit EscrowTransferReleased(workflowId, token, to, originalAmount); }
+
+    function _getReleaseStrategy(uint256 id) internal view override returns (IReleaseStrategy) { address snap = snapshotReleaseStrategies[id]; return snap != address(0) ? IReleaseStrategy(snap) : defaultReleaseStrategy; }
+    function _getResolutionModule(uint256 id) internal view override returns (IResolutionModule) { address snap = snapshotResolutionModules[id]; return snap != address(0) ? IResolutionModule(snap) : defaultDisputeResolutionModule; }
+    function _getYieldGenerationModule(uint256 id) internal view override returns (IYieldGenerationModule) { address snap = snapshotYieldGenerationModules[id]; return snap != address(0) ? IYieldGenerationModule(snap) : defaultYieldGenerationModule; }
+    function _getYieldDistributionModule(uint256 id) internal view override returns (IYieldDistributionModule) { address snap = snapshotYieldDistributionModules[id]; return snap != address(0) ? IYieldDistributionModule(snap) : defaultYieldDistributionModule; }
+
+    function getReleaseStrategy(uint256 /* id */) public view returns (IReleaseStrategy) { return defaultReleaseStrategy; }
+    function getResolutionModule(uint256 /* id */) public view returns (IResolutionModule) { return defaultDisputeResolutionModule; }
+    function getYieldGenerationModule(uint256 /* id */) public view returns (IYieldGenerationModule) { return defaultYieldGenerationModule; }
+    function getYieldDistributionModule(uint256 /* id */) public view returns (IYieldDistributionModule) { return defaultYieldDistributionModule; }
+
+    function queueDefaultReleaseStrategy(address s) public onlyRole(ROLE_TIMELOCK) { _queueAddress(_pendingDefaultReleaseStrategy, s); }
+    function activateDefaultReleaseStrategy() public onlyRole(ROLE_TIMELOCK) { defaultReleaseStrategy = IReleaseStrategy(_activateAddress(_pendingDefaultReleaseStrategy)); }
+    function queueDefaultResolutionModule(address m) public onlyRole(ROLE_TIMELOCK) { _queueAddress(_pendingDefaultResolutionModule, m); }
+    function activateDefaultResolutionModule() public onlyRole(ROLE_TIMELOCK) { defaultDisputeResolutionModule = IResolutionModule(_activateAddress(_pendingDefaultResolutionModule)); }
+    function queueDefaultYieldGenerationModule(address m) public onlyRole(ROLE_TIMELOCK) { _queueAddress(_pendingDefaultYieldGenerationModule, m); }
+    function activateDefaultYieldGenerationModule() public onlyRole(ROLE_TIMELOCK) { defaultYieldGenerationModule = IYieldGenerationModule(_activateAddress(_pendingDefaultYieldGenerationModule)); }
+    function queueDefaultYieldDistributionModule(address m) public onlyRole(ROLE_TIMELOCK) { _queueAddress(_pendingDefaultYieldDistributionModule, m); }
+    function activateDefaultYieldDistributionModule() public onlyRole(ROLE_TIMELOCK) { defaultYieldDistributionModule = IYieldDistributionModule(_activateAddress(_pendingDefaultYieldDistributionModule)); }
+
+    function getPendingDefaultReleaseStrategy() public view returns (address value, uint64 eta, bool exists) { return getPendingAddress(_pendingDefaultReleaseStrategy); }
+    function getPendingDefaultResolutionModule() public view returns (address value, uint64 eta, bool exists) { return getPendingAddress(_pendingDefaultResolutionModule); }
+    function getPendingDefaultYieldGenerationModule() public view returns (address value, uint64 eta, bool exists) { return getPendingAddress(_pendingDefaultYieldGenerationModule); }
+    function getPendingDefaultYieldDistributionModule() public view returns (address value, uint64 eta, bool exists) { return getPendingAddress(_pendingDefaultYieldDistributionModule); }
+
+    function withdrawFees(address token) public nonReentrant returns (bool) {
+        if (_msgSender() != escrowFeeAddress) revert NotFeeAddress(_msgSender(), escrowFeeAddress);
+        uint256 fees = totalFeesPerToken[token]; if (fees == 0) revert NoFeesToWithdraw(token, fees);
+        totalFeesPerToken[token] = 0; totalFees -= fees;
+        IERC20(token).safeTransfer(escrowFeeAddress, fees); emit FeesWithdrawn(token, fees); return true;
+    }
+
+    function recoverERC20(address token, address recipient, uint256 amount) external override onlyRole(ROLE_TIMELOCK) nonReentrant returns (bool) {
+        uint256 bal = IERC20(token).balanceOf(address(this)); uint256 esc = totalHeldInEscrowPerToken[token]; uint256 fee = totalFeesPerToken[token]; uint256 avail = bal > esc + fee ? bal - esc - fee : 0;
+        uint256 rec = amount == 0 ? avail : amount; require(rec <= avail && rec > 0, "Invalid amount");
+        rec = RecoveryLibrary.recoverERC20(token, recipient, rec, bal); emit ERC20Recovered(token, recipient, rec); return true;
+    }
+}

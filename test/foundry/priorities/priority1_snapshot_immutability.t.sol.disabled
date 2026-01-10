@@ -1,0 +1,144 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.33;
+
+import "forge-std/Test.sol";
+import "forge-std/StdInvariant.sol";
+import "../../../contracts/core/EscrowVault.sol";
+import "../../../contracts/core/EscrowableERC20.sol";
+import "../../../contracts/mocks/ERC20Mock.sol";
+import "../../../contracts/core/modules/DefaultResolutionModule.sol";
+import "../../../contracts/modules/DefaultReleaseStrategy.sol";
+import "../../../contracts/modules/DefaultYieldModule.sol";
+import "../../../contracts/modules/DefaultYieldDistributionModule.sol";
+import "../../../contracts/types/EscrowTypes.sol";
+import "../../../contracts/DisputeOps.sol";
+
+contract SnapshotImmutabilityTest is Test {
+    EscrowVault vault;
+    EscrowableERC20 escrowableERC20;
+    ERC20Mock token;
+    DisputeOps disputeOps;
+    
+    address owner = address(0x1);
+    address timelock = address(0x2);
+    address guardian = address(0x3);
+    address feeAddress = address(0x4);
+    address buyer = address(0x5);
+    address seller = address(0x6);
+    address resolver = address(0x7);
+    
+    DefaultResolutionModule resolutionModule1;
+    DefaultResolutionModule resolutionModule2;
+    DefaultReleaseStrategy releaseStrategy1;
+    DefaultYieldModule yieldGen1;
+    DefaultYieldDistributionModule yieldDist1;
+    
+    uint256 constant ESCROW_FEE = 100; // 1%
+    
+    function setUp() public {
+        disputeOps = new DisputeOps();
+        resolutionModule1 = new DefaultResolutionModule(owner, resolver);
+        resolutionModule2 = new DefaultResolutionModule(owner, address(0x8));
+        releaseStrategy1 = new DefaultReleaseStrategy();
+        yieldGen1 = new DefaultYieldModule();
+        yieldDist1 = new DefaultYieldDistributionModule();
+        
+        vault = new EscrowVault(ESCROW_FEE, feeAddress, address(0), address(disputeOps));
+        escrowableERC20 = new EscrowableERC20("Escrow Token", "ESCROW", ESCROW_FEE, feeAddress, address(0), address(disputeOps));
+        token = new ERC20Mock("Test Token", "TEST", address(this), 18);
+        
+        vm.startPrank(owner);
+        vault.grantRole(vault.ROLE_TIMELOCK(), timelock);
+        vault.grantRole(vault.ROLE_GUARDIAN(), guardian);
+        vm.stopPrank();
+        
+        vm.startPrank(timelock);
+        vault.queueDefaultResolutionModule(address(resolutionModule1));
+        vm.warp(block.timestamp + 7 days + 1);
+        vault.activateDefaultResolutionModule();
+        vm.stopPrank();
+    }
+    
+    function test_moduleSnapshotOnCreation() public {
+        uint256 amount = 1000e18;
+        token.mint(buyer, amount);
+        vm.startPrank(buyer);
+        token.approve(address(vault), amount);
+        uint256 workflowId = vault.createEscrow(address(token), seller, amount, vault.getDefaultSettings());
+        vm.stopPrank();
+        
+        assertEq(vault.getSnapshotResolutionModule(workflowId), address(resolutionModule1), "Resolution module snapshot not set");
+    }
+    
+    function test_snapshotImmutabilityAfterModuleSwap() public {
+        uint256 amount = 1000e18;
+        token.mint(buyer, amount * 2);
+        vm.startPrank(buyer);
+        token.approve(address(vault), amount * 2);
+        uint256 workflowId = vault.createEscrow(address(token), seller, amount, vault.getDefaultSettings());
+        vm.stopPrank();
+        
+        address snapshotResolution = vault.getSnapshotResolutionModule(workflowId);
+        assertEq(snapshotResolution, address(resolutionModule1));
+        
+        vm.startPrank(timelock);
+        vault.queueDefaultResolutionModule(address(resolutionModule2));
+        vm.warp(block.timestamp + 7 days + 1);
+        vault.activateDefaultResolutionModule();
+        vm.stopPrank();
+        
+        assertEq(vault.getSnapshotResolutionModule(workflowId), address(resolutionModule1), "Snapshot changed after module swap");
+    }
+    
+    function test_batchModuleSnapshots() public {
+        uint8 numEscrows = 10;
+        uint8 numSwaps = 3;
+        uint256 amount = 100e18;
+        address[] memory expectedModules = new address[](numEscrows);
+        
+        token.mint(buyer, amount * numEscrows);
+        vm.startPrank(buyer);
+        token.approve(address(vault), amount * numEscrows);
+        vm.stopPrank();
+        
+        for (uint8 i = 0; i < numEscrows; i++) {
+            vm.prank(buyer);
+            uint256 workflowId = vault.createEscrow(address(token), seller, amount, vault.getDefaultSettings());
+            expectedModules[i] = vault.getSnapshotResolutionModule(workflowId);
+            
+            if (i > 0 && i % (numEscrows / numSwaps + 1) == 0) {
+                vm.startPrank(timelock);
+                DefaultResolutionModule newModule = new DefaultResolutionModule(owner, address(uint160(i)));
+                vault.queueDefaultResolutionModule(address(newModule));
+                vm.warp(block.timestamp + 7 days + 1);
+                vault.activateDefaultResolutionModule();
+                vm.stopPrank();
+            }
+        }
+        
+        for (uint256 i = 0; i < numEscrows; i++) {
+            assertEq(vault.getSnapshotResolutionModule(i), expectedModules[i], "Module snapshot changed");
+        }
+    }
+    
+    function test_escrowCreatedDuringSwap() public {
+        uint256 amount = 1000e18;
+        token.mint(buyer, amount * 2);
+        vm.prank(buyer);
+        token.approve(address(vault), amount * 2);
+        
+        vm.prank(timelock);
+        vault.queueDefaultResolutionModule(address(resolutionModule2));
+        
+        vm.prank(buyer);
+        uint256 workflowId = vault.createEscrow(address(token), seller, amount, vault.getDefaultSettings());
+        
+        assertEq(vault.getSnapshotResolutionModule(workflowId), address(resolutionModule1), "Should use active module");
+        
+        vm.warp(block.timestamp + 7 days + 1);
+        vm.prank(timelock);
+        vault.activateDefaultResolutionModule();
+        
+        assertEq(vault.getSnapshotResolutionModule(workflowId), address(resolutionModule1), "Snapshot changed after activation");
+    }
+}

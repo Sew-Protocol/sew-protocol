@@ -44,14 +44,10 @@ contract ResolverIncentiveModule is
     mapping(uint256 => bool) public disputePaymentsDistributed;
     
     // Configuration (governance-controlled)
-    uint256 public resolverSharePercentage = 5000; // 50% (basis points)
+    uint256 public resolverSharePercentage;
     PendingUint private _pendingResolverSharePercentage;
     
-    Weights public weights = Weights({
-        level0: 10000,  // 1x for standard resolvers
-        level1: 15000, // 1.5x for senior resolvers
-        level2: 20000  // 2x for external resolvers
-    });
+    Weights public weights;
     PendingWeights private _pendingWeights;
     
     // Registered escrow contracts that can call onDisputeOpened and onDisputeResolved
@@ -173,6 +169,14 @@ contract ResolverIncentiveModule is
         _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
         _grantRole(ROLE_TIMELOCK, initialOwner);
         
+        // Initialize configuration
+        resolverSharePercentage = 5000; // 50%
+        weights = Weights({
+            level0: 10000,
+            level1: 15000,
+            level2: 20000
+        });
+
         // Validate and set initial library
         require(validateLibrary(initialLibrary), "Invalid library");
         currentPaymentLibrary = initialLibrary;

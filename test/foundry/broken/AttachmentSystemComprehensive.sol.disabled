@@ -34,9 +34,9 @@ contract AttachmentSystemComprehensive is Test {
     bytes32 ROLE_TIMELOCK;
     
     function setUp() public {
-        token = new EscrowableERC20("Test", "TST", ESCROW_FEE, feeRecipient, address(0));
+        token = new EscrowableERC20("Test", "TST", ESCROW_FEE, feeRecipient, address(0), address(0));
         paymentToken = new ERC20Mock("Payment", "PAY", address(this), 1_000_000 ether);
-        vault = new EscrowVault(ESCROW_FEE, feeRecipient, address(0));
+        vault = new EscrowVault(ESCROW_FEE, feeRecipient, address(0), address(0));
         
         ROLE_TIMELOCK = token.ROLE_TIMELOCK();
         token.grantRole(ROLE_TIMELOCK, owner);

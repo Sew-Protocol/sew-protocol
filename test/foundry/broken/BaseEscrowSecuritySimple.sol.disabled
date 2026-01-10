@@ -31,7 +31,7 @@ contract BaseEscrowSecuritySimple is Test {
     
     function setUp() public {
         // Deploy contracts
-        token = new EscrowableERC20("Test Token", "TEST", ESCROW_FEE, feeRecipient, address(0));
+        token = new EscrowableERC20("Test Token", "TEST", ESCROW_FEE, feeRecipient, address(0), address(0));
         
         // Get roles
         ROLE_TIMELOCK = token.ROLE_TIMELOCK();
@@ -244,7 +244,7 @@ contract BaseEscrowSecuritySimple is Test {
     
     function test_Security_handleMaxFee() public {
         // Create new token with max fee (100%)
-        EscrowableERC20 maxFeeToken = new EscrowableERC20("Max Fee", "MAX", 10000, feeRecipient, address(0));
+        EscrowableERC20 maxFeeToken = new EscrowableERC20("Max Fee", "MAX", 10000, feeRecipient, address(0), address(0));
         
         // Setup
         maxFeeToken.grantRole(ROLE_TIMELOCK, owner);
@@ -318,7 +318,7 @@ contract BaseEscrowSecuritySimple is Test {
     
     function test_Security_workflowIdStartsAtZero() public {
         // Deploy fresh token
-        EscrowableERC20 freshToken = new EscrowableERC20("Fresh", "FRH", ESCROW_FEE, feeRecipient, address(0));
+        EscrowableERC20 freshToken = new EscrowableERC20("Fresh", "FRH", ESCROW_FEE, feeRecipient, address(0), address(0));
         assertEq(freshToken.nextWorkflowId(), 0, "First workflow ID should be 0");
     }
 }

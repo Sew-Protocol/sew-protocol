@@ -34,7 +34,7 @@ contract Priority8_FeeAccounting is Test {
         releaseStrategy = new DefaultReleaseStrategy();
         
         token = new ERC20Mock("Test Token", "TEST", owner, 10000000e18);
-        vault = new EscrowVault(ESCROW_FEE, feeAddress, address(0));
+        vault = new EscrowVault(ESCROW_FEE, feeAddress, address(0), address(0));
         
         bytes32 ROLE_TIMELOCK = vault.ROLE_TIMELOCK();
         vault.grantRole(ROLE_TIMELOCK, owner);
@@ -82,7 +82,7 @@ contract Priority8_FeeAccounting is Test {
         feeRates[3] = 500;  // 5%
         
         for (uint256 i = 0; i < feeRates.length; i++) {
-            EscrowVault testVault = new EscrowVault(feeRates[i], feeAddress, address(0));
+            EscrowVault testVault = new EscrowVault(feeRates[i], feeAddress, address(0), address(0));
             bytes32 ROLE_TIMELOCK = testVault.ROLE_TIMELOCK();
             bytes32 ROLE_ADMIN = testVault.DEFAULT_ADMIN_ROLE();
             testVault.grantRole(ROLE_ADMIN, owner);

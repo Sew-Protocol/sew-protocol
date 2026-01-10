@@ -286,14 +286,14 @@ contract EscrowHandler is Test {
         startId = bound(startId, 0, vault.getEscrowCount());
         rangeEnd = bound(rangeEnd, startId, startId + 100);
         
-        try vault.automateTimedActions(startId, rangeEnd) {} catch {}
+        try vault.automateTimedActions(startId) {} catch {}
     }
     
     function automateTimedActionsERC20(uint256 startId, uint256 rangeEnd) external {
         startId = bound(startId, 0, escrowableERC20.getEscrowCount());
         rangeEnd = bound(rangeEnd, startId, startId + 100);
         
-        try escrowableERC20.automateTimedActions(startId, rangeEnd) {} catch {}
+        try escrowableERC20.automateTimedActions(startId) {} catch {}
     }
 }
 

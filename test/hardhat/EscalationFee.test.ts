@@ -25,7 +25,7 @@ describe("Escalation Fee Handling", function () {
     
     // Deploy EscrowableERC20
     const escrowableERC20Factory = await ethers.getContractFactory("EscrowableERC20");
-    escrowableERC20 = (await escrowableERC20Factory.deploy("Test Token", "TEST", ESCROW_FEE, feeAddress.address)) as EscrowableERC20;
+    escrowableERC20 = (await escrowableERC20Factory.deploy("Test Token", "TEST", ESCROW_FEE, feeAddress.address, ethers.ZeroAddress, ethers.ZeroAddress)) as EscrowableERC20;
     await escrowableERC20.waitForDeployment();
     
     // Grant ROLE_TIMELOCK to owner

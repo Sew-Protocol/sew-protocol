@@ -68,12 +68,6 @@ struct EscrowTransfer {
     uint256 autoCancelTime;
     string[] attachmentURIs;
     bytes32[] attachmentHashes;
-    bytes metadata; // optional metadata (IPFS hash, JSON, custom data)
-    // Phase 7: Module snapshots (ensures module changes only affect new escrows)
-    address snapshotResolutionModule;    // Resolution module at creation time
-    address snapshotReleaseStrategy;     // Release strategy at creation time
-    address snapshotYieldGenerationModule;  // Yield generation module at creation time
-    address snapshotYieldDistributionModule; // Yield distribution module at creation time
 }
 
 
