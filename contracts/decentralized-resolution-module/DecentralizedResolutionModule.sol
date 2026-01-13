@@ -9,6 +9,8 @@ import "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeabl
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 import "../shared/governance/SlowLaneQueueActivateUpgradeable.sol";
 import "./IIncentiveModule.sol";
+import "./IStakingModule.sol";
+import "./ISlashingModule.sol";
 import "./DecentralizedResolverStructs.sol";
 import "./ResolutionAnalytics.sol";
 import "./EscalationCostLibrary.sol";
@@ -51,15 +53,15 @@ contract DecentralizedResolutionModule is
     uint256[3] public appealWindows = [2 days, 3 days, 0]; // Time to appeal after decision
     
     // DR v2: Appeal bond configuration
-    EscalationCostConfig public escalationCostConfig;
-    PendingEscalationCostConfig private _pendingEscalationCostConfig;
-    uint256 public minEscrowValueForEscalation; // Minimum escrow value to allow escalation (anti-griefing)
-    
     struct PendingEscalationCostConfig {
         EscalationCostConfig config;
         uint64 eta;
         bool exists;
     }
+    
+    EscalationCostConfig public escalationCostConfig;
+    PendingEscalationCostConfig private _pendingEscalationCostConfig;
+    uint256 public minEscrowValueForEscalation; // Minimum escrow value to allow escalation (anti-griefing)
     
     mapping(address => ResolverRole) public resolverRoles;
     mapping(address => bool) public isApprovedResolver;
@@ -91,10 +93,20 @@ contract DecentralizedResolutionModule is
     mapping(address => bool) public registeredEscrowContracts;
     IIncentiveModule public incentiveModule; // Swappable incentive module (v1/v2/v3)
     
-    // DR v3 placeholders (not implemented in v1/v2, guarded behind module swap)
-    // IStakingModule public stakingModule; // DR v3 - resolver staking
-    // ISlashingModule public slashingModule; // DR v3 - resolver slashing
-    // IFraudProofModule public fraudProofModule; // DR v3 - fraud lane
+    // DR v3: Module configuration structs
+    struct PendingModuleConfig {
+        address module;
+        uint64 eta;
+        bool exists;
+    }
+    
+    // DR v3 modules (swappable implementations, can be address(0) for backward compatibility)
+    IStakingModule public stakingModule;     // DR v3 - resolver staking
+    ISlashingModule public slashingModule;   // DR v3 - resolver slashing
+    // IFraudProofModule public fraudProofModule; // DR v3 - fraud lane (future)
+    
+    PendingModuleConfig private _pendingStakingModule;
+    PendingModuleConfig private _pendingSlashingModule;
 
     event ResolverAppointed(address indexed resolver, ResolverRole role, address indexed appointedBy);
     event ResolverRemoved(address indexed resolver, address indexed removedBy);
@@ -123,6 +135,12 @@ contract DecentralizedResolutionModule is
     event EscalationCostConfigActivated(EscalationCostConfig oldConfig, EscalationCostConfig newConfig);
     event AppealBondRequired(uint256 indexed workflowId, uint8 round, uint256 amount, address token);
     event MinEscrowValueUpdated(uint256 oldValue, uint256 newValue);
+    
+    // DR v3 events
+    event StakingModuleQueued(address indexed module, uint64 eta);
+    event StakingModuleActivated(address indexed oldModule, address indexed newModule);
+    event SlashingModuleQueued(address indexed module, uint64 eta);
+    event SlashingModuleActivated(address indexed oldModule, address indexed newModule);
 
     modifier onlySeniorResolver() { require(isApprovedSeniorResolver[_msgSender()], "Not senior resolver"); _; }
     modifier onlyResolver() { require(isApprovedResolver[_msgSender()] || isApprovedSeniorResolver[_msgSender()], "Not authorized resolver"); _; }
@@ -296,6 +314,16 @@ contract DecentralizedResolutionModule is
             
             try incentiveModule.onEscalated(workflowId, fromRound, toRound, _msgSender()) {}
             catch { emit IncentiveModuleCallFailed(workflowId, "onEscalated", "FAILED"); }
+        }
+        
+        // DR v3: Call staking module hooks (if enabled)
+        if (address(stakingModule) != address(0)) {
+            // Unlock stake from prior round resolver
+            address priorResolver = dm.resolverAtRound[fromRound];
+            try stakingModule.onDisputeEscalated(workflowId, priorResolver) {} catch {}
+            
+            // Lock stake for new resolver
+            try stakingModule.onResolverAssigned(workflowId, nextRes, 0) {} catch {}
         }
         
         return (true, nextRes, toRound);
@@ -501,6 +529,15 @@ contract DecentralizedResolutionModule is
             try incentiveModule.onResolverAssigned(workflowId, resolver, 0) {} 
             catch { emit IncentiveModuleCallFailed(workflowId, "onResolverAssigned", "FAILED"); } 
         }
+        
+        // DR v3: Call staking module hook (if enabled)
+        if (address(stakingModule) != address(0)) {
+            try stakingModule.onResolverAssigned(workflowId, resolver, 0) {
+                // Success - stake locked for this dispute
+            } catch {
+                // Non-critical: Continue even if staking hook fails
+            }
+        }
     }
 
     function registerEscrowContract(address c) external onlyRole(ROLE_TIMELOCK) { registeredEscrowContracts[c] = true; emit EscrowContractRegistered(c); }
@@ -593,6 +630,15 @@ contract DecentralizedResolutionModule is
             catch { emit IncentiveModuleCallFailed(workflowId, "onResolverTimeout", "FAILED"); }
         }
         
+        // DR v3: Call slashing module hook for timeout (if enabled)
+        if (address(slashingModule) != address(0)) {
+            try slashingModule.slashForTimeout(workflowId, timedOutResolver, 1) {
+                // Success - timeout recorded for potential slashing
+            } catch {
+                // Non-critical: Continue even if slashing hook fails
+            }
+        }
+
         // Auto-reassign within same round
         bytes32 category = escrowCategory[workflowId];
         address newResolver;
@@ -658,6 +704,15 @@ contract DecentralizedResolutionModule is
         if (address(incentiveModule) != address(0)) {
             try incentiveModule.onDecisionSubmitted(workflowId, resolver, currentRound, outcome, resolutionTime) {}
             catch { emit IncentiveModuleCallFailed(workflowId, "onDecisionSubmitted", "FAILED"); }
+        }
+        
+        // DR v3: Call staking module hook (if enabled)
+        if (address(stakingModule) != address(0)) {
+            try stakingModule.onResolutionFinalized(workflowId, resolver, true) {
+                // Success - stake unlocked
+            } catch {
+                // Non-critical: Continue even if staking hook fails
+            }
         }
     }
 
@@ -786,6 +841,15 @@ contract DecentralizedResolutionModule is
                 dm.currentRound,
                 emaAlphaBps
             );
+            
+            // DR v3: Call slashing module hook for reversal (if enabled)
+            if (address(slashingModule) != address(0)) {
+                try slashingModule.slashForReversal(workflowId, priorResolver, priorRound) {
+                    // Success - reversal recorded for potential slashing
+                } catch {
+                    // Non-critical: Continue even if slashing hook fails
+                }
+            }
         }
     }
 
@@ -844,6 +908,103 @@ contract DecentralizedResolutionModule is
         uint256 oldValue = minEscrowValueForEscalation;
         minEscrowValueForEscalation = minValue;
         emit MinEscrowValueUpdated(oldValue, minValue);
+    }
+    
+    // ============ DR v3 Governance Functions ============
+    
+    /**
+     * @notice Queue staking module update (DR v3 - slow lane)
+     * @param module New staking module address (can be address(0) to disable)
+     */
+    function queueStakingModule(address module) external onlyRole(ROLE_TIMELOCK) {
+        _pendingStakingModule = PendingModuleConfig({
+            module: module,
+            eta: uint64(block.timestamp + SLOW_DELAY),
+            exists: true
+        });
+        
+        emit StakingModuleQueued(module, _pendingStakingModule.eta);
+    }
+    
+    /**
+     * @notice Activate queued staking module (DR v3 - slow lane)
+     */
+    function activateStakingModule() external onlyRole(ROLE_TIMELOCK) {
+        PendingModuleConfig storage pending = _pendingStakingModule;
+        if (!pending.exists || block.timestamp < pending.eta) revert NoPending();
+        
+        address oldModule = address(stakingModule);
+        stakingModule = IStakingModule(pending.module);
+        
+        emit StakingModuleActivated(oldModule, pending.module);
+        delete _pendingStakingModule;
+    }
+    
+    /**
+     * @notice Queue slashing module update (DR v3 - slow lane)
+     * @param module New slashing module address (can be address(0) to disable)
+     */
+    function queueSlashingModule(address module) external onlyRole(ROLE_TIMELOCK) {
+        _pendingSlashingModule = PendingModuleConfig({
+            module: module,
+            eta: uint64(block.timestamp + SLOW_DELAY),
+            exists: true
+        });
+        
+        emit SlashingModuleQueued(module, _pendingSlashingModule.eta);
+    }
+    
+    /**
+     * @notice Activate queued slashing module (DR v3 - slow lane)
+     */
+    function activateSlashingModule() external onlyRole(ROLE_TIMELOCK) {
+        PendingModuleConfig storage pending = _pendingSlashingModule;
+        if (!pending.exists || block.timestamp < pending.eta) revert NoPending();
+        
+        address oldModule = address(slashingModule);
+        slashingModule = ISlashingModule(pending.module);
+        
+        emit SlashingModuleActivated(oldModule, pending.module);
+        delete _pendingSlashingModule;
+    }
+    
+    /**
+     * @notice Get pending staking module config
+     * @return module Pending module address
+     * @return eta Activation timestamp
+     * @return exists Whether pending config exists
+     */
+    function getPendingStakingModule() external view returns (
+        address module,
+        uint64 eta,
+        bool exists
+    ) {
+        PendingModuleConfig storage pending = _pendingStakingModule;
+        return (pending.module, pending.eta, pending.exists);
+    }
+    
+    /**
+     * @notice Get pending slashing module config
+     * @return module Pending module address
+     * @return eta Activation timestamp
+     * @return exists Whether pending config exists
+     */
+    function getPendingSlashingModule() external view returns (
+        address module,
+        uint64 eta,
+        bool exists
+    ) {
+        PendingModuleConfig storage pending = _pendingSlashingModule;
+        return (pending.module, pending.eta, pending.exists);
+    }
+    
+    /**
+     * @notice Check if DR v3 modules are active
+     * @return stakingActive Whether staking module is set
+     * @return slashingActive Whether slashing module is set
+     */
+    function isV3Active() external view returns (bool stakingActive, bool slashingActive) {
+        return (address(stakingModule) != address(0), address(slashingModule) != address(0));
     }
 
     uint256[50] private __gap;
