@@ -39,7 +39,7 @@ Each module type has an interface, and multiple implementations can exist. The p
 | Implementation | Contract | Status | Change Mechanism |
 |----------------|----------|--------|------------------|
 | DefaultResolutionModule | `contracts/core/modules/DefaultResolutionModule.sol` | ✅ Active | Slow lane (queue/activate) |
-| DecentralizedResolutionModule | `contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol` | 🔄 Separate Package | Can be swapped in via slow-lane governance once proven |
+| DecentralizedResolutionModule | `contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol` | 🔄 Separate Package | **Not in initial mainnet release**. When ready, will be deployed and swapped in via Slow lane (queue + activate, ~9 days) |
 
 **Interface Methods**:
 - `isAuthorizedResolver(uint256 workflowId, address resolver, bytes calldata escrowData) → (bool, uint8)`
@@ -49,13 +49,15 @@ Each module type has an interface, and multiple implementations can exist. The p
 - `moduleName() → string`
 
 **Change Function**:
-- `EscrowableERC20.queueDefaultResolutionModule(address)` / `activateDefaultResolutionModule()`
-- `EscrowVault.queueDefaultResolutionModule(address)` / `activateDefaultResolutionModule()` (Phase 8: Lane consistency fix)
-- `BaseEscrow.proposeResolutionModule(address)` / `activateResolutionModule()` (two-step pattern)
+- `EscrowableERC20.queueDefaultResolutionModule(address)` / `activateDefaultResolutionModule()` - Slow lane (no-op, overridden)
+- `EscrowVault.queueDefaultResolutionModule(address)` / `activateDefaultResolutionModule()` - Slow lane (~9 days)
+- `BaseEscrow.queueResolutionModule(address)` / `activateResolutionModule()` - Slow lane (~9 days)
 
 **Module-Specific Configuration**:
 - `DefaultResolutionModule.setResolver(address)` - Standard lane (48h)
-- `DecentralizedResolutionModule` (when swapped in): All configuration functions require `ROLE_TIMELOCK` via standard governance lanes
+- `DecentralizedResolutionModule` (when swapped in): All configuration functions require `ROLE_TIMELOCK` via Standard lane (48h)
+
+**Note**: All modules use the same governance pattern: Slow lane for module swaps (~9 days). Modules are immutable - upgrades via deploy new version + swap.
 
 ---
 
@@ -105,7 +107,7 @@ Each module type has an interface, and multiple implementations can exist. The p
 
 **Distribution Configuration**:
 - `BaseEscrow.setDefaultYieldDistribution(address[] recipients, uint256[] percentages)` - Standard lane (48h)
-- `BaseEscrow.setEscrowYieldDistribution(uint256 workflowId, address[] recipients, uint256[] percentages)` - Standard lane (48h)
+- **Note**: Per-escrow yield distribution is immutable at creation. It is determined by the snapshotted yield distribution module and any configuration parameters set at creation time.
 
 ---
 
@@ -204,14 +206,11 @@ To add a new module implementation:
    hardhat deploy --tags MyNewResolutionModule
    ```
 
-3. **Queue/activate via governance** (for EscrowableERC20):
-   - Create governance proposal to queue new module
-   - Wait 7 days
-   - Create governance proposal to activate new module
-
-4. **Or set directly** (for EscrowVault):
-   - Create governance proposal to set new module
-   - Wait 48 hours for Timelock execution
+3. **Queue/activate via governance** (Slow lane, ~9 days):
+   - Create governance proposal to queue new module (48h delay)
+   - Wait 7 days (slow lane delay)
+   - Create governance proposal to activate new module (48h delay)
+   - **Applies to**: EscrowVault, BaseEscrow (all use same pattern)
 
 ---
 

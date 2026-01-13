@@ -24,7 +24,7 @@ describe("EscrowVault", function () {
     
     // Deploy EscrowVault
     const escrowVaultFactory = await ethers.getContractFactory("EscrowVault");
-    escrowVault = (await escrowVaultFactory.deploy(ESCROW_FEE, feeAddress.address)) as EscrowVault;
+    escrowVault = (await escrowVaultFactory.deploy(ESCROW_FEE, feeAddress.address, ethers.ZeroAddress, ethers.ZeroAddress)) as EscrowVault;
     await escrowVault.waitForDeployment();
     
     // Deploy mock ERC20 tokens
@@ -253,7 +253,7 @@ describe("EscrowVault", function () {
       
       const recipientBalanceBefore = await token1.balanceOf(recipient.address);
       
-      await escrowVault.connect(resolver).releaseAsDisputeResolver(workflowId);
+      await escrowVault.connect(resolver).releaseAsDisputeResolver(workflowId, ethers.ZeroHash);
       
       const escrowTransfer = await escrowVault.escrowTransfers(workflowId);
       expect(escrowTransfer.escrowState).to.equal(5); // RESOLVED

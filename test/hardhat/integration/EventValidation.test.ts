@@ -52,7 +52,7 @@ describe("EventValidation", () => {
 
         // Deploy vault
         const VaultFactory = await ethers.getContractFactory("EscrowVault");
-        vault = await VaultFactory.deploy(ESCROW_FEE, feeRecipient.address);
+        vault = await VaultFactory.deploy(ESCROW_FEE, feeRecipient.address, ethers.ZeroAddress, ethers.ZeroAddress);
         vaultAddress = await vault.getAddress();
 
         // Grant roles

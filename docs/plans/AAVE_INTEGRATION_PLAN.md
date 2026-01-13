@@ -218,8 +218,10 @@ struct YieldDistribution {
 // Global default yield distribution
 YieldDistribution public defaultYieldDistribution;
 
-// Per-escrow yield distribution (overrides default)
-mapping(uint256 => YieldDistribution) public escrowYieldDistribution;
+// Note: Per-escrow yield distribution is immutable at creation.
+// It is determined by the snapshotted yield distribution module and any
+// configuration parameters set in EscrowSettings at creation time.
+// There is no mutable mapping for per-escrow yield distribution.
 ```
 
 ### 3.2 Yield Distribution Logic
@@ -234,12 +236,11 @@ function _distributeYield(uint256 workflowId, address token, uint256 yieldAmount
     EscrowTransfer storage et = escrowTransfers[workflowId];
     YieldDistribution memory distribution;
     
-    // Check if escrow has custom distribution, otherwise use default
-    if (escrowYieldDistribution[workflowId].isSet) {
-        distribution = escrowYieldDistribution[workflowId];
-    } else {
-        distribution = defaultYieldDistribution;
-    }
+    // Yield distribution is determined by the snapshotted yield distribution module.
+    // The module receives distribution data encoded in EscrowSettings at creation time.
+    // If no custom distribution was set at creation, use default.
+    // Note: This is handled by the yield distribution module, not BaseEscrow storage.
+    distribution = defaultYieldDistribution;
     
     // Validate distribution exists
     if (!distribution.isSet || distribution.recipients.length == 0) {
@@ -285,26 +286,14 @@ function setDefaultYieldDistribution(
 ```
 
 #### 3.3.2 Per-Escrow (in Settings)
-```solidity
-// Set when creating escrow or update later
-function setEscrowYieldDistribution(
-    uint256 workflowId,
-    address[] memory recipients,
-    uint256[] memory percentages
-) public {
-    EscrowTransfer storage et = escrowTransfers[workflowId];
-    require(et.from == _msgSender() || _msgSender() == owner(), "Not authorized");
-    require(et.escrowTransferStatus == EscrowTransferStatus.PENDING, "Escrow not pending");
-    
-    _validateYieldDistribution(recipients, percentages);
-    escrowYieldDistribution[workflowId] = YieldDistribution({
-        recipients: recipients,
-        percentages: percentages,
-        isSet: true
-    });
-    emit EscrowYieldDistributionUpdated(workflowId, recipients, percentages);
-}
-```
+**Note**: Per-escrow yield distribution is **immutable at creation**. It must be configured via `EscrowSettings` when creating the escrow. There is no function to modify yield distribution after escrow creation.
+
+Yield distribution configuration is determined by:
+- The snapshotted yield distribution module (immutable after creation)
+- Any distribution parameters set in `EscrowSettings` at creation time
+- The module's internal logic for handling distribution
+
+This ensures consistency with the "no per-escrow governance intervention" principle.
 
 ---
 

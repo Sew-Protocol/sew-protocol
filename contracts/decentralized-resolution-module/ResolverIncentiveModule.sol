@@ -31,6 +31,10 @@ contract ResolverIncentiveModule is
     // ============ Role Constants ============
     bytes32 public constant ROLE_TIMELOCK = keccak256("ROLE_TIMELOCK");
     
+    // ============ Constants ============
+    uint256 public constant BASIS_POINTS_DENOMINATOR = 10000;
+    uint256 public constant MAX_SINGLE_PAYMENT_PERCENTAGE = 9000; // 90% - maximum single payment share
+    
     // ============ State Variables ============
     
     // Current payment calculation library (upgradeable via governance)
@@ -42,6 +46,10 @@ contract ResolverIncentiveModule is
     mapping(uint256 => uint256) public disputeEscrowFees;
     mapping(uint256 => uint256) public disputeEscalationFees;
     mapping(uint256 => bool) public disputePaymentsDistributed;
+    
+    // Pull pattern: claimable payments per resolver per dispute
+    mapping(uint256 => mapping(address => uint256)) public claimablePayments;
+    mapping(uint256 => bool) public paymentsCalculated;
     
     // Configuration (governance-controlled)
     uint256 public resolverSharePercentage;
@@ -134,6 +142,24 @@ contract ResolverIncentiveModule is
     
     event EscrowContractRegistered(address indexed escrowContract);
     event EscrowContractUnregistered(address indexed escrowContract);
+    
+    event PaymentsCalculated(
+        uint256 indexed workflowId,
+        address indexed token,
+        uint256 totalResolverShare
+    );
+    
+    event PaymentClaimed(
+        uint256 indexed workflowId,
+        address indexed resolver,
+        uint256 amount
+    );
+    
+    event PaymentClaimFailed(
+        uint256 indexed workflowId,
+        address indexed resolver,
+        string reason
+    );
     
     // ============ Structs ============
     
@@ -302,18 +328,19 @@ contract ResolverIncentiveModule is
     }
     
     /**
-     * @notice Calculate and distribute payments when dispute is resolved
+     * @notice Calculate payments when dispute is resolved (pull pattern)
      * @param workflowId The escrow transfer ID
      * @param token Token address for payments
      * @dev Called by escrow contract when dispute is resolved
-     *      Uses current payment library to calculate payments
+     *      Calculates payments and makes them claimable (pull pattern)
+     *      Escrow contract must transfer tokens to this contract before calling
      */
     function onDisputeResolved(
         uint256 workflowId,
         address token
     ) external onlyEscrowContract nonReentrant {
         require(token != address(0), "Zero token");
-        require(!disputePaymentsDistributed[workflowId], "Payments already distributed");
+        require(!paymentsCalculated[workflowId], "Payments already calculated");
         
         // Gather data (imperative - state reads)
         ResolverRecord[] memory resolvers = disputeResolvers[workflowId];
@@ -334,20 +361,96 @@ contract ResolverIncentiveModule is
         // Calculate payments (functional - pure library call)
         PaymentOutput memory output = calculatePaymentsWithVersion(input);
         
-        // Check contract has sufficient balance (Phase 1: Task 1.5)
+        // ============ Bounds Checking ============
+        // Validate payment calculation results
+        
+        // 1. Array length validation
+        require(output.resolvers.length == output.payments.length, "Array length mismatch");
+        require(output.resolvers.length > 0, "No resolvers in output");
+        
+        // 2. Total amount validation - resolver share cannot exceed total fees
+        require(output.totalResolverShare <= escrowFee + escalationFees, "Resolver share exceeds total fees");
+        
+        // 3. Individual payment validation
+        uint256 calculatedTotal = 0;
+        for (uint256 i = 0; i < output.payments.length; i++) {
+            // Each payment must be non-negative and not exceed total
+            require(output.payments[i] <= output.totalResolverShare, "Individual payment exceeds total");
+            
+            // Sum validation (check for overflow)
+            uint256 previousTotal = calculatedTotal;
+            calculatedTotal += output.payments[i];
+            require(calculatedTotal >= previousTotal, "Payment sum overflow");
+        }
+        
+        // 4. Sum validation - sum of individual payments should equal total
+        require(calculatedTotal == output.totalResolverShare, "Payment sum mismatch");
+        
+        // 5. Resolver address validation
+        for (uint256 i = 0; i < output.resolvers.length; i++) {
+            require(output.resolvers[i] != address(0), "Zero resolver address");
+        }
+        
+        // 6. Maximum payment validation - no single payment should exceed reasonable bounds
+        // (e.g., no single resolver should get more than 90% of total share)
+        // Only apply this check when there are multiple resolvers
+        // When there's only one resolver, they should legitimately get 100% of the share
+        if (output.resolvers.length > 1) {
+            uint256 maxSinglePayment = (output.totalResolverShare * MAX_SINGLE_PAYMENT_PERCENTAGE) / BASIS_POINTS_DENOMINATOR;
+            for (uint256 i = 0; i < output.payments.length; i++) {
+                require(output.payments[i] <= maxSinglePayment, "Payment exceeds maximum allowed");
+            }
+        }
+        
+        // 7. Minimum payment validation - if there are multiple resolvers, no payment should be 0
+        // (unless explicitly allowed by the payment library)
+        // Note: Zero payments are allowed but will be skipped in distribution
+        
+        // Check contract has sufficient balance
         IERC20 tokenContract = IERC20(token);
         uint256 contractBalance = tokenContract.balanceOf(address(this));
         require(contractBalance >= output.totalResolverShare, "Insufficient balance");
         
-        // Phase 2: Task 2.5 - Token transfer pattern clarification
-        // Note: Escrow contract must transfer tokens to this contract before calling onDisputeResolved
-        // The balance check above ensures tokens are available for distribution
+        // Store claimable amounts (pull pattern - resolvers claim their payments)
+        for (uint256 i = 0; i < output.resolvers.length; i++) {
+            if (output.resolvers[i] != address(0) && output.payments[i] > 0) {
+                claimablePayments[workflowId][output.resolvers[i]] = output.payments[i];
+            }
+        }
         
-        // Mark as distributed before external calls
-        disputePaymentsDistributed[workflowId] = true;
+        // Mark as calculated (allows resolvers to claim)
+        paymentsCalculated[workflowId] = true;
+        disputePaymentsDistributed[workflowId] = true; // For backward compatibility
         
-        // Distribute payments (imperative - state changes)
-        distributePayments(workflowId, token, output);
+        emit PaymentsCalculated(workflowId, token, output.totalResolverShare);
+    }
+    
+    /**
+     * @notice Claim payment for a resolved dispute (pull pattern)
+     * @param workflowId The escrow transfer ID
+     * @param token Token address for payment
+     * @dev Resolvers call this to claim their payment
+     *      Allows retry if initial transfer fails
+     */
+    function claimPayment(
+        uint256 workflowId,
+        address token
+    ) external nonReentrant {
+        require(token != address(0), "Zero token");
+        require(paymentsCalculated[workflowId], "Payments not calculated");
+        
+        uint256 amount = claimablePayments[workflowId][_msgSender()];
+        require(amount > 0, "Nothing to claim");
+        
+        // Clear claimable amount before transfer (prevent reentrancy)
+        delete claimablePayments[workflowId][_msgSender()];
+        
+        // Transfer payment (safeTransfer will revert on failure, restoring claimable amount is not needed
+        // since the delete above will be reverted by the transaction revert)
+        IERC20 tokenContract = IERC20(token);
+        tokenContract.safeTransfer(_msgSender(), amount);
+        
+        emit PaymentClaimed(workflowId, _msgSender(), amount);
     }
     
     /**
@@ -374,11 +477,13 @@ contract ResolverIncentiveModule is
     }
     
     /**
-     * @notice Distribute payments to resolvers
+     * @notice Distribute payments to resolvers (legacy push pattern - kept for backward compatibility)
      * @param workflowId The escrow transfer ID
      * @param token Token address
      * @param output Payment calculation output
      * @dev Transfers tokens to each resolver
+     * @dev NOTE: This function is deprecated. Use claimPayment() (pull pattern) instead.
+     *      Kept for backward compatibility if needed.
      */
     function distributePayments(
         uint256 workflowId,
@@ -679,6 +784,29 @@ contract ResolverIncentiveModule is
         external view returns (bool)
     {
         return disputePaymentsDistributed[workflowId];
+    }
+    
+    /**
+     * @notice Check if payments have been calculated for a dispute
+     * @param workflowId The escrow transfer ID
+     * @return calculated True if payments have been calculated (claimable)
+     */
+    function arePaymentsCalculated(uint256 workflowId)
+        external view returns (bool)
+    {
+        return paymentsCalculated[workflowId];
+    }
+    
+    /**
+     * @notice Get claimable payment amount for a resolver
+     * @param workflowId The escrow transfer ID
+     * @param resolver Resolver address
+     * @return amount Claimable amount (0 if nothing to claim)
+     */
+    function getClaimablePayment(uint256 workflowId, address resolver)
+        external view returns (uint256)
+    {
+        return claimablePayments[workflowId][resolver];
     }
     
     /**

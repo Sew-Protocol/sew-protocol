@@ -1,4 +1,4 @@
-# Escrow Protocol Whitepaper
+# Sew Protocol Whitepaper
 
 **Version:** 1.0  
 **Last Updated:** 2026-01-06  
@@ -7,9 +7,19 @@
 
 ---
 
+## Vision & Why
+
+We want to see accelerating consumer adoption of Ethereum for payments. The biggest problem is risk of lost money through errors or fraud. We want to enable that protection in an Ethereum-native way. It's genuinely decentralised, opensource, ethical and human first. No monitoring or unclear terms and conditions. No lock in. We introduce new primitives that augment the already proven account abstraction primitives (and also function independently with legacy EOA).
+
+Sew Protocol provides the foundational infrastructure to make Ethereum payments safe for everyday purchases, enabling trustless transactions for physical goods while maintaining the decentralized, transparent, and user-controlled principles of Web3.
+
+---
+
 ## Executive Summary
 
-The Escrow Protocol is a decentralized, trustless escrow system built on Base that enables secure peer-to-peer transactions with built-in dispute resolution, optional yield generation, and comprehensive onchain governance. The protocol addresses the fundamental trust problem in blockchain transactions by providing a secure, transparent, and flexible escrow mechanism that protects both buyers and sellers while maintaining the decentralized ethos of Web3.
+Sew Protocol is a decentralized, trustless escrow system built on Base that enables secure peer-to-peer transactions for everyday purchases with built-in dispute resolution, optional yield generation, and comprehensive onchain governance. The protocol addresses the fundamental trust problem in blockchain transactions by providing a secure, transparent, and flexible escrow mechanism that protects both buyers and sellers while maintaining the decentralized ethos of Web3.
+
+**Primary Use Case**: Safe everyday purchases of physical goods, enabling consumers to use Ethereum for payments with protection against fraud and errors.
 
 **Key Innovations:**
 - **Modular Architecture**: Pluggable resolution, yield, and distribution modules
@@ -25,13 +35,13 @@ The Escrow Protocol is a decentralized, trustless escrow system built on Base th
 
 ### 1.1 The Trust Problem in Blockchain Transactions
 
-Blockchain technology has revolutionized digital transactions by enabling trustless, peer-to-peer value transfer. However, this trustlessness creates a fundamental challenge: **onchain transactions are irreversible**. While this immutability provides security and finality, it creates significant friction for everyday transactions where:
+Blockchain technology has revolutionized digital transactions by enabling trustless, peer-to-peer value transfer. However, this trustlessness creates a fundamental challenge: **onchain transactions are irreversible**. While this immutability provides security and finality, it creates significant friction for everyday purchases of physical goods where:
 
-- **Buyers** need protection against non-delivery or misrepresented goods
-- **Sellers** need assurance of payment before shipping or delivering services
-- **Both parties** need a mechanism to resolve disputes fairly
+- **Buyers** need protection against non-delivery, damaged goods, or misrepresented items
+- **Sellers** need assurance of payment before shipping physical products
+- **Both parties** need a mechanism to resolve disputes fairly without relying on centralized intermediaries
 
-Traditional solutions rely on centralized intermediaries (e.g., payment processors, escrow services), which reintroduce trust assumptions and defeat the purpose of decentralized systems.
+Traditional solutions rely on centralized intermediaries (e.g., payment processors, escrow services, marketplaces), which reintroduce trust assumptions, monitoring, unclear terms, and lock-in - defeating the purpose of decentralized systems.
 
 ### 1.2 Current State of Escrow on Ethereum
 
@@ -45,14 +55,16 @@ Existing escrow solutions on Ethereum suffer from several limitations:
 
 ### 1.3 Our Solution
 
-The Escrow Protocol provides a **standardized, modular, and governance-controlled** escrow system that:
+Sew Protocol provides a **standardized, modular, and governance-controlled** escrow system that:
 
-- Enables secure, reversible payments for everyday transactions
+- Enables secure, reversible payments for everyday purchases of physical goods
 - Provides built-in dispute resolution with multiple escalation levels
 - Supports automated time-based settlements
 - Generates optional yield on escrowed funds
-- Maintains composability with existing DeFi protocols
+- Maintains composability with account abstraction and existing DeFi protocols
+- Works with both account abstraction wallets and legacy EOA wallets
 - Evolves transparently through onchain governance
+- No monitoring, no unclear terms, no lock-in - genuinely decentralized and human-first
 
 ---
 
@@ -69,21 +81,47 @@ The protocol is built on four fundamental principles:
 
 ### 2.2 Architecture Overview
 
-The protocol consists of three main components:
+Sew Protocol is built on a modular architecture that enables safe, trustless transactions for everyday purchases:
 
 #### Core Escrow Contracts (Immutable)
-- **BaseEscrow**: Abstract base contract with shared escrow logic
-- **EscrowVault**: Multi-token escrow vault supporting any ERC20 token
-- **EscrowableERC20**: ERC20 token with built-in escrow functionality
+- **BaseEscrow**: Abstract base contract with shared escrow logic, state machine, and module integration
+- **EscrowVault**: Multi-token escrow vault supporting any ERC20 token - ideal for marketplaces and multi-token use cases
+- **EscrowableERC20**: ERC20 token with built-in escrow functionality - enables token-specific escrow capabilities
 
-#### Resolution Modules (Swappable)
-- **DefaultResolutionModule**: Simple single-resolver system (initial deployment)
+**Key Features**:
+- Immutable core contracts (no proxies) for maximum security and auditability
+- Snapshot semantics: Escrow rules locked at creation, immune to governance changes
+- Account abstraction compatible: Works with smart contract wallets and legacy EOAs
+
+#### Resolution Modules (Swappable via Governance)
+- **DefaultResolutionModule**: Simple single-resolver system (initial mainnet deployment)
+  - Single trusted resolver per escrow
+  - Governance-controlled resolver updates
+  - Suitable for initial launch and simple disputes
+
 - **DecentralizedResolutionModule**: Advanced multi-resolver system with escalation (future swap-in)
+  - Multi-resolver registry with round-robin selection
+  - Three-level escalation: Standard → Senior → External resolver
+  - Category-based dispute routing
+  - Resolver incentive system
+
+**Module Governance**: All modules are immutable. Module upgrades are performed by deploying a new version and swapping via Slow lane (queue + activate, ~9 days). Both queue and activate operations require Timelock execution (ROLE_TIMELOCK), ensuring all module changes are time-delayed and transparent.
 
 #### Supporting Modules (Optional)
-- **AaveYieldGenerationModule**: Generates yield on escrowed funds
-- **DefaultYieldDistributionModule**: Configurable yield distribution
-- **ResolverIncentiveModule**: Tracks and distributes payments to resolvers
+- **AaveYieldGenerationModule**: Generates yield on escrowed funds via Aave integration
+  - Optional per-escrow yield generation
+  - Protected by exposure caps and pause mechanisms
+  - Governance-controlled enable/disable
+
+- **DefaultYieldDistributionModule**: Configurable yield distribution to recipients
+  - Percentage-based allocation
+  - Multiple recipients support
+  - Immutable at escrow creation
+
+- **ResolverIncentiveModule**: Tracks and distributes payments to resolvers (future, with DecentralizedResolutionModule)
+  - Resolver activity tracking
+  - Automatic payment distribution
+  - Incentive alignment for fair resolution
 
 ### 2.3 Key Guarantees
 
@@ -138,10 +176,11 @@ A simple, single-resolver resolution module:
 
 #### DecentralizedResolutionModule (Future Swap-In)
 
-An advanced decentralized resolution system (in separate package, can be swapped in via governance):
+An advanced decentralized resolution system (in separate package, **not included in initial mainnet release**. When ready, will be deployed and swapped in via Slow lane governance - queue + activate via Timelock, ~9 days):
 
 - **Resolver Registry**: Standard and senior resolvers
 - **Round-Robin Selection**: Fair distribution of disputes
+- **Governance**: Uses same pattern as other modules - deploy new version and swap via Slow lane (queue + activate via Timelock, ~9 days total)
 - **Three-Level Escalation**: Standard → Senior → External
 - **Category-Based Assignment**: Dynamic resolution table
 - **Resolver Incentives**: Automatic payment distribution
@@ -248,15 +287,19 @@ The protocol uses a multi-layered governance system:
 - **Down-only**: Cannot unpause, enable features, or raise caps
 
 #### Standard Lane (48h delay, Timelock)
-- Module upgrades
 - Parameter changes
 - Unpause protocol
 - Fee configuration updates
+- Operational configuration
 
 #### Slow Lane (~9 days delay, Timelock)
-- High-impact changes (module swaps)
+- Module swaps (all modules use this pattern)
+  - Process: Deploy new module → Queue (48h delay via Timelock) → Wait 7 days → Activate (48h delay via Timelock)
+  - Total time: ~9 days wall-clock (48h + 7d + 48h)
+  - Both queue and activate require Timelock execution (ROLE_TIMELOCK)
+  - All modules are immutable; upgrades are performed by deploying a new version and swapping
+- Fee recipient changes
 - Critical parameter changes
-- Payment calculation library upgrades
 
 ### 5.3 Governance Guarantees
 
@@ -267,89 +310,174 @@ The protocol uses a multi-layered governance system:
 
 ---
 
-## 6. Security & Trust Model
+## 6. Security
 
 ### 6.1 Security Goals
 
-The protocol is designed with the following security goals:
+Sew Protocol is designed with the following security goals:
 
-1. **Escrow Correctness**: Funds are correctly tracked and cannot be double-spent
-2. **Immutability of In-Flight Escrows**: Escrow rules cannot be changed after creation
-3. **Bounded Governance Changes**: All changes are time-delayed and bounded
-4. **Safe Dispute Resolution**: Resolution logic cannot be manipulated
-5. **Safe External Integrations**: External protocol failures don't result in fund loss
-6. **Reentrancy Protection**: Critical functions use reentrancy guards
-7. **Access Control Integrity**: Role-based access control properly enforced
+1. **Escrow Correctness**: Funds are correctly tracked and cannot be double-spent or lost due to state machine errors
+2. **Immutability of In-Flight Escrows**: Escrow rules (modules, timeouts, resolver) cannot be changed after creation by any actor, including governance
+3. **Bounded Governance Changes**: All governance changes are time-delayed and bounded. Changes affect only new escrows
+4. **Safe Dispute Resolution**: Dispute resolution is handled by authorized resolvers with proper access control. Resolution logic cannot be manipulated
+5. **Safe External Integrations**: External integrations (e.g., Aave) are protected by caps, pause mechanisms, and proper accounting. Failures in external protocols do not result in fund loss
+6. **No Per-Escrow Admin Overrides**: No function exists that allows governance to modify individual escrow rules after creation
+7. **Guardian Down-Only Powers**: Emergency controls can only reduce risk, never increase it. Guardian cannot unpause, enable features, or raise caps
+8. **Reentrancy Protection**: Critical functions use reentrancy guards and follow checks-effects-interactions pattern
+9. **Access Control Integrity**: Role-based access control is properly enforced. Deployer roles are revoked after deployment
+10. **Time-Delayed Governance**: All non-emergency changes execute through onchain timelock (48 hours for Standard lane, ~9 days for Slow lane)
 
-### 6.2 Trust Assumptions
+### 6.2 Security Architecture
 
-The protocol minimizes trust assumptions:
+#### Immutable Core Contracts
+- **BaseEscrow**, **EscrowVault**, **EscrowableERC20**: Deployed immutably (no proxies)
+- **No Upgrade Risk**: Core escrow logic cannot be changed after deployment
+- **Auditability**: Immutable contracts are easier to audit and verify
 
-- **Smart Contract Correctness**: Contracts must be correctly implemented (mitigated by audits)
-- **Governance Honesty**: Governance must act in protocol's best interest (mitigated by timelock and transparency)
-- **Resolver Honesty**: Resolvers must act fairly (mitigated by escalation and incentives)
-- **External Protocol Security**: Aave must be secure (mitigated by caps and pause mechanisms)
+#### Immutable Modules
+- **All modules are immutable**: Upgrades are performed by deploying a new version and swapping via Slow lane (~9 days)
+- **Unified Governance**: All modules use the same governance pattern (queue + activate via Timelock)
+- **Timelock-Only Execution**: Both queue and activate operations require Timelock execution (ROLE_TIMELOCK), ensuring all module changes are time-delayed and transparent
+- **Snapshot Semantics**: Module addresses are snapshotted at escrow creation and cannot be changed
+- **Process**: Deploy new module → Queue (48h delay via Timelock) → Wait 7 days → Activate (48h delay via Timelock) = ~9 days total
 
-### 6.3 Security Measures
+#### Governance Security
+- **Time-Delayed Execution**: All changes require timelock delays (48h Standard, ~9 days Slow)
+- **Bounded Changes**: All parameter changes are bounded onchain
+- **Emergency Controls**: Guardian can pause or reduce risk, but cannot increase risk
+- **Transparent**: All proposals and votes are onchain and publicly verifiable
 
-- **Immutable Core Contracts**: Core escrow contracts are not upgradeable
-- **Time-Delayed Governance**: All changes require timelock delays
-- **Emergency Controls**: Guardian can pause or reduce risk
-- **Comprehensive Testing**: Hardhat + Foundry test suites
-- **Static Analysis**: Slither analysis configured
+#### External Integration Security
+- **Aave Integration**: Protected by exposure caps and pause mechanisms
+- **Cap Enforcement**: Deposits enforce `exposure[token] + amount <= cap[token]`
+- **Guardian Controls**: Guardian can disable Aave or lower caps immediately
+- **No Direct Fund Risk**: External protocol failures don't result in direct fund loss
+
+### 6.3 Trust Model
+
+#### What Users Must Trust
+1. **Token Contracts**: ERC20 tokens behave as specified (standard ERC20 required)
+2. **Chain Liveness**: Base mainnet remains operational and accessible
+3. **Block Timestamps**: `block.timestamp` is reasonably accurate for auto-settlement
+4. **External Protocols**: If yield enabled, Aave protocol functions correctly
+5. **Governance Process**: Token holders vote honestly and timelock executes correctly
+6. **Resolver Honesty**: Dispute resolution relies on resolver behavior (mitigated by escalation and incentives)
+
+#### What Users Do NOT Need to Trust
+1. **Team/Developers**: Cannot modify in-flight escrow rules. Cannot unilaterally change modules
+2. **Governance**: Cannot change rules of existing escrows. Can only affect new escrows
+3. **Guardian**: Cannot steal funds, unpause without timelock, or increase risk. Powers are strictly down-only
+4. **Deployer**: All deployer roles are revoked after deployment
+5. **Future Code Changes**: Core contracts are non-upgradeable. Module upgrades are time-delayed and transparent
+
+### 6.4 Security Measures
+
+#### Code Security
+- **Comprehensive Testing**: Hardhat + Foundry test suites with high coverage
+- **Static Analysis**: Slither analysis configured and run regularly
+- **Fuzz Testing**: Foundry fuzz tests for critical paths
+- **Formal Verification**: Considered for critical invariants
+
+#### Operational Security
+- **Emergency Procedures**: Clear runbooks for emergency situations
+- **Guardian Multisig**: Hardware wallet-based multisig for emergency controls
+- **Monitoring**: Onchain monitoring for suspicious activity
+- **Incident Response**: Documented procedures for security incidents
+
+#### Audit & Verification
+- **Security Audits**: Multiple audit phases planned before mainnet
+- **Bug Bounties**: Bug bounty program for ongoing security
+- **Public Verification**: All contracts verified on Basescan
 - **Security Documentation**: Comprehensive security model and threat analysis
+
+### 6.5 Known Risks & Mitigations
+
+#### Smart Contract Risks
+- **Reentrancy**: Mitigated by ReentrancyGuard and CEI pattern
+- **Access Control**: Mitigated by role-based access control and role revocation
+- **Integer Overflow**: Mitigated by Solidity 0.8.33 built-in checks
+- **Front-Running**: Mitigated by commit-reveal patterns where applicable
+
+#### Governance Risks
+- **Governance Attacks**: Mitigated by timelock delays and proposal thresholds
+- **Malicious Proposals**: Mitigated by voting requirements and timelock delays
+- **Guardian Compromise**: Mitigated by multisig and down-only powers
+
+#### External Risks
+- **Aave Protocol Failure**: Mitigated by caps, pause mechanisms, and withdrawal procedures
+- **Token Contract Issues**: Mitigated by standard ERC20 requirement and SafeERC20 usage
+- **Chain Issues**: Mitigated by Base L2 reliability and monitoring
+
+#### Operational Risks
+- **Key Management**: Mitigated by hardware wallets and multisig
+- **Human Error**: Mitigated by runbooks, testing, and rehearsals
+- **Social Engineering**: Mitigated by security policies and access controls
+
+### 6.6 Security Guarantees
+
+Sew Protocol provides the following security guarantees:
+
+1. **Fund Safety**: Escrowed funds are held in smart contracts and cannot be accessed without proper authorization
+2. **Rule Immutability**: Once an escrow is created, its rules cannot be changed by any actor, including governance
+3. **Governance Bounds**: All governance changes are time-delayed and affect only new escrows
+4. **Emergency Controls**: Guardian can pause protocol or reduce risk, but cannot increase risk or unpause
+5. **No Per-Escrow Overrides**: No governance actor can modify rules for a specific escrow after creation
+6. **Transparent Operations**: All operations are onchain and publicly verifiable
 
 ---
 
 ## 7. Use Cases
 
-### 7.1 E-Commerce
+### 7.1 Everyday Physical Goods Purchases (Primary Use Case)
 
-**Scenario**: Buyer purchases goods from seller
+**Scenario**: Consumer purchases physical goods from seller using Ethereum
 
-1. Buyer creates escrow with seller address and amount
-2. Buyer funds escrow
+1. Buyer creates escrow with seller address and payment amount
+2. Buyer funds escrow (using account abstraction wallet or legacy EOA)
+3. Seller ships physical goods
+4. Buyer receives goods, inspects, and releases escrow
+5. If dispute (damaged goods, wrong item, non-delivery): Resolver reviews evidence and makes decision
+
+**Benefits**: 
+- Buyer protection against fraud and errors
+- Seller assurance of payment before shipping
+- No centralized intermediary or monitoring
+- Works with any ERC20 token
+- Account abstraction compatible
+
+**Example**: Purchasing electronics, clothing, collectibles, or any physical product with Ethereum payment protection.
+
+### 7.2 Marketplace Integration
+
+**Scenario**: Online marketplace integrates Sew Protocol for buyer protection
+
+1. Marketplace creates escrow for each transaction
+2. Buyer funds escrow at checkout
 3. Seller ships goods
-4. Buyer receives goods and releases escrow
-5. If dispute: Resolver reviews evidence and makes decision
+4. Buyer confirms receipt and releases escrow
+5. If dispute: Marketplace resolver or protocol resolver handles dispute
 
-**Benefits**: Buyer protection, seller assurance, automated dispute resolution
+**Benefits**: 
+- Built-in buyer protection for marketplaces
+- Reduces chargeback risk for sellers
+- Transparent, onchain dispute resolution
+- No payment processor lock-in
 
-### 7.2 Freelance Services
+### 7.3 Peer-to-Peer Physical Goods Sales
 
-**Scenario**: Client hires freelancer for project
-
-1. Client creates escrow with freelancer address and payment amount
-2. Client funds escrow
-3. Freelancer completes work
-4. Client reviews and releases escrow
-5. If dispute: Resolver reviews work and makes decision
-
-**Benefits**: Milestone-based payments, dispute resolution, trustless transactions
-
-### 7.3 Peer-to-Peer Sales
-
-**Scenario**: Person-to-person sale of digital goods
+**Scenario**: Person-to-person sale of physical items (e.g., classified ads, social commerce)
 
 1. Buyer creates escrow with seller address
 2. Buyer funds escrow
-3. Seller delivers digital goods
+3. Seller ships or delivers goods
 4. Buyer verifies and releases escrow
-5. If dispute: Resolver reviews evidence
+5. If dispute: Resolver reviews evidence (photos, tracking, messages)
 
-**Benefits**: Protection for both parties, no intermediary needed
-
-### 7.4 Token Launches
-
-**Scenario**: Token sale with vesting or conditions
-
-1. Investor creates escrow with token contract
-2. Investor funds escrow
-3. Conditions are met (e.g., vesting period)
-4. Escrow automatically releases
-5. If dispute: Resolver reviews conditions
-
-**Benefits**: Trustless token sales, automated vesting, dispute resolution
+**Benefits**: 
+- Protection for both parties in P2P transactions
+- No need for trusted intermediary
+- Works with any Ethereum wallet
+- Transparent dispute resolution
 
 ---
 
@@ -386,55 +514,148 @@ The protocol minimizes trust assumptions:
 
 ## 9. Roadmap
 
-### Phase 1: Initial Mainnet Deployment ✅
+### Phase 1: Initial Mainnet Deployment
 
-- Core escrow contracts (immutable)
-- DefaultResolutionModule
-- Basic governance infrastructure
-- Emergency controls
-- Comprehensive testing and audits
+**Goal**: Launch Sew Protocol on Base mainnet with core escrow functionality
+
+**Deliverables**:
+- Core escrow contracts (immutable, no proxies)
+- DefaultResolutionModule (single-resolver system)
+- Basic governance infrastructure (Governor, Timelock, Guardian)
+- Emergency controls (pause, disable Aave, lower caps)
+- Aave yield generation integration (optional)
+- Comprehensive testing and security audits
+- Operational runbooks and emergency procedures
 
 **Status**: Pre-mainnet, awaiting audits and drills
 
-### Phase 2: Decentralized Resolution Module
-
-- Deploy DecentralizedResolutionModule in separate package
-- Extensive testing in isolation
-- Swap into protocol via governance once proven
-- Resolver incentive system
-
-**Status**: Module extracted, testing in progress
-
-### Phase 3: Enhanced Features
-
-- Advanced yield distribution strategies
-- Additional resolution modules
-- Cross-chain support (future consideration)
-- Enhanced analytics and monitoring
-
-**Status**: Planning
-
-### Phase 4: Ecosystem Growth
-
-- Developer tooling and SDKs
-- Frontend integrations
-- Marketplace partnerships
-- Community governance expansion
-
-**Status**: Future
+**Timeline**: Q1 2026 (target)
 
 ---
 
-## 10. Tokenomics (If Applicable)
+### Phase 2: Extensive Simulation and Testing of Decentralized Dispute Resolution Network
 
-*Note: The protocol may or may not have a native token. If a governance token exists, this section would detail:*
+**Goal**: Prove DecentralizedResolutionModule in isolation before mainnet integration
 
-- Token distribution
-- Governance token mechanics
-- Fee distribution
-- Incentive structures
+**Deliverables**:
+- Deploy DecentralizedResolutionModule in separate package
+- Extensive testing with simulated disputes
+- Resolver network testing and validation
+- Performance and gas optimization
+- Security audits of decentralized resolution system
+- Resolver incentive system testing
+- Real-world dispute scenario simulations
 
-*Currently, the protocol uses a governance token (SEW) for voting, but detailed tokenomics are TBD.*
+**Status**: Module extracted, testing in progress
+
+**Timeline**: Q2-Q3 2026 (target)
+
+---
+
+### Phase 3: Mainnet Migration to Decentralized Dispute Resolution Module
+
+**Goal**: Swap DecentralizedResolutionModule into mainnet protocol via governance
+
+**Deliverables**:
+- Deploy DecentralizedResolutionModule contract
+- Governance proposal to queue module swap (48h delay via Timelock)
+- Community vote and timelock execution of queue
+- Wait 7 days (slow lane delay enforced onchain)
+- Governance proposal to activate module swap (48h delay via Timelock)
+- Community vote and timelock execution of activate
+- Resolver network onboarding
+- Incentive system activation
+- Monitoring and optimization
+
+**Status**: Planned for after Phase 2 completion
+
+**Timeline**: Q4 2026 (target, after Phase 2 validation)
+
+**Process**: 
+1. Deploy new DecentralizedResolutionModule
+2. Queue module swap (48h delay via Timelock) - requires Timelock execution (ROLE_TIMELOCK)
+3. Wait 7 days (slow lane delay)
+4. Activate module swap (48h delay via Timelock) - requires Timelock execution (ROLE_TIMELOCK)
+5. Total time: ~9 days wall-clock (48h + 7d + 48h)
+
+**Note**: All modules are immutable. Module upgrades are performed by deploying a new version and swapping via Slow lane (queue + activate via Timelock). Both queue and activate operations require Timelock execution (ROLE_TIMELOCK), ensuring all module changes are time-delayed and transparent. All existing escrows continue using DefaultResolutionModule (snapshot preserved). Only new escrows use DecentralizedResolutionModule.
+
+---
+
+## 10. Tokenomics
+
+### 10.1 Fee Structure
+
+#### Escrow Fees
+- **Escrow Fee**: 1% of escrow amount (100 basis points)
+- **Fee Recipient**: Protocol treasury (governance-controlled)
+- **Collection**: Fees are collected at escrow creation and held in protocol treasury
+
+#### Yield Distribution
+- **Yield Generation**: Optional per-escrow (via Aave integration)
+- **Protocol Share**: 30% of generated yield goes to protocol treasury
+- **User Share**: 70% of generated yield distributed to escrow participants (buyer/seller) based on escrow configuration
+
+#### Dispute Resolution Fees (After DecentralizedResolutionModule Launch)
+
+**Escalation Fees**:
+- **Level 1 Escalation** (Standard → Senior): Fee set by governance
+- **Level 2 Escalation** (Senior → External): Fee set by governance
+- **Fee Distribution**:
+  - 50% to resolver network (incentives for resolvers)
+  - 50% to protocol treasury
+
+**Resolver Incentives**:
+- Resolvers receive 50% of escalation fees as incentives
+- Payment distribution based on resolver activity and quality metrics
+- Automatic distribution via ResolverIncentiveModule
+
+### 10.2 Governance Token (SEW)
+
+**Purpose**: Governance token for protocol decision-making
+
+**Governance Functions**:
+- Proposal creation and voting
+- Parameter changes
+- Module swaps
+- Fee recipient updates
+- Emergency response coordination
+
+**Token Distribution**: TBD (to be determined before mainnet launch)
+
+**Voting Mechanics**:
+- Token-based voting (1 token = 1 vote)
+- Quorum requirements
+- Proposal thresholds
+- Timelock execution
+
+### 10.3 Revenue Streams
+
+**Protocol Revenue**:
+1. **Escrow Fees**: 1% of all escrow amounts
+2. **Yield Share**: 30% of generated yield (when yield enabled)
+3. **Escalation Fees**: 50% of escalation fees (after DecentralizedResolutionModule launch)
+
+**Revenue Use**:
+- Protocol development and maintenance
+- Security audits and bug bounties
+- Resolver network incentives (after DecentralizedResolutionModule)
+- Governance operations
+- Emergency reserves
+
+### 10.4 Incentive Alignment
+
+**Resolver Incentives** (After DecentralizedResolutionModule):
+- 50% of escalation fees distributed to resolvers
+- Quality-based payment weighting
+- Activity tracking and rewards
+- Fair workload distribution via round-robin selection
+
+**User Benefits**:
+- Buyer protection for everyday purchases
+- Seller payment assurance
+- Optional yield generation (70% to users)
+- Transparent, onchain dispute resolution
 
 ---
 
@@ -442,11 +663,19 @@ The protocol minimizes trust assumptions:
 
 ### 11.1 Known Limitations
 
-1. **Reliance on `block.timestamp`**: Auto-settlement features depend on `block.timestamp`, which can be manipulated by miners within a certain range
-2. **Dispute Resolution as Social Process**: While onchain mechanisms enforce rules, the ultimate fairness relies on resolver honesty
-3. **Governance Changes Affect New Escrows Only**: By design, governance can change defaults, but only for new escrows
-4. **External Protocol Dependencies**: If yield generation is enabled, the protocol inherits risks from integrated protocols (e.g., Aave)
-5. **ERC20 Token Support**: The protocol assumes standard ERC20 behavior; non-standard tokens may not be fully supported
+1. **Reliance on `block.timestamp`**: Auto-settlement features depend on `block.timestamp`, which can be manipulated by miners/validators within a certain range (typically ±15 seconds). This is acceptable for day-level timeouts but should be considered for shorter durations.
+
+2. **Dispute Resolution is a Social Process**: While dispute resolution is executed onchain, the decision-making process (resolver judgment) is inherently social. The protocol provides technical guarantees (access control, time delays, escalation) but cannot eliminate the need for human judgment in disputes.
+
+3. **Governance Can Change Defaults for New Escrows**: By design, governance can change default modules, timeouts, and other parameters. These changes affect only escrows created after the change (snapshot immutability), but users should be aware that protocol defaults may evolve.
+
+4. **External Protocol Dependencies**: If yield generation is enabled, the protocol depends on Aave functioning correctly. Aave protocol failures or exploits could affect yield generation, though caps and pause mechanisms limit exposure.
+
+5. **Token Support Limitations**: The protocol assumes standard ERC20 behavior. Non-standard tokens (fee-on-transfer, rebasing) may not be fully supported. See Security Model for details.
+
+6. **Gas Costs**: Complex operations (dispute resolution with multiple payouts, large attachment arrays) may have high gas costs. Users should be aware of gas implications, especially on mainnet.
+
+7. **Account Abstraction Compatibility**: While the protocol works with both account abstraction wallets and legacy EOAs, some advanced features may require smart contract wallet capabilities.
 
 ### 11.2 Risk Mitigations
 
@@ -460,17 +689,22 @@ The protocol minimizes trust assumptions:
 
 ## 12. Conclusion
 
-The Escrow Protocol provides a secure, transparent, and flexible solution to the trust problem in blockchain transactions. By combining immutable core contracts with modular, governance-controlled components, the protocol enables trustless peer-to-peer transactions while maintaining the ability to evolve and improve over time.
+Sew Protocol provides a secure, transparent, and flexible solution to the trust problem in blockchain transactions, specifically enabling safe everyday purchases of physical goods with Ethereum. By combining immutable core contracts with modular, governance-controlled components, the protocol enables trustless peer-to-peer transactions while maintaining the ability to evolve and improve over time.
 
 **Key Differentiators:**
 
 1. **Immutability Where It Matters**: Core escrow rules are immutable, but the protocol can evolve
 2. **Modular Design**: Pluggable modules enable flexibility without compromising security
-3. **Governance-Controlled Evolution**: Transparent, time-delayed protocol upgrades
-4. **Comprehensive Security**: Multiple layers of security and emergency controls
-5. **User-Centric Design**: Focus on protecting both buyers and sellers
+3. **Unified Module Governance**: All modules are immutable and use the same Slow lane swap pattern (queue + activate via Timelock, ~9 days). Both queue and activate require Timelock execution, ensuring all module changes are time-delayed and transparent.
+4. **Governance-Controlled Evolution**: Transparent, time-delayed protocol upgrades
+5. **Comprehensive Security**: Multiple layers of security and emergency controls
+6. **User-Centric Design**: Focus on protecting both buyers and sellers in everyday purchases
+7. **Account Abstraction Compatible**: Works with smart contract wallets and legacy EOAs
+8. **Genuinely Decentralized**: No monitoring, no unclear terms, no lock-in - ethical and human-first
 
-The protocol is designed to become a foundational piece of infrastructure for trustless transactions on Ethereum and Layer 2 networks, enabling new use cases and improving the user experience for decentralized applications.
+**Vision**: Sew Protocol is designed to accelerate consumer adoption of Ethereum for payments by solving the fundamental problem of lost money through errors or fraud. We introduce new primitives that augment account abstraction, enabling safe, trustless transactions for physical goods while maintaining the decentralized, transparent, and user-controlled principles of Web3.
+
+The protocol is designed to become a foundational piece of infrastructure for trustless transactions on Ethereum and Layer 2 networks, specifically enabling safe everyday purchases and improving the user experience for decentralized commerce.
 
 ---
 

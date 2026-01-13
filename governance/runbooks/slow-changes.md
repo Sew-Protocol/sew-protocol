@@ -181,18 +181,20 @@ This runbook provides step-by-step procedures for **Slow Lane** governance chang
 
 **Target Contract:** `EscrowVault` or `EscrowableERC20`  
 **Function:** `queueDefaultResolutionModule(address newModule)`  
-**New Module:** `0x...` (DecentralizedResolutionModule address)  
+**New Module:** `0x...` (New module address)  
 **Current Module:** `[CHECK BEFORE PROPOSAL]`
 
 **Proposal Description:**
 ```
-Queue swap of default resolution module to DecentralizedResolutionModule.
+Queue swap of default resolution module to [NEW_MODULE_NAME].
 
 Rationale:
 - Current module: DefaultResolutionModule
 - New module provides [FEATURES]
 - Change affects new escrows only (existing escrows unchanged)
 - Activation will occur after 7-day wait period
+
+Note: All modules use the same governance pattern: deploy new version and swap via Slow lane (~9 days).
 ```
 
 ### Step 2: Create Queue Proposal
@@ -217,10 +219,12 @@ Follow Phases 2-4 from "Slow Change Process" above.
 
 **Proposal Description:**
 ```
-Activate queued resolution module swap to DecentralizedResolutionModule.
+Activate queued resolution module swap to [NEW_MODULE_NAME].
 
 The module swap was queued on [DATE] and the 7-day wait period has passed.
 Activation will occur after 48-hour timelock delay.
+
+Note: All modules use the same governance pattern: deploy new version and swap via Slow lane (~9 days).
 ```
 
 ### Step 6-8: Follow Standard Process

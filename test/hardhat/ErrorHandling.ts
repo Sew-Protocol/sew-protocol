@@ -17,7 +17,7 @@ describe("Error Handling", function () {
 
     // Deploy contract
     const EscrowableERC20Factory = await ethers.getContractFactory("EscrowableERC20");
-    escrowableERC20 = await EscrowableERC20Factory.deploy("Test Token", "TEST", ESCROW_FEE, owner.address);
+    escrowableERC20 = await EscrowableERC20Factory.deploy("Test Token", "TEST", ESCROW_FEE, owner.address, ethers.ZeroAddress, ethers.ZeroAddress);
     await escrowableERC20.waitForDeployment();
 
     // Phase 2: Grant ROLE_TIMELOCK to owner
@@ -105,7 +105,7 @@ describe("Error Handling", function () {
       
       // Try to resolve as unauthorized user
       await expect(
-        escrowableERC20.connect(user2).cancelAsDisputeResolver(workflowId)
+        escrowableERC20.connect(user2).cancelAsDisputeResolver(workflowId, ethers.ZeroHash)
       ).to.be.revertedWithCustomError(escrowableERC20, "NotAuthorizedResolver")
         .withArgs(user2.address, resolver.address); // resolver.address is the authorized resolver
     });

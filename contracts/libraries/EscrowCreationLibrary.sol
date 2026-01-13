@@ -12,8 +12,8 @@ library EscrowCreationLibrary {
         uint256 amount,
         uint256 amountAfterFee,
         address defaultResolver
-    ) internal pure returns (EscrowTransfer memory escrowTransfer) {
-        escrowTransfer = EscrowTransfer({
+    ) internal pure returns (EscrowTransfer memory) {
+        return EscrowTransfer({
             workflowId: workflowId,
             token: token,
             to: seller,
@@ -25,10 +25,7 @@ library EscrowCreationLibrary {
             recipientStatus: RecipientStatus.NONE,
             disputeResolver: defaultResolver,
             autoReleaseTime: 0,
-                        autoCancelTime: 0,
-                        attachmentURIs: new string[](0),
-                        attachmentHashes: new bytes32[](0)
-                    });
-                }
-            }
-            
+            autoCancelTime: 0
+        });
+    }
+}

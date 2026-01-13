@@ -71,7 +71,7 @@ describe("EscrowableERC20", function () {
   beforeEach(async () => {
     [owner, sender, recipient, resolver, customResolver] = await ethers.getSigners();
     const escrowableERC20Factory = await ethers.getContractFactory("EscrowableERC20");
-    escrowableERC20 = (await escrowableERC20Factory.deploy("Test Token", "TEST", ESCROW_FEE, owner.address)) as EscrowableERC20;
+    escrowableERC20 = (await escrowableERC20Factory.deploy("Test Token", "TEST", ESCROW_FEE, owner.address, ethers.ZeroAddress, ethers.ZeroAddress)) as EscrowableERC20;
     await escrowableERC20.waitForDeployment();
     
     // Phase 7: Setup resolution module (required for escrow creation)
@@ -248,7 +248,7 @@ describe("EscrowableERC20", function () {
       const workflowId = await createEscrowTransfer(INITIAL_TRANSFER_AMOUNT);
       const disputeTx = await escrowableERC20.connect(sender).raiseDispute(workflowId);
       await disputeTx.wait();
-      await escrowableERC20.connect(resolver).releaseAsDisputeResolver(workflowId);
+      await escrowableERC20.connect(resolver).releaseAsDisputeResolver(workflowId, ethers.ZeroHash);
       const escrowTransfer = await escrowableERC20.escrowTransfers(workflowId);
       expect(escrowTransfer.escrowState).to.equal(5); // RESOLVED (enum value 5, was RESOLVER_OVERRIDDEN)
     });
@@ -257,7 +257,7 @@ describe("EscrowableERC20", function () {
       const workflowId = await createEscrowTransfer(INITIAL_TRANSFER_AMOUNT);
 
       await escrowableERC20.connect(sender).raiseDispute(workflowId);
-      await escrowableERC20.connect(resolver).cancelAsDisputeResolver(workflowId);
+      await escrowableERC20.connect(resolver).cancelAsDisputeResolver(workflowId, ethers.ZeroHash);
 
       const escrowTransfer = await escrowableERC20.escrowTransfers(workflowId);
       expect(escrowTransfer.escrowState).to.equal(5); // RESOLVED (enum value 5, was RESOLVER_OVERRIDDEN)
@@ -286,11 +286,11 @@ describe("EscrowableERC20", function () {
       const buyerBalanceBefore = await escrowableERC20.balanceOf(sender.address);
       const sellerBalanceBefore = await escrowableERC20.balanceOf(recipient.address);
 
-      await escrowableERC20.connect(resolver).partialCancelAsDisputeResolver(workflowId, refundAmount);
+      await escrowableERC20.connect(resolver).partialCancelAsDisputeResolver(workflowId, refundAmount, ethers.ZeroHash);
       let transfer = await escrowableERC20.escrowTransfers(workflowId);
       expect(transfer.escrowState).to.equal(4); // Still DISPUTED while funds remain
 
-      await escrowableERC20.connect(resolver).partialReleaseAsDisputeResolver(workflowId, releaseAmount);
+      await escrowableERC20.connect(resolver).partialReleaseAsDisputeResolver(workflowId, releaseAmount, ethers.ZeroHash);
       transfer = await escrowableERC20.escrowTransfers(workflowId);
       expect(transfer.escrowState).to.equal(5); // RESOLVED after all funds handled
 

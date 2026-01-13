@@ -88,18 +88,24 @@ The protocol consists of:
 - **Network**: Base mainnet
 - **Core contracts**: Immutable deployments (no proxies)
 - **Upgrades**: Performed via governed module swaps affecting **new escrows only**
-- **Future enhancement**: `DecentralizedResolutionModule` may later be swapped in and is designed for UUPS-based upgrades under governance control
-
 **Upgradeability posture (initial deployment):**
 - The initial mainnet deployment is **immutable** (no proxies for core escrow contracts).
 - Protocol evolution is achieved via **governed module swaps** that apply to **new escrows only**.
+- All modules are immutable - upgrades are performed by deploying a new version and swapping via Slow lane (~9 days).
 
-**Upgradeable components (future swap-in):**
-- `DecentralizedResolutionModule` (in separate package) is **UUPS upgradeable** and can be swapped in via slow-lane governance once proven.
-- If/when deployed and swapped in, upgrades must be executed via standard governance lanes (ROLE_TIMELOCK) and rehearsed on Base Sepolia + fork prior to mainnet execution.
+**Module Governance**:
+- All modules use the same governance pattern: Slow lane (queue + activate, ~9 days)
+- Module swaps: Deploy new version → Queue → Wait 7 days → Activate
+- Old escrows continue using old module (snapshot preserved)
+- New escrows use new module
+
+**Future modules** (not in initial release):
+- `DecentralizedResolutionModule` and `ResolverIncentiveModule` are in a separate package and are **not included in the initial mainnet release**.
+- When ready, they will be deployed and swapped in via the same Slow lane governance process as other modules.
 
 **Non-upgradeable components (initial deployment):**
 - `BaseEscrow`, `EscrowVault`, `EscrowableERC20` are deployed **immutably** (no proxies).
+- All modules are deployed as regular contracts (no proxies).
 
 ---
 
@@ -206,7 +212,7 @@ This custody model ensures that:
 | **Cap bypass** | High: Excessive exposure to Aave | Low | Caps checked before deposit, `currentExposure` tracking, revert on cap exceedance |
 | **Denial of service via attachments** | Medium: Gas griefing, transaction failures | Low | `maxAttachments` limit (20), gas-efficient storage, batch processing limits (`MAX_AUTOMATION_RANGE = 100`) |
 | **Large array DoS** | Medium: Gas limit exhaustion | Low | Array length validation, batch limits, gas-efficient loops |
-| **Upgrade/migration mistakes** | High: Logic errors, storage corruption | Low | Core contracts are immutable in the initial deployment. Risk is concentrated in: incorrect module swap execution (queue/activate timing, wrong addresses), future upgrades of the UUPS-based decentralized resolution module (if/when adopted). Mitigations include timelock lanes, rehearsals on Base Sepolia + fork, and explicit upgrade runbooks. |
+| **Upgrade/migration mistakes** | High: Logic errors, storage corruption | Low | Core contracts are immutable in the initial deployment. Risk is concentrated in: incorrect module swap execution (queue/activate timing, wrong addresses). All modules use the same swap pattern (Slow lane, ~9 days). Mitigations include timelock lanes, rehearsals on Base Sepolia + fork, and explicit upgrade runbooks. |
 | **Module swap errors** | Medium: Broken resolution logic | Low | Module interface validation, time delay (~9 days), testnet rehearsal, snapshot immutability |
 | **Dispute timeout bypass** | Medium: Permanently stuck escrows | Low | `maxDisputeDuration` (90 days), `autoCancelDisputedEscrow` function, dispute timestamp tracking |
 | **State machine violations** | High: Double-spend, invalid transitions | Low | State machine library (`StateManagementLibrary`), explicit state checks, invariant tests |

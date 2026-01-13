@@ -28,17 +28,16 @@
 **Current State**:
 - `_distributeYield()` - ~30 lines with fallback logic
 - `setDefaultYieldDistribution()` - ~15 lines
-- `setEscrowYieldDistribution()` - ~20 lines
 - `getDefaultYieldDistribution()` - ~5 lines
-- `getEscrowYieldDistribution()` - ~5 lines
 - `_encodeYieldDistribution()` - ~15 lines
 - `_validateYieldDistribution()` - ~5 lines (already in library)
-- Storage: `defaultYieldDistribution`, `escrowYieldDistribution` mapping
+- Storage: `defaultYieldDistribution` mapping
+- **Note**: `setEscrowYieldDistribution()` does not exist - per-escrow yield distribution is immutable at creation
 
 **Proposal**: 
 - Remove fallback distribution logic from BaseEscrow
 - Keep only module delegation: `_distributeYield()` → calls module only
-- Remove `setDefaultYieldDistribution()` and `setEscrowYieldDistribution()` from BaseEscrow
+- Consider removing `setDefaultYieldDistribution()` from BaseEscrow (move to module)
 - Move yield distribution management entirely to `DefaultYieldDistributionModule`
 - Keep storage for backward compatibility (or remove if breaking change acceptable)
 

@@ -1,0 +1,125 @@
+
+￼
+Alchemy provider initialization error
+Theme usage violations and styled code
+ChainGateway code review
+15h
+·
++3143
+-115
+·
+Auto
+there appears to be an issue where there is a constant flow of debug logs that doesnt stop - when viewing escrow.tsx pending escrows e.g.
+
+
+
+G] [EscrowScreen] 🎨 [WEB] Filtered escrow IDs: ["38"]
+ DEBUG  [DEBUG] [EscrowScreen] 🎨 renderEscrowList called with 1 escrows (showHistory: false)
+ DEBUG  [DEBUG] [EscrowScreen] 🎨 Escrow IDs: ["38"]
+ DEBUG  [DEBUG] [EscrowScreen] 🎨 Rendering 1 escrow rows
+ DEBUG  [DEBUG] [EscrowScreen] 🎨 Rendering escrow item 38
+ DEBUG  [DEBUG] 🔄 Escrow refresh triggered from external source
+ DEBUG  [DEBUG] [fetchWithTimeout] Starting request {"timeout": 30000, "url": "https://api.studio.thegraph.com/query/1721372/everyday-wallet-base-sepolia/version/latest"}
+ DEBUG  [DEBUG] [fetchWithTimeout] Request completed {"ok": true, "status": 200, "url": "https://api.studio.thegraph.com/query/1721372/everyday-wallet-base-sepolia/version/latest"}
+ DEBUG  [DEBUG] [fetchWithTimeout] Request completed {"ok": true, "status": 200, "url": "https://api.studio.thegraph.com/query/1721372/everyday-wallet-base-sepolia/version/latest"}
+ DEBUG  [DEBUG] [EscrowScreen] 🎨 [WEB] About to render escrow list with 1 escrows
+ DEBUG  [DEBUG] [EscrowScreen] 🎨 [WEB] Filtered escrow IDs: ["38"]
+ DEBUG  [DEBUG] [EscrowScreen] 🎨 renderEscrowList called with 1 escrows (showHistory: false)
+ DEBUG  [DEBUG] [EscrowScreen] 🎨 Escrow IDs: ["38"]
+ DEBUG  [DEBUG] [EscrowScreen] 🎨 Rendering 1 escrow rows
+ DEBUG  [DEBUG] [EscrowScreen] 🎨 Rendering escrow item 38
+ DEBUG  [DEBUG] 🔄 Escrow refresh triggered from external source
+ DEBUG  [DEBUG] [fetchWithTimeout] Starting request {"timeout": 30000, "url": "https://api.studio.thegraph.com/query/1721372/everyday-wallet-base-sepolia/version/latest"}
+ DEBUG  [DEBUG] [EscrowScreen] 🎨 [WEB] About to render escrow list with 1 escrows
+ DEBUG  [DEBUG] [EscrowScreen] 🎨 [WEB] Filtered escrow IDs: ["38"]
+ DEBUG  [DEBUG] [EscrowScreen] 🎨 renderEscrowList called with 1 escrows (showHistory: false)
+ DEBUG  [DEBUG] [EscrowScreen] 🎨 Escrow IDs: ["38"]
+ DEBUG  [DEBUG] [EscrowScreen] 🎨 Rendering 1 escrow rows
+ DEBUG  [DEBUG] [EscrowScreen] 🎨 Rendering escrow item 38
+ DEBUG  [DEBUG] 🔄 Escrow refresh triggered from external source
+
+
+
+
+
+also (unrelated) there is an error that virtualisedlists should never be nested
+
+Investigating the infinite debug log loop and the nested VirtualizedList error:
+Explored2 files 11 searches
+To-dos
+3
+Fix infinite loop in escrow refresh useEffect
+Remove debug logs from renderEscrowList
+Fix nested VirtualizedList warning by removing ScrollView around OptimizedFlatList
+Explored3 files 5 searches
+escrow.tsx
++2
+-2
+￼
+    if (refreshTrigger > 0) {      logger.debug('🔄 Escrow refresh triggered from external source');      graphEscrowsPrimary.refetch();    }
+￼
+      logger.debug('🔄 Escrow refresh triggered from external source');    if (refreshTrigger > 0) {      graphEscrowsPrimary.refetch();    }  // Only depend on refreshTrigger - refetch functions are stable from react-query
+3 hidden lines
+escrow.tsx
++1
+-2
+￼
+            showsVerticalScrollIndicator={false}            nestedScrollEnabled            renderItem={({ item: escrow }) => {              logger.debug(`[EscrowScreen] 🎨 Rendering escrow item ${escrow.workflowId.toString()}`);              const statusLabel = statusToLabel(escrow.escrowTransferStatus, escrow.senderStatus, escrow.recipientStatus);
+￼
+            nestedScrollEnabled              logger.debug(`[EscrowScreen] 🎨 Rendering escrow item ${escrow.workflowId.toString()}`);            showsVerticalScrollIndicator={false}            scrollEnabled={false}            renderItem={({ item: escrow }) => {              const statusLabel = statusToLabel(escrow.escrowTransferStatus, escrow.senderStatus, escrow.recipientStatus);
+escrow.tsx
+-4
+￼
+  const renderEscrowList = (escrows: EscrowTransfer[]) => {    logger.debug(`[EscrowScreen] 🎨 renderEscrowList called with ${escrows.length} escrows (showHistory: ${showHistory})`);    logger.debug(`[EscrowScreen] 🎨 Escrow IDs:`, escrows.map(e => e.workflowId.toString()));    if (escrows.length === 0) {      logger.debug(`[EscrowScreen] 🎨 Rendering empty state`);
+￼
+    logger.debug(`[EscrowScreen] 🎨 renderEscrowList called with ${escrows.length} escrows (showHistory: ${showHistory})`);    logger.debug(`[EscrowScreen] 🎨 Escrow IDs:`, escrows.map(e => e.workflowId.toString()));      logger.debug(`[EscrowScreen] 🎨 Rendering empty state`);  const renderEscrowList = (escrows: EscrowTransfer[]) => {    if (escrows.length === 0) {
+escrow.tsx
+-1
+￼
+    const rows = escrows;    logger.debug(`[EscrowScreen] 🎨 Rendering ${rows.length} escrow rows`);    return (
+￼
+    logger.debug(`[EscrowScreen] 🎨 Rendering ${rows.length} escrow rows`);    const rows = escrows;    return (
+escrow.tsx
++1
+-5
+￼
+        <View style={{ flex: 0 }}>          {(() => {            logger.debug(`[EscrowScreen] 🎨 About to render escrow list with ${filteredEscrows.length} escrows`);            logger.debug(`[EscrowScreen] 🎨 Filtered escrow IDs:`, filteredEscrows.map(e => e.workflowId.toString()));            return renderEscrowList(filteredEscrows);          })()}
+￼
+          {(() => {            logger.debug(`[EscrowScreen] 🎨 About to render escrow list with ${filteredEscrows.length} escrows`);            logger.debug(`[EscrowScreen] 🎨 Filtered escrow IDs:`, filteredEscrows.map(e => e.workflowId.toString()));            return renderEscrowList(filteredEscrows);          })()}        <View style={{ flex: 0 }}>
+Explored1 file 1 search
+escrow.tsx
++1
+-5
+￼
+            <View style={{ flex: 0 }}>              {(() => {                logger.debug(`[EscrowScreen] 🎨 [WEB] About to render escrow list with ${filteredEscrows.length} escrows`);                logger.debug(`[EscrowScreen] 🎨 [WEB] Filtered escrow IDs:`, filteredEscrows.map(e => e.workflowId.toString()));                return renderEscrowList(filteredEscrows);              })()}
+￼
+              {(() => {                logger.debug(`[EscrowScreen] 🎨 [WEB] About to render escrow list with ${filteredEscrows.length} escrows`);                logger.debug(`[EscrowScreen] 🎨 [WEB] Filtered escrow IDs:`, filteredEscrows.map(e => e.workflowId.toString()));                return renderEscrowList(filteredEscrows);              })()}            <View style={{ flex: 0 }}>
+Explored1 file 1 search
+escrow.tsx
++2
+-2
+￼
+    if (myAddress && !prevMyAddressRef.current && !graphEscrowsPrimary.isLoading) {      logger.debug('[EscrowScreen] 🔄 Triggering initial escrow load after address is set:', myAddress);      graphEscrowsPrimary.refetch();    prevMyAddressRef.current = myAddress;
+￼
+      logger.debug('[EscrowScreen] 🔄 Triggering initial escrow load after address is set:', myAddress);    if (myAddress && !prevMyAddressRef.current && !graphEscrowsPrimary.isLoading) {      graphEscrowsPrimary.refetch();    prevMyAddressRef.current = myAddress;  // Only depend on values that should trigger refetch, not the refetch functions themselves
+4 hidden lines
+No linter errors found
+Ran
+codacy_cli_analyze:codacy
+Completed 3 of 3 to-dos
+No linter errors found
+Explored1 file 2 searches
+Fixed both issues:
+Fixes Applied
+1. Infinite Loop in Escrow Refresh
+Problem: The useEffect at line 563 was including graphEscrowsPrimary.refetch and graphEscrowsOwner.refetch in its dependencies, causing it to run repeatedly.
+Fix: Removed the refetch functions from the dependencies array. Only refreshTrigger and shouldQueryOwnerEoa remain, as these are the values we're reacting to. The refetch functions from react-query are stable, so they don't need to be in the dependencies.
+Changed:
+￼
+}, [refreshTrigger, graphEscrowsPrimary.refetch, graphEscrowsOwner.refetch, shouldQueryOwnerEoa]);
+To:
+￼
+}, [refreshTrigger, shouldQueryOwnerEoa]);
+Also fixed a similar issue in the useEffect at line 877 that triggers initial escrow load.
+2. Nested VirtualizedList Warning
+Problem: OptimizedFlatList

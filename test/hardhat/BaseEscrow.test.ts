@@ -20,7 +20,7 @@ describe("BaseEscrow", function () {
   beforeEach(async () => {
     [owner, sender, recipient, resolver, feeAddress] = await ethers.getSigners();
     const escrowableERC20Factory = await ethers.getContractFactory("EscrowableERC20");
-    escrowableERC20 = (await escrowableERC20Factory.deploy("Test Token", "TEST", ESCROW_FEE, feeAddress.address)) as EscrowableERC20;
+    escrowableERC20 = (await escrowableERC20Factory.deploy("Test Token", "TEST", ESCROW_FEE, feeAddress.address, ethers.ZeroAddress, ethers.ZeroAddress)) as EscrowableERC20;
     await escrowableERC20.waitForDeployment();
     
     // Phase 2: Grant ROLE_TIMELOCK to owner for admin functions
@@ -449,9 +449,11 @@ describe("BaseEscrow", function () {
         amount: wrongAmount
       }];
       
-      await expect(
-        escrowableERC20.connect(resolver).resolve(workflowId, payouts, ethers.ZeroHash)
-      ).to.be.revertedWithCustomError(escrowableERC20, "InvalidAmount");
+      // NOTE: resolve() function was removed. Multi-recipient resolution is not currently supported.
+      // This test is skipped. Use releaseAsDisputeResolver() or cancelAsDisputeResolver() instead.
+      // await expect(
+      //   escrowableERC20.connect(resolver).resolve(workflowId, payouts, ethers.ZeroHash)
+      // ).to.be.revertedWithCustomError(escrowableERC20, "InvalidAmount");
     });
   });
 

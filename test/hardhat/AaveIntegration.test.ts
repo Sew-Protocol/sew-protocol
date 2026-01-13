@@ -36,7 +36,9 @@ describe("Aave Integration", function () {
       "Test Token",
       "TEST",
       ESCROW_FEE,
-      feeAddress.address
+      feeAddress.address,
+      ethers.ZeroAddress,
+      ethers.ZeroAddress
     )) as EscrowableERC20;
     await escrowableERC20.waitForDeployment();
 
@@ -520,7 +522,7 @@ describe("Aave Integration", function () {
       
       const recipientBalanceBefore = await escrowableERC20.balanceOf(recipient.address);
       
-      await escrowableERC20.connect(resolver).partialReleaseAsDisputeResolver(workflowId, halfAmount);
+      await escrowableERC20.connect(resolver).partialReleaseAsDisputeResolver(workflowId, halfAmount, ethers.ZeroHash);
       
       const recipientBalanceAfter = await escrowableERC20.balanceOf(recipient.address);
       const amountReceived = recipientBalanceAfter - recipientBalanceBefore;
@@ -542,7 +544,7 @@ describe("Aave Integration", function () {
       
       const senderBalanceBefore = await escrowableERC20.balanceOf(sender.address);
       
-      await escrowableERC20.connect(resolver).partialCancelAsDisputeResolver(workflowId, halfAmount);
+      await escrowableERC20.connect(resolver).partialCancelAsDisputeResolver(workflowId, halfAmount, ethers.ZeroHash);
       
       const senderBalanceAfter = await escrowableERC20.balanceOf(sender.address);
       const amountReceived = senderBalanceAfter - senderBalanceBefore;

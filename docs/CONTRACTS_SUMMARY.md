@@ -62,7 +62,7 @@
 
 ### DecentralizedResolutionModule.sol
 **Purpose**: Advanced decentralized resolution with multiple resolvers and escalation  
-**Status**: In separate package (`contracts/decentralized-resolution-module/`), can be swapped into protocol via slow-lane governance once proven through testing  
+**Status**: In separate package (`contracts/decentralized-resolution-module/`), **not included in initial mainnet release**. When ready, will be deployed and swapped in via Slow lane governance (queue + activate, ~9 days).  
 **Key Features**:
 - Resolver registry (standard and senior resolvers)
 - Round-robin resolver selection (fair distribution)
@@ -72,7 +72,7 @@
 
 **Use Case**: Complex disputes requiring multiple resolvers, escalation paths, and fair workload distribution
 
-**Note**: This module is developed and tested in isolation before mainnet integration. All upgrades require `ROLE_TIMELOCK` (standard governance lanes).
+**Note**: This module is developed and tested in isolation before mainnet integration. When ready, it will use the same governance pattern as other modules: deploy new version and swap via Slow lane (~9 days).
 
 ---
 
@@ -85,10 +85,12 @@
 - Fee aggregation (escrow fees + escalation fees)
 - Payment calculation using pluggable libraries
 - Automatic payment distribution (ERC20)
-- Governance-controlled library upgrades (7-day delay)
+- Governance-controlled configuration (Slow lane, ~9 days)
 - Configurable resolver share percentage and weights
 
 **Use Case**: Incentivizing resolvers by paying them a share of collected fees
+
+**Note**: When ready, this module will use the same governance pattern as other modules: deploy new version and swap via Slow lane (~9 days).
 
 ---
 
@@ -317,10 +319,10 @@
 ## Key Design Patterns
 
 1. **Modular Architecture**: Pluggable modules for resolution, yield generation, and distribution
-2. **Governance-Controlled Upgrades**: Slow lane (7-day delay) for critical changes
+2. **Unified Module Governance**: All modules use Slow lane swap pattern (immutable modules, ~9 days)
 3. **Functional/Hybrid Approach**: Pure functions for calculations, imperative for state
-4. **Round-Robin Selection**: Fair distribution of resolver workload
-5. **Extensible Interfaces**: Future-proof design allowing upgrades without breaking changes
+4. **Round-Robin Selection**: Fair distribution of resolver workload (DecentralizedResolutionModule)
+5. **Immutable Modules**: All modules are immutable - upgrades via deploy new version + swap
 
 ---
 

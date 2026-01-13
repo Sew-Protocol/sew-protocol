@@ -39,7 +39,9 @@ describe("Access Control", function () {
       "Test Token",
       "TEST",
       ESCROW_FEE,
-      feeAddress.address
+      feeAddress.address,
+      ethers.ZeroAddress,
+      ethers.ZeroAddress
     );
     await escrowableERC20.waitForDeployment();
 
@@ -47,7 +49,9 @@ describe("Access Control", function () {
     const EscrowVaultFactory = await ethers.getContractFactory("EscrowVault");
     escrowVault = await EscrowVaultFactory.deploy(
       ESCROW_FEE,
-      feeAddress.address
+      feeAddress.address,
+      ethers.ZeroAddress,
+      ethers.ZeroAddress
     );
     await escrowVault.waitForDeployment();
   });

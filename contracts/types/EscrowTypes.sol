@@ -66,8 +66,6 @@ struct EscrowTransfer {
     address disputeResolver;
     uint256 autoReleaseTime;
     uint256 autoCancelTime;
-    string[] attachmentURIs;
-    bytes32[] attachmentHashes;
 }
 
 

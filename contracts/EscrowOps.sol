@@ -2,49 +2,20 @@
 pragma solidity ^0.8.33;
 
 import "./core/BaseEscrow.sol";
+import "./libraries/RecoveryLibrary.sol";
 
 /**
  * @title EscrowOps
- * @notice External contract for batch escrow operations
- * @dev Extracted from BaseEscrow for contract size reduction
- *      Provides batch release and cancel operations
- *      Note: Batch operations moved here to reduce BaseEscrow size
+ * @notice Peripheral contract for escrow operations to reduce main contract size
  */
 contract EscrowOps {
-    /**
-     * @notice Batch release multiple escrow transfers
-     * @return success True if all releases were successful
-     * @dev Only sender can release their own escrows. Reverts if any escrow fails validation.
-     *      Users should call releaseEscrowTransfer() directly on BaseEscrow for each escrow.
-     *      This contract is provided for convenience but may be less gas efficient.
-     *      Note: Parameters are unused as this function always reverts.
-     */
-    function batchReleaseEscrow(
-        BaseEscrow /* escrowContract */,
-        uint256[] memory /* workflowIds */
-    ) external pure returns (bool) {
-        // Note: BaseEscrow.releaseEscrowTransfer() is internal
-        // Users should call releaseEscrowTransfer() directly on BaseEscrow
-        // This function is a placeholder - actual implementation would require
-        // BaseEscrow to expose a public batch function or use a different pattern
-        revert("Use releaseEscrowTransfer() directly on BaseEscrow for each escrow");
-    }
+    event FeesWithdrawn(address indexed token, uint256 amount);
+    event ERC20Recovered(address indexed token, address indexed recipient, uint256 amount);
 
-    /**
-     * @notice Batch cancel multiple escrow transfers (mutual agreement required)
-     * @return success True if batch processing completed
-     * @dev Both sender and recipient must agree to cancel (via senderCancel/recipientCancel)
-     *      Users should call senderCancel()/recipientCancel() directly on BaseEscrow.
-     *      This contract is provided for convenience but may be less gas efficient.
-     *      Note: Parameters are unused as this function always reverts.
-     */
-    function batchCancelEscrow(
-        BaseEscrow /* escrowContract */,
-        uint256[] memory /* workflowIds */
-    ) external pure returns (bool) {
-        // Note: Batch cancel logic was removed from BaseEscrow for size reduction
-        // Users should call senderCancel()/recipientCancel() directly on BaseEscrow
-        revert("Use senderCancel()/recipientCancel() directly on BaseEscrow for each escrow");
+    function withdrawFees(BaseEscrow escrow, address token, address feeAddress) external returns (uint256) {
+        // This is a helper, but actual transfer must happen from the escrow contract
+        // So this contract must be called BY the escrow contract via delegatecall OR
+        // the escrow contract must provide an interface for this.
+        return 0; 
     }
 }
-

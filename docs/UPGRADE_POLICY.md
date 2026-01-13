@@ -15,14 +15,18 @@ The following core invariants are intended to **ossify** (become immutable) over
 3. **No Per-Escrow Overrides**: No selective intervention is possible for individual escrows.
 4. **Time-Delayed Execution**: All non-emergency changes execute through TimelockController.
 
-### Upgradeable Components
+### Module Governance
 
-The following components are designed to be upgradeable:
+**Rule**: All modules are immutable. Module upgrades are performed by deploying a new version and swapping via Slow lane (queue + activate, ~9 days).
 
-1. **Module Implementations**: New modules can be added and swapped via governance.
-2. **Default Parameters**: Bounded parameters can be adjusted within predefined limits.
-3. **Fee Configuration**: Fee rates and recipients can be changed via Slow lane.
-4. **Governance Infrastructure**: DAO, Timelock, and Guardian addresses can be updated.
+**Components That Can Be Changed**:
+
+1. **Module Implementations**: New modules can be added and swapped via Slow lane governance.
+2. **Default Parameters**: Bounded parameters can be adjusted within predefined limits (Standard lane, 48h).
+3. **Fee Configuration**: Fee rates and recipients can be changed via Slow lane (~9 days).
+4. **Governance Infrastructure**: DAO, Timelock, and Guardian addresses can be updated via Slow lane.
+
+**Note**: All modules use the same governance pattern: deploy new version and swap via Slow lane. No modules are upgradeable via proxy in the initial mainnet release.
 
 ---
 
@@ -78,43 +82,28 @@ The following components are designed to be upgradeable:
 
 ---
 
-## Storage Layout Discipline
+## Module Upgrade Strategy
 
-### Proxy Upgrades
+### Module Swaps (Standard Approach)
 
-If using UUPS or Transparent proxies:
+All modules use the **module swap** pattern:
 
-1. **Storage Layout Rules**:
-   - Never remove storage variables
-   - Never change variable order
-   - Never change variable types
-   - Only append new variables at the end
+1. Deploy new module version (immutable contract)
+2. Queue module swap via Slow lane (48h delay)
+3. Wait 7 days (slow lane delay)
+4. Activate module swap (48h delay)
+5. New escrows use new module
+6. Old escrows continue using old module (snapshot preserved)
 
-2. **Storage Gaps**:
-   - Use storage gaps for future variables:
-   ```solidity
-   uint256[50] private __gap;
-   ```
-
-3. **Initialization**:
-   - Always use `initializer` modifier
-   - Never call constructor logic in implementation
-
-### Module Swaps (Preferred)
-
-Instead of proxy upgrades, prefer **module swaps**:
-
-1. Deploy new module implementation
-2. Queue new module via Slow lane
-3. Activate new module after 7 days
-4. New escrows use new module
-5. Existing escrows continue using old module (snapshotted)
+**Total Time**: ~9 days wall-clock (48h + 7d + 48h)
 
 **Benefits**:
 - No storage layout concerns
 - No proxy upgrade risks
 - Clear separation of concerns
 - Easier to audit
+- Consistent governance pattern for all modules
+- Helps with contract size (no proxy overhead)
 
 ---
 
@@ -126,7 +115,7 @@ Before executing any upgrade:
 - [ ] Proposal has been queued to TimelockController
 - [ ] Timelock delay has elapsed (48h for Standard, 7d+48h for Slow)
 - [ ] All parameters are within bounds
-- [ ] Storage layout is compatible (if proxy upgrade)
+- [ ] New module version deployed and tested
 - [ ] Tests pass for new configuration
 - [ ] Fork simulation has been run
 - [ ] Emergency pause is available if needed

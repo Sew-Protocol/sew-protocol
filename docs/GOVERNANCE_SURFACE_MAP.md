@@ -4,13 +4,12 @@ Complete mapping of all governance functions to roles, lanes, and delays.
 
 ## Role Permissions Matrix
 
-| Role | Standard Lane | Slow Lane | Emergency Lane | Module Upgrades | Notes |
-|------|--------------|-----------|----------------|----------------|-------|
+| Role | Standard Lane | Slow Lane | Emergency Lane | Notes |
+|------|--------------|-----------|----------------|-------|
 | **DAO (Governor)** | Propose & Vote | Propose & Vote | Cannot execute | Cannot execute | Proposals go through Timelock |
-| **TimelockController** | Execute (48h delay) | Execute (48h + 7d delay) | Cannot execute | Can upgrade (instant) | Only executor for Standard/Slow. Emergency lane functions are guarded by `onlyRole(ROLE_GUARDIAN)`; Timelock lacks this role. |
+| **TimelockController** | Execute (48h delay) | Execute (48h + 7d delay) | Cannot execute | N/A | Only executor for Standard/Slow. Emergency lane functions are guarded by `onlyRole(ROLE_GUARDIAN)`; Timelock lacks this role. |
 | **Guardian Multisig** | Cannot execute | Cannot execute | Execute (immediate) | Cannot execute | Down-only powers |
 | **Fee Recipient** | None | None | None | None | Can only withdraw fees |
-| **Module Developer** | Cannot execute | Cannot execute | Cannot execute | Can upgrade (staged delays) | Can upgrade DecentralizedResolutionModule and ResolverIncentiveModule with staged delays (first 3 instant, then 1h/24h/7d based on time since deployment). Cannot swap modules in BaseEscrow. |
 
 ## Governance Lanes
 
@@ -33,56 +32,60 @@ Complete mapping of all governance functions to roles, lanes, and delays.
 
 ## Complete Function Mapping
 
-### BaseEscrow.sol
+### BaseEscrow.sol (`contracts/core/BaseEscrow.sol`)
 
 | Function | Role | Lane | Delay | Bounds | Notes |
 |----------|------|------|-------|--------|-------|
 | `setDefaultAutoCancelTime(uint256)` | `ROLE_TIMELOCK` | Standard | 48h | 0 <= time <= 30 days | Auto-cancel timeout |
 | `setDefaultAutoReleaseTime(uint256)` | `ROLE_TIMELOCK` | Standard | 48h | 0 <= time <= 30 days | Auto-release timeout |
 | `setMaxAttachments(uint256)` | `ROLE_TIMELOCK` | Standard | 48h | 0 <= max <= 20 | Max attachments per escrow |
-| `setResolutionModuleDelay(uint256)` | `ROLE_TIMELOCK` | Standard | 48h | 48h <= delay <= 30 days | Resolution delay |
-| `setDefaultYieldDistribution(address[], uint256[])` | `ROLE_TIMELOCK` | Standard | 48h | 1-10 recipients, sum=10000 bps | Yield distribution |
-| `setEscrowYieldDistribution(uint256, address[], uint256[])` (Sender path) | Sender | N/A (User action) | No delay | 1-10 recipients, sum=10000 bps | Sender-only (while PENDING) – User configuration, not governance |
-| `setEscrowYieldDistribution(uint256, address[], uint256[])` (Timelock path) | `ROLE_TIMELOCK` | Standard | 48h | 1-10 recipients, sum=10000 bps | Timelock can set (while PENDING) – Does not affect snapshotted modules |
+| `setMaxDisputeDuration(uint256)` | `ROLE_TIMELOCK` | Standard | 48h | - | Maximum dispute duration |
+| `setDefaultYieldDistribution(address[], uint256[])` | `ROLE_TIMELOCK` | Standard | 48h | 1-10 recipients, sum=10000 bps | Yield distribution defaults (affects new escrows only) |
 | `unpause()` | `ROLE_TIMELOCK` | Standard | 48h | - | Unpause protocol |
 | `pause()` | `ROLE_GUARDIAN` | Emergency | 0h | - | Pause protocol |
 | `queueEscrowFeeAddress(address)` | `ROLE_TIMELOCK` | Slow | 48h queue | Non-zero address | Queue fee address change |
 | `activateEscrowFeeAddress()` | `ROLE_TIMELOCK` | Slow | 7d + 48h | - | Activate queued fee address |
 | `queueEscrowFee(uint256)` | `ROLE_TIMELOCK` | Slow | 48h queue | 0 <= fee <= 200 bps | Queue fee change |
 | `activateEscrowFee()` | `ROLE_TIMELOCK` | Slow | 7d + 48h | - | Activate queued fee |
-| ~~`queueDao(address)`~~ | N/A | N/A | N/A | N/A | ❌ **REMOVED** - DAO address is immutable after deployment (set in constructor only) |
-| ~~`activateDao()`~~ | N/A | N/A | N/A | N/A | ❌ **REMOVED** - DAO address is immutable after deployment |
-| `proposeResolutionModule(address)` | `ROLE_TIMELOCK` | Slow | 48h queue | Non-zero address | Propose new resolution module |
-| `activateResolutionModule()` | `ROLE_TIMELOCK` | Slow | 7d + 48h | - | Activate proposed module |
-| `setAuthorizedResolver(address)` | `ROLE_TIMELOCK` | N/A | N/A | N/A | ❌ **DEPRECATED & REMOVED** - Always reverts. Not used anywhere in code paths; kept for compatibility only. Will be removed from ABI in future version. Use resolution modules instead. |
+| `queueResolutionModule(address)` | `ROLE_TIMELOCK` | Slow | 48h queue | Non-zero address | Queue resolution module change (BaseEscrow level) |
+| `activateResolutionModule()` | `ROLE_TIMELOCK` | Slow | 7d + 48h | - | Activate queued resolution module |
+| `getPendingResolutionModule()` | N/A | N/A | N/A | - | View pending resolution module change |
+| `recoverNativeETH(address, uint256)` | `ROLE_TIMELOCK` | Standard | 48h | - | Recover stuck native ETH |
+| `recoverERC20(address, address, uint256)` | `ROLE_TIMELOCK` | Standard | 48h | - | Recover stuck ERC20 tokens |
+| ~~`setAuthorizedResolver(address)`~~ | N/A | N/A | N/A | N/A | ❌ **DEPRECATED & REMOVED** - Always reverts. Not used anywhere in code paths; kept for compatibility only. Will be removed from ABI in future version. Use resolution modules instead. |
 
-### EscrowableERC20.sol
+### EscrowableERC20.sol (`contracts/core/EscrowableERC20.sol`)
+
+| Function | Role | Lane | Delay | Bounds | Notes |
+|----------|------|------|-------|--------|-------|
+| `queueDefaultReleaseStrategy(address)` | `ROLE_TIMELOCK` | Slow | 48h queue | Non-zero address | No-op (inherited from BaseEscrow, overridden as empty) |
+| `activateDefaultReleaseStrategy()` | `ROLE_TIMELOCK` | Slow | 7d + 48h | - | No-op (inherited from BaseEscrow, overridden as empty) |
+| `queueDefaultResolutionModule(address)` | `ROLE_TIMELOCK` | Slow | 48h queue | Non-zero address | No-op (inherited from BaseEscrow, overridden as empty) |
+| `activateDefaultResolutionModule()` | `ROLE_TIMELOCK` | Slow | 7d + 48h | - | No-op (inherited from BaseEscrow, overridden as empty) |
+| `queueDefaultYieldGenerationModule(address)` | `ROLE_TIMELOCK` | Slow | 48h queue | Non-zero address | No-op (inherited from BaseEscrow, overridden as empty) |
+| `activateDefaultYieldGenerationModule()` | `ROLE_TIMELOCK` | Slow | 7d + 48h | - | No-op (inherited from BaseEscrow, overridden as empty) |
+| `queueDefaultYieldDistributionModule(address)` | `ROLE_TIMELOCK` | Slow | 48h queue | Non-zero address | No-op (inherited from BaseEscrow, overridden as empty) |
+| `activateDefaultYieldDistributionModule()` | `ROLE_TIMELOCK` | Slow | 7d + 48h | - | No-op (inherited from BaseEscrow, overridden as empty) |
+| `queueEscrowFee(uint256)` | `ROLE_TIMELOCK` | Slow | 48h queue | 0 <= fee <= 200 bps | No-op (inherited from BaseEscrow, overridden as empty) |
+| `activateEscrowFee()` | `ROLE_TIMELOCK` | Slow | 7d + 48h | - | No-op (inherited from BaseEscrow, overridden as empty) |
+
+**Note**: `EscrowableERC20` inherits from `BaseEscrow` but overrides these functions as no-ops. Module configuration for `EscrowableERC20` is handled at deployment time via constructor parameters. All other governance functions are inherited from `BaseEscrow`.
+
+### EscrowVault.sol (`contracts/core/EscrowVault.sol`)
 
 | Function | Role | Lane | Delay | Bounds | Notes |
 |----------|------|------|-------|--------|-------|
 | `queueDefaultReleaseStrategy(address)` | `ROLE_TIMELOCK` | Slow | 48h queue | Non-zero address | Queue release strategy |
 | `activateDefaultReleaseStrategy()` | `ROLE_TIMELOCK` | Slow | 7d + 48h | - | Activate queued strategy |
-| `queueDefaultResolutionModule(address)` | `ROLE_TIMELOCK` | Slow | 48h queue | Non-zero address | Queue resolution module |
-| `activateDefaultResolutionModule()` | `ROLE_TIMELOCK` | Slow | 7d + 48h | - | Activate queued module |
 | `queueDefaultYieldGenerationModule(address)` | `ROLE_TIMELOCK` | Slow | 48h queue | Non-zero address | Queue yield generation module |
 | `activateDefaultYieldGenerationModule()` | `ROLE_TIMELOCK` | Slow | 7d + 48h | - | Activate queued module |
 | `queueDefaultYieldDistributionModule(address)` | `ROLE_TIMELOCK` | Slow | 48h queue | Non-zero address | Queue yield distribution module |
 | `activateDefaultYieldDistributionModule()` | `ROLE_TIMELOCK` | Slow | 7d + 48h | - | Activate queued module |
+| `recoverERC20(address, address, uint256)` | `ROLE_TIMELOCK` | Standard | 48h | - | Recover stuck ERC20 tokens |
 
-### EscrowVault.sol
+**Note**: `EscrowVault` inherits from `BaseEscrow` and uses BaseEscrow's `queueResolutionModule()` / `activateResolutionModule()` for resolution module changes. EscrowVault does not have its own separate resolution module mechanism. Other default modules (release strategy, yield generation, yield distribution) are EscrowVault-specific and have their own queue/activate functions.
 
-| Function | Role | Lane | Delay | Bounds | Notes |
-|----------|------|------|-------|--------|-------|
-| `queueDefaultReleaseStrategy(address)` | `ROLE_TIMELOCK` | Slow | 48h queue | Non-zero address | Queue release strategy |
-| `activateDefaultReleaseStrategy()` | `ROLE_TIMELOCK` | Slow | 7d + 48h | - | Activate queued strategy |
-| `queueDefaultResolutionModule(address)` | `ROLE_TIMELOCK` | Slow | 48h queue | Non-zero address | Queue resolution module |
-| `activateDefaultResolutionModule()` | `ROLE_TIMELOCK` | Slow | 7d + 48h | - | Activate queued module |
-| `queueDefaultYieldGenerationModule(address)` | `ROLE_TIMELOCK` | Slow | 48h queue | Non-zero address | Queue yield generation module |
-| `activateDefaultYieldGenerationModule()` | `ROLE_TIMELOCK` | Slow | 7d + 48h | - | Activate queued module |
-| `queueDefaultYieldDistributionModule(address)` | `ROLE_TIMELOCK` | Slow | 48h queue | Non-zero address | Queue yield distribution module |
-| `activateDefaultYieldDistributionModule()` | `ROLE_TIMELOCK` | Slow | 7d + 48h | - | Activate queued module |
-
-### AaveYieldGenerationModule.sol
+### AaveYieldGenerationModule.sol (`contracts/modules/AaveYieldGenerationModule.sol`)
 
 | Function | Role | Lane | Delay | Bounds | Notes |
 |----------|------|------|-------|--------|-------|
@@ -97,30 +100,39 @@ Complete mapping of all governance functions to roles, lanes, and delays.
 | `guardianLowerTokenCap(address, uint256)` | `ROLE_GUARDIAN` | Emergency | 0h | newCap <= currentCap | Lower token cap (down-only) |
 | `guardianLowerGlobalCap(address, uint256)` | `ROLE_GUARDIAN` | Emergency | 0h | newCap <= currentCap | Lower global cap (down-only) |
 
-### DefaultResolutionModule.sol
+### DefaultResolutionModule.sol (`contracts/core/modules/DefaultResolutionModule.sol`)
 
 | Function | Role | Lane | Delay | Bounds | Notes |
 |----------|------|------|-------|--------|-------|
 | `setResolver(address)` | `ROLE_TIMELOCK` | Standard | 48h | Non-zero address | Set resolver address |
 
-### ResolverIncentiveModule.sol
+### DecentralizedResolutionModule.sol (`contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol`)
 
 | Function | Role | Lane | Delay | Bounds | Notes |
 |----------|------|------|-------|--------|-------|
-| `initialize(address,address)` | Initializer | N/A | 0h | Non-zero addresses | Initialize upgradeable contract (one-time) |
-| `upgradeTo(address)` | `ROLE_TIMELOCK` OR `ROLE_MODULE_DEVELOPER` | Instant | 0h | Valid implementation | Upgrade module implementation (UUPS) |
-| `upgradeToAndCall(address,bytes)` | `ROLE_TIMELOCK` OR `ROLE_MODULE_DEVELOPER` | Instant | 0h | Valid implementation | Upgrade and call (UUPS) |
-| `swapPaymentLibraryInstant(address)` | `ROLE_MODULE_DEVELOPER` | Instant | 0h | Valid library | Swap payment library instantly (no slow-lane delay) |
-| `queuePaymentCalculationLibrary(address)` | `ROLE_TIMELOCK` | Slow | 48h queue | Valid library | Queue payment library change (slow-lane) |
-| `activatePaymentCalculationLibrary()` | `ROLE_TIMELOCK` | Slow | 7d + 48h | - | Activate queued library |
-| `queueResolverSharePercentage(uint256)` | `ROLE_TIMELOCK` | Slow | 48h queue | 0 <= pct <= 10000 bps | Queue resolver share percentage change |
-| `activateResolverSharePercentage()` | `ROLE_TIMELOCK` | Slow | 7d + 48h | - | Activate queued percentage |
-| `queueWeights(Weights)` | `ROLE_TIMELOCK` | Slow | 48h queue | Valid weights | Queue weight configuration change |
-| `activateWeights()` | `ROLE_TIMELOCK` | Slow | 7d + 48h | - | Activate queued weights |
+| `appointSeniorResolver(address, string, string)` | `ROLE_TIMELOCK` | Standard | 48h | Non-zero address | Appoint senior resolver (affects new disputes only) |
+| `removeSeniorResolver(address)` | `ROLE_TIMELOCK` | Standard | 48h | - | Remove senior resolver (affects new disputes only) |
+| `setResolutionTableEntry(bytes32, ResolutionTableEntry)` | `ROLE_TIMELOCK` | Standard | 48h | Valid entry | Set resolution table entry for category |
+| `queueEscalationConfig(uint8, EscalationConfig)` | `ROLE_TIMELOCK` | Slow | 48h queue | Valid config | Queue escalation configuration |
+| `activateEscalationConfig(uint8)` | `ROLE_TIMELOCK` | Slow | 7d + 48h | - | Activate queued escalation config |
+| `setExternalResolver(address)` | `ROLE_TIMELOCK` | Standard | 48h | Non-zero address | Set external resolver (e.g., Kleros) |
 | `registerEscrowContract(address)` | `ROLE_TIMELOCK` | Standard | 48h | Non-zero address | Register escrow contract |
 | `unregisterEscrowContract(address)` | `ROLE_TIMELOCK` | Standard | 48h | - | Unregister escrow contract |
+| `setIncentiveModule(address)` | `ROLE_TIMELOCK` | Standard | 48h | Non-zero address | Set incentive module address |
+| `setResolverActive(address, bool)` | `ROLE_TIMELOCK` | Standard | 48h | - | Set resolver active status |
+| `setResolverCapacity(address, uint256, bool)` | `ROLE_TIMELOCK` | Standard | 48h | - | Set resolver capacity limits |
+| `setDisputeTimeout(uint256)` | `ROLE_TIMELOCK` | Standard | 48h | 0 < timeout <= 365 days | Set dispute timeout |
 
-**Note:** `DecentralizedResolutionModule` is in a separate package (`contracts/decentralized-resolution-module/`) and can be swapped into the protocol via slow-lane governance once proven through testing. All upgrades of the module require `ROLE_TIMELOCK` (standard governance lanes).
+**Note:** `DecentralizedResolutionModule` is in a separate package (`contracts/decentralized-resolution-module/`) and is **not included in the initial mainnet release**. When ready, it will be deployed and swapped in via the same Slow lane governance process as other modules (queue + activate, ~9 days).
+
+### ResolverIncentiveModule.sol (`contracts/decentralized-resolution-module/ResolverIncentiveModule.sol`)
+
+**Note:** `ResolverIncentiveModule` is in a separate package (`contracts/decentralized-resolution-module/`) and is **not included in the initial mainnet release**. When ready, it will be deployed and swapped in via the same Slow lane governance process as other modules (queue + activate, ~9 days).
+
+**Governance Functions** (when deployed):
+- All configuration changes use Slow lane (queue + activate, ~9 days)
+- All functions require `ROLE_TIMELOCK`
+- Module swaps follow the same pattern as other modules: deploy new version and swap via Slow lane
 
 ---
 

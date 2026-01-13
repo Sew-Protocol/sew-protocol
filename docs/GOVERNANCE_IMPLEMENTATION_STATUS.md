@@ -124,8 +124,7 @@ These need `onlyRole(ROLE_TIMELOCK)` with 48h delay:
 17. `setMaxAttachments(uint256)` - BaseEscrow
 18. `setResolutionModuleDelay(uint256)` - BaseEscrow
 19. `setDefaultYieldDistribution(address[], uint256[])` - BaseEscrow
-20. `setEscrowYieldDistribution(uint256, address[], uint256[])` - BaseEscrow
-21. `setAaveEnabled(bool)` - AaveYieldGenerationModule (enable only; disable is guardian)
+20. `setAaveEnabled(bool)` - AaveYieldGenerationModule (enable only; disable is guardian)
 22. `registerTokenForAave(address, address)` - AaveYieldGenerationModule
 23. `batchRegisterTokensForAave(address[], address[])` - AaveYieldGenerationModule
 24. `setResolver(address)` - DefaultResolutionModule

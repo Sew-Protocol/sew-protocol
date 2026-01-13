@@ -49,11 +49,9 @@ The protocol contracts have not yet undergone formal security audits. Audits are
 - `EscrowableERC20.sol` - ERC20 token with escrow functionality
 
 **Resolution Modules:**
-- `DefaultResolutionModule.sol` - Simple single-resolver module
-- `DecentralizedResolutionModule.sol` - Advanced multi-resolver module (in separate package)
+- `DefaultResolutionModule.sol` - Simple single-resolver module (initial mainnet release)
 
-**Incentive Module:**
-- `ResolverIncentiveModule.sol` - Resolver payment tracking (in separate package)
+**Note:** `DecentralizedResolutionModule` and `ResolverIncentiveModule` are in a separate package (`contracts/decentralized-resolution-module/`) and are **not included in the initial mainnet release**. They will be audited separately when ready for deployment.
 
 **Yield Modules:**
 - `AaveYieldGenerationModule.sol` - Aave yield generation
@@ -80,7 +78,7 @@ The protocol contracts have not yet undergone formal security audits. Audits are
 
 ### Out of Scope (For Initial Audit)
 
-- `DecentralizedResolutionModule` and `ResolverIncentiveModule` (in separate package, will be audited separately)
+- `DecentralizedResolutionModule` and `ResolverIncentiveModule` (in separate package, **not in initial mainnet release**, will be audited separately when ready)
 - Frontend applications
 - Off-chain infrastructure
 - Third-party dependencies (Aave protocol itself)

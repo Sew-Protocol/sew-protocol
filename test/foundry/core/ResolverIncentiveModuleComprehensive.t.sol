@@ -214,14 +214,15 @@ contract ResolverIncentiveModuleComprehensiveTest is Test {
         // Fund Incentive Module
         token.mint(address(incentiveModule), 10000 ether);
 
-        // Distribute
+        // Calculate payments (pull pattern)
         vm.prank(escrow);
-        
-        // We rely on balance checks instead of event checks due to Transfer event ordering
-        
         incentiveModule.onDisputeResolved(1, address(token));
 
         assertTrue(incentiveModule.arePaymentsDistributed(1));
+        
+        // Claim payment (pull pattern - resolver claims their payment)
+        vm.prank(resolver);
+        incentiveModule.claimPayment(1, address(token));
         
         // Verify resolver received funds
         // Default share is 50% (5000 bps)
@@ -243,8 +244,16 @@ contract ResolverIncentiveModuleComprehensiveTest is Test {
 
         token.mint(address(incentiveModule), 10000 ether);
 
+        // Calculate payments (pull pattern)
         vm.prank(escrow);
         incentiveModule.onDisputeResolved(1, address(token));
+
+        // Claim payments (pull pattern - resolvers claim their payments)
+        vm.prank(resolver);
+        incentiveModule.claimPayment(1, address(token));
+        
+        vm.prank(resolver2);
+        incentiveModule.claimPayment(1, address(token));
 
         // Total Share: 500 ether
         // Weights: 10000 (1x) + 15000 (1.5x) = 25000
@@ -263,11 +272,13 @@ contract ResolverIncentiveModuleComprehensiveTest is Test {
         
         token.mint(address(incentiveModule), 10000 ether);
 
+        // Calculate payments (pull pattern)
         vm.prank(escrow);
         incentiveModule.onDisputeResolved(1, address(token));
 
+        // Try to calculate again - should revert
         vm.prank(escrow);
-        vm.expectRevert("Payments already distributed");
+        vm.expectRevert("Payments already calculated");
         incentiveModule.onDisputeResolved(1, address(token));
     }
 }

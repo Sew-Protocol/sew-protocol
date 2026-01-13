@@ -13,7 +13,7 @@ describe("Simple Error Test", function () {
     [owner, user1, user2, resolver] = await ethers.getSigners();
 
     const EscrowableERC20Factory = await ethers.getContractFactory("EscrowableERC20");
-    escrowableERC20 = await EscrowableERC20Factory.deploy("Test Token", "TEST", 100, owner.address);
+    escrowableERC20 = await EscrowableERC20Factory.deploy("Test Token", "TEST", 100, owner.address, ethers.ZeroAddress, ethers.ZeroAddress);
     await escrowableERC20.waitForDeployment();
 
     // Phase 7: Setup resolution module (required for escrow creation)

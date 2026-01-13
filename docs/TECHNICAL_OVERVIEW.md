@@ -62,16 +62,18 @@ A decentralized escrow protocol built on Base (Ethereum L2) that enables secure,
 ### Modular System
 
 **Resolution Modules**:
-- `DefaultResolutionModule` - Simple single-resolver system
-- `DecentralizedResolutionModule` - Advanced multi-resolver with round-robin selection, 3-level escalation (standard → senior → external). In separate package (`contracts/decentralized-resolution-module/`), can be swapped in via governance once proven.
+- `DefaultResolutionModule` - Simple single-resolver system (initial mainnet release)
+- `DecentralizedResolutionModule` - Advanced multi-resolver with round-robin selection, 3-level escalation (standard → senior → external). In separate package (`contracts/decentralized-resolution-module/`), **not included in initial mainnet release**. When ready, will be deployed and swapped in via Slow lane governance.
 
 **Yield Modules**:
 - `AaveYieldGenerationModule` - Generates yield on escrowed funds via Aave
 - `DefaultYieldDistributionModule` - Configurable yield distribution to recipients
 
-**Incentive System** (in separate package with DecentralizedResolutionModule):
+**Incentive System** (in separate package, not in initial release):
 - `ResolverIncentiveModule` - Tracks and distributes payments to resolvers
-- `PaymentCalculationLibraryV1` - Weighted payment calculation (pluggable, upgradeable)
+- `PaymentCalculationLibraryV1` - Weighted payment calculation (pluggable)
+
+**Module Governance**: All modules use the same governance pattern: module swaps via Slow lane (queue + activate, ~9 days). Modules are immutable - upgrades are performed by deploying a new version and swapping.
 
 ### Design Principles
 
@@ -173,9 +175,10 @@ A decentralized escrow protocol built on Base (Ethereum L2) that enables secure,
 3. **Yield Generation**: Optional Aave integration for earning on escrowed funds
 4. **Resolver Incentives**: Automatic payment distribution to dispute resolvers
 5. **Governance**: Full onchain governance with timelock and emergency controls
-6. **Upgradeable**: Proxy-based upgradeability (Transparent or UUPS)
+6. **Immutable Core**: Core contracts are immutable (no proxies). Protocol evolution via module swaps.
 7. **Modular**: Pluggable modules for resolution, yield, and distribution
 8. **Snapshot Semantics**: Escrow rules locked at creation time
+9. **Unified Module Governance**: All modules use Slow lane swap pattern (immutable modules, ~9 days)
 
 ---
 

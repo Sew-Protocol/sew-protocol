@@ -23,7 +23,7 @@ This document defines the governance model, upgrade policy, and emergency contro
 - Reduces "soft-rug" optics around token launches
 - Module swaps are timelocked and publicly observable
 
-**Note:** `DecentralizedResolutionModule` and `ResolverIncentiveModule` are in a separate package and can be swapped in via governance once proven. If/when swapped in, they use UUPS proxies with all upgrades requiring `ROLE_TIMELOCK` via standard governance lanes.
+**Note:** `DecentralizedResolutionModule` and `ResolverIncentiveModule` are in a separate package (`contracts/decentralized-resolution-module/`) and are **not included in the initial mainnet release**. When ready, they will be deployed and swapped in via the same Slow lane governance process as other modules. All modules use the same governance pattern: module swaps via Slow lane (queue + activate, ~9 days).
 
 ### Timelock Canceller: Governor-Only
 **Decision:** `CANCELLER_ROLE` on TimelockController is **Governor-only** (Guardian does not have cancellation rights).
@@ -41,6 +41,8 @@ This document defines the governance model, upgrade policy, and emergency contro
 ## Canonical Reference
 
 **The authoritative list of governed functions, lanes, and delays is [`GOVERNANCE_SURFACE_MAP.md`](./GOVERNANCE_SURFACE_MAP.md).**
+
+**Interface versioning and compatibility information is documented in [`INTERFACE_VERSIONING.md`](./INTERFACE_VERSIONING.md).**
 
 This document (`governance.md`) provides narrative context, guarantees, snapshot semantics, and operational runbooks. For the complete function mapping, see the surface map.
 
@@ -137,31 +139,41 @@ At the moment an escrow is created (when `createEscrow()` or `createEscrowTransf
 
 ### What Is NOT Snapshotted (Global Settings)
 
-The following settings are **global** and apply to all escrows (including existing ones):
+The following settings are **global** and can be changed by governance:
+
+#### Global Defaults (Affect New Escrows Only)
+
+These settings can be changed by governance, but only affect **new escrows** created after the change:
+
+1. **Default Modules**
+   - Default resolution module (Slow lane)
+   - Default release strategy (Slow lane)
+   - Default yield generation module (Slow lane)
+   - Default yield distribution module (Slow lane)
+   - Existing escrows use their snapshotted module addresses
+
+2. **Default Parameters**
+   - `defaultAutoReleaseTime` (Standard lane)
+   - `defaultAutoCancelTime` (Standard lane)
+   - `defaultYieldDistribution` (Standard lane) - fallback for new escrows
+   - Existing escrows use their snapshotted values
+
+3. **Fee Configuration**
+   - `escrowFee` (Slow lane) - applies to new escrows only
+   - `escrowFeeAddress` (Slow lane) - where fees are withdrawn from (affects all escrows)
+   - Existing escrows have already had fees deducted at creation
+
+#### Global Settings (Affect All Escrows)
+
+These settings affect **all escrows** (existing and new):
 
 1. **Protocol Pause Status**
    - `paused()` state affects all escrows
    - Can be changed by Guardian (emergency) or Timelock (unpause)
 
-2. **Default Yield Distribution Recipients/Percentages**
-   - `defaultYieldDistribution` is used as a fallback for escrows that don't have escrow-specific distribution set
-   - Can be changed by Timelock (Standard lane)
-   - **Note**: Escrow-specific yield distribution (set via `setEscrowYieldDistribution()`) is set by the sender and can only be changed by the sender or Timelock, but only while the escrow is PENDING
-
-3. **Default Timeouts**
-   - `defaultAutoReleaseTime` and `defaultAutoCancelTime` only affect new escrows
-   - Existing escrows use their snapshotted values
-
-4. **Max Attachments**
-   - `maxAttachments` is a global limit that applies to all escrows
-
-5. **Escrow Fee Rate**
-   - `escrowFee` applies to all new escrows
-   - Existing escrows have already had fees deducted at creation
-
-6. **Fee Recipient Address**
-   - `escrowFeeAddress` is where fees are withdrawn from
-   - Does not affect existing escrows (fees already deducted)
+2. **Global Limits**
+   - `maxAttachments` - global limit that applies to all escrows
+   - `maxDisputeDuration` - maximum dispute duration for all escrows
 
 ### Immutability Rule
 
@@ -170,9 +182,9 @@ The following settings are **global** and apply to all escrows (including existi
 Specifically:
 - ✅ Default module setters (`queueDefaultX()` / `activateDefaultX()`) only change the default used for **new escrows**
 - ✅ Default parameter setters (`setDefaultAutoCancelTime()`, etc.) only affect **new escrows**
-- ✅ `setEscrowYieldDistribution(workflowId, ...)` can only be called while escrow is `PENDING` and only by sender or Timelock (not a governance bypass)
 - ❌ No function can change `snapshotResolutionModule`, `snapshotReleaseStrategy`, `snapshotYieldGenerationModule`, or `snapshotYieldDistributionModule` after creation
 - ❌ No function can change `autoReleaseTime` or `autoCancelTime` after creation (except via resolution)
+- ❌ No function can change yield distribution configuration after escrow creation
 
 ### Mechanical Enforcement
 
@@ -190,14 +202,13 @@ The implementation enforces this through:
 
 4. **Workflow ID Immutability**: Once a `workflowId` is assigned, the `EscrowTransfer` struct at that index is never deleted or replaced. Only state transitions (PENDING → RELEASED, etc.) are allowed.
 
-5. **Yield Distribution Exception**: `setEscrowYieldDistribution(workflowId, ...)` is the only function that can modify escrow-specific state after creation, but:
-   - It can only be called while `escrowState == PENDING`
-   - It can only be called by the sender or Timelock (not arbitrary governance)
-   - It does not affect the snapshotted modules
-   - It only sets the yield distribution recipients/percentages for that specific escrow
-   - **Rationale**: This allows the sender to configure yield distribution after escrow creation (e.g., if they forgot to set it initially), but does not allow governance to change the rules of an existing escrow. The Timelock role is included to allow governance to set distribution if needed, but this is a limited exception that does not affect module selection or core escrow rules.
+5. **Yield Distribution Immutability**: Yield distribution configuration is determined by the snapshotted yield distribution module at escrow creation. Any distribution parameters (recipients, percentages) must be configured at creation time or handled by the module's internal logic. There is no function to modify yield distribution after escrow creation.
 
-### Summary Table
+### Summary Tables
+
+#### Escrow-Specific Fields (Snapshotted at Creation)
+
+These fields are **snapshotted** into each escrow at creation time and **cannot be changed** by any governance action:
 
 | Field | Snapshotted? | Can Be Changed After Creation? | Who Can Change? |
 |-------|--------------|--------------------------------|-----------------|
@@ -208,11 +219,44 @@ The implementation enforces this through:
 | `autoReleaseTime` | ✅ Yes | ❌ No | N/A (immutable) |
 | `autoCancelTime` | ✅ Yes | ❌ No | N/A (immutable) |
 | `disputeResolver` | ✅ Yes | ❌ No | N/A (immutable) |
-| `escrowYieldDistribution[workflowId]` | ❌ No | ⚠️ Limited | Sender or Timelock (only while PENDING) |
-| `escrowState` | ❌ No | ✅ Yes | State machine transitions only |
-| `attachmentURIs` | ❌ No | ✅ Yes | Sender (only while PENDING) |
-| Protocol `paused()` | ❌ No | ✅ Yes | Guardian (pause) or Timelock (unpause) |
-| `defaultYieldDistribution` | ❌ No | ✅ Yes | Timelock (affects new escrows only) |
+| Yield distribution configuration | ✅ Yes | ❌ No | N/A (immutable - determined by snapshotted module) |
+
+#### Global Defaults (Affect New Escrows Only)
+
+These are **global settings** that can be changed by governance, but only affect **new escrows** created after the change:
+
+| Setting | Can Be Changed? | Who Can Change? | Lane | Affects |
+|---------|----------------|-----------------|------|---------|
+| Default resolution module | ✅ Yes | Timelock | Slow (7d + 48h) | New escrows only |
+| Default release strategy | ✅ Yes | Timelock | Slow (7d + 48h) | New escrows only |
+| Default yield generation module | ✅ Yes | Timelock | Slow (7d + 48h) | New escrows only |
+| Default yield distribution module | ✅ Yes | Timelock | Slow (7d + 48h) | New escrows only |
+| `defaultAutoReleaseTime` | ✅ Yes | Timelock | Standard (48h) | New escrows only |
+| `defaultAutoCancelTime` | ✅ Yes | Timelock | Standard (48h) | New escrows only |
+| `defaultYieldDistribution` | ✅ Yes | Timelock | Standard (48h) | New escrows only (fallback) |
+| `escrowFee` | ✅ Yes | Timelock | Slow (7d + 48h) | New escrows only |
+| `escrowFeeAddress` | ✅ Yes | Timelock | Slow (7d + 48h) | Where fees are withdrawn from (affects all escrows) |
+
+#### Global Settings (Affect All Escrows)
+
+These are **global settings** that affect **all escrows** (existing and new):
+
+| Setting | Can Be Changed? | Who Can Change? | Lane | Affects |
+|---------|----------------|-----------------|------|---------|
+| Protocol `paused()` | ✅ Yes | Guardian (pause) or Timelock (unpause) | Emergency (0h) or Standard (48h) | All escrows |
+| `maxAttachments` | ✅ Yes | Timelock | Standard (48h) | All escrows |
+| `maxDisputeDuration` | ✅ Yes | Timelock | Standard (48h) | All escrows |
+
+#### Lifecycle Fields (Not Governance-Controlled)
+
+These fields change naturally as part of the escrow lifecycle, not through governance actions:
+
+| Field | Can Be Changed? | Who Can Change? | Notes |
+|-------|----------------|-----------------|-------|
+| `escrowState` | ✅ Yes | State machine | Changes through normal operations (PENDING → RELEASED, etc.) |
+| `attachmentURIs` | ✅ Yes | Sender | Can be added by sender while escrow is PENDING (user action, not governance) |
+| `senderStatus` | ✅ Yes | Sender | User action (AGREE_TO_CANCEL, RAISE_DISPUTE) |
+| `recipientStatus` | ✅ Yes | Recipient | User action (AGREE_TO_CANCEL, RAISE_DISPUTE) |
 
 ---
 
@@ -258,9 +302,8 @@ Guardian **cannot**:
 - enabling/disabling Aave (Timelock can enable/disable; Guardian can only disable)
 - registering supported tokens (bounded)
 - setting exposure caps (bounded: 0 <= cap <= type(uint128).max)
-- managing senior resolvers (affects new disputes only, active disputes use stored resolver)
 
-**Note**: Sender updates to `setEscrowYieldDistribution()` are not governance actions; they are user configuration during PENDING state. Only Timelock path is a governance action.
+**Note**: Yield distribution configuration is immutable at escrow creation. It is determined by the snapshotted yield distribution module and any configuration parameters set at creation time.
 
 ### Slow lane (Queue + activate: 7 days, timelock-only)
 **Purpose:** high-impact changes such as module swaps and fee recipient changes.
@@ -275,6 +318,8 @@ Both `queueX()` and `activateX()` are timelock-only, meaning governance must:
 - pass a proposal to activate (48h delay).
 
 > Note: Under a single timelock, Slow lane takes ~9 days wall-clock (48h + 7d + 48h). This is intentional for safety.
+
+**Note**: All module changes (resolution, release, yield generation, yield distribution) use the unified slow lane pattern with 7-day delay. This applies consistently across all contracts (BaseEscrow, EscrowVault, EscrowableERC20). The previous BaseEscrow mechanism with configurable delay has been removed for consistency.
 
 ### Emergency lane (Guardian: immediate)
 **Purpose:** immediate risk reduction.
@@ -334,11 +379,18 @@ Slow-lane queue/activate MUST be used for:
 - fee bps changes
 - default module swaps:
   - release strategy
-  - resolution module (in addition to existing propose/activate)
+  - resolution module (BaseEscrow: `queueResolutionModule()` / `activateResolutionModule()`)
   - yield generation module
   - yield distribution module
 - Aave pool provider changes
 - decentralized escalation configuration changes
+
+**Note**: All module swaps use the unified slow lane pattern with 7-day delay:
+- **BaseEscrow**: Uses `queueResolutionModule()` / `activateResolutionModule()` to change the resolution module
+- **EscrowVault**: Uses BaseEscrow's `queueResolutionModule()` / `activateResolutionModule()` (inherits from BaseEscrow, no separate mechanism)
+- **EscrowableERC20**: Module setters are no-ops (placeholder implementation)
+
+All resolution module changes use the same Slow lane pattern (queue + activate, ~9 days total).
 
 **Note**: DAO address is immutable after deployment (set in constructor only). The `queueDao()` and `activateDao()` functions were removed to ensure DAO address cannot be changed.
 
@@ -357,7 +409,6 @@ All Standard-lane parameters are bounded onchain in `SettingsValidationLibrary`.
 - Default auto-release time: `0 .. 30 days`
 - Max attachments: `0 .. 20`
 - Fee bps: `0 .. 200` (Slow lane)
-- Resolution module delay: `48 hours .. 30 days`
 - Yield distribution recipients: `1 .. 10`
 - Yield distribution sum: must equal `10_000 bps`
 
@@ -383,39 +434,79 @@ Timelock can set caps within bounds:
 
 ---
 
-## Resolution Routing & Rollout
+## Module Governance
 
-The protocol supports safe rollouts of new resolution mechanisms without per-escrow admin control.
+**Rule**: All modules are immutable. Module upgrades are performed by deploying a new version and swapping via Slow lane (queue + activate, ~9 days).
 
-### ResolutionRouter
-- Implements `IResolutionModule`
-- Routes deterministically using `hash(escrowId) % 10_000 < rolloutBps`
-- `rolloutBps` is governed (timelock-only); guardian may reduce `rolloutBps` (down-only) if needed
+**Applies To**: All module types (resolution, release, yield generation, yield distribution).
 
-### Snapshot rule
-At escrow creation, the chosen resolution implementation is snapshotted into escrow state:
-- `escrow.resolutionImpl = router.route(escrowId)`
+**Current Modules** (Initial Mainnet Release):
+- `DefaultResolutionModule` - Simple single-resolver system
+- `DefaultReleaseStrategy` - Default release logic
+- `AaveYieldGenerationModule` - Aave yield generation
+- `DefaultYieldDistributionModule` - Configurable yield distribution
 
-Policy changes affect new escrows only.
+**Process**:
+1. Deploy new module version
+2. Queue module swap (48h delay via Timelock)
+3. Wait 7 days (slow lane delay)
+4. Activate module swap (48h delay via Timelock)
 
-### Senior Resolver Management (DecentralizedResolutionModule)
+**Total Time**: ~9 days wall-clock (48h + 7d + 48h)
 
-**Governance Lane**: Standard (48h delay)
+**Guarantee**: 
+- Old escrows continue using the old module (snapshot preserved)
+- New escrows use the new module
+- No exceptions: This rule applies to all modules
 
-**Functions**:
-- `addSeniorResolver(address)` - Add a senior resolver to the registry
-- `removeSeniorResolver(address)` - Remove a senior resolver from the registry
+**Future Modules**: Modules added after initial release (e.g., `DecentralizedResolutionModule`) will use the same governance pattern: deploy new version and swap via Slow lane.
 
-**Behavior**:
-- **Affects new disputes only**: Senior resolver changes only affect disputes that are created after the change
-- **Active disputes protected**: Once a dispute is created, the resolver is stored in `disputeMetadata[workflowId].currentResolver`
-- **Authorization check**: `isAuthorizedResolver()` first checks if the resolver matches the stored `currentResolver` for that dispute. If it matches, authorization is granted regardless of registry status.
-- **New dispute assignment**: For new disputes, `getResolver()` uses the current senior resolver registry to assign a resolver.
+---
 
-**Why Standard Lane is Acceptable**:
-- Cannot retroactively change active dispute paths (resolver is snapshotted in dispute metadata)
-- Only affects new dispute assignments
-- Does not violate "new escrows only" guarantee (disputes are separate from escrow creation)
+## Risk Reduction for Decentralized Dispute Resolution Migration
+
+When migrating from `DefaultResolutionModule` to `DecentralizedResolutionModule`, the protocol will use a staged approach to reduce risk:
+
+### Migration Strategy
+
+**Phase 1: Initial Deployment**
+- Deploy `DecentralizedResolutionModule` as a separate contract
+- Test extensively on testnet with real dispute scenarios
+- Conduct security audits specific to the decentralized resolution logic
+
+**Phase 2: Staged Rollout (Future Consideration)**
+- **Option A: Percentage-Based Rollout via ResolutionRouter**
+  - Deploy a `ResolutionRouter` module that implements `IResolutionModule`
+  - Router deterministically routes escrows to either `DefaultResolutionModule` or `DecentralizedResolutionModule` based on a governed rollout percentage
+  - Routing is deterministic (hash-based) and snapshotted at escrow creation
+  - Governance can increase rollout percentage gradually (0% → 100%)
+  - Guardian can lower rollout percentage (down-only) in case of issues
+  - **Status**: Not implemented in initial release. Will be considered for future migration.
+
+- **Option B: Direct Module Swap**
+  - Deploy `DecentralizedResolutionModule`
+  - Swap via Slow lane governance (queue + activate, ~9 days)
+  - All new escrows use the new module
+  - Existing escrows continue using their snapshotted module
+
+### Risk Mitigation Measures
+
+1. **Snapshot Semantics**: All escrows snapshot their resolution module at creation. Module swaps only affect new escrows.
+
+2. **Slow Lane Governance**: Module swaps require ~9 days (48h queue + 7d wait + 48h activate), providing time for community review and potential cancellation.
+
+3. **Guardian Emergency Controls**: Guardian can pause protocol if issues are detected during migration.
+
+4. **Extensive Testing**: Decentralized resolution module will be tested extensively on testnet before mainnet deployment.
+
+5. **Gradual Rollout (if ResolutionRouter implemented)**: Percentage-based rollout allows gradual migration, reducing risk of widespread issues.
+
+### Current Status
+
+- `DecentralizedResolutionModule` is **not included in the initial mainnet release**
+- It will be deployed and tested separately before being considered for swap
+- When ready, it will use the same Slow lane governance pattern as other modules
+- ResolutionRouter pattern is a future consideration for staged rollout, not implemented in initial release
 
 ---
 
@@ -466,7 +557,7 @@ Policy changes affect new escrows only.
 
 **Rationale**: The `authorizedResolver` global gate was eliminated in Phase 7 for mainnet credibility. Resolution is now handled entirely through resolution modules, which are snapshotted at escrow creation.
 
-**Replacement**: Use resolution modules (`DefaultResolutionModule`, `DecentralizedResolutionModule`, etc.) instead.
+**Replacement**: Use resolution modules (`DefaultResolutionModule`, etc.) instead.
 
 **Removal Timeline**: Function will be completely removed in a future version. Currently reverts with clear error message to prevent accidental use.
 
@@ -480,11 +571,20 @@ Policy changes affect new escrows only.
 
 ## Change Log
 
+### 2025-01-06
+- Updated contract paths to reflect `contracts/core/` structure
+- Added `setMaxDisputeDuration()` function to BaseEscrow
+- Added recovery functions (`recoverNativeETH`, `recoverERC20`) to governance surface
+- Clarified EscrowableERC20 module setters as no-ops
+- Updated EscrowVault to include recovery functions
+- Unified module governance: All modules use Slow lane swap pattern (immutable modules, ~9 days)
+
 ### 2025-01-27
 - Added Design Principles section (no proxies for core, Governor-only cancellation)
-- Removed Module Developer role (DecentralizedResolutionModule extracted to separate package, all upgrades via ROLE_TIMELOCK)
+- Unified module governance: All modules use immutable swap pattern (Slow lane, ~9 days)
 - Enhanced TimelockController roles documentation with rationale
 - Removed DAO address change references (DAO address is immutable)
+- Scoped documentation to initial mainnet release modules only
 - Merged content from gov-details.md
 
 ### Previous Updates

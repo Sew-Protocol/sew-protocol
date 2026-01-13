@@ -43,7 +43,9 @@ describe("BaseEscrow Module Validation", function () {
       "Test Token",
       "TEST",
       ESCROW_FEE,
-      feeAddress.address
+      feeAddress.address,
+      ethers.ZeroAddress,
+      ethers.ZeroAddress
     );
     await escrowableERC20.waitForDeployment();
 

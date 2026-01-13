@@ -34,12 +34,12 @@ describe("Core Contracts - Coverage Tests", function () {
 
     // Deploy EscrowVault
     const escrowVaultFactory = await ethers.getContractFactory("EscrowVault");
-    escrowVault = (await escrowVaultFactory.deploy(ESCROW_FEE, feeAddress.address)) as EscrowVault;
+    escrowVault = (await escrowVaultFactory.deploy(ESCROW_FEE, feeAddress.address, ethers.ZeroAddress, ethers.ZeroAddress)) as EscrowVault;
     await escrowVault.waitForDeployment();
 
     // Deploy EscrowableERC20
     const escrowableERC20Factory = await ethers.getContractFactory("EscrowableERC20");
-    escrowableERC20 = (await escrowableERC20Factory.deploy("Test Token", "TEST", ESCROW_FEE, feeAddress.address)) as EscrowableERC20;
+    escrowableERC20 = (await escrowableERC20Factory.deploy("Test Token", "TEST", ESCROW_FEE, feeAddress.address, ethers.ZeroAddress, ethers.ZeroAddress)) as EscrowableERC20;
     await escrowableERC20.waitForDeployment();
 
     // Deploy modules
@@ -414,7 +414,7 @@ describe("Core Contracts - Coverage Tests", function () {
 
       await escrowVault.connect(buyer).raiseDispute(workflowId);
       
-      await escrowVault.connect(resolver).cancelAsDisputeResolver(workflowId);
+      await escrowVault.connect(resolver).cancelAsDisputeResolver(workflowId, ethers.ZeroHash);
       
       const et = await escrowVault.escrowTransfers(workflowId);
       expect(Number(et.escrowState)).to.equal(5); // RESOLVED
@@ -428,7 +428,7 @@ describe("Core Contracts - Coverage Tests", function () {
 
       await escrowVault.connect(buyer).raiseDispute(workflowId);
       
-      await escrowVault.connect(resolver).releaseAsDisputeResolver(workflowId);
+      await escrowVault.connect(resolver).releaseAsDisputeResolver(workflowId, ethers.ZeroHash);
       
       const et = await escrowVault.escrowTransfers(workflowId);
       expect(Number(et.escrowState)).to.equal(5); // RESOLVED
@@ -445,7 +445,7 @@ describe("Core Contracts - Coverage Tests", function () {
       const remainingBalance = await escrowVault.getRemainingBalance(workflowId);
       const partialAmount = remainingBalance / 2n;
       
-      await escrowVault.connect(resolver).partialReleaseAsDisputeResolver(workflowId, partialAmount);
+      await escrowVault.connect(resolver).partialReleaseAsDisputeResolver(workflowId, partialAmount, ethers.ZeroHash);
       
       expect(await escrowVault.getRemainingBalance(workflowId)).to.equal(remainingBalance - partialAmount);
     });
@@ -461,7 +461,7 @@ describe("Core Contracts - Coverage Tests", function () {
       const remainingBalance = await escrowVault.getRemainingBalance(workflowId);
       const partialAmount = remainingBalance / 2n;
       
-      await escrowVault.connect(resolver).partialCancelAsDisputeResolver(workflowId, partialAmount);
+      await escrowVault.connect(resolver).partialCancelAsDisputeResolver(workflowId, partialAmount, ethers.ZeroHash);
       
       expect(await escrowVault.getRemainingBalance(workflowId)).to.equal(remainingBalance - partialAmount);
     });
@@ -480,48 +480,18 @@ describe("Core Contracts - Coverage Tests", function () {
       expect(et.escrowState).to.equal(4); // DISPUTED
     });
 
-    it("Should resolve with payouts", async function () {
-      await token1.connect(buyer).approve(await escrowVault.getAddress(), INITIAL_AMOUNT);
-      const tx = await escrowVault.connect(buyer).createEscrow(await token1.getAddress(), seller.address, INITIAL_AMOUNT);
-      await tx.wait();
-      const workflowId = Number(await escrowVault.nextWorkflowId()) - 1;
-
-      await escrowVault.connect(buyer).raiseDispute(workflowId);
-      
-      const remainingBalance = await escrowVault.getRemainingBalance(workflowId);
-      const payouts = [{
-        recipient: seller.address,
-        amount: remainingBalance
-      }];
-      
-      await escrowVault.connect(resolver).resolve(workflowId, payouts, ethers.ZeroHash);
-      
-      const et = await escrowVault.escrowTransfers(workflowId);
-      expect(et.escrowState).to.equal(5); // RESOLVED
-    });
-
-    it("Should resolve with partial payouts", async function () {
-      await token1.connect(buyer).approve(await escrowVault.getAddress(), INITIAL_AMOUNT);
-      const tx = await escrowVault.connect(buyer).createEscrow(await token1.getAddress(), seller.address, INITIAL_AMOUNT);
-      await tx.wait();
-      const workflowId = Number(await escrowVault.nextWorkflowId()) - 1;
-
-      await escrowVault.connect(buyer).raiseDispute(workflowId);
-      
-      const remainingBalance = await escrowVault.getRemainingBalance(workflowId);
-      const payouts = [{
-        recipient: seller.address,
-        amount: remainingBalance * 60n / 100n
-      }, {
-        recipient: buyer.address,
-        amount: remainingBalance * 40n / 100n
-      }];
-      
-      await escrowVault.connect(resolver).resolve(workflowId, payouts, ethers.ZeroHash);
-      
-      const et = await escrowVault.escrowTransfers(workflowId);
-      expect(et.escrowState).to.equal(5); // RESOLVED
-    });
+    // NOTE: resolve() function was removed. Multi-recipient resolution may be added
+    // back in the future with participant approval mechanism.
+    // 
+    // it("Should resolve with payouts", async function () {
+    //   // Test removed - resolve() function no longer exists
+    //   // Use releaseAsDisputeResolver() or cancelAsDisputeResolver() instead
+    // });
+    //
+    // it("Should resolve with partial payouts", async function () {
+    //   // Test removed - resolve() function no longer exists
+    //   // Use partialReleaseAsDisputeResolver() or partialCancelAsDisputeResolver() instead
+    // });
   });
 
   describe("BaseEscrow - View Functions", function () {

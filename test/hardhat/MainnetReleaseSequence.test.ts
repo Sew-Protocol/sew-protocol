@@ -129,7 +129,9 @@ describe("Mainnet Release Sequence", function () {
         "Escrowable Token",
         "EUSD",
         ESCROW_FEE,
-        feeAddress.address
+        feeAddress.address,
+        ethers.ZeroAddress,
+        ethers.ZeroAddress
       )) as EscrowableERC20;
       await escrowableERC20.waitForDeployment();
       
@@ -176,7 +178,8 @@ describe("Mainnet Release Sequence", function () {
         "EUSD",
         ESCROW_FEE,
         feeAddress.address,
-        {}
+        ethers.ZeroAddress,
+        ethers.ZeroAddress
       ) as EscrowableERC20;
       await escrowableERC20.waitForDeployment();
       
@@ -185,7 +188,8 @@ describe("Mainnet Release Sequence", function () {
       escrowVault = await EscrowVaultFactory.deploy(
         ESCROW_FEE,
         feeAddress.address,
-        {}
+        ethers.ZeroAddress,
+        ethers.ZeroAddress
       ) as EscrowVault;
       await escrowVault.waitForDeployment();
       
@@ -870,7 +874,9 @@ describe("Mainnet Release Sequence", function () {
         "Escrowable Token",
         "EUSD",
         ESCROW_FEE,
-        feeAddress.address
+        feeAddress.address,
+        ethers.ZeroAddress,
+        ethers.ZeroAddress
       );
       await escrowToken.waitForDeployment();
       

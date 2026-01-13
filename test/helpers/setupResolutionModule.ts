@@ -40,34 +40,36 @@ export async function setupResolutionModule(
     }
   }
 
-  // Set default resolution module
+  // Set default resolution module (Derived contract level)
   // Phase 8: EscrowVault now uses Slow lane (queue/activate) like EscrowableERC20
   if ("queueDefaultResolutionModule" in contract) {
     // EscrowableERC20 or EscrowVault (after Phase 8 fix) - uses 7-day delay
     await contract.connect(deployer).queueDefaultResolutionModule(await resolutionModule.getAddress());
-    const [, eta, exists] = await contract.getPendingDefaultResolutionModule();
+    const [, eta, exists] = await (contract as any).getPendingDefaultResolutionModule();
     if (!exists) {
       throw new Error("Failed to queue resolution module");
     }
     // Fast-forward time to allow activation (7 days = 604800 seconds)
     await time.increaseTo(Number(eta) + 1);
-    await contract.connect(deployer).activateDefaultResolutionModule();
-  } else if ("proposeResolutionModule" in contract) {
-    // BaseEscrow pattern (two-step with delay) - uses resolutionModuleDelay (min 48 hours)
-    // Set minimum delay for testing
-    const MIN_DELAY = 48 * 60 * 60; // 48 hours
-    try {
-      await contract.connect(deployer).setResolutionModuleDelay(MIN_DELAY);
-    } catch (error: any) {
-      // If already set or fails, continue
+    await (contract as any).connect(deployer).activateDefaultResolutionModule();
+  }
+
+  // Set resolution module (BaseEscrow level) - now uses slow lane (7-day delay)
+  if ("queueResolutionModule" in contract) {
+    // BaseEscrow pattern (slow lane queue/activate) - uses 7-day delay
+    await (contract as any).connect(deployer).queueResolutionModule(await resolutionModule.getAddress());
+    const [, eta, exists] = await (contract as any).getPendingResolutionModule();
+    if (!exists) {
+      throw new Error("Failed to queue resolution module");
     }
-    await contract.connect(deployer).proposeResolutionModule(await resolutionModule.getAddress());
-    const delay = await contract.disputeResolutionModuleDelay();
-    const currentTime = await time.latest();
-    await time.increaseTo(Number(currentTime) + Number(delay) + 1);
-    await contract.connect(deployer).activateResolutionModule();
-  } else {
-    throw new Error("Contract does not have a method to set default resolution module.");
+    // Fast-forward time to allow activation (7 days = 604800 seconds)
+    await time.increaseTo(Number(eta) + 1);
+    await (contract as any).connect(deployer).activateResolutionModule();
+  }
+
+  // Ensure at least one was set
+  if (!("queueDefaultResolutionModule" in contract) && !("queueResolutionModule" in contract)) {
+    throw new Error("Contract does not have a method to set resolution module.");
   }
 
   return resolutionModule as DefaultResolutionModule;

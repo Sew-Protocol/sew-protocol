@@ -37,3 +37,17 @@ docs/internal/INTRINSIC_CURSOR_OPERATING_SYSTEM.md
 
 docs/archived
 
+
+
+#Ignore cursor AI rules
+.cursor/rules/codacy.mdc
+
+
+.gitignore
+
+.codacy
+
+.cursorignore
+
+.cursor/
+
