@@ -11,6 +11,7 @@ import "../shared/governance/SlowLaneQueueActivateUpgradeable.sol";
 import "./IIncentiveModule.sol";
 import "./DecentralizedResolverStructs.sol";
 import "./ResolutionAnalytics.sol";
+import "./EscalationCostLibrary.sol";
 import "../libraries/ResolutionTableLibrary.sol";
 
 /**
@@ -48,6 +49,17 @@ contract DecentralizedResolutionModule is
     // DR v1: Timeout durations per round
     uint256[3] public resolveDeadlines = [3 days, 5 days, 7 days]; // Time to resolve per round
     uint256[3] public appealWindows = [2 days, 3 days, 0]; // Time to appeal after decision
+    
+    // DR v2: Appeal bond configuration
+    EscalationCostConfig public escalationCostConfig;
+    PendingEscalationCostConfig private _pendingEscalationCostConfig;
+    uint256 public minEscrowValueForEscalation; // Minimum escrow value to allow escalation (anti-griefing)
+    
+    struct PendingEscalationCostConfig {
+        EscalationCostConfig config;
+        uint64 eta;
+        bool exists;
+    }
     
     mapping(address => ResolverRole) public resolverRoles;
     mapping(address => bool) public isApprovedResolver;
@@ -105,6 +117,12 @@ contract DecentralizedResolutionModule is
     event ModuleUpgraded(address indexed oldImplementation, address indexed newImplementation, address indexed upgradedBy, uint256 timestamp);
     event EscalationFeePaid(uint256 indexed workflowId, uint256 fee);
     event ResolverAssignmentWeightUpdated(address indexed resolver, uint256 oldWeight, uint256 newWeight); // DR v1
+    
+    // DR v2 events
+    event EscalationCostConfigQueued(EscalationCostConfig config, uint64 eta);
+    event EscalationCostConfigActivated(EscalationCostConfig oldConfig, EscalationCostConfig newConfig);
+    event AppealBondRequired(uint256 indexed workflowId, uint8 round, uint256 amount, address token);
+    event MinEscrowValueUpdated(uint256 oldValue, uint256 newValue);
 
     modifier onlySeniorResolver() { require(isApprovedSeniorResolver[_msgSender()], "Not senior resolver"); _; }
     modifier onlyResolver() { require(isApprovedResolver[_msgSender()] || isApprovedSeniorResolver[_msgSender()], "Not authorized resolver"); _; }
@@ -125,6 +143,10 @@ contract DecentralizedResolutionModule is
         emaAlphaBps = 1000; // 10% EMA step
         minEmaScoreThreshold = 500000; // 50% minimum score
         maxTimeoutRateBps = 3000; // 30% maximum timeout rate
+        
+        // Initialize DR v2 parameters (disabled by default)
+        escalationCostConfig.enabled = false;
+        minEscrowValueForEscalation = 0; // No minimum by default
     }
 
     function _authorizeUpgrade(address newImplementation) internal override {
@@ -281,17 +303,32 @@ contract DecentralizedResolutionModule is
 
     /**
      * @notice Get required appeal bond for escalation (DR v2)
-     * @dev DR v2: Returns bond requirement for escalation. Currently returns (0, address(0)) as v2 not yet implemented.
-     *      v2 implementation will use escalation cost curves and appeal bond logic.
+     * @dev Calculates bond based on escalation cost curve configuration
+     * @param currentLevel Current escalation level/round
+     * @return amount Required bond amount
+     * @return token Token address for bond
      */
     function getRequiredAppealBond(
         uint256 /* workflowId */,
-        uint8 /* currentLevel */,
+        uint8 currentLevel,
         bytes calldata /* escrowData */
-    ) external pure override returns (uint256 amount, address token) {
-        // DR v2: Not yet implemented - returns (0, address(0))
-        // Future implementation will calculate bond based on escalation cost curve and dispute characteristics
-        return (0, address(0));
+    ) external view override returns (uint256 amount, address token) {
+        if (!escalationCostConfig.enabled) {
+            return (0, address(0));
+        }
+        
+        // Use escalation count (number of prior escalations)
+        // Round 0 → 1: escalationCount = 0 (first escalation)
+        // Round 1 → 2: escalationCount = 1 (second escalation)
+        // Round 2 → 3: escalationCount = 2 (hypothetical third escalation)
+        uint8 escalationCount = currentLevel;
+        
+        uint256 bondAmount = EscalationCostLibrary.calculateEscalationCost(
+            escalationCount,
+            escalationCostConfig
+        );
+        
+        return (bondAmount, escalationCostConfig.bondToken);
     }
 
     function moduleName() external pure override returns (string memory) { return "DecentralizedResolution"; }
@@ -750,6 +787,63 @@ contract DecentralizedResolutionModule is
                 emaAlphaBps
             );
         }
+    }
+
+    // ============ DR v2 Governance Functions ============
+    
+    /**
+     * @notice Queue escalation cost configuration (DR v2 - slow lane)
+     * @param config Escalation cost curve configuration
+     */
+    function queueEscalationCostConfig(EscalationCostConfig memory config) external onlyRole(ROLE_TIMELOCK) {
+        require(config.baseCost > 0 || !config.enabled, "Base cost must be > 0 if enabled");
+        
+        _pendingEscalationCostConfig = PendingEscalationCostConfig({
+            config: config,
+            eta: uint64(block.timestamp + SLOW_DELAY),
+            exists: true
+        });
+        
+        emit EscalationCostConfigQueued(config, _pendingEscalationCostConfig.eta);
+    }
+    
+    /**
+     * @notice Activate queued escalation cost configuration (DR v2 - slow lane)
+     */
+    function activateEscalationCostConfig() external onlyRole(ROLE_TIMELOCK) {
+        PendingEscalationCostConfig storage pending = _pendingEscalationCostConfig;
+        if (!pending.exists || block.timestamp < pending.eta) revert NoPending();
+        
+        EscalationCostConfig memory oldConfig = escalationCostConfig;
+        escalationCostConfig = pending.config;
+        
+        emit EscalationCostConfigActivated(oldConfig, pending.config);
+        delete _pendingEscalationCostConfig;
+    }
+    
+    /**
+     * @notice Get pending escalation cost configuration
+     * @return config Pending configuration
+     * @return eta Activation timestamp
+     * @return exists Whether pending config exists
+     */
+    function getPendingEscalationCostConfig() external view returns (
+        EscalationCostConfig memory config,
+        uint64 eta,
+        bool exists
+    ) {
+        PendingEscalationCostConfig storage pending = _pendingEscalationCostConfig;
+        return (pending.config, pending.eta, pending.exists);
+    }
+    
+    /**
+     * @notice Set minimum escrow value for escalation (DR v2 anti-griefing)
+     * @param minValue Minimum escrow value (0 = no minimum)
+     */
+    function setMinEscrowValueForEscalation(uint256 minValue) external onlyRole(ROLE_TIMELOCK) {
+        uint256 oldValue = minEscrowValueForEscalation;
+        minEscrowValueForEscalation = minValue;
+        emit MinEscrowValueUpdated(oldValue, minValue);
     }
 
     uint256[50] private __gap;

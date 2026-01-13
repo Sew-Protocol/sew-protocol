@@ -49,6 +49,12 @@ interface DecentralizedResolverStructs {
         uint256[3] decidedAtRound;    // Timestamp when decision was submitted
         uint256[3] appealDeadline;    // Deadline to appeal each round's decision
         
+        // DR v2: Appeal bond tracking per round
+        address[3] bondDepositorAtRound; // Who deposited appeal bond for this round
+        uint256[3] bondAmountAtRound;    // Appeal bond amount for this round
+        address[3] bondTokenAtRound;     // Token used for appeal bond
+        bool[3] bondRefundedAtRound;     // Whether bond was refunded (vs paid to resolvers)
+        
         // Current state
         address escalatedBy;          // Who initiated current escalation
         uint256 escalationTimestamp;  // When current escalation happened
@@ -118,9 +124,10 @@ interface DecentralizedResolverStructs {
     
     struct EscalationCostConfig {
         CostCurveType curveType;  // Type of cost curve (DR v2)
-        uint256 baseCost;         // Base cost for escalation
-        uint256 stepSize;         // Step size for cost curve calculation
-        uint256 multiplier;       // Multiplier for geometric curves (r > 1)
+        uint256 baseCost;         // Base cost for escalation (in wei or token units)
+        uint256 stepSize;         // Step size for cost curve calculation  
+        uint256 multiplier;       // Multiplier for geometric curves (r > 1, scaled by 1e18)
+        address bondToken;        // Token address for bond (address(0) = ETH)
         bool enabled;             // Whether this cost config is enabled
     }
     
