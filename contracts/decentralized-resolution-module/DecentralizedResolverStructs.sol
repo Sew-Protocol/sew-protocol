@@ -21,6 +21,13 @@ interface DecentralizedResolverStructs {
         CANCEL     // 2 - Funds refunded to sender
     }
     
+    enum DisputeStatus {
+        Open,       // 0 - Awaiting resolver decision
+        Decided,    // 1 - Decision submitted, appeal window open
+        Escalated,  // 2 - Escalated to next round
+        Final       // 3 - No further appeals possible
+    }
+    
     // ============ Structs ============
     
     struct ResolverMetadata {
@@ -32,14 +39,22 @@ interface DecentralizedResolverStructs {
     }
     
     struct DisputeMetadata {
-        address currentResolver;      // Current resolver assigned
-        uint8 escalationLevel;        // Current escalation level (0 = initial, 1 = senior, 2 = external)
-        address escalatedBy;          // Who escalated (if escalated)
-        uint256 escalationTimestamp;  // When escalated
-        uint256 timeoutTimestamp;     // When dispute should auto-escalate
+        // Round-based tracking (DR v1)
+        uint8 currentRound;           // 0=initial resolver, 1=senior resolver, 2=external (Kleros)
+        DisputeStatus status;         // Open, Decided, Escalated, Final
+        
+        // Per-round data (fixed 3 rounds: 0, 1, 2)
+        address[3] resolverAtRound;   // Resolver assigned for each round
+        ResolutionOutcome[3] decisionAtRound; // Decision submitted for each round
+        uint256[3] decidedAtRound;    // Timestamp when decision was submitted
+        uint256[3] appealDeadline;    // Deadline to appeal each round's decision
+        
+        // Current state
+        address escalatedBy;          // Who initiated current escalation
+        uint256 escalationTimestamp;  // When current escalation happened
+        uint256 assignedAt;           // When current resolver was assigned
+        uint256 resolveBy;            // Deadline for current resolver to submit decision
         bytes resolutionData;         // Additional resolution data
-        ResolutionOutcome lastResolutionOutcome; // Last resolution decision (for reversal tracking)
-        address lastResolver;          // Resolver who made last decision
     }
     
     struct EscalationConfig {
@@ -56,8 +71,8 @@ interface DecentralizedResolverStructs {
     }
     
     struct ResolutionTableEntry {
-        uint8 maxEscalationLevel;     // Maximum escalation level (0-2)
-        uint256 escalationFee;        // Fee required for escalation
+        uint8 maxRound;               // Maximum round (0-2: 0=resolver only, 1=+senior, 2=+Kleros)
+        uint256 escalationFee;        // Fee required for escalation (legacy, use cost curves in v2)
         bool enabled;                 // Whether this entry is active
         string categoryName;          // Human-readable category name
     }
@@ -69,12 +84,51 @@ interface DecentralizedResolverStructs {
     }
     
     struct ResolverStats {
-        uint256 disputesResolved;           // Number of disputes successfully resolved
-        uint256 disputesEscalated;          // Number of disputes escalated away from this resolver
-        uint256 resolutionReversals;        // Number of resolutions reversed by higher-level resolver
-        uint256 totalResolutionTime;        // Cumulative resolution time (for average calculation)
-        uint256 lastResolutionTimestamp;    // Timestamp of last resolution
-        uint256 qualityScore;               // Quality score (0-10000 basis points)
-        uint256 totalDisputes;             // Total disputes handled (resolved + escalated)
+        // EMA-based performance score (DR v1)
+        uint256 emaScore;                   // EMA performance score (0-1e6 fixed point, 1e6 = perfect)
+        uint256 lastScoreUpdate;            // Timestamp of last EMA update
+        
+        // Objective counters
+        uint256 casesAssigned;              // Total cases assigned
+        uint256 casesDecided;               // Cases decided on time
+        uint256 timeoutsAccept;             // Failed to accept assignment (DR v1)
+        uint256 timeoutsResolve;            // Failed to resolve on time (DR v1)
+        uint256 reversals;                  // Decisions reversed on escalation
+        
+        // Timing metrics
+        uint256 totalResolutionTime;        // Cumulative resolution time (for average)
+        uint256 lastActive;                 // Last activity timestamp
+        
+        // Legacy fields (kept for backward compatibility during migration)
+        uint256 disputesResolved;           // Deprecated: use casesDecided
+        uint256 disputesEscalated;          // Deprecated: tracked separately
+        uint256 qualityScore;               // Deprecated: use emaScore
+        
+        // Manual controls
+        uint256 assignmentWeight;           // Manual override (0-10000 bps, 0=excluded)
+    }
+    
+    // ============ DR v2 Structures ============
+    
+    enum CostCurveType {
+        LINEAR,      // cost(k) = baseCost + stepSize * k
+        QUADRATIC,   // cost(k) = baseCost + stepSize * k^2 (recommended default)
+        GEOMETRIC    // cost(k) = baseCost * multiplier^k
+    }
+    
+    struct EscalationCostConfig {
+        CostCurveType curveType;  // Type of cost curve (DR v2)
+        uint256 baseCost;         // Base cost for escalation
+        uint256 stepSize;         // Step size for cost curve calculation
+        uint256 multiplier;       // Multiplier for geometric curves (r > 1)
+        bool enabled;             // Whether this cost config is enabled
+    }
+    
+    struct AppealBond {
+        address depositor;        // Address that deposited the bond
+        uint256 amount;           // Bond amount
+        address token;            // Token address
+        uint256 depositedAt;      // Timestamp when bond was deposited
+        bool refunded;            // Whether bond has been refunded
     }
 }

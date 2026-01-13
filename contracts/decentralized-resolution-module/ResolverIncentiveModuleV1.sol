@@ -12,15 +12,16 @@ import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import "../shared/governance/SlowLaneQueueActivateUpgradeable.sol";
 
 /**
- * @title ResolverIncentiveModule
- * @notice Module for calculating and distributing resolver payments
+ * @title ResolverIncentiveModuleV1
+ * @notice DR v1 incentive module: performance-based workload routing (no appeal bonds/staking)
  * @dev Uses functional library approach with governance-controlled upgrades
  *      - State management: Imperative (in this contract)
  *      - Payment calculations: Functional (in library)
  *      - Library upgrades: Governance-controlled (slow lane) or instant (module developer)
  *      - UUPS upgradeable for rapid iteration and bug fixes
+ *      - Implements IIncentiveModule for compatibility with DecentralizedResolutionModule
  */
-contract ResolverIncentiveModule is 
+contract ResolverIncentiveModuleV1 is 
     AccessControlUpgradeable,
     ReentrancyGuardUpgradeable,
     SlowLaneQueueActivateUpgradeable,

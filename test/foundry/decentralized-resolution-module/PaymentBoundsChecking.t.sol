@@ -2,13 +2,13 @@
 pragma solidity ^0.8.33;
 
 import "forge-std/Test.sol";
-import "../../../contracts/decentralized-resolution-module/ResolverIncentiveModule.sol";
+import "../../../contracts/decentralized-resolution-module/ResolverIncentiveModuleV1.sol";
 import "../../../contracts/decentralized-resolution-module/PaymentCalculationLibraryV1.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract PaymentBoundsCheckingTest is Test {
-    ResolverIncentiveModule public incentiveModule;
+    ResolverIncentiveModuleV1 public incentiveModule;
     PaymentCalculationLibraryV1 public paymentLib;
     ERC20Mock public token;
     
@@ -42,19 +42,19 @@ contract PaymentBoundsCheckingTest is Test {
         paymentLib = new PaymentCalculationLibraryV1();
 
         // Deploy Implementation
-        ResolverIncentiveModule implementation = new ResolverIncentiveModule();
+        ResolverIncentiveModuleV1 implementation = new ResolverIncentiveModuleV1();
 
         // Deploy Proxy and Initialize
         ERC1967Proxy proxy = new ERC1967Proxy(
             address(implementation),
             abi.encodeWithSelector(
-                ResolverIncentiveModule.initialize.selector,
+                ResolverIncentiveModuleV1.initialize.selector,
                 owner,
                 address(paymentLib)
             )
         );
 
-        incentiveModule = ResolverIncentiveModule(payable(address(proxy)));
+        incentiveModule = ResolverIncentiveModuleV1(payable(address(proxy)));
 
         // Setup roles
         incentiveModule.grantRole(ROLE_TIMELOCK, timelock);

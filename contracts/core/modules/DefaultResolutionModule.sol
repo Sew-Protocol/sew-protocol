@@ -84,6 +84,18 @@ contract DefaultResolutionModule is AccessControl, IResolutionModule {
     }
 
     /**
+     * @notice Get required appeal bond for escalation (DR v2)
+     * @dev Default implementation: no bonds required (returns 0)
+     */
+    function getRequiredAppealBond(
+        uint256 /* workflowId */,
+        uint8 /* currentLevel */,
+        bytes calldata /* escrowData */
+    ) external pure override returns (uint256 amount, address token) {
+        return (0, address(0));
+    }
+
+    /**
      * @notice Get module name
      */
     function moduleName() external pure override returns (string memory) {

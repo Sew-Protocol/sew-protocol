@@ -3,12 +3,12 @@ pragma solidity ^0.8.33;
 
 import "forge-std/Test.sol";
 import "../../../contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol";
-import "../../../contracts/decentralized-resolution-module/ResolverIncentiveModule.sol";
+import "../../../contracts/decentralized-resolution-module/ResolverIncentiveModuleV1.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract EscalationFeeEnforcementTest is Test {
     DecentralizedResolutionModule public resolutionModule;
-    ResolverIncentiveModule public incentiveModule;
+    ResolverIncentiveModuleV1 public incentiveModule;
     
     address public owner;
     address public timelock;
@@ -22,7 +22,7 @@ contract EscalationFeeEnforcementTest is Test {
     uint256 public workflowId = 1;
     
     event EscalationFeePaid(uint256 indexed workflowId, uint256 fee);
-    event DisputeEscalated(uint256 indexed workflowId, uint8 fromLevel, uint8 toLevel, address indexed newResolver);
+    event DisputeEscalatedToRound(uint256 indexed workflowId, uint8 fromRound, uint8 toRound, address indexed newResolver);
     
     function setUp() public {
         owner = address(this);
@@ -97,7 +97,7 @@ contract EscalationFeeEnforcementTest is Test {
         // Now escalation should succeed
         vm.prank(escrowContract);
         vm.expectEmit(true, false, false, true);
-        emit DisputeEscalated(workflowId, 0, 1, seniorResolver);
+        emit DisputeEscalatedToRound(workflowId, 0, 1, seniorResolver);
         (bool success, address newResolver, uint8 newLevel) = resolutionModule.executeEscalation(workflowId, "");
         
         assertTrue(success);

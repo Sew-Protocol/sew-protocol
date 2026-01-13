@@ -73,6 +73,23 @@ interface IResolutionModule is IERC165 {
     );
 
     /**
+     * @notice Get required appeal bond for escalation (DR v2)
+     * @param workflowId The escrow transfer ID
+     * @param currentLevel Current escalation level
+     * @param escrowData Encoded escrow data
+     * @return amount Bond amount required (0 if bonds not enabled)
+     * @return token Token address for bond (address(0) if native token)
+     * @dev In DR v2, escalation requires a bond deposit from the escalator.
+     *      If bonds are not enabled, returns (0, address(0)).
+     *      For v1 modules, this function should return (0, address(0)).
+     */
+    function getRequiredAppealBond(
+        uint256 workflowId,
+        uint8 currentLevel,
+        bytes calldata escrowData
+    ) external view returns (uint256 amount, address token);
+
+    /**
      * @notice Get the module name/identifier
      * @return name The module name
      */

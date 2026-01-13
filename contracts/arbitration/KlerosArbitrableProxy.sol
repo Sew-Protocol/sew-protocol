@@ -281,6 +281,19 @@ contract KlerosArbitrableProxy is
     }
 
     /**
+     * @notice Get required appeal bond for escalation (DR v2)
+     * @dev Kleros is final level - no bonds required (returns 0)
+     */
+    function getRequiredAppealBond(uint256, uint8, bytes calldata) 
+        external 
+        pure 
+        override 
+        returns (uint256 amount, address token) 
+    {
+        return (0, address(0));
+    }
+
+    /**
      * @notice Module metadata
      */
     function moduleName() external pure override returns (string memory) {

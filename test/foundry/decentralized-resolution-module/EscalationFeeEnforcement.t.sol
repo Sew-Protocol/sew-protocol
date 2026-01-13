@@ -22,7 +22,7 @@ contract EscalationFeeEnforcementTest is Test {
     uint256 public constant ESCALATION_FEE_LEVEL_2 = 200e18; // 200 tokens
 
     event EscalationFeePaid(uint256 indexed workflowId, uint256 fee);
-    event DisputeEscalated(uint256 indexed workflowId, uint8 fromLevel, uint8 toLevel, address indexed newResolver);
+    event DisputeEscalatedToRound(uint256 indexed workflowId, uint8 fromRound, uint8 toRound, address indexed newResolver);
 
     function setUp() public {
         owner = address(this);
@@ -139,7 +139,7 @@ contract EscalationFeeEnforcementTest is Test {
 
         // Now escalation should succeed
         vm.expectEmit(true, false, false, true);
-        emit DisputeEscalated(workflowId, 0, 1, seniorResolver);
+        emit DisputeEscalatedToRound(workflowId, 0, 1, seniorResolver);
         
         vm.prank(escrowContract);
         (bool success, address newResolver, uint8 newLevel) = resolutionModule.executeEscalation(workflowId, "");
@@ -216,7 +216,7 @@ contract EscalationFeeEnforcementTest is Test {
         resolutionModule.markEscalationFeePaid(workflowId, ESCALATION_FEE_LEVEL_2);
         
         vm.expectEmit(true, false, false, true);
-        emit DisputeEscalated(workflowId, 1, 2, externalResolver);
+        emit DisputeEscalatedToRound(workflowId, 1, 2, externalResolver);
         
         vm.prank(escrowContract);
         (bool success3, address newResolver5, uint8 newLevel) = resolutionModule.executeEscalation(workflowId, "");
