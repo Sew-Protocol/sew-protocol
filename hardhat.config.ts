@@ -17,7 +17,7 @@ extendEnvironment(async (hre) => {
   // Add getSignerFrom method to provider if it doesn't exist
   if (hre.network.provider && !(hre.network.provider as any).getSignerFrom) {
     const provider = hre.network.provider;
-    (provider as any).getSignerFrom = function(address: string) {
+    (provider as any).getSignerFrom = function (address: string) {
       // Use ethers provider to get signer - hardhat-deploy expects this method to exist
       // The actual implementation will use provider.getSigner anyway, so this is just a stub
       return (hre.ethers.provider as any).getSigner(address);
@@ -39,7 +39,7 @@ function accountsOrThrow(networkName: string) {
 
 const config: HardhatUserConfig = {
   solidity: {
-    version: "0.8.33",
+    version: '0.8.33',
     settings: {
       optimizer: {
         enabled: true,
@@ -47,7 +47,7 @@ const config: HardhatUserConfig = {
         runs: 1000, // Higher runs = smaller code size (but higher gas cost)
       },
       viaIR: true, // Enable IR-based code generation to reduce contract size (required to avoid stack too deep)
-      evmVersion: "cancun", // Use Cancun EVM version to support mcopy instruction
+      evmVersion: 'cancun', // Use Cancun EVM version to support mcopy instruction
     },
   },
   paths: {
@@ -60,11 +60,15 @@ const config: HardhatUserConfig = {
     deployer: { default: 0 },
   },
   networks: {
-    hardhat: { 
+    hardhat: {
       allowUnlimitedContractSize: true, // Allow large contracts in test environment only
-      chainId: 31337
+      chainId: 31337,
     },
-    baseSepolia: { url: rpc('RPC_BASE_SEPOLIA'), accounts: accountsOrThrow('baseSepolia'), chainId: 84532 },
+    baseSepolia: {
+      url: rpc('RPC_BASE_SEPOLIA'),
+      accounts: accountsOrThrow('baseSepolia'),
+      chainId: 84532,
+    },
     base: { url: rpc('RPC_BASE_MAINNET'), accounts: accountsOrThrow('base'), chainId: 8453 },
     ethereum: { url: rpc('RPC_ETHEREUM'), accounts: accountsOrThrow('ethereum'), chainId: 1 },
   },

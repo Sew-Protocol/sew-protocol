@@ -20,6 +20,7 @@ uint256 randomSeed = uint256(keccak256(abi.encodePacked(
 ```
 
 **Locations:**
+
 1. `selectResolverRoundRobin()` - Resolver selection
 2. `selectResolverByQuality()` - Quality-based selection
 
@@ -53,6 +54,7 @@ uint256 randomSeed = uint256(keccak256(abi.encodePacked(
        blockHashValue = 0;
    }
    ```
+
    - Code already handles the case where blockhash might be 0
    - Falls back to using other entropy sources (category, timestamp, index)
    - Randomness is still provided, just without blockhash component
@@ -62,6 +64,7 @@ uint256 randomSeed = uint256(keccak256(abi.encodePacked(
 **Risk Level:** ✅ **Very Low**
 
 **Reasons:**
+
 1. **Practically Impossible:** Transactions are included in recent blocks, not 256+ blocks old
 2. **Multiple Entropy Sources:** Even if blockhash is 0, randomness still comes from:
    - Category key
@@ -74,25 +77,31 @@ uint256 randomSeed = uint256(keccak256(abi.encodePacked(
 ### Potential Improvements (If Desired)
 
 #### Option 1: Use Current Block Hash (Not Recommended)
+
 ```solidity
 uint256 blockHashValue = uint256(blockhash(block.number));
 ```
+
 **Problem:** Current block hash is not available until after the block is mined, so this won't work.
 
 #### Option 2: Use Multiple Previous Blocks (Low Value)
+
 ```solidity
 uint256 blockHashValue = uint256(blockhash(block.number - 1));
 if (blockHashValue == 0 && block.number > 1) {
     blockHashValue = uint256(blockhash(block.number - 2));
 }
 ```
+
 **Benefit:** Minimal - only helps in the impossible edge case
 **Cost:** Additional gas, complexity
 
 #### Option 3: Use Block Timestamp as Primary (Current Approach is Better)
+
 The current approach already uses timestamp as a fallback, which is sufficient.
 
 #### Option 4: Chainlink VRF (Overkill)
+
 **Benefit:** True randomness
 **Cost:** Significant gas cost, external dependency, complexity
 **Conclusion:** Not worth it for resolver selection fairness
@@ -102,6 +111,7 @@ The current approach already uses timestamp as a fallback, which is sufficient.
 **Status:** ✅ **No Action Required**
 
 **Reasoning:**
+
 1. The limitation only affects an edge case that is practically impossible
 2. The code already handles the fallback gracefully
 3. Multiple entropy sources ensure randomness even without blockhash
@@ -125,5 +135,3 @@ if (block.number > 0) {
     // Fallback entropy sources (category, timestamp, index) ensure randomness.
 }
 ```
-
-

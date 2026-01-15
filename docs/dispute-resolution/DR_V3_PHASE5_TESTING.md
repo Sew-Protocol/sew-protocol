@@ -3,9 +3,11 @@
 ## Test Coverage
 
 ### InsurancePoolVault Tests (`InsurancePoolVaultTest.t.sol`)
+
 **Status:** ✅ 18/18 tests passing
 
 **Coverage:**
+
 - ✅ Deposit with source tags (timeout, reversal, fraud)
 - ✅ Multiple source deposits
 - ✅ Access control (only slashing module can deposit)
@@ -16,9 +18,11 @@
 - ✅ Query functions
 
 ### Freeze Assignments Tests (`FreezeAssignmentsTest.t.sol`)
+
 **Status:** ✅ 11/11 tests passing
 
 **Coverage:**
+
 - ✅ Pause/resume by timelock
 - ✅ Pause/resume by admin
 - ✅ Unauthorized access blocked
@@ -27,9 +31,11 @@
 - ✅ New disputes blocked when paused
 
 ### Phase 5 Integration Tests (`Phase5IntegrationTest.t.sol`)
+
 **Status:** ✅ 4/4 tests passing
 
 **Coverage:**
+
 - ✅ Slash → Vault transfer with source tags
 - ✅ Insurance payout flow (propose → delay → execute)
 - ✅ Freeze assignments integration
@@ -38,7 +44,9 @@
 ## Known Issues
 
 ### E2E Test Failures (6 tests)
+
 **Issue:** Some E2E tests are failing due to:
+
 1. Slash amount calculations - need to verify decimal handling
 2. Freeze duration checks - timing edge cases
 3. Circuit breaker tests - may need adjustment
@@ -46,6 +54,7 @@
 **Status:** Under investigation - these are existing E2E tests that may need updates for Phase 5 changes.
 
 ### Slashing Module Invariant Tests (12 tests)
+
 **Issue:** "Not slashing module" errors - vault role not granted in test setup
 
 **Fix Applied:** Added `insuranceVault.grantRole(insuranceVault.ROLE_SLASHING_MODULE(), address(slashingModule));` to test setup.
@@ -77,6 +86,7 @@
 ## Summary
 
 **Phase 5 Testing Status:**
+
 - ✅ Insurance Pool Vault: Fully tested (18/18)
 - ✅ Freeze Assignments: Fully tested (11/11)
 - ✅ Integration: Fully tested (4/4)

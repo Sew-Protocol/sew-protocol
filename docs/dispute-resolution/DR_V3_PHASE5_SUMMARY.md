@@ -11,6 +11,7 @@ Phase 5 focuses on **insurance pool management** and **recovery procedures** - o
 **InsurancePoolVault Contract** (`contracts/decentralized-resolution-module/InsurancePoolVault.sol`)
 
 **Key Features:**
+
 - ✅ Vault contract holding slashed funds
 - ✅ Source-tagged accounting: `timeout`, `reversal`, `fraud` (separate tracking)
 - ✅ Automatic deposits from slashing module (via `ROLE_SLASHING_MODULE`)
@@ -19,11 +20,13 @@ Phase 5 focuses on **insurance pool management** and **recovery procedures** - o
 - ✅ Events: `InsuranceFunded`, `InsurancePayoutProposed`, `InsurancePayoutExecuted`
 
 **Distribution Logic:**
+
 - 50% of slashed funds → Insurance Pool (via vault)
 - 30% → Protocol Treasury (TODO: when treasury contract exists)
 - 20% → Burned (deflationary)
 
 **Integration:**
+
 - `ResolverSlashingModuleV1` now transfers funds to `InsurancePoolVault` on slash
 - Source tags (`TIMEOUT_ACCEPT`, `TIMEOUT_RESOLVE`, `REVERSAL`, `FRAUD`) are preserved
 - Workflow IDs are tracked for auditability
@@ -31,15 +34,18 @@ Phase 5 focuses on **insurance pool management** and **recovery procedures** - o
 ### Governance Controls
 
 **Deposits:**
+
 - Automatic from slashing module (no governance required)
 - Anyone can also fund via `fundInsurancePool()` (backward compatibility)
 
 **Withdrawals:**
+
 - **Default:** Disabled (`withdrawalsEnabled = false`)
 - **Slow Lane:** `proposePayout()` → 7-day delay → `executePayout()` (requires `ROLE_TIMELOCK`)
 - **Direct Withdrawals:** Only if `withdrawalsEnabled = true` (requires `ROLE_TIMELOCK`)
 
 **Access Control:**
+
 - `ROLE_SLASHING_MODULE`: Can deposit funds
 - `ROLE_TIMELOCK`: Can propose/execute payouts
 - `ROLE_ADMIN`: Can enable/disable withdrawals
@@ -48,26 +54,26 @@ Phase 5 focuses on **insurance pool management** and **recovery procedures** - o
 
 ```solidity
 event InsuranceFunded(
-    uint256 indexed amount,
-    ISlashingModule.SlashReason indexed source,
-    uint256 indexed workflowId,
-    uint256 newTotalBalance
+  uint256 indexed amount,
+  ISlashingModule.SlashReason indexed source,
+  uint256 indexed workflowId,
+  uint256 newTotalBalance
 );
 
 event InsurancePayoutProposed(
-    uint256 indexed payoutId,
-    address indexed to,
-    uint256 amount,
-    uint256 indexed workflowId,
-    string reason,
-    uint64 eta
+  uint256 indexed payoutId,
+  address indexed to,
+  uint256 amount,
+  uint256 indexed workflowId,
+  string reason,
+  uint64 eta
 );
 
 event InsurancePayoutExecuted(
-    uint256 indexed payoutId,
-    address indexed to,
-    uint256 amount,
-    uint256 indexed workflowId
+  uint256 indexed payoutId,
+  address indexed to,
+  uint256 amount,
+  uint256 indexed workflowId
 );
 ```
 
@@ -78,6 +84,7 @@ event InsurancePayoutExecuted(
 **Status:** ✅ Already proven in Phase 4 E2E tests
 
 **Procedure:**
+
 1. Queue `address(0)` for staking/slashing modules via `queueStakingModule()` / `queueSlashingModule()`
 2. Wait 7 days (slow lane delay)
 3. Activate via `activateStakingModule()` / `activateSlashingModule()`
@@ -92,10 +99,12 @@ event InsurancePayoutExecuted(
 **Status:** ✅ Already implemented in `ResolverSlashingModuleV1`
 
 **Functions:**
+
 - `triggerCircuitBreaker(string reason)`: Activates circuit breaker (requires `ROLE_ADMIN`)
 - `resetCircuitBreaker()`: Deactivates after cooldown (1 hour, requires `ROLE_ADMIN`)
 
 **Scope:**
+
 - Prevents new slashes when active
 - Existing slashes continue processing
 - Mass unavailability detection can auto-trigger
@@ -107,17 +116,20 @@ event InsurancePayoutExecuted(
 **Status:** ✅ Implemented
 
 **Implementation:**
+
 - Added `newAssignmentsPaused` state variable to `DecentralizedResolutionModule`
 - `pauseNewAssignments(string reason)`: Freezes all new assignments (requires `ROLE_TIMELOCK` or `DEFAULT_ADMIN_ROLE`)
 - `resumeNewAssignments()`: Resumes new assignments (requires `ROLE_TIMELOCK` or `DEFAULT_ADMIN_ROLE`)
 - `areNewAssignmentsPaused()`: Query function to check pause status
 
 **Behavior:**
+
 - When paused, `selectResolverRoundRobin()` and `selectResolverWithQuality()` return `address(0)`
 - Existing disputes continue processing normally (only new assignments are blocked)
 - Events: `NewAssignmentsPaused`, `NewAssignmentsResumed`
 
 **Use Cases:**
+
 - Emergency response to system issues
 - Planned maintenance windows
 - Gradual rollout control
@@ -127,11 +139,13 @@ event InsurancePayoutExecuted(
 **Status:** ⏸️ Manual for now (recommended for launch)
 
 **Current Implementation:**
+
 - Manual trigger via `triggerCircuitBreaker()` (multisig)
 - Auto-trigger on mass unavailability (30% threshold)
 - Transparent events: `CircuitBreakerActivated`, `CircuitBreakerDeactivated`
 
 **Future Automation (Optional):**
+
 - Objective on-chain signals: % of timeouts over epoch
 - Threshold-based triggers (e.g., >30% timeout rate)
 - Requires careful design to avoid false positives
@@ -139,9 +153,11 @@ event InsurancePayoutExecuted(
 ## Files Modified
 
 ### New Contracts
+
 - `contracts/decentralized-resolution-module/InsurancePoolVault.sol` - Insurance pool vault
 
 ### Modified Contracts
+
 - `contracts/decentralized-resolution-module/ResolverSlashingModuleV1.sol`
   - Added `InsurancePoolVault` integration
   - Updated `initialize()` to accept vault and stable token
@@ -154,6 +170,7 @@ event InsurancePayoutExecuted(
   - Added events: `NewAssignmentsPaused`, `NewAssignmentsResumed`
 
 ### Modified Tests
+
 - `test/foundry/decentralized-resolution-module/DRv3E2E.t.sol` - Updated to deploy vault
 - `test/foundry/decentralized-resolution-module/SlashingModuleInvariants.t.sol` - Updated to deploy vault
 

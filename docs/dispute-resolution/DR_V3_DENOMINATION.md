@@ -1,5 +1,4 @@
-Denomination: safest approach with minimal oracle complexity
-------------------------------------------------------------
+## Denomination: safest approach with minimal oracle complexity
 
 ### Design goal
 
@@ -19,10 +18,10 @@ Given your system may escrow arbitrary ERC20s, the safest operational approach i
 
 Why this works:
 
--   Stable denomination makes parameters meaningful and predictable.
+- Stable denomination makes parameters meaningful and predictable.
 
--   No oracle needed.
+- No oracle needed.
 
--   Prevents governance manipulation where someone pumps/dumps a volatile token to game bond requirements.
+- Prevents governance manipulation where someone pumps/dumps a volatile token to game bond requirements.
 
 This is aligned with how optimistic oracle and arbitration systems often parameterize bond/liveness per request and care about the token used for bonding.

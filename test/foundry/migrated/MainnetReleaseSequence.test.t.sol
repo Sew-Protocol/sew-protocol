@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "forge-std/Test.sol";
-import "../../../../contracts/YieldOps.sol";
-import "../../../../contracts/DisputeOps.sol";
-import "contracts/token/SewToken.sol";
-import "contracts/core/EscrowableERC20.sol";
-import "contracts/core/EscrowVault.sol";
-import "contracts/modules/DefaultReleaseStrategy.sol";
-import "contracts/core/modules/DefaultResolutionModule.sol";
-import "contracts/modules/DefaultYieldDistributionModule.sol";
+import 'forge-std/Test.sol';
+import 'contracts/YieldOps.sol';
+import 'contracts/DisputeOps.sol';
+import 'contracts/token/SewToken.sol';
+import 'contracts/core/EscrowableERC20.sol';
+import 'contracts/core/EscrowVault.sol';
+import 'contracts/modules/DefaultReleaseStrategy.sol';
+import 'contracts/core/modules/DefaultResolutionModule.sol';
+import 'contracts/modules/DefaultYieldDistributionModule.sol';
 
 contract Test_MainnetReleaseSequence_test is Test {
     SewToken public governanceToken;
@@ -32,7 +32,7 @@ contract Test_MainnetReleaseSequence_test is Test {
         yieldOps = new YieldOps();
         disputeOps = new DisputeOps();
         // Deploy governance token
-        governanceToken = new SewToken("Sew Token", "SEW", deployer, INITIAL_TOKEN_SUPPLY);
+        governanceToken = new SewToken('Sew Token', 'SEW', deployer, INITIAL_TOKEN_SUPPLY);
 
         // Deploy modules
         relStrat = new DefaultReleaseStrategy();
@@ -40,7 +40,14 @@ contract Test_MainnetReleaseSequence_test is Test {
         yieldDist = new DefaultYieldDistributionModule();
 
         // Deploy main contracts
-        escrowable = new EscrowableERC20("Escrowable Token", "EUSD", 100, feeAddress, address(yieldOps), address(disputeOps));
+        escrowable = new EscrowableERC20(
+            'Escrowable Token',
+            'EUSD',
+            100,
+            feeAddress,
+            address(yieldOps),
+            address(disputeOps)
+        );
         vault = new EscrowVault(100, feeAddress, address(yieldOps), address(disputeOps));
     }
 
@@ -66,9 +73,9 @@ contract Test_MainnetReleaseSequence_test is Test {
         assertEq(governanceToken.balanceOf(tokenHolder3), 3_000_000 ether);
 
         // Verify modules are deployed and have expected metadata
-        assertEq(relStrat.strategyName(), "DefaultBuyerRelease");
-        assertEq(resModule.moduleName(), "DefaultSingleResolver");
-        assertEq(yieldDist.moduleName(), "DefaultYieldDistribution");
+        assertEq(relStrat.strategyName(), 'DefaultBuyerRelease');
+        assertEq(resModule.moduleName(), 'DefaultSingleResolver');
+        assertEq(yieldDist.moduleName(), 'DefaultYieldDistribution');
 
         // Verify deployer has admin roles on escrow contracts
         bytes32 ADMIN = escrowable.DEFAULT_ADMIN_ROLE();

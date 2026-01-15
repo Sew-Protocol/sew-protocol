@@ -1,6 +1,6 @@
-import fs from "fs";
-import path from "path";
-import { execSync } from "child_process";
+import fs from 'fs';
+import path from 'path';
+import { execSync } from 'child_process';
 
 /**
  * @title Coverage Report Generator
@@ -29,32 +29,26 @@ interface TestFile {
 
 // Colors for console output
 const colors = {
-  green: "\x1b[32m",
-  yellow: "\x1b[33m",
-  blue: "\x1b[34m",
-  red: "\x1b[31m",
-  reset: "\x1b[0m",
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  blue: '\x1b[34m',
+  red: '\x1b[31m',
+  reset: '\x1b[0m',
 };
 
 /**
  * Run Hardhat coverage
  */
 function runHardhatCoverage(): void {
-  console.log(
-    `${colors.blue}Running Hardhat coverage...${colors.reset}`
-  );
+  console.log(`${colors.blue}Running Hardhat coverage...${colors.reset}`);
   try {
-    execSync("npx hardhat coverage", { stdio: "inherit" });
-    console.log(
-      `${colors.green}✓ Hardhat coverage complete${colors.reset}`
-    );
+    execSync('npx hardhat coverage', { stdio: 'inherit' });
+    console.log(`${colors.green}✓ Hardhat coverage complete${colors.reset}`);
   } catch (error) {
     console.warn(
-      `${colors.yellow}⚠ Hardhat coverage encountered issues (some tests may fail under coverage instrumentation)${colors.reset}`
+      `${colors.yellow}⚠ Hardhat coverage encountered issues (some tests may fail under coverage instrumentation)${colors.reset}`,
     );
-    console.warn(
-      `${colors.yellow}  Proceeding with analysis of coverage data...${colors.reset}`
-    );
+    console.warn(`${colors.yellow}  Proceeding with analysis of coverage data...${colors.reset}`);
   }
 }
 
@@ -62,17 +56,13 @@ function runHardhatCoverage(): void {
  * Attempt Foundry coverage (may fail on some configurations)
  */
 function runFoundryCoverage(): void {
-  console.log(
-    `${colors.blue}Attempting Foundry coverage...${colors.reset}`
-  );
+  console.log(`${colors.blue}Attempting Foundry coverage...${colors.reset}`);
   try {
-    execSync("forge coverage --report lcov", { stdio: "inherit" });
-    console.log(
-      `${colors.green}✓ Foundry coverage complete${colors.reset}`
-    );
+    execSync('forge coverage --report lcov', { stdio: 'inherit' });
+    console.log(`${colors.green}✓ Foundry coverage complete${colors.reset}`);
   } catch (error) {
     console.warn(
-      `${colors.yellow}⚠ Foundry coverage skipped (may require specific setup)${colors.reset}`
+      `${colors.yellow}⚠ Foundry coverage skipped (may require specific setup)${colors.reset}`,
     );
   }
 }
@@ -81,12 +71,10 @@ function runFoundryCoverage(): void {
  * Parse coverage files and extract statistics
  */
 function extractCoverageStats(): CoverageStats {
-  const coverageFile = path.join(process.cwd(), "coverage", "coverage-final.json");
+  const coverageFile = path.join(process.cwd(), 'coverage', 'coverage-final.json');
 
   if (!fs.existsSync(coverageFile)) {
-    console.warn(
-      `${colors.yellow}Warning: coverage-final.json not found${colors.reset}`
-    );
+    console.warn(`${colors.yellow}Warning: coverage-final.json not found${colors.reset}`);
     return {
       lines: 0,
       linesCovered: 0,
@@ -97,7 +85,7 @@ function extractCoverageStats(): CoverageStats {
     };
   }
 
-  const coverage = JSON.parse(fs.readFileSync(coverageFile, "utf-8"));
+  const coverage = JSON.parse(fs.readFileSync(coverageFile, 'utf-8'));
   let stats: CoverageStats = {
     lines: 0,
     linesCovered: 0,
@@ -109,7 +97,7 @@ function extractCoverageStats(): CoverageStats {
 
   for (const file of Object.values(coverage)) {
     const fileCov = file as any;
-    
+
     // Lines coverage (using 'l' key for Istanbul format)
     if (fileCov.l) {
       Object.values(fileCov.l).forEach((lineCount: any) => {
@@ -126,7 +114,7 @@ function extractCoverageStats(): CoverageStats {
         }
       });
     }
-    
+
     // Functions coverage (using 'f' key)
     if (fileCov.f) {
       Object.values(fileCov.f).forEach((funcCount: any) => {
@@ -143,7 +131,7 @@ function extractCoverageStats(): CoverageStats {
         }
       });
     }
-    
+
     // Branches coverage (using 'b' key)
     if (fileCov.b) {
       Object.values(fileCov.b).forEach((branches: any) => {
@@ -178,7 +166,7 @@ function extractCoverageStats(): CoverageStats {
  * Calculate and format percentages
  */
 function calculatePercentage(covered: number, total: number): string {
-  if (total === 0) return "N/A";
+  if (total === 0) return 'N/A';
   const percentage = ((covered / total) * 100).toFixed(2);
   return `${percentage}%`;
 }
@@ -188,8 +176,8 @@ function calculatePercentage(covered: number, total: number): string {
  */
 function findTestFiles(): TestFile[] {
   const testDirs = [
-    path.join(process.cwd(), "test", "foundry"),
-    path.join(process.cwd(), "test", "hardhat"),
+    path.join(process.cwd(), 'test', 'foundry'),
+    path.join(process.cwd(), 'test', 'hardhat'),
   ];
 
   const testFiles: TestFile[] = [];
@@ -205,10 +193,7 @@ function findTestFiles(): TestFile[] {
 
         if (stat.isDirectory()) {
           walk(fullPath);
-        } else if (
-          file.endsWith(".test.ts") ||
-          file.endsWith(".t.sol")
-        ) {
+        } else if (file.endsWith('.test.ts') || file.endsWith('.t.sol')) {
           const relPath = path.relative(process.cwd(), fullPath);
           testFiles.push({
             file: relPath,
@@ -229,8 +214,8 @@ function findTestFiles(): TestFile[] {
  */
 function countTestsInFile(filePath: string): number {
   try {
-    const content = fs.readFileSync(filePath, "utf-8");
-    const isSolidity = filePath.endsWith(".sol");
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const isSolidity = filePath.endsWith('.sol');
 
     if (isSolidity) {
       // Solidity: count `it(` or similar patterns
@@ -250,55 +235,49 @@ function countTestsInFile(filePath: string): number {
  * Generate coverage summary markdown
  */
 function generateCoverageSummary(stats: CoverageStats, testFiles: TestFile[]): string {
-  let markdown = "# Test Coverage Report\n\n";
+  let markdown = '# Test Coverage Report\n\n';
   markdown += `**Generated:** ${new Date().toISOString()}\n\n`;
 
-  markdown += "## Coverage Statistics\n\n";
-  markdown += "| Metric | Covered | Total | Percentage |\n";
-  markdown += "|--------|---------|-------|------------|\n";
+  markdown += '## Coverage Statistics\n\n';
+  markdown += '| Metric | Covered | Total | Percentage |\n';
+  markdown += '|--------|---------|-------|------------|\n';
 
   const linePercent = calculatePercentage(stats.linesCovered, stats.lines);
-  const funcPercent = calculatePercentage(
-    stats.functionsCovered,
-    stats.functions
-  );
-  const branchPercent = calculatePercentage(
-    stats.branchesCovered,
-    stats.branches
-  );
+  const funcPercent = calculatePercentage(stats.functionsCovered, stats.functions);
+  const branchPercent = calculatePercentage(stats.branchesCovered, stats.branches);
 
   markdown += `| Lines | ${stats.linesCovered} | ${stats.lines} | ${linePercent} |\n`;
   markdown += `| Functions | ${stats.functionsCovered} | ${stats.functions} | ${funcPercent} |\n`;
   markdown += `| Branches | ${stats.branchesCovered} | ${stats.branches} | ${branchPercent} |\n\n`;
 
-  markdown += "## Test Files\n\n";
-  markdown += "| File | Test Count |\n";
-  markdown += "|------|------------|\n";
+  markdown += '## Test Files\n\n';
+  markdown += '| File | Test Count |\n';
+  markdown += '|------|------------|\n';
 
   let totalTests = 0;
   for (const testFile of testFiles) {
     const count = countTestsInFile(testFile.file);
     totalTests += count;
-    const displayName = testFile.file.replace(process.cwd() + "/", "");
+    const displayName = testFile.file.replace(process.cwd() + '/', '');
     markdown += `| ${displayName} | ${count} |\n`;
   }
 
   markdown += `\n**Total Tests:** ${totalTests}\n\n`;
 
-  markdown += "## Test Phases Completion\n\n";
-  markdown += "### Phase 1: Edge Cases & DoS Vectors ✅\n";
-  markdown += "- ERC20 Edge Cases: 3 tests\n";
-  markdown += "- DoS Vector Protection: 8 tests\n";
-  markdown += "- **Status:** Complete\n\n";
+  markdown += '## Test Phases Completion\n\n';
+  markdown += '### Phase 1: Edge Cases & DoS Vectors ✅\n';
+  markdown += '- ERC20 Edge Cases: 3 tests\n';
+  markdown += '- DoS Vector Protection: 8 tests\n';
+  markdown += '- **Status:** Complete\n\n';
 
-  markdown += "### Phase 2: Event Validation ✅\n";
-  markdown += "- Event Validation: 15 tests\n";
-  markdown += "- **Status:** Complete\n\n";
+  markdown += '### Phase 2: Event Validation ✅\n';
+  markdown += '- Event Validation: 15 tests\n';
+  markdown += '- **Status:** Complete\n\n';
 
-  markdown += "### Phase 3: Coverage Reporting 🔄\n";
-  markdown += "- Coverage Report Generator (this script)\n";
-  markdown += "- CI/CD Integration\n";
-  markdown += "- **Status:** In Progress\n\n";
+  markdown += '### Phase 3: Coverage Reporting 🔄\n';
+  markdown += '- Coverage Report Generator (this script)\n';
+  markdown += '- CI/CD Integration\n';
+  markdown += '- **Status:** In Progress\n\n';
 
   return markdown;
 }
@@ -307,14 +286,10 @@ function generateCoverageSummary(stats: CoverageStats, testFiles: TestFile[]): s
  * Main execution
  */
 async function main() {
+  console.log(`${colors.blue}════════════════════════════════════════════════════${colors.reset}`);
+  console.log(`${colors.blue}          Test Coverage Report Generator            ${colors.reset}`);
   console.log(
-    `${colors.blue}════════════════════════════════════════════════════${colors.reset}`
-  );
-  console.log(
-    `${colors.blue}          Test Coverage Report Generator            ${colors.reset}`
-  );
-  console.log(
-    `${colors.blue}════════════════════════════════════════════════════${colors.reset}\n`
+    `${colors.blue}════════════════════════════════════════════════════${colors.reset}\n`,
   );
 
   try {
@@ -323,7 +298,7 @@ async function main() {
     runHardhatCoverage();
     runFoundryCoverage();
 
-    console.log("");
+    console.log('');
 
     // Step 2: Extract statistics
     console.log(`${colors.blue}Step 2: Extracting coverage statistics${colors.reset}\n`);
@@ -331,7 +306,7 @@ async function main() {
     console.log(`  Lines: ${stats.linesCovered}/${stats.lines}`);
     console.log(`  Functions: ${stats.functionsCovered}/${stats.functions}`);
     console.log(`  Branches: ${stats.branchesCovered}/${stats.branches}`);
-    console.log("");
+    console.log('');
 
     // Step 3: Find test files
     console.log(`${colors.blue}Step 3: Cataloging test files${colors.reset}\n`);
@@ -346,27 +321,27 @@ async function main() {
       totalTests += count;
     }
     console.log(`  Total tests: ${totalTests}`);
-    console.log("");
+    console.log('');
 
     // Step 4: Generate report
     console.log(`${colors.blue}Step 4: Generating coverage report${colors.reset}\n`);
     const report = generateCoverageSummary(stats, testFiles);
-    
-    const reportPath = path.join(process.cwd(), "coverage", "COVERAGE_REPORT.md");
+
+    const reportPath = path.join(process.cwd(), 'coverage', 'COVERAGE_REPORT.md');
     fs.mkdirSync(path.dirname(reportPath), { recursive: true });
     fs.writeFileSync(reportPath, report);
     console.log(`  Report saved to: ${reportPath}`);
-    console.log("");
+    console.log('');
 
     // Step 5: Display summary
     console.log(
-      `${colors.green}════════════════════════════════════════════════════${colors.reset}`
+      `${colors.green}════════════════════════════════════════════════════${colors.reset}`,
     );
     console.log(
-      `${colors.green}                 COVERAGE SUMMARY                   ${colors.reset}`
+      `${colors.green}                 COVERAGE SUMMARY                   ${colors.reset}`,
     );
     console.log(
-      `${colors.green}════════════════════════════════════════════════════${colors.reset}\n`
+      `${colors.green}════════════════════════════════════════════════════${colors.reset}\n`,
     );
 
     const linePercent = parseFloat(calculatePercentage(stats.linesCovered, stats.lines));
@@ -377,20 +352,22 @@ async function main() {
     const coverageColor =
       avgCoverage >= 80 ? colors.green : avgCoverage >= 60 ? colors.yellow : colors.red;
 
-    console.log(`Lines:      ${stats.linesCovered}/${stats.lines} (${calculatePercentage(stats.linesCovered, stats.lines)})`);
-    console.log(`Functions:  ${stats.functionsCovered}/${stats.functions} (${calculatePercentage(stats.functionsCovered, stats.functions)})`);
-    console.log(`Branches:   ${stats.branchesCovered}/${stats.branches} (${calculatePercentage(stats.branchesCovered, stats.branches)})`);
     console.log(
-      `\nAverage Coverage: ${coverageColor}${avgCoverage.toFixed(2)}%${colors.reset}`
+      `Lines:      ${stats.linesCovered}/${stats.lines} (${calculatePercentage(stats.linesCovered, stats.lines)})`,
     );
+    console.log(
+      `Functions:  ${stats.functionsCovered}/${stats.functions} (${calculatePercentage(stats.functionsCovered, stats.functions)})`,
+    );
+    console.log(
+      `Branches:   ${stats.branchesCovered}/${stats.branches} (${calculatePercentage(stats.branchesCovered, stats.branches)})`,
+    );
+    console.log(`\nAverage Coverage: ${coverageColor}${avgCoverage.toFixed(2)}%${colors.reset}`);
     console.log(`Total Tests: ${totalTests}`);
-    console.log("");
+    console.log('');
 
     console.log(`${colors.green}✓ Coverage report generation complete${colors.reset}\n`);
   } catch (error) {
-    console.error(
-      `${colors.red}✗ Coverage report generation failed${colors.reset}`
-    );
+    console.error(`${colors.red}✗ Coverage report generation failed${colors.reset}`);
     console.error(error);
     process.exit(1);
   }

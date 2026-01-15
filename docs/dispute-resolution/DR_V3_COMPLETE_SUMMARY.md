@@ -19,6 +19,7 @@ Capital at risk creates adversarial pressure. We only introduced this after v1 (
 ## What's Complete
 
 ### Phase 1: Interface Boundaries ✅
+
 - `IStakingModule.sol` (230 lines)
 - `ISlashingModule.sol` (330 lines)
 - `StakingModuleNoOp.sol` (250 lines)
@@ -27,6 +28,7 @@ Capital at risk creates adversarial pressure. We only introduced this after v1 (
 - 20 integration tests
 
 ### Phase 2: Real Staking ✅
+
 - `BondValuationLibrary.sol` (420 lines)
 - `ResolverStakingModuleV1.sol` (850 lines)
 - Mixed stable/SEW bonds (80/20 rule)
@@ -36,6 +38,7 @@ Capital at risk creates adversarial pressure. We only introduced this after v1 (
 - 18 staking tests + 18 bond valuation tests
 
 ### Phase 3: Real Slashing ✅
+
 - `ResolverSlashingModuleV1.sol` (450 lines)
 - Objective triggers (timeouts only)
 - Conservative penalties (2%, 5%, 10%)
@@ -66,6 +69,7 @@ DecentralizedResolutionModule (stable core)
 ### Data Flow
 
 **Without V3 (Current Production):**
+
 ```
 User → Escrow → ResolutionModule → IncentiveModule
                  ↓
@@ -73,6 +77,7 @@ User → Escrow → ResolutionModule → IncentiveModule
 ```
 
 **With V3 (Future Production):**
+
 ```
 User → Escrow → ResolutionModule → IncentiveModule
                  ↓                ↓              ↓
@@ -88,15 +93,18 @@ User → Escrow → ResolutionModule → IncentiveModule
 ### 1. Bond Valuation (Oracle-Free)
 
 **Formula:**
+
 ```
 effectiveBondUSD = stable + (sew × $1 × 0.5)
 ```
 
 **Mix Enforcement:**
+
 - Minimum 80% stable
 - Maximum 20% SEW (after 50% haircut)
 
 **Example:**
+
 ```
 Bond: 800 USDC + 100 SEW
 Effective: 800 + (100 × 1 × 0.5) = 850 USD
@@ -105,6 +113,7 @@ SEW%: 5.9% ✓
 ```
 
 **Benefits:**
+
 - No oracle dependency
 - No manipulation risk
 - Conservative valuation
@@ -113,10 +122,12 @@ SEW%: 5.9% ✓
 ### 2. Coverage System
 
 **Delegation:**
+
 - Junior needs: Bond × 3 (coverage multiplier)
 - Senior provides: Bond × 0.5 (utilization)
 
 **Example:**
+
 ```
 Junior: 3K bond → needs 9K coverage
 Senior: 30K bond → provides 15K coverage
@@ -124,6 +135,7 @@ Senior: 30K bond → provides 15K coverage
 ```
 
 **Protection:**
+
 - Junior's stake exhausted first
 - Senior only exposed if junior exhausted
 - Fair risk allocation
@@ -131,19 +143,23 @@ Senior: 30K bond → provides 15K coverage
 ### 3. Slashing System
 
 **Triggers (Objective Only):**
+
 - Missed accept: 2%
 - Missed resolve: 5%
 - Unresponsive: 10%
 
 **Caps:**
+
 - Per-offense: 50% max
 - Per-period: 100% max (30 days)
 
 **Waterfall:**
+
 1. Resolver stake (up to available)
 2. Senior coverage (if resolver exhausted)
 
 **Circuit Breaker:**
+
 - Triggers at >30% unavailability
 - Throttles slashing
 - 1-hour cooldown
@@ -151,10 +167,12 @@ Senior: 30K bond → provides 15K coverage
 ### 4. Unbonding System
 
 **Delays:**
+
 - Resolvers: 14 days
 - Seniors: 21 days
 
 **Restrictions:**
+
 - Cannot unbond if locked (active disputes)
 - Cannot unbond if coverage reserved (seniors)
 - Cannot unbond if delegated (juniors)
@@ -167,6 +185,7 @@ Senior: 30K bond → provides 15K coverage
 ### Total: 230 Tests ✅
 
 **By Phase:**
+
 - DR v1: 47 tests (decisions)
 - DR v2: 36 tests (incentives)
 - DR v3 Phase 1: 20 tests (integration)
@@ -175,12 +194,14 @@ Senior: 30K bond → provides 15K coverage
 - Shared: 74 tests (core, payment, governance)
 
 **By Type:**
+
 - Unit Tests: 147
 - Fuzz Tests: 17 (4,353 runs)
 - Invariant Tests: 14 (1.79M calls)
 - Integration Tests: 52
 
 **Coverage:**
+
 - Contracts: 17 files, 5,650 lines
 - Tests: 11 files, 5,740 lines
 - Docs: 15+ files
@@ -190,6 +211,7 @@ Senior: 30K bond → provides 15K coverage
 ## Critical Invariants Proven
 
 ### Bond Valuation
+
 1. ✅ Coverage never exceeds bond (even at SEW=0)
 2. ✅ 80% stable ensures coverage floor
 3. ✅ Mix constraints always hold
@@ -197,6 +219,7 @@ Senior: 30K bond → provides 15K coverage
 5. ✅ Pure stable bonds immune to price
 
 ### Staking
+
 1. ✅ Mix constraints always hold (80/20)
 2. ✅ Reserved coverage <= available coverage
 3. ✅ Withdrawals respect delays
@@ -204,6 +227,7 @@ Senior: 30K bond → provides 15K coverage
 5. ✅ Mix remains valid after withdrawal
 
 ### Slashing
+
 1. ✅ Slashes never exceed caps (50% per-offense, 100% per-period)
 2. ✅ No double slashing (one per workflow)
 3. ✅ Freeze logic correct (7 days)
@@ -217,24 +241,28 @@ Senior: 30K bond → provides 15K coverage
 ### Attack Vectors Tested
 
 **Price Manipulation:**
+
 - ✅ Oracle-free design (no oracle to manipulate)
 - ✅ Conservative $1 valuation
 - ✅ 50% haircut provides safety margin
 - ✅ 80% stable minimum ensures floor
 
 **Slash Gaming:**
+
 - ✅ Caps prevent excessive slashing
 - ✅ Double slash prevented
 - ✅ Period limits prevent spam
 - ✅ Circuit breaker prevents cascades
 
 **Withdrawal Gaming:**
+
 - ✅ Delays enforced (14/21 days)
 - ✅ Locks prevent withdrawal during disputes
 - ✅ Freeze prevents withdrawal after slash
 - ✅ Coverage prevents senior withdrawal
 
 **Coverage Gaming:**
+
 - ✅ Reserved <= available always
 - ✅ Multiple juniors cannot over-reserve
 - ✅ Coverage released on undelegate
@@ -243,6 +271,7 @@ Senior: 30K bond → provides 15K coverage
 ### Formal Properties
 
 **Proven via Fuzz Testing (4,353 runs):**
+
 1. Mix constraints (80/20)
 2. Coverage bounds
 3. Slash caps
@@ -250,6 +279,7 @@ Senior: 30K bond → provides 15K coverage
 5. Waterfall ordering
 
 **Proven via Invariant Testing (1.79M calls):**
+
 1. EMA score bounds
 2. Counter consistency
 3. Bond accounting
@@ -261,16 +291,19 @@ Senior: 30K bond → provides 15K coverage
 ## Files Created (Phase 2-3)
 
 ### Contracts (3 files, 1,720 lines)
+
 - `BondValuationLibrary.sol` (420 lines)
 - `ResolverStakingModuleV1.sol` (850 lines)
 - `ResolverSlashingModuleV1.sol` (450 lines)
 
 ### Tests (3 files, 1,980 lines)
+
 - `BondValuationInvariants.t.sol` (680 lines, 18 tests)
 - `StakingModuleInvariants.t.sol` (850 lines, 18 tests)
 - `SlashingModuleInvariants.t.sol` (450 lines, 17 tests)
 
 ### Documentation (3 files)
+
 - `BOND_VALUATION_SUMMARY.md`
 - `DR_V3_PHASE2_SUMMARY.md`
 - `DR_V3_PHASE3_SUMMARY.md`
@@ -283,25 +316,25 @@ Senior: 30K bond → provides 15K coverage
 ### Phase 4: Staking-Slashing Integration (1-2 weeks)
 
 **High Priority:**
+
 1. Add `slash()` function to `ResolverStakingModuleV1`
 2. Add `slashCoverage()` for senior slashing
 3. Add freeze check to `requestUnstake()`
 4. Update bond values after slash
 5. Integration tests for full flow
 
-**Medium Priority:**
-6. Add delegation lookup to slashing module
-7. Optimize waterfall calculation
-8. Add batch slashing support
+**Medium Priority:** 6. Add delegation lookup to slashing module 7. Optimize waterfall calculation 8. Add batch slashing support
 
 ### Phase 5: Economic Safety (1-2 weeks)
 
 **Insurance Pool:**
+
 - Payout mechanism
 - Claim verification
 - Pool solvency checks
 
 **Circuit Breakers:**
+
 - Automated triggers
 - Recovery procedures
 - Admin dashboards
@@ -309,12 +342,14 @@ Senior: 30K bond → provides 15K coverage
 ### Phase 6: Testing & Audits (2-3 weeks)
 
 **Comprehensive Testing:**
+
 - End-to-end scenarios
 - Economic simulations
 - Stress testing
 - Gas optimization
 
 **Security Audits:**
+
 - Internal review
 - External audit
 - Formal verification (optional)
@@ -322,11 +357,13 @@ Senior: 30K bond → provides 15K coverage
 ### Phase 7: Deployment (1-2 weeks)
 
 **Testnet:**
+
 - Deploy v3 modules
 - Monitor for 2-4 weeks
 - Measure phase gates
 
 **Mainnet:**
+
 - Governance proposal
 - Slow lane activation
 - Gradual rollout
@@ -335,25 +372,27 @@ Senior: 30K bond → provides 15K coverage
 
 ## Deployment Readiness
 
-| Component | Implementation | Tests | Docs | Status |
-|-----------|----------------|-------|------|--------|
-| **DR v1** | ✅ Complete | ✅ 47 | ✅ Yes | Ready for testnet |
-| **DR v2** | ✅ Complete | ✅ 36 | ✅ Yes | Ready for testnet |
-| **DR v3 Interfaces** | ✅ Complete | ✅ 20 | ✅ Yes | Ready for testnet |
-| **DR v3 Staking** | ✅ Complete | ✅ 36 | ✅ Yes | Needs integration |
-| **DR v3 Slashing** | ✅ Complete | ✅ 17 | ✅ Yes | Needs integration |
-| **DR v3 Integration** | 🚧 Pending | 🚧 Pending | 🚧 Pending | Phase 4 |
+| Component             | Implementation | Tests      | Docs       | Status            |
+| --------------------- | -------------- | ---------- | ---------- | ----------------- |
+| **DR v1**             | ✅ Complete    | ✅ 47      | ✅ Yes     | Ready for testnet |
+| **DR v2**             | ✅ Complete    | ✅ 36      | ✅ Yes     | Ready for testnet |
+| **DR v3 Interfaces**  | ✅ Complete    | ✅ 20      | ✅ Yes     | Ready for testnet |
+| **DR v3 Staking**     | ✅ Complete    | ✅ 36      | ✅ Yes     | Needs integration |
+| **DR v3 Slashing**    | ✅ Complete    | ✅ 17      | ✅ Yes     | Needs integration |
+| **DR v3 Integration** | 🚧 Pending     | 🚧 Pending | 🚧 Pending | Phase 4           |
 
 ---
 
 ## Timeline Estimate
 
 **Completed (Phases 1-3):** ~2 weeks
+
 - Phase 1: 2 days (interfaces)
 - Phase 2: 5 days (staking + bond valuation)
 - Phase 3: 3 days (slashing)
 
 **Remaining (Phases 4-7):** ~6-10 weeks
+
 - Phase 4: 1-2 weeks (integration)
 - Phase 5: 1-2 weeks (economic safety)
 - Phase 6: 2-3 weeks (testing & audits)
@@ -368,24 +407,28 @@ Senior: 30K bond → provides 15K coverage
 ## Key Achievements
 
 ### Architecture
+
 ✅ **Modular Design:** Clean interfaces, swappable implementations  
 ✅ **Backward Compatible:** V1/V2 work without V3  
 ✅ **Governance:** Slow lane (7 days) for all changes  
 ✅ **Upgradeable:** UUPS pattern for all modules
 
 ### Innovation
+
 ✅ **Oracle-Free Valuation:** Conservative $1 SEW + 50% haircut  
 ✅ **Coverage System:** M=3, U=0.5 delegation model  
 ✅ **Waterfall Slashing:** Protects seniors from junior misbehavior  
 ✅ **Circuit Breakers:** Prevents cascade during system issues
 
 ### Testing
+
 ✅ **230 tests** with 100% pass rate  
 ✅ **4,353 fuzz runs** (property-based testing)  
 ✅ **1.79M invariant calls** (comprehensive coverage)  
 ✅ **All attack vectors tested**
 
 ### Security
+
 ✅ **Conservative by design** (2-10% penalties)  
 ✅ **Objective triggers only** (no subjective judgment)  
 ✅ **Multiple safety layers** (caps, circuit breakers, freezes)  
@@ -396,21 +439,25 @@ Senior: 30K bond → provides 15K coverage
 ## Production Readiness Assessment
 
 ### Ready for Testnet ✅
+
 - DR v1 (decisions)
 - DR v2 (incentives)
 - DR v3 interfaces + no-ops
 
 ### Needs Integration (1-2 weeks)
+
 - DR v3 staking ← slashing
 - End-to-end tests
 - Gas optimization
 
 ### Needs Safety Features (1-2 weeks)
+
 - Insurance pool payouts
 - Circuit breaker automation
 - Recovery procedures
 
 ### Needs Audits (2-3 weeks)
+
 - Internal review
 - External audit
 - Formal verification
@@ -422,6 +469,7 @@ Senior: 30K bond → provides 15K coverage
 **Current State:** DR v3 core modules complete and tested. Integration work remains.
 
 **Action Plan:**
+
 1. ✅ **Now:** Deploy v1 + v2 to testnet (ready)
 2. **+2 weeks:** Complete v3 integration (Phase 4)
 3. **+4 weeks:** Add safety features (Phase 5)
@@ -442,6 +490,7 @@ Senior: 30K bond → provides 15K coverage
 **Pass Rate:** 100% ✅
 
 **Key Metrics:**
+
 - 0 compiler errors
 - 0 test failures
 - 0 security vulnerabilities identified

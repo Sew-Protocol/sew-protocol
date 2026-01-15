@@ -1,5 +1,3 @@
-
-
 Updated plan:
 (original plan is below)
 
@@ -173,53 +171,51 @@ If still >24KB: Phase 4A incremental composition on one contract
 
 This order reduces chance you spend time on risky refactors before harvesting easy wins.
 
-
-
 Older plan:
 
-   Migration Plan: Reduce EscrowVault & EscrowableERC20 to <24KB
+Migration Plan: Reduce EscrowVault & EscrowableERC20 to <24KB
 
-   Problem Analysis
+Problem Analysis
 
-   Both contracts inherit from BaseEscrow (~1693 lines), causing code duplication and exceeding 24KB
-   bytecode limit. The analysis identifies three high-impact areas for size reduction.
+Both contracts inherit from BaseEscrow (~1693 lines), causing code duplication and exceeding 24KB
+bytecode limit. The analysis identifies three high-impact areas for size reduction.
 
-   Migration Strategy (Phased Approach)
+Migration Strategy (Phased Approach)
 
-   ----------------------------------------------------------------------------------------------------
+---
 
-   Phase 1: Extract Yield Logic (~4-6KB savings)
+Phase 1: Extract Yield Logic (~4-6KB savings)
 
-   Contracts to Create:
+Contracts to Create:
 
      - YieldOps.sol - External yield orchestration contract
 
-   Changes to BaseEscrow:
+Changes to BaseEscrow:
 
      - Remove inline yield distribution from release(), refundBuyer(), refundSeller()
      - Replace with single external call: yieldOps.handleYield(workflowId, token, amount)
      - Keep only module references and minimal yield triggering
      - Remove YieldHandlingLibrary inline calls
 
-   Changes to EscrowVault/EscrowableERC20:
+Changes to EscrowVault/EscrowableERC20:
 
      - Add YieldOps reference
      - Remove yield-related functions if any
 
-   Risk Level: LOW
+Risk Level: LOW
 
      - Yield is non-critical; failure doesn't block escrow lifecycle
      - Already modularized via IYieldDistributionModule
 
-   ----------------------------------------------------------------------------------------------------
+---
 
-   Phase 2: Extract Dispute Escalation Orchestration (~3-5KB savings)
+Phase 2: Extract Dispute Escalation Orchestration (~3-5KB savings)
 
-   Contracts to Create:
+Contracts to Create:
 
      - DisputeOps.sol - Escalation orchestration
 
-   Changes to BaseEscrow:
+Changes to BaseEscrow:
 
      - Keep only:
        - disputeRaisedTimestamp tracking
@@ -231,32 +227,32 @@ Older plan:
        - Complex event emission
        - Resolution module interaction
 
-   Function Pattern:
+Function Pattern:
 
      // In BaseEscrow
      function escalateDispute(uint256 workflowId) external {
          // Basic validation
-         (address newResolver, uint8 newLevel, uint256 newDeadline) = 
+         (address newResolver, uint8 newLevel, uint256 newDeadline) =
              disputeOps.computeEscalation(workflowId, msg.sender, escrowTransfers[workflowId]);
          // Apply result
          escrowTransfers[workflowId].disputeResolver = newResolver;
          escrowTransfers[workflowId].escalationLevel = newLevel;
      }
 
-   Risk Level: MEDIUM
+Risk Level: MEDIUM
 
      - Requires careful separation of state updates
      - Must maintain atomicity guarantees
 
-   ----------------------------------------------------------------------------------------------------
+---
 
-   Phase 3: Extract Batch & Admin Operations (~2-4KB savings)
+Phase 3: Extract Batch & Admin Operations (~2-4KB savings)
 
-   Contracts to Create:
+Contracts to Create:
 
      - EscrowOps.sol (already exists - verify/extend)
 
-   Move from BaseEscrow to EscrowOps:
+Move from BaseEscrow to EscrowOps:
 
      - Batch release functions
      - Batch cancel functions
@@ -264,7 +260,7 @@ Older plan:
      - Admin debugging utilities
      - Category key generation (if present)
 
-   Pattern:
+Pattern:
 
      // EscrowOps
      function batchRelease(uint256[] calldata workflowIds) external {
@@ -273,82 +269,82 @@ Older plan:
          }
      }
 
-   Risk Level: LOW
+Risk Level: LOW
 
      - No core logic changes
      - Convenience functions only
 
-   ----------------------------------------------------------------------------------------------------
+---
 
-   Phase 4: Composition over Inheritance (CRITICAL - ~8-12KB savings per contract)
+Phase 4: Composition over Inheritance (CRITICAL - ~8-12KB savings per contract)
 
-   This is the highest impact change for EscrowVault and EscrowableERC20.
+This is the highest impact change for EscrowVault and EscrowableERC20.
 
-   Current Structure (Problematic):
+Current Structure (Problematic):
 
      contract EscrowVault is BaseEscrow { ... }
      contract EscrowableERC20 is ERC20, BaseEscrow { ... }
 
-   Problem: Both contracts duplicate BaseEscrow bytecode (~50KB each)
+Problem: Both contracts duplicate BaseEscrow bytecode (~50KB each)
 
-   Target Structure:
+Target Structure:
 
-   Option A: Thin Wrapper Pattern
+Option A: Thin Wrapper Pattern
 
      contract EscrowVault {
          BaseEscrow public immutable escrowCore;
-         
+
          function createEscrow(...) external returns (uint256) {
              return escrowCore.createEscrow(...);
          }
          // Delegate all escrow methods
      }
 
-   Option B: BaseEscrow Becomes EscrowCore (Recommended)
+Option B: BaseEscrow Becomes EscrowCore (Recommended)
 
      - Rename BaseEscrow → EscrowCore (make standalone, not abstract)
      - EscrowVault holds reference to EscrowCore
      - EscrowableERC20 holds reference to EscrowCore
      - Both forward escrow calls to EscrowCore
 
-   Risk Level: HIGH
+Risk Level: HIGH
 
      - Major architectural change
      - Requires extensive testing
      - Benefits: Eliminates all code duplication
 
-   ----------------------------------------------------------------------------------------------------
+---
 
-   Implementation Order
+Implementation Order
 
-   Week 1: Phase 1 (Yield Extraction)
+Week 1: Phase 1 (Yield Extraction)
 
      - Create YieldOps.sol
      - Refactor BaseEscrow.release(), refundBuyer(), refundSeller()
      - Update tests
      - Measure size reduction
 
-   Expected Result: EscrowVault: 28-30KB, EscrowableERC20: 28-30KB
+Expected Result: EscrowVault: 28-30KB, EscrowableERC20: 28-30KB
 
-   Week 2: Phase 3 (Quick Win - Batch/Admin Ops)
+Week 2: Phase 3 (Quick Win - Batch/Admin Ops)
 
      - Audit EscrowOps.sol
      - Move batch functions if in BaseEscrow
      - Move recovery functions
      - Update tests
 
-   Expected Result: EscrowVault: 26-28KB, EscrowableERC20: 26-28KB
+Expected Result: EscrowVault: 26-28KB, EscrowableERC20: 26-28KB
 
-   Week 3: Phase 2 (Dispute Escalation)
+Week 3: Phase 2 (Dispute Escalation)
 
      - Create DisputeOps.sol
      - Carefully separate state vs logic
      - Extensive testing of escalation flows
      - Measure size
 
-   Expected Result: EscrowVault: 23-25KB, EscrowableERC20: 23-25KB
+Expected Result: EscrowVault: 23-25KB, EscrowableERC20: 23-25KB
 
-   Week 4 (If Still Over Limit): Phase 4 (Composition)
+Week 4 (If Still Over Limit): Phase 4 (Composition)
 
      - Design composition architecture
      - Create EscrowCore (from BaseEscrow)
@@ -357,24 +353,24 @@ Older plan:
      - Comprehensive integration testing
      - Gas benchmarking
 
-   Expected Result: Both contracts <20KB
+Expected Result: Both contracts <20KB
 
-   ----------------------------------------------------------------------------------------------------
+---
 
-   Size Validation Commands
+Size Validation Commands
 
-   After each phase:
+After each phase:
 
      npx hardhat compile
      npx hardhat size-contracts
      # Or
      forge build --sizes
 
-   ----------------------------------------------------------------------------------------------------
+---
 
-   Testing Requirements
+Testing Requirements
 
-   Each phase must include:
+Each phase must include:
 
      - Unit tests for new external contracts
      - Integration tests for cross-contract calls
@@ -382,24 +378,21 @@ Older plan:
      - Gas cost comparison (external calls add ~2.6k gas)
      - Security audit review for Phase 2 & 4
 
-   ----------------------------------------------------------------------------------------------------
+---
 
-   Rollback Plan
+Rollback Plan
 
      - Each phase in separate PR/branch
      - Feature flags for new external contracts
      - Maintain old code paths initially
      - Progressive rollout on testnet
 
-   ----------------------------------------------------------------------------------------------------
+---
 
-   Success Metrics
+Success Metrics
 
      - ✅ EscrowVault <24KB (target: 22KB)
      - ✅ EscrowableERC20 <24KB (target: 22KB)
      - ✅ No gas regression >10% for common operations
      - ✅ All existing tests pass
      - ✅ No new security vulnerabilities
-
-
-

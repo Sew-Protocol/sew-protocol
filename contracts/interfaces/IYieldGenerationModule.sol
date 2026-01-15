@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
-import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import '@openzeppelin/contracts/utils/introspection/IERC165.sol';
 
 /**
  * @title IYieldGenerationModule
@@ -36,11 +36,7 @@ interface IYieldGenerationModule is IERC165 {
         uint256 workflowId,
         address token,
         uint256 originalAmount
-    ) external returns (
-        bool success,
-        uint256 actualAmount,
-        uint256 yieldAmount
-    );
+    ) external returns (bool success, uint256 actualAmount, uint256 yieldAmount);
 
     /**
      * @notice Calculate current yield for an escrow
@@ -82,5 +78,3 @@ interface IYieldGenerationModule is IERC165 {
      */
     function moduleVersion() external pure returns (string memory version);
 }
-
-

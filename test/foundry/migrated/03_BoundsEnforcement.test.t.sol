@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "forge-std/Test.sol";
-import "../../../../contracts/YieldOps.sol";
-import "../../../../contracts/DisputeOps.sol";
-import "contracts/core/EscrowVault.sol";
+import 'forge-std/Test.sol';
+import 'contracts/YieldOps.sol';
+import 'contracts/DisputeOps.sol';
+import 'contracts/core/EscrowVault.sol';
 
 contract Test_03_BoundsEnforcement_test is Test {
     EscrowVault vault;

@@ -6,6 +6,7 @@
 ## Implementation Summary
 
 ### Functions Extracted to Library
+
 - ✅ `getEscrowTransfer()` - Returns full EscrowTransfer struct
 - ✅ `getEscrowStatusInfo()` - Returns status, isActive, isPending
 - ✅ `getAttachments()` - Returns attachment URIs and hashes
@@ -19,21 +20,26 @@
 - ✅ `isDisputeTimedOut()` - Checks if dispute exceeded max duration
 
 ### Functions Kept in BaseEscrow
+
 - `getEscrowCount()` - Too simple (just returns nextWorkflowId)
 - `getNextWorkflowId()` - Too simple (just returns nextWorkflowId)
 
 ## Size Impact
 
 ### Before Extraction
+
 - **EscrowVault:** 38.57 KB (39,495 bytes)
 - **EscrowableERC20:** 38.73 KB (39,658 bytes)
 
 ### After Extraction
+
 - **EscrowVault:** 38.91 KB (39,843 bytes) - **+348 bytes** ⚠️
 - **EscrowableERC20:** 38.90 KB (39,831 bytes) - **+173 bytes** ⚠️
 
 ### Analysis
+
 **Why Size Increased:**
+
 1. **Library Linking Overhead:** Each library function call adds:
    - Function selector (4 bytes)
    - ABI encoding overhead
@@ -69,11 +75,13 @@
 ## Recommendation
 
 **Revert EscrowQueryLibrary extraction** and focus on:
+
 1. **Module Management Contract** - Highest impact (~6-8 KB savings)
 2. **Governance Library** - Medium impact (~1-1.5 KB savings)
 3. **Dispute Resolution Simplification** - Medium impact (~1-2 KB savings)
 
 **Alternative Approach for View Functions:**
+
 - Keep view functions in BaseEscrow
 - Consider inlining very simple functions
 - Only extract complex view functions with logic
@@ -83,5 +91,3 @@
 1. ⚠️ **Revert EscrowQueryLibrary** (if size increase is unacceptable)
 2. ✅ **Proceed with Module Management Contract** (highest impact)
 3. ⚠️ **Review other optimization opportunities**
-
-

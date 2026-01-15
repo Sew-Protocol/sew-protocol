@@ -7,6 +7,7 @@
 ## Breakdown by Type
 
 ### Events
+
 - **Count:** 32 events
 - **Estimated Size:** ~3.5 KB | **~15%**
 - **Breakdown:**
@@ -18,11 +19,13 @@
   - Module snapshot events: ~0.3 KB
 
 ### Errors
+
 - **Count:** 18 custom errors
 - **Estimated Size:** ~0.8 KB | **~3%**
 - **Note:** Custom errors are more gas-efficient than revert strings
 
 ### Storage Variables
+
 - **Count:** ~15 public/private storage variables
 - **Estimated Size:** ~1.2 KB | **~5%**
 - **Breakdown:**
@@ -32,6 +35,7 @@
   - Mappings (disputeRaisedTimestamp, escrowSettings): ~0.2 KB
 
 ### Public/External Functions
+
 - **Count:** 41 functions
 - **Estimated Size:** ~12.5 KB | **~52%**
 - **Breakdown:**
@@ -43,26 +47,30 @@
   - Other (attachments, automation): ~0.4 KB
 
 ### Internal Functions
+
 - **Count:** ~15 internal functions
 - **Estimated Size:** ~3.8 KB | **~16%**
 - **Breakdown:**
-  - Validation helpers (_validateWorkflowId, _requirePending, etc.): ~0.8 KB
-  - Core transfer logic (_releaseEscrowTransfer, _cancelAndRefund): ~1.5 KB
-  - Dispute helpers (_isAuthorizedDisputeResolver, _encodeResolutionData): ~0.7 KB
-  - Settings helpers (_applyEscrowSettings, _getDefaultSettings): ~0.5 KB
-  - Module helpers (_snapshotModulesForEscrow, _getDisputeResolverForNewEscrow): ~0.3 KB
+  - Validation helpers (\_validateWorkflowId, \_requirePending, etc.): ~0.8 KB
+  - Core transfer logic (\_releaseEscrowTransfer, \_cancelAndRefund): ~1.5 KB
+  - Dispute helpers (\_isAuthorizedDisputeResolver, \_encodeResolutionData): ~0.7 KB
+  - Settings helpers (\_applyEscrowSettings, \_getDefaultSettings): ~0.5 KB
+  - Module helpers (\_snapshotModulesForEscrow, \_getDisputeResolverForNewEscrow): ~0.3 KB
 
 ### Abstract Functions
+
 - **Count:** 6 abstract functions
 - **Estimated Size:** ~0.3 KB | **~1%**
 - **Note:** Abstract functions are just declarations, minimal bytecode
 
 ### Modifiers
+
 - **Count:** Uses inherited modifiers (onlyRole, nonReentrant, whenNotPaused)
 - **Estimated Size:** ~0.5 KB | **~2%**
 - **Note:** Most modifiers come from OpenZeppelin contracts
 
 ### Library Calls
+
 - **Count:** 8 libraries used
 - **Estimated Size:** ~1.5 KB | **~6%**
 - **Libraries:**
@@ -76,10 +84,12 @@
   - ResolverLogicLibrary: ~0.1 KB (payout calculations)
 
 ### Constants
+
 - **Count:** 3 constants
 - **Estimated Size:** ~0.1 KB | **<1%**
 
 ### Imports & Inheritance
+
 - **Estimated Size:** ~0.8 KB | **~3%**
 - **Inherits:** AccessControl, ReentrancyGuard, Pausable, SlowLaneQueueActivate
 - **Imports:** Multiple OpenZeppelin contracts and interfaces
@@ -89,6 +99,7 @@
 ## Breakdown by Functionality
 
 ### Dispute Resolution
+
 - **Estimated Size:** ~6.2 KB | **~26%**
 - **Functions:**
   - `raiseDispute()`: ~0.8 KB
@@ -105,6 +116,7 @@
 - **Libraries:** DisputeInitializationLibrary, ResolverActionLibrary
 
 ### Transfer/Release/Cancel Operations
+
 - **Estimated Size:** ~4.8 KB | **~20%**
 - **Functions:**
   - `_releaseEscrowTransfer()`: ~0.8 KB
@@ -119,6 +131,7 @@
 - **Events:** EscrowStateChanged, EscrowTransferReleased, EscrowTransferCancelled
 
 ### Yield Handling
+
 - **Estimated Size:** ~2.5 KB | **~10%**
 - **Functions:**
   - Yield handling in `_releaseEscrowTransfer()`: ~0.4 KB
@@ -130,6 +143,7 @@
 - **Note:** Most yield logic is in libraries, but function calls add overhead
 
 ### Governance & Configuration
+
 - **Estimated Size:** ~3.2 KB | **~13%**
 - **Functions:**
   - `queueEscrowFeeAddress()` / `activateEscrowFeeAddress()`: ~0.4 KB
@@ -146,6 +160,7 @@
 - **Libraries:** ModuleProposalLibrary, SettingsValidationLibrary
 
 ### View/Getter Functions
+
 - **Estimated Size:** ~2.1 KB | **~9%**
 - **Functions:**
   - `getEscrowTransfer()`: ~0.3 KB
@@ -163,6 +178,7 @@
   - `isDisputeTimedOut()`: ~0.2 KB
 
 ### Automation & Timeouts
+
 - **Estimated Size:** ~1.2 KB | **~5%**
 - **Functions:**
   - `automateTimedActions()`: ~0.5 KB
@@ -171,12 +187,14 @@
 - **Events:** TimeoutExecuted, EscrowTransferAutoReleased, EscrowTransferAutoCancelled
 
 ### Attachments & Evidence
+
 - **Estimated Size:** ~0.6 KB | **~2%**
 - **Functions:**
   - `addAttachment()`: ~0.4 KB
 - **Events:** AttachmentAdded, EvidenceSubmitted
 
 ### Recovery Functions
+
 - **Estimated Size:** ~0.6 KB | **~2%**
 - **Functions:**
   - `recoverNativeETH()`: ~0.3 KB
@@ -185,6 +203,7 @@
 - **Events:** NativeETHRecovered, ERC20Recovered
 
 ### Validation & Helpers
+
 - **Estimated Size:** ~1.5 KB | **~6%**
 - **Functions:**
   - `_validateWorkflowId()`: ~0.2 KB
@@ -198,12 +217,14 @@
 - **Libraries:** SettingsValidationLibrary
 
 ### Module Management
+
 - **Estimated Size:** ~0.8 KB | **~3%**
 - **Functions:**
   - `_snapshotModulesForEscrow()`: ~0.4 KB
 - **Events:** EscrowModuleSnapshot
 
 ### ERC-165 Support
+
 - **Estimated Size:** ~0.2 KB | **<1%**
 - **Functions:**
   - `supportsInterface()`: ~0.2 KB
@@ -213,36 +234,38 @@
 ## Summary
 
 ### By Type
-| Type | Size | Percentage |
-|------|------|------------|
-| Public/External Functions | ~12.5 KB | ~52% |
-| Internal Functions | ~3.8 KB | ~16% |
-| Events | ~3.5 KB | ~15% |
-| Library Calls | ~1.5 KB | ~6% |
-| Validation & Helpers | ~1.5 KB | ~6% |
-| Storage Variables | ~1.2 KB | ~5% |
-| Imports & Inheritance | ~0.8 KB | ~3% |
-| Errors | ~0.8 KB | ~3% |
-| Modifiers | ~0.5 KB | ~2% |
-| Abstract Functions | ~0.3 KB | ~1% |
-| Constants | ~0.1 KB | <1% |
-| **Total** | **~24 KB** | **100%** |
+
+| Type                      | Size       | Percentage |
+| ------------------------- | ---------- | ---------- |
+| Public/External Functions | ~12.5 KB   | ~52%       |
+| Internal Functions        | ~3.8 KB    | ~16%       |
+| Events                    | ~3.5 KB    | ~15%       |
+| Library Calls             | ~1.5 KB    | ~6%        |
+| Validation & Helpers      | ~1.5 KB    | ~6%        |
+| Storage Variables         | ~1.2 KB    | ~5%        |
+| Imports & Inheritance     | ~0.8 KB    | ~3%        |
+| Errors                    | ~0.8 KB    | ~3%        |
+| Modifiers                 | ~0.5 KB    | ~2%        |
+| Abstract Functions        | ~0.3 KB    | ~1%        |
+| Constants                 | ~0.1 KB    | <1%        |
+| **Total**                 | **~24 KB** | **100%**   |
 
 ### By Functionality
-| Functionality | Size | Percentage |
-|---------------|------|------------|
-| Dispute Resolution | ~6.2 KB | ~26% |
-| Transfer/Release/Cancel | ~4.8 KB | ~20% |
-| Governance & Configuration | ~3.2 KB | ~13% |
-| Yield Handling | ~2.5 KB | ~10% |
-| View/Getter Functions | ~2.1 KB | ~9% |
-| Validation & Helpers | ~1.5 KB | ~6% |
-| Automation & Timeouts | ~1.2 KB | ~5% |
-| Library Calls Overhead | ~1.0 KB | ~4% |
-| Attachments & Evidence | ~0.6 KB | ~2% |
-| Recovery Functions | ~0.6 KB | ~2% |
-| Module Management | ~0.8 KB | ~3% |
-| **Total** | **~24 KB** | **100%** |
+
+| Functionality              | Size       | Percentage |
+| -------------------------- | ---------- | ---------- |
+| Dispute Resolution         | ~6.2 KB    | ~26%       |
+| Transfer/Release/Cancel    | ~4.8 KB    | ~20%       |
+| Governance & Configuration | ~3.2 KB    | ~13%       |
+| Yield Handling             | ~2.5 KB    | ~10%       |
+| View/Getter Functions      | ~2.1 KB    | ~9%        |
+| Validation & Helpers       | ~1.5 KB    | ~6%        |
+| Automation & Timeouts      | ~1.2 KB    | ~5%        |
+| Library Calls Overhead     | ~1.0 KB    | ~4%        |
+| Attachments & Evidence     | ~0.6 KB    | ~2%        |
+| Recovery Functions         | ~0.6 KB    | ~2%        |
+| Module Management          | ~0.8 KB    | ~3%        |
+| **Total**                  | **~24 KB** | **100%**   |
 
 ---
 
@@ -282,5 +305,3 @@
 4. **Reduce Library Overhead** → Save ~0.5 KB (optimize linking)
 
 **Total Potential Savings:** ~4-5 KB (would bring BaseEscrow from ~24 KB to ~19-20 KB)
-
-

@@ -10,10 +10,12 @@
 ### ✅ 1. Function Rename: `escrowTransfer()` → `createEscrow()`
 
 **Files Modified**:
+
 - `contracts/EscrowVault.sol`
 - `contracts/EscrowableERC20.sol`
 
 **Changes**:
+
 - Removed `escrowTransfer()` wrapper functions
 - Added convenience overloads for `createEscrow()`:
   - `createEscrow(address seller, uint256 amount)` - Default settings
@@ -28,12 +30,14 @@
 ### ✅ 2. Struct Field Rename: `amount`/`originalAmount` → `remainingBalance`/`totalDeposited`
 
 **Files Modified**:
+
 - `contracts/BaseEscrow.sol` - Struct definition and ~89 references
 - `contracts/EscrowVault.sol` - Struct initialization
 - `contracts/EscrowableERC20.sol` - Struct initialization
 - `contracts/libraries/EscrowEncodingLibrary.sol` - Updated comments
 
 **Changes**:
+
 - Renamed `amount` → `remainingBalance` in `EscrowTransfer` struct
 - Renamed `originalAmount` → `totalDeposited` in `EscrowTransfer` struct
 - Updated all ~89 references throughout BaseEscrow.sol
@@ -52,9 +56,11 @@
 ### ✅ 3. Helper Functions Added
 
 **Files Modified**:
+
 - `contracts/BaseEscrow.sol`
 
 **New Functions**:
+
 1. `getEscrowStatus(uint256 workflowId) returns (EscrowState)`
    - Returns the current state of an escrow
    - Simple wrapper around struct field access
@@ -71,11 +77,13 @@
 ### ✅ 4. Custom Metadata Field Added
 
 **Files Modified**:
+
 - `contracts/BaseEscrow.sol` - Struct definition
 - `contracts/EscrowVault.sol` - Struct initialization
 - `contracts/EscrowableERC20.sol` - Struct initialization
 
 **Changes**:
+
 - Added `bytes metadata` field to `EscrowTransfer` struct
 - Initialized as empty string `""` in struct creation
 - Can store IPFS hashes, JSON, or any custom data
@@ -90,6 +98,7 @@
 ✅ **SUCCESS** - All contracts compile successfully
 
 **Warnings** (Expected):
+
 - Contract size warnings (43KB for EscrowVault, 42KB for EscrowableERC20)
 - These are expected - contracts were already over limit
 - Size optimization is separate task
@@ -124,18 +133,22 @@
 ## Breaking Changes
 
 ### Function Names
+
 - ❌ `escrowTransfer()` - **REMOVED**
 - ✅ `createEscrow()` - **NEW PRIMARY FUNCTION**
 
 ### Struct Fields
+
 - ❌ `amount` - **RENAMED** to `remainingBalance`
 - ❌ `originalAmount` - **RENAMED** to `totalDeposited`
 - ✅ `metadata` - **NEW FIELD** added
 
 ### Function Parameters
+
 - ❌ `to` - **RENAMED** to `seller` (in createEscrow functions)
 
 ### Impact
+
 - **Testnet Only**: Base Sepolia
 - **Single User**: Dev only
 - **Action Required**: Update wallet app with new function/field names
@@ -189,14 +202,14 @@ function getTotalDeposited(uint256 workflowId) public view returns (uint256)
 
 ```solidity
 struct EscrowTransfer {
-    uint256 workflowId;
-    address token;
-    address buyer;        // from (not renamed yet - buyer/seller rename is separate)
-    address seller;        // to (not renamed yet - buyer/seller rename is separate)
-    uint256 remainingBalance;  // ✅ RENAMED from 'amount'
-    uint256 totalDeposited;     // ✅ RENAMED from 'originalAmount'
-    bytes metadata;             // ✅ NEW FIELD
-    // ... other fields
+  uint256 workflowId;
+  address token;
+  address buyer; // from (not renamed yet - buyer/seller rename is separate)
+  address seller; // to (not renamed yet - buyer/seller rename is separate)
+  uint256 remainingBalance; // ✅ RENAMED from 'amount'
+  uint256 totalDeposited; // ✅ RENAMED from 'originalAmount'
+  bytes metadata; // ✅ NEW FIELD
+  // ... other fields
 }
 ```
 
@@ -233,6 +246,7 @@ struct EscrowTransfer {
 ## Size Impact
 
 **Estimated Size Changes**:
+
 - Helper functions: +350-500 bytes
 - Metadata field: +50-100 bytes (per escrow storage, not contract size)
 - Field renames: ~0 bytes (field names don't affect bytecode)
@@ -251,7 +265,7 @@ struct EscrowTransfer {
 ✅ **Function Names**: All updated  
 ✅ **Helper Functions**: Added  
 ✅ **Metadata Field**: Added  
-✅ **References**: All updated  
+✅ **References**: All updated
 
 **Status**: Ready for testing
 
@@ -263,7 +277,3 @@ struct EscrowTransfer {
 - Wallet app needs update (copy/paste changes)
 - Contract size optimization is separate task
 - buyer/seller terminology rename can be done in separate pass (not included here)
-
-
-
-

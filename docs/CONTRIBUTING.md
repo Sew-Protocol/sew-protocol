@@ -51,6 +51,7 @@ pnpm test
 ### Development Workflow
 
 1. **Create a feature branch** from `main`:
+
    ```bash
    git checkout -b feature/your-feature-name
    ```
@@ -58,23 +59,26 @@ pnpm test
 2. **Make your changes** following the code style guidelines below
 
 3. **Run tests** to ensure everything works:
+
    ```bash
    # Run all tests
    pnpm test
-   
+
    # Run only Hardhat tests
    pnpm test:hardhat
-   
+
    # Run only Foundry tests
    pnpm test:foundry
    ```
 
 4. **Check contract sizes** (important - we have 24KB limit):
+
    ```bash
    pnpm size:check
    ```
 
 5. **Format and lint**:
+
    ```bash
    pnpm format
    pnpm lint
@@ -111,10 +115,11 @@ pnpm test
 - ❌ **Don't use**: `escrowTransfer()` (deprecated)
 
 For tests with multiple overloads, use `.getFunction()` to disambiguate:
+
 ```typescript
 await contract
   .connect(sender)
-  .getFunction("createEscrow(address,uint256)")
+  .getFunction('createEscrow(address,uint256)')
   .send(recipient.address, amount);
 ```
 
@@ -142,18 +147,18 @@ await contract
 #### Hardhat Tests
 
 ```typescript
-import { expect } from "chai";
-import { ethers } from "hardhat";
-import { EscrowableERC20 } from "../typechain-types";
+import { expect } from 'chai';
+import { ethers } from 'hardhat';
+import { EscrowableERC20 } from '../typechain-types';
 
-describe("Feature Name", function () {
+describe('Feature Name', function () {
   let escrowableERC20: EscrowableERC20;
-  
+
   beforeEach(async function () {
     // Setup
   });
-  
-  it("Should do something", async function () {
+
+  it('Should do something', async function () {
     // Test implementation
   });
 });
@@ -165,19 +170,19 @@ describe("Feature Name", function () {
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
-import "forge-std/Test.sol";
-import "../contracts/EscrowableERC20.sol";
+import 'forge-std/Test.sol';
+import '../contracts/EscrowableERC20.sol';
 
 contract FeatureTest is Test {
-    EscrowableERC20 escrow;
-    
-    function setUp() public {
-        // Setup
-    }
-    
-    function testSomething() public {
-        // Test implementation
-    }
+  EscrowableERC20 escrow;
+
+  function setUp() public {
+    // Setup
+  }
+
+  function testSomething() public {
+    // Test implementation
+  }
 }
 ```
 
@@ -192,11 +197,13 @@ contract FeatureTest is Test {
 ### Known Test Issues
 
 Some tests may be failing due to:
+
 - Function name changes (`escrowTransfer` → `createEscrow`)
 - Deprecated functions (`setAuthorizedResolver` is deprecated)
 - Missing module deployments in test setup
 
 When fixing tests:
+
 1. Update function names to `createEscrow()`
 2. Use `.getFunction()` for overloaded functions
 3. Ensure all required modules are deployed in test setup
@@ -214,6 +221,7 @@ The protocol uses a modular architecture:
 - **Yield Distribution**: `IYieldDistributionModule` - Yield distribution
 
 When adding new modules:
+
 1. Implement the interface
 2. Add to module registry
 3. Update documentation
@@ -245,6 +253,7 @@ See [Governance Documentation](governance.md) for details.
 - **Errors**: Document all custom errors
 
 Example:
+
 ```solidity
 /**
  * @notice Create a new escrow with custom settings
@@ -255,11 +264,11 @@ Example:
  * @dev Emits EscrowTransferCreated event
  */
 function createEscrow(
-    address seller,
-    uint256 amount,
-    EscrowSettings memory settings
+  address seller,
+  uint256 amount,
+  EscrowSettings memory settings
 ) public nonReentrant whenNotPaused returns (uint256 workflowId) {
-    // Implementation
+  // Implementation
 }
 ```
 
@@ -290,27 +299,33 @@ Before submitting a PR, ensure:
 
 ```markdown
 ## Summary
+
 Brief description of changes
 
 ## Changes
+
 - Change 1
 - Change 2
 
 ## Testing
+
 - [ ] Unit tests added/updated
 - [ ] Integration tests pass
 - [ ] Manual testing completed
 
 ## Contract Size Impact
+
 - BaseEscrow: +X bytes / -X bytes
 - EscrowVault: +X bytes / -X bytes
 - EscrowableERC20: +X bytes / -X bytes
 
 ## Breaking Changes
+
 - [ ] Yes (describe)
 - [ ] No
 
 ## Related Issues
+
 Closes #123
 ```
 

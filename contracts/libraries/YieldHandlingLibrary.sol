@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
-import "../interfaces/IYieldGenerationModule.sol";
-import "../interfaces/IYieldDistributionModule.sol";
-import "./ResolverLogicLibrary.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import '../interfaces/IYieldGenerationModule.sol';
+import '../interfaces/IYieldDistributionModule.sol';
+import './ResolverLogicLibrary.sol';
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 
 /**
  * @title YieldHandlingLibrary
@@ -19,8 +19,8 @@ library YieldHandlingLibrary {
      * @dev Result of yield withdrawal operation
      */
     struct YieldWithdrawalResult {
-        uint256 actualAmount;      // Actual amount withdrawn (may include yield)
-        uint256 yield;             // Yield amount (actualAmount - originalAmount)
+        uint256 actualAmount; // Actual amount withdrawn (may include yield)
+        uint256 yield; // Yield amount (actualAmount - originalAmount)
         uint256 yieldToDistribute; // Proportional yield to distribute
     }
 
@@ -47,7 +47,7 @@ library YieldHandlingLibrary {
         }
 
         (bool success, uint256 amt, ) = genModule.withdrawWithYield(workflowId, token, amount);
-        
+
         if (success) {
             actualAmount = amt;
             if (amt > amount) {
@@ -74,7 +74,7 @@ library YieldHandlingLibrary {
         uint256 yieldAmount
     ) internal {
         if (yieldAmount == 0) return;
-        require(address(distModule) != address(0), "No yield distribution module");
+        require(address(distModule) != address(0), 'No yield distribution module');
 
         // Transfer yield to module first (module expects tokens to be in its balance)
         // This matches the pattern used by DefaultYieldDistributionModule which uses safeTransfer
@@ -82,11 +82,16 @@ library YieldHandlingLibrary {
 
         // Empty distributionData means no distribution configured - yield stays in contract
         // This allows tests to work without full distribution setup
-        bytes memory distributionData = "";
-        (bool success, ) = distModule.distributeYield(workflowId, token, yieldAmount, distributionData);
+        bytes memory distributionData = '';
+        (bool success, ) = distModule.distributeYield(
+            workflowId,
+            token,
+            yieldAmount,
+            distributionData
+        );
         // Revert if distribution fails - yield should be properly distributed
         // This ensures yield is not lost if distribution module has issues
-        require(success, "Yield distribution failed");
+        require(success, 'Yield distribution failed');
     }
 
     /**
@@ -104,7 +109,7 @@ library YieldHandlingLibrary {
         if (address(genModule) == address(0)) {
             return address(0);
         }
-        
+
         // Try to get approval target from module (new interface method)
         try genModule.getApprovalTarget(token) returns (address target) {
             return target;
@@ -114,4 +119,3 @@ library YieldHandlingLibrary {
         }
     }
 }
-

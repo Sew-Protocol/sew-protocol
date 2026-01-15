@@ -8,9 +8,7 @@
       "target": "0xPLACEHOLDER_ESCROWABLEERC20",
       "contractName": "EscrowableERC20",
       "functionName": "queueEscrowFeeAddress",
-      "args": [
-        "0xPLACEHOLDER_NEW_FEE_ADDRESS"
-      ],
+      "args": ["0xPLACEHOLDER_NEW_FEE_ADDRESS"],
       "description": "Queue new fee address: 0xPLACEHOLDER_NEW_FEE_ADDRESS (REPLACE WITH ACTUAL ADDRESS)"
     }
   ],

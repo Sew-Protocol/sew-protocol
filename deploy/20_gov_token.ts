@@ -4,7 +4,7 @@ import { getGovConfig, validateGovConfig } from './_config';
 
 /**
  * Deploy SewToken (Governance Token)
- * 
+ *
  * This script deploys the SewToken ERC20Votes token with fixed supply.
  * The token will be used for DAO governance voting.
  */
@@ -12,7 +12,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts, ethers } = hre;
   const { deploy } = deployments;
   const { deployer } = await getNamedAccounts();
-  
+
   const config = getGovConfig(hre);
   validateGovConfig(config, hre);
 
@@ -37,12 +37,12 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   if (tokenDeployment.newlyDeployed) {
     console.log(`✅ SewToken deployed at: ${tokenDeployment.address}`);
-    
+
     // Mint initial tokens to configured addresses (for testing)
     if (config.initialGovTokenMints.length > 0) {
       const token = await ethers.getContractAt('SewToken', tokenDeployment.address);
       console.log(`\n💰 Minting tokens to initial recipients...`);
-      
+
       for (const mint of config.initialGovTokenMints) {
         try {
           const tx = await token.mint(mint.to, mint.amount);
@@ -56,7 +56,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
         }
       }
     }
-    
+
     // Verify token balance
     const token = await ethers.getContractAt('SewToken', tokenDeployment.address);
     const deployerBalance = await token.balanceOf(deployer);
@@ -71,4 +71,3 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 export default func;
 func.tags = ['token', 'governance'];
 func.dependencies = [];
-

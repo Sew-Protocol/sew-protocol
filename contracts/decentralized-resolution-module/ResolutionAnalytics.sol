@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
-import "./DecentralizedResolverStructs.sol";
+import './DecentralizedResolverStructs.sol';
 
 /**
  * @title ResolutionAnalytics
@@ -14,16 +14,16 @@ import "./DecentralizedResolverStructs.sol";
 library ResolutionAnalytics {
     uint256 public constant BASIS_POINTS_DENOMINATOR = 10000;
     uint256 public constant EMA_PRECISION = 1e6; // 1 million = 100% score
-    
+
     // Default EMA parameters (governance can override)
     uint256 public constant DEFAULT_ALPHA_BPS = 1000; // 10% (alphaBps / 10000)
     uint256 public constant MIN_SCORE_THRESHOLD = 500000; // 50% of EMA_PRECISION
-    
+
     // Outcome values for EMA calculation (as ratio of EMA_PRECISION)
-    uint256 public constant OUTCOME_UPHELD = EMA_PRECISION;      // 1.0 = decision upheld
+    uint256 public constant OUTCOME_UPHELD = EMA_PRECISION; // 1.0 = decision upheld
     uint256 public constant OUTCOME_REVERSED = EMA_PRECISION / 2; // 0.5 = decision reversed
-    uint256 public constant OUTCOME_TIMEOUT = 0;                  // 0.0 = timeout/no response
-    
+    uint256 public constant OUTCOME_TIMEOUT = 0; // 0.0 = timeout/no response
+
     // Events
     event ResolverStatsUpdated(
         address indexed resolver,
@@ -32,7 +32,7 @@ library ResolutionAnalytics {
         uint256 timeouts,
         uint256 reversals
     );
-    
+
     event EMAScoreUpdated(
         address indexed resolver,
         uint256 oldScore,
@@ -40,7 +40,7 @@ library ResolutionAnalytics {
         uint256 outcome,
         uint256 alphaBps
     );
-    
+
     event ResolutionReversed(
         uint256 indexed escrowId,
         address indexed resolver,
@@ -49,21 +49,19 @@ library ResolutionAnalytics {
         uint8 fromRound,
         uint8 toRound
     );
-    
+
     event ResolverTimeout(
         uint256 indexed escrowId,
         address indexed resolver,
         uint8 round,
         uint8 timeoutType // 0=accept, 1=resolve
     );
-    
+
     /**
      * @notice Initialize resolver stats with default EMA score
      * @param stats Resolver stats storage reference
      */
-    function initializeResolver(
-        DecentralizedResolverStructs.ResolverStats storage stats
-    ) internal {
+    function initializeResolver(DecentralizedResolverStructs.ResolverStats storage stats) internal {
         if (stats.emaScore == 0) {
             // New resolvers start with perfect score (benefit of the doubt)
             stats.emaScore = EMA_PRECISION;
@@ -71,7 +69,7 @@ library ResolutionAnalytics {
             stats.assignmentWeight = BASIS_POINTS_DENOMINATOR; // Full weight
         }
     }
-    
+
     /**
      * @notice Update EMA score based on outcome
      * @dev score_new = score_old * (1 - α) + outcome * α
@@ -86,24 +84,22 @@ library ResolutionAnalytics {
         uint256 outcome,
         uint256 alphaBps
     ) internal {
-        require(outcome <= EMA_PRECISION, "Invalid outcome");
-        require(alphaBps <= BASIS_POINTS_DENOMINATOR, "Invalid alpha");
-        
+        require(outcome <= EMA_PRECISION, 'Invalid outcome');
+        require(alphaBps <= BASIS_POINTS_DENOMINATOR, 'Invalid alpha');
+
         uint256 oldScore = stats.emaScore;
-        
+
         // EMA formula: score_new = score_old * (1 - α) + outcome * α
         // Implementation: score_new = (score_old * (10000 - alphaBps) + outcome * alphaBps) / 10000
-        uint256 newScore = (
-            oldScore * (BASIS_POINTS_DENOMINATOR - alphaBps) + 
-            outcome * alphaBps
-        ) / BASIS_POINTS_DENOMINATOR;
-        
+        uint256 newScore = (oldScore * (BASIS_POINTS_DENOMINATOR - alphaBps) + outcome * alphaBps) /
+            BASIS_POINTS_DENOMINATOR;
+
         stats.emaScore = newScore;
         stats.lastScoreUpdate = block.timestamp;
-        
+
         emit EMAScoreUpdated(resolver, oldScore, newScore, outcome, alphaBps);
     }
-    
+
     /**
      * @notice Record a successful resolution
      * @param stats Resolver stats storage reference
@@ -120,13 +116,13 @@ library ResolutionAnalytics {
         stats.casesDecided++;
         stats.totalResolutionTime += resolutionTime;
         stats.lastActive = block.timestamp;
-        
+
         // Decision made on time = positive signal
         updateEMAScore(stats, resolver, OUTCOME_UPHELD, alphaBps);
-        
+
         // Update legacy fields
         stats.disputesResolved++;
-        
+
         emit ResolverStatsUpdated(
             resolver,
             stats.emaScore,
@@ -135,7 +131,7 @@ library ResolutionAnalytics {
             stats.reversals
         );
     }
-    
+
     /**
      * @notice Record a resolution that was reversed on appeal
      * @param stats Resolver stats storage reference
@@ -158,10 +154,10 @@ library ResolutionAnalytics {
         uint256 alphaBps
     ) internal {
         stats.reversals++;
-        
+
         // Reversal = negative signal (0.5 outcome)
         updateEMAScore(stats, resolver, OUTCOME_REVERSED, alphaBps);
-        
+
         emit ResolutionReversed(
             workflowId,
             resolver,
@@ -170,7 +166,7 @@ library ResolutionAnalytics {
             fromRound,
             toRound
         );
-        
+
         emit ResolverStatsUpdated(
             resolver,
             stats.emaScore,
@@ -179,7 +175,7 @@ library ResolutionAnalytics {
             stats.reversals
         );
     }
-    
+
     /**
      * @notice Record a timeout (accept or resolve)
      * @param stats Resolver stats storage reference
@@ -202,12 +198,12 @@ library ResolutionAnalytics {
         } else {
             stats.timeoutsResolve++;
         }
-        
+
         // Timeout = worst signal (0 outcome)
         updateEMAScore(stats, resolver, OUTCOME_TIMEOUT, alphaBps);
-        
+
         emit ResolverTimeout(workflowId, resolver, round, timeoutType);
-        
+
         emit ResolverStatsUpdated(
             resolver,
             stats.emaScore,
@@ -216,7 +212,7 @@ library ResolutionAnalytics {
             stats.reversals
         );
     }
-    
+
     /**
      * @notice Calculate workload weight from EMA score
      * @dev Weight = 0 if score below threshold or manual override, otherwise scaled to 0-10000
@@ -230,15 +226,15 @@ library ResolutionAnalytics {
     ) internal pure returns (uint256 weight) {
         // Manual override: 0 = excluded
         if (stats.assignmentWeight == 0) return 0;
-        
+
         // Below threshold → weight to 0
         if (stats.emaScore < minScoreThreshold) return 0;
-        
+
         // Scale EMA score (0-1e6) to basis points (0-10000)
         // weight = (emaScore * 10000) / 1e6 = emaScore / 100
         return stats.emaScore / 100;
     }
-    
+
     /**
      * @notice Get recent timeout rate for a resolver
      * @dev Calculates timeout rate from total cases assigned
@@ -249,11 +245,11 @@ library ResolutionAnalytics {
         DecentralizedResolverStructs.ResolverStats memory stats
     ) internal pure returns (uint256 timeoutRate) {
         if (stats.casesAssigned == 0) return 0;
-        
+
         uint256 totalTimeouts = stats.timeoutsAccept + stats.timeoutsResolve;
         return (totalTimeouts * BASIS_POINTS_DENOMINATOR) / stats.casesAssigned;
     }
-    
+
     /**
      * @notice Get reversal rate for a resolver
      * @param stats Resolver stats
@@ -263,10 +259,10 @@ library ResolutionAnalytics {
         DecentralizedResolverStructs.ResolverStats memory stats
     ) internal pure returns (uint256 reversalRate) {
         if (stats.casesDecided == 0) return 0;
-        
+
         return (stats.reversals * BASIS_POINTS_DENOMINATOR) / stats.casesDecided;
     }
-    
+
     /**
      * @notice Get average resolution time for a resolver
      * @param stats Resolver stats
@@ -276,10 +272,10 @@ library ResolutionAnalytics {
         DecentralizedResolverStructs.ResolverStats memory stats
     ) internal pure returns (uint256 avgTime) {
         if (stats.casesDecided == 0) return 0;
-        
+
         return stats.totalResolutionTime / stats.casesDecided;
     }
-    
+
     /**
      * @notice Check if resolver needs attention (legacy function for compatibility)
      * @param stats Resolver stats
@@ -293,16 +289,16 @@ library ResolutionAnalytics {
     ) internal pure returns (bool needsAttention, uint8 reason) {
         if (!active) return (true, 3);
         if (stats.casesAssigned == 0) return (false, 0);
-        
+
         // Check EMA score
         if (stats.emaScore < MIN_SCORE_THRESHOLD) return (true, 1);
-        
+
         // Check timeout rate (>30%)
         if (getTimeoutRate(stats) > 3000) return (true, 2);
-        
+
         // Check reversal rate (>20%)
         if (getReversalRate(stats) > 2000) return (true, 4);
-        
+
         return (false, 0);
     }
 }

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
-import "../types/EscrowTypes.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import '../types/EscrowTypes.sol';
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 
 /**
  * @title YieldDistributionLibrary
@@ -28,25 +28,25 @@ library YieldDistributionLibrary {
         uint256[] memory percentages
     ) internal pure {
         if (recipients.length == 0) {
-            revert InvalidAmount("Yield distribution must have at least one recipient");
+            revert InvalidAmount('Yield distribution must have at least one recipient');
         }
         if (recipients.length != percentages.length) {
             revert ArrayLengthMismatch(recipients.length, percentages.length);
         }
-        
+
         uint256 totalPercentage = 0;
         for (uint256 i = 0; i < percentages.length; i++) {
             if (recipients[i] == address(0)) {
-                revert InvalidAddress("Recipient address cannot be zero", recipients[i]);
+                revert InvalidAddress('Recipient address cannot be zero', recipients[i]);
             }
             if (percentages[i] == 0) {
-                revert InvalidAmount("Percentage must be greater than zero");
+                revert InvalidAmount('Percentage must be greater than zero');
             }
             totalPercentage += percentages[i];
         }
-        
+
         if (totalPercentage != ESCROW_FEE_DENOMINATOR) {
-            revert InvalidAmount("Yield distribution percentages must sum to 10000 (100%)");
+            revert InvalidAmount('Yield distribution percentages must sum to 10000 (100%)');
         }
     }
 
@@ -98,7 +98,8 @@ library YieldDistributionLibrary {
                 if (distribution.recipients[i] == address(0)) {
                     continue;
                 }
-                uint256 share = (yieldAmount * distribution.percentages[i]) / ESCROW_FEE_DENOMINATOR;
+                uint256 share = (yieldAmount * distribution.percentages[i]) /
+                    ESCROW_FEE_DENOMINATOR;
                 if (share > 0) {
                     IERC20(token).safeTransfer(distribution.recipients[i], share);
                     totalDistributed += share;
@@ -114,4 +115,3 @@ library YieldDistributionLibrary {
         }
     }
 }
-

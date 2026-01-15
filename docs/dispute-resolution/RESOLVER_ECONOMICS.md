@@ -1,5 +1,4 @@
-Detailed overview: Resolver staking, escalation deposits, incentives, and slashing (Ethereum-native 2026)
----------------------------------------------------------------------------------------------------------
+## Detailed overview: Resolver staking, escalation deposits, incentives, and slashing (Ethereum-native 2026)
 
 ### Executive design rule
 
@@ -7,40 +6,37 @@ Detailed overview: Resolver staking, escalation deposits, incentives, and slashi
 Decentralise incentives second.\
 Decentralise capital last.**
 
-The system becomes adversarial when *capital is at risk*. A resolver making a wrong call is annoying; a resolver losing money creates a profit motive to attack the mechanism. So we intentionally introduce **economic adversarial pressure** only after **decision-making and escalation flows** are stable under real usage.
+The system becomes adversarial when _capital is at risk_. A resolver making a wrong call is annoying; a resolver losing money creates a profit motive to attack the mechanism. So we intentionally introduce **economic adversarial pressure** only after **decision-making and escalation flows** are stable under real usage.
 
-* * * * *
+---
 
-1) Escalation deposits: bonds, delays, increasing fees
-======================================================
+1. # Escalation deposits: bonds, delays, increasing fees
 
-1.1 Core mechanism: escalation-bonded appeals
----------------------------------------------
+## 1.1 Core mechanism: escalation-bonded appeals
 
 **Every escalation requires the losing party to post an appeal bond.**
 
--   If escalation succeeds (the outcome is reversed): the escalator gets the bond back (minus a small processing fee).
+- If escalation succeeds (the outcome is reversed): the escalator gets the bond back (minus a small processing fee).
 
--   If escalation fails (outcome upheld): the bond is paid to the prior resolver set (and a protocol cut).
+- If escalation fails (outcome upheld): the bond is paid to the prior resolver set (and a protocol cut).
 
 **Result:** "Appeal because I'm angry" becomes financially irrational.
-
 
 ### Minimal on-chain state
 
 For each dispute `D`:
 
--   `round`: current escalation step `k` (0 = initial resolver)
+- `round`: current escalation step `k` (0 = initial resolver)
 
--   `decision[k]`: outcome at round `k`
+- `decision[k]`: outcome at round `k`
 
--   `appealBond[k]`: bond amount posted to reach round `k`
+- `appealBond[k]`: bond amount posted to reach round `k`
 
--   `appealDeadline[k]`: latest time to appeal to next round
+- `appealDeadline[k]`: latest time to appeal to next round
 
--   `resolverSet[k]`: the resolver(s) who decided round `k`
+- `resolverSet[k]`: the resolver(s) who decided round `k`
 
--   `status`: Open / Resolved / Escalated / Expired
+- `status`: Open / Resolved / Escalated / Expired
 
 ### Core transitions
 
@@ -49,25 +45,20 @@ For each dispute `D`:
 2.  **Appeal window opens** (time boxed)
 
 3.  If appealed:
+    - escalator posts bond for round `k+1`
 
-    -   escalator posts bond for round `k+1`
-
-    -   system assigns next resolver(s)
+    - system assigns next resolver(s)
 
 4.  **New ruling** (`k+1`)
 
 5.  Compare outcomes:
+    - If outcome flips → appeal bond returns to escalator (minus fee if any)
 
-    -   If outcome flips → appeal bond returns to escalator (minus fee if any)
+    - If outcome same → bond paid to resolver(s) from previous round
 
-    -   If outcome same → bond paid to resolver(s) from previous round
+> Important: "success" should be defined precisely. Commonly: _the next round decision differs from the prior round_. You can later refine to "final outcome differs from initial outcome," but that adds complexity and delays incentives. Start simple.
 
-> Important: "success" should be defined precisely. Commonly: *the next round decision differs from the prior round*. You can later refine to "final outcome differs from initial outcome," but that adds complexity and delays incentives. Start simple.
-
-
-
-1.2 Bond sizing: increasing fees via cost curves
-------------------------------------------------
+## 1.2 Bond sizing: increasing fees via cost curves
 
 If appeals don't get more expensive, a griefer can keep escalating cheaply. So bond cost must grow with depth.
 
@@ -78,33 +69,30 @@ Let `k` be the appeal number (1 for first appeal, 2 for second, ...)
 **Linear:**\
 `bond(k) = base + step * k`
 
--   Good UX, weaker anti-spam.
+- Good UX, weaker anti-spam.
 
 **Quadratic (recommended default):**\
 `bond(k) = base + step * k^2`
 
--   Strongly discourages repeated escalation while keeping the first appeal affordable.
+- Strongly discourages repeated escalation while keeping the first appeal affordable.
 
 **Geometric / exponential:**\
 `bond(k) = base * r^k` where `r > 1`
 
--   Very strong anti-spam; can price out legitimate late appeals.
+- Very strong anti-spam; can price out legitimate late appeals.
 
 ### Recommended 2026 default
 
--   **Quadratic** with conservative parameters.
+- **Quadratic** with conservative parameters.
 
--   Tune such that:
+- Tune such that:
+  - `bond(1)` is "painful but possible"
 
-    -   `bond(1)` is "painful but possible"
-
-    -   `bond(3)` is "almost never rational"
+  - `bond(3)` is "almost never rational"
 
 You can also impose `maxRounds` to cap worst-case UX and duration.
 
-
-1.3 Delays (time as a spam throttle)
-------------------------------------
+## 1.3 Delays (time as a spam throttle)
 
 Delays are a second throttle: they raise the cost of griefing by increasing lockup time and slowing throughput.
 
@@ -112,53 +100,45 @@ Delays are a second throttle: they raise the cost of griefing by increasing lock
 
 For each round:
 
--   Resolver must respond within `t_resolve[k]`
+- Resolver must respond within `t_resolve[k]`
 
--   Parties may appeal within `t_appeal[k]`
+- Parties may appeal within `t_appeal[k]`
 
 Increase delays with depth:
 
--   `t_resolve[k] = baseResolve + k * resolveStep` (or mild geometric)
+- `t_resolve[k] = baseResolve + k * resolveStep` (or mild geometric)
 
--   `t_appeal[k] = baseAppeal + k * appealStep`
+- `t_appeal[k] = baseAppeal + k * appealStep`
 
 This reduces:
 
--   rapid-fire appeal spam
+- rapid-fire appeal spam
 
--   manipulative "race" strategies
+- manipulative "race" strategies
 
--   latency games intended to block funds
+- latency games intended to block funds
 
-
-
-
-1.4 What this prevents (and why)
---------------------------------
+## 1.4 What this prevents (and why)
 
 **Harassment / appeal spam:** escalating costs and lockup time make it irrational.\
 **Bribe-farming:** you can't profit by forcing repeated appeals unless you can flip outcomes---harder with random assignment and multi-resolver rounds.\
 **Governance capture:** if appeals are cheap, attackers can generate massive dispute volume and pressure governance; expensive appeals reduce attack throughput.
 
-* * * * *
+---
 
-
-
-2) Delegation must be capital-weighted
-======================================
+2. # Delegation must be capital-weighted
 
 Your model (senior resolvers appoint resolvers) is good. The missing piece is ensuring **appointments scale exposure**.
 
-2.1 Defined delegation bond + liability ceiling
------------------------------------------------
+## 2.1 Defined delegation bond + liability ceiling
 
 Each Senior Resolver `S` has:
 
--   `seniorBond`: staked collateral
+- `seniorBond`: staked collateral
 
--   `delegationExposure`: computed risk for all appointed resolvers
+- `delegationExposure`: computed risk for all appointed resolvers
 
--   `liabilityCeiling`: maximum loss per epoch / per resolver / per dispute class
+- `liabilityCeiling`: maximum loss per epoch / per resolver / per dispute class
 
 ### Delegation bond rule (simple)
 
@@ -178,266 +158,230 @@ This prevents:
 
 Because each appointment consumes coverage capacity.
 
-2.2 Quantified exposure scaling (concrete)
-------------------------------------------
+## 2.2 Quantified exposure scaling (concrete)
 
 Pick one:
 
 **A) Per-resolver coverage**
 
--   Each appointed resolver requires `coverage = resolverBond * m`
+- Each appointed resolver requires `coverage = resolverBond * m`
 
--   `m` starts high in early network, decreases as system matures.
+- `m` starts high in early network, decreases as system matures.
 
 **B) Per-case coverage**
 
--   Appointments don't cost much, but each case assigned to an appointed resolver consumes "coverage units" and caps throughput if senior bond is low.
+- Appointments don't cost much, but each case assigned to an appointed resolver consumes "coverage units" and caps throughput if senior bond is low.
 
 **C) Hybrid (recommended)**
 
--   Baseline per-resolver coverage + per-case cap to prevent burst risk.
+- Baseline per-resolver coverage + per-case cap to prevent burst risk.
 
-2.3 Liability ceiling implementation
-------------------------------------
+## 2.3 Liability ceiling implementation
 
 Define:
 
--   `maxLossPerEpoch`
+- `maxLossPerEpoch`
 
--   `maxLossPerResolver`
+- `maxLossPerResolver`
 
--   `maxLossPerDispute`
+- `maxLossPerDispute`
 
 If slashing would exceed a limit:
 
--   excess becomes **workload throttling** / suspension, not additional slash
+- excess becomes **workload throttling** / suspension, not additional slash
 
--   remaining penalties apply next epoch only after re-bond
+- remaining penalties apply next epoch only after re-bond
 
 This prevents senior-resolver insolvency from cascading into protocol-wide instability.
 
-
-
-
-3) Reputation must be slow, not reactive
-========================================
+3. # Reputation must be slow, not reactive
 
 Fast reputation systems are gameable and unfair.
 
-3.1 EMA-style scoring (slow half-life)
---------------------------------------
+## 3.1 EMA-style scoring (slow half-life)
 
 Maintain per resolver:
 
--   `score` in [0..1] (or [0..10000])
+- `score` in [0..1] (or [0..10000])
 
--   Update after each case using an EMA:
+- Update after each case using an EMA:
 
 `score_new = score_old * (1 - α) + outcomePoints * α`
 
 Where:
 
--   `α` is small (e.g., 0.01--0.05) → slow change
+- `α` is small (e.g., 0.01--0.05) → slow change
 
--   `outcomePoints` is derived from performance metrics
+- `outcomePoints` is derived from performance metrics
 
 ### Multi-signal outcomePoints
 
 Weight objective signals more than subjective ones:
 
--   Timeliness (SLA met)
+- Timeliness (SLA met)
 
--   Responsiveness (no missed commits)
+- Responsiveness (no missed commits)
 
--   Escalation alignment (upheld vs reversed)
+- Escalation alignment (upheld vs reversed)
 
--   Later: user feedback (low weight)
+- Later: user feedback (low weight)
 
--   Later: DAO feedback (low weight)
+- Later: DAO feedback (low weight)
 
-3.2 Multi-epoch aggregates
---------------------------
+## 3.2 Multi-epoch aggregates
 
 Instead of updating score per-case only, also track per epoch (week/month):
 
--   `casesHandled`
+- `casesHandled`
 
--   `upheldRate`
+- `upheldRate`
 
--   `timeoutRate`
+- `timeoutRate`
 
--   `avgResponseTime`
+- `avgResponseTime`
 
 Then compute:
 
--   `eligibility` and `workloadWeight` from both EMA and epoch stats
+- `eligibility` and `workloadWeight` from both EMA and epoch stats
 
 This prevents:
 
--   one bad case destroying a resolver
+- one bad case destroying a resolver
 
--   angry users brigading feedback
+- angry users brigading feedback
 
--   short-term noise
+- short-term noise
 
-
-
-
-4) DAO should govern the machine, not the cases
-===============================================
+4. # DAO should govern the machine, not the cases
 
 This is essential for legitimacy and for reducing regulatory perception risk.
 
-4.1 DAO controls (allowed)
---------------------------
+## 4.1 DAO controls (allowed)
 
--   Who can be senior resolver (membership / eligibility)
+- Who can be senior resolver (membership / eligibility)
 
--   Bond sizes and curve parameters
+- Bond sizes and curve parameters
 
--   Escalation rules and max rounds
+- Escalation rules and max rounds
 
--   Slashing percentages, thresholds, timeouts
+- Slashing percentages, thresholds, timeouts
 
--   Module upgrades (standard/slow lanes)
+- Module upgrades (standard/slow lanes)
 
--   Appoint investigation committee roles (fraud lane)
+- Appoint investigation committee roles (fraud lane)
 
-4.2 DAO must NOT control (prohibited)
--------------------------------------
+## 4.2 DAO must NOT control (prohibited)
 
--   Who won a specific dispute
+- Who won a specific dispute
 
--   Reversing a specific ruling
+- Reversing a specific ruling
 
--   Slashing a specific resolver ad hoc
+- Slashing a specific resolver ad hoc
 
 ### Concrete enforcement
 
--   Ensure no governance method can call `slash(address)` directly.
+- Ensure no governance method can call `slash(address)` directly.
 
--   Governance can only:
+- Governance can only:
+  - update parameters
 
-    -   update parameters
+  - upgrade modules
 
-    -   upgrade modules
+  - appoint committee keys
 
-    -   appoint committee keys
+- Slashing must be triggered by **contract state transitions** (timeouts, missed commitments, on-chain contradictions, escalation outcome checks)
 
--   Slashing must be triggered by **contract state transitions** (timeouts, missed commitments, on-chain contradictions, escalation outcome checks)
-
-
-
-
-
-5) DAO-driven fraud adjudication must be separated from slashing
-================================================================
+5. # DAO-driven fraud adjudication must be separated from slashing
 
 Fraud is inherently subjective and evidence-heavy. But slashing must be mechanical.
 
-5.1 Fraud lane architecture
----------------------------
+## 5.1 Fraud lane architecture
 
 **Fraud lane is a separate module** with:
 
--   Committee selection (DAO appoints committee membership)
+- Committee selection (DAO appoints committee membership)
 
--   Evidence submission and time windows
+- Evidence submission and time windows
 
--   On-chain quorum verification
+- On-chain quorum verification
 
--   Deterministic execution: if quorum threshold met, apply ban and slash per rules
+- Deterministic execution: if quorum threshold met, apply ban and slash per rules
 
 DAO's role:
 
--   appoint/replace committee
+- appoint/replace committee
 
--   set thresholds and procedures
+- set thresholds and procedures
 
--   upgrade fraud module
+- upgrade fraud module
 
 DAO does not:
 
--   take funds directly
+- take funds directly
 
--   decide per case outcome
+- decide per case outcome
 
+6. # Objective slashing (Ethereum-native 2026)
 
-
-
-
-
-6) Objective slashing (Ethereum-native 2026)
-============================================
-
-6.1 Slashing triggers must be objective
----------------------------------------
+## 6.1 Slashing triggers must be objective
 
 Allowed triggers:
 
--   Missed deadlines (no action within `t_resolve`)
+- Missed deadlines (no action within `t_resolve`)
 
--   No response / unresponsive proof
+- No response / unresponsive proof
 
--   On-chain contradictions (e.g. signed commitment then violated)
+- On-chain contradictions (e.g. signed commitment then violated)
 
--   Escalation outcome alignment (decision reversed at next round)
+- Escalation outcome alignment (decision reversed at next round)
 
 Not allowed:
 
--   forum votes
+- forum votes
 
--   "community feels"
+- "community feels"
 
--   ad hoc governance calls
+- ad hoc governance calls
 
-6.2 Deterministic slashing table
---------------------------------
+## 6.2 Deterministic slashing table
 
-| Event | Penalty | Mechanism |
-| --- | --- | --- |
-| Missed deadline | small % slash | auto once `deadline` passes |
-| No response (after grace) | medium % slash + temporary suspension | auto |
-| Decision reversed on escalation (repeat-based) | % slash scaled by EMA + severity | computed on transition to next round |
-| Fraud proven (committee quorum) | 100% slash + ban | fraud module |
+| Event                                          | Penalty                               | Mechanism                            |
+| ---------------------------------------------- | ------------------------------------- | ------------------------------------ |
+| Missed deadline                                | small % slash                         | auto once `deadline` passes          |
+| No response (after grace)                      | medium % slash + temporary suspension | auto                                 |
+| Decision reversed on escalation (repeat-based) | % slash scaled by EMA + severity      | computed on transition to next round |
+| Fraud proven (committee quorum)                | 100% slash + ban                      | fraud module                         |
 
 Important nuance:
 
--   For "reversed on escalation," don't slash harshly per single reversal. Use:
+- For "reversed on escalation," don't slash harshly per single reversal. Use:
+  - a small penalty
 
-    -   a small penalty
+  - scaled by repeated reversals
 
-    -   scaled by repeated reversals
-
-    -   bounded by epoch ceilings
+  - bounded by epoch ceilings
 
 This avoids punishing honest disagreement and preserves decentralisation.
 
+7. # Two-tier staking (v3): resolver deductible + senior insurance
 
-
-
-7) Two-tier staking (v3): resolver deductible + senior insurance
-================================================================
-
-7.1 Structure
--------------
+## 7.1 Structure
 
 **Resolver bond (deductible):**
 
--   smaller stake
+- smaller stake
 
--   first-loss for their own behaviour (timeouts, negligence)
+- first-loss for their own behaviour (timeouts, negligence)
 
 **Senior bond (insurance):**
 
--   large stake (100--1000× resolver bond)
+- large stake (100--1000× resolver bond)
 
--   covers systemic risk from appointed resolvers
+- covers systemic risk from appointed resolvers
 
--   also covers senior's own decisions
+- also covers senior's own decisions
 
-7.2 Payout ordering
--------------------
+## 7.2 Payout ordering
 
 When a slashable event occurs:
 
@@ -449,59 +393,46 @@ When a slashable event occurs:
 
 This prevents:
 
--   small resolvers becoming attack targets
+- small resolvers becoming attack targets
 
--   seniors from appointing recklessly
+- seniors from appointing recklessly
 
--   cascading insolvency
+- cascading insolvency
 
-
-
-
-
-8) Workload as the primary safety lever (v1 onward)
-===================================================
+8. # Workload as the primary safety lever (v1 onward)
 
 Workload routing is your most underrated weapon:
 
--   It's reversible
+- It's reversible
 
--   It's low-risk
+- It's low-risk
 
--   It changes incentives without enabling stake attacks
+- It changes incentives without enabling stake attacks
 
-8.1 WorkloadWeight function
----------------------------
+## 8.1 WorkloadWeight function
 
 Define:\
 `WorkloadWeight = f(score, availability, recentTimeoutRate, stakeTier)`
 
--   In v1: no stake input; mostly `score` + `availability`
+- In v1: no stake input; mostly `score` + `availability`
 
--   In v3: incorporate stake tiers or senior backing
+- In v3: incorporate stake tiers or senior backing
 
 Bad actors:
 
--   don't get nuked instantly
+- don't get nuked instantly
 
--   get starved of income → exit naturally
+- get starved of income → exit naturally
 
 This is extremely resilient.
 
-
-
-
-
-
-9) Attack vectors and specific mechanisms that stop them
-========================================================
+9. # Attack vectors and specific mechanisms that stop them
 
 Below are the main failure modes you listed, with concrete countermeasures.
 
-* * * * *
+---
 
-9.1 Griefing (blocking funds / wasting time)
---------------------------------------------
+## 9.1 Griefing (blocking funds / wasting time)
 
 **Attack:** party escalates repeatedly, stalls resolution, harms counterparty.
 
@@ -519,18 +450,17 @@ Below are the main failure modes you listed, with concrete countermeasures.
 
 **Implementation:**
 
--   `appealBond(k)` increases
+- `appealBond(k)` increases
 
--   `appealDeadline[k]` enforced
+- `appealDeadline[k]` enforced
 
--   `maxRounds` enforced
+- `maxRounds` enforced
 
--   If escalator doesn't submit required payload/signature by `t_submit`, bond is forfeited
+- If escalator doesn't submit required payload/signature by `t_submit`, bond is forfeited
 
-* * * * *
+---
 
-9.2 Appeal spam (cheap harassment of resolvers)
------------------------------------------------
+## 9.2 Appeal spam (cheap harassment of resolvers)
 
 **Attack:** attacker files lots of appeals to drain resolver time or manipulate workload.
 
@@ -546,15 +476,11 @@ Below are the main failure modes you listed, with concrete countermeasures.
 
 **Implementation:**
 
--   Pay failed-appeal bonds directly to previous resolver set (and/or shared pool)
+- Pay failed-appeal bonds directly to previous resolver set (and/or shared pool)
 
--   Require `escrowAmount >= threshold` for deeper than `k=1`
+- Require `escrowAmount >= threshold` for deeper than `k=1`
 
-
-
-
-9.3 Bribery (decision buying)
------------------------------
+## 9.3 Bribery (decision buying)
 
 **Attack:** party bribes resolver to rule incorrectly.
 
@@ -572,16 +498,15 @@ Below are the main failure modes you listed, with concrete countermeasures.
 
 **Implementation:**
 
--   For `k>=2`, assign a committee and take majority outcome
+- For `k>=2`, assign a committee and take majority outcome
 
--   Track correlation metrics (later): same parties + same resolver outcomes
+- Track correlation metrics (later): same parties + same resolver outcomes
 
--   Fraud committee can ban/slash if proven
+- Fraud committee can ban/slash if proven
 
-* * * * *
+---
 
-9.4 Latency games (timeouts, strategic unresponsiveness)
---------------------------------------------------------
+## 9.4 Latency games (timeouts, strategic unresponsiveness)
 
 **Attack:** resolvers intentionally delay; parties time appeals to maximize harm.
 
@@ -597,16 +522,15 @@ Below are the main failure modes you listed, with concrete countermeasures.
 
 **Implementation:**
 
--   Resolver must accept assignment within `t_accept` or auto-reassign
+- Resolver must accept assignment within `t_accept` or auto-reassign
 
--   Must submit ruling within `t_resolve` or auto-reassign + penalty
+- Must submit ruling within `t_resolve` or auto-reassign + penalty
 
--   Repeated timeouts reduce workload to zero (v1), slash bond (v3)
+- Repeated timeouts reduce workload to zero (v1), slash bond (v3)
 
-* * * * *
+---
 
-9.5 Senior-resolver insolvency (delegation risk)
-------------------------------------------------
+## 9.5 Senior-resolver insolvency (delegation risk)
 
 **Attack/failure:** senior backs too many resolvers; a cluster of penalties wipes senior bond; protocol becomes unstable.
 
@@ -624,95 +548,77 @@ Below are the main failure modes you listed, with concrete countermeasures.
 
 **Implementation:**
 
--   `requiredCoverageForAppointments` enforced on appointment
+- `requiredCoverageForAppointments` enforced on appointment
 
--   `maxLossPerEpoch` enforced on slashing
+- `maxLossPerEpoch` enforced on slashing
 
--   If ceiling reached: freeze further assignments, require top-up
+- If ceiling reached: freeze further assignments, require top-up
 
-
-
-
-10) "Open marketplace" timing (do not start open)
-=================================================
+10. # "Open marketplace" timing (do not start open)
 
 2026 best practice:
 
--   Start **curated, bonded, DAO-appointed** resolvers.
+- Start **curated, bonded, DAO-appointed** resolvers.
 
--   Only later add:
+- Only later add:
+  - optional user-choice lanes
 
-    -   optional user-choice lanes
+  - premium speed lanes
 
-    -   premium speed lanes
-
-    -   high-bond arbitrators
+  - high-bond arbitrators
 
 Open too early leads to:
 
--   bribe-based undercutting
+- bribe-based undercutting
 
--   cartel formation
+- cartel formation
 
--   reputation gaming
+- reputation gaming
 
--   pay-to-win arbitration
+- pay-to-win arbitration
 
 So: **never start open**.
 
-
-
-11) Putting it together: staged implementation map
-==================================================
+11. # Putting it together: staged implementation map
 
 ### DR v1 (decisions decentralised; no resolver capital)
 
--   curated resolver set
+- curated resolver set
 
--   random assignment
+- random assignment
 
--   escalation logic
+- escalation logic
 
--   optional Kleros backstop
+- optional Kleros backstop
 
--   performance → workload (to zero)
+- performance → workload (to zero)
 
--   EMA reputation (slow)
+- EMA reputation (slow)
 
--   no staking, no slashing
+- no staking, no slashing
 
--   objective timeouts (penalty = workload reduction)
+- objective timeouts (penalty = workload reduction)
 
 ### DR v2 (incentives decentralised; capital still soft for resolvers)
 
--   escalation bonds (appeal deposits)
+- escalation bonds (appeal deposits)
 
--   increasing bond curve (quadratic default)
+- increasing bond curve (quadratic default)
 
--   bounded appeal windows and delays
+- bounded appeal windows and delays
 
--   bond payout rules (fail → resolver, success → refund)
+- bond payout rules (fail → resolver, success → refund)
 
--   still no resolver staking/slashing
+- still no resolver staking/slashing
 
 ### DR v3 (capital decentralised)
 
--   resolver bonds
+- resolver bonds
 
--   objective slashing
+- objective slashing
 
--   senior backing with capital-weighted delegation
+- senior backing with capital-weighted delegation
 
--   liability ceilings + exposure accounting
+- liability ceilings + exposure accounting
 
--   fraud lane with committee quorum and mechanical execution
-
-
-
-
-
-
-
-
-
-
+- fraud lane with committee quorum and mechanical execution

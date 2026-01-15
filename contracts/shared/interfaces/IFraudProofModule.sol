@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
-import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import '@openzeppelin/contracts/utils/introspection/IERC165.sol';
 
 /**
  * @title IFraudProofModule
@@ -33,9 +33,7 @@ interface IFraudProofModule is IERC165 {
      * @return isValid True if fraud proof is valid
      * @dev In DR v3, fraud proofs must be objectively verifiable
      */
-    function verifyFraudProof(
-        uint256 workflowId
-    ) external view returns (bool isValid);
+    function verifyFraudProof(uint256 workflowId) external view returns (bool isValid);
 
     /**
      * @notice Get the status of a fraud proof submission
@@ -53,9 +51,7 @@ interface IFraudProofModule is IERC165 {
      * @return success True if execution was successful
      * @dev In DR v3, verified fraud proofs trigger automatic resolution execution
      */
-    function executeFraudProof(
-        uint256 submissionId
-    ) external returns (bool success);
+    function executeFraudProof(uint256 submissionId) external returns (bool success);
 
     /**
      * @notice Get the module name/identifier

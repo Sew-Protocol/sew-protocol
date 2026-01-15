@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
-import "../types/EscrowTypes.sol";
+import '../types/EscrowTypes.sol';
 
 /**
  * @title SettingsValidationLibrary
@@ -11,7 +11,7 @@ import "../types/EscrowTypes.sol";
 library SettingsValidationLibrary {
     /// @notice Maximum auto time duration (10 years in seconds)
     uint256 public constant MAX_AUTO_TIME_DURATION = 10 * 365 * 24 * 60 * 60;
-    
+
     // Phase 6: Bounds constants
     uint256 public constant MAX_AUTO_TIME_DAYS = 30 days;
     uint256 public constant MAX_ATTACHMENTS = 20;
@@ -21,7 +21,7 @@ library SettingsValidationLibrary {
     uint256 public constant MIN_YIELD_RECIPIENTS = 1;
     uint256 public constant MAX_YIELD_RECIPIENTS = 10;
     uint256 public constant BPS_DENOMINATOR = 10_000;
-    
+
     // Phase 6: Custom errors (using different names to avoid conflicts with EscrowTypes)
     error OutOfBounds(bytes32 key, uint256 value, uint256 min, uint256 max);
     error InvalidAddressKey(bytes32 key);
@@ -45,16 +45,16 @@ library SettingsValidationLibrary {
         if (autoTime == 0) {
             return; // 0 means no auto time, which is valid
         }
-        
+
         // Validate time is in the future
         if (autoTime <= currentTime) {
             revert InvalidAutoTime(
-                string.concat(timeType, " must be in the future"),
+                string.concat(timeType, ' must be in the future'),
                 autoTime,
                 currentTime
             );
         }
-        
+
         // Validate time doesn't exceed maximum duration
         uint256 maxAllowedTime = currentTime + MAX_AUTO_TIME_DURATION;
         if (autoTime > maxAllowedTime) {
@@ -76,11 +76,11 @@ library SettingsValidationLibrary {
         if (settings.autoReleaseTime != 0 && settings.autoCancelTime != 0) {
             revert CannotSetBothAutoTimes(settings.autoReleaseTime, settings.autoCancelTime);
         }
-        
+
         // Validate auto times using helper function
-        validateAutoTime(settings.autoReleaseTime, currentTime, "Auto release time");
-        validateAutoTime(settings.autoCancelTime, currentTime, "Auto cancel time");
-        
+        validateAutoTime(settings.autoReleaseTime, currentTime, 'Auto release time');
+        validateAutoTime(settings.autoCancelTime, currentTime, 'Auto cancel time');
+
         // Validate custom dispute resolver if set
         if (settings.customResolver != address(0)) {
             // Could add additional validation here (e.g., isContract check)
@@ -93,13 +93,14 @@ library SettingsValidationLibrary {
      * @return Default settings struct with all fields set to default values
      */
     function getDefaultSettings() internal pure returns (EscrowSettings memory) {
-        return EscrowSettings({
-            customResolver: address(0),
-            yieldEnabled: false,
-            autoReleaseTime: 0,
-            autoCancelTime: 0,
-            escrowType: EscrowType.STANDARD
-        });
+        return
+            EscrowSettings({
+                customResolver: address(0),
+                yieldEnabled: false,
+                autoReleaseTime: 0,
+                autoCancelTime: 0,
+                escrowType: EscrowType.STANDARD
+            });
     }
 
     // ============ Phase 6: Bounds Validation Functions ============
@@ -115,10 +116,20 @@ library SettingsValidationLibrary {
         }
         uint256 currentTime = block.timestamp;
         if (t <= currentTime) {
-            revert OutOfBounds("autoCancelTime", t, currentTime + 1, currentTime + MAX_AUTO_TIME_DAYS);
+            revert OutOfBounds(
+                'autoCancelTime',
+                t,
+                currentTime + 1,
+                currentTime + MAX_AUTO_TIME_DAYS
+            );
         }
         if (t > currentTime + MAX_AUTO_TIME_DAYS) {
-            revert OutOfBounds("autoCancelTime", t, currentTime + 1, currentTime + MAX_AUTO_TIME_DAYS);
+            revert OutOfBounds(
+                'autoCancelTime',
+                t,
+                currentTime + 1,
+                currentTime + MAX_AUTO_TIME_DAYS
+            );
         }
     }
 
@@ -133,10 +144,20 @@ library SettingsValidationLibrary {
         }
         uint256 currentTime = block.timestamp;
         if (t <= currentTime) {
-            revert OutOfBounds("autoReleaseTime", t, currentTime + 1, currentTime + MAX_AUTO_TIME_DAYS);
+            revert OutOfBounds(
+                'autoReleaseTime',
+                t,
+                currentTime + 1,
+                currentTime + MAX_AUTO_TIME_DAYS
+            );
         }
         if (t > currentTime + MAX_AUTO_TIME_DAYS) {
-            revert OutOfBounds("autoReleaseTime", t, currentTime + 1, currentTime + MAX_AUTO_TIME_DAYS);
+            revert OutOfBounds(
+                'autoReleaseTime',
+                t,
+                currentTime + 1,
+                currentTime + MAX_AUTO_TIME_DAYS
+            );
         }
     }
 
@@ -147,7 +168,7 @@ library SettingsValidationLibrary {
      */
     function validateMaxAttachments(uint256 n) internal pure {
         if (n > MAX_ATTACHMENTS) {
-            revert OutOfBounds("maxAttachments", n, 0, MAX_ATTACHMENTS);
+            revert OutOfBounds('maxAttachments', n, 0, MAX_ATTACHMENTS);
         }
     }
 
@@ -158,7 +179,7 @@ library SettingsValidationLibrary {
      */
     function validateFeeBps(uint256 bps) internal pure {
         if (bps > MAX_FEE_BPS) {
-            revert OutOfBounds("escrowFee", bps, 0, MAX_FEE_BPS);
+            revert OutOfBounds('escrowFee', bps, 0, MAX_FEE_BPS);
         }
     }
 
@@ -169,10 +190,10 @@ library SettingsValidationLibrary {
      */
     function validateResolutionDelay(uint256 d) internal pure {
         if (d < MIN_RESOLUTION_DELAY) {
-            revert OutOfBounds("resolutionDelay", d, MIN_RESOLUTION_DELAY, MAX_RESOLUTION_DELAY);
+            revert OutOfBounds('resolutionDelay', d, MIN_RESOLUTION_DELAY, MAX_RESOLUTION_DELAY);
         }
         if (d > MAX_RESOLUTION_DELAY) {
-            revert OutOfBounds("resolutionDelay", d, MIN_RESOLUTION_DELAY, MAX_RESOLUTION_DELAY);
+            revert OutOfBounds('resolutionDelay', d, MIN_RESOLUTION_DELAY, MAX_RESOLUTION_DELAY);
         }
     }
 
@@ -192,38 +213,43 @@ library SettingsValidationLibrary {
         uint256[] memory bps
     ) internal pure {
         uint256 length = recipients.length;
-        
+
         // Check recipient count bounds
         if (length < MIN_YIELD_RECIPIENTS) {
-            revert OutOfBounds("yieldRecipients", length, MIN_YIELD_RECIPIENTS, MAX_YIELD_RECIPIENTS);
+            revert OutOfBounds(
+                'yieldRecipients',
+                length,
+                MIN_YIELD_RECIPIENTS,
+                MAX_YIELD_RECIPIENTS
+            );
         }
         if (length > MAX_YIELD_RECIPIENTS) {
             revert TooManyRecipients(length, MAX_YIELD_RECIPIENTS);
         }
-        
+
         // Check array lengths match
         if (length != bps.length) {
-            revert InvalidArrayLength("yieldDistribution", length, bps.length);
+            revert InvalidArrayLength('yieldDistribution', length, bps.length);
         }
-        
+
         // Validate recipients and calculate sum
         uint256 sum = 0;
         for (uint256 i = 0; i < length; i++) {
             // Check recipient is non-zero
             if (recipients[i] == address(0)) {
-                revert InvalidAddressKey("yieldRecipient");
+                revert InvalidAddressKey('yieldRecipient');
             }
-            
+
             // Check for duplicates
             for (uint256 j = i + 1; j < length; j++) {
                 if (recipients[i] == recipients[j]) {
                     revert DuplicateRecipient(recipients[i]);
                 }
             }
-            
+
             sum += bps[i];
         }
-        
+
         // Check sum equals 100%
         if (sum != BPS_DENOMINATOR) {
             revert InvalidBpsSum(sum);
@@ -241,4 +267,3 @@ library SettingsValidationLibrary {
         }
     }
 }
-

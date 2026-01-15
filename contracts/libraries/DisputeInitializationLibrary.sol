@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
-import "../shared/interfaces/IResolutionModule.sol";
-import "../interfaces/IResolver.sol";
-import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import '../shared/interfaces/IResolutionModule.sol';
+import '../interfaces/IResolver.sol';
+import '@openzeppelin/contracts/utils/introspection/IERC165.sol';
 
 /**
  * @title DisputeInitializationLibrary
@@ -32,18 +32,20 @@ library DisputeInitializationLibrary {
         // Try initializeDisputeWithCategory first
         (bool success1, ) = disputeResolutionModule.call(
             abi.encodeWithSignature(
-                "initializeDisputeWithCategory(uint256,bytes)",
+                'initializeDisputeWithCategory(uint256,bytes)',
                 workflowId,
                 escrowData
             )
         );
-        
+
         if (success1) {
             // Try to get updated dispute resolver from module
-            try IResolutionModule(disputeResolutionModule).getDisputeResolver(workflowId, escrowData) returns (
-                address moduleDisputeResolver,
-                uint8
-            ) {
+            try
+                IResolutionModule(disputeResolutionModule).getDisputeResolver(
+                    workflowId,
+                    escrowData
+                )
+            returns (address moduleDisputeResolver, uint8) {
                 if (moduleDisputeResolver != address(0)) {
                     return moduleDisputeResolver;
                 }
@@ -54,18 +56,20 @@ library DisputeInitializationLibrary {
         // Fallback: try initializeDispute
         (bool success2, ) = disputeResolutionModule.call(
             abi.encodeWithSignature(
-                "initializeDispute(uint256,address,bytes32)",
+                'initializeDispute(uint256,address,bytes32)',
                 workflowId,
                 disputeResolver,
                 bytes32(0)
             )
         );
-        
+
         if (success2) {
-            try IResolutionModule(disputeResolutionModule).getDisputeResolver(workflowId, escrowData) returns (
-                address moduleDisputeResolver,
-                uint8
-            ) {
+            try
+                IResolutionModule(disputeResolutionModule).getDisputeResolver(
+                    workflowId,
+                    escrowData
+                )
+            returns (address moduleDisputeResolver, uint8) {
                 if (moduleDisputeResolver != address(0)) {
                     return moduleDisputeResolver;
                 }
@@ -85,9 +89,11 @@ library DisputeInitializationLibrary {
             return; // Not a contract
         }
 
-        try IERC165(disputeResolver).supportsInterface(type(IResolver).interfaceId) returns (bool supported) {
+        try IERC165(disputeResolver).supportsInterface(type(IResolver).interfaceId) returns (
+            bool supported
+        ) {
             if (supported) {
-                try IResolver(disputeResolver).onDisputeOpened(workflowId, "") {
+                try IResolver(disputeResolver).onDisputeOpened(workflowId, '') {
                     // Callback succeeded
                 } catch {
                     // Callback failed, but don't revert
@@ -98,4 +104,3 @@ library DisputeInitializationLibrary {
         }
     }
 }
-

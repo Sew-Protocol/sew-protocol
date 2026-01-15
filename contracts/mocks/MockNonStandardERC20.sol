@@ -36,7 +36,7 @@ contract MockNonStandardERC20 {
 
     // Note: No return value
     function transfer(address to, uint256 amount) external {
-        require(balanceOf[msg.sender] >= amount, "NS: insufficient");
+        require(balanceOf[msg.sender] >= amount, 'NS: insufficient');
         balanceOf[msg.sender] -= amount;
         balanceOf[to] += amount;
         emit Transfer(msg.sender, to, amount);
@@ -51,9 +51,9 @@ contract MockNonStandardERC20 {
     // Note: No return value
     function transferFrom(address from, address to, uint256 amount) external {
         uint256 allowed = allowance[from][msg.sender];
-        require(allowed >= amount, "NS: allowance");
+        require(allowed >= amount, 'NS: allowance');
         allowance[from][msg.sender] = allowed - amount;
-        require(balanceOf[from] >= amount, "NS: balance");
+        require(balanceOf[from] >= amount, 'NS: balance');
         balanceOf[from] -= amount;
         balanceOf[to] += amount;
         emit Transfer(from, to, amount);

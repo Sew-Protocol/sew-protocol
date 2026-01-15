@@ -12,9 +12,3 @@ This directory contains governance-related artifacts, proposals, runbooks, and t
 ## Usage
 
 See individual subdirectories for documentation on their contents.
-
-
-
-
-
-

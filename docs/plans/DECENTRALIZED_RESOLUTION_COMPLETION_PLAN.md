@@ -26,12 +26,14 @@ This plan addresses the final 5% of work needed to complete the current iteratio
 **Status**: ⚠️ **70% Complete**
 
 **What's Implemented**:
+
 - ✅ External resolver address can be set (`setExternalResolver()`)
 - ✅ Level 2 escalation config points to external resolver
 - ✅ Escalation infrastructure supports external resolver
 - ✅ `executeEscalation()` can escalate to level 2 (external)
 
 **What's Missing**:
+
 - ❌ Kleros contract interface implementation
 - ❌ Automatic dispute creation in Kleros when escalating to level 2
 - ❌ Ruling retrieval from Kleros
@@ -45,6 +47,7 @@ This plan addresses the final 5% of work needed to complete the current iteratio
 **Status**: ⚠️ **Needs Verification & Enhancement**
 
 **Current Implementation** (from BaseEscrow.sol, lines 1240-1243):
+
 ```solidity
 // Transfer escalation fee to fee address
 if (escalationFee > 0 && escrowFeeAddress != address(0)) {
@@ -53,12 +56,14 @@ if (escalationFee > 0 && escrowFeeAddress != address(0)) {
 ```
 
 **Current Flow**:
+
 1. ✅ Fee is validated (line 1225)
 2. ✅ Escalation is executed (line 1230)
 3. ✅ Fee is transferred AFTER successful escalation (line 1242)
 4. ✅ Excess fee is refunded (line 1247)
 
 **Potential Issues**:
+
 - ⚠️ Fee is transferred AFTER escalation - if escalation fails, fee might not be collected (but escalation failure reverts, so this is fine)
 - ❌ No event emitted for fee collection (should add `EscalationFeeCollected` event)
 - ⚠️ Fee transfer order: Currently after escalation - consider transferring before for clarity
@@ -66,6 +71,7 @@ if (escalationFee > 0 && escrowFeeAddress != address(0)) {
 - ⚠️ Need to verify fee collection works correctly with module's escalation fee configuration
 
 **Recommendation**:
+
 - Add `EscalationFeeCollected` event for transparency
 - Consider transferring fee BEFORE escalation (ensures fee is collected even if there's an issue)
 - Add tests to verify fee collection
@@ -79,6 +85,7 @@ if (escalationFee > 0 && escrowFeeAddress != address(0)) {
 **Objective**: Verify escalation fee transfer is working correctly
 
 **Tasks**:
+
 - [ ] Review `BaseEscrow.escalateDispute()` implementation
 - [ ] Verify fee transfer order (before/after escalation execution)
 - [ ] Test fee transfer with native ETH
@@ -87,11 +94,13 @@ if (escalationFee > 0 && escrowFeeAddress != address(0)) {
 - [ ] Test edge cases (zero fee, excess fee, insufficient fee)
 
 **Files to Review**:
+
 - `contracts/BaseEscrow.sol` - `escalateDispute()` function
 - `contracts/modules/DecentralizedResolutionModule.sol` - `executeEscalation()` function
 - `test/hardhat/BaseEscrow.test.ts` - Escalation tests
 
 **Deliverables**:
+
 - Audit report of current implementation
 - List of any issues found
 - Test results
@@ -105,6 +114,7 @@ if (escalationFee > 0 && escrowFeeAddress != address(0)) {
 **Objective**: Improve escalation fee handling with events and better ordering
 
 **Tasks**:
+
 - [ ] Add `EscalationFeeCollected` event
 - [ ] Consider moving fee transfer before escalation (for clarity and safety)
 - [ ] Add validation for fee address
@@ -112,63 +122,69 @@ if (escalationFee > 0 && escrowFeeAddress != address(0)) {
 - [ ] Document fee handling
 
 **Implementation**:
+
 ```solidity
 // Add event
-event EscalationFeeCollected(
-    uint256 indexed workflowId,
-    uint256 fee,
-    address indexed feeRecipient
-);
+event EscalationFeeCollected(uint256 indexed workflowId, uint256 fee, address indexed feeRecipient);
 
-function escalateDispute(uint256 workflowId) public payable nonReentrant returns (
-    bool success,
-    address newResolver,
-    uint8 newLevel
-) {
-    // ... existing validation ...
-    
-    // Validate fee if required
-    if (escalationFee > 0 && msg.value < escalationFee) {
-        revert InvalidAmount("Insufficient escalation fee");
+function escalateDispute(
+  uint256 workflowId
+) public payable nonReentrant returns (bool success, address newResolver, uint8 newLevel) {
+  // ... existing validation ...
+
+  // Validate fee if required
+  if (escalationFee > 0 && msg.value < escalationFee) {
+    revert InvalidAmount('Insufficient escalation fee');
+  }
+
+  // Transfer fee BEFORE escalation (ensures fee is collected, escalation can still revert if needed)
+  if (escalationFee > 0) {
+    if (escrowFeeAddress == address(0)) {
+      revert InvalidAddress('Fee address not set', address(0));
     }
-    
-    // Transfer fee BEFORE escalation (ensures fee is collected, escalation can still revert if needed)
-    if (escalationFee > 0) {
-        if (escrowFeeAddress == address(0)) {
-            revert InvalidAddress("Fee address not set", address(0));
-        }
-        payable(escrowFeeAddress).transfer(escalationFee);
-        emit EscalationFeeCollected(workflowId, escalationFee, escrowFeeAddress);
-    }
-    
-    // Execute escalation in module
-    (bool escalationSuccess, address newResolverAddress, uint8 newEscalationLevel) = 
-        IResolutionModule(resolutionModule).executeEscalation(workflowId, escrowData);
-    
-    if (!escalationSuccess) {
-        revert ResolutionModuleCallFailed();
-    }
-    
-    // Update resolver in escrow
-    et.disputeResolver = newResolverAddress;
-    
-    // Refund excess fee
-    if (msg.value > escalationFee) {
-        payable(_msgSender()).transfer(msg.value - escalationFee);
-    }
-    
-    // Emit event
-    emit DisputeEscalated(workflowId, currentLevel, newEscalationLevel, newResolverAddress, _msgSender());
-    
-    return (true, newResolverAddress, newEscalationLevel);
+    payable(escrowFeeAddress).transfer(escalationFee);
+    emit EscalationFeeCollected(workflowId, escalationFee, escrowFeeAddress);
+  }
+
+  // Execute escalation in module
+  (
+    bool escalationSuccess,
+    address newResolverAddress,
+    uint8 newEscalationLevel
+  ) = IResolutionModule(resolutionModule).executeEscalation(workflowId, escrowData);
+
+  if (!escalationSuccess) {
+    revert ResolutionModuleCallFailed();
+  }
+
+  // Update resolver in escrow
+  et.disputeResolver = newResolverAddress;
+
+  // Refund excess fee
+  if (msg.value > escalationFee) {
+    payable(_msgSender()).transfer(msg.value - escalationFee);
+  }
+
+  // Emit event
+  emit DisputeEscalated(
+    workflowId,
+    currentLevel,
+    newEscalationLevel,
+    newResolverAddress,
+    _msgSender()
+  );
+
+  return (true, newResolverAddress, newEscalationLevel);
 }
 ```
 
 **Files to Modify**:
+
 - `contracts/BaseEscrow.sol` - `escalateDispute()` function
 - `contracts/BaseEscrow.sol` - Add `EscalationFeeCollected` event
 
 **Deliverables**:
+
 - Enhanced fee transfer with event
 - Updated tests
 - All tests passing
@@ -182,6 +198,7 @@ function escalateDispute(uint256 workflowId) public payable nonReentrant returns
 **Objective**: Support ERC20 tokens for escalation fees (if required)
 
 **Tasks**:
+
 - [ ] Design ERC20 escalation fee mechanism
 - [ ] Add ERC20 fee transfer function
 - [ ] Update `escalateDispute()` to support both ETH and ERC20
@@ -200,6 +217,7 @@ function escalateDispute(uint256 workflowId) public payable nonReentrant returns
 **Objective**: Understand Kleros integration requirements
 
 **Tasks**:
+
 - [ ] Research ERC-792 Arbitrable standard
 - [ ] Review Kleros contract interfaces
 - [ ] Design integration architecture
@@ -209,6 +227,7 @@ function escalateDispute(uint256 workflowId) public payable nonReentrant returns
 - [ ] Define fee handling for Kleros
 
 **Key Questions**:
+
 - How to create disputes in Kleros?
 - How to submit evidence?
 - How to retrieve rulings?
@@ -216,6 +235,7 @@ function escalateDispute(uint256 workflowId) public payable nonReentrant returns
 - How to execute Kleros rulings?
 
 **Deliverables**:
+
 - Integration design document
 - Architecture diagram
 - Flow diagrams
@@ -229,6 +249,7 @@ function escalateDispute(uint256 workflowId) public payable nonReentrant returns
 **Objective**: Create interface for Kleros integration
 
 **Tasks**:
+
 - [ ] Define `IKlerosResolver` interface
 - [ ] Implement ERC-792 Arbitrable interface (if needed)
 - [ ] Define dispute creation function
@@ -237,11 +258,12 @@ function escalateDispute(uint256 workflowId) public payable nonReentrant returns
 - [ ] Define fee calculation functions
 
 **Implementation**:
+
 ```solidity
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.28;
 
-import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import '@openzeppelin/contracts/utils/introspection/IERC165.sol';
 
 /**
  * @title IKlerosResolver
@@ -249,53 +271,55 @@ import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
  * @dev Implements ERC-792 Arbitrable standard
  */
 interface IKlerosResolver is IERC165 {
-    /**
-     * @notice Create a dispute in Kleros
-     * @param escrowId The escrow transfer ID
-     * @param evidence Evidence data (IPFS hash, JSON, etc.)
-     * @return disputeId Kleros dispute ID
-     * @return fee Required fee for dispute creation
-     */
-    function createDispute(
-        uint256 escrowId,
-        bytes calldata evidence
-    ) external payable returns (uint256 disputeId, uint256 fee);
-    
-    /**
-     * @notice Submit additional evidence to Kleros dispute
-     * @param disputeId Kleros dispute ID
-     * @param evidence Evidence data
-     */
-    function submitEvidence(uint256 disputeId, bytes calldata evidence) external;
-    
-    /**
-     * @notice Get ruling for a dispute
-     * @param disputeId Kleros dispute ID
-     * @return ruling The ruling (0 = no ruling, 1 = favor sender, 2 = favor recipient)
-     * @return hasRuling True if ruling is available
-     */
-    function getRuling(uint256 disputeId) external view returns (uint256 ruling, bool hasRuling);
-    
-    /**
-     * @notice Get required fee for creating a dispute
-     * @param escrowId The escrow transfer ID
-     * @return fee Required fee in native token
-     */
-    function getDisputeFee(uint256 escrowId) external view returns (uint256 fee);
-    
-    /**
-     * @notice Check if dispute has been ruled on
-     * @param disputeId Kleros dispute ID
-     * @return ruled True if dispute has been ruled on
-     */
-    function isRuled(uint256 disputeId) external view returns (bool ruled);
+  /**
+   * @notice Create a dispute in Kleros
+   * @param escrowId The escrow transfer ID
+   * @param evidence Evidence data (IPFS hash, JSON, etc.)
+   * @return disputeId Kleros dispute ID
+   * @return fee Required fee for dispute creation
+   */
+  function createDispute(
+    uint256 escrowId,
+    bytes calldata evidence
+  ) external payable returns (uint256 disputeId, uint256 fee);
+
+  /**
+   * @notice Submit additional evidence to Kleros dispute
+   * @param disputeId Kleros dispute ID
+   * @param evidence Evidence data
+   */
+  function submitEvidence(uint256 disputeId, bytes calldata evidence) external;
+
+  /**
+   * @notice Get ruling for a dispute
+   * @param disputeId Kleros dispute ID
+   * @return ruling The ruling (0 = no ruling, 1 = favor sender, 2 = favor recipient)
+   * @return hasRuling True if ruling is available
+   */
+  function getRuling(uint256 disputeId) external view returns (uint256 ruling, bool hasRuling);
+
+  /**
+   * @notice Get required fee for creating a dispute
+   * @param escrowId The escrow transfer ID
+   * @return fee Required fee in native token
+   */
+  function getDisputeFee(uint256 escrowId) external view returns (uint256 fee);
+
+  /**
+   * @notice Check if dispute has been ruled on
+   * @param disputeId Kleros dispute ID
+   * @return ruled True if dispute has been ruled on
+   */
+  function isRuled(uint256 disputeId) external view returns (bool ruled);
 }
 ```
 
 **Files to Create**:
+
 - `contracts/interfaces/IKlerosResolver.sol`
 
 **Deliverables**:
+
 - Kleros interface definition
 - Interface documentation
 
@@ -308,6 +332,7 @@ interface IKlerosResolver is IERC165 {
 **Objective**: Integrate Kleros into escalation system
 
 **Tasks**:
+
 - [ ] Add Kleros resolver address state variable
 - [ ] Add dispute ID mapping (workflowId => klerosDisputeId)
 - [ ] Implement `escalateToKleros()` function
@@ -318,6 +343,7 @@ interface IKlerosResolver is IERC165 {
 - [ ] Add fee handling for Kleros
 
 **Implementation**:
+
 ```solidity
 // State variables
 IKlerosResolver public klerosResolver;
@@ -338,30 +364,30 @@ function escalateToKleros(
     DisputeMetadata storage dm = disputeMetadata[workflowId];
     require(dm.escalationLevel == 1, "Must escalate from senior resolver");
     require(address(klerosResolver) != address(0), "Kleros resolver not set");
-    
+
     // Get required fee
     fee = klerosResolver.getDisputeFee(workflowId);
     require(msg.value >= fee, "Insufficient Kleros fee");
-    
+
     // Create dispute in Kleros
     disputeId = klerosResolver.createDispute{value: fee}(workflowId, evidence);
-    
+
     // Update metadata
     dm.escalationLevel = 2; // EXTERNAL
     dm.currentResolver = address(klerosResolver);
     dm.escalatedBy = _msgSender();
     dm.escalationTimestamp = block.timestamp;
-    
+
     // Store Kleros dispute ID
     klerosDisputeId[workflowId] = disputeId;
-    
+
     // Refund excess fee
     if (msg.value > fee) {
         payable(_msgSender()).transfer(msg.value - fee);
     }
-    
+
     emit DisputeEscalatedToKleros(workflowId, disputeId, fee);
-    
+
     return (disputeId, fee);
 }
 
@@ -371,12 +397,12 @@ function escalateToKleros(
  * @return ruled True if Kleros has ruled
  * @return ruling The ruling (0 = no ruling, 1 = favor sender, 2 = favor recipient)
  */
-function checkKlerosRuling(uint256 workflowId) 
-    external view returns (bool ruled, uint256 ruling) 
+function checkKlerosRuling(uint256 workflowId)
+    external view returns (bool ruled, uint256 ruling)
 {
     uint256 disputeId = klerosDisputeId[workflowId];
     require(disputeId != 0, "No Kleros dispute");
-    
+
     (ruling, ruled) = klerosResolver.getRuling(disputeId);
     return (ruled, ruling);
 }
@@ -388,28 +414,30 @@ function checkKlerosRuling(uint256 workflowId)
  */
 function executeKlerosRuling(uint256 workflowId) external returns (bool success) {
     require(!klerosRulingExecuted[workflowId], "Ruling already executed");
-    
+
     uint256 disputeId = klerosDisputeId[workflowId];
     require(disputeId != 0, "No Kleros dispute");
-    
+
     (uint256 ruling, bool hasRuling) = klerosResolver.getRuling(disputeId);
     require(hasRuling, "No ruling available");
     require(ruling > 0, "Invalid ruling");
-    
+
     // Mark as executed
     klerosRulingExecuted[workflowId] = true;
-    
+
     // Emit event - actual execution happens in BaseEscrow
     emit KlerosRulingExecuted(workflowId, disputeId, ruling);
-    
+
     return true;
 }
 ```
 
 **Files to Modify**:
+
 - `contracts/modules/DecentralizedResolutionModule.sol`
 
 **Deliverables**:
+
 - Kleros integration functions
 - Updated escalation logic
 - Events for Kleros operations
@@ -423,6 +451,7 @@ function executeKlerosRuling(uint256 workflowId) external returns (bool success)
 **Objective**: Connect Kleros rulings to escrow resolution
 
 **Tasks**:
+
 - [ ] Add `escalateToKleros()` function to BaseEscrow (or call module function)
 - [ ] Add `checkAndExecuteKlerosRuling()` function
 - [ ] Update `resolverRelease()` / `resolverCancel()` to handle Kleros rulings
@@ -430,6 +459,7 @@ function executeKlerosRuling(uint256 workflowId) external returns (bool success)
 - [ ] Add events for Kleros operations
 
 **Implementation**:
+
 ```solidity
 /**
  * @notice Escalate dispute to Kleros
@@ -437,22 +467,24 @@ function executeKlerosRuling(uint256 workflowId) external returns (bool success)
  * @param evidence Evidence data for Kleros
  * @return success True if escalation was successful
  */
-function escalateToKleros(uint256 workflowId, bytes calldata evidence) 
-    external payable nonReentrant returns (bool) 
-{
-    _validateWorkflowId(workflowId);
-    EscrowTransfer storage et = escrowTransfers[workflowId];
-    
-    require(et.escrowState == EscrowState.DISPUTED, "Escrow not in dispute");
-    require(address(resolutionModule) != address(0), "Resolution module not set");
-    
-    // Call module's escalateToKleros function
-    (uint256 disputeId, uint256 fee) = IResolutionModule(resolutionModule)
-        .escalateToKleros{value: msg.value}(workflowId, evidence);
-    
-    emit DisputeEscalatedToKleros(workflowId, disputeId, fee);
-    
-    return true;
+function escalateToKleros(
+  uint256 workflowId,
+  bytes calldata evidence
+) external payable nonReentrant returns (bool) {
+  _validateWorkflowId(workflowId);
+  EscrowTransfer storage et = escrowTransfers[workflowId];
+
+  require(et.escrowState == EscrowState.DISPUTED, 'Escrow not in dispute');
+  require(address(resolutionModule) != address(0), 'Resolution module not set');
+
+  // Call module's escalateToKleros function
+  (uint256 disputeId, uint256 fee) = IResolutionModule(resolutionModule).escalateToKleros{
+    value: msg.value
+  }(workflowId, evidence);
+
+  emit DisputeEscalatedToKleros(workflowId, disputeId, fee);
+
+  return true;
 }
 
 /**
@@ -460,47 +492,50 @@ function escalateToKleros(uint256 workflowId, bytes calldata evidence)
  * @param workflowId The escrow transfer ID
  * @return executed True if ruling was executed
  */
-function checkAndExecuteKlerosRuling(uint256 workflowId) 
-    external nonReentrant returns (bool executed) 
-{
-    _validateWorkflowId(workflowId);
-    EscrowTransfer storage et = escrowTransfers[workflowId];
-    
-    require(et.escrowState == EscrowState.DISPUTED, "Escrow not in dispute");
-    require(address(resolutionModule) != address(0), "Resolution module not set");
-    
-    // Check if Kleros has ruled
-    (bool hasRuling, uint256 ruling) = IResolutionModule(resolutionModule)
-        .checkKlerosRuling(workflowId);
-    
-    if (!hasRuling || ruling == 0) {
-        return false; // No ruling yet
-    }
-    
-    // Execute ruling in module
-    bool success = IResolutionModule(resolutionModule).executeKlerosRuling(workflowId);
-    if (!success) {
-        return false;
-    }
-    
-    // Execute resolution based on ruling
-    // Ruling: 1 = favor sender (cancel), 2 = favor recipient (release)
-    if (ruling == 1) {
-        // Favor sender - cancel escrow
-        return resolverCancel(workflowId);
-    } else if (ruling == 2) {
-        // Favor recipient - release escrow
-        return resolverRelease(workflowId);
-    }
-    
+function checkAndExecuteKlerosRuling(
+  uint256 workflowId
+) external nonReentrant returns (bool executed) {
+  _validateWorkflowId(workflowId);
+  EscrowTransfer storage et = escrowTransfers[workflowId];
+
+  require(et.escrowState == EscrowState.DISPUTED, 'Escrow not in dispute');
+  require(address(resolutionModule) != address(0), 'Resolution module not set');
+
+  // Check if Kleros has ruled
+  (bool hasRuling, uint256 ruling) = IResolutionModule(resolutionModule).checkKlerosRuling(
+    workflowId
+  );
+
+  if (!hasRuling || ruling == 0) {
+    return false; // No ruling yet
+  }
+
+  // Execute ruling in module
+  bool success = IResolutionModule(resolutionModule).executeKlerosRuling(workflowId);
+  if (!success) {
     return false;
+  }
+
+  // Execute resolution based on ruling
+  // Ruling: 1 = favor sender (cancel), 2 = favor recipient (release)
+  if (ruling == 1) {
+    // Favor sender - cancel escrow
+    return resolverCancel(workflowId);
+  } else if (ruling == 2) {
+    // Favor recipient - release escrow
+    return resolverRelease(workflowId);
+  }
+
+  return false;
 }
 ```
 
 **Files to Modify**:
+
 - `contracts/BaseEscrow.sol`
 
 **Deliverables**:
+
 - Kleros escalation function
 - Ruling execution function
 - Integration with escrow resolution
@@ -514,6 +549,7 @@ function checkAndExecuteKlerosRuling(uint256 workflowId)
 **Objective**: Comprehensive testing of Kleros integration
 
 **Tasks**:
+
 - [ ] Create mock Kleros resolver contract for testing
 - [ ] Test dispute creation in Kleros
 - [ ] Test evidence submission
@@ -524,39 +560,42 @@ function checkAndExecuteKlerosRuling(uint256 workflowId)
 - [ ] Integration tests with BaseEscrow
 
 **Test Cases**:
+
 ```typescript
-describe("Kleros Integration", () => {
-  it("Should create dispute in Kleros when escalating to level 2", async () => {
+describe('Kleros Integration', () => {
+  it('Should create dispute in Kleros when escalating to level 2', async () => {
     // Test dispute creation
   });
-  
-  it("Should submit evidence to Kleros", async () => {
+
+  it('Should submit evidence to Kleros', async () => {
     // Test evidence submission
   });
-  
-  it("Should retrieve ruling from Kleros", async () => {
+
+  it('Should retrieve ruling from Kleros', async () => {
     // Test ruling retrieval
   });
-  
-  it("Should execute Kleros ruling (favor sender)", async () => {
+
+  it('Should execute Kleros ruling (favor sender)', async () => {
     // Test cancel execution
   });
-  
-  it("Should execute Kleros ruling (favor recipient)", async () => {
+
+  it('Should execute Kleros ruling (favor recipient)', async () => {
     // Test release execution
   });
-  
-  it("Should handle Kleros fees correctly", async () => {
+
+  it('Should handle Kleros fees correctly', async () => {
     // Test fee handling
   });
 });
 ```
 
 **Files to Create**:
+
 - `test/hardhat/KlerosIntegration.test.ts`
 - `test/mocks/MockKlerosResolver.sol`
 
 **Deliverables**:
+
 - Comprehensive test suite
 - Mock Kleros resolver
 - All tests passing
@@ -572,6 +611,7 @@ describe("Kleros Integration", () => {
 **Objective**: Document Kleros integration and fee handling
 
 **Tasks**:
+
 - [ ] Update `DECENTRALIZED_RESOLUTION_MODULE_ANALYSIS.md`
 - [ ] Update `DISPUTE_RESOLUTION_IMPLEMENTATION_PLAN.md`
 - [ ] Create Kleros integration guide
@@ -579,6 +619,7 @@ describe("Kleros Integration", () => {
 - [ ] Update API documentation
 
 **Deliverables**:
+
 - Updated documentation
 - Integration guide
 - API documentation
@@ -592,6 +633,7 @@ describe("Kleros Integration", () => {
 **Objective**: Ensure everything works together
 
 **Tasks**:
+
 - [ ] End-to-end testing
 - [ ] Gas optimization review
 - [ ] Security review
@@ -599,6 +641,7 @@ describe("Kleros Integration", () => {
 - [ ] Update implementation status
 
 **Deliverables**:
+
 - Test results
 - Review reports
 - Updated status documents
@@ -610,6 +653,7 @@ describe("Kleros Integration", () => {
 ## Implementation Checklist
 
 ### Phase 1: Escalation Fee Transfer
+
 - [ ] Audit current implementation
 - [ ] Fix fee transfer if needed
 - [ ] Add events for fee transfer
@@ -617,6 +661,7 @@ describe("Kleros Integration", () => {
 - [ ] Document fee handling
 
 ### Phase 2: Kleros Integration
+
 - [ ] Research ERC-792 and Kleros
 - [ ] Design integration architecture
 - [ ] Implement IKlerosResolver interface
@@ -629,6 +674,7 @@ describe("Kleros Integration", () => {
 - [ ] All tests passing
 
 ### Phase 3: Documentation & Finalization
+
 - [ ] Update all documentation
 - [ ] Create integration guide
 - [ ] Final testing
@@ -640,14 +686,17 @@ describe("Kleros Integration", () => {
 ## Risk Assessment
 
 ### Low Risk ✅
+
 - Escalation fee transfer fixes (straightforward)
 - Documentation updates
 
 ### Medium Risk ⚠️
+
 - Kleros interface implementation (depends on Kleros contract details)
 - Ruling execution logic (must handle edge cases)
 
 ### High Risk ❌
+
 - None identified (Kleros is well-established)
 
 ---
@@ -655,11 +704,13 @@ describe("Kleros Integration", () => {
 ## Success Criteria
 
 ### Phase 1 Success
+
 - ✅ Escalation fees are properly transferred
 - ✅ Fee transfer is tested and verified
 - ✅ Events emitted for fee collection
 
 ### Phase 2 Success
+
 - ✅ Kleros disputes can be created
 - ✅ Evidence can be submitted
 - ✅ Rulings can be retrieved
@@ -667,6 +718,7 @@ describe("Kleros Integration", () => {
 - ✅ All tests passing
 
 ### Phase 3 Success
+
 - ✅ Documentation complete
 - ✅ All features tested
 - ✅ Implementation status: 100% complete
@@ -675,11 +727,11 @@ describe("Kleros Integration", () => {
 
 ## Timeline Summary
 
-| Phase | Duration | Key Deliverables |
-|-------|----------|-----------------|
-| Phase 1: Fee Transfer | 1-2 days | Fixed fee transfer, tests |
+| Phase                       | Duration | Key Deliverables               |
+| --------------------------- | -------- | ------------------------------ |
+| Phase 1: Fee Transfer       | 1-2 days | Fixed fee transfer, tests      |
 | Phase 2: Kleros Integration | 6-8 days | Full Kleros integration, tests |
-| Phase 3: Documentation | 1-2 days | Complete documentation |
+| Phase 3: Documentation      | 1-2 days | Complete documentation         |
 
 **Total Timeline**: 1-2 weeks (8-12 working days)
 
@@ -688,11 +740,13 @@ describe("Kleros Integration", () => {
 ## Dependencies
 
 ### External Dependencies
+
 - Kleros contract interfaces (need to verify exact interface)
 - ERC-792 Arbitrable standard documentation
 - Kleros deployment addresses (mainnet/testnet)
 
 ### Internal Dependencies
+
 - BaseEscrow escalation infrastructure
 - DecentralizedResolutionModule escalation system
 - Existing test infrastructure
@@ -709,5 +763,4 @@ describe("Kleros Integration", () => {
 
 ---
 
-*This plan should be updated as implementation progresses and Kleros integration details are clarified.*
-
+_This plan should be updated as implementation progresses and Kleros integration details are clarified._

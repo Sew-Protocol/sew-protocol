@@ -1,41 +1,36 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.33;
 
-import "./IArbitrator.sol";
-import "./IArbitrable.sol";
-import "../shared/interfaces/IResolutionModule.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import './IArbitrator.sol';
+import './IArbitrable.sol';
+import '../shared/interfaces/IResolutionModule.sol';
+import '@openzeppelin/contracts/access/AccessControl.sol';
+import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
+import '@openzeppelin/contracts/utils/introspection/IERC165.sol';
 
 /**
  * @title KlerosArbitrableProxy
  * @notice Proxy contract that integrates Kleros arbitration with BaseEscrow
  * @dev Implements IArbitrable to receive rulings from Kleros and IResolutionModule to integrate with BaseEscrow
  */
-contract KlerosArbitrableProxy is 
-    AccessControl, 
-    ReentrancyGuard,
-    IArbitrable,
-    IResolutionModule 
-{
-    bytes32 public constant ROLE_TIMELOCK = keccak256("ROLE_TIMELOCK");
-    bytes32 public constant ROLE_ESCROW_CONTRACT = keccak256("ROLE_ESCROW_CONTRACT");
+contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, IResolutionModule {
+    bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');
+    bytes32 public constant ROLE_ESCROW_CONTRACT = keccak256('ROLE_ESCROW_CONTRACT');
 
     IArbitrator public arbitrator;
-    
+
     // Mapping: workflowId => klerosDisputeID + 1 (0 means no dispute)
     mapping(uint256 => uint256) public workflowToKlerosDispute;
-    
+
     // Mapping: klerosDisputeID => workflowId
     mapping(uint256 => uint256) public klerosDisputeToWorkflow;
-    
+
     // Mapping: workflowId => escrow contract address
     mapping(uint256 => address) public workflowToEscrow;
-    
+
     // Mapping: workflowId => dispute metadata
     mapping(uint256 => DisputeMetadata) public disputes;
-    
+
     struct DisputeMetadata {
         address arbitrable;
         uint256 klerosDisputeId;
@@ -49,30 +44,26 @@ contract KlerosArbitrableProxy is
     }
 
     event DisputeCreated(
-        uint256 indexed escrowId, 
-        uint256 indexed klerosDisputeId, 
+        uint256 indexed escrowId,
+        uint256 indexed klerosDisputeId,
         IArbitrator indexed arbitrator
     );
-    
+
     event EvidenceSubmitted(
         uint256 indexed escrowId,
         uint256 indexed klerosDisputeId,
         address indexed submitter,
         string evidence
     );
-    
-    event RulingExecuted(
-        uint256 indexed escrowId,
-        uint256 indexed klerosDisputeId,
-        uint256 ruling
-    );
+
+    event RulingExecuted(uint256 indexed escrowId, uint256 indexed klerosDisputeId, uint256 ruling);
 
     constructor(address _arbitrator, address _admin) {
-        require(_arbitrator != address(0), "Invalid arbitrator");
-        require(_admin != address(0), "Invalid admin");
-        
+        require(_arbitrator != address(0), 'Invalid arbitrator');
+        require(_admin != address(0), 'Invalid admin');
+
         arbitrator = IArbitrator(_arbitrator);
-        
+
         // OpenZeppelin best practice: Grant DEFAULT_ADMIN_ROLE to deployer
         // Deployment scripts will transfer this to TimelockController
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
@@ -82,7 +73,7 @@ contract KlerosArbitrableProxy is
      * @notice Register an escrow contract that can create disputes
      */
     function registerEscrowContract(address escrow) external onlyRole(ROLE_TIMELOCK) {
-        require(escrow != address(0), "Invalid escrow address");
+        require(escrow != address(0), 'Invalid escrow address');
         _grantRole(ROLE_ESCROW_CONTRACT, escrow);
     }
 
@@ -98,27 +89,33 @@ contract KlerosArbitrableProxy is
         uint256 choices,
         bytes calldata extraData,
         bytes calldata escrowData
-    ) external payable onlyRole(ROLE_ESCROW_CONTRACT) nonReentrant returns (uint256 klerosDisputeId) {
-        require(workflowToKlerosDispute[workflowId] == 0, "Dispute already exists");
-        
+    )
+        external
+        payable
+        onlyRole(ROLE_ESCROW_CONTRACT)
+        nonReentrant
+        returns (uint256 klerosDisputeId)
+    {
+        require(workflowToKlerosDispute[workflowId] == 0, 'Dispute already exists');
+
         // Decode escrow data
         (, address from, address to, uint256 amount, ) = abi.decode(
-            escrowData, 
+            escrowData,
             (address, address, address, uint256, uint256)
         );
-        
+
         // Check arbitration cost
         uint256 cost = arbitrator.arbitrationCost(extraData);
-        require(msg.value >= cost, "Insufficient arbitration fee");
-        
+        require(msg.value >= cost, 'Insufficient arbitration fee');
+
         // Create dispute in Kleros
         klerosDisputeId = arbitrator.createDispute{value: cost}(choices, extraData);
-        
+
         // Store mappings (add 1 to klerosDisputeId for storage to distinguish from "no dispute")
         workflowToKlerosDispute[workflowId] = klerosDisputeId + 1;
         klerosDisputeToWorkflow[klerosDisputeId] = workflowId;
         workflowToEscrow[workflowId] = msg.sender;
-        
+
         // Store dispute metadata
         disputes[workflowId] = DisputeMetadata({
             arbitrable: address(this),
@@ -131,15 +128,15 @@ contract KlerosArbitrableProxy is
             to: to,
             amount: amount
         });
-        
+
         emit DisputeCreated(workflowId, klerosDisputeId, arbitrator);
-        
+
         // Refund excess
         if (msg.value > cost) {
-            (bool success, ) = payable(msg.sender).call{value: msg.value - cost}("");
-            require(success, "Refund failed");
+            (bool success, ) = payable(msg.sender).call{value: msg.value - cost}('');
+            require(success, 'Refund failed');
         }
-        
+
         return klerosDisputeId;
     }
 
@@ -148,13 +145,11 @@ contract KlerosArbitrableProxy is
      * @param workflowId The escrow workflow ID
      * @param evidence Evidence string (typically IPFS hash or URL)
      */
-    function submitEvidence(uint256 workflowId, string calldata evidence) 
-        external 
-    {
-        require(workflowToKlerosDispute[workflowId] != 0, "Dispute does not exist");
+    function submitEvidence(uint256 workflowId, string calldata evidence) external {
+        require(workflowToKlerosDispute[workflowId] != 0, 'Dispute does not exist');
         DisputeMetadata storage dispute = disputes[workflowId];
-        require(!dispute.resolved, "Dispute already resolved");
-        
+        require(!dispute.resolved, 'Dispute already resolved');
+
         // Anyone can submit evidence (sender, recipient, or others)
         emit EvidenceSubmitted(workflowId, dispute.klerosDisputeId, msg.sender, evidence);
     }
@@ -165,17 +160,17 @@ contract KlerosArbitrableProxy is
      * @param _ruling The ruling (0 = refused to rule, 1 = release to recipient, 2 = cancel to sender)
      */
     function rule(uint256 _disputeID, uint256 _ruling) external override {
-        require(msg.sender == address(arbitrator), "Only arbitrator can rule");
-        
+        require(msg.sender == address(arbitrator), 'Only arbitrator can rule');
+
         uint256 workflowId = klerosDisputeToWorkflow[_disputeID];
-        require(workflowId != 0, "Unknown dispute");
-        
+        require(workflowId != 0, 'Unknown dispute');
+
         DisputeMetadata storage dispute = disputes[workflowId];
-        require(!dispute.resolved, "Already resolved");
-        
+        require(!dispute.resolved, 'Already resolved');
+
         dispute.resolved = true;
         dispute.ruling = _ruling;
-        
+
         emit Ruling(arbitrator, _disputeID, _ruling);
         emit RulingExecuted(workflowId, _disputeID, _ruling);
     }
@@ -189,21 +184,21 @@ contract KlerosArbitrableProxy is
         if (workflowToKlerosDispute[workflowId] == 0) {
             return (false, 0);
         }
-        
+
         DisputeMetadata storage dispute = disputes[workflowId];
-        
+
         // Check if Kleros has a ruling
         if (dispute.resolved) {
             return (true, dispute.ruling);
         }
-        
+
         // Check Kleros arbitrator for current ruling
         IArbitrator.DisputeStatus status = arbitrator.disputeStatus(dispute.klerosDisputeId);
         if (status == IArbitrator.DisputeStatus.Solved) {
             uint256 currentRuling = arbitrator.currentRuling(dispute.klerosDisputeId);
             return (true, currentRuling);
         }
-        
+
         return (false, 0);
     }
 
@@ -219,12 +214,11 @@ contract KlerosArbitrableProxy is
     /**
      * @notice Check if an address is authorized to resolve a dispute
      */
-    function isAuthorizedDisputeResolver(uint256, address disputeResolver, bytes calldata) 
-        external 
-        view 
-        override 
-        returns (bool authorized, uint8 role) 
-    {
+    function isAuthorizedDisputeResolver(
+        uint256,
+        address disputeResolver,
+        bytes calldata
+    ) external view override returns (bool authorized, uint8 role) {
         // Only this contract (Kleros proxy) can resolve disputes
         return (disputeResolver == address(this), 2); // Role 2 = external resolver
     }
@@ -232,49 +226,43 @@ contract KlerosArbitrableProxy is
     /**
      * @notice Get dispute resolver for a workflow
      */
-    function getDisputeResolver(uint256, bytes calldata) 
-        external 
-        view 
-        override 
-        returns (address resolver, uint8 level) 
-    {
+    function getDisputeResolver(
+        uint256,
+        bytes calldata
+    ) external view override returns (address resolver, uint8 level) {
         return (address(this), 2); // Level 2 = external resolver
     }
 
     /**
      * @notice Check if escalation is possible (not applicable for Kleros - it's final)
      */
-    function canEscalate(uint256, uint8, bytes calldata) 
-        external 
-        pure 
-        override 
-        returns (bool, address, uint256) 
-    {
+    function canEscalate(
+        uint256,
+        uint8,
+        bytes calldata
+    ) external pure override returns (bool, address, uint256) {
         return (false, address(0), 0); // No further escalation from Kleros
     }
 
     /**
      * @notice Execute escalation (not applicable for Kleros)
      */
-    function executeEscalation(uint256, bytes calldata) 
-        external 
-        pure 
-        override 
-        returns (bool, address, uint8) 
-    {
-        revert("No escalation from Kleros");
+    function executeEscalation(
+        uint256,
+        bytes calldata
+    ) external pure override returns (bool, address, uint8) {
+        revert('No escalation from Kleros');
     }
 
     /**
      * @notice Get required appeal bond for escalation (DR v2)
      * @dev Kleros is final level - no bonds required (returns 0)
      */
-    function getRequiredAppealBond(uint256, uint8, bytes calldata) 
-        external 
-        pure 
-        override 
-        returns (uint256 amount, address token) 
-    {
+    function getRequiredAppealBond(
+        uint256,
+        uint8,
+        bytes calldata
+    ) external pure override returns (uint256 amount, address token) {
         return (0, address(0));
     }
 
@@ -282,24 +270,22 @@ contract KlerosArbitrableProxy is
      * @notice Module metadata
      */
     function moduleName() external pure override returns (string memory) {
-        return "KlerosArbitrableProxy";
+        return 'KlerosArbitrableProxy';
     }
 
     function moduleVersion() external pure override returns (string memory) {
-        return "1.0.0";
+        return '1.0.0';
     }
 
     /**
      * @notice ERC-165 support
      */
-    function supportsInterface(bytes4 interfaceId) 
-        public 
-        view 
-        override(AccessControl, IERC165) 
-        returns (bool) 
-    {
-        return interfaceId == type(IResolutionModule).interfaceId ||
-               interfaceId == type(IArbitrable).interfaceId ||
-               super.supportsInterface(interfaceId);
+    function supportsInterface(
+        bytes4 interfaceId
+    ) public view override(AccessControl, IERC165) returns (bool) {
+        return
+            interfaceId == type(IResolutionModule).interfaceId ||
+            interfaceId == type(IArbitrable).interfaceId ||
+            super.supportsInterface(interfaceId);
     }
 }

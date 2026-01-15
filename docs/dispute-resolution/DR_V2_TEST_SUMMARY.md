@@ -65,6 +65,7 @@
 ### Cost Curve Verification
 
 **Quadratic (Recommended):**
+
 ```
 base=100, step=50
 Round 0→1: 100 + 50×0² = 100 ✅
@@ -73,6 +74,7 @@ Round 2→3: 100 + 50×2² = 300 ✅
 ```
 
 **Linear:**
+
 ```
 base=100, step=50
 Round 0→1: 100 + 50×0 = 100 ✅
@@ -81,6 +83,7 @@ Round 2→3: 100 + 50×2 = 200 ✅
 ```
 
 **Geometric:**
+
 ```
 base=100, multiplier=2x (basis points: 20000)
 Round 0→1: 100 × 2^0 = 100 ✅
@@ -91,6 +94,7 @@ Round 2→3: 100 × 2^2 = 400 ✅
 ### Metrics Tracking
 
 **Comprehensive Flow Test:**
+
 - Bond 1 (100): Refunded (appeal succeeded) ✅
 - Bond 2 (100): Paid to protocol (appeal failed, no resolver records) ✅
 - Bond 3 (100): Forfeited (escalator timeout) ✅
@@ -102,12 +106,14 @@ Round 2→3: 100 × 2^2 = 400 ✅
 ### Governance Controls
 
 **Slow Lane Activation:**
+
 1. Queue config with timelock ✅
 2. Wait 7 days ✅
 3. Activate config ✅
 4. New bonds use updated parameters ✅
 
 **Access Control:**
+
 - Only timelock can queue/activate ✅
 - Only escrow contracts can record/distribute bonds ✅
 
@@ -152,16 +158,19 @@ forge test --match-contract DRv2AppealBondsTest
 ```
 
 **Result:**
+
 ```
 Suite result: ok. 23 passed; 0 failed; 0 skipped
 ```
 
 **Full Suite:**
+
 ```
 forge test --summary
 ```
 
 **Result:**
+
 ```
 Total: 130 tests
 ├─ DRv2AppealBonds:        23 tests ✅
@@ -190,6 +199,7 @@ Total: 130 tests
 ## Summary
 
 DR v2 implementation is **fully tested** with:
+
 - ✅ 23 comprehensive tests covering all features
 - ✅ 100% pass rate
 - ✅ Integration with existing test suite

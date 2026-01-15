@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
-import "@openzeppelin/contracts/governance/Governor.sol";
-import "@openzeppelin/contracts/governance/extensions/GovernorSettings.sol";
-import "@openzeppelin/contracts/governance/extensions/GovernorCountingSimple.sol";
-import "@openzeppelin/contracts/governance/extensions/GovernorVotes.sol";
-import "@openzeppelin/contracts/governance/extensions/GovernorVotesQuorumFraction.sol";
-import "@openzeppelin/contracts/governance/extensions/GovernorTimelockControl.sol";
-import "@openzeppelin/contracts/governance/TimelockController.sol";
+import '@openzeppelin/contracts/governance/Governor.sol';
+import '@openzeppelin/contracts/governance/extensions/GovernorSettings.sol';
+import '@openzeppelin/contracts/governance/extensions/GovernorCountingSimple.sol';
+import '@openzeppelin/contracts/governance/extensions/GovernorVotes.sol';
+import '@openzeppelin/contracts/governance/extensions/GovernorVotesQuorumFraction.sol';
+import '@openzeppelin/contracts/governance/extensions/GovernorTimelockControl.sol';
+import '@openzeppelin/contracts/governance/TimelockController.sol';
 
 /**
  * @title GovGovernor
@@ -17,7 +17,7 @@ import "@openzeppelin/contracts/governance/TimelockController.sol";
  * - GovernorVotes: token-weighted voting
  * - GovernorVotesQuorumFraction: quorum based on token supply
  * - GovernorTimelockControl: execution via TimelockController
- * 
+ *
  * Configuration:
  * - Voting delay: 1 block (configurable, longer for mainnet)
  * - Voting period: ~1 week (configurable)
@@ -50,7 +50,7 @@ contract GovGovernor is
         uint256 proposalThresholdTokens,
         uint256 quorumBps
     )
-        Governor("Sew Protocol DAO")
+        Governor('Sew Protocol DAO')
         GovernorSettings(votingDelayBlocks, votingPeriodBlocks, proposalThresholdTokens)
         GovernorVotes(IVotes(token))
         GovernorVotesQuorumFraction(quorumBps)
@@ -70,25 +70,24 @@ contract GovGovernor is
         return super.votingPeriod();
     }
 
-    function proposalThreshold() public view override(Governor, GovernorSettings) returns (uint256) {
+    function proposalThreshold()
+        public
+        view
+        override(Governor, GovernorSettings)
+        returns (uint256)
+    {
         return super.proposalThreshold();
     }
 
-    function quorum(uint256 blockNumber)
-        public
-        view
-        override(Governor, GovernorVotesQuorumFraction)
-        returns (uint256)
-    {
+    function quorum(
+        uint256 blockNumber
+    ) public view override(Governor, GovernorVotesQuorumFraction) returns (uint256) {
         return super.quorum(blockNumber);
     }
 
-    function state(uint256 proposalId)
-        public
-        view
-        override(Governor, GovernorTimelockControl)
-        returns (ProposalState)
-    {
+    function state(
+        uint256 proposalId
+    ) public view override(Governor, GovernorTimelockControl) returns (ProposalState) {
         return super.state(proposalId);
     }
 
@@ -128,7 +127,9 @@ contract GovGovernor is
         return super.cancel(targets, values, calldatas, descriptionHash);
     }
 
-    function proposalNeedsQueuing(uint256) public view override(Governor, GovernorTimelockControl) returns (bool) {
+    function proposalNeedsQueuing(
+        uint256
+    ) public view override(Governor, GovernorTimelockControl) returns (bool) {
         return super.proposalNeedsQueuing(0);
     }
 
@@ -161,17 +162,16 @@ contract GovGovernor is
         return super._cancel(targets, values, calldatas, descriptionHash);
     }
 
-    function _executor() internal view override(Governor, GovernorTimelockControl) returns (address) {
+    function _executor()
+        internal
+        view
+        override(Governor, GovernorTimelockControl)
+        returns (address)
+    {
         return super._executor();
     }
 
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        override(Governor)
-        returns (bool)
-    {
+    function supportsInterface(bytes4 interfaceId) public view override(Governor) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
 }
-

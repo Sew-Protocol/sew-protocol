@@ -1,53 +1,46 @@
+# Dependencies
 node_modules
+lib
+
+# Build outputs
 dist
 out
 cache
 cache-foundry
 artifacts
 typechain-types
-deploy-ledger
 coverage
-.DS_Store
+
+# Deployment artifacts
+deploy-ledger
+
+# Environment files
 .env
 .envq
-lib
 
+# OS files
+.DS_Store
 
-.editorconfig
-.eslint
-.cursorignore
+# Editor directories
 .vscode
 .cursor
 .cursor/
+
+# IDE/Editor config files (some should be tracked, so these are specific)
+# Note: .editorconfig, .prettierrc.json, .eslintrc.cjs should be tracked
 .cursor/index/
 .cursor/cache/
-.cursor/rules/
-.cursor/rules/scaffold-eth.mdc
-.cursor/rules/scaffold-eth.mdc
 
-.gitignore
+# Ignore Cursor AI rules (repository-specific, not shared)
+.cursor/rules/codacy.mdc
 
-.prettierrc
-.vscode
-
+# Temporary/work directories
 work
 bugs
+
+# Internal documentation (temporary/private)
 docs/internal/icos.md
 docs/internal/INTRINSIC_CURSOR_OPERATING_SYSTEM.md
 
+# Archived documentation
 docs/archived
-
-
-
-#Ignore cursor AI rules
-.cursor/rules/codacy.mdc
-
-
-.gitignore
-
-.codacy
-
-.cursorignore
-
-.cursor/
-

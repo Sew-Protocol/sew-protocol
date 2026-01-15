@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "forge-std/Test.sol";
-import "../../../../contracts/YieldOps.sol";
-import "../../../../contracts/DisputeOps.sol";
-import "contracts/core/EscrowableERC20.sol";
-import "contracts/core/EscrowVault.sol";
+import 'forge-std/Test.sol';
+import 'contracts/YieldOps.sol';
+import 'contracts/DisputeOps.sol';
+import 'contracts/core/EscrowableERC20.sol';
+import 'contracts/core/EscrowVault.sol';
 
 contract Test_01_AccessControl_test is Test {
     EscrowableERC20 escrowable;
@@ -20,7 +20,14 @@ contract Test_01_AccessControl_test is Test {
     function setUp() public {
         yieldOps = new YieldOps();
         disputeOps = new DisputeOps();
-        escrowable = new EscrowableERC20("Test Token", "TEST", 100, feeAddr, address(yieldOps), address(disputeOps));
+        escrowable = new EscrowableERC20(
+            'Test Token',
+            'TEST',
+            100,
+            feeAddr,
+            address(yieldOps),
+            address(disputeOps)
+        );
         escrowVault = new EscrowVault(100, feeAddr, address(yieldOps), address(disputeOps));
     }
 

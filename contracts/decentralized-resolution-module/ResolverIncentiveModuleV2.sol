@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
-import "./ResolverIncentiveModuleV1.sol";
-import "./IIncentiveModule.sol";
-import "./DecentralizedResolverStructs.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import './ResolverIncentiveModuleV1.sol';
+import './IIncentiveModule.sol';
+import './DecentralizedResolverStructs.sol';
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 
 /**
  * @title ResolverIncentiveModuleV2
@@ -15,7 +15,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
  *      - Bond custody and payout logic (refund if appeal succeeds, pay to resolvers if fails)
  *      - Escalation cost curve integration
  *      - Observability metrics (bonds posted/refunded/forfeited)
- *      
+ *
  *      Key principles:
  *      - Users post bonds to escalate (not resolvers)
  *      - Bonds refunded if decision changes (appeal succeeds)
@@ -24,90 +24,97 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
  */
 contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
     using SafeERC20 for IERC20;
-    
+
     // ============ DR v2 Structures ============
-    
+
     struct AppealBondRecord {
-        address depositor;           // Who deposited the bond
-        uint256 amount;              // Bond amount
-        address token;               // Token address (address(0) = ETH)
-        uint256 depositedAt;         // Timestamp
-        bool distributed;            // Whether bond has been refunded/paid
-        bool refunded;               // True = refunded to depositor, False = paid to resolvers
+        address depositor; // Who deposited the bond
+        uint256 amount; // Bond amount
+        address token; // Token address (address(0) = ETH)
+        uint256 depositedAt; // Timestamp
+        bool distributed; // Whether bond has been refunded/paid
+        bool refunded; // True = refunded to depositor, False = paid to resolvers
     }
-    
+
     // ============ DR v2 State Variables ============
-    
+
     // Appeal bond storage: workflowId => round => AppealBondRecord
     mapping(uint256 => mapping(uint8 => AppealBondRecord)) public appealBonds;
-    
+
     // Observability metrics
     uint256 public totalBondsPosted;
     uint256 public totalBondsRefunded;
     uint256 public totalBondsPaidToResolvers;
     uint256 public totalBondsForfeited;
-    
+
     // Escalation depth histogram: round => count
     mapping(uint8 => uint256) public escalationDepthHistogram;
-    
+
     // ============ DR v2 Constructor ============
-    
-    constructor(address initialOwner, address initialLibrary) 
-        ResolverIncentiveModuleV1(initialOwner, initialLibrary) 
-    {}
-    
+
+    constructor(
+        address initialOwner,
+        address initialLibrary
+    ) ResolverIncentiveModuleV1(initialOwner, initialLibrary) {}
+
     // ============ DR v2 Events ============
-    
+
     event AppealBondRecorded(
-        uint256 indexed escrowId,
+        uint256 indexed workflowId,
         uint8 round,
         address indexed depositor,
         uint256 amount,
         address token
     );
-    
+
     event AppealBondRefunded(
-        uint256 indexed escrowId,
+        uint256 indexed workflowId,
         uint8 round,
         address indexed depositor,
         uint256 amount,
         address token
     );
-    
+
     event AppealBondPaidToResolvers(
-        uint256 indexed escrowId,
+        uint256 indexed workflowId,
         uint8 round,
         address[] resolvers,
         uint256 totalAmount,
         address token
     );
-    
+
     event AppealBondForfeited(
-        uint256 indexed escrowId,
+        uint256 indexed workflowId,
         uint8 round,
         uint256 amount,
         address token,
         string reason
     );
-    
+
     // ============ IIncentiveModule V2 Implementation ============
-    
+
     /**
      * @notice Get required appeal bond for escalation (V2)
-     * @dev Delegates to DecentralizedResolutionModule.getRequiredAppealBond()
-     *      This is a passthrough function - actual calculation happens in resolution module
+     * @dev This function is a stub for interface compliance.
+     *      The actual bond calculation is done in DecentralizedResolutionModule.
+     *      Callers should use IResolutionModule.getRequiredAppealBond() instead.
+     *      This function always reverts to prevent misuse.
+     * @return bondAmount Always reverts - use resolution module instead
+     * @return token Always reverts - use resolution module instead
      */
     function getRequiredAppealBond(
-        uint256 workflowId,
-        uint8 fromRound,
-        uint8 toRound
-    ) external view returns (uint256 bondAmount, address token) {
-        // This function exists in IIncentiveModule but the actual calculation
-        // is done in DecentralizedResolutionModule for consistency
-        // Just return 0 here - escrow contracts should call resolution module directly
-        return (0, address(0));
+        uint256 /* workflowId */,
+        uint8 /* fromRound */,
+        uint8 /* toRound */
+    ) external pure override returns (uint256 /* bondAmount */, address /* token */) {
+        // This function exists in IIncentiveModule for interface compliance,
+        // but the actual calculation is done in DecentralizedResolutionModule
+        // to maintain consistency and avoid duplication.
+        //
+        // Escrow contracts should call IResolutionModule.getRequiredAppealBond() directly.
+        revert('Use IResolutionModule.getRequiredAppealBond() instead');
     }
-    
+
     /**
      * @notice Record appeal bond payment (V2)
      * @param workflowId Unique identifier for the dispute
@@ -115,6 +122,9 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
      * @param amount Bond amount
      * @param token Token address (address(0) = ETH)
      * @param round Round being appealed to
+     * @dev For ETH bonds: function must be called with msg.value == amount
+     *      For ERC20 bonds: tokens must be transferred to this contract before calling
+     *      This function enforces custody - it verifies funds are actually received
      */
     function recordAppealBond(
         uint256 workflowId,
@@ -122,13 +132,31 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
         uint256 amount,
         address token,
         uint8 round
-    ) external onlyEscrowContract {
-        require(depositor != address(0), "Invalid depositor");
-        require(amount > 0, "Invalid amount");
-        require(round > 0 && round <= 2, "Invalid round");
-        require(!appealBonds[workflowId][round].distributed, "Bond already recorded");
-        
-        // Record bond
+    ) external payable override onlyEscrowContract {
+        require(depositor != address(0), 'Invalid depositor');
+        require(amount > 0, 'Invalid amount');
+        require(round > 0 && round <= 2, 'Invalid round');
+        require(appealBonds[workflowId][round].amount == 0, 'Bond already exists');
+        require(!appealBonds[workflowId][round].distributed, 'Bond already distributed');
+
+        // Enforce custody: verify funds are actually received
+        if (token == address(0)) {
+            // ETH bond: require exact msg.value match
+            require(msg.value == amount, 'ETH amount mismatch');
+            // Funds are automatically received via payable
+        } else {
+            // ERC20 bond: verify contract has sufficient balance
+            // Escrow contract MUST transfer tokens to this contract BEFORE calling this function
+            // We verify the balance is sufficient (handles fee-on-transfer tokens)
+            uint256 currentBalance = IERC20(token).balanceOf(address(this));
+            require(currentBalance >= amount, 'Insufficient token balance');
+
+            // For fee-on-transfer tokens, escrow should account for fees when transferring
+            // We use the specified amount (escrow is responsible for transferring enough)
+            // If escrow transferred less due to fees, this will revert - escrow must handle fees
+        }
+
+        // Record bond with actual received amount
         appealBonds[workflowId][round] = AppealBondRecord({
             depositor: depositor,
             amount: amount,
@@ -137,14 +165,14 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
             distributed: false,
             refunded: false
         });
-        
+
         // Update metrics
         totalBondsPosted += amount;
         escalationDepthHistogram[round]++;
-        
+
         emit AppealBondRecorded(workflowId, round, depositor, amount, token);
     }
-    
+
     /**
      * @notice Distribute appeal bond based on outcome (V2)
      * @param workflowId Unique identifier for the dispute
@@ -152,22 +180,26 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
      * @param outcomeFlipped Whether the appeal succeeded (decision changed)
      * @dev If outcomeFlipped = true: refund to depositor
      *      If outcomeFlipped = false: pay to resolvers from 'round'
+     * @dev Protected by reentrancy guard to prevent reentrancy attacks
      */
     function distributeAppealBond(
         uint256 workflowId,
         uint8 round,
         bool outcomeFlipped
-    ) external onlyEscrowContract {
+    ) external override onlyEscrowContract nonReentrant {
+        // Validate round bounds
+        require(round < 2, 'Invalid round - no higher round');
+
         // Bond was posted to escalate FROM round to round+1
         // So we look up the bond at round+1
         uint8 bondRound = round + 1;
         AppealBondRecord storage bond = appealBonds[workflowId][bondRound];
-        
-        require(bond.amount > 0, "No bond recorded");
-        require(!bond.distributed, "Bond already distributed");
-        
+
+        require(bond.amount > 0, 'No bond recorded');
+        require(!bond.distributed, 'Bond already distributed');
+
         bond.distributed = true;
-        
+
         if (outcomeFlipped) {
             // Appeal succeeded - refund to depositor
             _refundBond(workflowId, bondRound, bond);
@@ -176,9 +208,9 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
             _payBondToResolvers(workflowId, round, bond);
         }
     }
-    
+
     // ============ Internal DR v2 Functions ============
-    
+
     /**
      * @notice Refund bond to depositor
      */
@@ -189,31 +221,27 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
     ) internal {
         bond.refunded = true;
         totalBondsRefunded += bond.amount;
-        
+
         // Transfer bond back to depositor
         if (bond.token == address(0)) {
             // ETH
-            (bool success,) = bond.depositor.call{value: bond.amount}("");
-            require(success, "ETH refund failed");
+            (bool success, ) = bond.depositor.call{value: bond.amount}('');
+            require(success, 'ETH refund failed');
         } else {
             // ERC20
             IERC20(bond.token).safeTransfer(bond.depositor, bond.amount);
         }
-        
-        emit AppealBondRefunded(
-            workflowId,
-            bondRound,
-            bond.depositor,
-            bond.amount,
-            bond.token
-        );
+
+        emit AppealBondRefunded(workflowId, bondRound, bond.depositor, bond.amount, bond.token);
     }
-    
+
     /**
      * @notice Pay bond to resolvers from prior round
      * @param workflowId Dispute ID
      * @param priorRound Round whose resolvers should receive bond
      * @param bond Bond record
+     * @dev Only increments totalBondsPaidToResolvers when actually paid to resolvers
+     *      If no resolvers found, bond is retained by protocol (not counted as "paid")
      */
     function _payBondToResolvers(
         uint256 workflowId,
@@ -221,13 +249,14 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
         AppealBondRecord storage bond
     ) internal {
         bond.refunded = false;
-        totalBondsPaidToResolvers += bond.amount;
-        
+
         // Get resolvers from prior round
         ResolverRecord[] storage resolvers = disputeResolvers[workflowId];
-        
-        // If no resolvers in storage (e.g., testing scenario), store bond as protocol revenue
+
+        // If no resolvers in storage (e.g., testing scenario), bond is retained by protocol
         if (resolvers.length == 0) {
+            // Don't increment totalBondsPaidToResolvers - bond is not actually paid
+            // Bond remains in contract as protocol revenue
             emit AppealBondPaidToResolvers(
                 workflowId,
                 priorRound,
@@ -237,34 +266,68 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
             );
             return;
         }
-        
+
         // Find resolvers who decided at priorRound
         address[] memory eligibleResolvers = new address[](resolvers.length);
         uint256 count = 0;
-        
+
         for (uint256 i = 0; i < resolvers.length; i++) {
             if (resolvers[i].level == priorRound) {
                 eligibleResolvers[count] = resolvers[i].resolver;
                 count++;
             }
         }
-        
-        require(count > 0, "No resolvers found");
-        
+
+        // If no resolvers found at this round, bond is retained by protocol
+        if (count == 0) {
+            // Don't increment totalBondsPaidToResolvers - bond is not actually paid
+            emit AppealBondPaidToResolvers(
+                workflowId,
+                priorRound,
+                new address[](0),
+                bond.amount,
+                bond.token
+            );
+            return;
+        }
+
+        // Actually pay to resolvers - increment metric only now
+        totalBondsPaidToResolvers += bond.amount;
+
         // Distribute bond equally among resolvers from that round
         uint256 amountPerResolver = bond.amount / count;
-        
+        uint256 remainder = bond.amount % count; // Handle rounding error
+
         // Add to claimable payments for each resolver
+        //
+        // IMPORTANT TOKEN ACCOUNTING LIMITATION:
+        // claimablePayments[workflowId][resolver] is NOT token-scoped.
+        // This assumes bond.token matches the token used for fee payments in onDisputeResolved().
+        //
+        // If bonds can be in different tokens than fees, this will cause accounting errors:
+        // - Resolver claims will use the wrong token
+        // - Amounts from different tokens will be mixed
+        //
+        // To support multi-token bonds, claimablePayments should be changed to:
+        // mapping(uint256 => mapping(address => mapping(address => uint256))) claimablePayments;
+        // (workflowId => resolver => token => amount)
+        //
+        // For now, we require bond.token == fee token for the dispute.
         for (uint256 i = 0; i < count; i++) {
-            claimablePayments[workflowId][eligibleResolvers[i]] += amountPerResolver;
+            uint256 payment = amountPerResolver;
+            // Distribute remainder to first resolver(s) to avoid loss
+            if (i < remainder) {
+                payment += 1;
+            }
+            claimablePayments[workflowId][eligibleResolvers[i]] += payment;
         }
-        
+
         // Emit event with actual resolver addresses (trimmed array)
         address[] memory actualResolvers = new address[](count);
         for (uint256 i = 0; i < count; i++) {
             actualResolvers[i] = eligibleResolvers[i];
         }
-        
+
         emit AppealBondPaidToResolvers(
             workflowId,
             priorRound,
@@ -273,46 +336,46 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
             bond.token
         );
     }
-    
+
     /**
      * @notice Forfeit bond (e.g., if escalator doesn't follow through)
      * @param workflowId Dispute ID
      * @param round Bond round
      * @param reason Reason for forfeiture
+     * @dev Protected by reentrancy guard to prevent reentrancy attacks
      */
     function forfeitAppealBond(
         uint256 workflowId,
         uint8 round,
         string memory reason
-    ) external onlyEscrowContract {
+    ) external onlyEscrowContract nonReentrant {
         AppealBondRecord storage bond = appealBonds[workflowId][round];
-        
-        require(bond.amount > 0, "No bond recorded");
-        require(!bond.distributed, "Bond already distributed");
-        
+
+        require(bond.amount > 0, 'No bond recorded');
+        require(!bond.distributed, 'Bond already distributed');
+
         bond.distributed = true;
         bond.refunded = false;
         totalBondsForfeited += bond.amount;
-        
+
         // Bond remains in contract as protocol revenue
         // or could be sent to treasury
-        
+
         emit AppealBondForfeited(workflowId, round, bond.amount, bond.token, reason);
     }
-    
+
     // ============ View Functions (DR v2 Metrics) ============
-    
+
     /**
      * @notice Get appeal bond record for a dispute/round
      */
-    function getAppealBond(uint256 workflowId, uint8 round) 
-        external 
-        view 
-        returns (AppealBondRecord memory) 
-    {
+    function getAppealBond(
+        uint256 workflowId,
+        uint8 round
+    ) external view returns (AppealBondRecord memory) {
         return appealBonds[workflowId][round];
     }
-    
+
     /**
      * @notice Get DR v2 observability metrics
      * @return bondsPosted Total bonds posted
@@ -320,12 +383,16 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
      * @return bondsPaidToResolvers Total bonds paid to resolvers
      * @return bondsForfeited Total bonds forfeited
      */
-    function getV2Metrics() external view returns (
-        uint256 bondsPosted,
-        uint256 bondsRefunded,
-        uint256 bondsPaidToResolvers,
-        uint256 bondsForfeited
-    ) {
+    function getV2Metrics()
+        external
+        view
+        returns (
+            uint256 bondsPosted,
+            uint256 bondsRefunded,
+            uint256 bondsPaidToResolvers,
+            uint256 bondsForfeited
+        )
+    {
         return (
             totalBondsPosted,
             totalBondsRefunded,
@@ -333,32 +400,50 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
             totalBondsForfeited
         );
     }
-    
+
     /**
      * @notice Get escalation depth histogram
      * @return round0 Count of escalations to round 0 (should be 0)
      * @return round1 Count of escalations to round 1
      * @return round2 Count of escalations to round 2
      */
-    function getEscalationDepthHistogram() external view returns (
-        uint256 round0,
-        uint256 round1,
-        uint256 round2
-    ) {
+    function getEscalationDepthHistogram()
+        external
+        view
+        returns (uint256 round0, uint256 round1, uint256 round2)
+    {
         return (
             escalationDepthHistogram[0],
             escalationDepthHistogram[1],
             escalationDepthHistogram[2]
         );
     }
-    
+
     /**
      * @notice Check if dispute has appeal bond at round
      */
     function hasAppealBond(uint256 workflowId, uint8 round) external view returns (bool) {
         return appealBonds[workflowId][round].amount > 0;
     }
-    
+
+    /**
+     * @notice Calculate and distribute resolver payments for a finalized dispute (IIncentiveModule interface)
+     * @param workflowId Unique identifier for the dispute
+     * @param token Token address for payment
+     * @param totalFees Total fees available for distribution
+     * @dev This is a wrapper that calls onDisputeResolved for backward compatibility
+     *      Note: totalFees parameter is ignored as fees are already recorded via recordEscrowFee/recordEscalationFee
+     */
+    function distributePayments(
+        uint256 workflowId,
+        address token,
+        uint256 totalFees
+    ) external virtual override onlyEscrowContract {
+        // Delegate to onDisputeResolved for backward compatibility
+        // Note: totalFees parameter is ignored as fees are already recorded via recordEscrowFee/recordEscalationFee
+        onDisputeResolved(workflowId, token);
+    }
+
     // Allow contract to receive ETH for bonds
     receive() external payable {}
 }

@@ -42,9 +42,6 @@ interface IResolver {
  * @notice Structure for escrow resolution payouts
  */
 struct Payout {
-    address recipient;  // Address to receive payout
-    uint256 amount;     // Amount to payout
+    address recipient; // Address to receive payout
+    uint256 amount; // Amount to payout
 }
-
-
-

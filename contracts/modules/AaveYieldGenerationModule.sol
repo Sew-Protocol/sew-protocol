@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
-import "../interfaces/IYieldGenerationModule.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
-import "@openzeppelin/contracts/utils/Address.sol";
-import "../governance/SlowLaneQueueActivate.sol";
-import "../types/EscrowTypes.sol";
+import '../interfaces/IYieldGenerationModule.sol';
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
+import '@openzeppelin/contracts/access/AccessControl.sol';
+import '@openzeppelin/contracts/utils/introspection/ERC165.sol';
+import '@openzeppelin/contracts/utils/Address.sol';
+import '../governance/SlowLaneQueueActivate.sol';
+import '../types/EscrowTypes.sol';
 
 // Aave V3 interfaces
 interface IPoolAddressesProvider {
@@ -16,7 +16,12 @@ interface IPoolAddressesProvider {
 }
 
 interface IPool {
-    function supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode) external;
+    function supply(
+        address asset,
+        uint256 amount,
+        address onBehalfOf,
+        uint16 referralCode
+    ) external;
     function withdraw(address asset, uint256 amount, address to) external returns (uint256);
     // Optional: Add more interface methods for validation if needed
     // function getReserveData(address asset) external view returns (ReserveData memory);
@@ -46,8 +51,8 @@ error PoolProviderCallFailed(address provider);
  */
 contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, SlowLaneQueueActivate {
     // Role constants for governance
-    bytes32 public constant ROLE_TIMELOCK = keccak256("ROLE_TIMELOCK");
-    bytes32 public constant ROLE_GUARDIAN = keccak256("ROLE_GUARDIAN");
+    bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');
+    bytes32 public constant ROLE_GUARDIAN = keccak256('ROLE_GUARDIAN');
     using SafeERC20 for IERC20;
 
     // Aave configuration
@@ -62,7 +67,7 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
     // Token support mapping
     mapping(address => address) public tokenToAToken; // token => aToken address
     mapping(address => uint256) public totalDepositedToAave; // token => total amount
-    
+
     // Exposure tracking and caps (Phase 4)
     mapping(address => uint256) public tokenCap; // token => maximum exposure per token
     mapping(address => uint256) public globalCap; // token => global maximum exposure
@@ -77,17 +82,32 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
     PendingAddress private _pendingPoolProvider;
 
     // Events
-    event EscrowDepositedToAave(uint256 indexed escrowId, address indexed token, uint256 amount, uint256 aTokenBalance);
-    event EscrowWithdrawnFromAave(uint256 indexed escrowId, address indexed token, uint256 originalAmount, uint256 actualAmount, uint256 yield);
+    event EscrowDepositedToAave(
+        uint256 indexed escrowId,
+        address indexed token,
+        uint256 amount,
+        uint256 aTokenBalance
+    );
+    event EscrowWithdrawnFromAave(
+        uint256 indexed escrowId,
+        address indexed token,
+        uint256 originalAmount,
+        uint256 actualAmount,
+        uint256 yield
+    );
     event AaveWithdrawalFailedEvent(uint256 indexed escrowId, address indexed token);
     event AavePoolConfigured(address indexed provider, address indexed pool);
     event AaveEnabledUpdated(bool enabled);
     event TokenRegisteredForAave(address indexed token, address indexed aToken);
-    
+
     // Slow lane queue/activate events (Phase 3)
-    event AavePoolProviderQueued(address indexed oldProvider, address indexed newProvider, uint64 eta);
+    event AavePoolProviderQueued(
+        address indexed oldProvider,
+        address indexed newProvider,
+        uint64 eta
+    );
     event AavePoolProviderActivated(address indexed oldProvider, address indexed newProvider);
-    
+
     // Guardian emergency control events (Phase 4)
     event AaveDisabledByGuardian();
     event TokenCapLowered(address indexed token, uint256 oldCap, uint256 newCap);
@@ -171,11 +191,7 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
         uint256 workflowId,
         address token,
         uint256 originalAmount
-    ) external override returns (
-        bool success,
-        uint256 actualAmount,
-        uint256 yieldAmount
-    ) {
+    ) external override returns (bool success, uint256 actualAmount, uint256 yieldAmount) {
         address escrowContract = msg.sender; // BaseEscrow contract calling this
 
         if (!escrowInAave[escrowContract][workflowId]) {
@@ -262,7 +278,8 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
         // We need to estimate what the current aToken balance represents in underlying tokens
         // For simplicity, we'll use the ratio: (currentATokenBalance / originalATokenBalance) * originalDeposit
         // This gives us an estimate of current value
-        uint256 estimatedCurrentValue = (currentATokenBalance * originalDeposit) / originalATokenBalance;
+        uint256 estimatedCurrentValue = (currentATokenBalance * originalDeposit) /
+            originalATokenBalance;
 
         // Yield = estimated current value - original deposit
         if (estimatedCurrentValue > originalDeposit) {
@@ -289,7 +306,9 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
      *      For EscrowVault: returns address(0) as module handles approvals via forceApprove
      *      Returns address(0) if Aave is not enabled or token is not supported
      */
-    function getApprovalTarget(address token) external view override returns (address approvalTarget) {
+    function getApprovalTarget(
+        address token
+    ) external view override returns (address approvalTarget) {
         if (!aaveEnabled) {
             return address(0);
         }
@@ -307,7 +326,7 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
      * @return name The module name
      */
     function moduleName() external pure override returns (string memory name) {
-        return "AaveYieldGeneration";
+        return 'AaveYieldGeneration';
     }
 
     /**
@@ -315,13 +334,15 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
      * @return version The module version (semantic versioning)
      */
     function moduleVersion() external pure override returns (string memory version) {
-        return "1.0.0";
+        return '1.0.0';
     }
 
     /**
      * @notice ERC-165 interface support
      */
-    function supportsInterface(bytes4 interfaceId) public view virtual override(AccessControl, IERC165) returns (bool) {
+    function supportsInterface(
+        bytes4 interfaceId
+    ) public view virtual override(AccessControl, IERC165) returns (bool) {
         return
             interfaceId == type(IYieldGenerationModule).interfaceId ||
             super.supportsInterface(interfaceId);
@@ -336,10 +357,14 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
      */
     function queueAavePoolProvider(address provider) public onlyRole(ROLE_TIMELOCK) {
         if (provider == address(0)) {
-            revert InvalidAddress("Provider address cannot be zero", provider);
+            revert InvalidAddress('Provider address cannot be zero', provider);
         }
         _queueAddress(_pendingPoolProvider, provider);
-        emit AavePoolProviderQueued(address(aavePoolAddressesProvider), provider, _pendingPoolProvider.eta);
+        emit AavePoolProviderQueued(
+            address(aavePoolAddressesProvider),
+            provider,
+            _pendingPoolProvider.eta
+        );
     }
 
     /**
@@ -354,12 +379,12 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
     function activateAavePoolProvider() public onlyRole(ROLE_TIMELOCK) {
         address oldProvider = address(aavePoolAddressesProvider);
         address newProvider = _activateAddress(_pendingPoolProvider);
-        
+
         // Safety validation 1: Provider must be a contract (has code)
         if (newProvider.code.length == 0) {
             revert PoolAddressIsNotContract(newProvider);
         }
-        
+
         // Safety validation 2: Get pool address with error handling
         address poolAddress;
         try IPoolAddressesProvider(newProvider).getPool() returns (address pool) {
@@ -367,27 +392,27 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
         } catch {
             revert PoolProviderCallFailed(newProvider);
         }
-        
+
         // Safety validation 3: Pool address must be non-zero
         if (poolAddress == address(0)) {
             revert InvalidPoolAddress(poolAddress);
         }
-        
+
         // Safety validation 4: Pool address must be a contract (has code)
         if (poolAddress.code.length == 0) {
             revert PoolAddressIsNotContract(poolAddress);
         }
-        
+
         // Safety validation 5: Optional - Verify pool implements expected interface
         // Note: Full interface validation is complex and gas-intensive.
         // Governance should verify the pool address is correct before activation.
         // The pool will be validated during first use (depositForYield will fail if invalid).
-        
+
         // All validations passed - update state (checks-effects-interactions pattern)
         aavePoolAddressesProvider = IPoolAddressesProvider(newProvider);
         aavePool = IPool(poolAddress);
         aaveEnabled = true;
-        
+
         emit AavePoolProviderActivated(oldProvider, newProvider);
         emit AavePoolConfigured(newProvider, poolAddress);
     }
@@ -398,7 +423,11 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
      * @return eta Timestamp when activation is allowed
      * @return exists Whether a pending change exists
      */
-    function getPendingAavePoolProvider() public view returns (address value, uint64 eta, bool exists) {
+    function getPendingAavePoolProvider()
+        public
+        view
+        returns (address value, uint64 eta, bool exists)
+    {
         return (getPendingAddress(_pendingPoolProvider));
     }
 
@@ -433,10 +462,10 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
      */
     function registerTokenForAave(address token, address aToken) public onlyRole(ROLE_TIMELOCK) {
         if (token == address(0)) {
-            revert InvalidAddress("Token address cannot be zero", token);
+            revert InvalidAddress('Token address cannot be zero', token);
         }
         if (aToken == address(0)) {
-            revert InvalidAddress("aToken address cannot be zero", aToken);
+            revert InvalidAddress('aToken address cannot be zero', aToken);
         }
 
         // Verify aToken is valid by checking underlying asset (external call)
@@ -461,7 +490,10 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
      * @param tokens Array of ERC20 token addresses
      * @param aTokens Array of corresponding aToken addresses
      */
-    function batchRegisterTokensForAave(address[] memory tokens, address[] memory aTokens) public onlyRole(ROLE_TIMELOCK) {
+    function batchRegisterTokensForAave(
+        address[] memory tokens,
+        address[] memory aTokens
+    ) public onlyRole(ROLE_TIMELOCK) {
         if (tokens.length != aTokens.length) {
             revert ArrayLengthMismatch(tokens.length, aTokens.length);
         }
@@ -490,7 +522,7 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
      */
     function guardianLowerTokenCap(address token, uint256 newCap) public onlyRole(ROLE_GUARDIAN) {
         uint256 currentCap = tokenCap[token];
-        require(newCap <= currentCap, "Guardian can only lower caps");
+        require(newCap <= currentCap, 'Guardian can only lower caps');
         tokenCap[token] = newCap;
         emit TokenCapLowered(token, currentCap, newCap);
     }
@@ -503,7 +535,7 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
      */
     function guardianLowerGlobalCap(address token, uint256 newCap) public onlyRole(ROLE_GUARDIAN) {
         uint256 currentCap = globalCap[token];
-        require(newCap <= currentCap, "Guardian can only lower caps");
+        require(newCap <= currentCap, 'Guardian can only lower caps');
         globalCap[token] = newCap;
         emit GlobalCapLowered(token, currentCap, newCap);
     }
@@ -552,19 +584,19 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
      */
     function _checkAndAccrueExposure(address token, uint256 amount) internal {
         uint256 newExposure = currentExposure[token] + amount;
-        
+
         // Check token-specific cap
         uint256 tokenCapValue = tokenCap[token];
         if (tokenCapValue > 0 && newExposure > tokenCapValue) {
             revert CapExceeded(token, newExposure, tokenCapValue);
         }
-        
+
         // Check global cap
         uint256 globalCapValue = globalCap[token];
         if (globalCapValue > 0 && newExposure > globalCapValue) {
             revert CapExceeded(token, newExposure, globalCapValue);
         }
-        
+
         uint256 oldExposure = currentExposure[token];
         currentExposure[token] = newExposure;
         emit ExposureUpdated(token, oldExposure, newExposure);
@@ -611,11 +643,10 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
      * @return aTokenBalance aToken balance at deposit
      * @return originalDeposit Original deposit amount
      */
-    function getEscrowAaveData(address escrowContract, uint256 workflowId) public view returns (
-        bool inAave,
-        uint256 aTokenBalance,
-        uint256 originalDeposit
-    ) {
+    function getEscrowAaveData(
+        address escrowContract,
+        uint256 workflowId
+    ) public view returns (bool inAave, uint256 aTokenBalance, uint256 originalDeposit) {
         return (
             escrowInAave[escrowContract][workflowId],
             escrowATokenBalance[escrowContract][workflowId],
@@ -623,5 +654,3 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
         );
     }
 }
-
-

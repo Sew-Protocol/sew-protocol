@@ -34,13 +34,7 @@ library EscrowEncodingLibrary {
      */
     function decodeEscrowTransferData(
         bytes memory data
-    ) internal pure returns (
-        address token,
-        address from,
-        address to,
-        uint256 amountAfterFee
-    ) {
+    ) internal pure returns (address token, address from, address to, uint256 amountAfterFee) {
         return abi.decode(data, (address, address, address, uint256));
     }
 }
-

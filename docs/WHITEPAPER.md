@@ -22,6 +22,7 @@ Sew Protocol is a decentralized, trustless escrow system built on Base that enab
 **Primary Use Case**: Safe everyday purchases of physical goods, enabling consumers to use Ethereum for payments with protection against fraud and errors.
 
 **Key Innovations:**
+
 - **Modular Architecture**: Pluggable resolution, yield, and distribution modules
 - **Snapshot Immutability**: Escrow rules locked at creation, immune to governance changes
 - **Multi-Token Support**: Escrow any ERC20 token with a single interface
@@ -84,16 +85,19 @@ The protocol is built on four fundamental principles:
 Sew Protocol is built on a modular architecture that enables safe, trustless transactions for everyday purchases:
 
 #### Core Escrow Contracts (Immutable)
+
 - **BaseEscrow**: Abstract base contract with shared escrow logic, state machine, and module integration
 - **EscrowVault**: Multi-token escrow vault supporting any ERC20 token - ideal for marketplaces and multi-token use cases
 - **EscrowableERC20**: ERC20 token with built-in escrow functionality - enables token-specific escrow capabilities
 
 **Key Features**:
+
 - Immutable core contracts (no proxies) for maximum security and auditability
 - Snapshot semantics: Escrow rules locked at creation, immune to governance changes
 - Account abstraction compatible: Works with smart contract wallets and legacy EOAs
 
 #### Resolution Modules (Swappable via Governance)
+
 - **DefaultResolutionModule**: Simple single-resolver system (initial mainnet deployment)
   - Single trusted resolver per escrow
   - Governance-controlled resolver updates
@@ -108,6 +112,7 @@ Sew Protocol is built on a modular architecture that enables safe, trustless tra
 **Module Governance**: All modules are immutable. Module upgrades are performed by deploying a new version and swapping via Slow lane (queue + activate, ~9 days). Both queue and activate operations require Timelock execution (ROLE_TIMELOCK), ensuring all module changes are time-delayed and transparent.
 
 #### Supporting Modules (Optional)
+
 - **AaveYieldGenerationModule**: Generates yield on escrowed funds via Aave integration
   - Optional per-escrow yield generation
   - Protected by exposure caps and pause mechanisms
@@ -206,6 +211,7 @@ A critical design feature: **module addresses and settings are snapshotted at es
 - Existing escrows continue using their snapshotted modules
 
 This ensures that:
+
 - Governance cannot retroactively change escrow rules
 - Users can trust that their escrow rules will remain unchanged
 - Protocol evolution doesn't break existing escrows
@@ -281,18 +287,21 @@ The protocol uses a multi-layered governance system:
 ### 5.2 Governance Lanes
 
 #### Emergency Lane (0h delay, Guardian only)
+
 - Pause protocol
 - Disable features (e.g., Aave)
 - Lower exposure caps
 - **Down-only**: Cannot unpause, enable features, or raise caps
 
 #### Standard Lane (48h delay, Timelock)
+
 - Parameter changes
 - Unpause protocol
 - Fee configuration updates
 - Operational configuration
 
 #### Slow Lane (~9 days delay, Timelock)
+
 - Module swaps (all modules use this pattern)
   - Process: Deploy new module → Queue (48h delay via Timelock) → Wait 7 days → Activate (48h delay via Timelock)
   - Total time: ~9 days wall-clock (48h + 7d + 48h)
@@ -330,11 +339,13 @@ Sew Protocol is designed with the following security goals:
 ### 6.2 Security Architecture
 
 #### Immutable Core Contracts
+
 - **BaseEscrow**, **EscrowVault**, **EscrowableERC20**: Deployed immutably (no proxies)
 - **No Upgrade Risk**: Core escrow logic cannot be changed after deployment
 - **Auditability**: Immutable contracts are easier to audit and verify
 
 #### Immutable Modules
+
 - **All modules are immutable**: Upgrades are performed by deploying a new version and swapping via Slow lane (~9 days)
 - **Unified Governance**: All modules use the same governance pattern (queue + activate via Timelock)
 - **Timelock-Only Execution**: Both queue and activate operations require Timelock execution (ROLE_TIMELOCK), ensuring all module changes are time-delayed and transparent
@@ -342,12 +353,14 @@ Sew Protocol is designed with the following security goals:
 - **Process**: Deploy new module → Queue (48h delay via Timelock) → Wait 7 days → Activate (48h delay via Timelock) = ~9 days total
 
 #### Governance Security
+
 - **Time-Delayed Execution**: All changes require timelock delays (48h Standard, ~9 days Slow)
 - **Bounded Changes**: All parameter changes are bounded onchain
 - **Emergency Controls**: Guardian can pause or reduce risk, but cannot increase risk
 - **Transparent**: All proposals and votes are onchain and publicly verifiable
 
 #### External Integration Security
+
 - **Aave Integration**: Protected by exposure caps and pause mechanisms
 - **Cap Enforcement**: Deposits enforce `exposure[token] + amount <= cap[token]`
 - **Guardian Controls**: Guardian can disable Aave or lower caps immediately
@@ -356,6 +369,7 @@ Sew Protocol is designed with the following security goals:
 ### 6.3 Trust Model
 
 #### What Users Must Trust
+
 1. **Token Contracts**: ERC20 tokens behave as specified (standard ERC20 required)
 2. **Chain Liveness**: Base mainnet remains operational and accessible
 3. **Block Timestamps**: `block.timestamp` is reasonably accurate for auto-settlement
@@ -364,6 +378,7 @@ Sew Protocol is designed with the following security goals:
 6. **Resolver Honesty**: Dispute resolution relies on resolver behavior (mitigated by escalation and incentives)
 
 #### What Users Do NOT Need to Trust
+
 1. **Team/Developers**: Cannot modify in-flight escrow rules. Cannot unilaterally change modules
 2. **Governance**: Cannot change rules of existing escrows. Can only affect new escrows
 3. **Guardian**: Cannot steal funds, unpause without timelock, or increase risk. Powers are strictly down-only
@@ -373,18 +388,21 @@ Sew Protocol is designed with the following security goals:
 ### 6.4 Security Measures
 
 #### Code Security
+
 - **Comprehensive Testing**: Hardhat + Foundry test suites with high coverage
 - **Static Analysis**: Slither analysis configured and run regularly
 - **Fuzz Testing**: Foundry fuzz tests for critical paths
 - **Formal Verification**: Considered for critical invariants
 
 #### Operational Security
+
 - **Emergency Procedures**: Clear runbooks for emergency situations
 - **Guardian Multisig**: Hardware wallet-based multisig for emergency controls
 - **Monitoring**: Onchain monitoring for suspicious activity
 - **Incident Response**: Documented procedures for security incidents
 
 #### Audit & Verification
+
 - **Security Audits**: Multiple audit phases planned before mainnet
 - **Bug Bounties**: Bug bounty program for ongoing security
 - **Public Verification**: All contracts verified on Basescan
@@ -393,22 +411,26 @@ Sew Protocol is designed with the following security goals:
 ### 6.5 Known Risks & Mitigations
 
 #### Smart Contract Risks
+
 - **Reentrancy**: Mitigated by ReentrancyGuard and CEI pattern
 - **Access Control**: Mitigated by role-based access control and role revocation
 - **Integer Overflow**: Mitigated by Solidity 0.8.33 built-in checks
 - **Front-Running**: Mitigated by commit-reveal patterns where applicable
 
 #### Governance Risks
+
 - **Governance Attacks**: Mitigated by timelock delays and proposal thresholds
 - **Malicious Proposals**: Mitigated by voting requirements and timelock delays
 - **Guardian Compromise**: Mitigated by multisig and down-only powers
 
 #### External Risks
+
 - **Aave Protocol Failure**: Mitigated by caps, pause mechanisms, and withdrawal procedures
 - **Token Contract Issues**: Mitigated by standard ERC20 requirement and SafeERC20 usage
 - **Chain Issues**: Mitigated by Base L2 reliability and monitoring
 
 #### Operational Risks
+
 - **Key Management**: Mitigated by hardware wallets and multisig
 - **Human Error**: Mitigated by runbooks, testing, and rehearsals
 - **Social Engineering**: Mitigated by security policies and access controls
@@ -438,7 +460,8 @@ Sew Protocol provides the following security guarantees:
 4. Buyer receives goods, inspects, and releases escrow
 5. If dispute (damaged goods, wrong item, non-delivery): Resolver reviews evidence and makes decision
 
-**Benefits**: 
+**Benefits**:
+
 - Buyer protection against fraud and errors
 - Seller assurance of payment before shipping
 - No centralized intermediary or monitoring
@@ -457,7 +480,8 @@ Sew Protocol provides the following security guarantees:
 4. Buyer confirms receipt and releases escrow
 5. If dispute: Marketplace resolver or protocol resolver handles dispute
 
-**Benefits**: 
+**Benefits**:
+
 - Built-in buyer protection for marketplaces
 - Reduces chargeback risk for sellers
 - Transparent, onchain dispute resolution
@@ -473,7 +497,8 @@ Sew Protocol provides the following security guarantees:
 4. Buyer verifies and releases escrow
 5. If dispute: Resolver reviews evidence (photos, tracking, messages)
 
-**Benefits**: 
+**Benefits**:
+
 - Protection for both parties in P2P transactions
 - No need for trusted intermediary
 - Works with any Ethereum wallet
@@ -519,6 +544,7 @@ Sew Protocol provides the following security guarantees:
 **Goal**: Launch Sew Protocol on Base mainnet with core escrow functionality
 
 **Deliverables**:
+
 - Core escrow contracts (immutable, no proxies)
 - DefaultResolutionModule (single-resolver system)
 - Basic governance infrastructure (Governor, Timelock, Guardian)
@@ -538,6 +564,7 @@ Sew Protocol provides the following security guarantees:
 **Goal**: Prove DecentralizedResolutionModule in isolation before mainnet integration
 
 **Deliverables**:
+
 - Deploy DecentralizedResolutionModule in separate package
 - Extensive testing with simulated disputes
 - Resolver network testing and validation
@@ -557,6 +584,7 @@ Sew Protocol provides the following security guarantees:
 **Goal**: Swap DecentralizedResolutionModule into mainnet protocol via governance
 
 **Deliverables**:
+
 - Deploy DecentralizedResolutionModule contract
 - Governance proposal to queue module swap (48h delay via Timelock)
 - Community vote and timelock execution of queue
@@ -571,7 +599,8 @@ Sew Protocol provides the following security guarantees:
 
 **Timeline**: Q4 2026 (target, after Phase 2 validation)
 
-**Process**: 
+**Process**:
+
 1. Deploy new DecentralizedResolutionModule
 2. Queue module swap (48h delay via Timelock) - requires Timelock execution (ROLE_TIMELOCK)
 3. Wait 7 days (slow lane delay)
@@ -587,11 +616,13 @@ Sew Protocol provides the following security guarantees:
 ### 10.1 Fee Structure
 
 #### Escrow Fees
+
 - **Escrow Fee**: 1% of escrow amount (100 basis points)
 - **Fee Recipient**: Protocol treasury (governance-controlled)
 - **Collection**: Fees are collected at escrow creation and held in protocol treasury
 
 #### Yield Distribution
+
 - **Yield Generation**: Optional per-escrow (via Aave integration)
 - **Protocol Share**: 30% of generated yield goes to protocol treasury
 - **User Share**: 70% of generated yield distributed to escrow participants (buyer/seller) based on escrow configuration
@@ -599,6 +630,7 @@ Sew Protocol provides the following security guarantees:
 #### Dispute Resolution Fees (After DecentralizedResolutionModule Launch)
 
 **Escalation Fees**:
+
 - **Level 1 Escalation** (Standard → Senior): Fee set by governance
 - **Level 2 Escalation** (Senior → External): Fee set by governance
 - **Fee Distribution**:
@@ -606,6 +638,7 @@ Sew Protocol provides the following security guarantees:
   - 50% to protocol treasury
 
 **Resolver Incentives**:
+
 - Resolvers receive 50% of escalation fees as incentives
 - Payment distribution based on resolver activity and quality metrics
 - Automatic distribution via ResolverIncentiveModule
@@ -615,6 +648,7 @@ Sew Protocol provides the following security guarantees:
 **Purpose**: Governance token for protocol decision-making
 
 **Governance Functions**:
+
 - Proposal creation and voting
 - Parameter changes
 - Module swaps
@@ -624,6 +658,7 @@ Sew Protocol provides the following security guarantees:
 **Token Distribution**: TBD (to be determined before mainnet launch)
 
 **Voting Mechanics**:
+
 - Token-based voting (1 token = 1 vote)
 - Quorum requirements
 - Proposal thresholds
@@ -632,11 +667,13 @@ Sew Protocol provides the following security guarantees:
 ### 10.3 Revenue Streams
 
 **Protocol Revenue**:
+
 1. **Escrow Fees**: 1% of all escrow amounts
 2. **Yield Share**: 30% of generated yield (when yield enabled)
 3. **Escalation Fees**: 50% of escalation fees (after DecentralizedResolutionModule launch)
 
 **Revenue Use**:
+
 - Protocol development and maintenance
 - Security audits and bug bounties
 - Resolver network incentives (after DecentralizedResolutionModule)
@@ -646,12 +683,14 @@ Sew Protocol provides the following security guarantees:
 ### 10.4 Incentive Alignment
 
 **Resolver Incentives** (After DecentralizedResolutionModule):
+
 - 50% of escalation fees distributed to resolvers
 - Quality-based payment weighting
 - Activity tracking and rewards
 - Fair workload distribution via round-robin selection
 
 **User Benefits**:
+
 - Buyer protection for everyday purchases
 - Seller payment assurance
 - Optional yield generation (70% to users)
@@ -749,7 +788,7 @@ The protocol is designed to become a foundational piece of infrastructure for tr
 
 ## Appendix B: Contract Addresses
 
-*To be filled after mainnet deployment*
+_To be filled after mainnet deployment_
 
 - **EscrowVault**: TBD
 - **EscrowableERC20**: TBD
@@ -766,7 +805,4 @@ The protocol is designed to become a foundational piece of infrastructure for tr
 
 ---
 
-*This whitepaper is a living document and will be updated as the protocol evolves.*
-
-
-
+_This whitepaper is a living document and will be updated as the protocol evolves._

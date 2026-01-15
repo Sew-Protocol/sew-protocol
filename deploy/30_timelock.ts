@@ -4,7 +4,7 @@ import { getGovConfig, validateGovConfig } from './_config';
 
 /**
  * Deploy TimelockController
- * 
+ *
  * This script deploys OpenZeppelin's TimelockController with:
  * - 48h minimum delay (configurable)
  * - Empty proposers initially (will be granted to Governor)
@@ -15,12 +15,14 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts, ethers } = hre;
   const { deploy } = deployments;
   const { deployer } = await getNamedAccounts();
-  
+
   const config = getGovConfig(hre);
   validateGovConfig(config, hre);
 
   console.log(`\n📦 Deploying TimelockController...`);
-  console.log(`   Min Delay: ${config.timelock.minDelaySec}s (${config.timelock.minDelaySec / 3600}h)`);
+  console.log(
+    `   Min Delay: ${config.timelock.minDelaySec}s (${config.timelock.minDelaySec / 3600}h)`,
+  );
   console.log(`   Proposers: [] (empty, will be granted to Governor)`);
   console.log(`   Executors: [address(0)] (open - anyone can execute)`);
   console.log(`   Admin: ${deployer} (temporary, will be revoked)`);
@@ -41,7 +43,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   if (timelockDeployment.newlyDeployed) {
     console.log(`✅ TimelockController deployed at: ${timelockDeployment.address}`);
-    
+
     // Verify deployment
     const timelock = await ethers.getContractAt('TimelockController', timelockDeployment.address);
     const minDelay = await timelock.getMinDelay();
@@ -54,4 +56,3 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 export default func;
 func.tags = ['timelock', 'governance'];
 func.dependencies = [];
-

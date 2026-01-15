@@ -8,6 +8,7 @@
 ## Executive Summary
 
 This plan outlines the implementation of improvements identified in the contract review:
+
 1. Variable naming clarity (amount/originalAmount → remainingBalance/totalDeposited)
 2. Function name clarity improvements
 3. Add `getEscrowStatus()` and `isEscrowActive()` helper functions
@@ -20,25 +21,28 @@ This plan outlines the implementation of improvements identified in the contract
 ## Current State Analysis
 
 ### Contract Sizes (Target)
+
 - **BaseEscrow**: Abstract contract (no deployed bytecode)
 - **EscrowVault**: Must be ≤ 24,576 bytes
 - **EscrowableERC20**: Must be ≤ 24,576 bytes
 
 ### Current Field Names in EscrowTransfer Struct
+
 ```solidity
 struct EscrowTransfer {
-    uint256 workflowId;
-    address token;
-    address to;
-    address from;
-    uint256 amount;              // Current: tracks remaining balance
-    uint256 originalAmount;      // Current: tracks total deposited
-    EscrowState escrowState;
-    // ... other fields
+  uint256 workflowId;
+  address token;
+  address to;
+  address from;
+  uint256 amount; // Current: tracks remaining balance
+  uint256 originalAmount; // Current: tracks total deposited
+  EscrowState escrowState;
+  // ... other fields
 }
 ```
 
 ### Existing Query Functions
+
 - ✅ `getEscrowTransfer(uint256)` - Returns full struct
 - ✅ `isEscrowPending(uint256)` - Checks if PENDING
 - ✅ `getEscrowAmount(uint256)` - Returns current amount
@@ -65,12 +69,13 @@ struct EscrowTransfer {
  * @dev Reverts if workflowId is invalid
  */
 function getEscrowStatus(uint256 workflowId) public view returns (EscrowState) {
-    _validateWorkflowId(workflowId);
-    return escrowTransfers[workflowId].escrowState;
+  _validateWorkflowId(workflowId);
+  return escrowTransfers[workflowId].escrowState;
 }
 ```
 
 **Rationale**:
+
 - Simple wrapper around struct field access
 - Improves developer experience
 - Minimal size impact
@@ -89,15 +94,16 @@ function getEscrowStatus(uint256 workflowId) public view returns (EscrowState) {
  * @dev Returns false for invalid workflowId
  */
 function isEscrowActive(uint256 workflowId) public view returns (bool) {
-    if (workflowId >= nextWorkflowId) {
-        return false;
-    }
-    EscrowState state = escrowTransfers[workflowId].escrowState;
-    return state == EscrowState.PENDING || state == EscrowState.DISPUTED;
+  if (workflowId >= nextWorkflowId) {
+    return false;
+  }
+  EscrowState state = escrowTransfers[workflowId].escrowState;
+  return state == EscrowState.PENDING || state == EscrowState.DISPUTED;
 }
 ```
 
 **Rationale**:
+
 - Useful for frontend/wallet applications
 - Combines state checks into single function
 - Minimal size impact
@@ -112,6 +118,7 @@ function isEscrowActive(uint256 workflowId) public view returns (bool) {
 #### 2.1 Rename Struct Fields Directly
 
 **Current**:
+
 - `amount` → `remainingBalance`
 - `originalAmount` → `totalDeposited`
 
@@ -119,7 +126,8 @@ function isEscrowActive(uint256 workflowId) public view returns (bool) {
 
 **Implementation Strategy**: **Direct Rename (Recommended)**
 
-**Context**: 
+**Context**:
+
 - Current deployment is on Base Sepolia testnet only
 - Single user (dev) - breaking changes have minimal impact
 - Contract has been stable for ~6 months
@@ -127,6 +135,7 @@ function isEscrowActive(uint256 workflowId) public view returns (bool) {
 - This is the right time to make breaking changes before mainnet
 
 **Benefits of Direct Rename**:
+
 - ✅ Cleaner codebase (no duplicate/alias functions)
 - ✅ Better long-term maintainability
 - ✅ Sets correct foundation for mainnet
@@ -135,17 +144,19 @@ function isEscrowActive(uint256 workflowId) public view returns (bool) {
 - ✅ Better documentation and self-documenting code
 
 **Implementation Steps**:
+
 1. Rename struct fields in `EscrowTransfer`:
+
    ```solidity
    struct EscrowTransfer {
-       uint256 workflowId;
-       address token;
-       address to;
-       address from;
-       uint256 remainingBalance;  // renamed from 'amount'
-       uint256 totalDeposited;    // renamed from 'originalAmount'
-       EscrowState escrowState;
-       // ... other fields
+     uint256 workflowId;
+     address token;
+     address to;
+     address from;
+     uint256 remainingBalance; // renamed from 'amount'
+     uint256 totalDeposited; // renamed from 'originalAmount'
+     EscrowState escrowState;
+     // ... other fields
    }
    ```
 
@@ -169,18 +180,21 @@ function isEscrowActive(uint256 workflowId) public view returns (bool) {
 #### 3.1 Standardize Function Names
 
 **Current Issues**:
+
 - `automateTimedActions()` vs `executeTimeout()` - alias exists, but primary name unclear
 - `disputeResolver` vs `resolver` - inconsistent terminology
 
 **Implementation**:
 
 **3.1.1 Keep Alias, Improve Documentation**
+
 - Keep `executeTimeout()` as primary public function
 - Keep `automateTimedActions()` as internal/alias
 - Improve NatSpec documentation
 - **Size Impact**: ~50-100 bytes (documentation only)
 
 **3.1.2 Standardize Terminology in Documentation**
+
 - Update all comments/docs to use "resolver" consistently
 - No code changes needed
 - **Size Impact**: 0 bytes (documentation only)
@@ -194,28 +208,30 @@ function isEscrowActive(uint256 workflowId) public view returns (bool) {
 #### 4.1 Feasibility Analysis
 
 **Proposed Function**:
+
 ```solidity
 function getEscrowsByParticipant(address participant) public view returns (uint256[] memory) {
-    uint256[] memory workflowIds = new uint256[](nextWorkflowId);
-    uint256 count = 0;
-    for (uint256 i = 0; i < nextWorkflowId; i++) {
-        EscrowTransfer storage et = escrowTransfers[i];
-        if (et.from == participant || et.to == participant) {
-            workflowIds[count] = i;
-            count++;
-        }
+  uint256[] memory workflowIds = new uint256[](nextWorkflowId);
+  uint256 count = 0;
+  for (uint256 i = 0; i < nextWorkflowId; i++) {
+    EscrowTransfer storage et = escrowTransfers[i];
+    if (et.from == participant || et.to == participant) {
+      workflowIds[count] = i;
+      count++;
     }
-    // Resize array to actual count
-    assembly {
-        mstore(workflowIds, count)
-    }
-    return workflowIds;
+  }
+  // Resize array to actual count
+  assembly {
+    mstore(workflowIds, count)
+  }
+  return workflowIds;
 }
 ```
 
 **Size Impact**: ~400-600 bytes
 
 **Gas Cost Analysis**:
+
 - **Low escrow count (< 100)**: ~50,000-200,000 gas
 - **Medium escrow count (100-1000)**: ~200,000-2,000,000 gas
 - **High escrow count (> 1000)**: > 2,000,000 gas (may exceed block gas limit)
@@ -223,27 +239,31 @@ function getEscrowsByParticipant(address participant) public view returns (uint2
 **Recommendation**: ⚠️ **CONDITIONAL IMPLEMENTATION**
 
 **Pros**:
+
 - Useful for wallet/frontend applications
 - Can be built off-chain, but on-chain is more convenient
 
 **Cons**:
+
 - Gas cost scales linearly with total escrow count
 - May become unusable as protocol scales
 - Better suited for off-chain indexing (The Graph)
 
 **Alternative Approach**: **Pagination Support**
+
 ```solidity
 function getEscrowsByParticipant(
-    address participant,
-    uint256 offset,
-    uint256 limit
+  address participant,
+  uint256 offset,
+  uint256 limit
 ) public view returns (uint256[] memory workflowIds, uint256 totalCount) {
-    // Implementation with pagination
-    // Limits gas cost per call
+  // Implementation with pagination
+  // Limits gas cost per call
 }
 ```
 
 **Decision**: **DEFER** - Implement only if:
+
 1. Contract size allows (after other improvements)
 2. User demand is high
 3. With pagination to limit gas costs
@@ -254,12 +274,12 @@ function getEscrowsByParticipant(
 
 ## Size Impact Summary
 
-| Phase | Changes | Size Impact | Priority |
-|-------|---------|-------------|----------|
-| Phase 1 | Add helper functions | +350-500 bytes | **HIGH** |
-| Phase 2 | Rename struct fields directly | ~0 bytes (saves vs alias) | **HIGH** |
-| Phase 3 | Documentation improvements | +50-100 bytes | **LOW** |
-| Phase 4 | getEscrowsByParticipant (conditional) | +400-600 bytes | **DEFER** |
+| Phase   | Changes                               | Size Impact               | Priority  |
+| ------- | ------------------------------------- | ------------------------- | --------- |
+| Phase 1 | Add helper functions                  | +350-500 bytes            | **HIGH**  |
+| Phase 2 | Rename struct fields directly         | ~0 bytes (saves vs alias) | **HIGH**  |
+| Phase 3 | Documentation improvements            | +50-100 bytes             | **LOW**   |
+| Phase 4 | getEscrowsByParticipant (conditional) | +400-600 bytes            | **DEFER** |
 
 **Total (Phases 1-3)**: ~400-600 bytes  
 **Total (All Phases)**: ~800-1200 bytes
@@ -271,6 +291,7 @@ function getEscrowsByParticipant(
 ## Implementation Order
 
 ### Step 1: Implement Phase 1 (Helper Functions)
+
 **Priority**: HIGH  
 **Risk**: LOW  
 **Size Impact**: +350-500 bytes
@@ -281,6 +302,7 @@ function getEscrowsByParticipant(
 4. Verify contract size remains under limit
 
 ### Step 2: Implement Phase 2 (Direct Struct Field Rename)
+
 **Priority**: HIGH  
 **Risk**: LOW (testnet only, single user)  
 **Size Impact**: ~0 bytes (saves space vs alias approach)
@@ -296,6 +318,7 @@ function getEscrowsByParticipant(
 9. Verify contract size remains under limit
 
 ### Step 3: Implement Phase 3 (Documentation)
+
 **Priority**: LOW  
 **Risk**: NONE  
 **Size Impact**: +50-100 bytes
@@ -305,6 +328,7 @@ function getEscrowsByParticipant(
 3. No code changes, documentation only
 
 ### Step 4: Evaluate Phase 4 (Conditional)
+
 **Priority**: DEFER  
 **Risk**: MEDIUM (gas costs)  
 **Size Impact**: +400-600 bytes
@@ -319,6 +343,7 @@ function getEscrowsByParticipant(
 ## Testing Requirements
 
 ### Unit Tests
+
 - [ ] Test `getEscrowStatus()` returns correct state
 - [ ] Test `isEscrowActive()` for all state combinations
 - [ ] Test `getRemainingBalance()` returns correct value
@@ -326,11 +351,13 @@ function getEscrowsByParticipant(
 - [ ] Test edge cases (invalid workflowId, etc.)
 
 ### Integration Tests
+
 - [ ] Verify functions work with existing escrow lifecycle
 - [ ] Verify no breaking changes to existing functionality
 - [ ] Test gas costs for new functions
 
 ### Size Verification
+
 - [ ] Compile contracts and verify bytecode size
 - [ ] Ensure EscrowVault ≤ 24,576 bytes
 - [ ] Ensure EscrowableERC20 ≤ 24,576 bytes
@@ -343,12 +370,14 @@ function getEscrowsByParticipant(
 ### For Existing Integrations
 
 **Breaking Changes (Acceptable for Testnet)**:
+
 - Struct field names changed: `amount` → `remainingBalance`, `originalAmount` → `totalDeposited`
 - Function names changed: `getEscrowAmount()` → `getRemainingBalance()`, `getEscrowOriginalDeposit()` → `getTotalDeposited()`
 - **Impact**: Single user (dev) - minimal impact
 - **Action Required**: Update wallet app with new field/function names
 
 **Migration Path**:
+
 1. **Redeploy**: Deploy updated contracts to Base Sepolia
 2. **Update Wallet App**: Copy/paste change to use new field names
 3. **Test**: Verify all functionality works with new names
@@ -366,14 +395,17 @@ function getEscrowsByParticipant(
 ## Risk Assessment
 
 ### Low Risk Items ✅
+
 - Phase 1: Helper functions (read-only, no state changes)
 - Phase 2: Direct struct field rename (testnet only, single user, acceptable breaking change)
 - Phase 3: Documentation only
 
 ### Medium Risk Items ⚠️
+
 - Phase 4: `getEscrowsByParticipant()` - gas costs may be high
 
 ### Mitigation Strategies
+
 1. **Size Monitoring**: Check contract size after each phase
 2. **Gas Testing**: Test gas costs for all new functions
 3. **Backward Compatibility**: Ensure no breaking changes
@@ -384,6 +416,7 @@ function getEscrowsByParticipant(
 ## Success Criteria
 
 ### Must Have ✅
+
 - [ ] Contracts remain under 24KB limit
 - [ ] All new functions tested and working
 - [ ] Struct field renames complete and tested
@@ -391,6 +424,7 @@ function getEscrowsByParticipant(
 - [ ] Documentation updated
 
 ### Nice to Have 🎯
+
 - [ ] `getEscrowsByParticipant()` implemented (if size allows)
 - [ ] Gas costs optimized
 - [ ] Frontend examples updated
@@ -458,4 +492,3 @@ function getEscrowsByParticipant(
 
 **Last Updated**: Current  
 **Status**: Ready for Implementation
-

@@ -25,6 +25,7 @@ Implemented DR v2 (Decentralise Incentives) phase of the staged dispute resoluti
 ### 1. Appeal Bond System
 
 **User Flow:**
+
 1. User wants to escalate dispute from round k to k+1
 2. System calculates required bond via `getRequiredAppealBond()`
 3. Escrow contract collects bond from user
@@ -35,37 +36,41 @@ Implemented DR v2 (Decentralise Incentives) phase of the staged dispute resoluti
    - If decision same as prior round → **pay bond to prior round's resolvers**
 
 **Bond Tracking (per dispute/round):**
+
 ```solidity
 struct AppealBondRecord {
-    address depositor;      // Who posted the bond
-    uint256 amount;         // Bond amount
-    address token;          // Token address (address(0) = ETH)
-    uint256 depositedAt;    // Timestamp
-    bool distributed;       // Whether refunded/paid
-    bool refunded;          // True = refunded, False = paid to resolvers
+  address depositor; // Who posted the bond
+  uint256 amount; // Bond amount
+  address token; // Token address (address(0) = ETH)
+  uint256 depositedAt; // Timestamp
+  bool distributed; // Whether refunded/paid
+  bool refunded; // True = refunded, False = paid to resolvers
 }
 ```
 
 ### 2. Escalation Cost Curves
 
 **Configuration:**
+
 ```solidity
 struct EscalationCostConfig {
-    CostCurveType curveType;  // LINEAR, QUADRATIC, GEOMETRIC
-    uint256 baseCost;         // Base cost (e.g., 100 tokens)
-    uint256 stepSize;         // Step increment
-    uint256 multiplier;       // For geometric (scaled by 1e18)
-    address bondToken;        // Token for bonds (address(0) = ETH)
-    bool enabled;             // Master switch
+  CostCurveType curveType; // LINEAR, QUADRATIC, GEOMETRIC
+  uint256 baseCost; // Base cost (e.g., 100 tokens)
+  uint256 stepSize; // Step increment
+  uint256 multiplier; // For geometric (scaled by 1e18)
+  address bondToken; // Token for bonds (address(0) = ETH)
+  bool enabled; // Master switch
 }
 ```
 
 **Cost Formulas:**
+
 - **Linear:** `bond(k) = baseCost + stepSize × k`
 - **Quadratic (recommended):** `bond(k) = baseCost + stepSize × k²`
 - **Geometric:** `bond(k) = baseCost × (multiplier/1e18)^k`
 
 **Example (Quadratic with base=100, step=50):**
+
 - Round 0→1: 100 + 50×0² = **100 tokens**
 - Round 1→2: 100 + 50×1² = **150 tokens**
 - Round 2→3: 100 + 50×2² = **300 tokens** (if round 3 existed)
@@ -73,6 +78,7 @@ struct EscalationCostConfig {
 ### 3. Observability Metrics
 
 **Tracked Metrics:**
+
 - `totalBondsPosted` - Sum of all bonds deposited
 - `totalBondsRefunded` - Sum of bonds returned to depositors (appeals succeeded)
 - `totalBondsPaidToResolvers` - Sum of bonds paid to resolvers (appeals failed)
@@ -80,37 +86,44 @@ struct EscalationCostConfig {
 - `escalationDepthHistogram[round]` - Count of escalations to each round
 
 **View Functions:**
+
 ```solidity
-function getV2Metrics() external view returns (
+function getV2Metrics()
+  external
+  view
+  returns (
     uint256 bondsPosted,
     uint256 bondsRefunded,
     uint256 bondsPaidToResolvers,
     uint256 bondsForfeited
-);
+  );
 
-function getEscalationDepthHistogram() external view returns (
-    uint256 round0,
-    uint256 round1,
-    uint256 round2
-);
+function getEscalationDepthHistogram()
+  external
+  view
+  returns (uint256 round0, uint256 round1, uint256 round2);
 ```
 
 ### 4. Anti-Griefing Measures
 
 **Minimum Escrow Value:**
+
 - Governance can set `minEscrowValueForEscalation`
 - Prevents escalation of low-value disputes beyond threshold
 - Example: Require $1000 minimum to escalate to round 2 (Kleros)
 
 **Increasing Delays** (already in v1, now meaningful with bonds):
+
 - `resolveDeadlines[k]` - Time for resolver to decide
 - `appealWindows[k]` - Time window to post appeal bond
 - Can increase with depth to throttle spam
 
 **Bond Forfeiture:**
+
 ```solidity
 function forfeitAppealBond(uint256 workflowId, uint8 round, string memory reason)
 ```
+
 - Escrow can forfeit bond if escalator doesn't follow through
 - Example: Posted bond but didn't submit required evidence
 - Bond remains in contract as protocol revenue
@@ -120,6 +133,7 @@ function forfeitAppealBond(uint256 workflowId, uint8 round, string memory reason
 ## Files Created
 
 ### Contracts
+
 - `/contracts/decentralized-resolution-module/ResolverIncentiveModuleV2.sol` (370 lines)
   - Extends `ResolverIncentiveModuleV1`
   - Adds `recordAppealBond()`, `distributeAppealBond()`, `forfeitAppealBond()`
@@ -134,6 +148,7 @@ function forfeitAppealBond(uint256 workflowId, uint8 round, string memory reason
 ### Core Contracts
 
 **`DecentralizedResolverStructs.sol`:**
+
 - Extended `DisputeMetadata` with bond tracking arrays:
   ```solidity
   address[3] bondDepositorAtRound;
@@ -144,6 +159,7 @@ function forfeitAppealBond(uint256 workflowId, uint8 round, string memory reason
 - Added `bondToken` field to `EscalationCostConfig`
 
 **`DecentralizedResolutionModule.sol`:**
+
 - Added DR v2 storage:
   - `escalationCostConfig` - cost curve configuration
   - `minEscrowValueForEscalation` - anti-griefing threshold
@@ -162,17 +178,20 @@ function forfeitAppealBond(uint256 workflowId, uint8 round, string memory reason
 ## Architecture: Stable Core + Swappable V2
 
 **Module Swap (v1 → v2):**
+
 ```
 Before: DecentralizedResolutionModule + IncentiveModuleV1
 After:  DecentralizedResolutionModule + IncentiveModuleV2 (swap only)
 ```
 
 **What Changes:**
+
 - `IncentiveModuleV1` → `IncentiveModuleV2`
 - New: Appeal bond tracking and distribution
 - New: V2 observability metrics
 
 **What Stays:**
+
 - `DecentralizedResolutionModule` unchanged (stable core)
 - Round-based dispute flow
 - EMA-based resolver scoring
@@ -180,6 +199,7 @@ After:  DecentralizedResolutionModule + IncentiveModuleV2 (swap only)
 - Phase gate metrics
 
 **Governance Flow:**
+
 1. Deploy `ResolverIncentiveModuleV2` (proxy)
 2. Configure escalation cost curve via `queueEscalationCostConfig()` + wait + `activateEscalationCostConfig()`
 3. Call `DecentralizedResolutionModule.setIncentiveModule(addressV2)` via ROLE_TIMELOCK
@@ -193,9 +213,10 @@ After:  DecentralizedResolutionModule + IncentiveModuleV2 (swap only)
 ### 1. User Escalates Dispute
 
 **Escrow Contract:**
+
 ```solidity
 // Get required bond
-(uint256 bondAmount, address bondToken) = 
+(uint256 bondAmount, address bondToken) =
     resolutionModule.getRequiredAppealBond(workflowId, currentRound, escrowData);
 
 // Collect bond from user
@@ -223,6 +244,7 @@ resolutionModule.executeEscalation(workflowId, "");
 ### 2. Next Round Resolver Decides
 
 **Escrow Contract (after resolution):**
+
 ```solidity
 // Get decisions from both rounds
 bool outcomeFlipped = (
@@ -238,6 +260,7 @@ incentiveModuleV2.distributeAppealBond(
 ```
 
 **IncentiveModuleV2 (internal):**
+
 - If `outcomeFlipped = true`: Refund bond to depositor
 - If `outcomeFlipped = false`: Pay bond to resolvers from `priorRound`
 
@@ -285,30 +308,36 @@ incentiveModuleV2.distributeAppealBond(
 ## Economics Example
 
 **Scenario:**
+
 - Dispute value: $10,000
 - Escalation cost config: Quadratic, base=100 USDC, step=50 USDC
 - Escrow fee: 2% = $200 USDC (split among resolvers)
 
 **Round 0 (Standard Resolver):**
+
 - Resolver1 decides: Release to buyer
 - Seller disagrees, wants to escalate
 
 **Escalation 0→1:**
+
 - Required bond: 100 + 50×0² = **100 USDC**
 - Seller posts 100 USDC bond
 - Escalates to senior resolver
 
 **Round 1 (Senior Resolver):**
+
 - SeniorResolver1 decides: Cancel (return to seller)
 - Decision **changed** from round 0
 - **Outcome:** Seller's bond (100 USDC) **refunded** (appeal succeeded)
 
 **Alternative Scenario:**
+
 - Senior resolver also decides: Release to buyer
 - Decision **unchanged** from round 0
 - **Outcome:** Seller's bond (100 USDC) **paid to Resolver1** (appeal failed)
 
 **Resolver1 Total Earnings:**
+
 - Base case (no escalation): ~$100 USDC (50% of escrow fee)
 - Failed appeal case: ~$100 + $100 = **$200 USDC** (escrow fee + bond)
 
@@ -319,6 +348,7 @@ incentiveModuleV2.distributeAppealBond(
 ## Governance Parameters (Recommended Defaults)
 
 ### Escalation Cost Curve (Quadratic)
+
 ```solidity
 EscalationCostConfig({
     curveType: CostCurveType.QUADRATIC,
@@ -331,11 +361,13 @@ EscalationCostConfig({
 ```
 
 **Resulting Costs:**
+
 - 0→1: 100 tokens (first appeal)
 - 1→2: 150 tokens (to Kleros)
 - 2→3: 300 tokens (if hypothetical round 3 existed)
 
 ### Anti-Griefing
+
 ```solidity
 minEscrowValueForEscalation = 1000e18; // $1000 minimum to escalate beyond round 1
 ```
@@ -345,6 +377,7 @@ minEscrowValueForEscalation = 1000e18; // $1000 minimum to escalate beyond round
 ## Phase Gate: v2 → v3 Readiness
 
 **Metrics to Track:**
+
 - Appeal success rate (refund rate)
 - Average bond amount
 - Escalation depth distribution
@@ -352,6 +385,7 @@ minEscrowValueForEscalation = 1000e18; // $1000 minimum to escalate beyond round
 - Resolver behavior changes (decision quality)
 
 **V2 Exit Criteria (before v3):**
+
 - Stable appeal economics (20-40% reversal rate)
 - No evidence of resolver collusion
 - Predictable bond flows (not excessive refunds or forfeitures)
@@ -364,6 +398,7 @@ minEscrowValueForEscalation = 1000e18; // $1000 minimum to escalate beyond round
 **Current:** ✅ 107 tests passing (all v1 tests)
 
 **Needed for v2:**
+
 - [ ] Appeal bond recording and tracking
 - [ ] Bond refund on successful appeal
 - [ ] Bond payment to resolvers on failed appeal
@@ -392,6 +427,7 @@ minEscrowValueForEscalation = 1000e18; // $1000 minimum to escalate beyond round
 ## Future Work (DR v3)
 
 DR v3 will add:
+
 - **Resolver staking** (capital at risk)
 - **Slashing** (penalties for bad decisions)
 - **Senior backing** (capital delegation)
@@ -404,6 +440,7 @@ These features are intentionally deferred until v2 proves stable under real usag
 ## Summary
 
 DR v2 implementation is **feature-complete** with:
+
 - ✅ Appeal bond tracking per dispute/round
 - ✅ Bond custody in IncentiveModuleV2
 - ✅ Refund/payout logic based on outcome

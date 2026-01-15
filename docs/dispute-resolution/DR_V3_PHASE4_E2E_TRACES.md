@@ -34,6 +34,7 @@
 ```
 
 **Verification:**
+
 - ✅ Resolver1 assigned to workflowId=1
 - ✅ 1,000 USD (minimum stake) locked
 - ✅ Available stake reduced from 5,000 → 4,000 USD
@@ -86,6 +87,7 @@
 ```
 
 **Verification:**
+
 - ✅ Exactly-once slashing: workflowSlashed[1][resolver1] = true
 - ✅ Slash amount: 250 USD (5% of 5,000 USD)
 - ✅ Resolver1 stake: 5,000 → 4,750 USD
@@ -109,6 +111,7 @@
 ```
 
 **Verification:**
+
 - ✅ Withdrawal correctly blocked during freeze
 - ✅ Error message: "Resolver frozen"
 - ✅ No unbond request created
@@ -130,6 +133,7 @@
 ```
 
 **Verification:**
+
 - ✅ Top-up succeeds during freeze
 - ✅ No freeze check in stakeWithMix()
 - ✅ Total stake: 4,750 → 5,750 USD
@@ -150,6 +154,7 @@
 ```
 
 **Verification:**
+
 - ✅ Resolver2 successfully resolves
 - ✅ Resolver2 stake unlocked
 - ✅ Dispute finalized
@@ -184,6 +189,7 @@
 ```
 
 **Verification:**
+
 - ✅ Freeze expires after 7 days
 - ✅ Withdrawal succeeds after freeze expiry
 - ✅ Unbond delay enforced (14 days)
@@ -242,6 +248,7 @@
 ```
 
 **Verification:**
+
 - ✅ V3 modules active and working
 - ✅ Slash executed: 250 USD
 - ✅ Resolver1 frozen
@@ -266,6 +273,7 @@
 ```
 
 **Verification:**
+
 - ✅ Rollback queued via slow lane (7 days)
 - ✅ Can queue address(0) to disable modules
 
@@ -293,6 +301,7 @@
 ```
 
 **Verification:**
+
 - ✅ V3 modules disabled (address(0))
 - ✅ Slow lane delay enforced (7 days)
 - ✅ Active disputes continue (hooks check `if (address(module) != address(0))`)
@@ -315,6 +324,7 @@
 ```
 
 **Verification:**
+
 - ✅ Dispute progression not broken
 - ✅ Hooks safely skipped when module is address(0)
 - ✅ Core resolution logic works without V3
@@ -397,6 +407,7 @@ Both traces demonstrate:
 ```
 
 **Verification:**
+
 - ✅ Senior has 50K USD stake
 - ✅ Junior has 1.1K USD stake
 - ✅ Delegation active: 3.3K USD coverage reserved from senior
@@ -416,6 +427,7 @@ Both traces demonstrate:
 ```
 
 **Verification:**
+
 - ✅ Resolver1 assigned to workflowId=1
 - ✅ 1,000 USD (minimum stake) locked
 - ✅ Available stake reduced from 1,100 → 100 USD
@@ -477,6 +489,7 @@ Both traces demonstrate:
 ```
 
 **Verification:**
+
 - ✅ Slash amount: 55 USD (5% of 1,100 USD)
 - ✅ Resolver1 stake: 1,100 → 1,045 USD
 - ✅ Junior covered fully (55 USD < 100 USD available)
@@ -560,6 +573,7 @@ Both traces demonstrate:
 ```
 
 **Verification:**
+
 - ✅ Exactly-once slashing: workflowSlashed[2][resolver1] = true
 - ✅ Slash amount: 52.25 USD (5% of 1,045 USD)
 - ✅ Waterfall executed:
@@ -590,6 +604,7 @@ Both traces demonstrate:
 ```
 
 **Verification:**
+
 - ✅ Junior bond exhausted (availableStake = 0)
 - ✅ Senior coverage slashed (7.25 USD)
 - ✅ Reserved coverage reduced proportionally
@@ -599,6 +614,7 @@ Both traces demonstrate:
 ---
 
 **Key Takeaways:**
+
 1. **Waterfall Ordering:** Resolver bond exhausted first, then senior coverage
 2. **Caps Respected:** Per-offense cap (50%) and period cap (100%) enforced
 3. **Coverage Accounting:** Reserved coverage reduced when senior slashed

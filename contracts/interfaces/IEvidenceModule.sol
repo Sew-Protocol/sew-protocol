@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
-import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import '@openzeppelin/contracts/utils/introspection/IERC165.sol';
 
 /**
  * @title IEvidenceModule
@@ -25,7 +25,7 @@ interface IEvidenceModule is IERC165 {
         bytes32 evidenceHash,
         string calldata metadata
     ) external returns (uint256 evidenceId);
-    
+
     /**
      * @notice Get all evidence hashes for a dispute
      * @param workflowId The escrow workflow ID
@@ -36,20 +36,23 @@ interface IEvidenceModule is IERC165 {
      */
     function getEvidence(
         uint256 workflowId
-    ) external view returns (
-        bytes32[] memory hashes,
-        address[] memory submitters,
-        uint256[] memory timestamps,
-        string[] memory metadata
-    );
-    
+    )
+        external
+        view
+        returns (
+            bytes32[] memory hashes,
+            address[] memory submitters,
+            uint256[] memory timestamps,
+            string[] memory metadata
+        );
+
     /**
      * @notice Get evidence count for a dispute
      * @param workflowId The escrow workflow ID
      * @return count Number of evidence submissions
      */
     function getEvidenceCount(uint256 workflowId) external view returns (uint256 count);
-    
+
     /**
      * @notice Get a specific evidence record
      * @param workflowId The escrow workflow ID
@@ -62,13 +65,11 @@ interface IEvidenceModule is IERC165 {
     function getEvidenceRecord(
         uint256 workflowId,
         uint256 evidenceId
-    ) external view returns (
-        bytes32 hash,
-        address submitter,
-        uint256 submittedAt,
-        string memory metadata
-    );
-    
+    )
+        external
+        view
+        returns (bytes32 hash, address submitter, uint256 submittedAt, string memory metadata);
+
     /**
      * @notice Check if evidence submission is allowed
      * @param workflowId The escrow workflow ID
@@ -82,7 +83,7 @@ interface IEvidenceModule is IERC165 {
         address submitter,
         bytes calldata escrowData
     ) external view returns (bool allowed, string memory reason);
-    
+
     /**
      * @notice Callback when dispute is opened (optional)
      * @param workflowId The escrow workflow ID
@@ -90,13 +91,13 @@ interface IEvidenceModule is IERC165 {
      *      Allows evidence module to initialize dispute-specific state
      */
     function onDisputeOpened(uint256 workflowId) external;
-    
+
     /**
      * @notice Get the module name/identifier
      * @return name The module name
      */
     function moduleName() external pure returns (string memory name);
-    
+
     /**
      * @notice Get the module version
      * @return version The module version (semantic versioning)

@@ -4,7 +4,7 @@ import { getGovConfig, validateGovConfig } from './_config';
 
 /**
  * Deploy GovGovernor
- * 
+ *
  * This script deploys the GovGovernor contract with all extensions:
  * - GovernorSettings: voting delay, period, threshold
  * - GovernorCountingSimple: simple vote counting
@@ -16,14 +16,14 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts, ethers } = hre;
   const { deploy, get } = deployments;
   const { deployer } = await getNamedAccounts();
-  
+
   const config = getGovConfig(hre);
   validateGovConfig(config, hre);
 
   // Get deployed contracts
   const tokenDeployment = await get('SewToken');
   const timelockDeployment = await get('TimelockController');
-  
+
   const token = await ethers.getContractAt('SewToken', tokenDeployment.address);
 
   console.log(`\n📦 Deploying GovGovernor...`);
@@ -32,7 +32,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   console.log(`   Timelock: ${timelockDeployment.address}`);
   console.log(`   Voting Delay: ${config.governor.votingDelayBlocks} blocks`);
   console.log(`   Voting Period: ${config.governor.votingPeriodBlocks} blocks`);
-  const thresholdFormatted = (BigInt(config.governor.proposalThreshold) / BigInt(10 ** 18)).toString();
+  const thresholdFormatted = (
+    BigInt(config.governor.proposalThreshold) / BigInt(10 ** 18)
+  ).toString();
   console.log(`   Proposal Threshold: ${thresholdFormatted} tokens`);
   console.log(`   Quorum: ${config.governor.quorumBps / 100}% (${config.governor.quorumBps} bps)`);
 
@@ -52,7 +54,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   if (governorDeployment.newlyDeployed) {
     console.log(`✅ GovGovernor deployed at: ${governorDeployment.address}`);
-    
+
     // Verify deployment
     const governor = await ethers.getContractAt('GovGovernor', governorDeployment.address);
     const votingDelay = await governor.votingDelay();
@@ -60,7 +62,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     const proposalThreshold = await governor.proposalThreshold();
     const timelockAddress = await governor.timelock();
     const quorumNumerator = await governor.quorumNumerator();
-    
+
     console.log(`\n📊 Governor Configuration:`);
     console.log(`   Voting Delay: ${votingDelay.toString()} blocks`);
     console.log(`   Voting Period: ${votingPeriod.toString()} blocks`);
@@ -68,7 +70,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     console.log(`   Proposal Threshold: ${thresholdFormatted} tokens`);
     console.log(`   Quorum Numerator: ${quorumNumerator.toString()}% (denominator: 100)`);
     console.log(`   Timelock: ${timelockAddress}`);
-    
+
     // Note: quorum() requires checkpoints to exist, so we can't call it immediately after deployment
     // The quorum will be calculated as: totalSupply * quorumNumerator / 100
   } else {
@@ -79,4 +81,3 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 export default func;
 func.tags = ['governor', 'governance'];
 func.dependencies = ['token', 'timelock'];
-

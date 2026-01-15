@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
-import "../types/EscrowTypes.sol";
+import '../types/EscrowTypes.sol';
 
 library EscrowCreationLibrary {
     function createEscrowTransferStruct(
@@ -11,17 +11,18 @@ library EscrowCreationLibrary {
         uint256 amountAfterFee,
         address defaultResolver
     ) internal pure returns (EscrowTransfer memory) {
-        return EscrowTransfer({
-            token: token,
-            to: seller,
-            from: from,
-            amountAfterFee: amountAfterFee,
-            escrowState: EscrowState.PENDING,
-            senderStatus: SenderStatus.NONE,
-            recipientStatus: RecipientStatus.NONE,
-            disputeResolver: defaultResolver,
-            autoReleaseTime: 0,
-            autoCancelTime: 0
-        });
+        return
+            EscrowTransfer({
+                token: token,
+                to: seller,
+                from: from,
+                amountAfterFee: amountAfterFee,
+                escrowState: EscrowState.PENDING,
+                senderStatus: SenderStatus.NONE,
+                recipientStatus: RecipientStatus.NONE,
+                disputeResolver: defaultResolver,
+                autoReleaseTime: 0,
+                autoCancelTime: 0
+            });
     }
 }

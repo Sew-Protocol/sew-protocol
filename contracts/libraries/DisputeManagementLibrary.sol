@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
-import "../types/EscrowTypes.sol";
+import '../types/EscrowTypes.sol';
 
 /**
  * @title DisputeManagementLibrary
@@ -26,12 +26,12 @@ library DisputeManagementLibrary {
         if (escrowState != EscrowState.DISPUTED || raisedTimestamp == 0) {
             return (false, 0);
         }
-        
+
         uint256 elapsed = block.timestamp - raisedTimestamp;
         if (elapsed >= maxDuration) {
             return (true, 0);
         }
-        
+
         return (false, maxDuration - elapsed);
     }
 }

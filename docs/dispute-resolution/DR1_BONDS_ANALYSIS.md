@@ -13,6 +13,7 @@ This avoids creating escalation fee governance infrastructure (`escalationConfig
 ### DR v1 (Current Implementation)
 
 **Escalation Fees:**
+
 - Uses `escalationConfig` mapping: `mapping(uint8 => EscalationConfig)`
 - Per-round fee configuration via governance
 - Governance functions: `queueEscalationConfig()`, `activateEscalationConfig()`
@@ -20,6 +21,7 @@ This avoids creating escalation fee governance infrastructure (`escalationConfig
 - Fees are simple ETH payments (not bonds)
 
 **Issues:**
+
 - Governance infrastructure for fees that will be replaced by bonds
 - Fee configuration complexity without benefit (fees are always 0)
 - Need to maintain governance surface for temporary feature
@@ -27,6 +29,7 @@ This avoids creating escalation fee governance infrastructure (`escalationConfig
 ### DR v2 (Planned Implementation)
 
 **Escalation Bonds:**
+
 - Uses `escalationCostConfig` with cost curves (linear, quadratic, geometric)
 - Bonds are posted by users, refunded if appeal succeeds
 - Bonds paid to resolvers if appeal fails
@@ -34,6 +37,7 @@ This avoids creating escalation fee governance infrastructure (`escalationConfig
 - Currently disabled (`escalationCostConfig.enabled = false`)
 
 **Key Differences:**
+
 - Bonds vs fees: Bonds are refundable deposits, fees are payments
 - Cost curves: Bonds use dynamic cost calculation based on escalation count
 - Bond distribution: Bonds go to resolvers, fees go to treasury
@@ -69,11 +73,13 @@ This avoids creating escalation fee governance infrastructure (`escalationConfig
 #### Option A: Fixed Bonds (Simplest)
 
 **Concept:**
+
 - Fixed bond amounts per escalation level
 - No cost curves
 - Simple governance: Set bond amounts via single parameter
 
 **Implementation:**
+
 ```solidity
 // Simple bond configuration
 uint256 public escalationBondRound1 = 0.01 ether; // Round 0 → 1
@@ -85,24 +91,28 @@ address public bondToken = address(0); // ETH
 ```
 
 **Pros:**
+
 - ✅ Simplest implementation
 - ✅ Minimal governance surface
 - ✅ Clear user expectations
 - ✅ Can upgrade to curves in DR v2
 
 **Cons:**
+
 - ❌ Less flexible than cost curves
 - ❌ Doesn't prevent repeated escalation as well
 
 #### Option B: Simple Cost Curve (Recommended)
 
 **Concept:**
+
 - Use cost curve infrastructure from DR v2, but simpler
 - Enable `escalationCostConfig` in DR v1
 - Start with simple quadratic curve
 - Same infrastructure, simpler parameters
 
 **Implementation:**
+
 ```solidity
 // Use existing escalationCostConfig
 EscalationCostConfig public escalationCostConfig;
@@ -114,28 +124,33 @@ EscalationCostConfig public escalationCostConfig;
 ```
 
 **Pros:**
+
 - ✅ Uses existing infrastructure
 - ✅ Consistent with DR v2 model
 - ✅ Better anti-spam than fixed bonds
 - ✅ No new governance functions needed (reuse DR v2 functions)
 
 **Cons:**
+
 - ⚠️ Slightly more complex than fixed bonds
 - ⚠️ Requires enabling DR v2 infrastructure early
 
 #### Option C: Hybrid (Start Fixed, Upgrade to Curves)
 
 **Concept:**
+
 - Start with fixed bonds in DR v1
 - Upgrade to cost curves when moving to DR v2
 - Maintains simplicity for initial launch
 
 **Pros:**
+
 - ✅ Simplest initial implementation
 - ✅ Can upgrade later
 - ✅ Lower initial complexity
 
 **Cons:**
+
 - ❌ Still requires infrastructure change in DR v2
 - ❌ Less optimal long-term
 
@@ -170,6 +185,7 @@ EscalationCostConfig public escalationCostConfig;
 ### Implementation Details
 
 **Enable Bonds in DR v1:**
+
 ```solidity
 // In DecentralizedResolutionModule initialization
 escalationCostConfig = EscalationCostConfig({
@@ -183,12 +199,14 @@ escalationCostConfig = EscalationCostConfig({
 ```
 
 **Remove Fee Infrastructure:**
+
 - Remove `escalationConfig` mapping
 - Remove `queueEscalationConfig()`, `activateEscalationConfig()`
 - Remove `escalationFeePaid` tracking
 - Remove fee collection in `BaseEscrow.escalateDispute()`
 
 **Update Escalation Flow:**
+
 - Use `getRequiredAppealBond()` instead of `canEscalate()` fee return
 - Require bond deposit before escalation
 - Refund bonds on successful appeals
@@ -201,21 +219,25 @@ escalationCostConfig = EscalationCostConfig({
 ### Positive Impacts
 
 ✅ **Simpler Governance:**
+
 - Remove fee governance infrastructure
 - Use bond governance (persists to DR v2)
 - Less governance surface to maintain
 
 ✅ **Better Incentives:**
+
 - Bonds align incentives (users only pay if appeal fails)
 - Fees don't align (users always pay)
 - Reduces frivolous appeals
 
 ✅ **Consistent Model:**
+
 - DR v1: Bonds (simple curves)
 - DR v2: Bonds (advanced curves)
 - No transition needed
 
 ✅ **Code Simplification:**
+
 - Remove `escalationConfig` mapping
 - Remove fee collection logic
 - Remove fee governance functions
@@ -224,17 +246,20 @@ escalationCostConfig = EscalationCostConfig({
 ### Negative Impacts / Risks
 
 ⚠️ **Initial Complexity:**
+
 - Requires enabling bond infrastructure in DR v1
 - Bond deposit/refund logic needed in `BaseEscrow`
 - More complex than fixed fees
 
 ⚠️ **Bond Management:**
+
 - Need to handle bond deposits
 - Need to handle bond refunds
 - Need to handle bond distribution to resolvers
 - More state tracking than fees
 
 ⚠️ **User Experience:**
+
 - Bonds require users to lock funds (refundable)
 - Fees are simpler (pay once)
 - Bonds may have higher gas costs
@@ -242,32 +267,35 @@ escalationCostConfig = EscalationCostConfig({
 ### Risk Assessment
 
 **Low Risk:**
+
 - Bond infrastructure already exists
 - Can start with simple parameters
 - Governance functions already implemented
 
 **Medium Risk:**
+
 - Requires changes to `BaseEscrow.escalateDispute()`
 - Bond deposit/refund logic needs careful implementation
 - User experience changes (bonds vs fees)
 
 **High Risk:**
+
 - None identified
 
 ---
 
 ## Comparison: Fees vs Bonds
 
-| Aspect | Fees (Current DR v1) | Bonds (Proposed DR v1) |
-|--------|---------------------|------------------------|
-| **Payment Model** | Pay once, non-refundable | Lock deposit, refundable |
-| **Incentive Alignment** | Poor (always pay) | Good (pay only if fail) |
-| **Governance** | Per-round config needed | Single cost curve config |
-| **Anti-Spam** | Fixed amount | Cost curves (increasing) |
-| **Complexity** | Simple (pay ETH) | Medium (deposit/refund) |
-| **DR v2 Compatibility** | Needs replacement | Persists (upgrade curves) |
-| **User Experience** | Simple (pay once) | More complex (lock funds) |
-| **Gas Costs** | Lower | Higher (more state changes) |
+| Aspect                  | Fees (Current DR v1)     | Bonds (Proposed DR v1)      |
+| ----------------------- | ------------------------ | --------------------------- |
+| **Payment Model**       | Pay once, non-refundable | Lock deposit, refundable    |
+| **Incentive Alignment** | Poor (always pay)        | Good (pay only if fail)     |
+| **Governance**          | Per-round config needed  | Single cost curve config    |
+| **Anti-Spam**           | Fixed amount             | Cost curves (increasing)    |
+| **Complexity**          | Simple (pay ETH)         | Medium (deposit/refund)     |
+| **DR v2 Compatibility** | Needs replacement        | Persists (upgrade curves)   |
+| **User Experience**     | Simple (pay once)        | More complex (lock funds)   |
+| **Gas Costs**           | Lower                    | Higher (more state changes) |
 
 ---
 
@@ -276,7 +304,9 @@ escalationCostConfig = EscalationCostConfig({
 ### Whitepaper Section 10.1: Dispute Resolution Fees
 
 **Current Whitepaper:**
+
 > "Escalation Fees:
+>
 > - Level 1 Escalation (Standard → Senior): Fee set by governance
 > - Level 2 Escalation (Senior → External): Fee set by governance
 > - Fee Distribution:
@@ -284,7 +314,9 @@ escalationCostConfig = EscalationCostConfig({
 >   - 50% to protocol treasury"
 
 **Proposed Update:**
+
 > "Escalation Bonds:
+>
 > - Bonds required for escalation (calculated via cost curves)
 > - Bond amounts increase with escalation depth (quadratic curve)
 > - Bond Distribution:
@@ -293,6 +325,7 @@ escalationCostConfig = EscalationCostConfig({
 >   - Configurable via governance (cost curve parameters)"
 
 **Alignment:**
+
 - ✅ Matches "Decentralise incentives" philosophy
 - ✅ Aligns with RESOLVER_ECONOMICS.md design
 - ✅ Better incentive alignment than fees
@@ -338,18 +371,21 @@ escalationCostConfig = EscalationCostConfig({
 **Recommendation: ✅ Bring bonds into DR v1**
 
 **Key Benefits:**
+
 1. Avoid creating governance infrastructure that will be retired
 2. Consistent model (bonds from the start)
 3. Better incentive alignment
 4. Simpler long-term maintenance
 
 **Implementation:**
+
 - Use existing `escalationCostConfig` infrastructure
 - Start with simple quadratic curve
 - Remove fee infrastructure entirely
 - Upgrade curve parameters in DR v2 (not infrastructure)
 
 **Risk:**
+
 - Low to medium (bond infrastructure exists, requires integration)
 - Can start with simple parameters
 - Well-aligned with whitepaper philosophy

@@ -10,12 +10,14 @@
 This runbook provides step-by-step procedures for **Slow Lane** governance changes. Slow lane changes use a **queue/activate pattern** with a **~9 day total delay** (48h queue + 7d wait + 48h activate).
 
 **Slow Lane Scope:**
+
 - Module swaps (resolution modules, yield modules)
 - Fee changes (escrow fee, fee recipient)
 - Escalation configuration changes
 - High-impact parameter changes
 
 **Examples:**
+
 - `queueDefaultResolutionModule(address)` / `activateDefaultResolutionModule()`
 - `queueEscrowFee(uint256)` / `activateEscrowFee()`
 - `queueEscalationConfig(...)` / `activateEscalationConfig(...)`
@@ -185,6 +187,7 @@ This runbook provides step-by-step procedures for **Slow Lane** governance chang
 **Current Module:** `[CHECK BEFORE PROPOSAL]`
 
 **Proposal Description:**
+
 ```
 Queue swap of default resolution module to [NEW_MODULE_NAME].
 
@@ -218,6 +221,7 @@ Follow Phases 2-4 from "Slow Change Process" above.
 **Parameters:** None
 
 **Proposal Description:**
+
 ```
 Activate queued resolution module swap to [NEW_MODULE_NAME].
 
@@ -243,6 +247,7 @@ Follow Phases 6-8 from "Slow Change Process" above.
 **Current Fee:** `[CHECK BEFORE PROPOSAL]`
 
 **Proposal Description:**
+
 ```
 Queue escrow fee update to 1% (100 basis points).
 
@@ -262,6 +267,7 @@ Follow all phases from "Slow Change Process" above.
 ## Timeline
 
 **Typical Timeline:**
+
 - **Day 0:** Queue proposal created
 - **Day 0-7:** Queue voting period (3-7 days)
 - **Day 7:** Queue proposal executed
@@ -336,6 +342,3 @@ Follow all phases from "Slow Change Process" above.
 ---
 
 **Note:** Slow lane changes are high-impact. Always verify addresses and values carefully, and test on testnet before mainnet proposals.
-
-
-

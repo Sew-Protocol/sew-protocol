@@ -10,6 +10,7 @@
 This document defines the security model for the escrow protocol contracts, deployment infrastructure, and operational scripts.
 
 **In Scope:**
+
 - Core escrow contracts: `BaseEscrow`, `EscrowVault`, `EscrowableERC20`
 - Resolution modules: `DefaultResolutionModule`, `DecentralizedResolutionModule`
 - Resolver incentive module: `ResolverIncentiveModule` (with payment calculation libraries)
@@ -19,6 +20,7 @@ This document defines the security model for the escrow protocol contracts, depl
 - Operational runbooks and emergency procedures
 
 **Out of Scope:**
+
 - Frontend applications
 - Off-chain infrastructure (IPFS, APIs)
 - Third-party dependencies (Aave protocol itself, block explorers)
@@ -77,6 +79,7 @@ The protocol consists of:
    - Guardian Multisig: Emergency controls (down-only)
 
 **Architecture Principles:**
+
 - Module swaps are time-delayed and affect **new escrows only**
 - Module addresses are **snapshotted** at escrow creation
 - Governance changes use **queue/activate pattern** for high-impact changes
@@ -88,22 +91,25 @@ The protocol consists of:
 - **Network**: Base mainnet
 - **Core contracts**: Immutable deployments (no proxies)
 - **Upgrades**: Performed via governed module swaps affecting **new escrows only**
-**Upgradeability posture (initial deployment):**
+  **Upgradeability posture (initial deployment):**
 - The initial mainnet deployment is **immutable** (no proxies for core escrow contracts).
 - Protocol evolution is achieved via **governed module swaps** that apply to **new escrows only**.
 - All modules are immutable - upgrades are performed by deploying a new version and swapping via Slow lane (~9 days).
 
 **Module Governance**:
+
 - All modules use the same governance pattern: Slow lane (queue + activate, ~9 days)
 - Module swaps: Deploy new version → Queue → Wait 7 days → Activate
 - Old escrows continue using old module (snapshot preserved)
 - New escrows use new module
 
 **Future modules** (not in initial release):
+
 - `DecentralizedResolutionModule` and `ResolverIncentiveModule` are in a separate package and are **not included in the initial mainnet release**.
 - When ready, they will be deployed and swapped in via the same Slow lane governance process as other modules.
 
 **Non-upgradeable components (initial deployment):**
+
 - `BaseEscrow`, `EscrowVault`, `EscrowableERC20` are deployed **immutably** (no proxies).
 - All modules are deployed as regular contracts (no proxies).
 
@@ -155,6 +161,7 @@ The protocol assumes standard ERC20 behavior. The following token types may be u
 **Funds are held by escrow contracts** (`EscrowVault` or `EscrowableERC20`). Resolvers do not have custody of funds; they can only authorize releases through the resolution process. Governance does not have custody; it can only change defaults for new escrows. The fee recipient can only withdraw accumulated protocol fees, not escrowed funds.
 
 This custody model ensures that:
+
 - Escrowed funds remain in escrow contracts until released or refunded
 - No single actor (resolver, governance, team) has unilateral access to escrowed funds
 - Fee recipient access is limited to accumulated fees only
@@ -197,28 +204,28 @@ This custody model ensures that:
 
 ## Threat Model
 
-| Threat | Impact | Likelihood | Mitigations |
-|--------|--------|------------|-------------|
-| **Reentrancy attacks** | High: Fund theft, state corruption | Low | Reentrancy protection on critical entrypoints, `nonReentrant` modifier, checks-effects-interactions pattern |
-| **ERC20 token weirdness** | High: Accounting errors, failed transfers | Medium | `SafeERC20` library, explicit balance checks, revert on transfer failure |
-| **Signature/approval misuse** | Medium: Unauthorized transfers | Low | TBD — verify if permit functionality exists (removed per docs) |
-| **Resolver collusion/bribery** | High: Unfair dispute resolution | Medium | Multi-level escalation (`DecentralizedResolutionModule`), senior resolver registry, incentive alignment, public resolution events |
-| **Payout manipulation/rounding** | Medium: Incorrect payouts, remainder loss | Low | Payout validation (`validatePayouts`), proportional yield calculation, rounding tolerance checks, sum validation |
-| **Timelock bypass attempts** | High: Unauthorized governance actions | Low | Access control enforcement (`onlyRole(ROLE_TIMELOCK)`), timelock delay enforcement, role revocation checks |
-| **Role misconfiguration** | High: Unauthorized access | Low | Deployment scripts verify role revocation, post-deployment checks, `GOVERNANCE_SURFACE_MAP` validation |
-| **Guardian key compromise** | High: Protocol pause, cap reduction | Medium | Multisig threshold, hardware wallets, down-only powers (cannot steal funds), unpause requires timelock |
-| **Oracle/timestamp dependence** | Medium: Premature/late auto-settlement | Low | `block.timestamp` validation, max duration limits (30 days), tolerance for minor clock skew |
-| **External yield integration risks** | High: Fund loss, accounting bugs | Medium | Exposure caps enforced at deposit (`_checkAndAccrueExposure`), pause mechanism (`guardianDisableAave`), proper accounting (`escrowATokenBalance`), withdrawal validation |
-| **Cap bypass** | High: Excessive exposure to Aave | Low | Caps checked before deposit, `currentExposure` tracking, revert on cap exceedance |
-| **Denial of service via attachments** | Medium: Gas griefing, transaction failures | Low | `maxAttachments` limit (20), gas-efficient storage, batch processing limits (`MAX_AUTOMATION_RANGE = 100`) |
-| **Large array DoS** | Medium: Gas limit exhaustion | Low | Array length validation, batch limits, gas-efficient loops |
-| **Upgrade/migration mistakes** | High: Logic errors, storage corruption | Low | Core contracts are immutable in the initial deployment. Risk is concentrated in: incorrect module swap execution (queue/activate timing, wrong addresses). All modules use the same swap pattern (Slow lane, ~9 days). Mitigations include timelock lanes, rehearsals on Base Sepolia + fork, and explicit upgrade runbooks. |
-| **Module swap errors** | Medium: Broken resolution logic | Low | Module interface validation, time delay (~9 days), testnet rehearsal, snapshot immutability |
-| **Dispute timeout bypass** | Medium: Permanently stuck escrows | Low | `maxDisputeDuration` (90 days), `autoCancelDisputedEscrow` function, dispute timestamp tracking |
-| **State machine violations** | High: Double-spend, invalid transitions | Low | State machine library (`StateManagementLibrary`), explicit state checks, invariant tests |
-| **Snapshot immutability violation** | High: Governance changes existing escrows | Low | Snapshot fields never modified after creation, module getters read from snapshots, no per-escrow setters exist |
-| **Fee accounting errors** | Medium: Incorrect fee calculation | Low | Fee calculation in libraries, fee denominator constants, validation tests |
-| **Yield distribution errors** | Medium: Incorrect yield allocation | Low | Yield distribution module validation, percentage sum checks (must equal 10000 bps), recipient validation |
+| Threat                                | Impact                                     | Likelihood | Mitigations                                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------- | ------------------------------------------ | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Reentrancy attacks**                | High: Fund theft, state corruption         | Low        | Reentrancy protection on critical entrypoints, `nonReentrant` modifier, checks-effects-interactions pattern                                                                                                                                                                                                                  |
+| **ERC20 token weirdness**             | High: Accounting errors, failed transfers  | Medium     | `SafeERC20` library, explicit balance checks, revert on transfer failure                                                                                                                                                                                                                                                     |
+| **Signature/approval misuse**         | Medium: Unauthorized transfers             | Low        | TBD — verify if permit functionality exists (removed per docs)                                                                                                                                                                                                                                                               |
+| **Resolver collusion/bribery**        | High: Unfair dispute resolution            | Medium     | Multi-level escalation (`DecentralizedResolutionModule`), senior resolver registry, incentive alignment, public resolution events                                                                                                                                                                                            |
+| **Payout manipulation/rounding**      | Medium: Incorrect payouts, remainder loss  | Low        | Payout validation (`validatePayouts`), proportional yield calculation, rounding tolerance checks, sum validation                                                                                                                                                                                                             |
+| **Timelock bypass attempts**          | High: Unauthorized governance actions      | Low        | Access control enforcement (`onlyRole(ROLE_TIMELOCK)`), timelock delay enforcement, role revocation checks                                                                                                                                                                                                                   |
+| **Role misconfiguration**             | High: Unauthorized access                  | Low        | Deployment scripts verify role revocation, post-deployment checks, `GOVERNANCE_SURFACE_MAP` validation                                                                                                                                                                                                                       |
+| **Guardian key compromise**           | High: Protocol pause, cap reduction        | Medium     | Multisig threshold, hardware wallets, down-only powers (cannot steal funds), unpause requires timelock                                                                                                                                                                                                                       |
+| **Oracle/timestamp dependence**       | Medium: Premature/late auto-settlement     | Low        | `block.timestamp` validation, max duration limits (30 days), tolerance for minor clock skew                                                                                                                                                                                                                                  |
+| **External yield integration risks**  | High: Fund loss, accounting bugs           | Medium     | Exposure caps enforced at deposit (`_checkAndAccrueExposure`), pause mechanism (`guardianDisableAave`), proper accounting (`escrowATokenBalance`), withdrawal validation                                                                                                                                                     |
+| **Cap bypass**                        | High: Excessive exposure to Aave           | Low        | Caps checked before deposit, `currentExposure` tracking, revert on cap exceedance                                                                                                                                                                                                                                            |
+| **Denial of service via attachments** | Medium: Gas griefing, transaction failures | Low        | `maxAttachments` limit (20), gas-efficient storage, batch processing limits (`MAX_AUTOMATION_RANGE = 100`)                                                                                                                                                                                                                   |
+| **Large array DoS**                   | Medium: Gas limit exhaustion               | Low        | Array length validation, batch limits, gas-efficient loops                                                                                                                                                                                                                                                                   |
+| **Upgrade/migration mistakes**        | High: Logic errors, storage corruption     | Low        | Core contracts are immutable in the initial deployment. Risk is concentrated in: incorrect module swap execution (queue/activate timing, wrong addresses). All modules use the same swap pattern (Slow lane, ~9 days). Mitigations include timelock lanes, rehearsals on Base Sepolia + fork, and explicit upgrade runbooks. |
+| **Module swap errors**                | Medium: Broken resolution logic            | Low        | Module interface validation, time delay (~9 days), testnet rehearsal, snapshot immutability                                                                                                                                                                                                                                  |
+| **Dispute timeout bypass**            | Medium: Permanently stuck escrows          | Low        | `maxDisputeDuration` (90 days), `autoCancelDisputedEscrow` function, dispute timestamp tracking                                                                                                                                                                                                                              |
+| **State machine violations**          | High: Double-spend, invalid transitions    | Low        | State machine library (`StateManagementLibrary`), explicit state checks, invariant tests                                                                                                                                                                                                                                     |
+| **Snapshot immutability violation**   | High: Governance changes existing escrows  | Low        | Snapshot fields never modified after creation, module getters read from snapshots, no per-escrow setters exist                                                                                                                                                                                                               |
+| **Fee accounting errors**             | Medium: Incorrect fee calculation          | Low        | Fee calculation in libraries, fee denominator constants, validation tests                                                                                                                                                                                                                                                    |
+| **Yield distribution errors**         | Medium: Incorrect yield allocation         | Low        | Yield distribution module validation, percentage sum checks (must equal 10000 bps), recipient validation                                                                                                                                                                                                                     |
 
 ---
 
@@ -386,6 +393,7 @@ This custody model ensures that:
 ### Explicit Guarantee
 
 **The team, governance, and any admin actor cannot unilaterally change the rules of an existing escrow.** Module swaps, timeout changes, and other governance actions affect only escrows created after the change. This is enforced by:
+
 - Snapshot immutability (snapshot fields never modified)
 - No per-escrow setters (removed in Phase 5)
 - Access control (no role can modify snapshot fields)
@@ -418,7 +426,7 @@ These limitations are documented to provide transparency. They do not represent 
 
 1. **Governor**: Token-based voting, multisig recommended for proposal submission
 2. **TimelockController**: Self-administered (`TIMELOCK_ADMIN_ROLE` → TimelockController itself)
-3. **Guardian Multisig**: 
+3. **Guardian Multisig**:
    - Multisig threshold: TBD — verify in deployment config (recommend 3-of-5 or higher)
    - Hardware wallets for signers
    - Geographic distribution of signers
@@ -454,6 +462,7 @@ These limitations are documented to provide transparency. They do not represent 
 ### Monitoring/Alerting Ideas
 
 **Events to Watch:**
+
 - `EscrowStateChanged` → Monitor for unexpected state transitions
 - `DisputeOpened` → Track dispute rate
 - `EscrowResolved` → Verify resolution outcomes
@@ -466,6 +475,7 @@ These limitations are documented to provide transparency. They do not represent 
 - `Paused` / `Unpaused` → Alert on pause state changes
 
 **Metrics to Track:**
+
 - Total escrowed value
 - Number of active escrows
 - Dispute rate
@@ -474,6 +484,7 @@ These limitations are documented to provide transparency. They do not represent 
 - Fee accumulation rate
 
 **Alert Thresholds:**
+
 - Large escrow creation (> threshold TBD)
 - Dispute rate spike
 - Cap near limit (> 80% of cap)
@@ -540,10 +551,10 @@ These limitations are documented to provide transparency. They do not represent 
 1. **Escrow Creation + Funding**: Events emitted when escrows are created and funded
 2. **Escrow State Transitions**: Events for release, refund, dispute, and resolution state changes
 3. **Dispute Lifecycle + Escalation**: Events for dispute opening, escalation (if supported), and resolution
-4. **Governance Changes**: 
+4. **Governance Changes**:
    - Queue/activate events for slow lane changes
    - Parameter update events for standard lane changes
-5. **External Integration Actions**: 
+5. **External Integration Actions**:
    - Yield deposit/withdraw events (if yield enabled)
    - Cap changes and disable switches
 
@@ -567,9 +578,9 @@ These limitations are documented to provide transparency. They do not represent 
 ---
 
 **Document Status**: This is a living document. Update when:
+
 - New threats are identified
 - New mitigations are implemented
 - Governance structure changes
 - External dependencies change
 - Audit findings are incorporated
-

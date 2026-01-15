@@ -14,6 +14,7 @@
 **Source:** `docs/OUTSTANDING_ISSUES.md` #1
 
 **What's Missing:**
+
 - `SECURITY.md` file in repository root
 - Security contact information
 - Responsible disclosure policy (e.g., 90-day coordinated disclosure)
@@ -21,12 +22,14 @@
 - PGP key or secure contact method (optional but recommended)
 
 **Why Critical:**
+
 - Required by Mainnet Checklist Section B (Security Baseline)
 - Essential for responsible disclosure
 - Expected by auditors and security researchers
 - Quick win (30 minutes)
 
 **Action Items:**
+
 - [ ] Create `SECURITY.md` with security contact
 - [ ] Define disclosure policy
 - [ ] Add security contact email/contact method
@@ -44,18 +47,21 @@
 **Source:** `docs/OUTSTANDING_ISSUES.md` #7
 
 **What's Missing:**
+
 - Base Sepolia deployment rehearsal (documented with tx hashes)
 - Emergency drill (pause, disable yield, lower caps)
 - Recovery drill (unpause via timelock)
 - Documented drill results
 
 **Why Critical:**
+
 - Must-pass gate for mainnet deployment
 - Validates operational procedures work
 - Provides evidence of readiness
 - Identifies issues before mainnet
 
 **Action Items:**
+
 - [ ] Perform Base Sepolia deployment rehearsal
 - [ ] Document deployment rehearsal with tx hashes
 - [ ] Perform emergency drill (pause protocol)
@@ -64,6 +70,7 @@
 - [ ] Create drill evidence document
 
 **Current State:**
+
 - Fork simulation tools exist (`scripts/gov/simulate-hardhat.ts`)
 - No documented Base Sepolia rehearsal
 - No documented emergency/recovery drills
@@ -78,6 +85,7 @@
 **Source:** `docs/OUTSTANDING_ISSUES.md` #4
 
 **What's Missing:**
+
 - Detailed runbooks in `governance/runbooks/`
 - Step-by-step emergency procedures
 - Step-by-step recovery procedures
@@ -85,12 +93,14 @@
 - Step-by-step slow change procedures
 
 **Why Critical:**
+
 - Required for operational readiness
 - Enables team to respond to incidents
 - Documents standard operating procedures
 - Complements emergency drills
 
 **Action Items:**
+
 - [ ] Create `governance/runbooks/emergency.md` - Step-by-step emergency procedures
 - [ ] Create `governance/runbooks/recovery.md` - Unpause and recovery procedures
 - [ ] Create `governance/runbooks/standard-changes.md` - Bounded parameter updates
@@ -98,6 +108,7 @@
 - [ ] Link from `docs/EMERGENCY_POLICY.md`
 
 **Current State:**
+
 - `governance/runbooks/` directory exists but is empty
 - `docs/EMERGENCY_POLICY.md` exists but is high-level policy, not operational runbook
 - No step-by-step procedures for common operations
@@ -112,6 +123,7 @@
 **Source:** `docs/OUTSTANDING_ISSUES.md` #2
 
 **What's Missing:**
+
 - `docs/AUDIT.md` file
 - Audit status documentation (even if "not yet audited")
 - Audit plan if audits are planned
@@ -120,12 +132,14 @@
 - Document fixes linked to commits
 
 **Why Critical:**
+
 - Expected by auditors and security researchers
 - Documents audit readiness
 - Provides scope for future audits
 - Links security fixes to commits
 
 **Action Items:**
+
 - [ ] Create `docs/AUDIT.md` with audit status/plan
 - [ ] Create audit package structure (optional but recommended)
 - [ ] Document scope list (contracts to be audited)
@@ -133,6 +147,7 @@
 - [ ] Link to `docs/TECHNICAL_OVERVIEW.md` for architecture
 
 **Current State:**
+
 - No `docs/AUDIT.md` file exists
 - No audit package directory
 - No scope list documented
@@ -148,6 +163,7 @@
 **Source:** `docs/OUTSTANDING_ISSUES.md` #8
 
 **What's Missing:**
+
 - Mainnet fork deployment rehearsal
 - Documented rehearsal process
 - Saved transaction hashes
@@ -155,12 +171,14 @@
 - Verification that role assignments are correct
 
 **Why Critical:**
+
 - Must-pass gate for mainnet deployment
 - Validates deployment scripts work on mainnet fork
 - Identifies deployment issues before mainnet
 - Provides evidence of readiness
 
 **Action Items:**
+
 - [ ] Perform mainnet fork deployment rehearsal
 - [ ] Document rehearsal process
 - [ ] Save transaction hashes
@@ -169,6 +187,7 @@
 - [ ] Document in deployment docs
 
 **Current State:**
+
 - Fork simulation tools exist
 - No documented mainnet fork deployment rehearsal
 - No documented rehearsal with tx hashes
@@ -177,13 +196,13 @@
 
 ## Summary
 
-| Priority | Item | Type | Time | Status |
-|----------|------|------|------|--------|
-| 🔴 #1 | SECURITY.md | Docs | 30 min | ❌ Missing |
-| 🟠 #2 | Emergency + Recovery Drills | Test/Docs | 2-4 hrs | ❌ Missing |
-| 🟠 #3 | Operational Runbooks | Docs | 4-6 hrs | ❌ Missing |
-| 🟠 #4 | AUDIT.md | Docs | 1-2 hrs | ❌ Missing |
-| 🟡 #5 | Fork Deployment Rehearsal | Test/Docs | 2-3 hrs | ❌ Missing |
+| Priority | Item                        | Type      | Time    | Status     |
+| -------- | --------------------------- | --------- | ------- | ---------- |
+| 🔴 #1    | SECURITY.md                 | Docs      | 30 min  | ❌ Missing |
+| 🟠 #2    | Emergency + Recovery Drills | Test/Docs | 2-4 hrs | ❌ Missing |
+| 🟠 #3    | Operational Runbooks        | Docs      | 4-6 hrs | ❌ Missing |
+| 🟠 #4    | AUDIT.md                    | Docs      | 1-2 hrs | ❌ Missing |
+| 🟡 #5    | Fork Deployment Rehearsal   | Test/Docs | 2-3 hrs | ❌ Missing |
 
 **Total Estimated Time:** 10-16 hours
 
@@ -192,24 +211,28 @@
 ## Additional High-Priority Items (Not in Top 5)
 
 ### 6. CHANGELOG.md (DOCS)
+
 - **Priority:** High
 - **Time:** 1 hour
 - **Status:** Missing
 - Create `CHANGELOG.md` following Keep a Changelog format
 
 ### 7. Slither Status Verification (TEST)
+
 - **Priority:** Must-Pass Gate
 - **Time:** 1 hour
 - **Status:** Unknown
 - Run slither locally, review findings, document exceptions
 
 ### 8. Verification Documentation (DOCS)
+
 - **Priority:** High
 - **Time:** 2-3 hours
 - **Status:** Partial
 - Enhance `scripts/verify.ts`, document verification process
 
 ### 9. Contract Security Tasks - Phase 1 (CODE)
+
 - **Priority:** Critical (Security)
 - **Time:** Week 1-2
 - **Status:** Unchecked
@@ -217,6 +240,7 @@
 - **Note:** May be deferred if not critical for MVP
 
 ### 10. Escalation Fee Transfer Verification (CODE/TEST)
+
 - **Priority:** High
 - **Time:** 4-6 hours
 - **Status:** Needs Verification
@@ -240,6 +264,7 @@
 ## Notes
 
 ### Already Complete ✅
+
 - SECURITY_MODEL.md - Comprehensive (570 lines)
 - CI/CD Pipeline - Exists and working
 - Repository Hygiene - Mostly complete (.nvmrc, .env.example, LICENSE)
@@ -249,6 +274,7 @@
 - Role Removal - ROLE_MODULE_DEVELOPER removed
 
 ### Context
+
 - **Overall Progress:** ~70% complete (per MAINNET_CHECKLIST_ASSESSMENT.md)
 - **Mainnet Readiness:** Close, but missing critical documentation and operational procedures
 - **Security:** Strong foundation, but missing security contact/disclosure policy
@@ -258,4 +284,3 @@
 
 **Last Updated:** 2026-01-06  
 **Next Review:** After completing top 5 priorities
-

@@ -4,3 +4,5 @@ forge-std/=lib/forge-std/src/
 @decentralized-resolution-module/=contracts/decentralized-resolution-module/
 @shared/=contracts/shared/
 @governance/=contracts/governance/
+DisputeOps/=contracts/DisputeOps.sol
+YieldOps/=contracts/YieldOps.sol

@@ -23,7 +23,12 @@ async function testCompilerSettings() {
     { version: '0.8.31', runs: 50000, viaIR: true, name: 'Upgrade (0.8.31, 50k runs, viaIR)' },
     { version: '0.8.31', runs: 100000, viaIR: true, name: 'Upgrade (0.8.31, 100k runs, viaIR)' },
     { version: '0.8.31', runs: 50000, viaIR: false, name: 'Upgrade (0.8.31, 50k runs, no viaIR)' },
-    { version: '0.8.31', runs: 100000, viaIR: false, name: 'Upgrade (0.8.31, 100k runs, no viaIR)' },
+    {
+      version: '0.8.31',
+      runs: 100000,
+      viaIR: false,
+      name: 'Upgrade (0.8.31, 100k runs, no viaIR)',
+    },
   ];
 
   const results: CompilerTestResult[] = [];
@@ -57,7 +62,7 @@ async function testCompilerSettings() {
       for (const name of contractNames) {
         const artifactPath = path.join(
           __dirname,
-          `../artifacts/contracts/${name}.sol/${name}.json`
+          `../artifacts/contracts/${name}.sol/${name}.json`,
         );
         if (fs.existsSync(artifactPath)) {
           const artifact = JSON.parse(fs.readFileSync(artifactPath, 'utf8'));
@@ -90,7 +95,12 @@ async function testCompilerSettings() {
   console.log('📊 Size Comparison Results\n');
 
   // Header
-  console.log('Configuration'.padEnd(50) + 'EscrowVault'.padStart(12) + 'EscrowableERC20'.padStart(15) + 'DecentralizedResolution'.padStart(25));
+  console.log(
+    'Configuration'.padEnd(50) +
+      'EscrowVault'.padStart(12) +
+      'EscrowableERC20'.padStart(15) +
+      'DecentralizedResolution'.padStart(25),
+  );
   console.log('─'.repeat(102));
 
   // Results
@@ -135,7 +145,7 @@ async function testCompilerSettings() {
       result.config.padEnd(50) +
         (vaultSize + vaultDiff).padStart(12 + vaultDiff.length) +
         (erc20Size + erc20Diff).padStart(15 + erc20Diff.length) +
-        (drmSize + drmDiff).padStart(25 + drmDiff.length)
+        (drmSize + drmDiff).padStart(25 + drmDiff.length),
     );
   }
 
@@ -149,7 +159,9 @@ async function testCompilerSettings() {
   });
 
   console.log(`\n🏆 Best Configuration: ${bestConfig.config}`);
-  console.log(`   Total size: ${(bestConfig.contracts.reduce((sum, c) => sum + c.size, 0) / 1024).toFixed(2)} KB\n`);
+  console.log(
+    `   Total size: ${(bestConfig.contracts.reduce((sum, c) => sum + c.size, 0) / 1024).toFixed(2)} KB\n`,
+  );
 
   // Save results to file
   const resultsPath = path.join(__dirname, '../docs/COMPILER_TEST_RESULTS.json');
@@ -163,7 +175,3 @@ testCompilerSettings()
     console.error(error);
     process.exit(1);
   });
-
-
-
-

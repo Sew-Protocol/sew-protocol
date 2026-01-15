@@ -11,12 +11,14 @@ This document outlines the plan for adding three critical contract types require
 ## Current State
 
 ### What Exists
+
 - ✅ `ERC20Mock` - Basic ERC20 token (no voting capabilities)
 - ✅ OpenZeppelin contracts package (`@openzeppelin/contracts@^5.4.0`)
 - ✅ Test infrastructure expecting these contracts
 - ✅ Deployment scripts structure
 
 ### What's Missing
+
 - ❌ OpenZeppelin governance contracts not compiled/accessible
 - ❌ Safe multisig contract
 - ❌ ERC20Votes token contract for governance
@@ -24,6 +26,7 @@ This document outlines the plan for adding three critical contract types require
 ## 1. OpenZeppelin Governor with Timelock
 
 ### Requirements
+
 - `TimelockController` - For timelocked execution of governance proposals
 - `GovernorTimelockControl` - Governor contract integrated with Timelock
 - `ERC20Votes` - Token with voting snapshots (see section 3)
@@ -31,12 +34,15 @@ This document outlines the plan for adding three critical contract types require
 ### Implementation Plan
 
 #### Step 1.1: Verify OpenZeppelin Contracts Availability
+
 - [ ] Check that `@openzeppelin/contracts@^5.4.0` includes governance contracts
 - [ ] Verify Hardhat can compile OpenZeppelin contracts directly
 - [ ] Test compilation of `TimelockController` and `GovernorTimelockControl`
 
 #### Step 1.2: Create Wrapper Contracts (Optional but Recommended)
+
 **File**: `contracts/governance/TimelockControllerWrapper.sol`
+
 ```solidity
 // Wrapper for TimelockController with convenience functions
 ```
@@ -44,7 +50,9 @@ This document outlines the plan for adding three critical contract types require
 **Rationale**: Wrappers make contracts easier to deploy via hardhat-deploy and provide better type safety in tests.
 
 #### Step 1.3: Create Deployment Scripts
+
 **File**: `deploy/20_timelock.ts`
+
 - Deploy `TimelockController` with:
   - `minDelay`: 2 days (configurable)
   - `proposers`: Array of addresses (multisig initially)
@@ -52,6 +60,7 @@ This document outlines the plan for adding three critical contract types require
   - `admin`: Multisig address (can be revoked later)
 
 **File**: `deploy/30_governor.ts`
+
 - Deploy `GovernorTimelockControl` with:
   - `name`: "SewDAO" (configurable)
   - `token`: SewToken address
@@ -61,15 +70,18 @@ This document outlines the plan for adding three critical contract types require
   - `timelock`: TimelockController address
 
 #### Step 1.4: Update Tests
+
 - [ ] Remove try-catch blocks that skip tests
 - [ ] Use proper TypeScript types from `@openzeppelin/contracts`
 - [ ] Add comprehensive governance flow tests
 
 ### Dependencies
+
 - `@openzeppelin/contracts@^5.4.0` (already installed)
 - SewToken contract (see section 3)
 
 ### Testing Checklist
+
 - [ ] Deploy TimelockController successfully
 - [ ] Deploy GovernorTimelockControl successfully
 - [ ] Test proposal creation
@@ -82,6 +94,7 @@ This document outlines the plan for adding three critical contract types require
 ## 2. Safe Multisig
 
 ### Requirements
+
 - Gnosis Safe contract for multisig wallet
 - Support for 2-of-3 or 3-of-5 multisig (configurable)
 - Integration with deployment scripts
@@ -90,6 +103,7 @@ This document outlines the plan for adding three critical contract types require
 ### Implementation Plan
 
 #### Step 2.1: Install Safe Contracts
+
 - [ ] Add `@safe-global/safe-contracts` package
   ```bash
   pnpm add -D @safe-global/safe-contracts
@@ -97,7 +111,9 @@ This document outlines the plan for adding three critical contract types require
 - [ ] Verify version compatibility with Solidity ^0.8.28
 
 #### Step 2.2: Create Safe Deployment Script
+
 **File**: `deploy/10_safe.ts`
+
 - Deploy Gnosis Safe with:
   - `owners`: Array of owner addresses (from config)
   - `threshold`: Number of signatures required (e.g., 2 for 2-of-3)
@@ -111,35 +127,38 @@ This document outlines the plan for adding three critical contract types require
 **Alternative**: Use Safe's `createProxyWithNonce` or `createProxy` factory pattern
 
 #### Step 2.3: Create Safe Mock for Testing
+
 **File**: `contracts/mocks/SafeMock.sol`
+
 ```solidity
 // Simple mock that implements basic Safe interface
 // Allows testing without deploying full Safe contract
 ```
 
 #### Step 2.4: Update Test Infrastructure
+
 - [ ] Replace `multisigAddress = multisigOwner1.address` with actual Safe contract
 - [ ] Add helper functions for Safe operations (submit transaction, confirm, execute)
 - [ ] Update `MainnetReleaseSequence.test.ts` to use real Safe
 
 #### Step 2.5: Create Configuration
+
 **File**: `config/safe.config.ts`
+
 ```typescript
 export const SAFE_CONFIG = {
-  owners: [
-    process.env.SAFE_OWNER_1,
-    process.env.SAFE_OWNER_2,
-    process.env.SAFE_OWNER_3,
-  ],
+  owners: [process.env.SAFE_OWNER_1, process.env.SAFE_OWNER_2, process.env.SAFE_OWNER_3],
   threshold: 2, // 2-of-3 multisig
 };
 ```
 
 ### Dependencies
+
 - `@safe-global/safe-contracts` (to be installed)
 - Safe factory contract (deployed on target network)
 
 ### Testing Checklist
+
 - [ ] Deploy Safe contract successfully
 - [ ] Add owners and set threshold
 - [ ] Submit transaction from Safe
@@ -149,6 +168,7 @@ export const SAFE_CONFIG = {
 - [ ] Verify Safe can perform owner-only operations
 
 ### Network Considerations
+
 - **Mainnet**: Use official Safe factory at `0xa6B71E26C5e0845f74c812102Ca7114b6a896AB2`
 - **Testnets**: Use testnet Safe factory addresses
 - **Local**: Deploy Safe factory locally for testing
@@ -158,6 +178,7 @@ export const SAFE_CONFIG = {
 ## 3. Sew Token Contract
 
 ### Requirements
+
 - Governance token with voting snapshots
 - Compatible with OpenZeppelin Governor
 - Initial supply distribution
@@ -166,33 +187,37 @@ export const SAFE_CONFIG = {
 ### Implementation Plan
 
 #### Step 3.1: Create ERC20Votes Token Contract
+
 **File**: `contracts/token/SewToken.sol`
+
 ```solidity
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.28;
 
-import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import '@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol';
+import '@openzeppelin/contracts/access/Ownable.sol';
 
 contract SewToken is ERC20Votes, Ownable {
-    constructor(
-        string memory name,
-        string memory symbol,
-        address initialOwner,
-        uint256 initialSupply
-    ) ERC20(name, symbol) ERC20Permit(name) Ownable(initialOwner) {
-        _mint(initialOwner, initialSupply);
-    }
+  constructor(
+    string memory name,
+    string memory symbol,
+    address initialOwner,
+    uint256 initialSupply
+  ) ERC20(name, symbol) ERC20Permit(name) Ownable(initialOwner) {
+    _mint(initialOwner, initialSupply);
+  }
 
-    // Optional: Add minting function for future token distribution
-    function mint(address to, uint256 amount) public onlyOwner {
-        _mint(to, amount);
-    }
+  // Optional: Add minting function for future token distribution
+  function mint(address to, uint256 amount) public onlyOwner {
+    _mint(to, amount);
+  }
 }
 ```
 
 #### Step 3.2: Create Deployment Script
+
 **File**: `deploy/00_governance_token.ts`
+
 - Deploy `SewToken` with:
   - `name`: "Sew Protocol Token" (configurable)
   - `symbol`: "$EW" (configurable)
@@ -200,12 +225,15 @@ contract SewToken is ERC20Votes, Ownable {
   - `initialSupply`: 1,000,000,000 tokens (fixed supply)
 
 #### Step 3.3: Update Existing Tests
+
 - [ ] Replace `ERC20Mock` with `SewToken` in `MainnetReleaseSequence.test.ts`
 - [ ] Add delegation tests
 - [ ] Add voting snapshot tests
 
 #### Step 3.4: Create Token Distribution Script (Optional)
+
 **File**: `scripts/distribute-tokens.ts`
+
 - Distribute initial supply to:
   - Team/Founders
   - Investors
@@ -213,10 +241,12 @@ contract SewToken is ERC20Votes, Ownable {
   - Liquidity pools
 
 ### Dependencies
+
 - `@openzeppelin/contracts@^5.4.0` (already installed)
 - `ERC20Permit` (included in OpenZeppelin)
 
 ### Testing Checklist
+
 - [ ] Deploy SewToken successfully
 - [ ] Mint initial supply
 - [ ] Test token transfers
@@ -261,7 +291,9 @@ The contracts must be deployed in this order:
 ## Configuration Files
 
 ### Environment Variables
+
 Add to `.env.example`:
+
 ```bash
 # Governance
 GOVERNANCE_TOKEN_NAME="Sew Token"
@@ -284,29 +316,27 @@ PROPOSAL_THRESHOLD=10000000000000000000000000 # 10M tokens (1% of 1B supply)
 ```
 
 ### Configuration File
+
 **File**: `config/governance.config.ts`
+
 ```typescript
 export const GOVERNANCE_CONFIG = {
   token: {
-    name: process.env.GOVERNANCE_TOKEN_NAME || "Sew Token",
-    symbol: process.env.GOVERNANCE_TOKEN_SYMBOL || "$EW",
-    initialSupply: process.env.GOVERNANCE_TOKEN_SUPPLY || "1000000000000000000000000000",
+    name: process.env.GOVERNANCE_TOKEN_NAME || 'Sew Token',
+    symbol: process.env.GOVERNANCE_TOKEN_SYMBOL || '$EW',
+    initialSupply: process.env.GOVERNANCE_TOKEN_SUPPLY || '1000000000000000000000000000',
   },
   safe: {
-    owners: [
-      process.env.SAFE_OWNER_1!,
-      process.env.SAFE_OWNER_2!,
-      process.env.SAFE_OWNER_3!,
-    ],
-    threshold: parseInt(process.env.SAFE_THRESHOLD || "2"),
+    owners: [process.env.SAFE_OWNER_1!, process.env.SAFE_OWNER_2!, process.env.SAFE_OWNER_3!],
+    threshold: parseInt(process.env.SAFE_THRESHOLD || '2'),
   },
   timelock: {
-    minDelay: parseInt(process.env.TIMELOCK_DELAY || "172800"), // 2 days
+    minDelay: parseInt(process.env.TIMELOCK_DELAY || '172800'), // 2 days
   },
   governor: {
-    votingDelay: parseInt(process.env.VOTING_DELAY || "1"),
-    votingPeriod: parseInt(process.env.VOTING_PERIOD || "5"),
-    proposalThreshold: process.env.PROPOSAL_THRESHOLD || "10000000000000000000000000",
+    votingDelay: parseInt(process.env.VOTING_DELAY || '1'),
+    votingPeriod: parseInt(process.env.VOTING_PERIOD || '5'),
+    proposalThreshold: process.env.PROPOSAL_THRESHOLD || '10000000000000000000000000',
   },
 };
 ```
@@ -316,17 +346,20 @@ export const GOVERNANCE_CONFIG = {
 ## Testing Strategy
 
 ### Unit Tests
+
 - [ ] Test each contract in isolation
 - [ ] Test constructor parameters
 - [ ] Test access control
 
 ### Integration Tests
+
 - [ ] Test full deployment sequence
 - [ ] Test ownership transfers
 - [ ] Test governance flow (propose → vote → execute)
 - [ ] Test timelocked upgrades
 
 ### End-to-End Tests
+
 - [ ] Test complete mainnet release sequence
 - [ ] Test progressive decentralization path
 - [ ] Test emergency scenarios
@@ -407,6 +440,7 @@ export const GOVERNANCE_CONFIG = {
 Before proceeding with implementation, please clarify the following:
 
 ### 1. Token Supply and Distribution
+
 - **Question**: The total supply is set to 1B tokens. What is the initial distribution plan?
   - How much goes to team/founders?
   - How much goes to investors?
@@ -418,12 +452,14 @@ Before proceeding with implementation, please clarify the following:
 Yes vesting schedules. Will paste in exact details later
 
 ### 2. Proposal Threshold
+
 - **Question**: The proposal threshold is set to 10M tokens (1% of supply). Is this the desired threshold?
   - Alternative: 1M tokens (0.1% of supply) for more accessible governance
   - Alternative: 50M tokens (5% of supply) for more conservative governance
 - **Impact**: Affects who can create governance proposals
 
 ### 3. Token Minting Capability
+
 - **Question**: Should `SewToken` have a `mint()` function for future token distribution, or should it be a fixed supply token?
   - If minting is allowed: Who can mint? (Owner only? Governance only? Never?)
   - If fixed supply: Should we remove the `mint()` function entirely?
@@ -432,6 +468,7 @@ Yes vesting schedules. Will paste in exact details later
 Fixed, remove mint
 
 ### 4. Governor Name
+
 - **Question**: Should the Governor contract name be "SewDAO" or something else?
   - Alternative: "Sew Protocol DAO"
   - Alternative: "Sew Governance"
@@ -440,6 +477,7 @@ Fixed, remove mint
 Sew Protocol DAO
 
 ### 5. Token Symbol Format
+
 - **Question**: The symbol is "$EW". Is this the final format?
   - Note: Some exchanges/standards prefer symbols without special characters
   - Alternative: "SEW" or "SEWT"
@@ -448,6 +486,7 @@ Sew Protocol DAO
 If $ is a problem with exchanges, then SEW or SEWT (depending on availability)
 
 ### 6. Initial Owner
+
 - **Question**: Who should be the initial owner of `SewToken`?
   - Deployer EOA (temporary, will transfer to Safe)
   - Safe multisig directly
@@ -457,6 +496,7 @@ If $ is a problem with exchanges, then SEW or SEWT (depending on availability)
 Safe -> timelock -> governor
 
 ### 7. Voting Parameters
+
 - **Question**: Are the voting parameters appropriate for mainnet?
   - `votingDelay`: 1 block (very short - is this for testing only?)
   - `votingPeriod`: 5 blocks (very short - typical is 3-7 days)
@@ -466,6 +506,7 @@ Safe -> timelock -> governor
 Those are for testing. 7 day voting period
 
 ### 8. Timelock Delay
+
 - **Question**: Is 2 days the appropriate timelock delay for mainnet?
   - Typical range: 1-7 days
   - Longer delays = more security but slower response
@@ -474,6 +515,7 @@ Those are for testing. 7 day voting period
 7 days
 
 ### 9. Safe Multisig Configuration
+
 - **Question**: What is the final Safe multisig configuration?
   - Number of owners: 3, 5, or more?
   - Threshold: 2-of-3, 3-of-5, or other?
@@ -483,6 +525,7 @@ Those are for testing. 7 day voting period
 Assume 3 of 5
 
 ### 10. Network Selection
+
 - **Question**: Which network will be used for mainnet deployment?
   - Base Mainnet (Chain ID: 8453) - Lower gas costs
   - Ethereum Mainnet (Chain ID: 1) - Higher gas costs, more established

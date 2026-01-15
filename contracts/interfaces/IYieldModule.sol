@@ -34,11 +34,7 @@ interface IYieldModule {
         uint256 workflowId,
         address token,
         uint256 originalAmount
-    ) external returns (
-        bool success,
-        uint256 actualAmount,
-        uint256 yieldAmount
-    );
+    ) external returns (bool success, uint256 actualAmount, uint256 yieldAmount);
 
     /**
      * @notice Calculate current yield for an escrow
@@ -87,6 +83,3 @@ interface IYieldModule {
      */
     function moduleName() external pure returns (string memory name);
 }
-
-
-

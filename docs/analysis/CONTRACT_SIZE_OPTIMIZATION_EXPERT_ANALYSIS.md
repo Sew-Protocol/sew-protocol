@@ -6,11 +6,11 @@
 
 ## Current Status
 
-| Contract | Current Size | Needs Reduction | Status |
-|----------|-------------|----------------|--------|
-| **EscrowVault** | 32,549 bytes | -7,973 bytes (24.5%) | ❌ Over limit |
+| Contract            | Current Size | Needs Reduction      | Status        |
+| ------------------- | ------------ | -------------------- | ------------- |
+| **EscrowVault**     | 32,549 bytes | -7,973 bytes (24.5%) | ❌ Over limit |
 | **EscrowableERC20** | 33,291 bytes | -8,715 bytes (26.2%) | ❌ Over limit |
-| **BaseEscrow** | Inherited | N/A | Base contract |
+| **BaseEscrow**      | Inherited    | N/A                  | Base contract |
 
 ---
 
@@ -36,20 +36,23 @@ Both child contracts are **significantly over the 24KB limit** and require aggre
 **Location**: `EscrowVault.sol` lines 401-437, `EscrowableERC20.sol` lines 411-447
 
 **Problem**: Both contracts have 4 identical getter functions that:
+
 - Take `workflowId` parameter but don't use it (silenced with comment)
 - Simply return default module addresses
 - Add ~100 bytes each (400 bytes total per contract)
 
 **Current Code**:
+
 ```solidity
 function getReleaseStrategy(uint256 workflowId) public view returns (IReleaseStrategy) {
-    workflowId; // Silence unused parameter warning
-    return defaultReleaseStrategy;
+  workflowId; // Silence unused parameter warning
+  return defaultReleaseStrategy;
 }
 // ... 3 more similar functions
 ```
 
-**Recommendation**: 
+**Recommendation**:
+
 - **Option A (Preferred)**: Remove `workflowId` parameter entirely (breaking change, but cleaner)
 - **Option B**: Consolidate into single function returning struct
 - **Option C**: Move to BaseEscrow as internal helpers
@@ -57,21 +60,23 @@ function getReleaseStrategy(uint256 workflowId) public view returns (IReleaseStr
 **Estimated Savings**: **1-1.5KB per contract** (2-3KB total)
 
 **Implementation**:
+
 ```solidity
 // Option B: Single consolidated getter
 struct ModuleAddresses {
-    IReleaseStrategy releaseStrategy;
-    IResolutionModule resolutionModule;
-    IYieldGenerationModule yieldGeneration;
-    IYieldDistributionModule yieldDistribution;
+  IReleaseStrategy releaseStrategy;
+  IResolutionModule resolutionModule;
+  IYieldGenerationModule yieldGeneration;
+  IYieldDistributionModule yieldDistribution;
 }
 
 function getModules(uint256 /* workflowId */) public view returns (ModuleAddresses memory) {
-    return ModuleAddresses({
-        releaseStrategy: defaultReleaseStrategy,
-        resolutionModule: defaultResolutionModule,
-        yieldGeneration: defaultYieldGenerationModule,
-        yieldDistribution: defaultYieldDistributionModule
+  return
+    ModuleAddresses({
+      releaseStrategy: defaultReleaseStrategy,
+      resolutionModule: defaultResolutionModule,
+      yieldGeneration: defaultYieldGenerationModule,
+      yieldDistribution: defaultYieldDistributionModule
     });
 }
 ```
@@ -96,23 +101,25 @@ function getModules(uint256 /* workflowId */) public view returns (ModuleAddress
 **Estimated Savings**: **1-2KB** (affects both child contracts)
 
 **Implementation**:
+
 ```solidity
 // Consolidate into single comprehensive getter
 struct EscrowInfo {
-    EscrowTransfer transfer;
-    EscrowSettings settings;
-    string[] attachmentUris;
-    bytes32[] attachmentHashes;
+  EscrowTransfer transfer;
+  EscrowSettings settings;
+  string[] attachmentUris;
+  bytes32[] attachmentHashes;
 }
 
 function getEscrowInfo(uint256 workflowId) public view returns (EscrowInfo memory) {
-    _validateWorkflowId(workflowId);
-    EscrowTransfer storage et = escrowTransfers[workflowId];
-    return EscrowInfo({
-        transfer: et,
-        settings: escrowSettings[workflowId],
-        attachmentUris: et.attachmentURIs,
-        attachmentHashes: et.attachmentHashes
+  _validateWorkflowId(workflowId);
+  EscrowTransfer storage et = escrowTransfers[workflowId];
+  return
+    EscrowInfo({
+      transfer: et,
+      settings: escrowSettings[workflowId],
+      attachmentUris: et.attachmentURIs,
+      attachmentHashes: et.attachmentHashes
     });
 }
 ```
@@ -124,6 +131,7 @@ function getEscrowInfo(uint256 workflowId) public view returns (EscrowInfo memor
 **Location**: `BaseEscrow.sol`
 
 **Findings**:
+
 - `_deprecatedAuthorizedResolver` (line 89) - marked deprecated, still in storage
 - `isEscrowInAave()` (line 1224) - Aave-specific, should query module directly
 - `NotDaoOrOwner` error (line 39) - marked deprecated
@@ -141,7 +149,8 @@ function getEscrowInfo(uint256 workflowId) public view returns (EscrowInfo memor
 
 **Problem**: Multiple events emitted in sequence, some with overlapping data
 
-**Recommendation**: 
+**Recommendation**:
+
 - Consolidate related events where possible
 - Use indexed parameters efficiently
 - Remove redundant event fields
@@ -149,15 +158,16 @@ function getEscrowInfo(uint256 workflowId) public view returns (EscrowInfo memor
 **Estimated Savings**: **0.5-1KB**
 
 **Example**:
+
 ```solidity
 // Instead of multiple events, emit comprehensive event
 event EscrowStateTransitioned(
-    uint256 indexed workflowId,
-    EscrowState indexed oldState,
-    EscrowState indexed newState,
-    address from,
-    address to,
-    uint256 amount
+  uint256 indexed workflowId,
+  EscrowState indexed oldState,
+  EscrowState indexed newState,
+  address from,
+  address to,
+  uint256 amount
 );
 ```
 
@@ -220,11 +230,20 @@ event EscrowStateTransitioned(
 **Estimated Savings**: **1-2KB per contract**
 
 **Implementation**:
-```solidity
-enum ModuleType { ReleaseStrategy, Resolution, YieldGeneration, YieldDistribution }
 
-function queueDefaultModule(ModuleType moduleType, address newModule) external onlyRole(ROLE_TIMELOCK) {
-    // Generic implementation using switch statement
+```solidity
+enum ModuleType {
+  ReleaseStrategy,
+  Resolution,
+  YieldGeneration,
+  YieldDistribution
+}
+
+function queueDefaultModule(
+  ModuleType moduleType,
+  address newModule
+) external onlyRole(ROLE_TIMELOCK) {
+  // Generic implementation using switch statement
 }
 ```
 
@@ -236,7 +255,8 @@ function queueDefaultModule(ModuleType moduleType, address newModule) external o
 
 **Problem**: Storage variables may not be optimally packed
 
-**Recommendation**: 
+**Recommendation**:
+
 - Review struct packing
 - Consider using smaller uint types where possible
 - Group related storage variables
@@ -255,7 +275,8 @@ function queueDefaultModule(ModuleType moduleType, address newModule) external o
 
 **Problem**: Some small functions could be inlined, but compiler may not optimize
 
-**Recommendation**: 
+**Recommendation**:
+
 - Mark small internal functions as `internal` (already done)
 - Consider making very small functions inline manually
 - Review compiler optimizer settings
@@ -295,20 +316,24 @@ function queueDefaultModule(ModuleType moduleType, address newModule) external o
 ## Expected Results
 
 ### After Phase 1
+
 - **EscrowVault**: 32,549 → ~28,549 bytes (still over, but closer)
 - **EscrowableERC20**: 33,291 → ~29,291 bytes (still over, but closer)
 
 ### After Phase 2
+
 - **EscrowVault**: ~28,549 → ~25,549 bytes (still over by ~1.5KB)
 - **EscrowableERC20**: ~29,291 → ~26,291 bytes (still over by ~2.3KB)
 
 ### After Phase 3
+
 - **EscrowVault**: ~25,549 → ~23,549 bytes ✅ **UNDER LIMIT**
 - **EscrowableERC20**: ~26,291 → ~24,291 bytes (still over by ~300 bytes)
 
 ### Additional Optimization Needed for EscrowableERC20
 
 If EscrowableERC20 is still over after Phase 3:
+
 - Consider removing `_getAavePoolAddress` comment (already removed)
 - Review ERC20 inheritance overhead (unavoidable)
 - Consider splitting into proxy pattern (high complexity)
@@ -317,14 +342,14 @@ If EscrowableERC20 is still over after Phase 3:
 
 ## Risk Assessment
 
-| Optimization | Risk Level | Impact | Recommendation |
-|--------------|-----------|--------|----------------|
-| Remove module getter parameters | Medium | High | Proceed with caution, document breaking change |
-| Extract libraries | Low | High | Safe, proceed |
-| Remove deprecated code | Low | Medium | Safe, proceed |
-| Consolidate view functions | Medium | High | Proceed, test thoroughly |
-| Generic module management | Medium | High | Proceed, test thoroughly |
-| Storage optimization | High | Low | Skip unless critical |
+| Optimization                    | Risk Level | Impact | Recommendation                                 |
+| ------------------------------- | ---------- | ------ | ---------------------------------------------- |
+| Remove module getter parameters | Medium     | High   | Proceed with caution, document breaking change |
+| Extract libraries               | Low        | High   | Safe, proceed                                  |
+| Remove deprecated code          | Low        | Medium | Safe, proceed                                  |
+| Consolidate view functions      | Medium     | High   | Proceed, test thoroughly                       |
+| Generic module management       | Medium     | High   | Proceed, test thoroughly                       |
+| Storage optimization            | High       | Low    | Skip unless critical                           |
 
 ---
 
@@ -333,6 +358,7 @@ If EscrowableERC20 is still over after Phase 3:
 **Current Settings**: Check `hardhat.config.js` and `foundry.toml`
 
 **Recommendations**:
+
 - Ensure `optimizer.enabled = true`
 - Set `optimizer.runs = 10000` (or higher for size)
 - Consider `viaIR: true` for better optimization
@@ -343,6 +369,7 @@ If EscrowableERC20 is still over after Phase 3:
 ## Testing Strategy
 
 After each phase:
+
 1. Run full test suite
 2. Verify contract sizes
 3. Check gas costs (should improve or stay similar)
@@ -362,6 +389,7 @@ With aggressive optimization across all three phases, both contracts can be brou
 4. **Optimize compiler settings** - Ensure maximum optimization
 
 **Priority Order**:
+
 1. Phase 1 (High-Impact, Low-Risk) - **START HERE**
 2. Phase 2 (Medium-Impact, Low-Risk)
 3. Phase 3 (High-Impact, Medium-Risk)
@@ -376,4 +404,3 @@ With aggressive optimization across all three phases, both contracts can be brou
 2. ✅ Begin Phase 1 implementation
 3. ✅ Measure results after each phase
 4. ✅ Adjust plan based on actual savings
-

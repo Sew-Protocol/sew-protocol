@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
 - Security documentation (`SECURITY.md`) with responsible disclosure policy
 - Comprehensive security model (`docs/SECURITY_MODEL.md`)
 - Operational runbooks (`governance/runbooks/`) for emergency, recovery, and governance procedures
@@ -21,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Module extraction: DecentralizedResolutionModule moved to separate package (`contracts/decentralized-resolution-module/`)
 
 ### Changed
+
 - Removed `ROLE_MODULE_DEVELOPER` for governance consistency (all upgrades now via `ROLE_TIMELOCK`)
 - Simplified upgrade authorization in DecentralizedResolutionModule and ResolverIncentiveModule
 - Updated contract structure: core contracts in `contracts/core/`, shared interfaces in `contracts/shared/`
@@ -28,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated documentation to reflect module extraction and role removal
 
 ### Security
+
 - Removed module developer role to reduce attack surface
 - All upgrades now require standard governance lanes (ROLE_TIMELOCK)
 - Enhanced security model documentation
@@ -37,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0] - 2026-01-06
 
 ### Added
+
 - Initial release preparation
 - Core escrow contracts (BaseEscrow, EscrowVault, EscrowableERC20)
 - Resolution modules (DefaultResolutionModule, DecentralizedResolutionModule)
@@ -48,12 +52,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Deployment infrastructure (hardhat-deploy)
 
 ### Architecture
+
 - Modular design with "new escrows only" semantics
 - Immutable core contracts (no proxies)
 - UUPS upgradeable modules (when swapped in)
 - Library-based architecture for contract size optimization
 
 ### Testing
+
 - Hardhat unit tests (277 passing)
 - Foundry fuzz tests and invariants
 - Integration tests for governance flows
@@ -116,6 +122,3 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html):
 ---
 
 **Note:** This changelog will be updated as the project progresses toward mainnet deployment.
-
-
-

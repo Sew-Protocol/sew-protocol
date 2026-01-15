@@ -20,6 +20,7 @@
 ### Protocol-Wide Fee
 
 **Current Implementation**:
+
 ```solidity
 uint256 public escrowFee;  // Protocol-wide fee (basis points)
 uint256 public constant ESCROW_FEE_DENOMINATOR = 10000;
@@ -30,6 +31,7 @@ uint256 amountAfterFee = amount - fee;
 ```
 
 **Limitations**:
+
 - All escrows use the same fee percentage
 - No flexibility for different use cases
 - Marketplaces cannot set custom fees per transaction
@@ -45,16 +47,17 @@ uint256 amountAfterFee = amount - fee;
 
 ```solidity
 struct EscrowSettings {
-    address customResolver;
-    bool yieldEnabled;
-    uint256 autoReleaseTime;
-    uint256 autoCancelTime;
-    EscrowType escrowType;
-    uint256 customFee;  // NEW: 0 = use default, >0 = override (max 200 bps)
+  address customResolver;
+  bool yieldEnabled;
+  uint256 autoReleaseTime;
+  uint256 autoCancelTime;
+  EscrowType escrowType;
+  uint256 customFee; // NEW: 0 = use default, >0 = override (max 200 bps)
 }
 ```
 
 **Logic**:
+
 - If `customFee == 0`: Use protocol default fee (`escrowFee`)
 - If `customFee > 0`: Use custom fee (with validation)
 - Maximum custom fee: 200 bps (2%) - same as protocol max
@@ -68,6 +71,7 @@ struct EscrowSettings {
 **Scenario**: Marketplace wants to charge different fees for different transaction types
 
 **Example**:
+
 - Standard escrows: 1% fee (protocol default)
 - Premium escrows: 1.5% fee (custom)
 - High-value escrows (>$10k): 0.5% fee (custom, lower for volume)
@@ -81,6 +85,7 @@ struct EscrowSettings {
 **Scenario**: Large volume buyers/sellers get fee discounts
 
 **Example**:
+
 - First 10 escrows: 1% fee (default)
 - Next 50 escrows: 0.75% fee (custom)
 - 100+ escrows: 0.5% fee (custom)
@@ -94,6 +99,7 @@ struct EscrowSettings {
 **Scenario**: Temporary fee reductions for marketing
 
 **Example**:
+
 - Launch period: 0.5% fee (custom, lower than default)
 - Special events: Fee waivers or reductions
 
@@ -106,6 +112,7 @@ struct EscrowSettings {
 **Scenario**: Different fees based on escrow amount
 
 **Example**:
+
 - < $100: 2% fee (custom, higher for small transactions)
 - $100-$1000: 1% fee (default)
 - > $1000: 0.5% fee (custom, lower for large transactions)
@@ -122,12 +129,12 @@ struct EscrowSettings {
 
 ```solidity
 struct EscrowSettings {
-    address customResolver;
-    bool yieldEnabled;
-    uint256 autoReleaseTime;
-    uint256 autoCancelTime;
-    EscrowType escrowType;
-    uint256 customFee;  // NEW: 0 = use default, >0 = override (max 200 bps)
+  address customResolver;
+  bool yieldEnabled;
+  uint256 autoReleaseTime;
+  uint256 autoCancelTime;
+  EscrowType escrowType;
+  uint256 customFee; // NEW: 0 = use default, >0 = override (max 200 bps)
 }
 ```
 
@@ -147,10 +154,10 @@ struct EscrowSettings {
  * @dev Reverts if customFee > maxFee
  */
 function validateCustomFee(uint256 customFee, uint256 maxFee) internal pure {
-    if (customFee > maxFee) {
-        revert InvalidEscrowFee(customFee, maxFee);
-    }
-    // 0 is valid (means use default)
+  if (customFee > maxFee) {
+    revert InvalidEscrowFee(customFee, maxFee);
+  }
+  // 0 is valid (means use default)
 }
 ```
 
@@ -163,12 +170,14 @@ function validateCustomFee(uint256 customFee, uint256 maxFee) internal pure {
 **File**: `contracts/EscrowVault.sol` and `contracts/EscrowableERC20.sol`
 
 **Current**:
+
 ```solidity
 uint256 fee = amount * escrowFee / ESCROW_FEE_DENOMINATOR;
 uint256 amountAfterFee = amount - fee;
 ```
 
 **Updated**:
+
 ```solidity
 uint256 fee;
 if (settings.customFee > 0) {
@@ -192,16 +201,13 @@ uint256 amountAfterFee = amount - fee;
 Add custom fee validation to `validateEscrowSettings()`:
 
 ```solidity
-function validateEscrowSettings(
-    EscrowSettings memory settings,
-    uint256 currentTime
-) internal pure {
-    // ... existing validations ...
-    
-    // Validate custom fee if set
-    if (settings.customFee > 0) {
-        validateCustomFee(settings.customFee, 200);
-    }
+function validateEscrowSettings(EscrowSettings memory settings, uint256 currentTime) internal pure {
+  // ... existing validations ...
+
+  // Validate custom fee if set
+  if (settings.customFee > 0) {
+    validateCustomFee(settings.customFee, 200);
+  }
 }
 ```
 
@@ -211,13 +217,13 @@ function validateEscrowSettings(
 
 ## Total Size Impact
 
-| Component | Size Impact |
-|-----------|-------------|
-| Struct field addition | 0 bytes |
-| Validation function | +50-100 bytes |
-| Fee calculation logic | +100-150 bytes |
-| Settings validation update | +20-30 bytes |
-| **Total** | **+170-280 bytes** |
+| Component                  | Size Impact        |
+| -------------------------- | ------------------ |
+| Struct field addition      | 0 bytes            |
+| Validation function        | +50-100 bytes      |
+| Fee calculation logic      | +100-150 bytes     |
+| Settings validation update | +20-30 bytes       |
+| **Total**                  | **+170-280 bytes** |
 
 **Note**: Actual size may vary based on optimizer settings.
 
@@ -230,11 +236,13 @@ function validateEscrowSettings(
 **Requirement**: Custom fee must be ≤ 200 bps (2%)
 
 **Rationale**:
+
 - Matches protocol maximum fee
 - Prevents excessive fees
 - Protects users
 
 **Implementation**:
+
 ```solidity
 if (settings.customFee > 200) {
     revert InvalidEscrowFee(settings.customFee, 200);
@@ -248,11 +256,13 @@ if (settings.customFee > 200) {
 **Question**: Should there be a minimum custom fee?
 
 **Options**:
+
 - **Option A**: No minimum (allow 0% fees for promotions)
 - **Option B**: Minimum = protocol fee (prevent undercutting)
 - **Option C**: Minimum = 50 bps (0.5%) (prevent abuse)
 
 **Recommendation**: **Option A** - No minimum
+
 - Allows promotional pricing
 - Marketplaces can subsidize fees
 - Governance can set protocol fee to prevent abuse
@@ -264,21 +274,25 @@ if (settings.customFee > 200) {
 **Options**:
 
 **Option A: Anyone** (Recommended)
+
 - Any user can set custom fee when creating escrow
 - Simple, flexible
 - Risk: Users could set very high fees (mitigated by max limit)
 
 **Option B: Whitelist Only**
+
 - Only whitelisted addresses can set custom fees
 - More control
 - Risk: Less flexible, requires governance for whitelist management
 
 **Option C: Governance Only**
+
 - Only governance can set custom fees
 - Maximum control
 - Risk: Not useful for marketplace use cases
 
 **Recommendation**: **Option A** - Anyone can set
+
 - Max fee limit (200 bps) provides protection
 - Users can see fee before creating escrow
 - Marketplaces can set appropriate fees
@@ -292,11 +306,13 @@ if (settings.customFee > 200) {
 **Risk**: Users could set fees lower than protocol fee, reducing protocol revenue
 
 **Mitigation Options**:
+
 - **Option 1**: Require customFee >= protocol fee (prevents undercutting)
 - **Option 2**: Allow any custom fee, but protocol fee applies to all (custom fee is additional)
 - **Option 3**: Allow any custom fee (current recommendation)
 
 **Recommendation**: **Option 3** - Allow any custom fee
+
 - Marketplaces may want to subsidize fees
 - Promotional pricing is valuable
 - Protocol can adjust default fee if needed
@@ -310,14 +326,16 @@ if (settings.customFee > 200) {
 **Current**: Fee is visible in `EscrowSettings` struct
 
 **Enhancement**: Consider adding fee preview function:
+
 ```solidity
-function calculateFee(uint256 amount, EscrowSettings memory settings) 
-    public view returns (uint256 fee, uint256 amountAfterFee) 
-{
-    uint256 feeRate = settings.customFee > 0 ? settings.customFee : escrowFee;
-    fee = amount * feeRate / ESCROW_FEE_DENOMINATOR;
-    amountAfterFee = amount - fee;
-    return (fee, amountAfterFee);
+function calculateFee(
+  uint256 amount,
+  EscrowSettings memory settings
+) public view returns (uint256 fee, uint256 amountAfterFee) {
+  uint256 feeRate = settings.customFee > 0 ? settings.customFee : escrowFee;
+  fee = (amount * feeRate) / ESCROW_FEE_DENOMINATOR;
+  amountAfterFee = amount - fee;
+  return (fee, amountAfterFee);
 }
 ```
 
@@ -330,10 +348,12 @@ function calculateFee(uint256 amount, EscrowSettings memory settings)
 **Question**: Should we track custom fees separately?
 
 **Options**:
+
 - **Option A**: Track all fees together (simpler)
 - **Option B**: Track custom fees separately (more analytics)
 
 **Recommendation**: **Option A** - Track together
+
 - Simpler implementation
 - Analytics can be done off-chain
 - No additional storage needed
@@ -347,6 +367,7 @@ function calculateFee(uint256 amount, EscrowSettings memory settings)
 **Risk**: Malicious users could set very high fees
 
 **Mitigation**:
+
 - ✅ Maximum fee limit (200 bps)
 - ✅ Fee is visible in settings before creation
 - ✅ Users can see fee in transaction
@@ -360,11 +381,13 @@ function calculateFee(uint256 amount, EscrowSettings memory settings)
 **Risk**: Users could set 0% fee to bypass protocol fees
 
 **Mitigation Options**:
+
 - **Option 1**: Require minimum fee = protocol fee
 - **Option 2**: Allow 0% (for promotions), but track separately
 - **Option 3**: Allow 0% (current recommendation)
 
 **Recommendation**: **Option 3** - Allow 0% fees
+
 - Useful for promotional pricing
 - Marketplaces may want to subsidize
 - Governance can adjust protocol fee if revenue is concern
@@ -376,6 +399,7 @@ function calculateFee(uint256 amount, EscrowSettings memory settings)
 **Risk**: Attacker could front-run escrow creation with high custom fee
 
 **Mitigation**:
+
 - Fee is set by creator, not attacker
 - Front-running would require attacker to create escrow (not useful)
 - **Assessment**: **NO RISK** - Not applicable
@@ -390,12 +414,12 @@ function calculateFee(uint256 amount, EscrowSettings memory settings)
 
 ```solidity
 struct EscrowSettings {
-    address customResolver;
-    bool yieldEnabled;
-    uint256 autoReleaseTime;
-    uint256 autoCancelTime;
-    EscrowType escrowType;
-    uint256 customFee;  // 0 = use default, >0 = override (max 200 bps)
+  address customResolver;
+  bool yieldEnabled;
+  uint256 autoReleaseTime;
+  uint256 autoCancelTime;
+  EscrowType escrowType;
+  uint256 customFee; // 0 = use default, >0 = override (max 200 bps)
 }
 ```
 
@@ -409,25 +433,22 @@ struct EscrowSettings {
  * @dev Reverts if customFee > maxFee
  */
 function validateCustomFee(uint256 customFee, uint256 maxFee) internal pure {
-    if (customFee > maxFee) {
-        revert InvalidEscrowFee(customFee, maxFee);
-    }
-    // 0 is valid (means use default)
+  if (customFee > maxFee) {
+    revert InvalidEscrowFee(customFee, maxFee);
+  }
+  // 0 is valid (means use default)
 }
 
 /**
  * @dev Validate escrow settings (updated to include custom fee)
  */
-function validateEscrowSettings(
-    EscrowSettings memory settings,
-    uint256 currentTime
-) internal pure {
-    // ... existing validations ...
-    
-    // Validate custom fee if set
-    if (settings.customFee > 0) {
-        validateCustomFee(settings.customFee, 200);
-    }
+function validateEscrowSettings(EscrowSettings memory settings, uint256 currentTime) internal pure {
+  // ... existing validations ...
+
+  // Validate custom fee if set
+  if (settings.customFee > 0) {
+    validateCustomFee(settings.customFee, 200);
+  }
 }
 ```
 
@@ -435,27 +456,27 @@ function validateEscrowSettings(
 
 ```solidity
 function createEscrow(
-    address token,
-    address seller,
-    uint256 amount,
-    EscrowSettings memory settings
+  address token,
+  address seller,
+  uint256 amount,
+  EscrowSettings memory settings
 ) public nonReentrant whenNotPaused returns (uint256) {
-    // ... existing validation ...
-    
-    // Calculate fee with custom override
-    uint256 fee;
-    if (settings.customFee > 0) {
-        // Validate custom fee (max 200 bps)
-        if (settings.customFee > 200) {
-            revert InvalidEscrowFee(settings.customFee, 200);
-        }
-        fee = amount * settings.customFee / ESCROW_FEE_DENOMINATOR;
-    } else {
-        fee = amount * escrowFee / ESCROW_FEE_DENOMINATOR;
+  // ... existing validation ...
+
+  // Calculate fee with custom override
+  uint256 fee;
+  if (settings.customFee > 0) {
+    // Validate custom fee (max 200 bps)
+    if (settings.customFee > 200) {
+      revert InvalidEscrowFee(settings.customFee, 200);
     }
-    uint256 amountAfterFee = amount - fee;
-    
-    // ... rest of function ...
+    fee = (amount * settings.customFee) / ESCROW_FEE_DENOMINATOR;
+  } else {
+    fee = (amount * escrowFee) / ESCROW_FEE_DENOMINATOR;
+  }
+  uint256 amountAfterFee = amount - fee;
+
+  // ... rest of function ...
 }
 ```
 
@@ -504,6 +525,7 @@ function createEscrow(
 ### Additional Gas Costs
 
 **Per Escrow Creation**:
+
 - Custom fee validation: ~50-100 gas
 - Conditional check: ~20-30 gas
 - **Total Additional**: ~70-130 gas per escrow
@@ -517,6 +539,7 @@ function createEscrow(
 ### Existing Escrows
 
 **Impact**: ✅ **NONE**
+
 - Existing escrows use protocol default fee
 - New field is optional (0 = use default)
 - No migration needed
@@ -524,6 +547,7 @@ function createEscrow(
 ### API Compatibility
 
 **Breaking Changes**: ❌ **NONE**
+
 - New field is optional
 - Default behavior unchanged
 - Existing code continues to work
@@ -535,6 +559,7 @@ function createEscrow(
 ### Option 1: Per-Escrow Fee (Recommended) ✅
 
 **Implementation**: Custom fee in EscrowSettings
+
 - **Pros**: Flexible, per-escrow control
 - **Cons**: Slightly more complex
 - **Size**: +170-280 bytes
@@ -542,6 +567,7 @@ function createEscrow(
 ### Option 2: Fee Tiers
 
 **Implementation**: Predefined fee tiers based on amount
+
 - **Pros**: Simpler, no custom fee needed
 - **Cons**: Less flexible
 - **Size**: Similar
@@ -551,6 +577,7 @@ function createEscrow(
 ### Option 3: Marketplace Fee Override
 
 **Implementation**: Whitelisted addresses can set fees
+
 - **Pros**: More control
 - **Cons**: Requires whitelist management
 - **Size**: Similar + whitelist storage
@@ -566,11 +593,13 @@ function createEscrow(
 **Question**: Should custom fees have a minimum?
 
 **Options**:
+
 - **A**: No minimum (allow 0% for promotions) ✅ **RECOMMENDED**
 - **B**: Minimum = protocol fee (prevent undercutting)
 - **C**: Minimum = 50 bps (0.5%)
 
 **Decision**: **Option A** - No minimum
+
 - Allows promotional pricing
 - Marketplaces can subsidize
 - Max limit (200 bps) provides upper bound
@@ -582,10 +611,12 @@ function createEscrow(
 **Question**: Should we add fee preview function?
 
 **Options**:
+
 - **A**: Add `calculateFee()` view function ✅ **RECOMMENDED**
 - **B**: Fee visible in EscrowSettings (current)
 
 **Decision**: **Option A** - Add preview function
+
 - Better UX
 - Users can calculate fee before creating
 - Small size impact (+50-100 bytes)
@@ -597,10 +628,12 @@ function createEscrow(
 **Question**: Should we track custom fees separately?
 
 **Options**:
+
 - **A**: Track all fees together ✅ **RECOMMENDED**
 - **B**: Separate tracking for analytics
 
 **Decision**: **Option A** - Track together
+
 - Simpler
 - Analytics can be done off-chain
 - No additional storage
@@ -610,12 +643,14 @@ function createEscrow(
 ## Implementation Checklist
 
 ### Pre-Implementation
+
 - [ ] Review and approve approach
 - [ ] Decide on minimum fee requirement
 - [ ] Decide on fee preview function
 - [ ] Review governance implications
 
 ### Implementation
+
 - [ ] Add `customFee` to EscrowSettings struct
 - [ ] Add validation function
 - [ ] Update fee calculation in createEscrow()
@@ -624,6 +659,7 @@ function createEscrow(
 - [ ] Update documentation
 
 ### Testing
+
 - [ ] Unit tests for validation
 - [ ] Unit tests for fee calculation
 - [ ] Integration tests
@@ -631,6 +667,7 @@ function createEscrow(
 - [ ] Gas cost verification
 
 ### Deployment
+
 - [ ] Code review
 - [ ] Security audit (if needed)
 - [ ] Testnet deployment
@@ -696,6 +733,7 @@ uint256 workflowId = createEscrow(
 **Risk**: Users set lower fees, reducing protocol revenue
 
 **Mitigation**:
+
 - Governance can adjust protocol default fee
 - Marketplaces may subsidize (still good for adoption)
 - Volume may increase with lower fees
@@ -709,6 +747,7 @@ uint256 workflowId = createEscrow(
 **Risk**: Users might not understand custom fees
 
 **Mitigation**:
+
 - Clear documentation
 - Fee preview function
 - Fee visible in settings
@@ -722,6 +761,7 @@ uint256 workflowId = createEscrow(
 **Risk**: Malicious users set very high fees
 
 **Mitigation**:
+
 - Maximum fee limit (200 bps)
 - Fee visible before creation
 - Users can see fee in transaction
@@ -733,16 +773,19 @@ uint256 workflowId = createEscrow(
 ## Success Metrics
 
 ### Adoption Metrics
+
 - % of escrows using custom fees
 - Average custom fee vs. default fee
 - Marketplace adoption rate
 
 ### Revenue Metrics
+
 - Total fees collected (custom + default)
 - Average fee per escrow
 - Revenue impact of custom fees
 
 ### User Metrics
+
 - User satisfaction with fee flexibility
 - Marketplace integration success
 - Promotional campaign effectiveness
@@ -754,6 +797,7 @@ uint256 workflowId = createEscrow(
 ### Recommendation: ✅ **IMPLEMENT**
 
 **Rationale**:
+
 - ✅ Low complexity (~170-280 bytes)
 - ✅ High value (marketplace use cases)
 - ✅ Low risk (max limit provides protection)
@@ -763,6 +807,7 @@ uint256 workflowId = createEscrow(
 ### Implementation Priority
 
 **Priority**: **HIGH**
+
 - Can be implemented alongside other improvements
 - Low risk, high value
 - Enables marketplace integrations
@@ -770,6 +815,7 @@ uint256 workflowId = createEscrow(
 ### Timeline
 
 **Estimated Time**: 2-3 hours
+
 - Implementation: 1-2 hours
 - Testing: 1 hour
 - Documentation: 0.5 hours
@@ -790,14 +836,10 @@ uint256 workflowId = createEscrow(
 **Status**: Ready for Implementation  
 **Last Updated**: Current
 
-
-
-#Feedback 
+#Feedback
 
 Only makes sense if the escrow is created for the buyer, otherwise it's the buyer specifying the fee they pay
 
-Having flexibility to adjust fees is useful 
+Having flexibility to adjust fees is useful
 
 How could we add a module for determining fees?
-
-

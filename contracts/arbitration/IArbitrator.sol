@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.33;
 
-import "./IArbitrable.sol";
+import './IArbitrable.sol';
 
 /**
  * @title IArbitrator
@@ -25,29 +25,24 @@ interface IArbitrator {
      * @param _extraData Additional data for the arbitrator.
      * @return disputeID ID of the dispute created.
      */
-    function createDispute(uint256 _choices, bytes calldata _extraData) 
-        external 
-        payable 
-        returns (uint256 disputeID);
+    function createDispute(
+        uint256 _choices,
+        bytes calldata _extraData
+    ) external payable returns (uint256 disputeID);
 
     /**
      * @notice Compute the cost of arbitration.
      * @param _extraData Additional data for the arbitrator.
      * @return cost Required cost of arbitration.
      */
-    function arbitrationCost(bytes calldata _extraData) 
-        external 
-        view 
-        returns (uint256 cost);
+    function arbitrationCost(bytes calldata _extraData) external view returns (uint256 cost);
 
     /**
      * @notice Appeal a ruling. Must be called by the arbitrable contract.
      * @param _disputeID ID of the dispute to be appealed.
      * @param _extraData Additional data for the arbitrator.
      */
-    function appeal(uint256 _disputeID, bytes calldata _extraData) 
-        external 
-        payable;
+    function appeal(uint256 _disputeID, bytes calldata _extraData) external payable;
 
     /**
      * @notice Compute the cost of appeal.
@@ -55,28 +50,22 @@ interface IArbitrator {
      * @param _extraData Additional data for the arbitrator.
      * @return cost Required cost of appeal.
      */
-    function appealCost(uint256 _disputeID, bytes calldata _extraData) 
-        external 
-        view 
-        returns (uint256 cost);
+    function appealCost(
+        uint256 _disputeID,
+        bytes calldata _extraData
+    ) external view returns (uint256 cost);
 
     /**
      * @notice Get the status of a dispute.
      * @param _disputeID ID of the dispute.
      * @return status The status of the dispute.
      */
-    function disputeStatus(uint256 _disputeID) 
-        external 
-        view 
-        returns (DisputeStatus status);
+    function disputeStatus(uint256 _disputeID) external view returns (DisputeStatus status);
 
     /**
      * @notice Get the current ruling of a dispute.
      * @param _disputeID ID of the dispute.
      * @return ruling The ruling which has been given or the one which will be given if there is no appeal.
      */
-    function currentRuling(uint256 _disputeID) 
-        external 
-        view 
-        returns (uint256 ruling);
+    function currentRuling(uint256 _disputeID) external view returns (uint256 ruling);
 }

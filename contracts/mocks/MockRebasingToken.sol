@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
-import "./ERC20Mock.sol";
+import './ERC20Mock.sol';
 
 /**
  * @notice Simple rebasing-like token for tests. For test purposes this exposes a `rebase`

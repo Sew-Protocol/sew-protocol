@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.33;
 
-import "../IArbitrator.sol";
-import "../IArbitrable.sol";
+import '../IArbitrator.sol';
+import '../IArbitrable.sol';
 
 /**
  * @title MockKlerosArbitrator
@@ -27,84 +27,64 @@ contract MockKlerosArbitrator is IArbitrator {
         arbitrationPrice = _arbitrationPrice;
     }
 
-    function createDispute(uint256 _choices, bytes calldata) 
-        external 
-        payable 
-        override 
-        returns (uint256 disputeID) 
-    {
-        require(msg.value >= arbitrationPrice, "Insufficient payment");
-        
+    function createDispute(
+        uint256 _choices,
+        bytes calldata
+    ) external payable override returns (uint256 disputeID) {
+        require(msg.value >= arbitrationPrice, 'Insufficient payment');
+
         disputeID = disputes.length;
-        disputes.push(Dispute({
-            arbitrable: IArbitrable(msg.sender),
-            choices: _choices,
-            ruling: 0,
-            status: DisputeStatus.Waiting
-        }));
-        
+        disputes.push(
+            Dispute({
+                arbitrable: IArbitrable(msg.sender),
+                choices: _choices,
+                ruling: 0,
+                status: DisputeStatus.Waiting
+            })
+        );
+
         emit DisputeCreation(disputeID, IArbitrable(msg.sender));
-        
+
         return disputeID;
     }
 
-    function arbitrationCost(bytes calldata) 
-        external 
-        view 
-        override 
-        returns (uint256 cost) 
-    {
+    function arbitrationCost(bytes calldata) external view override returns (uint256 cost) {
         return arbitrationPrice;
     }
 
     function appeal(uint256, bytes calldata) external payable override {
-        revert("Appeal not implemented in mock");
+        revert('Appeal not implemented in mock');
     }
 
-    function appealCost(uint256, bytes calldata) 
-        external 
-        view 
-        override 
-        returns (uint256) 
-    {
+    function appealCost(uint256, bytes calldata) external view override returns (uint256) {
         return arbitrationPrice;
     }
 
-    function disputeStatus(uint256 _disputeID) 
-        external 
-        view 
-        override 
-        returns (DisputeStatus) 
-    {
-        require(_disputeID < disputes.length, "Invalid dispute ID");
+    function disputeStatus(uint256 _disputeID) external view override returns (DisputeStatus) {
+        require(_disputeID < disputes.length, 'Invalid dispute ID');
         return disputes[_disputeID].status;
     }
 
-    function currentRuling(uint256 _disputeID) 
-        external 
-        view 
-        override 
-        returns (uint256) 
-    {
-        require(_disputeID < disputes.length, "Invalid dispute ID");
+    function currentRuling(uint256 _disputeID) external view override returns (uint256) {
+        require(_disputeID < disputes.length, 'Invalid dispute ID');
         return disputes[_disputeID].ruling;
     }
 
     // Test helper functions
     function giveRuling(uint256 _disputeID, uint256 _ruling) external {
-        require(_disputeID < disputes.length, "Invalid dispute ID");
-        
+        require(_disputeID < disputes.length, 'Invalid dispute ID');
+
         Dispute storage dispute = disputes[_disputeID];
-        require(_ruling <= dispute.choices, "Invalid ruling");
-        
+        require(_ruling <= dispute.choices, 'Invalid ruling');
+
         dispute.ruling = _ruling;
         dispute.status = DisputeStatus.Solved;
-        
+
         dispute.arbitrable.rule(_disputeID, _ruling);
     }
 
     function setDisputeStatus(uint256 _disputeID, DisputeStatus _status) external {
-        require(_disputeID < disputes.length, "Invalid dispute ID");
+        require(_disputeID < disputes.length, 'Invalid dispute ID');
         disputes[_disputeID].status = _status;
     }
 

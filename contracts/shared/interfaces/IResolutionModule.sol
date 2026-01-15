@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
-import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import '@openzeppelin/contracts/utils/introspection/IERC165.sol';
 
 /**
  * @title IResolutionModule
@@ -49,11 +49,7 @@ interface IResolutionModule is IERC165 {
         uint256 workflowId,
         uint8 currentLevel,
         bytes calldata escrowData
-    ) external view returns (
-        bool canEscalate,
-        address nextDisputeResolver,
-        uint256 escalationFee
-    );
+    ) external view returns (bool canEscalate, address nextDisputeResolver, uint256 escalationFee);
 
     /**
      * @notice Execute escalation to next level
@@ -66,11 +62,7 @@ interface IResolutionModule is IERC165 {
     function executeEscalation(
         uint256 workflowId,
         bytes calldata escrowData
-    ) external returns (
-        bool success,
-        address newDisputeResolver,
-        uint8 newLevel
-    );
+    ) external returns (bool success, address newDisputeResolver, uint8 newLevel);
 
     /**
      * @notice Get required appeal bond for escalation (DR v2)
@@ -103,6 +95,3 @@ interface IResolutionModule is IERC165 {
      */
     function moduleVersion() external pure returns (string memory version);
 }
-
-
-

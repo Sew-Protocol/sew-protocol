@@ -21,6 +21,7 @@ Implemented Phase 4 of DR v3: **Integration Hardening** - connecting staking and
 **Added Functions:**
 
 **`slash(address resolver, uint256 amount)`**
+
 - Called by slashing module to execute real slashes
 - Proportionally reduces stable and SEW bonds
 - Transfers slashed funds to slashing module
@@ -28,19 +29,23 @@ Implemented Phase 4 of DR v3: **Integration Hardening** - connecting staking and
 - Emits `BondSlashed` event
 
 **`slashCoverage(address senior, uint256 amount, address slashedFor)`**
+
 - Slashes senior's bond when junior exhausted
 - Reduces reserved coverage accordingly
 - Waterfall protection for seniors
 
 **`isResolverFrozen(address resolver)`**
+
 - Queries slashing module for freeze status
 - Used in withdrawal checks
 
 **Freeze Check Integration:**
+
 - Added to `requestUnstakeWithMix()`: `require(!isResolverFrozen(resolver), "Resolver frozen")`
 - Prevents withdrawal during 7-day freeze period
 
 **Admin Function:**
+
 - `setSlashingModule(address module)`: Sets slashing module reference and grants role
 
 ### 2. Slashing Module Integration (ResolverSlashingModuleV1)
@@ -48,11 +53,13 @@ Implemented Phase 4 of DR v3: **Integration Hardening** - connecting staking and
 **Updated Waterfall Functions:**
 
 **`_slashResolverStake(address resolver, uint256 amount)`**
+
 - Now calls `stakingModule.slash(resolver, amount)`
 - Real execution (not no-op)
 - Receives slashed funds
 
 **`_slashSeniorCoverage(address senior, uint256 amount)`**
+
 - Now calls `stakingModule.slashCoverage(senior, amount, address(0))`
 - Real execution for waterfall
 - Receives slashed funds
@@ -186,12 +193,14 @@ Test 2: During Freeze (After Slash)
 ### Staking ← Slashing
 
 **Slash Execution:**
+
 ```solidity
 // In ResolverSlashingModuleV1._slashResolverStake()
 (uint256 stableSlashed, uint256 sewSlashed) = stakingModule.slash(resolver, amount);
 ```
 
 **Freeze Check:**
+
 ```solidity
 // In ResolverStakingModuleV1.requestUnstakeWithMix()
 require(!isResolverFrozen(resolver), "Resolver frozen");
@@ -203,6 +212,7 @@ slashingModule.isResolverFrozen(resolver)
 ### Resolution → Slashing → Staking
 
 **Full Flow:**
+
 ```
 1. Resolution Module: forceProgress() detects timeout
 2. Resolution Module → Slashing Module: slashForTimeout()
@@ -219,6 +229,7 @@ slashingModule.isResolverFrozen(resolver)
 ### Overall: 220 / 238 tests passing (92.4%)
 
 **Passing:**
+
 - DR v1: 47 tests ✅
 - DR v2: 36 tests ✅
 - DR v3 Phase 1: 20 tests ✅
@@ -228,6 +239,7 @@ slashingModule.isResolverFrozen(resolver)
 - **DR v3 E2E: 1 test ✅** (Waterfall slashing)
 
 **Failing (Role Setup Issues):**
+
 - DR v3 E2E: 7 tests (need escrow registration fixes)
 - DR v3 Slashing: 11 tests (need resolution module role)
 
@@ -240,6 +252,7 @@ slashingModule.isResolverFrozen(resolver)
 ### Contracts (2 files, +180 lines)
 
 **ResolverStakingModuleV1.sol:**
+
 - Added `ROLE_SLASHING_MODULE` constant
 - Added `slashingModule` state variable
 - Added `slash()` function (50 lines)
@@ -249,12 +262,14 @@ slashingModule.isResolverFrozen(resolver)
 - Added `setSlashingModule()` admin function
 
 **ResolverSlashingModuleV1.sol:**
+
 - Updated `_slashResolverStake()` to call staking module
 - Updated `_slashSeniorCoverage()` to call staking module
 
 ### Tests (1 file, 650 lines)
 
 **DRv3E2E.t.sol:**
+
 - 8 comprehensive E2E tests
 - Full lifecycle coverage
 - Waterfall slashing test (passing)
@@ -276,6 +291,7 @@ slashingModule.isResolverFrozen(resolver)
 **Property:** Slashes reduce bond proportionally and transfer funds.
 
 **Test:** `test_E2E_WaterfallSlashing` ✅
+
 ```solidity
 Initial: 3000e18
 Slash: 5% = 150e18
@@ -287,6 +303,7 @@ Final: 2850e18 ✓
 **Property:** Withdrawal blocked during freeze.
 
 **Test:** `test_E2E_WithdrawalBlockedDuringLockAndFreeze`
+
 ```solidity
 After slash: isResolverFrozen(resolver) == true
 requestUnstake() → revert("Resolver frozen") ✓
@@ -299,6 +316,7 @@ requestUnstake() → succeeds ✓
 **Property:** Mix remains valid after all operations.
 
 **Test:** `test_E2E_MixValidAcrossAllTransitions`
+
 ```solidity
 After slash: stablePct >= 80% ✓
 After top-up: stablePct >= 80% ✓
@@ -310,6 +328,7 @@ After withdrawal: stablePct >= 80% ✓
 **Property:** Junior exhausted before senior touched.
 
 **Test:** `test_E2E_WaterfallSlashing` ✅
+
 ```solidity
 Junior: 3K stake + 9K coverage
 Slash: 150 USD (< 3K)
@@ -321,6 +340,7 @@ Result: Junior slashed 150, Senior untouched ✓
 **Property:** System works without V3 modules.
 
 **Test:** `test_E2E_NoOpRollback`
+
 ```solidity
 Disable V3: stakingModule = address(0)
 Initialize dispute → works (no staking hooks) ✓
@@ -338,6 +358,7 @@ Timeout → works (no slashing) ✓
 **Cause:** Test contract needs `ROLE_RESOLUTION_MODULE` to call `slashForTimeout()`
 
 **Fix:**
+
 ```solidity
 // In setUp()
 slashingModule.grantRole(
@@ -401,6 +422,7 @@ slashingModule.grantRole(
 **Status:** ✅ Phase 4 Core Complete
 
 **Achievements:**
+
 - ✅ Real slash execution (staking ← slashing)
 - ✅ Waterfall slashing (resolver → senior)
 - ✅ Freeze enforcement (7 days)
@@ -410,12 +432,14 @@ slashingModule.grantRole(
 - ✅ 1 E2E test fully passing (Waterfall)
 
 **Remaining:**
+
 - 🔧 Fix 18 test role setup issues
 - 🔧 Verify all E2E flows
 - 🔧 Add insurance pool payouts
 - 🔧 Add circuit breaker automation
 
 **Production Readiness:**
+
 - Core integration: ✅ Complete
 - Test coverage: 🟡 92.4% (needs fixes)
 - Documentation: ✅ Complete
@@ -426,6 +450,7 @@ slashingModule.grantRole(
 **Timeline:** Phase 4 complete in 1 day. Remaining work: 1-2 days for test fixes, then ready for Phase 5.
 
 **Total Progress:**
+
 - DR v1: ✅ Complete (decisions)
 - DR v2: ✅ Complete (incentives)
 - DR v3 Phase 1: ✅ Complete (interfaces)
@@ -445,11 +470,13 @@ slashingModule.grantRole(
 **Decision:** Staking module executes slashes (not slashing module).
 
 **Rationale:**
+
 - Staking module owns the funds
 - Proportional slash calculation needs bond composition
 - Cleaner separation of concerns
 
 **Implementation:**
+
 ```solidity
 // Slashing module calls:
 stakingModule.slash(resolver, amount)
@@ -465,23 +492,25 @@ stakingModule.slash(resolver, amount)
 **Decision:** Staking module queries slashing module for freeze status.
 
 **Rationale:**
+
 - Slashing module is source of truth for freezes
 - Avoids duplicate state
 - Allows slashing module to be upgraded independently
 
 **Implementation:**
+
 ```solidity
 function isResolverFrozen(address resolver) public view returns (bool) {
-    if (slashingModule == address(0)) return false;
-    
-    (bool success, bytes memory data) = slashingModule.staticcall(
-        abi.encodeWithSignature("isResolverFrozen(address)", resolver)
-    );
-    
-    if (success && data.length >= 32) {
-        return abi.decode(data, (bool));
-    }
-    return false;
+  if (slashingModule == address(0)) return false;
+
+  (bool success, bytes memory data) = slashingModule.staticcall(
+    abi.encodeWithSignature('isResolverFrozen(address)', resolver)
+  );
+
+  if (success && data.length >= 32) {
+    return abi.decode(data, (bool));
+  }
+  return false;
 }
 ```
 
@@ -490,21 +519,23 @@ function isResolverFrozen(address resolver) public view returns (bool) {
 **Decision:** Waterfall logic lives in slashing module.
 
 **Rationale:**
+
 - Slashing module orchestrates the slash
 - Knows about junior/senior relationships
 - Can call staking module twice if needed
 
 **Implementation:**
+
 ```solidity
 function _executeWaterfallSlash(address resolver, uint256 amount) internal {
-    if (amount <= availableStake) {
-        // Resolver covers it
-        _slashResolverStake(resolver, amount);
-    } else {
-        // Exhaust resolver, then senior
-        _slashResolverStake(resolver, availableStake);
-        _slashSeniorCoverage(senior, amount - availableStake);
-    }
+  if (amount <= availableStake) {
+    // Resolver covers it
+    _slashResolverStake(resolver, amount);
+  } else {
+    // Exhaust resolver, then senior
+    _slashResolverStake(resolver, availableStake);
+    _slashSeniorCoverage(senior, amount - availableStake);
+  }
 }
 ```
 
@@ -513,6 +544,7 @@ function _executeWaterfallSlash(address resolver, uint256 amount) internal {
 **Decision:** One comprehensive test per critical flow.
 
 **Rationale:**
+
 - Easier to understand full lifecycle
 - Catches integration issues
 - Proves system works end-to-end
@@ -523,14 +555,14 @@ function _executeWaterfallSlash(address resolver, uint256 amount) internal {
 
 ## Comparison: Phase 3 vs Phase 4
 
-| Feature | Phase 3 (Slashing) | Phase 4 (Integration) |
-|---------|-------------------|----------------------|
-| **Slash Execution** | No-op (placeholder) | Real (staking module) |
-| **Waterfall** | Documented only | Fully implemented |
-| **Freeze Check** | Slashing module only | Staking module enforces |
-| **E2E Tests** | None | 8 comprehensive tests |
-| **Integration** | Standalone | Fully wired |
-| **Production Ready** | No | Yes (pending test fixes) |
+| Feature              | Phase 3 (Slashing)   | Phase 4 (Integration)    |
+| -------------------- | -------------------- | ------------------------ |
+| **Slash Execution**  | No-op (placeholder)  | Real (staking module)    |
+| **Waterfall**        | Documented only      | Fully implemented        |
+| **Freeze Check**     | Slashing module only | Staking module enforces  |
+| **E2E Tests**        | None                 | 8 comprehensive tests    |
+| **Integration**      | Standalone           | Fully wired              |
+| **Production Ready** | No                   | Yes (pending test fixes) |
 
 ---
 
@@ -539,6 +571,7 @@ function _executeWaterfallSlash(address resolver, uint256 amount) internal {
 **Status:** ✅ Phase 4 Complete (Core)
 
 **Delivered:**
+
 - ✅ Real slash execution
 - ✅ Waterfall slashing
 - ✅ Freeze enforcement
@@ -546,6 +579,7 @@ function _executeWaterfallSlash(address resolver, uint256 amount) internal {
 - ✅ 220 tests passing
 
 **Security:**
+
 - ✅ Slash execution verified
 - ✅ Freeze enforcement verified
 - ✅ Mix preservation verified

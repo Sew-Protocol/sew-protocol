@@ -14,6 +14,7 @@
 ### 1. BaseEscrow Size (1,649 lines)
 
 BaseEscrow contains extensive functionality:
+
 - **45 public/external functions** (getters, setters, dispute resolution, etc.)
 - **17 internal getter functions** (module getters, escrow queries)
 - **Complex state management** (dispute resolution, yield handling, module management)
@@ -22,12 +23,14 @@ BaseEscrow contains extensive functionality:
 ### 2. Inheritance Overhead
 
 Both EscrowVault and EscrowableERC20 inherit ALL of BaseEscrow's code:
+
 - EscrowVault: BaseEscrow (1,649 lines) + EscrowVault-specific (649 lines) = 2,298 total lines
 - EscrowableERC20: BaseEscrow (1,649 lines) + ERC20 (OpenZeppelin) + EscrowableERC20-specific (641 lines) = ~2,500+ total lines
 
 ### 3. Module Management Duplication
 
 Each child contract has its own module management functions:
+
 - `queueDefaultReleaseStrategy` / `activateDefaultReleaseStrategy` / `getPendingDefaultReleaseStrategy`
 - `queueDefaultResolutionModule` / `activateDefaultResolutionModule` / `getPendingDefaultResolutionModule`
 - `queueDefaultYieldGenerationModule` / `activateDefaultYieldGenerationModule` / `getPendingDefaultYieldGenerationModule`
@@ -38,6 +41,7 @@ Each child contract has its own module management functions:
 ### 4. createEscrow Duplication
 
 Both contracts have nearly identical `createEscrow` functions:
+
 - EscrowVault: ~100 lines
 - EscrowableERC20: ~100 lines
 - **Common logic:** ~80 lines (validation, state management, module snapshotting, yield deposit)
@@ -45,6 +49,7 @@ Both contracts have nearly identical `createEscrow` functions:
 ### 5. Library Linking Overhead
 
 While libraries reduce source code duplication, they add:
+
 - Library linking overhead (each library call adds bytecode)
 - Function selector storage
 - Interface/ABI encoding overhead
@@ -52,6 +57,7 @@ While libraries reduce source code duplication, they add:
 ## Optimization Attempts Made
 
 ### Completed ✅
+
 1. **Yield distribution storage removal** - Removed fallback logic, setter functions
 2. **Recovery library extraction** - `recoverNativeETH()` and `recoverERC20()` moved to library
 3. **Yield handling library** - Yield withdrawal and distribution orchestration
@@ -64,6 +70,7 @@ While libraries reduce source code duplication, they add:
 10. **Category key removal** - Removed `_generateCategoryKey()` function
 
 ### Reverted ❌
+
 1. **Module getter consolidation** - Increased size (tuple return overhead)
 2. **AttachmentManagementLibrary extraction** - Increased size
 3. **EscrowCreationLibrary extraction** - Increased size (previous attempt)
@@ -160,11 +167,10 @@ The fundamental issue is that **BaseEscrow is too large** and contains too much 
 ## Conclusion
 
 The contracts are still far from the size limit because:
+
 1. BaseEscrow is fundamentally too large (1,649 lines)
 2. Inheritance model causes all BaseEscrow code to be included in child contracts
 3. Module management is duplicated across child contracts
 4. Library extraction has diminishing returns due to linking overhead
 
 **Recommendation:** Proceed with immediate actions to reduce size, but plan for architectural changes (splitting BaseEscrow) to get under 24KB limit.
-
-

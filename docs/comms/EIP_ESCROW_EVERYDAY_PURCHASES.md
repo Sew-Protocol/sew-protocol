@@ -49,130 +49,111 @@ This standard enables marketplaces, payment processors, and dApps to implement c
 pragma solidity ^0.8.0;
 
 interface IEscrowPayment {
-    /// @notice Creates an escrow payment, locking funds until release conditions are met
-    /// @param recipient Address that will receive funds upon release
-    /// @param amount Amount of tokens to escrow
-    /// @param settings Escrow configuration (resolver, auto-times, metadata)
-    /// @return workflowId Unique identifier for this escrow
-    function createEscrow(
-        address recipient,
-        uint256 amount,
-        EscrowSettings calldata settings
-    ) external returns (uint256 workflowId);
+  /// @notice Creates an escrow payment, locking funds until release conditions are met
+  /// @param recipient Address that will receive funds upon release
+  /// @param amount Amount of tokens to escrow
+  /// @param settings Escrow configuration (resolver, auto-times, metadata)
+  /// @return workflowId Unique identifier for this escrow
+  function createEscrow(
+    address recipient,
+    uint256 amount,
+    EscrowSettings calldata settings
+  ) external returns (uint256 workflowId);
 
-    /// @notice Releases escrowed funds to recipient (typically called by sender)
-    /// @param workflowId Identifier of the escrow to release
-    function releaseEscrow(uint256 workflowId) external;
+  /// @notice Releases escrowed funds to recipient (typically called by sender)
+  /// @param workflowId Identifier of the escrow to release
+  function releaseEscrow(uint256 workflowId) external;
 
-    /// @notice Cancels escrow and refunds to sender (requires mutual agreement or timeout)
-    /// @param workflowId Identifier of the escrow to cancel
-    function cancelEscrow(uint256 workflowId) external;
+  /// @notice Cancels escrow and refunds to sender (requires mutual agreement or timeout)
+  /// @param workflowId Identifier of the escrow to cancel
+  function cancelEscrow(uint256 workflowId) external;
 
-    /// @notice Initiates a dispute, transferring resolution authority to a resolver
-    /// @param workflowId Identifier of the escrow in dispute
-    function raiseDispute(uint256 workflowId) external;
+  /// @notice Initiates a dispute, transferring resolution authority to a resolver
+  /// @param workflowId Identifier of the escrow in dispute
+  function raiseDispute(uint256 workflowId) external;
 
-    /// @notice Resolves a dispute with specified payout distribution
-    /// @param workflowId Identifier of the escrow to resolve
-    /// @param payouts Array of payout recipients and amounts
-    function resolveDispute(
-        uint256 workflowId,
-        Payout[] calldata payouts
-    ) external;
+  /// @notice Resolves a dispute with specified payout distribution
+  /// @param workflowId Identifier of the escrow to resolve
+  /// @param payouts Array of payout recipients and amounts
+  function resolveDispute(uint256 workflowId, Payout[] calldata payouts) external;
 
-    /// @notice Gets the current state of an escrow
-    /// @param workflowId Identifier of the escrow
-    /// @return EscrowTransfer struct containing all escrow details
-    function getEscrow(uint256 workflowId) external view returns (EscrowTransfer memory);
+  /// @notice Gets the current state of an escrow
+  /// @param workflowId Identifier of the escrow
+  /// @return EscrowTransfer struct containing all escrow details
+  function getEscrow(uint256 workflowId) external view returns (EscrowTransfer memory);
 
-    /// @notice Gets the total number of escrows created
-    /// @return count Total number of escrows
-    function getEscrowCount() external view returns (uint256 count);
+  /// @notice Gets the total number of escrows created
+  /// @return count Total number of escrows
+  function getEscrowCount() external view returns (uint256 count);
 }
 
 /// @notice Escrow state enumeration
 enum EscrowState {
-    NONE,      // Escrow does not exist
-    PENDING,   // Funds locked, awaiting release/cancel
-    RELEASED,   // Funds released to recipient
-    REFUNDED,   // Funds refunded to sender
-    DISPUTED,   // Dispute raised, awaiting resolution
-    RESOLVED    // Dispute resolved with payout
+  NONE, // Escrow does not exist
+  PENDING, // Funds locked, awaiting release/cancel
+  RELEASED, // Funds released to recipient
+  REFUNDED, // Funds refunded to sender
+  DISPUTED, // Dispute raised, awaiting resolution
+  RESOLVED // Dispute resolved with payout
 }
 
 /// @notice Configuration for escrow creation
 struct EscrowSettings {
-    address customResolver;      // Optional: Custom dispute resolver (0 = use default)
-    bool yieldEnabled;           // Enable yield generation during escrow period
-    uint256 autoReleaseTime;     // Timestamp for automatic release (0 = disabled)
-    uint256 autoCancelTime;      // Timestamp for automatic cancellation (0 = disabled)
-    EscrowType escrowType;       // Type classification for categorization
-    bytes metadata;              // Optional metadata (IPFS hash, JSON, etc.)
+  address customResolver; // Optional: Custom dispute resolver (0 = use default)
+  bool yieldEnabled; // Enable yield generation during escrow period
+  uint256 autoReleaseTime; // Timestamp for automatic release (0 = disabled)
+  uint256 autoCancelTime; // Timestamp for automatic cancellation (0 = disabled)
+  EscrowType escrowType; // Type classification for categorization
+  bytes metadata; // Optional metadata (IPFS hash, JSON, etc.)
 }
 
 /// @notice Escrow type classification
 enum EscrowType {
-    STANDARD,      // Standard purchase
-    SERVICE,       // Service delivery
-    SUBSCRIPTION,  // Recurring payment
-    CUSTOM         // Custom type
+  STANDARD, // Standard purchase
+  SERVICE, // Service delivery
+  SUBSCRIPTION, // Recurring payment
+  CUSTOM // Custom type
 }
 
 /// @notice Complete escrow transfer information
 struct EscrowTransfer {
-    uint256 workflowId;
-    address token;              // ERC-20 token address
-    address sender;             // Address that created escrow
-    address recipient;          // Address that will receive funds
-    uint256 amount;             // Amount currently in escrow
-    uint256 totalDeposited;    // Total amount originally deposited
-    EscrowState state;         // Current state
-    address disputeResolver;   // Address authorized to resolve disputes
-    uint256 autoReleaseTime;   // Timestamp for auto-release
-    uint256 autoCancelTime;    // Timestamp for auto-cancel
-    string[] attachmentURIs;   // IPFS/HTTP URIs for attachments
-    bytes32[] attachmentHashes; // Content hashes for verification
-    bytes metadata;            // Additional metadata
+  uint256 workflowId;
+  address token; // ERC-20 token address
+  address sender; // Address that created escrow
+  address recipient; // Address that will receive funds
+  uint256 amount; // Amount currently in escrow
+  uint256 totalDeposited; // Total amount originally deposited
+  EscrowState state; // Current state
+  address disputeResolver; // Address authorized to resolve disputes
+  uint256 autoReleaseTime; // Timestamp for auto-release
+  uint256 autoCancelTime; // Timestamp for auto-cancel
+  string[] attachmentURIs; // IPFS/HTTP URIs for attachments
+  bytes32[] attachmentHashes; // Content hashes for verification
+  bytes metadata; // Additional metadata
 }
 
 /// @notice Payout specification for dispute resolution
 struct Payout {
-    address recipient;  // Address to receive payout
-    uint256 amount;    // Amount to pay (in escrowed token)
+  address recipient; // Address to receive payout
+  uint256 amount; // Amount to pay (in escrowed token)
 }
 
 /// @notice Events
 event EscrowCreated(
-    uint256 indexed workflowId,
-    address indexed sender,
-    address indexed recipient,
-    address token,
-    uint256 amount
+  uint256 indexed workflowId,
+  address indexed sender,
+  address indexed recipient,
+  address token,
+  uint256 amount
 );
 
-event EscrowReleased(
-    uint256 indexed workflowId,
-    address indexed recipient,
-    uint256 amount
-);
+event EscrowReleased(uint256 indexed workflowId, address indexed recipient, uint256 amount);
 
-event EscrowCancelled(
-    uint256 indexed workflowId,
-    address indexed sender,
-    uint256 refundAmount
-);
+event EscrowCancelled(uint256 indexed workflowId, address indexed sender, uint256 refundAmount);
 
-event DisputeRaised(
-    uint256 indexed workflowId,
-    address indexed raisedBy,
-    address indexed resolver
-);
+event DisputeRaised(uint256 indexed workflowId, address indexed raisedBy, address indexed resolver);
 
-event DisputeResolved(
-    uint256 indexed workflowId,
-    address indexed resolver,
-    Payout[] payouts
-);
+event DisputeResolved(uint256 indexed workflowId, address indexed resolver, Payout[] payouts);
 ```
 
 ### State Machine
@@ -248,6 +229,7 @@ NONE → PENDING → RELEASED (via releaseEscrow)
 ## Backwards Compatibility
 
 This EIP is compatible with:
+
 - **ERC-20**: Works with any ERC-20 token
 - **ERC-165**: Supports interface detection
 - **ERC-721/ERC-1155**: Can be extended for NFT escrow (future EIP)
@@ -255,12 +237,14 @@ This EIP is compatible with:
 ## Test Cases
 
 ### Test Case 1: Standard Purchase Flow
+
 1. Buyer creates escrow for $100 purchase
 2. Seller ships goods
 3. Buyer releases escrow
 4. Seller receives $100
 
 ### Test Case 2: Dispute Resolution
+
 1. Buyer creates escrow
 2. Seller fails to deliver
 3. Buyer raises dispute
@@ -268,11 +252,13 @@ This EIP is compatible with:
 5. Escrow marked as RESOLVED
 
 ### Test Case 3: Auto-Release
+
 1. Buyer creates escrow with 7-day auto-release
 2. Buyer doesn't respond
 3. After 7 days, funds automatically release to seller
 
 ### Test Case 4: Mutual Cancellation
+
 1. Buyer creates escrow
 2. Both parties agree to cancel
 3. Funds refunded to buyer
@@ -280,6 +266,7 @@ This EIP is compatible with:
 ## Implementation
 
 Reference implementations:
+
 - [EscrowableERC20](https://github.com/your-org/escrow-contracts): ERC-20 token with built-in escrow
 - [EscrowVault](https://github.com/your-org/escrow-contracts): Multi-token escrow vault
 
@@ -293,5 +280,3 @@ Reference implementations:
 ## Copyright
 
 Copyright and related rights waived via [CC0](https://creativecommons.org/publicdomain/zero/1.0/).
-
-

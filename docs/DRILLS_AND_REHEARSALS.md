@@ -20,6 +20,7 @@ This document tracks emergency drills, recovery drills, and deployment rehearsal
 **Duration:** 2-4 hours
 
 **Required Drills:**
+
 1. Emergency drill (pause protocol)
 2. Recovery drill (unpause via timelock)
 
@@ -134,6 +135,7 @@ This document tracks emergency drills, recovery drills, and deployment rehearsal
 **Duration:** 2-3 hours
 
 **Required Steps:**
+
 1. Fork mainnet
 2. Deploy all contracts
 3. Verify deployments
@@ -181,6 +183,7 @@ This document tracks emergency drills, recovery drills, and deployment rehearsal
 **Fork Network:** Base Mainnet Fork
 
 **Deployed Contracts:**
+
 - BaseEscrow: `[TO BE FILLED]`
 - EscrowVault: `[TO BE FILLED]`
 - EscrowableERC20: `[TO BE FILLED]`
@@ -190,11 +193,13 @@ This document tracks emergency drills, recovery drills, and deployment rehearsal
 - TimelockController: `[TO BE FILLED]`
 
 **Role Assignments:**
+
 - ROLE_TIMELOCK: `[TO BE FILLED]`
 - ROLE_GUARDIAN: `[TO BE FILLED]`
 - Deployer roles revoked: `[YES/NO]`
 
 **Transaction Hashes:**
+
 - Deployment transactions: `[TO BE FILLED]`
 - Role assignment transactions: `[TO BE FILLED]`
 
@@ -242,6 +247,7 @@ This document tracks emergency drills, recovery drills, and deployment rehearsal
 **Next Fork Rehearsal:** `[TO BE FILLED]`
 
 **Frequency:**
+
 - Emergency + Recovery Drills: Quarterly
 - Fork Deployment Rehearsal: Before mainnet deployment
 
@@ -250,6 +256,7 @@ This document tracks emergency drills, recovery drills, and deployment rehearsal
 ## Drill Evidence
 
 All drills should produce:
+
 - Transaction hashes
 - Block numbers
 - Timestamps
@@ -258,6 +265,7 @@ All drills should produce:
 - Issues found (if any)
 
 **Evidence Storage:**
+
 - Transaction hashes documented in this file
 - Detailed logs in `governance/runbooks/` (if applicable)
 - Screenshots in `governance/runbooks/evidence/` (if created)
@@ -267,12 +275,15 @@ All drills should produce:
 ## Lessons Learned
 
 **From Emergency Drills:**
+
 - `[TO BE FILLED AFTER DRILLS]`
 
 **From Recovery Drills:**
+
 - `[TO BE FILLED AFTER DRILLS]`
 
 **From Fork Rehearsals:**
+
 - `[TO BE FILLED AFTER REHEARSALS]`
 
 ---
@@ -287,6 +298,3 @@ All drills should produce:
 ---
 
 **Note:** This document should be updated after each drill or rehearsal. All transaction hashes and results should be documented.
-
-
-

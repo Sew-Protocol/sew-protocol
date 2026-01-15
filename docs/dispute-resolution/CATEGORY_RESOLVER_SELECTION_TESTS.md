@@ -7,6 +7,7 @@
 **File:** `test/hardhat/decentralized-resolution-module/DecentralizedResolutionModule.test.ts`
 
 **Key Test Cases:**
+
 1. **Round-Robin Selection** (lines 104-145)
    - Tests resolver selection in round-robin order for a single category
    - Sets up `resolutionTable` entry with category
@@ -75,6 +76,7 @@
 ## Code Testability Score: 7/10
 
 **Reasoning:**
+
 - Core functionality is testable ✅
 - Randomness reduces test precision ⚠️
 - Missing edge cases ❌

@@ -14,24 +14,28 @@ A decentralized escrow protocol built on Base (Ethereum L2) that enables secure,
 ## Technology Stack
 
 ### Development Framework
+
 - **Hardhat** (v2.28.2) - Primary development environment with TypeScript
 - **Foundry** (Forge) - Additional testing framework for Solidity
 - **hardhat-deploy** (v0.12.0) - Deployment orchestration with script ordering and tags
 - **TypeScript** (v5.9.3) - Type-safe development
 
 ### Smart Contract Infrastructure
+
 - **Solidity** v0.8.33 with Cancun EVM
 - **OpenZeppelin Contracts** v5.4.0 (upgradeable patterns)
 - **Proxy Patterns**: Transparent Proxy (default) or UUPS (configurable via `PROXY_KIND`)
 - **Compiler Settings**: Optimizer enabled (50,000 runs), via-IR enabled, optimized for contract size
 
 ### Testing & Quality
+
 - **Hardhat Tests**: TypeScript-based integration tests
 - **Foundry Tests**: Solidity-based unit and fuzz tests
 - **TypeChain**: TypeScript bindings generation
 - **Slither**: Static analysis (configured)
 
 ### Package Management
+
 - **pnpm** - Fast, disk-efficient package manager
 - **Monorepo structure** with workspace support
 
@@ -42,18 +46,21 @@ A decentralized escrow protocol built on Base (Ethereum L2) that enables secure,
 ### Core Contracts
 
 **BaseEscrow.sol** - Abstract base contract providing:
+
 - Multi-token escrow support (ERC20)
 - Dispute resolution system with escalation
 - Fee management and tracking
 - Module integration (resolution, yield generation, yield distribution)
 
 **EscrowVault.sol** - Multi-token escrow vault:
+
 - Supports any ERC20 token
 - Per-token fee tracking
 - Batch operations
 - Aave yield generation integration
 
 **EscrowableERC20.sol** - ERC20 token with built-in escrow:
+
 - Standard ERC20 functionality
 - Built-in `createEscrow()` function (primary function name)
 - Factory pattern deployment
@@ -62,14 +69,17 @@ A decentralized escrow protocol built on Base (Ethereum L2) that enables secure,
 ### Modular System
 
 **Resolution Modules**:
+
 - `DefaultResolutionModule` - Simple single-resolver system (initial mainnet release)
 - `DecentralizedResolutionModule` - Advanced multi-resolver with round-robin selection, 3-level escalation (standard → senior → external). In separate package (`contracts/decentralized-resolution-module/`), **not included in initial mainnet release**. When ready, will be deployed and swapped in via Slow lane governance.
 
 **Yield Modules**:
+
 - `AaveYieldGenerationModule` - Generates yield on escrowed funds via Aave
 - `DefaultYieldDistributionModule` - Configurable yield distribution to recipients
 
 **Incentive System** (in separate package, not in initial release):
+
 - `ResolverIncentiveModule` - Tracks and distributes payments to resolvers
 - `PaymentCalculationLibraryV1` - Weighted payment calculation (pluggable)
 
@@ -87,6 +97,7 @@ A decentralized escrow protocol built on Base (Ethereum L2) that enables secure,
 ## Governance Model
 
 ### Structure
+
 - **OpenZeppelin Governor** - Proposal creation and voting
 - **TimelockController** - Time-delayed execution (48h standard, 7-day slow lane)
 - **Safe Multisig** - Upgrade authority (production deployments)
@@ -110,6 +121,7 @@ A decentralized escrow protocol built on Base (Ethereum L2) that enables secure,
    - High-risk modifications
 
 ### Key Guarantees
+
 - **No in-flight escrow modification**: Governance cannot change rules for existing escrows
 - **Snapshot at creation**: Module addresses and settings locked per escrow
 - **Time-delayed execution**: All non-emergency changes require timelock
@@ -120,6 +132,7 @@ A decentralized escrow protocol built on Base (Ethereum L2) that enables secure,
 ## Deployment Architecture
 
 ### Deployment Flow
+
 1. `00_impl.ts` - Deploy implementation contracts
 2. `10_proxy.ts` - Deploy proxy contracts + run initializers
 3. `10_safe.ts` - Deploy Safe multisig (production)
@@ -131,12 +144,14 @@ A decentralized escrow protocol built on Base (Ethereum L2) that enables secure,
 9. `90_post.ts` - Post-deployment sanity checks
 
 ### Networks
+
 - **Hardhat** (local development, chainId: 31337)
 - **Base Sepolia** (testnet, chainId: 84532)
 - **Base Mainnet** (production, chainId: 8453)
 - **Ethereum Mainnet** (chainId: 1)
 
 ### Deployment Artifacts
+
 - Timestamped deployment ledger: `deploy-ledger/<network>/<stamp>/`
 - TypeChain bindings: `typechain-types/`
 - Hardhat artifacts: `artifacts/`
@@ -147,6 +162,7 @@ A decentralized escrow protocol built on Base (Ethereum L2) that enables secure,
 ## Development Tooling
 
 ### Governance Scripts
+
 - `pnpm gov:build` - Build governance proposals
 - `pnpm gov:sim` - Simulate proposals on forked network
 - `pnpm gov:stage` - Stage proposals (propose, queue, execute)
@@ -155,6 +171,7 @@ A decentralized escrow protocol built on Base (Ethereum L2) that enables secure,
 - `pnpm gov:surface:check` - Verify governance surface mapping
 
 ### Development Commands
+
 - `pnpm test` - Run all tests (Hardhat + Foundry)
 - `pnpm compile` - Compile contracts (Hardhat + Foundry)
 - `pnpm deploy` - Deploy to network
@@ -162,6 +179,7 @@ A decentralized escrow protocol built on Base (Ethereum L2) that enables secure,
 - `pnpm verify` - Verify contracts on block explorer
 
 ### Code Quality
+
 - **ESLint** - TypeScript linting
 - **Prettier** - Code formatting
 - **TypeScript** - Type checking (`pnpm typecheck`)
@@ -203,6 +221,4 @@ A decentralized escrow protocol built on Base (Ethereum L2) that enables secure,
 
 ---
 
-*For detailed documentation, see the [Document Index](_DOCUMENT_INDEX.md)*
-
-
+_For detailed documentation, see the [Document Index](_DOCUMENT_INDEX.md)_

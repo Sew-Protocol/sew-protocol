@@ -1,6 +1,13 @@
 import path from 'node:path';
 import { deployments } from 'hardhat';
-import { addressesBundle, metaBundle, ledgerRoot, ensureDir, writeJson, snapshotAbi } from './_lib/ledger';
+import {
+  addressesBundle,
+  metaBundle,
+  ledgerRoot,
+  ensureDir,
+  writeJson,
+  snapshotAbi,
+} from './_lib/ledger';
 
 async function main() {
   const dir = ledgerRoot();

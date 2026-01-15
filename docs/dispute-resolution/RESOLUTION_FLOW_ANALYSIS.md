@@ -11,6 +11,7 @@
 This section captures the **table-stakes expectations** for any “court-like” dispute system on Ethereum, and how they map onto our current architecture / planned fixes.
 
 ### 1) Evidence integrity + authenticity (without trusting UI)
+
 - **On-chain evidence commitments**: hashes of evidence bundles + timestamp + submitter.
 - **Ordered evidence log**: append-only; clear cutoffs for when new evidence is admissible.
 - **Attestation plumbing**: the protocol supports attaching signed statements as evidence (even if v1 UX doesn’t expose it yet).
@@ -18,11 +19,14 @@ This section captures the **table-stakes expectations** for any “court-like”
 **Status in repo:** Evidence is designed as a **module boundary** (`IEvidenceModule` / `EvidenceModuleV1`) and should be treated as a first-class primitive. This analysis doc focuses primarily on **finality discipline** (see below), but the settlement/finality work must not assume “evidence is a PDF upload”.
 
 ### 2) Expert attestations (optional per category, but first-class)
+
 - **Now (A only)**: Expert attestations are **EIP-712 (or equivalent) signed statements** that can be **submitted/anchored as evidence** and considered by resolvers; they **do not move funds** directly.
 - **Future note**: category-scoped expert registries (appointed experts per category) can be added later to improve credibility without centralizing outcomes.
 
 ### 3) Finality discipline (no funds move during appeal)
+
 By 2026 this is non-negotiable:
+
 - **Decision recorded → appeal window → finalize**
 - **Escrow settlement delayed until appeal expiry**
 - **Escalation cancels pending settlement deterministically**
@@ -30,20 +34,26 @@ By 2026 this is non-negotiable:
 **Status in repo:** This is the **current critical gap**. `BaseEscrow` transfers funds before the resolution module’s `appealDeadline` is even set.
 
 ### 4) Liveness under adversary (timeouts, reassignment, anti-stall)
+
 Must have:
+
 - deadlines
 - explicit timeout handling
 - deterministic reassignment + max retries + escalation fallback
 - strong penalties for non-response (workload throttling in v1; slash/freeze in v3)
 
 ### 5) Cost discipline (anti-griefing)
+
 Appeal rights can become griefing rights unless:
+
 - escalation costs are non-trivial
 - costs can scale by amount/category
 - repeated escalations become progressively more expensive (fee curve and/or bond curve)
 
 ### 6) Resolver fairness + predictable ROI assumptions (anti-rug)
+
 Ethereum-native operators will expect:
+
 - predictable parameter-change cadence (slow lane)
 - bounded scope of what can change
 - clear “versioning” so operators know what they’re opting into
@@ -68,7 +78,6 @@ Ethereum-native operators will expect:
      - Seller has option to escalate/appeal to Kleros
      - Seller chooses not to escalate
      - After deadline passes, **[here funds should be transferred to buyer, including escrow and any yield]**
-   
    - **1b. Senior resolver rules in favor of seller**
      - Buyer loses bond
      - Buyer has option to escalate to Kleros
@@ -76,6 +85,7 @@ Ethereum-native operators will expect:
      - After deadline passes, **[here funds should be transferred to seller, including escrow and any yield]**
 
 ### Version Note
+
 The version prior to release of escalation bonds should be the same, except **no escalation bond (only an escalation fee)**.
 
 ---
@@ -85,13 +95,16 @@ The version prior to release of escalation bonds should be the same, except **no
 Goal: keep the system **flexible** (Bucket A: safe governance tunables) without drifting into “parameter roulette” (Bucket B: dangerous flexibility).
 
 ### Design stance (2026-native)
+
 - **Config-first** where possible (deadlines, windows, curves, routing, max rounds).
 - Avoid “data-only VM” designs for new arbitration mechanics.
 - Keep complex mechanics explicit/auditable via **typed round handlers** (even if not all are implemented now).
 - **Snapshot per escrow**: changes affect **new escrows only**, preserving non-retroactivity.
 
 ### Minimal path abstraction (docs-only; not implemented yet)
+
 Represent an escalation pathway as:
+
 - `pathId` (selected at escrow creation using category/amount routing)
 - `rounds[]` where each round defines:
   - **roundType**: `SingleResolver` | `ExternalArbitration` | (future) `Committee`
@@ -102,7 +115,9 @@ Represent an escalation pathway as:
   - (future) **EvidencePolicy**: evidence cutoff rules and allowed evidence types (incl. attestations)
 
 #### Category/amount routing (new escrows only)
+
 To support “more complex pathway for larger escrows” without changing mechanics mid-escrow:
+
 - Define amount buckets (example): `Small`, `Medium`, `Large` (token/value normalized).
 - Maintain routing table:
   - `(categoryKey, amountBucket) -> pathId`
@@ -111,6 +126,7 @@ To support “more complex pathway for larger escrows” without changing mechan
 This preserves the immutability doctrine while allowing governance to iteratively tune “lanes” for different dispute profiles.
 
 ### Incentives boundary (important)
+
 - **Resolution module**: assignment, round transitions, deadlines, appeal windows, and canonical dispute metadata.
 - **Incentive module**: computes and executes payout/distribution for fees/bonds, based on the dispute timeline and (snapshotted) path config.
 
@@ -119,12 +135,14 @@ This separation is how we evolve incentive economics without rewriting the dispu
 ### Incentive module contract (docs-only)
 
 The incentive module should be able to compute payouts deterministically from:
+
 - **snapshotted path config** (which lane, which curves, which distribution policy)
 - **round outcomes** (decision at round k vs k+1)
 - **who escalated** (payer of fee/bond)
 - **timing** (whether escalation was inside the appeal window)
 
 Minimal “inputs” the incentive module needs (can be emitted as events or queryable from the resolution module/escrow):
+
 - `workflowId`
 - `pathId`
 - `currentRound`
@@ -133,6 +151,7 @@ Minimal “inputs” the incentive module needs (can be emitted as events or que
 - `finalOutcome` and `finalRound`
 
 Recommended v1/v2 semantics (aligned with `RESOLVER_ECONOMICS.md`):
+
 - **Fee-only (v1)**: escalation fee is charged to escalator; distribution can be simple (treasury / ops).
 - **Bonded appeals (v2)**:
   - If `decision[k+1] != decision[k]` (appeal succeeds): refund bond to escalator (minus any processing fee).
@@ -242,36 +261,36 @@ sequenceDiagram
 
 ```solidity
 function _executeFullResolution(
-    uint256 workflowId,
-    EscrowTransfer storage et,
-    bool isRelease,
-    uint256 amount,
-    bytes32 resolutionHash
+  uint256 workflowId,
+  EscrowTransfer storage et,
+  bool isRelease,
+  uint256 amount,
+  bytes32 resolutionHash
 ) internal {
-    address recipient = isRelease ? et.to : et.from;
-    address token = et.token;
-    
-    // Update state
-    et.remainingBalance = 0;
-    et.escrowState = EscrowState.RESOLVED;  // ❌ Sets to RESOLVED immediately
-    totalEscrowsPending--;
-    _updateEscrowBalance(token, amount, false);
-    delete disputeRaisedTimestamp[workflowId];
-    
-    emit EscrowStateChanged(workflowId, EscrowState.DISPUTED, EscrowState.RESOLVED);
-    
-    // Handle yield
-    if (address(yieldOps) != address(0)) {
-        // ... yield handling
-    }
-    
-    // Transfer tokens
-    _transferTokens(token, recipient, amount);  // ❌ TRANSFERS IMMEDIATELY
-    
-    // Record outcome and emit events
-    _recordResolutionOutcome(workflowId, _msgSender(), isRelease, resolutionHash);  // ❌ Called AFTER transfer
-    emit EscrowResolved(workflowId, _msgSender(), resolutionHash);
-    emit EscrowTransferResolved(workflowId, et.from, et.to, et.totalDeposited);
+  address recipient = isRelease ? et.to : et.from;
+  address token = et.token;
+
+  // Update state
+  et.remainingBalance = 0;
+  et.escrowState = EscrowState.RESOLVED; // ❌ Sets to RESOLVED immediately
+  totalEscrowsPending--;
+  _updateEscrowBalance(token, amount, false);
+  delete disputeRaisedTimestamp[workflowId];
+
+  emit EscrowStateChanged(workflowId, EscrowState.DISPUTED, EscrowState.RESOLVED);
+
+  // Handle yield
+  if (address(yieldOps) != address(0)) {
+    // ... yield handling
+  }
+
+  // Transfer tokens
+  _transferTokens(token, recipient, amount); // ❌ TRANSFERS IMMEDIATELY
+
+  // Record outcome and emit events
+  _recordResolutionOutcome(workflowId, _msgSender(), isRelease, resolutionHash); // ❌ Called AFTER transfer
+  emit EscrowResolved(workflowId, _msgSender(), resolutionHash);
+  emit EscrowTransferResolved(workflowId, et.from, et.to, et.totalDeposited);
 }
 ```
 
@@ -280,11 +299,25 @@ function _executeFullResolution(
 **Location:** `contracts/core/BaseEscrow.sol:608-615`
 
 ```solidity
-function _recordResolutionOutcome(uint256 workflowId, address disputeResolver, bool isRelease, bytes32 /* resolutionHash */) internal {
-    address module = address(_getResolutionModule(workflowId)); 
-    if (module == address(0)) return;
-    (bool success, ) = module.call(abi.encodeWithSignature("recordResolution(uint256,address,uint8,bool,uint256)", workflowId, disputeResolver, isRelease ? 1 : 2, false, 0));
-    success;
+function _recordResolutionOutcome(
+  uint256 workflowId,
+  address disputeResolver,
+  bool isRelease,
+  bytes32 /* resolutionHash */
+) internal {
+  address module = address(_getResolutionModule(workflowId));
+  if (module == address(0)) return;
+  (bool success, ) = module.call(
+    abi.encodeWithSignature(
+      'recordResolution(uint256,address,uint8,bool,uint256)',
+      workflowId,
+      disputeResolver,
+      isRelease ? 1 : 2,
+      false,
+      0
+    )
+  );
+  success;
 }
 ```
 
@@ -293,17 +326,22 @@ function _recordResolutionOutcome(uint256 workflowId, address disputeResolver, b
 **Location:** `contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol:718-752`
 
 ```solidity
-function recordResolution(uint256 workflowId, address resolver, ResolutionOutcome outcome, uint256 resolutionTime) external onlyEscrowContract {
-    DisputeMetadata storage dm = disputeMetadata[workflowId];
-    uint8 currentRound = dm.currentRound;
-    
-    // Update round-based decision tracking
-    dm.decisionAtRound[currentRound] = outcome;
-    dm.decidedAtRound[currentRound] = block.timestamp;
-    dm.appealDeadline[currentRound] = block.timestamp + appealWindows[currentRound];  // ✅ Sets appeal deadline
-    dm.status = DisputeStatus.Decided;  // ✅ Sets status to Decided (not Final)
-    
-    // ... rest of function
+function recordResolution(
+  uint256 workflowId,
+  address resolver,
+  ResolutionOutcome outcome,
+  uint256 resolutionTime
+) external onlyEscrowContract {
+  DisputeMetadata storage dm = disputeMetadata[workflowId];
+  uint8 currentRound = dm.currentRound;
+
+  // Update round-based decision tracking
+  dm.decisionAtRound[currentRound] = outcome;
+  dm.decidedAtRound[currentRound] = block.timestamp;
+  dm.appealDeadline[currentRound] = block.timestamp + appealWindows[currentRound]; // ✅ Sets appeal deadline
+  dm.status = DisputeStatus.Decided; // ✅ Sets status to Decided (not Final)
+
+  // ... rest of function
 }
 ```
 
@@ -314,16 +352,19 @@ function recordResolution(uint256 workflowId, address resolver, ResolutionOutcom
 ### ❌ **Issue 1: Tokens Transferred Before Appeal Window**
 
 **Current Behavior:**
+
 - `_transferTokens()` is called **BEFORE** `recordResolution()` sets the appeal deadline
 - Escrow state is set to `RESOLVED` **immediately** upon resolution decision
 - Funds are transferred **before** appeal window expires
 
 **Expected Behavior:**
+
 - `recordResolution()` should be called **first** (sets appeal deadline)
 - Tokens should **only** be transferred **after** appeal window expires
 - Escrow state should remain `DISPUTED` (or similar) until appeal window passes
 
 **Impact:**
+
 - If buyer escalates after tokens are already transferred, the seller already has the funds
 - Cannot reverse or cancel a resolution that has already been executed
 - Appeal window becomes meaningless for token transfers
@@ -331,37 +372,44 @@ function recordResolution(uint256 workflowId, address resolver, ResolutionOutcom
 ### ✅ **Issue 2: Appeal Window Tracking (Correctly Implemented)**
 
 **Current Behavior:**
+
 - `dm.appealDeadline[currentRound]` is set correctly: `block.timestamp + appealWindows[currentRound]`
 - `dm.status` is set to `DisputeStatus.Decided` (not `Final`)
 - Appeal windows: `[2 days, 3 days, 0]` for rounds [0, 1, 2] (0 = no appeal for Kleros)
 
 **Expected Behavior:**
+
 - ✅ Matches expected behavior (deadline tracking is correct)
 
 ### ⚠️ **Issue 3: Escalation Handling**
 
 **Current Behavior:**
+
 - `escalateDispute()` in BaseEscrow (line 485) handles escalation
 - Escalation fee is collected and marked as paid
 - `executeEscalation()` in DecentralizedResolutionModule (line 262) moves dispute to next round
 - Status changes to `DisputeStatus.Escalated`
 
 **Expected Behavior:**
+
 - Should handle escalation during appeal window
 - If escalation happens, should cancel/revoke pending resolution
 - Funds should not have been transferred yet (but currently they have)
 
 **Impact:**
+
 - If tokens are already transferred, escalation cannot reverse the transfer
 - Need to prevent token transfer until appeal window passes
 
 ### ✅ **Issue 4: Final Level Handling (Correctly Implemented)**
 
 **Current Behavior:**
+
 - Round 2 (Kleros) has `appealWindows[2] = 0` (no appeal window)
 - Status can be set to `DisputeStatus.Final` for final decisions
 
 **Expected Behavior:**
+
 - ✅ Final-level resolutions (Kleros, round 2) can transfer immediately (no appeal window)
 - ✅ This matches expected behavior
 
@@ -369,14 +417,14 @@ function recordResolution(uint256 workflowId, address resolver, ResolutionOutcom
 
 ## Summary of Differences
 
-| Aspect | Described Flow | Current Implementation | Status |
-|--------|---------------|----------------------|--------|
-| **Token Transfer Timing** | After appeal window expires | Immediately upon resolution | ❌ **DIFFERS** |
-| **Appeal Deadline Tracking** | Set when resolution recorded | Set correctly in `recordResolution()` | ✅ **MATCHES** |
-| **Escrow State After Resolution** | Remains disputed/pending until appeal window passes | Set to `RESOLVED` immediately | ❌ **DIFFERS** |
-| **Escalation During Appeal Window** | Should cancel pending resolution | Can escalate, but tokens already transferred | ❌ **DIFFERS** |
-| **Final Level (Kleros)** | Transfer immediately (no appeal window) | `appealWindows[2] = 0` (no appeal window) | ✅ **MATCHES** |
-| **Escalation Fee/Bond** | Fee in v1, bond in v2 | Escalation fee collected correctly | ✅ **MATCHES** |
+| Aspect                              | Described Flow                                      | Current Implementation                       | Status         |
+| ----------------------------------- | --------------------------------------------------- | -------------------------------------------- | -------------- |
+| **Token Transfer Timing**           | After appeal window expires                         | Immediately upon resolution                  | ❌ **DIFFERS** |
+| **Appeal Deadline Tracking**        | Set when resolution recorded                        | Set correctly in `recordResolution()`        | ✅ **MATCHES** |
+| **Escrow State After Resolution**   | Remains disputed/pending until appeal window passes | Set to `RESOLVED` immediately                | ❌ **DIFFERS** |
+| **Escalation During Appeal Window** | Should cancel pending resolution                    | Can escalate, but tokens already transferred | ❌ **DIFFERS** |
+| **Final Level (Kleros)**            | Transfer immediately (no appeal window)             | `appealWindows[2] = 0` (no appeal window)    | ✅ **MATCHES** |
+| **Escalation Fee/Bond**             | Fee in v1, bond in v2                               | Escalation fee collected correctly           | ✅ **MATCHES** |
 
 ---
 
@@ -413,16 +461,19 @@ To match the described flow, the following changes are needed:
 ## Implementation Notes
 
 ### Appeal Windows
+
 - Round 0 (Initial Resolver): 2 days appeal window
-- Round 1 (Senior Resolver): 3 days appeal window  
+- Round 1 (Senior Resolver): 3 days appeal window
 - Round 2 (Kleros/External): 0 days (no appeal window, final decision)
 
 ### Status Flow (Expected)
+
 ```
 Open → Decided (appeal window open) → Final (after deadline) OR Escalated (if escalated)
 ```
 
 ### Status Flow (Current - Problematic)
+
 ```
 Open → RESOLVED (tokens transferred) → Escalated (cannot reverse transfer)
 ```

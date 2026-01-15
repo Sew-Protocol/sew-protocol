@@ -38,6 +38,7 @@ We follow a **90-day coordinated disclosure** policy:
 - **Day 90:** Public disclosure (or earlier if mutually agreed)
 
 **Exceptions:**
+
 - If the vulnerability is already publicly known, we may accelerate disclosure
 - If the vulnerability is actively being exploited, we may disclose immediately
 - If a fix is deployed and tested, we may disclose earlier
@@ -45,6 +46,7 @@ We follow a **90-day coordinated disclosure** policy:
 ### Scope
 
 **In Scope:**
+
 - Smart contract vulnerabilities
 - Access control issues
 - Reentrancy vulnerabilities
@@ -53,6 +55,7 @@ We follow a **90-day coordinated disclosure** policy:
 - Economic attacks (flash loans, MEV, etc.)
 
 **Out of Scope:**
+
 - Frontend vulnerabilities
 - Social engineering
 - Physical security
@@ -118,6 +121,3 @@ We thank security researchers who responsibly disclose vulnerabilities. Contribu
 ---
 
 **Note:** This policy may be updated. Please check this file for the latest version.
-
-
-

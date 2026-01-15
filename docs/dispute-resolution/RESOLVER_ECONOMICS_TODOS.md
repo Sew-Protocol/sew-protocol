@@ -1,254 +1,236 @@
-DR v1 & DR v2 --- Engineering TODOs
-=================================
+# DR v1 & DR v2 --- Engineering TODOs
 
-*(Derived from `RESOLVER_ECONOMICS_2026.md`)*
+_(Derived from `RESOLVER_ECONOMICS_2026.md`)_
 
 > Scope:
 >
-> -   DR v1 = decentralise decisions, no resolver capital at risk
->
->
-> -   DR v2 = decentralise incentives via appeal bonds + fee curves
->
->
-> -   DR v3 (staking, slashing, delegation) is explicitly **out of scope**
+> - DR v1 = decentralise decisions, no resolver capital at risk
+> - DR v2 = decentralise incentives via appeal bonds + fee curves
+> - DR v3 (staking, slashing, delegation) is explicitly **out of scope**
 
-* * * * *
+---
 
-🧩 Shared foundations (must exist before v1)
---------------------------------------------
+## 🧩 Shared foundations (must exist before v1)
 
 ### Core dispute state
 
--   ✅ `DisputeMetadata` struct includes:
+- ✅ `DisputeMetadata` struct includes:
+  - ✅ `currentRound` (uint8) - per-round tracking
 
-    -   ✅ `currentRound` (uint8) - per-round tracking
+  - ✅ `status` (Open, Decided, Escalated, Final)
 
-    -   ✅ `status` (Open, Decided, Escalated, Final)
+  - ✅ `resolverAtRound[3]` - resolver set per round
 
-    -   ✅ `resolverAtRound[3]` - resolver set per round
+  - ✅ `decisionAtRound[3]` - decision per round
 
-    -   ✅ `decisionAtRound[3]` - decision per round
+  - ✅ `appealDeadline[3]` - appeal deadline per round
 
-    -   ✅ `appealDeadline[3]` - appeal deadline per round
+  - ✅ `bondAmountAtRound[3]` - bond storage per round (DR v2 fields exist)
 
-    -   ✅ `bondAmountAtRound[3]` - bond storage per round (DR v2 fields exist)
+- ✅ Resolver set stored per round (`resolverAtRound[3]`) so appeal bonds can be paid to correct prior resolvers.
 
--   ✅ Resolver set stored per round (`resolverAtRound[3]`) so appeal bonds can be paid to correct prior resolvers.
+- Events:
+  - ✅ `DisputeOpened` (BaseEscrow)
 
--   Events:
+  - ✅ `DecisionSubmitted` (DecentralizedResolutionModule)
 
-    -   ✅ `DisputeOpened` (BaseEscrow)
+  - ⚠️ `DisputeEscalatedToRound` (exists, but no `AppealOpened` event)
 
-    -   ✅ `DecisionSubmitted` (DecentralizedResolutionModule)
+  - ⚠️ `AppealBondRequired` (exists, but `AppealBondPosted` not emitted)
 
-    -   ⚠️ `DisputeEscalatedToRound` (exists, but no `AppealOpened` event)
+  - ❌ `AppealResolved` (not emitted)
 
-    -   ⚠️ `AppealBondRequired` (exists, but `AppealBondPosted` not emitted)
+  - ⚠️ `DisputeFinalised` (status exists, but event not emitted)
 
-    -   ❌ `AppealResolved` (not emitted)
+---
 
-    -   ⚠️ `DisputeFinalised` (status exists, but event not emitted)
-
-* * * * *
-
-🧠 DR v1 --- Decentralise decisions (no resolver capital)
--------------------------------------------------------
+## 🧠 DR v1 --- Decentralise decisions (no resolver capital)
 
 ### Resolver selection & routing
 
--   ✅ Resolver pool implemented with:
+- ✅ Resolver pool implemented with:
+  - ✅ `resolverActive` flag
 
-    -   ✅ `resolverActive` flag
+  - ✅ `resolverCapacity.acceptsNewDisputes` flag
 
-    -   ✅ `resolverCapacity.acceptsNewDisputes` flag
+  - ✅ `resolverStats.emaScore` as performance score
 
-    -   ✅ `resolverStats.emaScore` as performance score
+- ✅ **Category-based round-robin selection** per dispute round (uses `escrowCategory[workflowId]`).
 
--   ✅ **Category-based round-robin selection** per dispute round (uses `escrowCategory[workflowId]`).
+- ✅ Excludes resolvers whose workload weight is zero (via `calculateWorkloadWeight`).
 
--   ✅ Excludes resolvers whose workload weight is zero (via `calculateWorkloadWeight`).
-
-* * * * *
+---
 
 ### Performance tracking (EMA-based)
 
--   ✅ `ResolverStats` includes:
+- ✅ `ResolverStats` includes:
+  - ✅ `emaScore` (0-1e6 fixed point)
 
-    -   ✅ `emaScore` (0-1e6 fixed point)
+  - ✅ `casesDecided` (cases handled)
 
-    -   ✅ `casesDecided` (cases handled)
+  - ✅ `timeoutsAccept` + `timeoutsResolve` (timeouts)
 
-    -   ✅ `timeoutsAccept` + `timeoutsResolve` (timeouts)
+  - ✅ `reversals`
 
-    -   ✅ `reversals`
+  - ✅ `lastActive` (via `resolverLastActive` mapping)
 
-    -   ✅ `lastActive` (via `resolverLastActive` mapping)
+- ✅ EMA update implemented:
 
--   ✅ EMA update implemented:
+  `score_new = score_old * (1 - α) + outcome * α` (in `ResolutionAnalytics.updateEMAScore`)
 
-    `score_new = score_old * (1 - α) + outcome * α` (in `ResolutionAnalytics.updateEMAScore`)
+- ✅ Outcome defined:
+  - 1.0 (EMA_PRECISION) for upheld decision
 
--   ✅ Outcome defined:
+  - 0.5 (EMA_PRECISION / 2) for reversed on escalation
 
-    -   1.0 (EMA_PRECISION) for upheld decision
+  - 0 for timeout / no response
 
-    -   0.5 (EMA_PRECISION / 2) for reversed on escalation
-
-    -   0 for timeout / no response
-
-* * * * *
+---
 
 ### Workload as incentive
 
--   ✅ `calculateWorkloadWeight(resolver)` implemented:
+- ✅ `calculateWorkloadWeight(resolver)` implemented:
 
-    `f(emaScore, assignmentWeight, minScoreThreshold)` (in `ResolutionAnalytics`)
+  `f(emaScore, assignmentWeight, minScoreThreshold)` (in `ResolutionAnalytics`)
 
--   ✅ Resolver selection weighted by workload weight (in `selectResolverRoundRobin`).
+- ✅ Resolver selection weighted by workload weight (in `selectResolverRoundRobin`).
 
--   ✅ If score < threshold → weight becomes 0 (resolver receives no new cases).
+- ✅ If score < threshold → weight becomes 0 (resolver receives no new cases).
 
-* * * * *
+---
 
 ### Timeouts & reassignment
 
--   ✅ Per-round `resolveDeadlines[3]` defined: `[3 days, 5 days, 7 days]`
+- ✅ Per-round `resolveDeadlines[3]` defined: `[3 days, 5 days, 7 days]`
 
--   ⚠️ `t_accept` not separately defined (resolvers are pre-assigned)
+- ⚠️ `t_accept` not separately defined (resolvers are pre-assigned)
 
--   ✅ Resolver fails to resolve → auto-reassign via `forceProgress()` + record penalty.
+- ✅ Resolver fails to resolve → auto-reassign via `forceProgress()` + record penalty.
 
--   ✅ Repeated failures push EMA down (via `recordTimeout`) and thus workload to zero.
+- ✅ Repeated failures push EMA down (via `recordTimeout`) and thus workload to zero.
 
-* * * * *
+---
 
 ### Escalation flow (with bonds - note: bonds enabled in DR v1)
 
--   ✅ Escalation to next round implemented (`executeEscalation`)
+- ✅ Escalation to next round implemented (`executeEscalation`)
 
--   ✅ Resolver reassignment implemented (category-based round-robin per round)
+- ✅ Resolver reassignment implemented (category-based round-robin per round)
 
--   ✅ Kleros escalation option (if enabled via `escalationConfig[2].enabled`)
+- ✅ Kleros escalation option (if enabled via `escalationConfig[2].enabled`)
 
--   ⚠️ Bonds are enabled in DR v1 (via `escalationCostConfig.enabled = true`), but collection/storage not yet implemented in BaseEscrow
+- ⚠️ Bonds are enabled in DR v1 (via `escalationCostConfig.enabled = true`), but collection/storage not yet implemented in BaseEscrow
 
-* * * * *
+---
 
 ### DR v1 exit metrics (for governance)
 
--   ✅ Tracked:
+- ✅ Tracked:
+  - ✅ Escalation rate (via `getV1PhaseGateMetrics`)
 
-    -   ✅ Escalation rate (via `getV1PhaseGateMetrics`)
+  - ✅ Timeout rate (via resolver stats)
 
-    -   ✅ Timeout rate (via resolver stats)
+  - ✅ Average resolution time (via `getAverageResolutionTime`)
 
-    -   ✅ Average resolution time (via `getAverageResolutionTime`)
+- ✅ Read-only views exposed for governance dashboards (`getV1PhaseGateMetrics`, `getAverageResolutionTime`, `getDisputeResolverStats`).
 
--   ✅ Read-only views exposed for governance dashboards (`getV1PhaseGateMetrics`, `getAverageResolutionTime`, `getDisputeResolverStats`).
+---
 
-* * * * *
-
-💰 DR v2 --- Decentralise incentives (appeal bonds, no resolver staking)
-----------------------------------------------------------------------
+## 💰 DR v2 --- Decentralise incentives (appeal bonds, no resolver staking)
 
 ### Appeal bond plumbing
 
--   ✅ `getRequiredAppealBond(uint k)` function exists (calculates bond using quadratic curve via `EscalationCostLibrary`)
+- ✅ `getRequiredAppealBond(uint k)` function exists (calculates bond using quadratic curve via `EscalationCostLibrary`)
 
--   ✅ Bond storage fields exist: `bondAmountAtRound[3]` in `DisputeMetadata`
+- ✅ Bond storage fields exist: `bondAmountAtRound[3]` in `DisputeMetadata`
 
--   ⚠️ Bond collection not yet implemented in `BaseEscrow.escalateDispute()` (still uses old fee collection)
+- ⚠️ Bond collection not yet implemented in `BaseEscrow.escalateDispute()` (still uses old fee collection)
 
-* * * * *
+---
 
 ### Bond custody & accounting
 
--   ⚠️ On appeal:
+- ✅ On appeal:
+  - ✅ Bond amount calculated and collected/stored in BaseEscrow (via `escalateDispute`)
 
-    -   ⚠️ Bond amount calculated but not collected/stored in BaseEscrow
+  - ✅ `ResolverIncentiveModuleV2` integrated with `recordAppealBond`, `distributeAppealBond` (bond custody enforced)
 
-    -   ⚠️ `ResolverIncentiveModuleV2` exists with `recordAppealBond`, `handleBondRefund`, `handleBondPayout`, but not integrated
-
-* * * * *
+---
 
 ### Bond payout rules
 
--   ⚠️ When round resolves:
+- ⚠️ When round resolves:
+  - ⚠️ `ResolverIncentiveModuleV2` has `handleBondRefund` and `handleBondPayout` but not integrated
 
-    -   ⚠️ `ResolverIncentiveModuleV2` has `handleBondRefund` and `handleBondPayout` but not integrated
+  - ⚠️ Events exist: `AppealBondRefunded`, `AppealBondPaidToResolvers` (in ResolverIncentiveModuleV2)
 
-    -   ⚠️ Events exist: `AppealBondRefunded`, `AppealBondPaidToResolvers` (in ResolverIncentiveModuleV2)
-
-* * * * *
+---
 
 ### Increasing delays
 
--   ⚠️ Fixed arrays `resolveDeadlines[3]` and `appealWindows[3]` exist (not calculated with steps)
+- ⚠️ Fixed arrays `resolveDeadlines[3]` and `appealWindows[3]` exist (not calculated with steps)
+  - Current: `[3 days, 5 days, 7 days]` and `[2 days, 3 days, 0]`
 
-    -   Current: `[3 days, 5 days, 7 days]` and `[2 days, 3 days, 0]`
+  - TODO: Change to `baseResolve + k * resolveStep` and `baseAppeal + k * appealStep`
 
-    -   TODO: Change to `baseResolve + k * resolveStep` and `baseAppeal + k * appealStep`
+- ⚠️ Enforced on-chain (via `resolveBy` timestamp).
 
--   ⚠️ Enforced on-chain (via `resolveBy` timestamp).
-
-* * * * *
+---
 
 ### Anti-griefing rules
 
--   ✅ `MAX_ROUND = 2` cap exists.
+- ✅ `MAX_ROUND = 2` cap exists.
 
--   ✅ `minEscrowValueForEscalation` exists (currently 0 by default).
+- ✅ `minEscrowValueForEscalation` exists (currently 0 by default).
 
--   ⚠️ Bond forfeiture logic exists in `ResolverIncentiveModuleV2.handleBondForfeit` but not integrated.
+- ⚠️ Bond forfeiture logic exists in `ResolverIncentiveModuleV2.forfeitAppealBond` but not automatically integrated into escalation timeout flow (manual call possible).
 
-* * * * *
+---
 
 ### Reporting & observability
 
--   ⚠️ Exposed in `ResolverIncentiveModuleV2` (not integrated):
+- ✅ Exposed in `ResolverIncentiveModuleV2` (integrated):
+  - ✅ `totalBondsPosted`
 
-    -   ✅ `totalBondsPosted`
+  - ✅ `totalBondsForfeited`
 
-    -   ✅ `totalBondsForfeited`
+  - ✅ `totalBondsRefunded`
 
-    -   ✅ `totalBondsRefunded`
+  - ✅ `totalBondsPaidToResolvers` (fixed: only increments when actually paid)
 
-    -   ✅ `escalationDepthHistogram`
+  - ✅ `escalationDepthHistogram`
 
--   ⚠️ These metrics exist but module not integrated into resolution flow.
+- ✅ Module integrated into resolution flow via `BaseEscrow` and `DecentralizedResolutionModule`.
 
-* * * * *
+---
 
-🚫 Explicitly out of scope (v3 only)
-------------------------------------
+## 🚫 Explicitly out of scope (v3 only)
 
 Do **not** implement yet:
 
--   Resolver staking
+- Resolver staking
 
--   Slashing
+- Slashing
 
--   Senior backing
+- Senior backing
 
--   Fraud committees
+- Fraud committees
 
--   Delegation coverage
+- Delegation coverage
 
 Interfaces for these may exist but must be inactive.
 
-* * * * *
+---
 
-Why this sequencing is safe (from `RESOLVER_ECONOMICS_2026.md`)
----------------------------------------------------------------
+## Why this sequencing is safe (from `RESOLVER_ECONOMICS_2026.md`)
 
--   DR v1 gives you decentralised decision-making with almost no financial attack surface.
+- DR v1 gives you decentralised decision-making with almost no financial attack surface.
 
--   DR v2 introduces economic friction for users (escalation bonds) but keeps resolvers non-adversarial.
+- DR v2 introduces economic friction for users (escalation bonds) but keeps resolvers non-adversarial.
 
--   Only after real-world griefing and appeal patterns are known do you introduce slashing and capital risk.
+- Only after real-world griefing and appeal patterns are known do you introduce slashing and capital risk.
 
-* * * * *
+---
 
 ## Implementation Status Summary
 
@@ -269,8 +251,8 @@ Why this sequencing is safe (from `RESOLVER_ECONOMICS_2026.md`)
 - Bond collection (not implemented in BaseEscrow)
 - Bond payout logic (exists in ResolverIncentiveModuleV2 but not integrated)
 
-### ❌ Not Implemented
+### ⚠️ Partially Implemented / Missing
 
-- Increasing delays (fixed arrays instead of calculated)
-- Bond integration (ResolverIncentiveModuleV2 not integrated)
-- Some events (AppealOpened, AppealBondPosted, AppealResolved, DisputeFinalised)
+- ⚠️ Increasing delays (fixed arrays instead of calculated - TODO: change to `baseResolve + k * resolveStep`)
+- ✅ Bond integration (ResolverIncentiveModuleV2 integrated with custody enforcement)
+- ⚠️ Some events missing (AppealOpened, AppealResolved, DisputeFinalised - but AppealBondRecorded exists)

@@ -7,8 +7,9 @@
 ## The Problem
 
 On-chain payments are irreversible. This is great for finality, but terrible for everyday purchases where:
+
 - Buyers need protection against non-delivery
-- Sellers need assurance of payment  
+- Sellers need assurance of payment
 - Both need a way to resolve disputes
 
 Right now, every marketplace/protocol implements custom escrow logic. This fragments the ecosystem and makes it hard to build composable tools.
@@ -22,7 +23,7 @@ A standard escrow interface (`IEscrowPayment`) that supports:
 ✅ **Dispute resolution** - Neutral third-party arbitrators  
 ✅ **Auto-settlement** - Time-based automatic release/cancel  
 ✅ **Attachments** - IPFS evidence for disputes  
-✅ **Yield generation** - Optional DeFi yield on locked funds  
+✅ **Yield generation** - Optional DeFi yield on locked funds
 
 ## Example Flow
 
@@ -65,6 +66,4 @@ escrow.resolveDispute(id, [
 
 ---
 
-*Cross-posted from [original discussion]. Join the conversation!*
-
-
+_Cross-posted from [original discussion]. Join the conversation!_

@@ -7,6 +7,7 @@ This document outlines the deployment plan for production contracts to mainnet, 
 ## Current State Analysis
 
 ### Repository Structure
+
 - **Deployment System**: Classic hardhat-deploy (not Ignition)
 - **Proxy Support**: Both Transparent and UUPS via `PROXY_KIND` environment variable
 - **Test Framework**: Hybrid (Hardhat TS tests + Foundry tests)
@@ -14,6 +15,7 @@ This document outlines the deployment plan for production contracts to mainnet, 
 - **Safety Checks**: Mainnet deployment requires `DEPLOY_CONFIRM=YES`
 
 ### Current Deployment Scripts
+
 - `deploy/00_impl.ts` - Deploys implementation contract (UpgradeableBox example)
 - `deploy/10_proxy.ts` - Deploys proxy with initialization
 - `deploy/90_post.ts` - Post-deployment sanity checks
@@ -21,6 +23,7 @@ This document outlines the deployment plan for production contracts to mainnet, 
 ### Production Contracts to Deploy
 
 #### Core Contracts
+
 1. **EscrowableERC20**
    - Constructor: `(string name, string symbol, uint256 escrowFee, address escrowFeeAddress)`
    - Initial Supply: 1,000,000 tokens (18 decimals)
@@ -34,12 +37,14 @@ This document outlines the deployment plan for production contracts to mainnet, 
    - Upgradeable: Yes (recommended)
 
 #### Libraries (Deploy First - Required for Linking)
+
 1. `EscrowEncodingLibrary`
 2. `ResolverLogicLibrary`
 3. `SettingsValidationLibrary`
 4. `YieldDistributionLibrary`
 
 #### Modules (Deploy Before Main Contracts)
+
 1. **DefaultReleaseStrategy**
    - Constructor: `(address initialOwner)`
 
@@ -62,6 +67,7 @@ This document outlines the deployment plan for production contracts to mainnet, 
 ### Phase 1: Pre-Deployment Preparation
 
 #### 1.1 Environment Configuration
+
 - [ ] Set up `.env` file with:
   - `PRIVATE_KEY` - Deployer private key
   - `RPC_BASE_MAINNET` or `RPC_ETHEREUM` - Mainnet RPC endpoint
@@ -70,6 +76,7 @@ This document outlines the deployment plan for production contracts to mainnet, 
   - `PROXY_KIND=transparent` or `PROXY_KIND=uups` - Choose proxy type
 
 #### 1.2 Contract Parameters Decision
+
 - [ ] **EscrowableERC20 Parameters**:
   - Token Name: [TO BE DECIDED]
   - Token Symbol: [TO BE DECIDED]
@@ -85,6 +92,7 @@ This document outlines the deployment plan for production contracts to mainnet, 
   - Aave Pool Address (if using yield): [TO BE DECIDED]
 
 #### 1.3 Network Selection
+
 - [ ] Choose deployment network:
   - Base Mainnet (Chain ID: 8453) - Recommended for lower gas costs
   - Ethereum Mainnet (Chain ID: 1) - Higher gas costs but more established
@@ -92,14 +100,16 @@ This document outlines the deployment plan for production contracts to mainnet, 
 ### Phase 2: Deployment Scripts Creation
 
 #### 2.1 Library Deployment (`deploy/01_libraries.ts`)
+
 ```typescript
 // Deploy all libraries first
-// Libraries: EscrowEncodingLibrary, ResolverLogicLibrary, 
+// Libraries: EscrowEncodingLibrary, ResolverLogicLibrary,
 //            SettingsValidationLibrary, YieldDistributionLibrary
 // Tag: 'libraries'
 ```
 
 #### 2.2 Module Deployment (`deploy/02_modules.ts`)
+
 ```typescript
 // Deploy all modules
 // Modules: DefaultReleaseStrategy, DefaultResolutionModule,
@@ -109,6 +119,7 @@ This document outlines the deployment plan for production contracts to mainnet, 
 ```
 
 #### 2.3 Main Contract Implementation (`deploy/03_impl.ts`)
+
 ```typescript
 // Deploy implementation contracts (no proxy yet)
 // Contracts: EscrowableERC20_Impl, EscrowVault_Impl
@@ -117,6 +128,7 @@ This document outlines the deployment plan for production contracts to mainnet, 
 ```
 
 #### 2.4 Proxy Deployment (`deploy/04_proxy.ts`)
+
 ```typescript
 // Deploy proxies with initialization
 // Contracts: EscrowableERC20 (via proxy), EscrowVault (via proxy)
@@ -126,6 +138,7 @@ This document outlines the deployment plan for production contracts to mainnet, 
 ```
 
 #### 2.5 Module Wiring (`deploy/05_wire_modules.ts`)
+
 ```typescript
 // Wire modules to main contracts
 // - Set defaultReleaseStrategy
@@ -137,6 +150,7 @@ This document outlines the deployment plan for production contracts to mainnet, 
 ```
 
 #### 2.6 Post-Deployment Verification (`deploy/06_verify.ts`)
+
 ```typescript
 // Verify deployment state
 // - Check contract addresses
@@ -150,6 +164,7 @@ This document outlines the deployment plan for production contracts to mainnet, 
 ### Phase 3: Deployment Execution
 
 #### 3.1 Test Deployment (Base Sepolia)
+
 ```bash
 # Test on Base Sepolia first
 pnpm deploy --network baseSepolia
@@ -157,6 +172,7 @@ pnpm export --network baseSepolia
 ```
 
 #### 3.2 Mainnet Deployment
+
 ```bash
 # Set environment variables
 export DEPLOY_CONFIRM=YES
@@ -177,17 +193,20 @@ pnpm verify --network base
 ### Phase 4: Post-Deployment
 
 #### 4.1 Contract Verification
+
 - [ ] Verify all contracts on Basescan/Etherscan
 - [ ] Verify proxy implementations
 - [ ] Verify library linking
 
 #### 4.2 Governance Setup (Recommended)
+
 - [ ] Transfer ownership to Safe multisig
 - [ ] Set up Timelock for upgrades (if using UUPS)
 - [ ] Configure authorized resolver
 - [ ] Document admin addresses
 
 #### 4.3 Documentation
+
 - [ ] Document all deployed addresses
 - [ ] Create deployment summary
 - [ ] Update frontend configuration
@@ -196,6 +215,7 @@ pnpm verify --network base
 ## Deployment Script Structure
 
 ### Recommended File Structure
+
 ```
 deploy/
 ├── 01_libraries.ts      # Deploy libraries
@@ -207,6 +227,7 @@ deploy/
 ```
 
 ### Tag Dependencies
+
 - `libraries` → no dependencies
 - `modules` → depends on `libraries`
 - `impl` → depends on `libraries`, `modules`
@@ -217,6 +238,7 @@ deploy/
 ## Safety Considerations
 
 ### Mainnet Deployment Safety
+
 1. **Required Confirmation**: `DEPLOY_CONFIRM=YES` must be set
 2. **Proxy Type**: Choose Transparent (safer) or UUPS (gas efficient)
 3. **Ownership**: Never leave upgrade authority on EOA
@@ -224,6 +246,7 @@ deploy/
 5. **Testing**: Always test on testnet first (Base Sepolia)
 
 ### Upgrade Safety
+
 - Gate upgrades behind Safe + Timelock
 - Require storage layout checks on every upgrade
 - Never leave upgrade authority on an EOA
@@ -232,6 +255,7 @@ deploy/
 ## Deployment Ledger
 
 The deployment ledger will be exported to:
+
 ```
 deploy-ledger/<network>/<timestamp>/
 ├── meta.json              # Deployment metadata
@@ -243,6 +267,7 @@ deploy-ledger/<network>/<timestamp>/
 ## IEO-Specific Requirements
 
 ### Coinstore Requirements
+
 - [ ] Mainnet contracts deployed before IEO date
 - [ ] Contract addresses provided to Coinstore
 - [ ] Verified contracts on block explorer
@@ -250,6 +275,7 @@ deploy-ledger/<network>/<timestamp>/
 - [ ] Escrow functionality operational
 
 ### Recommended Timeline
+
 1. **Week 1**: Create deployment scripts, test on Base Sepolia
 2. **Week 2**: Finalize contract parameters, security review
 3. **Week 3**: Deploy to mainnet, verify contracts
@@ -268,5 +294,3 @@ deploy-ledger/<network>/<timestamp>/
 - Production deployment scripts need to be created for actual contracts
 - The export-ledger script needs to be updated to support all production contracts
 - Consider using Transparent proxy for initial deployment (safer), can upgrade to UUPS later if needed
-
-

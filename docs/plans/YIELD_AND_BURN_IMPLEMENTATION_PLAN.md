@@ -25,6 +25,7 @@ This document outlines the implementation plan for three related features:
 ### 1. Current Yield Distribution
 
 **Current Implementation**:
+
 - 100% of yield goes to recipients specified in `YieldDistribution`
 - Distribution is percentage-based (must sum to 10000 bps)
 - No protocol share currently
@@ -33,13 +34,14 @@ This document outlines the implementation plan for three related features:
 
 ```solidity
 function _distributeYield(uint256 workflowId, address token, uint256 yieldAmount) internal {
-    // ... gets distribution module ...
-    // 100% of yield goes to recipients
-    distributionModule.distributeYield(workflowId, token, yieldAmount, distributionData);
+  // ... gets distribution module ...
+  // 100% of yield goes to recipients
+  distributionModule.distributeYield(workflowId, token, yieldAmount, distributionData);
 }
 ```
 
 **Distribution Module**: `DefaultYieldDistributionModule`
+
 - Distributes 100% to recipients based on percentages
 - No protocol fee deduction
 
@@ -48,6 +50,7 @@ function _distributeYield(uint256 workflowId, address token, uint256 yieldAmount
 ### 2. Current Reserve Management
 
 **Current Implementation**:
+
 - Fees collected in `totalFees` and `totalFeesPerToken[token]`
 - Fees stored in contract (no yield generation)
 - Withdrawal via `withdrawFees()` to `escrowFeeAddress`
@@ -66,6 +69,7 @@ function withdrawFees(address token) public {
 ```
 
 **Limitations**:
+
 - Reserves sit idle (no yield generation)
 - Opportunity cost of not earning yield
 - No burn mechanism
@@ -89,6 +93,7 @@ function withdrawFees(address token) public {
 **Goal**: Protocol takes 30% of all generated yield as revenue
 
 **Distribution**:
+
 - 30% → Protocol (`escrowFeeAddress`)
 - 70% → Recipients (existing distribution)
 
@@ -115,47 +120,52 @@ uint256 public constant YIELD_DENOMINATOR = 10000; // 100%
 **File**: `contracts/BaseEscrow.sol::_distributeYield()`
 
 **Current**:
+
 ```solidity
 function _distributeYield(uint256 workflowId, address token, uint256 yieldAmount) internal {
-    if (yieldAmount == 0) return;
-    
-    // 100% to recipients
-    distributionModule.distributeYield(workflowId, token, yieldAmount, distributionData);
+  if (yieldAmount == 0) return;
+
+  // 100% to recipients
+  distributionModule.distributeYield(workflowId, token, yieldAmount, distributionData);
 }
 ```
 
 **Updated**:
+
 ```solidity
 function _distributeYield(uint256 workflowId, address token, uint256 yieldAmount) internal {
-    if (yieldAmount == 0) return;
-    
-    // Calculate protocol share (30%)
-    uint256 protocolShare = (yieldAmount * PROTOCOL_YIELD_SHARE) / YIELD_DENOMINATOR;
-    uint256 recipientShare = yieldAmount - protocolShare;
-    
-    // Transfer protocol share to fee address
-    if (protocolShare > 0) {
-        IERC20(token).safeTransfer(escrowFeeAddress, protocolShare);
-        emit ProtocolYieldCollected(workflowId, token, protocolShare);
+  if (yieldAmount == 0) return;
+
+  // Calculate protocol share (30%)
+  uint256 protocolShare = (yieldAmount * PROTOCOL_YIELD_SHARE) / YIELD_DENOMINATOR;
+  uint256 recipientShare = yieldAmount - protocolShare;
+
+  // Transfer protocol share to fee address
+  if (protocolShare > 0) {
+    IERC20(token).safeTransfer(escrowFeeAddress, protocolShare);
+    emit ProtocolYieldCollected(workflowId, token, protocolShare);
+  }
+
+  // Distribute remaining 70% to recipients
+  if (recipientShare > 0) {
+    IYieldDistributionModule distributionModule = _getYieldDistributionModule(workflowId);
+    bytes memory distributionData = _encodeYieldDistribution(workflowId);
+
+    (bool success, uint256 distributed) = distributionModule.distributeYield(
+      workflowId,
+      token,
+      recipientShare,
+      distributionData
+    );
+
+    // Handle remainder (if distribution fails or doesn't distribute all)
+    if (!success || distributed < recipientShare) {
+      uint256 remainder = recipientShare - distributed;
+      if (remainder > 0) {
+        IERC20(token).safeTransfer(escrowFeeAddress, remainder);
+      }
     }
-    
-    // Distribute remaining 70% to recipients
-    if (recipientShare > 0) {
-        IYieldDistributionModule distributionModule = _getYieldDistributionModule(workflowId);
-        bytes memory distributionData = _encodeYieldDistribution(workflowId);
-        
-        (bool success, uint256 distributed) = distributionModule.distributeYield(
-            workflowId, token, recipientShare, distributionData
-        );
-        
-        // Handle remainder (if distribution fails or doesn't distribute all)
-        if (!success || distributed < recipientShare) {
-            uint256 remainder = recipientShare - distributed;
-            if (remainder > 0) {
-                IERC20(token).safeTransfer(escrowFeeAddress, remainder);
-            }
-        }
-    }
+  }
 }
 ```
 
@@ -166,12 +176,14 @@ function _distributeYield(uint256 workflowId, address token, uint256 yieldAmount
 #### Step 3: Update Distribution Module (Optional)
 
 **Option A**: Keep module unchanged (recommended)
+
 - Module still receives 100% of what it's given
 - Protocol takes share before calling module
 - **Pros**: No module changes needed
 - **Cons**: None
 
 **Option B**: Update module to handle protocol share
+
 - Module deducts protocol share internally
 - **Pros**: More centralized logic
 - **Cons**: Requires module changes, less flexible
@@ -185,11 +197,7 @@ function _distributeYield(uint256 workflowId, address token, uint256 yieldAmount
 **File**: `contracts/BaseEscrow.sol`
 
 ```solidity
-event ProtocolYieldCollected(
-    uint256 indexed workflowId,
-    address indexed token,
-    uint256 amount
-);
+event ProtocolYieldCollected(uint256 indexed workflowId, address indexed token, uint256 amount);
 ```
 
 **Size Impact**: ~30 bytes
@@ -221,12 +229,12 @@ event ProtocolYieldCollected(
 
 ### Size Impact Summary
 
-| Component | Size Impact |
-|-----------|-------------|
-| Constants | ~20 bytes |
-| Distribution logic | +150-200 bytes |
-| Event | +30 bytes |
-| **Total** | **+200-250 bytes** |
+| Component          | Size Impact        |
+| ------------------ | ------------------ |
+| Constants          | ~20 bytes          |
+| Distribution logic | +150-200 bytes     |
+| Event              | +30 bytes          |
+| **Total**          | **+200-250 bytes** |
 
 ---
 
@@ -268,54 +276,50 @@ mapping(address => uint256) public reservesYieldGenerated; // token => total yie
  * @param amount Amount to deposit (0 = deposit all available)
  * @dev Only fee address can call. Deposits reserves to default yield generation module.
  */
-function depositReservesForYield(address token, uint256 amount) 
-    public 
-    nonReentrant 
-    returns (bool) 
-{
-    if (_msgSender() != escrowFeeAddress) {
-        revert NotFeeAddress(_msgSender(), escrowFeeAddress);
-    }
-    
-    if (token == address(0)) {
-        revert InvalidAddress("Token address cannot be zero", token);
-    }
-    
-    // Get available reserves
-    uint256 availableReserves = totalFeesPerToken[token];
-    if (availableReserves == 0) {
-        revert InvalidAmount("No reserves available for this token");
-    }
-    
-    // Determine deposit amount
-    uint256 depositAmount = amount == 0 ? availableReserves : amount;
-    if (depositAmount > availableReserves) {
-        revert InvalidAmount("Amount exceeds available reserves");
-    }
-    
-    // Check yield module is set
-    IYieldGenerationModule genModule = defaultYieldGenerationModule;
-    if (address(genModule) == address(0)) {
-        revert InvalidAddress("Yield generation module not set", address(0));
-    }
-    
-    if (!genModule.isTokenSupported(token)) {
-        revert InvalidAmount("Token not supported by yield module");
-    }
-    
-    // Transfer reserves to contract (if not already there)
-    // Note: Reserves are already in contract, so we just need to deposit them
-    
-    // Deposit to yield module (use special workflowId = 0 for reserves)
-    uint256 workflowId = 0; // Reserve deposits use workflowId = 0
-    genModule.depositForYield(workflowId, token, depositAmount);
-    
-    // Update tracking
-    reservesInYield[token] += depositAmount;
-    totalFeesPerToken[token] -= depositAmount; // Remove from available (still tracked separately)
-    
-    emit ReservesDepositedForYield(token, depositAmount);
-    return true;
+function depositReservesForYield(address token, uint256 amount) public nonReentrant returns (bool) {
+  if (_msgSender() != escrowFeeAddress) {
+    revert NotFeeAddress(_msgSender(), escrowFeeAddress);
+  }
+
+  if (token == address(0)) {
+    revert InvalidAddress('Token address cannot be zero', token);
+  }
+
+  // Get available reserves
+  uint256 availableReserves = totalFeesPerToken[token];
+  if (availableReserves == 0) {
+    revert InvalidAmount('No reserves available for this token');
+  }
+
+  // Determine deposit amount
+  uint256 depositAmount = amount == 0 ? availableReserves : amount;
+  if (depositAmount > availableReserves) {
+    revert InvalidAmount('Amount exceeds available reserves');
+  }
+
+  // Check yield module is set
+  IYieldGenerationModule genModule = defaultYieldGenerationModule;
+  if (address(genModule) == address(0)) {
+    revert InvalidAddress('Yield generation module not set', address(0));
+  }
+
+  if (!genModule.isTokenSupported(token)) {
+    revert InvalidAmount('Token not supported by yield module');
+  }
+
+  // Transfer reserves to contract (if not already there)
+  // Note: Reserves are already in contract, so we just need to deposit them
+
+  // Deposit to yield module (use special workflowId = 0 for reserves)
+  uint256 workflowId = 0; // Reserve deposits use workflowId = 0
+  genModule.depositForYield(workflowId, token, depositAmount);
+
+  // Update tracking
+  reservesInYield[token] += depositAmount;
+  totalFeesPerToken[token] -= depositAmount; // Remove from available (still tracked separately)
+
+  emit ReservesDepositedForYield(token, depositAmount);
+  return true;
 }
 ```
 
@@ -334,60 +338,59 @@ function depositReservesForYield(address token, uint256 amount)
  * @param amount Amount to withdraw (0 = withdraw all)
  * @dev Only fee address can call. Withdraws from default yield generation module.
  */
-function withdrawReservesFromYield(address token, uint256 amount) 
-    public 
-    nonReentrant 
-    returns (bool) 
-{
-    if (_msgSender() != escrowFeeAddress) {
-        revert NotFeeAddress(_msgSender(), escrowFeeAddress);
-    }
-    
-    if (token == address(0)) {
-        revert InvalidAddress("Token address cannot be zero", token);
-    }
-    
-    uint256 deposited = reservesInYield[token];
-    if (deposited == 0) {
-        revert InvalidAmount("No reserves deposited for this token");
-    }
-    
-    // Determine withdrawal amount
-    uint256 withdrawAmount = amount == 0 ? deposited : amount;
-    if (withdrawAmount > deposited) {
-        revert InvalidAmount("Amount exceeds deposited reserves");
-    }
-    
-    // Withdraw from yield module
-    IYieldGenerationModule genModule = defaultYieldGenerationModule;
-    if (address(genModule) == address(0)) {
-        revert InvalidAddress("Yield generation module not set", address(0));
-    }
-    
-    uint256 workflowId = 0; // Reserve deposits use workflowId = 0
-    (bool success, uint256 withdrawn, uint256 yield) = genModule.withdrawWithYield(
-        workflowId, 
-        token, 
-        withdrawAmount
-    );
-    
-    if (!success) {
-        revert InvalidAmount("Withdrawal from yield module failed");
-    }
-    
-    // Update tracking
-    reservesInYield[token] -= withdrawAmount;
-    
-    // Track yield generated
-    if (yield > 0) {
-        reservesYieldGenerated[token] += yield;
-    }
-    
-    // Add back to available reserves (original + yield)
-    totalFeesPerToken[token] += withdrawn;
-    
-    emit ReservesWithdrawnFromYield(token, withdrawAmount, yield);
-    return true;
+function withdrawReservesFromYield(
+  address token,
+  uint256 amount
+) public nonReentrant returns (bool) {
+  if (_msgSender() != escrowFeeAddress) {
+    revert NotFeeAddress(_msgSender(), escrowFeeAddress);
+  }
+
+  if (token == address(0)) {
+    revert InvalidAddress('Token address cannot be zero', token);
+  }
+
+  uint256 deposited = reservesInYield[token];
+  if (deposited == 0) {
+    revert InvalidAmount('No reserves deposited for this token');
+  }
+
+  // Determine withdrawal amount
+  uint256 withdrawAmount = amount == 0 ? deposited : amount;
+  if (withdrawAmount > deposited) {
+    revert InvalidAmount('Amount exceeds deposited reserves');
+  }
+
+  // Withdraw from yield module
+  IYieldGenerationModule genModule = defaultYieldGenerationModule;
+  if (address(genModule) == address(0)) {
+    revert InvalidAddress('Yield generation module not set', address(0));
+  }
+
+  uint256 workflowId = 0; // Reserve deposits use workflowId = 0
+  (bool success, uint256 withdrawn, uint256 yield) = genModule.withdrawWithYield(
+    workflowId,
+    token,
+    withdrawAmount
+  );
+
+  if (!success) {
+    revert InvalidAmount('Withdrawal from yield module failed');
+  }
+
+  // Update tracking
+  reservesInYield[token] -= withdrawAmount;
+
+  // Track yield generated
+  if (yield > 0) {
+    reservesYieldGenerated[token] += yield;
+  }
+
+  // Add back to available reserves (original + yield)
+  totalFeesPerToken[token] += withdrawn;
+
+  emit ReservesWithdrawnFromYield(token, withdrawAmount, yield);
+  return true;
 }
 ```
 
@@ -405,52 +408,48 @@ function withdrawReservesFromYield(address token, uint256 amount)
  * @param token Token address
  * @dev Only fee address can call. Collects yield while keeping principal deposited.
  */
-function collectReserveYield(address token) 
-    public 
-    nonReentrant 
-    returns (uint256 yieldCollected) 
-{
-    if (_msgSender() != escrowFeeAddress) {
-        revert NotFeeAddress(_msgSender(), escrowFeeAddress);
-    }
-    
-    IYieldGenerationModule genModule = defaultYieldGenerationModule;
-    if (address(genModule) == address(0)) {
-        revert InvalidAddress("Yield generation module not set", address(0));
-    }
-    
-    uint256 workflowId = 0; // Reserve deposits use workflowId = 0
-    uint256 currentBalance = genModule.getBalance(workflowId, token);
-    uint256 deposited = reservesInYield[token];
-    
-    if (currentBalance <= deposited) {
-        return 0; // No yield yet
-    }
-    
-    uint256 yield = currentBalance - deposited;
-    
-    // Withdraw only the yield portion
-    // Note: This depends on yield module supporting partial withdrawal
-    // Alternative: Withdraw all, redeposit principal
-    (bool success, uint256 withdrawn, ) = genModule.withdrawWithYield(
-        workflowId,
-        token,
-        currentBalance
-    );
-    
-    if (!success) {
-        revert InvalidAmount("Yield collection failed");
-    }
-    
-    // Redeposit principal
-    genModule.depositForYield(workflowId, token, deposited);
-    
-    // Track yield
-    reservesYieldGenerated[token] += yield;
-    totalFeesPerToken[token] += yield;
-    
-    emit ReserveYieldCollected(token, yield);
-    return yield;
+function collectReserveYield(address token) public nonReentrant returns (uint256 yieldCollected) {
+  if (_msgSender() != escrowFeeAddress) {
+    revert NotFeeAddress(_msgSender(), escrowFeeAddress);
+  }
+
+  IYieldGenerationModule genModule = defaultYieldGenerationModule;
+  if (address(genModule) == address(0)) {
+    revert InvalidAddress('Yield generation module not set', address(0));
+  }
+
+  uint256 workflowId = 0; // Reserve deposits use workflowId = 0
+  uint256 currentBalance = genModule.getBalance(workflowId, token);
+  uint256 deposited = reservesInYield[token];
+
+  if (currentBalance <= deposited) {
+    return 0; // No yield yet
+  }
+
+  uint256 yield = currentBalance - deposited;
+
+  // Withdraw only the yield portion
+  // Note: This depends on yield module supporting partial withdrawal
+  // Alternative: Withdraw all, redeposit principal
+  (bool success, uint256 withdrawn, ) = genModule.withdrawWithYield(
+    workflowId,
+    token,
+    currentBalance
+  );
+
+  if (!success) {
+    revert InvalidAmount('Yield collection failed');
+  }
+
+  // Redeposit principal
+  genModule.depositForYield(workflowId, token, deposited);
+
+  // Track yield
+  reservesYieldGenerated[token] += yield;
+  totalFeesPerToken[token] += yield;
+
+  emit ReserveYieldCollected(token, yield);
+  return yield;
 }
 ```
 
@@ -479,11 +478,13 @@ event ReserveYieldCollected(address indexed token, uint256 yield);
 **Question**: Does yield module support `workflowId = 0` for reserves?
 
 **Options**:
+
 - **Option A**: Use `workflowId = 0` (special value for reserves)
 - **Option B**: Use separate mapping for reserve deposits
 - **Option C**: Create separate reserve yield module
 
 **Recommendation**: **Option A** - Use `workflowId = 0`
+
 - Simplest implementation
 - Yield module should handle it
 - Clear separation (0 = reserves, >0 = escrows)
@@ -515,14 +516,14 @@ event ReserveYieldCollected(address indexed token, uint256 yield);
 
 ### Size Impact Summary
 
-| Component | Size Impact |
-|-----------|-------------|
-| Storage variables | +50 bytes |
-| Deposit function | +200-250 bytes |
-| Withdraw function | +200-250 bytes |
-| Collect yield function | +150-200 bytes |
-| Events | +50 bytes |
-| **Total** | **+650-800 bytes** |
+| Component              | Size Impact        |
+| ---------------------- | ------------------ |
+| Storage variables      | +50 bytes          |
+| Deposit function       | +200-250 bytes     |
+| Withdraw function      | +200-250 bytes     |
+| Collect yield function | +150-200 bytes     |
+| Events                 | +50 bytes          |
+| **Total**              | **+650-800 bytes** |
 
 ---
 
@@ -533,6 +534,7 @@ event ReserveYieldCollected(address indexed token, uint256 yield);
 **Goal**: Add ability to burn tokens from protocol reserves
 
 **Use Cases**:
+
 - Deflationary tokenomics
 - Reduce token supply
 - Protocol value accrual
@@ -546,11 +548,13 @@ event ReserveYieldCollected(address indexed token, uint256 yield);
 **Implementation**: Burn tokens from `totalFeesPerToken`
 
 **Pros**:
+
 - Simple implementation
 - Direct deflationary mechanism
 - No additional tracking needed
 
 **Cons**:
+
 - Requires burnable token (ERC20 with burn function)
 
 ---
@@ -560,10 +564,12 @@ event ReserveYieldCollected(address indexed token, uint256 yield);
 **Implementation**: Burn yield generated from reserves
 
 **Pros**:
+
 - Doesn't reduce principal
 - Sustainable (only burns yield)
 
 **Cons**:
+
 - Less deflationary impact
 - Requires yield generation first
 
@@ -574,10 +580,12 @@ event ReserveYieldCollected(address indexed token, uint256 yield);
 **Implementation**: Burn both fees and yield
 
 **Pros**:
+
 - Maximum deflationary impact
 - Flexible (can choose what to burn)
 
 **Cons**:
+
 - More complex
 - Requires governance decisions
 
@@ -585,7 +593,8 @@ event ReserveYieldCollected(address indexed token, uint256 yield);
 
 ### Recommended Implementation: Option A + B (Hybrid)
 
-**Strategy**: 
+**Strategy**:
+
 - Burn function can burn from fees OR yield
 - Governance decides what to burn
 - Flexible and powerful
@@ -606,91 +615,86 @@ event ReserveYieldCollected(address indexed token, uint256 yield);
  *      Requires token to have burn() function (e.g., ERC20Burnable).
  */
 function burnReserves(
-    address token, 
-    uint256 amount, 
-    bool burnFromYield
-) 
-    public 
-    nonReentrant 
-    returns (uint256 burned) 
-{
-    if (_msgSender() != escrowFeeAddress) {
-        revert NotFeeAddress(_msgSender(), escrowFeeAddress);
+  address token,
+  uint256 amount,
+  bool burnFromYield
+) public nonReentrant returns (uint256 burned) {
+  if (_msgSender() != escrowFeeAddress) {
+    revert NotFeeAddress(_msgSender(), escrowFeeAddress);
+  }
+
+  if (token == address(0)) {
+    revert InvalidAddress('Token address cannot be zero', token);
+  }
+
+  uint256 available;
+  if (burnFromYield) {
+    // Burn from yield (need to withdraw first)
+    IYieldGenerationModule genModule = defaultYieldGenerationModule;
+    if (address(genModule) == address(0)) {
+      revert InvalidAddress('Yield generation module not set', address(0));
     }
-    
-    if (token == address(0)) {
-        revert InvalidAddress("Token address cannot be zero", token);
+
+    uint256 workflowId = 0;
+    uint256 currentBalance = genModule.getBalance(workflowId, token);
+    uint256 deposited = reservesInYield[token];
+
+    if (currentBalance <= deposited) {
+      return 0; // No yield to burn
     }
-    
-    uint256 available;
-    if (burnFromYield) {
-        // Burn from yield (need to withdraw first)
-        IYieldGenerationModule genModule = defaultYieldGenerationModule;
-        if (address(genModule) == address(0)) {
-            revert InvalidAddress("Yield generation module not set", address(0));
-        }
-        
-        uint256 workflowId = 0;
-        uint256 currentBalance = genModule.getBalance(workflowId, token);
-        uint256 deposited = reservesInYield[token];
-        
-        if (currentBalance <= deposited) {
-            return 0; // No yield to burn
-        }
-        
-        uint256 yield = currentBalance - deposited;
-        available = amount == 0 ? yield : amount;
-        
-        if (available > yield) {
-            revert InvalidAmount("Amount exceeds available yield");
-        }
-        
-        // Withdraw yield portion
-        (bool success, uint256 withdrawn, ) = genModule.withdrawWithYield(
-            workflowId,
-            token,
-            currentBalance
-        );
-        
-        if (!success) {
-            revert InvalidAmount("Withdrawal from yield module failed");
-        }
-        
-        // Redeposit principal
-        genModule.depositForYield(workflowId, token, deposited);
-        
-        // Update tracking
-        reservesInYield[token] = deposited; // Reset to principal only
-        reservesYieldGenerated[token] += (yield - available); // Track remaining yield
-        
-        // Burn the withdrawn yield
-        IERC20Burnable(token).burn(available);
-        burned = available;
-        
-    } else {
-        // Burn from fees
-        available = totalFeesPerToken[token];
-        if (available == 0) {
-            return 0; // No fees to burn
-        }
-        
-        uint256 burnAmount = amount == 0 ? available : amount;
-        if (burnAmount > available) {
-            revert InvalidAmount("Amount exceeds available fees");
-        }
-        
-        // Burn tokens
-        IERC20Burnable(token).burn(burnAmount);
-        
-        // Update tracking
-        totalFeesPerToken[token] -= burnAmount;
-        totalFees -= burnAmount;
-        
-        burned = burnAmount;
+
+    uint256 yield = currentBalance - deposited;
+    available = amount == 0 ? yield : amount;
+
+    if (available > yield) {
+      revert InvalidAmount('Amount exceeds available yield');
     }
-    
-    emit ReservesBurned(token, burned, burnFromYield);
-    return burned;
+
+    // Withdraw yield portion
+    (bool success, uint256 withdrawn, ) = genModule.withdrawWithYield(
+      workflowId,
+      token,
+      currentBalance
+    );
+
+    if (!success) {
+      revert InvalidAmount('Withdrawal from yield module failed');
+    }
+
+    // Redeposit principal
+    genModule.depositForYield(workflowId, token, deposited);
+
+    // Update tracking
+    reservesInYield[token] = deposited; // Reset to principal only
+    reservesYieldGenerated[token] += (yield - available); // Track remaining yield
+
+    // Burn the withdrawn yield
+    IERC20Burnable(token).burn(available);
+    burned = available;
+  } else {
+    // Burn from fees
+    available = totalFeesPerToken[token];
+    if (available == 0) {
+      return 0; // No fees to burn
+    }
+
+    uint256 burnAmount = amount == 0 ? available : amount;
+    if (burnAmount > available) {
+      revert InvalidAmount('Amount exceeds available fees');
+    }
+
+    // Burn tokens
+    IERC20Burnable(token).burn(burnAmount);
+
+    // Update tracking
+    totalFeesPerToken[token] -= burnAmount;
+    totalFees -= burnAmount;
+
+    burned = burnAmount;
+  }
+
+  emit ReservesBurned(token, burned, burnFromYield);
+  return burned;
 }
 ```
 
@@ -706,25 +710,25 @@ function burnReserves(
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.28;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 
 /**
  * @title IERC20Burnable
  * @notice Interface for burnable ERC20 tokens
  */
 interface IERC20Burnable is IERC20 {
-    /**
-     * @notice Burn tokens
-     * @param amount Amount to burn
-     */
-    function burn(uint256 amount) external;
-    
-    /**
-     * @notice Burn tokens from account
-     * @param from Account to burn from
-     * @param amount Amount to burn
-     */
-    function burnFrom(address from, uint256 amount) external;
+  /**
+   * @notice Burn tokens
+   * @param amount Amount to burn
+   */
+  function burn(uint256 amount) external;
+
+  /**
+   * @notice Burn tokens from account
+   * @param from Account to burn from
+   * @param amount Amount to burn
+   */
+  function burnFrom(address from, uint256 amount) external;
 }
 ```
 
@@ -755,11 +759,9 @@ event ReservesBurned(address indexed token, uint256 amount, bool fromYield);
  * @return True if token supports burn function
  */
 function isTokenBurnable(address token) public view returns (bool) {
-    // Try to call burn function (static call)
-    (bool success, ) = token.staticcall(
-        abi.encodeWithSignature("burn(uint256)", 0)
-    );
-    return success;
+  // Try to call burn function (static call)
+  (bool success, ) = token.staticcall(abi.encodeWithSignature('burn(uint256)', 0));
+  return success;
 }
 ```
 
@@ -772,32 +774,28 @@ function isTokenBurnable(address token) public view returns (bool) {
 If yield burning is too complex, start with fees-only:
 
 ```solidity
-function burnReserves(address token, uint256 amount) 
-    public 
-    nonReentrant 
-    returns (uint256 burned) 
-{
-    if (_msgSender() != escrowFeeAddress) {
-        revert NotFeeAddress(_msgSender(), escrowFeeAddress);
-    }
-    
-    uint256 available = totalFeesPerToken[token];
-    if (available == 0) {
-        return 0;
-    }
-    
-    uint256 burnAmount = amount == 0 ? available : amount;
-    if (burnAmount > available) {
-        revert InvalidAmount("Amount exceeds available fees");
-    }
-    
-    IERC20Burnable(token).burn(burnAmount);
-    
-    totalFeesPerToken[token] -= burnAmount;
-    totalFees -= burnAmount;
-    
-    emit ReservesBurned(token, burnAmount, false);
-    return burnAmount;
+function burnReserves(address token, uint256 amount) public nonReentrant returns (uint256 burned) {
+  if (_msgSender() != escrowFeeAddress) {
+    revert NotFeeAddress(_msgSender(), escrowFeeAddress);
+  }
+
+  uint256 available = totalFeesPerToken[token];
+  if (available == 0) {
+    return 0;
+  }
+
+  uint256 burnAmount = amount == 0 ? available : amount;
+  if (burnAmount > available) {
+    revert InvalidAmount('Amount exceeds available fees');
+  }
+
+  IERC20Burnable(token).burn(burnAmount);
+
+  totalFeesPerToken[token] -= burnAmount;
+  totalFees -= burnAmount;
+
+  emit ReservesBurned(token, burnAmount, false);
+  return burnAmount;
 }
 ```
 
@@ -830,15 +828,15 @@ function burnReserves(address token, uint256 amount)
 
 ### Size Impact Summary
 
-| Component | Size Impact |
-|-----------|-------------|
-| Burn function (full) | +250-300 bytes |
-| Burn function (simple) | +150 bytes |
-| Interface | 0 bytes |
-| Event | +30 bytes |
-| Helper function | +50 bytes (optional) |
-| **Total (full)** | **+330-380 bytes** |
-| **Total (simple)** | **+180 bytes** |
+| Component              | Size Impact          |
+| ---------------------- | -------------------- |
+| Burn function (full)   | +250-300 bytes       |
+| Burn function (simple) | +150 bytes           |
+| Interface              | 0 bytes              |
+| Event                  | +30 bytes            |
+| Helper function        | +50 bytes (optional) |
+| **Total (full)**       | **+330-380 bytes**   |
+| **Total (simple)**     | **+180 bytes**       |
 
 ---
 
@@ -846,12 +844,12 @@ function burnReserves(address token, uint256 amount)
 
 ### Total Size Impact
 
-| Feature | Size Impact |
-|---------|-------------|
-| 30% Yield to Protocol | +200-250 bytes |
-| Yield on Reserve | +650-800 bytes |
-| Burn Mechanism (full) | +330-380 bytes |
-| **Total** | **+1180-1430 bytes** |
+| Feature               | Size Impact          |
+| --------------------- | -------------------- |
+| 30% Yield to Protocol | +200-250 bytes       |
+| Yield on Reserve      | +650-800 bytes       |
+| Burn Mechanism (full) | +330-380 bytes       |
+| **Total**             | **+1180-1430 bytes** |
 
 **Note**: Actual size may vary based on optimizer settings.
 
@@ -866,6 +864,7 @@ function burnReserves(address token, uint256 amount)
 **Dependencies**: None
 
 **Rationale**:
+
 - Simplest implementation
 - Immediate revenue generation
 - No dependencies on other features
@@ -879,6 +878,7 @@ function burnReserves(address token, uint256 amount)
 **Dependencies**: Yield generation module must be set
 
 **Rationale**:
+
 - Requires yield module to be configured
 - More complex but high value
 - Can be implemented after Phase 1
@@ -892,6 +892,7 @@ function burnReserves(address token, uint256 amount)
 **Dependencies**: Reserves must exist (from fees or yield)
 
 **Rationale**:
+
 - Requires tokens to be burnable
 - Can be implemented independently
 - Lower priority than revenue features
@@ -905,10 +906,12 @@ function burnReserves(address token, uint256 amount)
 **Question**: Should 30% be configurable?
 
 **Options**:
+
 - **Option A**: Fixed at 30% (constant)
 - **Option B**: Configurable via governance (0-50%)
 
 **Recommendation**: **Option A** - Fixed at 30%
+
 - Simpler implementation
 - Clear expectations
 - Can be changed via upgrade if needed
@@ -922,6 +925,7 @@ function burnReserves(address token, uint256 amount)
 **Current**: Only `escrowFeeAddress` (governance)
 
 **Recommendation**: Keep as-is
+
 - Governance controls reserves
 - Appropriate for protocol treasury
 
@@ -934,6 +938,7 @@ function burnReserves(address token, uint256 amount)
 **Current**: Only `escrowFeeAddress` (governance)
 
 **Recommendation**: Keep as-is
+
 - Governance controls burns
 - Prevents accidental burns
 
@@ -946,6 +951,7 @@ function burnReserves(address token, uint256 amount)
 **Risk**: Rounding errors in 30/70 split
 
 **Mitigation**:
+
 - Use basis points (10000 = 100%)
 - Protocol gets exact 30%, recipients get remainder
 - Handle rounding in favor of protocol (or recipients - decide)
@@ -959,6 +965,7 @@ function burnReserves(address token, uint256 amount)
 **Risk**: Yield module failure could lock reserves
 
 **Mitigation**:
+
 - Only deposit portion of reserves
 - Keep emergency withdrawal function
 - Monitor yield module health
@@ -972,6 +979,7 @@ function burnReserves(address token, uint256 amount)
 **Risk**: Accidental burns
 
 **Mitigation**:
+
 - Only fee address can burn
 - Require explicit amount
 - Add confirmation events
@@ -1024,6 +1032,7 @@ function burnReserves(address token, uint256 amount)
 ### Existing Escrows
 
 **Impact**: ✅ **NONE**
+
 - Existing escrows continue with current distribution
 - New escrows use 30% protocol share
 - No migration needed
@@ -1031,6 +1040,7 @@ function burnReserves(address token, uint256 amount)
 ### Existing Reserves
 
 **Impact**: ⚠️ **OPTIONAL**
+
 - Existing reserves can be deposited for yield
 - No forced migration
 - Governance decides when to enable
@@ -1064,6 +1074,7 @@ function burnReserves(address token, uint256 amount)
 ### Recommendation: ✅ **IMPLEMENT ALL THREE FEATURES**
 
 **Rationale**:
+
 - ✅ High value (revenue + tokenomics)
 - ✅ Medium complexity (manageable)
 - ✅ Low risk (well-defined changes)
@@ -1101,5 +1112,3 @@ function burnReserves(address token, uint256 amount)
 
 **Status**: Ready for Implementation  
 **Last Updated**: Current
-
-

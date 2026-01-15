@@ -10,12 +10,14 @@
 This runbook provides step-by-step procedures for **Standard Lane** governance changes. Standard lane changes have a **48-hour timelock delay** and are used for bounded parameter updates.
 
 **Standard Lane Scope:**
+
 - Bounded parameter changes (timeouts, max attachments, caps within bounds)
 - Resolver updates (DefaultResolutionModule)
 - Yield distribution defaults
 - Non-critical configuration changes
 
 **Examples:**
+
 - `setDefaultAutoCancelTime(uint256)`
 - `setMaxAttachments(uint256)`
 - `setTokenCap(address, uint256)` (within bounds)
@@ -129,6 +131,7 @@ This runbook provides step-by-step procedures for **Standard Lane** governance c
 **Current Value:** `[CHECK BEFORE PROPOSAL]`
 
 **Proposal Description:**
+
 ```
 Update default auto-cancel time to 30 days (2592000 seconds).
 
@@ -164,6 +167,7 @@ Follow Phases 2-5 from "Standard Change Process" above.
 **Current Resolver:** `[CHECK BEFORE PROPOSAL]`
 
 **Proposal Description:**
+
 ```
 Update default resolver address to [NEW_ADDRESS].
 
@@ -194,12 +198,14 @@ Follow Phases 2-5 from "Standard Change Process" above.
 **Important:** All parameter changes must respect onchain bounds. Proposals that violate bounds will revert.
 
 **Common Bounds:**
+
 - Auto-cancel time: Min/Max values (check contract)
 - Max attachments: Min/Max values (check contract)
 - Token caps: Must be within bounds (check contract)
 - Fee rates: Must be within bounds (check contract)
 
 **Verification:**
+
 - Check contract's `SettingsValidationLibrary` or equivalent
 - Review `docs/GOVERNANCE_SURFACE_MAP.md` for bounds
 - Test on testnet before mainnet proposal
@@ -236,6 +242,7 @@ Follow Phases 2-5 from "Standard Change Process" above.
 ## Timeline
 
 **Typical Timeline:**
+
 - **Day 0:** Proposal created
 - **Day 0-7:** Voting period (3-7 days)
 - **Day 7:** Proposal queued
@@ -254,6 +261,3 @@ Follow Phases 2-5 from "Standard Change Process" above.
 ---
 
 **Note:** Always verify parameter bounds and test on testnet before mainnet proposals.
-
-
-

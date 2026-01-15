@@ -1,22 +1,22 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "./interfaces/IYieldGenerationModule.sol";
-import "./interfaces/IYieldDistributionModule.sol";
-import "./libraries/ResolverLogicLibrary.sol";
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
+import './interfaces/IYieldGenerationModule.sol';
+import './interfaces/IYieldDistributionModule.sol';
+import './libraries/ResolverLogicLibrary.sol';
 
 /**
  * @title YieldOps
  * @notice External contract for yield withdrawal and distribution operations
  * @dev Extracted from BaseEscrow to reduce contract size (Phase 1 size optimization)
- *      
+ *
  *      Key design principles (from updated plan):
  *      - Non-blocking: Uses try/catch to prevent yield failures from blocking escrow lifecycle
  *      - Non-reentrant: No callbacks to BaseEscrow, operates in "compute and return" pattern
  *      - Pull-based: BaseEscrow transfers tokens to this contract before calling
- *      
+ *
  *      This contract is stateless and purely operational - no escrow state stored here.
  */
 contract YieldOps {
@@ -25,22 +25,27 @@ contract YieldOps {
     // Events for yield operations
     event YieldWithdrawn(uint256 indexed escrowId, address indexed token, uint256 yieldAmount);
     event YieldDistributed(uint256 indexed escrowId, address indexed token, uint256 yieldAmount);
-    event YieldDistributionFailed(uint256 indexed escrowId, address indexed token, uint256 yieldAmount, string reason);
+    event YieldDistributionFailed(
+        uint256 indexed escrowId,
+        address indexed token,
+        uint256 yieldAmount,
+        string reason
+    );
 
     /**
      * @dev Result of yield handling operation
      */
     struct YieldResult {
-        uint256 actualAmount;      // Actual amount withdrawn (may include yield)
-        uint256 yield;             // Total yield amount
-        uint256 yieldDistributed;  // Amount successfully distributed
-        bool success;              // Whether distribution succeeded
+        uint256 actualAmount; // Actual amount withdrawn (may include yield)
+        uint256 yield; // Total yield amount
+        uint256 yieldDistributed; // Amount successfully distributed
+        bool success; // Whether distribution succeeded
     }
 
     /**
      * @notice Handle yield for full withdrawal (complete release/cancel)
      * @param genModule Yield generation module
-     * @param distModule Yield distribution module  
+     * @param distModule Yield distribution module
      * @param workflowId Escrow workflow ID
      * @param token Token address
      * @param amount Original escrow amount
@@ -67,8 +72,8 @@ contract YieldOps {
 
         // Withdraw with yield (try/catch to prevent blocking)
         try genModule.withdrawWithYield(workflowId, token, amount) returns (
-            bool withdrawSuccess, 
-            uint256 actualAmount, 
+            bool withdrawSuccess,
+            uint256 actualAmount,
             uint256 /* yieldGenerated */
         ) {
             if (withdrawSuccess) {
@@ -80,7 +85,7 @@ contract YieldOps {
             }
         } catch {
             // Withdrawal failed - continue with original amount
-            emit YieldDistributionFailed(workflowId, token, 0, "Yield withdrawal failed");
+            emit YieldDistributionFailed(workflowId, token, 0, 'Yield withdrawal failed');
         }
 
         // Distribute yield if any (try/catch for non-blocking)
@@ -92,7 +97,7 @@ contract YieldOps {
                 emit YieldDistributionFailed(workflowId, token, result.yield, reason);
                 result.success = false;
             } catch {
-                emit YieldDistributionFailed(workflowId, token, result.yield, "Unknown error");
+                emit YieldDistributionFailed(workflowId, token, result.yield, 'Unknown error');
                 result.success = false;
             }
         }
@@ -115,17 +120,22 @@ contract YieldOps {
         address token,
         uint256 yieldAmount
     ) public {
-        require(msg.sender == address(this), "Internal only");
-        
+        require(msg.sender == address(this), 'Internal only');
+
         if (yieldAmount == 0) return;
 
         // Transfer yield to module
         IERC20(token).safeTransfer(address(distModule), yieldAmount);
 
         // Distribute (empty data means no specific distribution config)
-        bytes memory distributionData = "";
-        (bool success, ) = distModule.distributeYield(workflowId, token, yieldAmount, distributionData);
-        require(success, "Distribution failed");
+        bytes memory distributionData = '';
+        (bool success, ) = distModule.distributeYield(
+            workflowId,
+            token,
+            yieldAmount,
+            distributionData
+        );
+        require(success, 'Distribution failed');
 
         emit YieldDistributed(workflowId, token, yieldAmount);
     }
@@ -137,16 +147,12 @@ contract YieldOps {
      * @param amount Amount to recover
      * @dev Emergency function - this contract should not hold funds
      */
-    function recoverTokens(
-        address token,
-        address to,
-        uint256 amount
-    ) external {
-        require(to != address(0), "Invalid recipient");
-        
+    function recoverTokens(address token, address to, uint256 amount) external {
+        require(to != address(0), 'Invalid recipient');
+
         if (token == address(0)) {
-            (bool success, ) = payable(to).call{value: amount}("");
-            require(success, "Transfer failed");
+            (bool success, ) = payable(to).call{value: amount}('');
+            require(success, 'Transfer failed');
         } else {
             IERC20(token).safeTransfer(to, amount);
         }

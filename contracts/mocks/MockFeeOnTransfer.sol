@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
-import "./ERC20Mock.sol";
+import './ERC20Mock.sol';
 
 /**
  * @notice ERC20 mock that charges a small fee on every transfer.

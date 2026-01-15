@@ -10,11 +10,13 @@
 This runbook provides step-by-step procedures for recovering from emergency states. **All recovery actions require timelock governance** - Guardian cannot unpause or re-enable features.
 
 **Recovery Actions:**
+
 - `unpause()` - Unpause protocol (requires `ROLE_TIMELOCK`)
 - Re-enable Aave (if disabled) - Requires timelock governance
 - Raise caps (if lowered) - Requires timelock governance
 
 **Important:** Recovery actions are **governance-controlled** and require:
+
 1. Governance proposal
 2. Community vote
 3. Timelock execution (48h delay for Standard lane)
@@ -52,6 +54,7 @@ This runbook provides step-by-step procedures for recovering from emergency stat
 **Role Required:** `ROLE_TIMELOCK` (via governance)
 
 **Proposal Details:**
+
 ```solidity
 // Target: BaseEscrow address
 // Value: 0
@@ -161,9 +164,10 @@ Follow steps 3-7 from Procedure 1 (Unpause Protocol), but for Aave re-enablement
 **Contract:** `AaveYieldGenerationModule` (or relevant contract)  
 **Function:** `setTokenCap(address token, uint256 newCap)` (or equivalent)  
 **Parameters:**
+
 - `token`: Token address
 - `newCap`: New cap value
-**Role Required:** `ROLE_TIMELOCK` (via governance)
+  **Role Required:** `ROLE_TIMELOCK` (via governance)
 
 **Note:** Exact function name may vary. Check contract interface.
 
@@ -212,6 +216,7 @@ Follow steps 3-7 from Procedure 1 (Unpause Protocol), but for cap raising.
 ## Recovery Timeline
 
 **Typical Recovery Timeline:**
+
 - **Day 0:** Emergency resolved, fix deployed
 - **Day 0-1:** Governance proposal created
 - **Day 1-4:** Voting period (3-7 days)
@@ -230,6 +235,7 @@ Follow steps 3-7 from Procedure 1 (Unpause Protocol), but for cap raising.
 **Next Drill:** `[TO BE FILLED]`
 
 **Drill Scenario:**
+
 1. Simulate emergency pause
 2. Create recovery proposal
 3. Vote on proposal
@@ -250,6 +256,3 @@ See `docs/OUTSTANDING_ISSUES.md` for drill requirements.
 ---
 
 **Note:** This runbook should be tested regularly. Update transaction hashes and block numbers after each drill.
-
-
-

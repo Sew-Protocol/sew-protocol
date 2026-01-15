@@ -24,8 +24,8 @@ library ModuleProposalLibrary {
      * @dev Reverts if module is invalid
      */
     function validateProposal(address newModule, address currentModule) internal pure {
-        require(newModule != address(0), "Zero module address");
-        require(newModule != currentModule, "Module already active");
+        require(newModule != address(0), 'Zero module address');
+        require(newModule != currentModule, 'Module already active');
     }
 
     /**
@@ -35,12 +35,7 @@ library ModuleProposalLibrary {
      * @dev Reverts if activation is not allowed
      */
     function validateActivation(address pendingModule, uint256 pendingEta) internal view {
-        require(block.timestamp >= pendingEta, "Delay not elapsed");
-        require(pendingModule != address(0), "No pending module");
+        require(block.timestamp >= pendingEta, 'Delay not elapsed');
+        require(pendingModule != address(0), 'No pending module');
     }
 }
-
-
-
-
-

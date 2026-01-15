@@ -4,7 +4,7 @@ import { getGovConfig } from './_config';
 
 /**
  * Grant Protocol Roles to Governance
- * 
+ *
  * This script grants AccessControl roles to governance:
  * - Grant ROLE_TIMELOCK to TimelockController (for Standard/Slow functions)
  * - Grant ROLE_GUARDIAN to Guardian multisig (for Emergency functions)
@@ -18,15 +18,15 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const config = getGovConfig(hre);
 
-  console.log("\n🔄 Granting protocol roles to governance...");
+  console.log('\n🔄 Granting protocol roles to governance...');
 
   const timelockDeployment = await get('TimelockController');
   const safeDeployment = await get('Safe');
   const guardianMultisig = config.guardian.multisig || safeDeployment.address;
 
   // Role constants (must match contracts)
-  const ROLE_TIMELOCK = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("ROLE_TIMELOCK"));
-  const ROLE_GUARDIAN = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("ROLE_GUARDIAN"));
+  const ROLE_TIMELOCK = ethers.utils.keccak256(ethers.utils.toUtf8Bytes('ROLE_TIMELOCK'));
+  const ROLE_GUARDIAN = ethers.utils.keccak256(ethers.utils.toUtf8Bytes('ROLE_GUARDIAN'));
   const DEFAULT_ADMIN_ROLE = ethers.constants.Zero; // AccessControl uses 0x00 for DEFAULT_ADMIN_ROLE
 
   const allDeployments = await all();
@@ -84,7 +84,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
         const deployerHasAdmin = await contract.hasRole(DEFAULT_ADMIN_ROLE, deployer);
         if (deployerHasAdmin) {
           // Grant DEFAULT_ADMIN_ROLE to TimelockController first
-          const timelockHasAdmin = await contract.hasRole(DEFAULT_ADMIN_ROLE, timelockDeployment.address);
+          const timelockHasAdmin = await contract.hasRole(
+            DEFAULT_ADMIN_ROLE,
+            timelockDeployment.address,
+          );
           if (!timelockHasAdmin) {
             console.log(`      Granting DEFAULT_ADMIN_ROLE to TimelockController...`);
             const tx3 = await contract.grantRole(DEFAULT_ADMIN_ROLE, timelockDeployment.address);
@@ -92,7 +95,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
             console.log(`      ✅ DEFAULT_ADMIN_ROLE granted to TimelockController`);
             rolesGranted++;
           }
-          
+
           // Revoke deployer's DEFAULT_ADMIN_ROLE
           console.log(`      Revoking DEFAULT_ADMIN_ROLE from deployer...`);
           const tx4 = await contract.revokeRole(DEFAULT_ADMIN_ROLE, deployer);
@@ -113,7 +116,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     }
   }
 
-  console.log("\n✅ Protocol role grants complete!");
+  console.log('\n✅ Protocol role grants complete!');
   console.log(`   Roles granted: ${rolesGranted}`);
   console.log(`   Contracts skipped: ${rolesSkipped}`);
 };

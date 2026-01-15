@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
-import "../interfaces/IYieldGenerationModule.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
+import '../interfaces/IYieldGenerationModule.sol';
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
+import '@openzeppelin/contracts/utils/introspection/ERC165.sol';
 
 /**
  * @title DefaultYieldModule
@@ -13,7 +13,7 @@ import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
  */
 contract DefaultYieldModule is IYieldGenerationModule, ERC165 {
     using SafeERC20 for IERC20;
-    
+
     /**
      * @notice Deposit for yield (no-op in default implementation)
      */
@@ -32,11 +32,7 @@ contract DefaultYieldModule is IYieldGenerationModule, ERC165 {
         uint256 /* workflowId */,
         address /* token */,
         uint256 originalAmount
-    ) external pure override returns (
-        bool success,
-        uint256 actualAmount,
-        uint256 yieldAmount
-    ) {
+    ) external pure override returns (bool success, uint256 actualAmount, uint256 yieldAmount) {
         return (true, originalAmount, 0);
     }
 
@@ -72,7 +68,7 @@ contract DefaultYieldModule is IYieldGenerationModule, ERC165 {
      * @notice Get module name
      */
     function moduleName() external pure override returns (string memory) {
-        return "DefaultNoYield";
+        return 'DefaultNoYield';
     }
 
     /**
@@ -80,17 +76,17 @@ contract DefaultYieldModule is IYieldGenerationModule, ERC165 {
      * @return version The module version (semantic versioning)
      */
     function moduleVersion() external pure override returns (string memory version) {
-        return "1.0.0";
+        return '1.0.0';
     }
 
     /**
      * @notice ERC-165 interface support
      */
-    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165, IERC165) returns (bool) {
+    function supportsInterface(
+        bytes4 interfaceId
+    ) public view virtual override(ERC165, IERC165) returns (bool) {
         return
             interfaceId == type(IYieldGenerationModule).interfaceId ||
             super.supportsInterface(interfaceId);
     }
 }
-
-

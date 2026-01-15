@@ -11,6 +11,7 @@
 After completing Phase 1 and Phase 2 optimizations, BaseEscrow still contributes significantly to the size of child contracts. This analysis identifies **high-impact optimization opportunities** that could save an additional **8-12KB**, bringing contracts closer to the 24KB limit.
 
 **Key Findings**:
+
 - 79 public/external functions
 - Several large functions with duplicate logic
 - Multiple redundant getter functions
@@ -28,6 +29,7 @@ After completing Phase 1 and Phase 2 optimizations, BaseEscrow still contributes
 **Current Size**: ~200 lines total (~6-7KB)
 
 **Issue**: Significant code duplication between partial release/cancel functions. Both handle:
+
 - Authorization check
 - State validation
 - Yield calculation
@@ -41,23 +43,24 @@ After completing Phase 1 and Phase 2 optimizations, BaseEscrow still contributes
 **Estimated Savings**: **2.5-3.5KB**
 
 **Implementation**:
+
 ```solidity
 library ResolverActionLibrary {
-    struct ActionParams {
-        uint256 amount;
-        address recipient;
-        bool isRelease;
-        bool isPartial;
-    }
-    
-    function executeResolverAction(
-        ActionParams memory params,
-        EscrowTransfer storage et,
-        IYieldGenerationModule genModule,
-        IYieldDistributionModule distModule
-    ) internal returns (uint256 actualAmount, uint256 yield) {
-        // Common logic for yield calculation, withdrawal, distribution
-    }
+  struct ActionParams {
+    uint256 amount;
+    address recipient;
+    bool isRelease;
+    bool isPartial;
+  }
+
+  function executeResolverAction(
+    ActionParams memory params,
+    EscrowTransfer storage et,
+    IYieldGenerationModule genModule,
+    IYieldDistributionModule distModule
+  ) internal returns (uint256 actualAmount, uint256 yield) {
+    // Common logic for yield calculation, withdrawal, distribution
+  }
 }
 ```
 
@@ -84,6 +87,7 @@ library ResolverActionLibrary {
 **Current Size**: ~65 lines (~2KB)
 
 **Issue**: Handles multiple concerns:
+
 - State validation
 - Module initialization
 - Resolver callback
@@ -102,6 +106,7 @@ library ResolverActionLibrary {
 ### 2.1 Redundant Getter Functions (Low Priority)
 
 **Functions**:
+
 - `getEscrowAmount()` vs `getRemainingBalance()` - identical functionality
 - `getEscrowOriginalDeposit()` vs `getTotalDeposited()` - identical functionality
 
@@ -124,30 +129,31 @@ library ResolverActionLibrary {
 **Estimated Savings**: **1.5-2KB**
 
 **Implementation**:
+
 ```solidity
 library YieldHandlingLibrary {
-    struct YieldResult {
-        uint256 actualAmount;
-        uint256 yield;
-    }
-    
-    function withdrawAndCalculateYield(
-        uint256 workflowId,
-        address token,
-        uint256 amount,
-        IYieldGenerationModule genModule
-    ) internal returns (YieldResult memory) {
-        // Common yield withdrawal logic
-    }
-    
-    function distributeYieldIfNeeded(
-        uint256 workflowId,
-        address token,
-        uint256 yield,
-        IYieldDistributionModule distModule
-    ) internal {
-        // Common yield distribution logic
-    }
+  struct YieldResult {
+    uint256 actualAmount;
+    uint256 yield;
+  }
+
+  function withdrawAndCalculateYield(
+    uint256 workflowId,
+    address token,
+    uint256 amount,
+    IYieldGenerationModule genModule
+  ) internal returns (YieldResult memory) {
+    // Common yield withdrawal logic
+  }
+
+  function distributeYieldIfNeeded(
+    uint256 workflowId,
+    address token,
+    uint256 yield,
+    IYieldDistributionModule distModule
+  ) internal {
+    // Common yield distribution logic
+  }
 }
 ```
 
@@ -391,6 +397,7 @@ library YieldHandlingLibrary {
 - Storage changes have high risk (avoid unless necessary)
 
 **Mitigation**:
+
 - Comprehensive testing after each phase
 - Keep deprecated functions as minimal stubs if needed
 - Document all breaking changes
@@ -410,4 +417,3 @@ library YieldHandlingLibrary {
 
 **Status**: Analysis Complete  
 **Last Updated**: Current
-

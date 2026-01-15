@@ -10,6 +10,7 @@
 ## Overview
 
 This document translates the staged rollout plan (`DR_STAGING_PLAN.md`) into concrete, atomic, testable code-level tasks. Each TODO is:
+
 - **Atomic**: Represents a single, complete change
 - **Testable**: Can be validated with a specific test
 - **Phase-aligned**: Tagged with target phase (IEO, DR v1, DR v2, DR v3)
@@ -22,6 +23,7 @@ This document translates the staged rollout plan (`DR_STAGING_PLAN.md`) into con
 **Status**: ✅ Excluded from IEO (DR module not in initial release)
 
 ### TODOs: N/A
+
 - Decentralised dispute resolution module is explicitly excluded from IEO release
 - DefaultResolutionModule remains active for IEO
 - Focus is on shipping core escrow functionality and funding DR testing
@@ -35,12 +37,14 @@ This document translates the staged rollout plan (`DR_STAGING_PLAN.md`) into con
 ### v1.1: Workload Routing Controls (Performance-Based Assignment)
 
 #### v1.1.1: Add Assignment Weight Configuration
+
 - **File**: `contracts/decentralized-resolution-module/DecentralizedResolverStructs.sol`
 - **Task**: Add `assignmentWeight` field to `ResolverStats` struct (uint256, basis points 0-10000)
 - **Test**: Verify struct allows weight 0-10000, defaults to 10000 for new resolvers
 - **Dependencies**: None
 
 #### v1.1.2: Implement Workload-to-Zero Mechanism
+
 - **File**: `contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol`
 - **Task**: Add function `setResolverAssignmentWeight(address resolver, uint256 weight)` (onlyRole(ROLE_TIMELOCK))
 - **Task**: Modify `selectResolverWithQuality` to respect assignment weight (weight=0 → exclude from selection)
@@ -49,6 +53,7 @@ This document translates the staged rollout plan (`DR_STAGING_PLAN.md`) into con
 - **Dependencies**: v1.1.1
 
 #### v1.1.3: Update Performance Signal Tracking
+
 - **File**: `contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol`
 - **Task**: Ensure `recordResolution()` updates quality score based on: SLA compliance, escalations, reversals
 - **Task**: Add helper function `calculateAssignmentWeight(address resolver) → uint256` that maps quality score to weight
@@ -56,6 +61,7 @@ This document translates the staged rollout plan (`DR_STAGING_PLAN.md`) into con
 - **Dependencies**: v1.1.2
 
 #### v1.1.4: Add Workload Routing Events
+
 - **File**: `contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol`
 - **Task**: Add event `ResolverAssignmentWeightUpdated(address indexed resolver, uint256 oldWeight, uint256 newWeight)`
 - **Test**: Verify event emitted on weight changes
@@ -64,6 +70,7 @@ This document translates the staged rollout plan (`DR_STAGING_PLAN.md`) into con
 ### v1.2: Ensure No Resolver Capital at Risk
 
 #### v1.2.1: Verify No Staking Interface in v1
+
 - **File**: Review all resolution module contracts
 - **Task**: Confirm no `stake()`, `slash()`, or resolver bond functions exist
 - **Task**: Document that v1 explicitly avoids resolver staking/slashing
@@ -71,6 +78,7 @@ This document translates the staged rollout plan (`DR_STAGING_PLAN.md`) into con
 - **Dependencies**: None
 
 #### v1.2.2: Document v1 Constraints in Code
+
 - **File**: `contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol`
 - **Task**: Add NatSpec comment at contract level: "DR v1: No resolver capital at risk. Workload routing is primary incentive lever."
 - **Dependencies**: None
@@ -78,6 +86,7 @@ This document translates the staged rollout plan (`DR_STAGING_PLAN.md`) into con
 ### v1.3: Phase Gate Validation (Exit Criteria)
 
 #### v1.3.1: Add Phase Gate Monitoring Functions
+
 - **File**: `contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol`
 - **Task**: Add view function `getV1PhaseGateMetrics() → (uint256 escalationRate, uint256 avgResponseTime, uint256 activeResolvers)`
 - **Test**: Verify metrics reflect real system state
@@ -92,6 +101,7 @@ This document translates the staged rollout plan (`DR_STAGING_PLAN.md`) into con
 ### v2.1: Appeal Bond Infrastructure
 
 #### v2.1.1: Add Appeal Bond Struct
+
 - **File**: `contracts/decentralized-resolution-module/DecentralizedResolverStructs.sol`
 - **Task**: Add struct `AppealBond { address depositor; uint256 amount; address token; uint256 depositedAt; bool refunded; }`
 - **Task**: Add mapping `mapping(uint256 => mapping(uint8 => AppealBond)) public appealBonds;` (workflowId → escalationLevel → bond)
@@ -99,6 +109,7 @@ This document translates the staged rollout plan (`DR_STAGING_PLAN.md`) into con
 - **Dependencies**: None
 
 #### v2.1.2: Extend IResolutionModule Interface for Bonds
+
 - **File**: `contracts/shared/interfaces/IResolutionModule.sol`
 - **Task**: Add function `getRequiredAppealBond(uint256 workflowId, uint8 currentLevel, bytes calldata escrowData) → (uint256 amount, address token)`
 - **Task**: Update `canEscalate()` return to include bond requirement (extend return struct or add separate view function)
@@ -106,6 +117,7 @@ This document translates the staged rollout plan (`DR_STAGING_PLAN.md`) into con
 - **Dependencies**: v2.1.1
 
 #### v2.1.3: Implement Bond Collection in BaseEscrow
+
 - **File**: `contracts/core/BaseEscrow.sol` or `contracts/DisputeOps.sol`
 - **Task**: Modify escalation flow to require bond deposit before escalation
 - **Task**: Add function `_collectAppealBond(uint256 workflowId, uint8 level, uint256 amount, address token)`
@@ -114,6 +126,7 @@ This document translates the staged rollout plan (`DR_STAGING_PLAN.md`) into con
 - **Dependencies**: v2.1.2
 
 #### v2.1.4: Implement Bond Redistribution Logic
+
 - **File**: `contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol`
 - **Task**: Add function `distributeAppealBond(uint256 workflowId, uint8 level, bool appealSucceeded)`
 - **Task**: Logic: If appeal fails (decision upheld) → bond goes to previous resolver(s) or treasury
@@ -125,6 +138,7 @@ This document translates the staged rollout plan (`DR_STAGING_PLAN.md`) into con
 ### v2.2: Escalation Cost Curve (Quadratic Default)
 
 #### v2.2.1: Add Cost Curve Configuration
+
 - **File**: `contracts/decentralized-resolution-module/DecentralizedResolverStructs.sol`
 - **Task**: Add enum `CostCurveType { LINEAR, QUADRATIC, GEOMETRIC }`
 - **Task**: Add struct `EscalationCostConfig { CostCurveType curveType; uint256 baseCost; uint256 stepSize; uint256 multiplier; }`
@@ -133,6 +147,7 @@ This document translates the staged rollout plan (`DR_STAGING_PLAN.md`) into con
 - **Dependencies**: None
 
 #### v2.2.2: Implement Cost Curve Calculation Library
+
 - **File**: `contracts/decentralized-resolution-module/EscalationCostLibrary.sol` (new file)
 - **Task**: Add pure function `calculateEscalationCost(uint8 level, EscalationCostConfig memory config) → uint256`
 - **Task**: Implement quadratic: `cost(k) = baseCost + stepSize * k^2` (where k = escalation count)
@@ -143,6 +158,7 @@ This document translates the staged rollout plan (`DR_STAGING_PLAN.md`) into con
 - **Dependencies**: v2.2.1
 
 #### v2.2.3: Integrate Cost Curve into Escalation Flow
+
 - **File**: `contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol`
 - **Task**: Modify `canEscalate()` to use cost curve library to calculate required fee
 - **Task**: Track escalation count per dispute: `mapping(uint256 => uint8) public disputeEscalationCount;`
@@ -150,6 +166,7 @@ This document translates the staged rollout plan (`DR_STAGING_PLAN.md`) into con
 - **Dependencies**: v2.2.2
 
 #### v2.2.4: Add Cost Curve Governance
+
 - **File**: `contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol`
 - **Task**: Add function `queueEscalationCostConfig(uint8 level, EscalationCostConfig memory config)` (onlyRole(ROLE_TIMELOCK))
 - **Task**: Add function `activateEscalationCostConfig(uint8 level)` (onlyRole(ROLE_TIMELOCK), slow lane)
@@ -159,6 +176,7 @@ This document translates the staged rollout plan (`DR_STAGING_PLAN.md`) into con
 ### v2.3: Ensure No Resolver Bonds in v2
 
 #### v2.3.1: Verify No Resolver Staking in v2
+
 - **File**: Review all v2 changes
 - **Task**: Confirm appeal bonds are user-side only (escalator deposits bond, not resolver)
 - **Task**: Document that v2 explicitly avoids resolver staking
@@ -168,6 +186,7 @@ This document translates the staged rollout plan (`DR_STAGING_PLAN.md`) into con
 ### v2.4: Phase Gate Validation
 
 #### v2.4.1: Add v2 Phase Gate Monitoring
+
 - **File**: `contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol`
 - **Task**: Add view function `getV2PhaseGateMetrics() → (uint256 appealSpamRate, uint256 bondRetentionRate, uint256 avgAppealCost)`
 - **Test**: Verify metrics help assess if appeal spam is suppressed
@@ -182,6 +201,7 @@ This document translates the staged rollout plan (`DR_STAGING_PLAN.md`) into con
 ### v3.1: Interface Placeholders (Do Not Implement)
 
 #### v3.1.1: Create IStakingModule Interface
+
 - **File**: `contracts/shared/interfaces/IStakingModule.sol` (new file)
 - **Task**: Define interface with functions: `stake(address resolver, uint256 amount, address token)`, `unstake(address resolver, uint256 amount)`, `getStake(address resolver, address token) → uint256`
 - **Task**: Add NatSpec: "⚠️ DR v3 placeholder - Not implemented in v1/v2. Guarded behind module swap."
@@ -189,6 +209,7 @@ This document translates the staged rollout plan (`DR_STAGING_PLAN.md`) into con
 - **Dependencies**: None
 
 #### v3.1.2: Create ISlashingModule Interface
+
 - **File**: `contracts/shared/interfaces/ISlashingModule.sol` (new file)
 - **Task**: Define interface with functions: `slash(address resolver, uint256 amount, address token, string reason)`, `getSlashableAmount(address resolver, address token) → uint256`
 - **Task**: Add NatSpec: "⚠️ DR v3 placeholder - Not implemented in v1/v2. Slashing must be objective and contract-executed."
@@ -196,6 +217,7 @@ This document translates the staged rollout plan (`DR_STAGING_PLAN.md`) into con
 - **Dependencies**: None
 
 #### v3.1.3: Create IFraudProofModule Interface
+
 - **File**: `contracts/shared/interfaces/IFraudProofModule.sol` (new file)
 - **Task**: Define interface with functions: `submitFraudProof(uint256 workflowId, bytes calldata proof)`, `verifyFraudProof(uint256 workflowId) → bool`
 - **Task**: Add NatSpec: "⚠️ DR v3 placeholder - Not implemented in v1/v2. Fraud lane for investigation + execution."
@@ -203,6 +225,7 @@ This document translates the staged rollout plan (`DR_STAGING_PLAN.md`) into con
 - **Dependencies**: None
 
 #### v3.1.4: Add v3 Interface Guards
+
 - **File**: `contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol`
 - **Task**: Add commented placeholder: `// IStakingModule public stakingModule; // DR v3 - guarded behind module swap`
 - **Task**: Add NatSpec at contract level: "DR v3 interfaces (IStakingModule, ISlashingModule, IFraudProofModule) are placeholders. Not implemented until v1/v2 phase gates are met."
@@ -212,18 +235,22 @@ This document translates the staged rollout plan (`DR_STAGING_PLAN.md`) into con
 ### v3.2: Implementation TODOs (Future - Not in Current Scope)
 
 #### v3.2.1: Resolver Bond Implementation
+
 - **Status**: ⏸️ Deferred until v1/v2 phase gates met
 - **Note**: Will require module swap to v3-compatible resolution module
 
 #### v3.2.2: Slashing Implementation
+
 - **Status**: ⏸️ Deferred until v1/v2 phase gates met
 - **Note**: Must be objective and contract-executed (timeouts, provable non-response)
 
 #### v3.2.3: Senior Backing Implementation
+
 - **Status**: ⏸️ Deferred until v1/v2 phase gates met
 - **Note**: Delegation/underwriting system for resolver bonds
 
 #### v3.2.4: Fraud Lane Implementation
+
 - **Status**: ⏸️ Deferred until v1/v2 phase gates met
 - **Note**: Investigation + execution path for fraud proofs
 
@@ -232,16 +259,19 @@ This document translates the staged rollout plan (`DR_STAGING_PLAN.md`) into con
 ## Testing Strategy
 
 ### Unit Tests
+
 - Each TODO should have corresponding unit test
 - Tests should be atomic (one test per TODO where possible)
 - Use forge-std for fast, deterministic tests
 
 ### Integration Tests
+
 - Test phase transitions (v1 → v2 → v3 readiness checks)
 - Test governance flows (slow lane config changes)
 - Test escalation flows with bonds and cost curves
 
 ### Phase Gate Tests
+
 - Verify v1 metrics are collectable before v2 deployment
 - Verify v2 metrics are collectable before v3 deployment
 - Verify phase gates prevent premature upgrades
@@ -251,17 +281,20 @@ This document translates the staged rollout plan (`DR_STAGING_PLAN.md`) into con
 ## Implementation Notes
 
 ### Constraints
+
 - **Do NOT implement resolver slashing in this change** (v3 only)
 - **Do NOT implement resolver bonds in this change** (v3 only)
 - **Prefer minimal changes** that reduce time-to-IEO
 - **v1/v2 changes should be small and low-risk** if implemented
 
 ### Architecture Alignment
+
 - All changes must align with modular architecture (module swaps via governance)
 - Changes must respect slow lane governance for critical parameters
 - Changes must be backward compatible where possible (v1 → v2 upgrades)
 
 ### Documentation Requirements
+
 - Each phase change must be documented in code (NatSpec)
 - Interface placeholders must clearly indicate v3 status
 - Phase gates must be documented in governance docs
@@ -294,6 +327,6 @@ DR v3 (Decentralise Capital - Resolver Bonds)
 ## Status Tracking
 
 - **IEO**: ✅ Excluded from release
-- **DR v1**: 🔄 TODOs defined, implementation pending
-- **DR v2**: 🔄 TODOs defined, implementation pending
-- **DR v3**: 🔄 Interface placeholders only (implementation deferred)
+- **DR v1**: ✅ **COMPLETE** - All TODOs implemented and tested
+- **DR v2**: ✅ **COMPLETE** - All TODOs implemented, bond custody enforced, integration complete
+- **DR v3**: ⚠️ **PARTIALLY COMPLETE** - Interfaces complete, staking complete, slashing mostly complete, fraud lane deferred

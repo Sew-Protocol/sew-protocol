@@ -2,6 +2,7 @@
 
 **Date:** 2025-01-27  
 **Current Settings:**
+
 - Solidity: 0.8.28
 - Optimizer: enabled, runs: 50000
 - viaIR: true
@@ -41,6 +42,7 @@
 ### Recommendation
 
 **Test upgrade in separate branch:**
+
 1. Upgrade to 0.8.31
 2. Compile and measure sizes
 3. Run all tests
@@ -53,6 +55,7 @@
 ## Current Compiler Settings Analysis
 
 ### Current Settings
+
 ```typescript
 optimizer: {
   enabled: true,
@@ -65,18 +68,21 @@ evmVersion: "cancun"
 ### Settings Explanation
 
 **`runs: 50000`**
+
 - **Purpose:** Optimize for contract size (not gas cost)
 - **Trade-off:** Higher `runs` = smaller bytecode but higher gas cost per transaction
 - **Current:** Already at very high value (50000)
 - **Max Recommended:** 100000 (but diminishing returns)
 
 **`viaIR: true`**
+
 - **Purpose:** Use Intermediate Representation pipeline
 - **Benefits:** Better optimizations, smaller bytecode in some cases
 - **Drawbacks:** Can increase size if functions are called many times (inlining)
 - **Current:** Already enabled
 
 **`evmVersion: "cancun"`**
+
 - **Purpose:** Use Cancun EVM features (mcopy instruction)
 - **Benefits:** More efficient memory operations
 - **Current:** Latest, good choice
@@ -131,7 +137,7 @@ optimizer: {
 
 ```typescript
 metadata: {
-  bytecodeHash: "none" // or "ipfs" instead of default
+  bytecodeHash: 'none'; // or "ipfs" instead of default
 }
 ```
 
@@ -158,23 +164,27 @@ outputSelection: {
 ## Recommended Testing Plan
 
 ### Test 1: Solidity Version Upgrade
+
 1. Upgrade to 0.8.31
 2. Compile and measure sizes
 3. Run all tests
 4. Compare with baseline
 
 ### Test 2: Optimizer Runs
+
 1. Test `runs: 100000`
 2. Test `runs: 200000`
 3. Measure size impact
 4. Test gas costs (if significant)
 
 ### Test 3: viaIR Setting
+
 1. Test `viaIR: false`
 2. Compare sizes with `viaIR: true`
 3. Choose best option
 
 ### Test 4: Combined Optimizations
+
 1. Best Solidity version
 2. Best `runs` value
 3. Best `viaIR` setting
@@ -185,18 +195,21 @@ outputSelection: {
 ## Expected Results
 
 ### Best Case Scenario
+
 - Solidity 0.8.31: -0.5 KB
 - Optimizer runs 100000: -0.3 KB
 - viaIR optimization: -0.2 KB
 - **Total: ~-1 KB per contract**
 
 ### Realistic Scenario
+
 - Solidity 0.8.31: -0.2 KB to +0.1 KB
 - Optimizer runs 100000: -0.2 KB
 - viaIR: No change or slight improvement
 - **Total: ~-0.3 to -0.5 KB per contract**
 
 ### Worst Case Scenario
+
 - Solidity 0.8.31: +0.2 KB (unlikely)
 - Optimizer: No improvement
 - **Total: ~+0.2 KB per contract**
@@ -231,10 +244,10 @@ ts-node scripts/test-compiler-settings.ts
 ```
 
 This will:
+
 1. Test current settings (0.8.28, 50k runs, viaIR)
 2. Test Solidity 0.8.31 with various settings
 3. Compare sizes and show differences
 4. Save results to `docs/COMPILER_TEST_RESULTS.json`
 
 **Note:** This script temporarily modifies `hardhat.config.ts` - make sure you have a clean git state before running.
-

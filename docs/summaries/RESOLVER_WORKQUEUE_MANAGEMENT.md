@@ -17,6 +17,7 @@ The resolver workqueue management system provides workload balancing and capacit
 ### 1.1 Core Components
 
 #### Resolver Capacity Tracking
+
 ```solidity
 struct ResolverCapacity {
     uint256 maxConcurrentDisputes;  // Maximum disputes resolver can handle (0 = unlimited)
@@ -27,12 +28,14 @@ mapping(address => ResolverCapacity) public resolverCapacity;
 ```
 
 **Features**:
+
 - Per-resolver capacity limits
 - Real-time tracking of active disputes
 - Ability to pause new dispute acceptance
 - Unlimited capacity option (0 = unlimited)
 
 #### Active Status Management
+
 ```solidity
 mapping(address => bool) public resolverActive;           // Quick active check
 mapping(address => uint256) public resolverLastActive;    // Last active timestamp
@@ -40,11 +43,13 @@ mapping(address => uint256) public resolverActiveDisputes; // Count of active di
 ```
 
 **Features**:
+
 - Quick active/inactive status check
 - Last active timestamp tracking
 - Separate counter for active disputes (used for removal protection)
 
 #### Resolver Statistics
+
 ```solidity
 struct ResolverStats {
     uint256 disputesResolved;           // Successfully resolved
@@ -58,6 +63,7 @@ mapping(address => ResolverStats) public resolverStats;
 ```
 
 **Features**:
+
 - Performance tracking
 - Quality score calculation
 - Resolution time metrics
@@ -68,9 +74,11 @@ mapping(address => ResolverStats) public resolverStats;
 ### 1.2 Selection Mechanisms
 
 #### Round-Robin Selection (Default)
+
 **Location**: `selectResolverRoundRobin(bytes32 category, bool useSeniorResolvers)`
 
 **Algorithm**:
+
 1. Get resolver list (standard or senior)
 2. Use blockhash-based randomness to prevent front-running
 3. Iterate through resolvers starting from random offset
@@ -83,21 +91,25 @@ mapping(address => ResolverStats) public resolverStats;
 6. Advance round-robin counter for next selection
 
 **Features**:
+
 - Fair distribution over time
 - Front-running prevention via blockhash randomness
 - Automatic skipping of unavailable resolvers
 - Category-specific counters
 
 #### Quality-Based Selection (Optional)
+
 **Location**: `selectResolverWithQuality(bytes32 category, bool useSeniorResolvers, bool useQualityWeighting)`
 
 **Algorithm**:
+
 1. If quality weighting disabled → fallback to round-robin
 2. Calculate quality-weighted probabilities for each resolver
 3. Use weighted random selection based on quality scores
 4. Respects capacity and active status checks
 
 **Features**:
+
 - Optional quality-based weighting
 - Falls back to round-robin if no stats available
 - Minimum weight for active resolvers (5000 = 50%)
@@ -107,6 +119,7 @@ mapping(address => ResolverStats) public resolverStats;
 ### 1.3 Workload Tracking
 
 #### Assignment Flow
+
 1. **Dispute Initialization** (`initializeDispute`):
    - Increment `resolverActiveDisputes[resolver]++`
    - Increment `resolverCapacity[resolver].currentDisputes++`
@@ -118,6 +131,7 @@ mapping(address => ResolverStats) public resolverStats;
    - Update statistics via `recordResolution()`
 
 #### Capacity Management
+
 - **Set Capacity**: `setResolverCapacity(resolver, maxConcurrentDisputes, acceptsNewDisputes)`
   - Only `ROLE_TIMELOCK` can set
   - Can set unlimited (0) or specific limit
@@ -130,12 +144,14 @@ mapping(address => ResolverStats) public resolverStats;
 ### 1.4 Monitoring and Analytics
 
 #### Performance Monitoring
+
 - `checkResolverNeedsAttention(resolver)`: Flags resolvers needing review
   - Low quality score (< 50%)
   - High escalation rate (> 50%)
   - Inactive status
 
 #### System Analytics
+
 - `getSystemMetrics()`: System-wide statistics
   - Total resolvers
   - Total disputes handled
@@ -152,12 +168,14 @@ mapping(address => ResolverStats) public resolverStats;
 **Issue**: The system uses immediate assignment rather than a queue.
 
 **Impact**:
+
 - Disputes are assigned immediately if a resolver is available
 - No queuing mechanism for disputes when all resolvers are at capacity
 - No priority system for urgent disputes
 - No estimated wait time for dispute resolution
 
 **Current Behavior**:
+
 - If no resolver available → returns `address(0)`
 - Escrow contract must retry later
 - No automatic retry mechanism
@@ -169,12 +187,14 @@ mapping(address => ResolverStats) public resolverStats;
 **Issue**: Capacity is a simple integer limit.
 
 **Limitations**:
+
 - No per-category capacity limits
 - No time-based capacity (e.g., disputes per day)
 - No complexity-based capacity (e.g., simple vs. complex disputes)
 - No dynamic capacity adjustment based on performance
 
 **Current Behavior**:
+
 - Single `maxConcurrentDisputes` for all dispute types
 - No differentiation between dispute complexities
 
@@ -185,12 +205,14 @@ mapping(address => ResolverStats) public resolverStats;
 **Issue**: Selection doesn't actively balance workload.
 
 **Limitations**:
+
 - Round-robin doesn't consider current workload distribution
 - Quality-based selection doesn't account for current load
 - No mechanism to prefer less-loaded resolvers
 - No automatic redistribution when resolvers become available
 
 **Current Behavior**:
+
 - Selection is based on round-robin + capacity check
 - Doesn't actively balance to minimize max workload
 
@@ -201,12 +223,14 @@ mapping(address => ResolverStats) public resolverStats;
 **Issue**: All disputes are treated equally.
 
 **Limitations**:
+
 - No priority levels (urgent, normal, low)
 - No SLA-based prioritization
 - No time-in-queue consideration
 - No automatic escalation for long-waiting disputes
 
 **Current Behavior**:
+
 - First-come-first-served within round-robin
 - No priority mechanism
 
@@ -217,12 +241,14 @@ mapping(address => ResolverStats) public resolverStats;
 **Issue**: Capacity must be manually configured.
 
 **Limitations**:
+
 - No automatic capacity adjustment
 - No self-service capacity updates by resolvers
 - No capacity recommendations based on performance
 - Governance overhead for capacity changes
 
 **Current Behavior**:
+
 - Only `ROLE_TIMELOCK` can set capacity
 - Requires governance transaction for each change
 
@@ -233,12 +259,14 @@ mapping(address => ResolverStats) public resolverStats;
 **Issue**: No prediction of future workload.
 
 **Limitations**:
+
 - No historical workload patterns
 - No peak time detection
 - No capacity planning tools
 - No early warning for capacity issues
 
 **Current Behavior**:
+
 - Reactive capacity management only
 - No predictive analytics
 
@@ -249,11 +277,13 @@ mapping(address => ResolverStats) public resolverStats;
 **Issue**: Escalation doesn't update capacity tracking.
 
 **Limitations**:
+
 - When dispute escalates, original resolver's capacity not immediately freed
 - Capacity only freed when dispute fully resolved
 - No partial capacity release on escalation
 
 **Current Behavior**:
+
 - Capacity held until `decrementResolverActiveDisputes` called
 - Escrow contract must manually call this function
 
@@ -264,12 +294,14 @@ mapping(address => ResolverStats) public resolverStats;
 **Issue**: Resolvers can't express preferences.
 
 **Limitations**:
+
 - No category preferences
 - No dispute type preferences
 - No time availability windows
 - No opt-in/opt-out for specific dispute types
 
 **Current Behavior**:
+
 - Resolvers either accept all disputes or none
 - No granular preferences
 
@@ -294,12 +326,14 @@ mapping(bytes32 => QueuedDispute[]) public disputeQueues; // Per category
 ```
 
 **Benefits**:
+
 - Automatic assignment when capacity available
 - Priority-based processing
 - Estimated wait times
 - Better user experience
 
 **Implementation Considerations**:
+
 - Gas costs for queue management
 - Queue size limits
 - Automatic retry mechanism
@@ -313,24 +347,26 @@ mapping(bytes32 => QueuedDispute[]) public disputeQueues; // Per category
 
 ```solidity
 struct AdvancedCapacity {
-    uint256 maxConcurrentDisputes;
-    uint256 maxDisputesPerDay;
-    uint256 maxDisputesPerWeek;
-    mapping(bytes32 => uint256) maxPerCategory; // Per-category limits
-    bool acceptsComplexDisputes; // Complexity-based
-    uint256 currentDailyCount;
-    uint256 currentWeeklyCount;
-    uint256 lastResetTimestamp;
+  uint256 maxConcurrentDisputes;
+  uint256 maxDisputesPerDay;
+  uint256 maxDisputesPerWeek;
+  mapping(bytes32 => uint256) maxPerCategory; // Per-category limits
+  bool acceptsComplexDisputes; // Complexity-based
+  uint256 currentDailyCount;
+  uint256 currentWeeklyCount;
+  uint256 lastResetTimestamp;
 }
 ```
 
 **Benefits**:
+
 - More granular capacity control
 - Category-specific limits
 - Time-based rate limiting
 - Complexity-based routing
 
 **Implementation Considerations**:
+
 - Additional storage costs
 - Daily/weekly reset logic
 - Complexity scoring mechanism
@@ -342,23 +378,26 @@ struct AdvancedCapacity {
 **Proposal**: Active workload balancing algorithm.
 
 ```solidity
-function selectResolverBalanced(bytes32 category, bool useSeniorResolvers)
-    internal view returns (address selectedResolver)
-{
-    // Find resolver with minimum current workload
-    // Among resolvers with capacity
-    // Weighted by quality score
-    // Prefer resolvers with lower currentDisputes
+function selectResolverBalanced(
+  bytes32 category,
+  bool useSeniorResolvers
+) internal view returns (address selectedResolver) {
+  // Find resolver with minimum current workload
+  // Among resolvers with capacity
+  // Weighted by quality score
+  // Prefer resolvers with lower currentDisputes
 }
 ```
 
 **Benefits**:
+
 - More even workload distribution
 - Better utilization of resolver capacity
 - Reduced wait times
 - Improved fairness
 
 **Implementation Considerations**:
+
 - Gas costs for iteration
 - Algorithm complexity
 - Balancing fairness vs. efficiency
@@ -371,27 +410,29 @@ function selectResolverBalanced(bytes32 category, bool useSeniorResolvers)
 
 ```solidity
 enum DisputePriority {
-    LOW,      // 0
-    NORMAL,   // 1
-    HIGH,     // 2
-    URGENT    // 3
+  LOW, // 0
+  NORMAL, // 1
+  HIGH, // 2
+  URGENT // 3
 }
 
 struct PrioritizedDispute {
-    uint256 workflowId;
-    DisputePriority priority;
-    uint256 queuedAt;
-    uint256 slaDeadline; // SLA deadline timestamp
+  uint256 workflowId;
+  DisputePriority priority;
+  uint256 queuedAt;
+  uint256 slaDeadline; // SLA deadline timestamp
 }
 ```
 
 **Benefits**:
+
 - Urgent disputes processed first
 - SLA compliance
 - Better user experience for high-priority cases
 - Automatic escalation for overdue disputes
 
 **Implementation Considerations**:
+
 - Priority assignment mechanism
 - SLA tracking
 - Automatic escalation logic
@@ -403,24 +444,23 @@ struct PrioritizedDispute {
 **Proposal**: Allow resolvers to manage their own capacity.
 
 ```solidity
-function setMyCapacity(
-    uint256 maxConcurrentDisputes,
-    bool acceptsNewDisputes
-) external {
-    require(isApprovedResolver[msg.sender] || isApprovedSeniorResolver[msg.sender], "Not a resolver");
-    resolverCapacity[msg.sender].maxConcurrentDisputes = maxConcurrentDisputes;
-    resolverCapacity[msg.sender].acceptsNewDisputes = acceptsNewDisputes;
-    emit ResolverCapacityUpdated(msg.sender, resolverCapacity[msg.sender]);
+function setMyCapacity(uint256 maxConcurrentDisputes, bool acceptsNewDisputes) external {
+  require(isApprovedResolver[msg.sender] || isApprovedSeniorResolver[msg.sender], 'Not a resolver');
+  resolverCapacity[msg.sender].maxConcurrentDisputes = maxConcurrentDisputes;
+  resolverCapacity[msg.sender].acceptsNewDisputes = acceptsNewDisputes;
+  emit ResolverCapacityUpdated(msg.sender, resolverCapacity[msg.sender]);
 }
 ```
 
 **Benefits**:
+
 - Reduced governance overhead
 - Faster capacity adjustments
 - Resolver autonomy
 - Better responsiveness
 
 **Implementation Considerations**:
+
 - Abuse prevention (minimum capacity requirements?)
 - Rate limiting on changes
 - Governance override capability
@@ -433,11 +473,11 @@ function setMyCapacity(
 
 ```solidity
 struct WorkloadPattern {
-    uint256[] hourlyAverages;  // 24-hour pattern
-    uint256[] dailyAverages;    // 7-day pattern
-    uint256 peakHour;
-    uint256 peakDay;
-    uint256 averageDisputesPerDay;
+  uint256[] hourlyAverages; // 24-hour pattern
+  uint256[] dailyAverages; // 7-day pattern
+  uint256 peakHour;
+  uint256 peakDay;
+  uint256 averageDisputesPerDay;
 }
 
 function predictWorkload(uint256 hoursAhead) external view returns (uint256 predictedDisputes);
@@ -445,12 +485,14 @@ function getCapacityRecommendation() external view returns (uint256 recommendedC
 ```
 
 **Benefits**:
+
 - Proactive capacity planning
 - Early warning for capacity issues
 - Better resource allocation
 - Data-driven decisions
 
 **Implementation Considerations**:
+
 - Historical data storage
 - Prediction algorithm complexity
 - Off-chain computation vs. on-chain storage
@@ -464,7 +506,7 @@ function getCapacityRecommendation() external view returns (uint256 recommendedC
 ```solidity
 function executeEscalation(...) external override {
     // ... existing escalation logic ...
-    
+
     // Free capacity for original resolver immediately
     address originalResolver = dm.currentResolver;
     if (originalResolver != address(0)) {
@@ -474,18 +516,20 @@ function executeEscalation(...) external override {
         }
         resolverActiveDisputes[originalResolver]--;
     }
-    
+
     // ... rest of escalation logic ...
 }
 ```
 
 **Benefits**:
+
 - Immediate capacity availability
 - Better resource utilization
 - Faster dispute processing
 - More accurate capacity tracking
 
 **Implementation Considerations**:
+
 - Ensure proper tracking (don't double-decrement)
 - Handle edge cases (multiple escalations)
 
@@ -509,12 +553,14 @@ mapping(address => ResolverPreferences) public resolverPreferences;
 ```
 
 **Benefits**:
+
 - Better resolver-dispute matching
 - Higher resolution quality
 - Resolver satisfaction
 - Specialization support
 
 **Implementation Considerations**:
+
 - Preference matching algorithm
 - Gas costs for preference checks
 - Default preferences for new resolvers
@@ -543,12 +589,14 @@ function retryPendingAssignments() external {
 ```
 
 **Benefits**:
+
 - Automatic handling of capacity issues
 - Reduced manual intervention
 - Better user experience
 - Guaranteed assignment (eventually)
 
 **Implementation Considerations**:
+
 - Gas costs for retry mechanism
 - Retry frequency and limits
 - Off-chain vs. on-chain retry
@@ -561,25 +609,27 @@ function retryPendingAssignments() external {
 
 ```solidity
 struct WorkloadAnalytics {
-    uint256 totalActiveDisputes;
-    uint256 totalPendingAssignments;
-    uint256 averageWaitTime;
-    uint256 maxWaitTime;
-    uint256 capacityUtilization;      // Percentage
-    address[] overloadedResolvers;    // Resolvers at capacity
-    address[] underutilizedResolvers;  // Resolvers with low utilization
+  uint256 totalActiveDisputes;
+  uint256 totalPendingAssignments;
+  uint256 averageWaitTime;
+  uint256 maxWaitTime;
+  uint256 capacityUtilization; // Percentage
+  address[] overloadedResolvers; // Resolvers at capacity
+  address[] underutilizedResolvers; // Resolvers with low utilization
 }
 
 function getWorkloadAnalytics() external view returns (WorkloadAnalytics memory);
 ```
 
 **Benefits**:
+
 - Real-time system health monitoring
 - Capacity planning insights
 - Performance optimization
 - Proactive issue detection
 
 **Implementation Considerations**:
+
 - Gas costs for analytics computation
 - Consider off-chain computation
 - Caching strategies
@@ -589,6 +639,7 @@ function getWorkloadAnalytics() external view returns (WorkloadAnalytics memory)
 ## 4. Implementation Priority
 
 ### High Priority (Immediate Value)
+
 1. **Immediate Capacity Release on Escalation** (3.7)
    - Simple to implement
    - Immediate benefit
@@ -600,6 +651,7 @@ function getWorkloadAnalytics() external view returns (WorkloadAnalytics memory)
    - Resolver autonomy
 
 ### Medium Priority (Significant Value)
+
 3. **True Queue System** (3.1)
    - Better user experience
    - Automatic assignment
@@ -615,6 +667,7 @@ function getWorkloadAnalytics() external view returns (WorkloadAnalytics memory)
    - Better handling of urgent cases
 
 ### Low Priority (Nice to Have)
+
 6. **Advanced Capacity Management** (3.2)
    - More granular control
    - Category-specific limits
@@ -638,11 +691,13 @@ function getWorkloadAnalytics() external view returns (WorkloadAnalytics memory)
 ## 5. Gas Cost Considerations
 
 ### Current Implementation
+
 - **Selection**: ~5,000-10,000 gas (view function)
 - **Assignment**: ~50,000-80,000 gas (includes capacity updates)
 - **Capacity Update**: ~30,000-50,000 gas
 
 ### Future Improvements Impact
+
 - **Queue System**: +20,000-40,000 gas per assignment
 - **Load Balancing**: +5,000-15,000 gas (more iteration)
 - **Preferences Matching**: +3,000-10,000 gas per check
@@ -655,21 +710,25 @@ function getWorkloadAnalytics() external view returns (WorkloadAnalytics memory)
 ## 6. Migration Path
 
 ### Phase 1: Quick Wins
+
 - Implement immediate capacity release on escalation
 - Add self-service capacity management
 - Enhance monitoring functions
 
 ### Phase 2: Core Improvements
+
 - Implement true queue system
 - Add automatic load balancing
 - Add dispute prioritization
 
 ### Phase 3: Advanced Features
+
 - Advanced capacity management
 - Resolver preferences
 - Workload forecasting
 
 ### Phase 4: Analytics and Optimization
+
 - Comprehensive analytics dashboard
 - Automatic retry mechanism
 - Performance optimizations
@@ -679,6 +738,7 @@ function getWorkloadAnalytics() external view returns (WorkloadAnalytics memory)
 ## 7. Conclusion
 
 The current resolver workqueue management system provides a solid foundation with:
+
 - ✅ Capacity tracking
 - ✅ Active status management
 - ✅ Round-robin selection with capacity checks
@@ -686,12 +746,14 @@ The current resolver workqueue management system provides a solid foundation wit
 - ✅ Performance monitoring
 
 **Key Limitations**:
+
 - No true queue system
 - Manual capacity management
 - No automatic load balancing
 - No dispute prioritization
 
 **Recommended Next Steps**:
+
 1. Implement immediate capacity release on escalation (quick win)
 2. Add self-service capacity management (reduces overhead)
 3. Design and implement queue system (major improvement)
@@ -701,7 +763,4 @@ The system is production-ready but would benefit significantly from the proposed
 
 ---
 
-*This document should be updated as improvements are implemented and new limitations are discovered.*
-
-
-
+_This document should be updated as improvements are implemented and new limitations are discovered._

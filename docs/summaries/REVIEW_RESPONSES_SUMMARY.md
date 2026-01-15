@@ -9,8 +9,9 @@
 **Issue:** DAO address should not be updateable.
 
 **Changes Made:**
+
 - Removed `queueDao()` function
-- Removed `activateDao()` function  
+- Removed `activateDao()` function
 - Removed `getPendingDao()` function
 - Removed `_pendingDao` storage variable
 - Removed `DaoQueued`, `DaoActivated`, and `DaoUpdated` events
@@ -25,6 +26,7 @@
 **Issue:** Yield distribution pattern - tokens transferred to module before distribution.
 
 **Current Implementation:**
+
 - `YieldHandlingLibrary.distributeYield()` transfers yield to module first
 - Then calls `distModule.distributeYield()`
 - **Now reverts on failure** (line 142): `require(success, "Yield distribution failed");`
@@ -38,6 +40,7 @@
 **Issue:** Escalation fee should be refunded if escalation fails.
 
 **Current Implementation:**
+
 - Fee transfer moved to **AFTER** successful escalation (line ~1055)
 - If escalation fails (line 1047-1052), any sent fee is refunded:
   ```solidity
@@ -60,6 +63,7 @@
 **Issue:** Yield distribution failure handling - should revert on failure.
 
 **Current Implementation:**
+
 - `YieldHandlingLibrary.distributeYield()` now reverts on failure:
   ```solidity
   (bool success, ) = distModule.distributeYield(workflowId, token, yieldAmount, distributionData);
@@ -108,5 +112,3 @@
 3. ⚠️ Optimize library usage
 4. ⚠️ Extract createEscrow common logic
 5. ⚠️ Consolidate view functions
-
-

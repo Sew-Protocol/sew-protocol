@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
-import "../interfaces/IYieldModule.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
-import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import '../interfaces/IYieldModule.sol';
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
+import '@openzeppelin/contracts/access/Ownable.sol';
+import '@openzeppelin/contracts/utils/introspection/ERC165.sol';
+import '@openzeppelin/contracts/utils/introspection/IERC165.sol';
 
 // Aave V3 interfaces
 interface IPoolAddressesProvider {
@@ -14,7 +14,12 @@ interface IPoolAddressesProvider {
 }
 
 interface IPool {
-    function supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode) external;
+    function supply(
+        address asset,
+        uint256 amount,
+        address onBehalfOf,
+        uint16 referralCode
+    ) external;
     function withdraw(address asset, uint256 amount, address to) external returns (uint256);
 }
 
@@ -54,8 +59,19 @@ contract AaveYieldModule is IYieldModule, Ownable, ERC165 {
     mapping(address => mapping(uint256 => uint256)) public escrowOriginalDeposit; // escrowContract => workflowId => original deposit amount
 
     // Events
-    event EscrowDepositedToAave(uint256 indexed escrowId, address indexed token, uint256 amount, uint256 aTokenBalance);
-    event EscrowWithdrawnFromAave(uint256 indexed escrowId, address indexed token, uint256 originalAmount, uint256 actualAmount, uint256 yield);
+    event EscrowDepositedToAave(
+        uint256 indexed escrowId,
+        address indexed token,
+        uint256 amount,
+        uint256 aTokenBalance
+    );
+    event EscrowWithdrawnFromAave(
+        uint256 indexed escrowId,
+        address indexed token,
+        uint256 originalAmount,
+        uint256 actualAmount,
+        uint256 yield
+    );
     event AaveWithdrawalFailedEvent(uint256 indexed escrowId, address indexed token);
     event AavePoolConfigured(address indexed provider, address indexed pool);
     event AaveEnabledUpdated(bool enabled);
@@ -129,11 +145,7 @@ contract AaveYieldModule is IYieldModule, Ownable, ERC165 {
         uint256 workflowId,
         address token,
         uint256 originalAmount
-    ) external override returns (
-        bool success,
-        uint256 actualAmount,
-        uint256 yieldAmount
-    ) {
+    ) external override returns (bool success, uint256 actualAmount, uint256 yieldAmount) {
         address escrowContract = msg.sender; // BaseEscrow contract calling this
 
         if (!escrowInAave[escrowContract][workflowId]) {
@@ -217,7 +229,8 @@ contract AaveYieldModule is IYieldModule, Ownable, ERC165 {
         // We need to estimate what the current aToken balance represents in underlying tokens
         // For simplicity, we'll use the ratio: (currentATokenBalance / originalATokenBalance) * originalDeposit
         // This gives us an estimate of current value
-        uint256 estimatedCurrentValue = (currentATokenBalance * originalDeposit) / originalATokenBalance;
+        uint256 estimatedCurrentValue = (currentATokenBalance * originalDeposit) /
+            originalATokenBalance;
 
         // Yield = estimated current value - original deposit
         if (estimatedCurrentValue > originalDeposit) {
@@ -264,7 +277,9 @@ contract AaveYieldModule is IYieldModule, Ownable, ERC165 {
      *      For EscrowVault: returns address(0) as module handles approvals via forceApprove
      *      Returns address(0) if Aave is not enabled or token is not supported
      */
-    function getApprovalTarget(address token) external view override returns (address approvalTarget) {
+    function getApprovalTarget(
+        address token
+    ) external view override returns (address approvalTarget) {
         if (!aaveEnabled) {
             return address(0);
         }
@@ -282,7 +297,7 @@ contract AaveYieldModule is IYieldModule, Ownable, ERC165 {
      * @return name The module name
      */
     function moduleName() external pure override returns (string memory name) {
-        return "AaveYield";
+        return 'AaveYield';
     }
 
     // ============ Aave Configuration Functions ============
@@ -295,7 +310,7 @@ contract AaveYieldModule is IYieldModule, Ownable, ERC165 {
      */
     function setAavePoolAddressesProvider(address provider) public onlyOwner {
         if (provider == address(0)) {
-            revert InvalidAddress("Provider address cannot be zero", provider);
+            revert InvalidAddress('Provider address cannot be zero', provider);
         }
         aavePoolAddressesProvider = IPoolAddressesProvider(provider);
         // Get pool address first (external call)
@@ -325,10 +340,10 @@ contract AaveYieldModule is IYieldModule, Ownable, ERC165 {
      */
     function registerTokenForAave(address token, address aToken) public onlyOwner {
         if (token == address(0)) {
-            revert InvalidAddress("Token address cannot be zero", token);
+            revert InvalidAddress('Token address cannot be zero', token);
         }
         if (aToken == address(0)) {
-            revert InvalidAddress("aToken address cannot be zero", aToken);
+            revert InvalidAddress('aToken address cannot be zero', aToken);
         }
 
         // Verify aToken is valid by checking underlying asset (external call)
@@ -353,7 +368,10 @@ contract AaveYieldModule is IYieldModule, Ownable, ERC165 {
      * @param tokens Array of ERC20 token addresses
      * @param aTokens Array of corresponding aToken addresses
      */
-    function batchRegisterTokensForAave(address[] memory tokens, address[] memory aTokens) public onlyOwner {
+    function batchRegisterTokensForAave(
+        address[] memory tokens,
+        address[] memory aTokens
+    ) public onlyOwner {
         if (tokens.length != aTokens.length) {
             revert ArrayLengthMismatch(tokens.length, aTokens.length);
         }
@@ -398,11 +416,10 @@ contract AaveYieldModule is IYieldModule, Ownable, ERC165 {
      * @return aTokenBalance aToken balance at deposit
      * @return originalDeposit Original deposit amount
      */
-    function getEscrowAaveData(address escrowContract, uint256 workflowId) public view returns (
-        bool inAave,
-        uint256 aTokenBalance,
-        uint256 originalDeposit
-    ) {
+    function getEscrowAaveData(
+        address escrowContract,
+        uint256 workflowId
+    ) public view returns (bool inAave, uint256 aTokenBalance, uint256 originalDeposit) {
         return (
             escrowInAave[escrowContract][workflowId],
             escrowATokenBalance[escrowContract][workflowId],
@@ -415,11 +432,10 @@ contract AaveYieldModule is IYieldModule, Ownable, ERC165 {
      * @param interfaceId The interface identifier
      * @return True if the contract supports the interface
      */
-    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165) returns (bool) {
+    function supportsInterface(
+        bytes4 interfaceId
+    ) public view virtual override(ERC165) returns (bool) {
         return
-            interfaceId == type(IYieldModule).interfaceId ||
-            super.supportsInterface(interfaceId);
+            interfaceId == type(IYieldModule).interfaceId || super.supportsInterface(interfaceId);
     }
 }
-
-

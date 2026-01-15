@@ -9,6 +9,7 @@
 ## Executive Summary
 
 This development plan implements all improvements from the Contract Improvements Proposal, organized into 4 phases with clear priorities. The plan focuses on:
+
 - **Security & Critical Functionality** (Phase 1)
 - **Usability & Efficiency** (Phase 2)
 - **Code Quality & Optimization** (Phase 3)
@@ -27,7 +28,9 @@ This development plan implements all improvements from the Contract Improvements
 **Files**: `contracts/modules/DecentralizedResolutionModule.sol`
 
 **Changes**:
+
 1. Add state variables:
+
    ```solidity
    mapping(address => bool) public resolverActive;
    mapping(address => uint256) public resolverLastActive;
@@ -38,6 +41,7 @@ This development plan implements all improvements from the Contract Improvements
 4. Add event `ResolverActiveStatusChanged`
 
 **Testing**:
+
 - Test selection skips inactive resolvers
 - Test all resolvers inactive returns address(0)
 - Test active status can be toggled
@@ -51,6 +55,7 @@ This development plan implements all improvements from the Contract Improvements
 **Files**: `contracts/modules/DecentralizedResolutionModule.sol`
 
 **Changes**:
+
 1. Add mapping: `mapping(address => uint256) public resolverIndex`
 2. Add mapping: `mapping(address => uint256) public seniorResolverIndex`
 3. Update `appointResolver()` to set index
@@ -59,6 +64,7 @@ This development plan implements all improvements from the Contract Improvements
 6. Refactor `removeSeniorResolver()` to use O(1) removal
 
 **Testing**:
+
 - Test removal maintains array integrity
 - Test index mapping is correct
 - Test gas costs (before/after comparison)
@@ -72,11 +78,13 @@ This development plan implements all improvements from the Contract Improvements
 **Files**: `contracts/modules/DecentralizedResolutionModule.sol`
 
 **Changes**:
+
 1. Refactor `executeEscalation()` to inline `canEscalate()` logic
 2. Remove `this.canEscalate()` external call
 3. Keep `canEscalate()` as view function for external use
 
 **Testing**:
+
 - Test escalation still works correctly
 - Test gas savings (~2100 gas per escalation)
 - Test edge cases (no resolvers, disabled levels)
@@ -90,53 +98,54 @@ This development plan implements all improvements from the Contract Improvements
 **Files**: `contracts/modules/DecentralizedResolutionModule.sol`
 
 **Changes**:
+
 1. Update `selectResolverRoundRobin()` to use blockhash:
+
    ```solidity
-   function selectResolverRoundRobin(bytes32 category, bool useSeniorResolvers)
-       internal view returns (address selectedResolver)
-   {
-       address[] memory resolverList = useSeniorResolvers 
-           ? approvedSeniorResolvers 
-           : approvedResolvers;
-       
-       if (resolverList.length == 0) {
-           return address(0);
-       }
-       
-       uint256 currentIndex = useSeniorResolvers 
-           ? categorySeniorResolverIndex[category] 
-           : categoryResolverIndex[category];
-       
-       // Add randomness from blockhash to prevent front-running
-       // Use block.number - 1 (blockhash only available for last 256 blocks)
-       uint256 blockHashValue = uint256(blockhash(block.number > 0 ? block.number - 1 : 0));
-       
-       // Combine with category and timestamp for additional entropy
-       uint256 randomOffset = uint256(keccak256(abi.encodePacked(
-           blockHashValue,
-           category,
-           block.timestamp,
-           currentIndex
-       ))) % resolverList.length;
-       
-       // Select resolver with random offset
-       uint256 index = (currentIndex + randomOffset) % resolverList.length;
-       return resolverList[index];
+   function selectResolverRoundRobin(
+     bytes32 category,
+     bool useSeniorResolvers
+   ) internal view returns (address selectedResolver) {
+     address[] memory resolverList = useSeniorResolvers
+       ? approvedSeniorResolvers
+       : approvedResolvers;
+
+     if (resolverList.length == 0) {
+       return address(0);
+     }
+
+     uint256 currentIndex = useSeniorResolvers
+       ? categorySeniorResolverIndex[category]
+       : categoryResolverIndex[category];
+
+     // Add randomness from blockhash to prevent front-running
+     // Use block.number - 1 (blockhash only available for last 256 blocks)
+     uint256 blockHashValue = uint256(blockhash(block.number > 0 ? block.number - 1 : 0));
+
+     // Combine with category and timestamp for additional entropy
+     uint256 randomOffset = uint256(
+       keccak256(abi.encodePacked(blockHashValue, category, block.timestamp, currentIndex))
+     ) % resolverList.length;
+
+     // Select resolver with random offset
+     uint256 index = (currentIndex + randomOffset) % resolverList.length;
+     return resolverList[index];
    }
    ```
 
 2. Add event for random selection (optional, for debugging):
    ```solidity
    event ResolverSelectedWithRandomness(
-       bytes32 indexed category,
-       address indexed resolver,
-       uint256 baseIndex,
-       uint256 randomOffset,
-       uint256 finalIndex
+     bytes32 indexed category,
+     address indexed resolver,
+     uint256 baseIndex,
+     uint256 randomOffset,
+     uint256 finalIndex
    );
    ```
 
 **Testing**:
+
 - Test randomness is applied correctly
 - Test selection is unpredictable (multiple calls in same block)
 - Test edge case: block.number = 0
@@ -151,11 +160,13 @@ This development plan implements all improvements from the Contract Improvements
 **Files**: `contracts/modules/ResolverIncentiveModule.sol`
 
 **Changes**:
+
 1. Add balance check in `onDisputeResolved()`:
+
    ```solidity
    // Calculate payments
    PaymentOutput memory output = calculatePaymentsWithVersion(input);
-   
+
    // Check contract has sufficient balance
    IERC20 tokenContract = IERC20(token);
    uint256 contractBalance = tokenContract.balanceOf(address(this));
@@ -163,6 +174,7 @@ This development plan implements all improvements from the Contract Improvements
    ```
 
 **Testing**:
+
 - Test reverts with clear error if insufficient balance
 - Test succeeds when balance is sufficient
 - Test edge case: balance exactly equals share
@@ -176,12 +188,14 @@ This development plan implements all improvements from the Contract Improvements
 **Files**: `contracts/modules/DecentralizedResolutionModule.sol`
 
 **Changes**:
+
 1. Add state variable: `mapping(address => uint256) public resolverActiveDisputes`
 2. Update `initializeDispute()` to increment counter
 3. Update `removeResolver()` to check active disputes
 4. Add function to decrement when dispute resolved (called from escrow/incentive module)
 
 **Testing**:
+
 - Test cannot remove resolver with active disputes
 - Test can remove resolver with no active disputes
 - Test counter increments/decrements correctly
@@ -195,6 +209,7 @@ This development plan implements all improvements from the Contract Improvements
 **Files**: `contracts/modules/DecentralizedResolutionModule.sol`
 
 **Changes**:
+
 1. Add event: `event IncentiveModuleCallFailed(uint256 indexed workflowId, string functionName, string reason)`
 2. Update try-catch blocks to emit events:
    ```solidity
@@ -210,6 +225,7 @@ This development plan implements all improvements from the Contract Improvements
    ```
 
 **Testing**:
+
 - Test events emitted on failure
 - Test different error types captured correctly
 
@@ -219,17 +235,20 @@ This development plan implements all improvements from the Contract Improvements
 
 ### Task 1.8: Input Validation Enhancements
 
-**Files**: 
+**Files**:
+
 - `contracts/modules/ResolverIncentiveModule.sol`
 - `contracts/modules/PaymentCalculationLibraryV1.sol`
 
 **Changes**:
+
 1. Add overflow checks in `recordEscalationFee()`
 2. Add dispute existence check in `recordEscalationFee()`
 3. Add zero address validation in `calculatePayments()`
 4. Add validation in `setIncentiveModule()` for contract check
 
 **Testing**:
+
 - Test all validation paths
 - Test edge cases (max values, zero values)
 
@@ -242,18 +261,20 @@ This development plan implements all improvements from the Contract Improvements
 **Files**: `contracts/modules/DecentralizedResolutionModule.sol`
 
 **Changes**:
+
 1. Update `generateCategoryKey()` to use `abi.encode` instead of `abi.encodePacked`:
    ```solidity
    function generateCategoryKey(
-       address token,
-       uint256 amount,
-       string memory categoryType
+     address token,
+     uint256 amount,
+     string memory categoryType
    ) external pure returns (bytes32) {
-       return keccak256(abi.encode(token, amount, categoryType));
+     return keccak256(abi.encode(token, amount, categoryType));
    }
    ```
 
 **Testing**:
+
 - Test collision resistance
 - Test same inputs produce same output
 - Test different inputs produce different outputs
@@ -277,7 +298,9 @@ This development plan implements all improvements from the Contract Improvements
 **Files**: `contracts/modules/DecentralizedResolutionModule.sol`
 
 **Changes**:
+
 1. Add struct and mapping:
+
    ```solidity
    struct ResolverCapacity {
        uint256 maxConcurrentDisputes;
@@ -293,6 +316,7 @@ This development plan implements all improvements from the Contract Improvements
 5. Add function to decrement when dispute resolved
 
 **Testing**:
+
 - Test selection respects capacity limits
 - Test selection skips resolvers at capacity
 - Test capacity can be updated
@@ -306,6 +330,7 @@ This development plan implements all improvements from the Contract Improvements
 **Files**: `contracts/modules/DecentralizedResolutionModule.sol`
 
 **Changes**:
+
 1. Add to `DisputeMetadata` struct: `uint256 timeoutTimestamp`
 2. Add state variable: `uint256 public disputeTimeout = 7 days`
 3. Update `initializeDispute()` to set timeout
@@ -313,6 +338,7 @@ This development plan implements all improvements from the Contract Improvements
 5. Add governance function to update timeout (slow lane)
 
 **Testing**:
+
 - Test timeout is set correctly
 - Test auto-escalation after timeout
 - Test cannot escalate if max level reached
@@ -327,12 +353,14 @@ This development plan implements all improvements from the Contract Improvements
 **Files**: `contracts/modules/DecentralizedResolutionModule.sol`
 
 **Changes**:
+
 1. Add `autoCategorizeEscrow()` function
 2. Add `getAmountTier()` helper function
 3. Update `getResolver()` to suggest category if not set
 4. Add helper in BaseEscrow to auto-set category
 
 **Testing**:
+
 - Test auto-categorization works correctly
 - Test amount tiers are correct
 - Test integration with escrow contract
@@ -346,12 +374,14 @@ This development plan implements all improvements from the Contract Improvements
 **Files**: `contracts/modules/DecentralizedResolutionModule.sol`
 
 **Changes**:
+
 1. Add `batchAppointResolvers()` function
 2. Add `batchRemoveResolvers()` function
 3. Add `batchSetResolverActive()` function
 4. Add array length validation
 
 **Testing**:
+
 - Test batch operations work correctly
 - Test gas savings vs. individual calls
 - Test array length mismatches revert
@@ -365,6 +395,7 @@ This development plan implements all improvements from the Contract Improvements
 **Files**: `contracts/modules/ResolverIncentiveModule.sol`
 
 **Changes**:
+
 1. Option: Add pull pattern to `onDisputeResolved()`
 2. Or: Add explicit balance check with better error message
 3. Update integration guide with clear instructions
@@ -372,6 +403,7 @@ This development plan implements all improvements from the Contract Improvements
 **Decision**: Recommend Option 2 (explicit check) - simpler, clearer
 
 **Testing**:
+
 - Test pull pattern works (if implemented)
 - Test error messages are clear
 
@@ -394,11 +426,13 @@ This development plan implements all improvements from the Contract Improvements
 **Files**: `contracts/modules/DecentralizedResolutionModule.sol`
 
 **Changes**:
+
 1. Optimize `selectResolverRoundRobin()` to cache storage reads
 2. Use `storage` reference instead of `memory` where possible
 3. Cache array length
 
 **Testing**:
+
 - Test functionality unchanged
 - Measure gas savings
 
@@ -408,13 +442,16 @@ This development plan implements all improvements from the Contract Improvements
 
 ### Task 3.2: Magic Numbers to Constants
 
-**Files**: 
+**Files**:
+
 - `contracts/modules/DecentralizedResolutionModule.sol`
 - `contracts/modules/ResolverIncentiveModule.sol`
 - `contracts/modules/PaymentCalculationLibraryV1.sol`
 
 **Changes**:
+
 1. Add constants:
+
    ```solidity
    uint8 public constant MAX_ESCALATION_LEVEL = 2;
    uint256 public constant BASIS_POINTS_DENOMINATOR = 10000;
@@ -425,6 +462,7 @@ This development plan implements all improvements from the Contract Improvements
 2. Replace all magic numbers with constants
 
 **Testing**:
+
 - Test all functionality unchanged
 - Verify constants are used correctly
 
@@ -434,17 +472,20 @@ This development plan implements all improvements from the Contract Improvements
 
 ### Task 3.3: Event Completeness
 
-**Files**: 
+**Files**:
+
 - `contracts/modules/DecentralizedResolutionModule.sol`
 - `contracts/modules/ResolverIncentiveModule.sol`
 
 **Changes**:
+
 1. Add `RoundRobinCounterAdvanced` event
 2. Add `ZeroPaymentSkipped` event
 3. Add `ResolverCapacityUpdated` event
 4. Emit events in all state-changing functions
 
 **Testing**:
+
 - Test all events are emitted
 - Test event parameters are correct
 
@@ -457,11 +498,13 @@ This development plan implements all improvements from the Contract Improvements
 **Files**: `contracts/modules/PaymentCalculationLibraryV1.sol`
 
 **Changes**:
+
 1. Improve remainder distribution (proportional instead of first resolver)
 2. Add zero payment event emission (in ResolverIncentiveModule)
 3. Add validation for zero resolver addresses
 
 **Testing**:
+
 - Test remainder distribution is fair
 - Test zero payments are handled correctly
 
@@ -474,6 +517,7 @@ This development plan implements all improvements from the Contract Improvements
 **Files**: All modified files
 
 **Changes**:
+
 1. Add NatSpec comments to all new functions
 2. Update existing comments for clarity
 3. Document complex logic (round-robin, blockhash)
@@ -497,6 +541,7 @@ This development plan implements all improvements from the Contract Improvements
 **Files**: `contracts/modules/DecentralizedResolutionModule.sol`
 
 **Changes**:
+
 1. Add `ResolverStats` struct
 2. Add `recordResolution()` function
 3. Track resolution metrics
@@ -505,6 +550,7 @@ This development plan implements all improvements from the Contract Improvements
 **Note**: This is foundation for future quality-based selection
 
 **Testing**:
+
 - Test stats are tracked correctly
 - Test quality score calculation
 
@@ -517,6 +563,7 @@ This development plan implements all improvements from the Contract Improvements
 **Files**: `contracts/modules/DecentralizedResolutionModule.sol`
 
 **Changes**:
+
 1. Split into multiple contracts (if needed):
    - `ResolverRegistry.sol`
    - `EscalationManager.sol`
@@ -526,6 +573,7 @@ This development plan implements all improvements from the Contract Improvements
 **Note**: Only if contract size becomes an issue
 
 **Testing**:
+
 - Test all functionality preserved
 - Test gas costs (may increase due to external calls)
 
@@ -579,10 +627,12 @@ This development plan implements all improvements from the Contract Improvements
 ### Unit Tests
 
 **New Test Files**:
+
 - `test/hardhat/DecentralizedResolutionModule_Improvements.test.ts`
 - `test/hardhat/ResolverIncentiveModule_Improvements.test.ts`
 
 **Test Coverage**:
+
 - All new functions
 - Edge cases
 - Gas comparisons
@@ -651,18 +701,22 @@ This development plan implements all improvements from the Contract Improvements
 ## Success Metrics
 
 ### Gas Optimization
+
 - **Target**: 25-35% reduction in common operations
 - **Measure**: Gas costs before/after
 
 ### Security
+
 - **Target**: Zero critical vulnerabilities
 - **Measure**: Audit findings
 
 ### Usability
+
 - **Target**: All improvements functional
 - **Measure**: Test coverage > 90%
 
 ### Code Quality
+
 - **Target**: All improvements implemented
 - **Measure**: Code review approval
 
@@ -675,59 +729,57 @@ This development plan implements all improvements from the Contract Improvements
 **Goal**: Prevent front-running of resolver selection using blockhash-based randomness
 
 **Implementation**:
+
 ```solidity
-function selectResolverRoundRobin(bytes32 category, bool useSeniorResolvers)
-    internal view returns (address selectedResolver)
-{
-    address[] memory resolverList = useSeniorResolvers 
-        ? approvedSeniorResolvers 
-        : approvedResolvers;
-    
-    if (resolverList.length == 0) {
-        return address(0);
-    }
-    
-    uint256 currentIndex = useSeniorResolvers 
-        ? categorySeniorResolverIndex[category] 
-        : categoryResolverIndex[category];
-    
-    // Blockhash-based randomness to prevent front-running
-    // blockhash(block.number - 1) is only available for last 256 blocks
-    uint256 blockHashValue = 0;
-    if (block.number > 0) {
-        // Use previous block's hash (available for last 256 blocks)
-        blockHashValue = uint256(blockhash(block.number - 1));
-    } else {
-        // Fallback for block 0 (shouldn't happen in practice)
-        blockHashValue = uint256(keccak256(abi.encodePacked(block.timestamp)));
-    }
-    
-    // Combine multiple entropy sources for better randomness
-    uint256 randomSeed = uint256(keccak256(abi.encodePacked(
-        blockHashValue,        // Previous block hash
-        category,              // Category-specific
-        block.timestamp,       // Current timestamp
-        currentIndex,          // Current round-robin index
-        block.difficulty       // Additional entropy (if available)
-    )));
-    
-    // Generate random offset (0 to resolverList.length - 1)
-    uint256 randomOffset = randomSeed % resolverList.length;
-    
-    // Select resolver: (base index + random offset) % length
-    uint256 finalIndex = (currentIndex + randomOffset) % resolverList.length;
-    address selected = resolverList[finalIndex];
-    
-    // Emit event for transparency (optional, can be removed for gas savings)
-    emit ResolverSelectedWithRandomness(
-        category,
-        selected,
-        currentIndex,
-        randomOffset,
-        finalIndex
-    );
-    
-    return selected;
+function selectResolverRoundRobin(
+  bytes32 category,
+  bool useSeniorResolvers
+) internal view returns (address selectedResolver) {
+  address[] memory resolverList = useSeniorResolvers ? approvedSeniorResolvers : approvedResolvers;
+
+  if (resolverList.length == 0) {
+    return address(0);
+  }
+
+  uint256 currentIndex = useSeniorResolvers
+    ? categorySeniorResolverIndex[category]
+    : categoryResolverIndex[category];
+
+  // Blockhash-based randomness to prevent front-running
+  // blockhash(block.number - 1) is only available for last 256 blocks
+  uint256 blockHashValue = 0;
+  if (block.number > 0) {
+    // Use previous block's hash (available for last 256 blocks)
+    blockHashValue = uint256(blockhash(block.number - 1));
+  } else {
+    // Fallback for block 0 (shouldn't happen in practice)
+    blockHashValue = uint256(keccak256(abi.encodePacked(block.timestamp)));
+  }
+
+  // Combine multiple entropy sources for better randomness
+  uint256 randomSeed = uint256(
+    keccak256(
+      abi.encodePacked(
+        blockHashValue, // Previous block hash
+        category, // Category-specific
+        block.timestamp, // Current timestamp
+        currentIndex, // Current round-robin index
+        block.difficulty // Additional entropy (if available)
+      )
+    )
+  );
+
+  // Generate random offset (0 to resolverList.length - 1)
+  uint256 randomOffset = randomSeed % resolverList.length;
+
+  // Select resolver: (base index + random offset) % length
+  uint256 finalIndex = (currentIndex + randomOffset) % resolverList.length;
+  address selected = resolverList[finalIndex];
+
+  // Emit event for transparency (optional, can be removed for gas savings)
+  emit ResolverSelectedWithRandomness(category, selected, currentIndex, randomOffset, finalIndex);
+
+  return selected;
 }
 ```
 
@@ -754,20 +806,20 @@ function selectResolverRoundRobin(bytes32 category, bool useSeniorResolvers)
 ```solidity
 // Test randomness
 function testResolverSelectionRandomness() public {
-    // Create multiple disputes in same block
-    // Verify different resolvers selected
+  // Create multiple disputes in same block
+  // Verify different resolvers selected
 }
 
 // Test blockhash fallback
 function testBlockhashFallback() public {
-    // Simulate blockhash unavailable
-    // Verify fallback works
+  // Simulate blockhash unavailable
+  // Verify fallback works
 }
 
 // Test fairness over time
 function testLongTermFairness() public {
-    // Create many disputes
-    // Verify distribution is fair
+  // Create many disputes
+  // Verify distribution is fair
 }
 ```
 
@@ -775,11 +827,11 @@ function testLongTermFairness() public {
 
 ## Timeline Summary
 
-| Phase | Duration | Tasks | Priority |
-|-------|----------|-------|----------|
-| Phase 1 | Week 1-2 | 9 tasks | HIGH |
-| Phase 2 | Week 2-3 | 5 tasks | MEDIUM |
-| Phase 3 | Week 3-4 | 5 tasks | MEDIUM |
+| Phase   | Duration | Tasks   | Priority       |
+| ------- | -------- | ------- | -------------- |
+| Phase 1 | Week 1-2 | 9 tasks | HIGH           |
+| Phase 2 | Week 2-3 | 5 tasks | MEDIUM         |
+| Phase 3 | Week 3-4 | 5 tasks | MEDIUM         |
 | Phase 4 | Week 4-5 | 2 tasks | LOW (Optional) |
 
 **Total Estimated Time**: 81 hours (~4-5 weeks with testing and review)
@@ -789,15 +841,19 @@ function testLongTermFairness() public {
 ## Dependencies
 
 ### Phase 1 Dependencies
+
 - None (can start immediately)
 
 ### Phase 2 Dependencies
+
 - Phase 1 complete (uses resolver active status)
 
 ### Phase 3 Dependencies
+
 - Phase 1 & 2 complete (optimizes existing code)
 
 ### Phase 4 Dependencies
+
 - Phase 1-3 complete (future enhancements)
 
 ---
@@ -811,5 +867,4 @@ function testLongTermFairness() public {
 
 ---
 
-*This plan provides a structured approach to implementing all improvements while maintaining system stability and security.*
-
+_This plan provides a structured approach to implementing all improvements while maintaining system stability and security._

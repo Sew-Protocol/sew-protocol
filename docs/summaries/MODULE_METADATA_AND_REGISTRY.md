@@ -38,6 +38,7 @@ Based on industry best practices (ERC-820, ERC-1319, OpenZeppelin patterns), we 
 ### Simple Registry (Current Approach)
 
 **Per-Contract Registry:**
+
 ```solidity
 // In EscrowVault/EscrowableERC20
 mapping(uint256 => address) public yieldGenerationModuleForEscrow;
@@ -48,49 +49,54 @@ IYieldDistributionModule public defaultYieldDistributionModule;
 ```
 
 **Benefits:**
+
 - Simple, gas-efficient
 - No external registry dependency
 - Direct module access
 
 **Limitations:**
+
 - No global module discovery
 - No version tracking across contracts
 
 ### Advanced Registry (Future Enhancement)
 
 **Global Module Registry Contract:**
+
 ```solidity
 contract ModuleRegistry {
-    struct ModuleInfo {
-        address implementation;
-        string name;
-        string version;
-        bytes4 interfaceId;
-        address owner;
-        bool enabled;
-        uint256 registeredAt;
-    }
-    
-    mapping(bytes32 => ModuleInfo) public modules; // name => info
-    mapping(address => bytes32) public moduleByAddress; // address => name
-    
-    function registerModule(
-        string memory name,
-        string memory version,
-        bytes4 interfaceId,
-        address implementation
-    ) external;
-    
-    function getModule(string memory name) external view returns (ModuleInfo memory);
+  struct ModuleInfo {
+    address implementation;
+    string name;
+    string version;
+    bytes4 interfaceId;
+    address owner;
+    bool enabled;
+    uint256 registeredAt;
+  }
+
+  mapping(bytes32 => ModuleInfo) public modules; // name => info
+  mapping(address => bytes32) public moduleByAddress; // address => name
+
+  function registerModule(
+    string memory name,
+    string memory version,
+    bytes4 interfaceId,
+    address implementation
+  ) external;
+
+  function getModule(string memory name) external view returns (ModuleInfo memory);
 }
 ```
 
 **Benefits:**
+
 - Global module discovery
 - Version tracking
 - Centralized management
 
 **Trade-offs:**
+
 - Additional gas cost
 - External dependency
 - More complexity
@@ -102,6 +108,7 @@ contract ModuleRegistry {
 ### Module Interfaces
 
 **IResolutionModule:**
+
 - `isAuthorizedResolver()`
 - `getResolver()`
 - `canEscalate()`
@@ -111,6 +118,7 @@ contract ModuleRegistry {
 - `supportsInterface()` - ERC-165 support
 
 **IReleaseStrategy:**
+
 - `canRelease()`
 - `executeRelease()`
 - `strategyName()` - Returns strategy identifier (backward compatibility)
@@ -119,6 +127,7 @@ contract ModuleRegistry {
 - `supportsInterface()` - ERC-165 support
 
 **IYieldGenerationModule:**
+
 - `depositForYield()`
 - `withdrawWithYield()`
 - `withdrawProportional()`
@@ -129,6 +138,7 @@ contract ModuleRegistry {
 - `supportsInterface()` - ERC-165 support
 
 **IYieldDistributionModule:**
+
 - `distributeYield()`
 - `moduleName()` - Returns "DefaultYieldDistribution"
 - `moduleVersion()` - Returns "1.0.0"
@@ -136,37 +146,41 @@ contract ModuleRegistry {
 
 ### Implemented Modules
 
-| Module | Name | Version | ERC-165 | Status |
-|--------|------|---------|---------|--------|
-| `DecentralizedResolutionModule` | "DecentralizedResolution" | "1.0.0" | ✅ | Complete |
-| `DefaultResolutionModule` | "DefaultSingleResolver" | "1.0.0" | ✅ | Complete |
-| `DefaultReleaseStrategy` | "DefaultBuyerRelease" | "1.0.0" | ✅ | Complete |
-| `AaveYieldGenerationModule` | "AaveYieldGeneration" | "1.0.0" | ✅ | Complete |
-| `DefaultYieldDistributionModule` | "DefaultYieldDistribution" | "1.0.0" | ✅ | Complete |
+| Module                           | Name                       | Version | ERC-165 | Status   |
+| -------------------------------- | -------------------------- | ------- | ------- | -------- |
+| `DecentralizedResolutionModule`  | "DecentralizedResolution"  | "1.0.0" | ✅      | Complete |
+| `DefaultResolutionModule`        | "DefaultSingleResolver"    | "1.0.0" | ✅      | Complete |
+| `DefaultReleaseStrategy`         | "DefaultBuyerRelease"      | "1.0.0" | ✅      | Complete |
+| `AaveYieldGenerationModule`      | "AaveYieldGeneration"      | "1.0.0" | ✅      | Complete |
+| `DefaultYieldDistributionModule` | "DefaultYieldDistribution" | "1.0.0" | ✅      | Complete |
 
 ### Module Validation
 
 **On Registration:**
+
 ```solidity
 function setDefaultYieldGenerationModule(address module) external onlyOwner {
-    require(module != address(0), "Invalid module");
-    require(
-        IERC165(module).supportsInterface(type(IYieldGenerationModule).interfaceId),
-        "Module does not implement IYieldGenerationModule"
-    );
-    defaultYieldGenerationModule = IYieldGenerationModule(module);
-    emit DefaultYieldGenerationModuleSet(module);
+  require(module != address(0), 'Invalid module');
+  require(
+    IERC165(module).supportsInterface(type(IYieldGenerationModule).interfaceId),
+    'Module does not implement IYieldGenerationModule'
+  );
+  defaultYieldGenerationModule = IYieldGenerationModule(module);
+  emit DefaultYieldGenerationModuleSet(module);
 }
 ```
 
 **On Usage:**
+
 ```solidity
-function _getYieldGenerationModule(uint256 workflowId) internal view returns (IYieldGenerationModule) {
-    address module = yieldGenerationModuleForEscrow[workflowId];
-    if (module != address(0)) {
-        return IYieldGenerationModule(module);
-    }
-    return defaultYieldGenerationModule;
+function _getYieldGenerationModule(
+  uint256 workflowId
+) internal view returns (IYieldGenerationModule) {
+  address module = yieldGenerationModuleForEscrow[workflowId];
+  if (module != address(0)) {
+    return IYieldGenerationModule(module);
+  }
+  return defaultYieldGenerationModule;
 }
 ```
 
@@ -175,19 +189,14 @@ function _getYieldGenerationModule(uint256 workflowId) internal view returns (IY
 ### 1. Interface IDs
 
 Use `type(Interface).interfaceId` for type checking:
+
 ```solidity
 bytes4 constant IYIELD_GENERATION_MODULE_INTERFACE_ID = type(IYieldGenerationModule).interfaceId;
 
-function supportsInterface(bytes4 interfaceId)
-    public
-    view
-    virtual
-    override(ERC165, IERC165)
-    returns (bool)
-{
-    return
-        interfaceId == type(IMyModule).interfaceId ||
-        super.supportsInterface(interfaceId);
+function supportsInterface(
+  bytes4 interfaceId
+) public view virtual override(ERC165, IERC165) returns (bool) {
+  return interfaceId == type(IMyModule).interfaceId || super.supportsInterface(interfaceId);
 }
 ```
 
@@ -210,6 +219,7 @@ function supportsInterface(bytes4 interfaceId)
 ### 4. Event Emission
 
 Emit events for module changes:
+
 ```solidity
 event YieldGenerationModuleSet(uint256 indexed workflowId, address indexed module);
 event DefaultYieldGenerationModuleSet(address indexed module);
@@ -219,6 +229,7 @@ event ModuleUpgraded(address indexed oldImplementation, address indexed newImple
 ### 5. Error Handling
 
 Validate modules before use:
+
 ```solidity
 require(address(module) != address(0), "Module not set");
 require(module.isTokenSupported(token), "Token not supported");
@@ -231,6 +242,7 @@ error ModuleNotSupported(address module, address token);
 ### 6. Documentation
 
 Always include NatSpec documentation:
+
 ```solidity
 /**
  * @title MyModule
@@ -238,19 +250,20 @@ Always include NatSpec documentation:
  * @dev Detailed technical documentation
  */
 contract MyModule {
-    /**
-     * @notice Get the module name/identifier
-     * @return name The module name
-     */
-    function moduleName() external pure returns (string memory name) {
-        return "MyModule";
-    }
+  /**
+   * @notice Get the module name/identifier
+   * @return name The module name
+   */
+  function moduleName() external pure returns (string memory name) {
+    return 'MyModule';
+  }
 }
 ```
 
 ### 7. Testing
 
 All modules must have comprehensive tests covering:
+
 - Module metadata functions (`moduleName()`, `moduleVersion()`)
 - Interface detection (`supportsInterface()`)
 - Module-specific functionality
@@ -306,5 +319,3 @@ See `MODULE_DEVELOPMENT_GUIDE.md` for detailed testing guidelines.
 - [ERC-820: Pseudo-introspection Registry Contract](https://eips.ethereum.org/EIPS/eip-820)
 - [ERC-1319: Package Registry Standard](https://docs.ethpm.com/erc1319)
 - [OpenZeppelin Contracts](https://docs.openzeppelin.com/contracts)
-
-

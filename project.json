@@ -4,23 +4,11 @@
   "description": "Classic hardhat-deploy scaffold (not Ignition) with robust deployment ledger, upgradeable deployments (Transparent or UUPS), Hardhat tests + Foundry tests.",
   "based_on": "https://github.com/wighawag/hardhat-deploy",
   "stack": {
-    "deployment": [
-      "hardhat-deploy (classic)"
-    ],
-    "upgrades": [
-      "openzeppelin contracts-upgradeable",
-      "openzeppelin hardhat-upgrades (helper)"
-    ],
-    "testing": [
-      "hardhat (ts) tests",
-      "foundry tests (forge)"
-    ],
-    "verification": [
-      "@nomicfoundation/hardhat-verify"
-    ],
-    "ci": [
-      "github actions"
-    ]
+    "deployment": ["hardhat-deploy (classic)"],
+    "upgrades": ["openzeppelin contracts-upgradeable", "openzeppelin hardhat-upgrades (helper)"],
+    "testing": ["hardhat (ts) tests", "foundry tests (forge)"],
+    "verification": ["@nomicfoundation/hardhat-verify"],
+    "ci": ["github actions"]
   },
   "layout": {
     "solidity": "contracts/",

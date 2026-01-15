@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "forge-std/Test.sol";
-import "../../../contracts/mocks/MockAavePool.sol";
-import "../../../contracts/mocks/ERC20Mock.sol";
-import "../../../contracts/modules/AaveYieldGenerationModule.sol";
+import 'forge-std/Test.sol';
+import 'contracts/mocks/MockAavePool.sol';
+import 'contracts/mocks/ERC20Mock.sol';
+import 'contracts/modules/AaveYieldGenerationModule.sol';
 
 contract Test_AaveIntegration is Test {
     MockAavePool pool;
@@ -20,11 +20,11 @@ contract Test_AaveIntegration is Test {
 
     function setUp() public {
         // Deploy token and pool
-        token = new ERC20Mock("Mock Token", "MOCK", address(this), 1_000_000 ether);
+        token = new ERC20Mock('Mock Token', 'MOCK', address(this), 1_000_000 ether);
         pool = new MockAavePool();
 
         // Deploy aToken and link to pool
-        aToken = new MockAToken(address(token), "aMock", "aM");
+        aToken = new MockAToken(address(token), 'aMock', 'aM');
         aToken.setPool(address(pool));
         pool.setAToken(address(token), address(aToken));
 
@@ -80,12 +80,19 @@ contract Test_AaveIntegration is Test {
 
         // Call depositForYield as if called by escrow contract
         vm.prank(escrow);
-        (bool success, uint256 aBalance) = aaveModule.depositForYield(workflowId, address(token), deposit);
+        (bool success, uint256 aBalance) = aaveModule.depositForYield(
+            workflowId,
+            address(token),
+            deposit
+        );
         assertTrue(success);
         assertEq(aBalance, deposit);
 
         // Ensure escrow tracked in aave
-        (bool inAave, uint256 atBal, uint256 orig) = aaveModule.getEscrowAaveData(escrow, workflowId);
+        (bool inAave, uint256 atBal, uint256 orig) = aaveModule.getEscrowAaveData(
+            escrow,
+            workflowId
+        );
         assertTrue(inAave);
         assertEq(atBal, deposit);
         assertEq(orig, deposit);
@@ -98,16 +105,19 @@ contract Test_AaveIntegration is Test {
 
         // Now withdraw as if escrow contract triggers a release
         vm.prank(escrow);
-        (bool wsuccess, uint256 actualAmount, uint256 yieldAmount) = aaveModule.withdrawWithYield(workflowId, address(token), deposit);
+        (bool wsuccess, uint256 actualAmount, uint256 yieldAmount) = aaveModule.withdrawWithYield(
+            workflowId,
+            address(token),
+            deposit
+        );
         assertTrue(wsuccess);
         assertGe(actualAmount, deposit);
         assertEq(yieldAmount, actualAmount > deposit ? actualAmount - deposit : 0);
 
         // inAave should be false now
-        (bool inAaveAfter,,) = aaveModule.getEscrowAaveData(escrow, workflowId);
+        (bool inAaveAfter, , ) = aaveModule.getEscrowAaveData(escrow, workflowId);
         assertFalse(inAaveAfter);
     }
-
 
     function test_calculate_yield_view() public {
         uint256 workflowId = 3;

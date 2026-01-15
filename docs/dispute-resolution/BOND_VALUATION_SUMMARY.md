@@ -17,17 +17,20 @@ Implemented `BondValuationLibrary` for calculating effective bond values with mi
 ## Core Formula
 
 ### Effective Bond Value
+
 ```
 effectiveBondUSD = stable + (sew × sewPrice × (1 - haircut))
 ```
 
 **Where:**
+
 - `stable`: Amount of stablecoin (USDC, DAI, etc.) - assumed 1:1 USD peg
 - `sew`: Amount of protocol token (SEW)
 - `sewPrice`: Current market price of SEW in USD (18 decimals)
 - `haircut`: Discount factor applied to SEW (e.g., 0.5 = 50% haircut)
 
 **Example:**
+
 ```
 stable = 800 USDC
 sew = 100 SEW @ $2/SEW
@@ -41,6 +44,7 @@ effectiveBondUSD = 800 + (100 × 2 × 0.5) = 900 USD
 ## Mix Enforcement Rules
 
 ### Minimum Stable Requirement
+
 ```
 stable >= 80% of effectiveBondUSD
 ```
@@ -48,6 +52,7 @@ stable >= 80% of effectiveBondUSD
 **Rationale:** Ensures coverage floor even if SEW price crashes to $0.
 
 ### Maximum SEW Allowance
+
 ```
 sew (after haircut) <= 20% of effectiveBondUSD
 ```
@@ -55,6 +60,7 @@ sew (after haircut) <= 20% of effectiveBondUSD
 **Rationale:** Limits exposure to protocol token price risk.
 
 ### Validation
+
 ```solidity
 function checkBondMix(...) returns (
     bool valid,      // True if mix satisfies rules
@@ -68,14 +74,17 @@ function checkBondMix(...) returns (
 ## Coverage Calculation
 
 ### Maximum Coverage
+
 ```
 maxCoverage = effectiveBondUSD × utilizationBps / 10000
 ```
 
 **Where:**
+
 - `utilizationBps`: Utilization factor (e.g., 5000 = 50% of bond can be used for coverage)
 
 **Example:**
+
 ```
 effectiveBond = 1000 USD
 utilization = 50%
@@ -84,6 +93,7 @@ maxCoverage = 1000 × 0.5 = 500 USD
 ```
 
 ### Coverage Check
+
 ```solidity
 function checkCoverage(
     uint256 effectiveBondUSD,
@@ -104,12 +114,14 @@ function checkCoverage(
 
 **Property:** `maxCoverage <= effectiveBond` always holds, even if SEW price crashes to $0.
 
-**Proof:** 
+**Proof:**
+
 - At SEW price = $0: `effectiveBond = stable`
 - With 80% stable minimum: `stable >= 0.8 × originalBond`
 - Coverage floor: `coverageFloor = stable × utilization >= 0.8 × originalCoverage`
 
 **Test:** `testFuzz_CoverageNeverExceedsBond` (256 runs)
+
 ```solidity
 // Test with random inputs
 effectiveBond = calculateEffectiveBondUSD(...)
@@ -127,11 +139,13 @@ assertLe(maxCoverageAtZero, effectiveBondAtZero)
 **Property:** Coverage after SEW crash >= 80% of original coverage (for valid bonds).
 
 **Proof:**
+
 - Valid bond: `stable >= 0.8 × effectiveBond`
 - At SEW = 0: `newBond = stable`
 - New coverage: `newCoverage = stable × utilization >= 0.8 × originalCoverage`
 
 **Test:** `testFuzz_StableComponentEnforcesCoverageFloor` (256 runs)
+
 ```solidity
 // For valid bonds
 (bool valid,,) = checkBondMix(...)
@@ -149,6 +163,7 @@ assertGe(coverageFloor, minExpectedFloor)
 **Property:** Valid bonds always have >= 80% stable and <= 20% SEW.
 
 **Test:** `testFuzz_ValidBondsHaveMinimumStable` + `testFuzz_ValidBondsHaveMaximumSEW` (512 runs)
+
 ```solidity
 (bool valid, uint256 stablePct, uint256 sewPct) = checkBondMix(...)
 
@@ -161,6 +176,7 @@ if (valid) {
 ### 4. Monotonicity Properties ✅
 
 **Properties:**
+
 - More stable → higher bond
 - More SEW → higher bond (if price > 0)
 - Higher haircut → lower bond
@@ -172,6 +188,7 @@ if (valid) {
 **Property:** If bond is valid at original price, coverage remains >= 80% after crash to $0.
 
 **Test:** `testFuzz_CoverageSurvivesPriceCrash` (256 runs)
+
 ```solidity
 // For valid bonds
 (bool valid,,) = checkBondMix(..., originalPrice, ...)
@@ -181,7 +198,7 @@ if (!valid) return;
 reservedCoverage = originalCoverage
 
 // Simulate crash to $0
-(coverageBeforeCrash, coverageAfterCrash, stillSufficient) = 
+(coverageBeforeCrash, coverageAfterCrash, stillSufficient) =
     simulatePriceCrash(..., newPrice=0, ...)
 
 // Coverage drops but remains >= 80%
@@ -199,6 +216,7 @@ assertTrue(conservativeSufficient)
 **Property:** Bonds with 0 SEW are unaffected by SEW price changes.
 
 **Test:** `testFuzz_PureStableBondsImmuneToPrice` (256 runs)
+
 ```solidity
 bond1 = calculateEffectiveBondUSD(..., sewAmount=0, sewPrice=P1, ...)
 bond2 = calculateEffectiveBondUSD(..., sewAmount=0, sewPrice=P2, ...)
@@ -211,6 +229,7 @@ assertEq(bond1, bond2)  // Immune to price
 ## Helper Functions
 
 ### Calculate Maximum SEW
+
 ```solidity
 function calculateMaxSEW(
     uint256 stableAmount,
@@ -227,6 +246,7 @@ function calculateMaxSEW(
 **Test:** `testFuzz_MaxSEWCalculation` (256 runs) - Verifies max SEW results in ~20% SEW.
 
 ### Calculate Minimum Stable
+
 ```solidity
 function calculateMinStable(
     uint256 sewAmount,
@@ -243,6 +263,7 @@ function calculateMinStable(
 **Test:** `testFuzz_MinStableCalculation` (256 runs) - Verifies min stable results in ~80% stable.
 
 ### Simulate Price Crash
+
 ```solidity
 function simulatePriceCrash(
     ...,
@@ -265,31 +286,31 @@ function simulatePriceCrash(
 
 ### Fuzz Tests (14 tests, 3,584 runs)
 
-| Test | Runs | Property |
-|------|------|----------|
-| `testFuzz_CoverageNeverExceedsBond` | 256 | Coverage <= Bond (even at SEW=0) |
-| `testFuzz_StableComponentEnforcesCoverageFloor` | 256 | Coverage floor >= 80% original |
-| `testFuzz_ValidBondsHaveMinimumStable` | 256 | Valid bonds >= 80% stable |
-| `testFuzz_ValidBondsHaveMaximumSEW` | 256 | Valid bonds <= 20% SEW |
-| `testFuzz_PercentagesSumTo100` | 256 | Stable% + SEW% = 100% |
-| `testFuzz_BondMonotonicInStable` | 256 | More stable → higher bond |
-| `testFuzz_BondMonotonicInSEW` | 256 | More SEW → higher bond |
-| `testFuzz_BondDecreasesWithHaircut` | 256 | Higher haircut → lower bond |
-| `testFuzz_CoverageRespectsBounds` | 256 | Coverage = bond × utilization |
-| `testFuzz_CoverageCheckConsistent` | 256 | Coverage check logic correct |
-| `testFuzz_CoverageSurvivesPriceCrash` | 256 | Coverage survives crash |
-| `testFuzz_PureStableBondsImmuneToPrice` | 256 | Pure stable immune to price |
-| `testFuzz_MaxSEWCalculation` | 256 | Max SEW calculation correct |
-| `testFuzz_MinStableCalculation` | 256 | Min stable calculation correct |
+| Test                                            | Runs | Property                         |
+| ----------------------------------------------- | ---- | -------------------------------- |
+| `testFuzz_CoverageNeverExceedsBond`             | 256  | Coverage <= Bond (even at SEW=0) |
+| `testFuzz_StableComponentEnforcesCoverageFloor` | 256  | Coverage floor >= 80% original   |
+| `testFuzz_ValidBondsHaveMinimumStable`          | 256  | Valid bonds >= 80% stable        |
+| `testFuzz_ValidBondsHaveMaximumSEW`             | 256  | Valid bonds <= 20% SEW           |
+| `testFuzz_PercentagesSumTo100`                  | 256  | Stable% + SEW% = 100%            |
+| `testFuzz_BondMonotonicInStable`                | 256  | More stable → higher bond        |
+| `testFuzz_BondMonotonicInSEW`                   | 256  | More SEW → higher bond           |
+| `testFuzz_BondDecreasesWithHaircut`             | 256  | Higher haircut → lower bond      |
+| `testFuzz_CoverageRespectsBounds`               | 256  | Coverage = bond × utilization    |
+| `testFuzz_CoverageCheckConsistent`              | 256  | Coverage check logic correct     |
+| `testFuzz_CoverageSurvivesPriceCrash`           | 256  | Coverage survives crash          |
+| `testFuzz_PureStableBondsImmuneToPrice`         | 256  | Pure stable immune to price      |
+| `testFuzz_MaxSEWCalculation`                    | 256  | Max SEW calculation correct      |
+| `testFuzz_MinStableCalculation`                 | 256  | Min stable calculation correct   |
 
 ### Unit Tests (4 tests)
 
-| Test | Property |
-|------|----------|
-| `test_ZeroSEWPrice` | Bond = stable when SEW price = 0 |
-| `test_ZeroHaircut` | Full SEW value when haircut = 0 |
-| `test_FullHaircut` | No SEW value when haircut = 100% |
-| `test_PureStableBond` | 100% stable bond valid |
+| Test                  | Property                         |
+| --------------------- | -------------------------------- |
+| `test_ZeroSEWPrice`   | Bond = stable when SEW price = 0 |
+| `test_ZeroHaircut`    | Full SEW value when haircut = 0  |
+| `test_FullHaircut`    | No SEW value when haircut = 100% |
+| `test_PureStableBond` | 100% stable bond valid           |
 
 **Total:** 18 tests, 3,588 runs, **100% pass rate** ✅
 
@@ -298,40 +319,52 @@ function simulatePriceCrash(
 ## Edge Cases Handled
 
 ### 1. SEW Price = $0
+
 ```solidity
 effectiveBond = stable + (sew × 0 × (1 - haircut)) = stable
 ```
+
 ✅ Bond reduces to stable component only.
 
 ### 2. Haircut = 0% (No Discount)
+
 ```solidity
 effectiveBond = stable + (sew × price × 1) = stable + sewValue
 ```
+
 ✅ Full SEW value counted.
 
 ### 3. Haircut = 100% (Full Discount)
+
 ```solidity
 effectiveBond = stable + (sew × price × 0) = stable
 ```
+
 ✅ SEW value ignored completely.
 
 ### 4. Pure Stable Bond (SEW = 0)
+
 ```solidity
 effectiveBond = stable + 0 = stable
 stablePct = 100%, sewPct = 0%
 ```
+
 ✅ Always valid, immune to SEW price.
 
 ### 5. Utilization = 0%
+
 ```solidity
 maxCoverage = effectiveBond × 0 = 0
 ```
+
 ✅ No coverage provided.
 
 ### 6. Utilization = 100%
+
 ```solidity
 maxCoverage = effectiveBond × 1 = effectiveBond
 ```
+
 ✅ Full bond used for coverage.
 
 ---
@@ -386,7 +419,7 @@ uint256 effectiveBond = BondValuationLibrary.calculateEffectiveBondUSD(
 );
 
 // 2. Check if mix is valid
-(bool valid, uint256 stablePct, uint256 sewPct) = 
+(bool valid, uint256 stablePct, uint256 sewPct) =
     BondValuationLibrary.checkBondMix(...);
 require(valid, "Invalid bond mix");
 
@@ -397,7 +430,7 @@ uint256 maxCoverage = BondValuationLibrary.calculateMaxCoverage(
 );
 
 // 4. Check if coverage is sufficient
-(bool sufficient, uint256 available, uint256 shortfall) = 
+(bool sufficient, uint256 available, uint256 shortfall) =
     BondValuationLibrary.checkCoverage(
         effectiveBond,
         utilizationBps,
@@ -409,12 +442,14 @@ require(sufficient, "Insufficient coverage");
 ### Coverage Invariant in Staking Module
 
 **Critical Invariant:**
+
 ```
 For all senior resolvers:
     effectiveBondUSD × utilizationBps >= sum(reservedCoverageByJuniors)
 ```
 
 **Enforcement:**
+
 1. When junior requests coverage: Check senior has available capacity
 2. When senior withdraws: Check remaining bond still covers reserved amounts
 3. When SEW price updates: Revalue all bonds, check coverage still sufficient
@@ -426,12 +461,15 @@ For all senior resolvers:
 ## Files Created
 
 ### Library
+
 - `/contracts/decentralized-resolution-module/BondValuationLibrary.sol` (420 lines)
 
 ### Tests
+
 - `/test/foundry/decentralized-resolution-module/BondValuationInvariants.t.sol` (680 lines, 18 tests)
 
 ### Documentation
+
 - `/docs/dispute-resolution/BOND_VALUATION_SUMMARY.md` (this file)
 
 ---
@@ -439,6 +477,7 @@ For all senior resolvers:
 ## Performance
 
 **Gas Costs (approximate):**
+
 - `calculateEffectiveBondUSD`: ~1,500 gas
 - `checkBondMix`: ~3,200 gas
 - `calculateMaxCoverage`: ~300 gas
@@ -446,6 +485,7 @@ For all senior resolvers:
 - `simulatePriceCrash`: ~6,000 gas
 
 **Optimizations:**
+
 - Pure functions (no storage access)
 - Minimal external calls
 - Efficient decimal normalization
@@ -458,6 +498,7 @@ For all senior resolvers:
 ### Phase 2: Integrate into ResolverStakingModule
 
 1. **Add State Variables:**
+
    ```solidity
    mapping(address => BondComposition) public resolverBonds;
    uint256 public sewHaircutBps;
@@ -465,6 +506,7 @@ For all senior resolvers:
    ```
 
 2. **Add Bond Management:**
+
    ```solidity
    function depositBond(uint256 stable, uint256 sew) external;
    function withdrawBond(uint256 stable, uint256 sew) external;
@@ -472,6 +514,7 @@ For all senior resolvers:
    ```
 
 3. **Add Coverage Tracking:**
+
    ```solidity
    mapping(address => uint256) public reservedCoverage;
    function reserveCoverage(address senior, uint256 amount) external;
@@ -479,10 +522,11 @@ For all senior resolvers:
    ```
 
 4. **Add Invariant Tests:**
+
    ```solidity
    // No resolver can exceed coverage even if SEW → 0
    function invariant_CoverageNeverExceeded() external;
-   
+
    // Total reserved <= total available
    function invariant_CoverageBalanced() external;
    ```
@@ -490,12 +534,14 @@ For all senior resolvers:
 ### Phase 3: Price Oracle Integration
 
 1. **Add Oracle:**
+
    ```solidity
    IOracle public sewPriceOracle;
    function updateSEWPrice() external;
    ```
 
 2. **Add Revaluation:**
+
    ```solidity
    function revalueAllBonds() external;
    function checkAllCoverageSufficient() external view returns (bool);
@@ -513,6 +559,7 @@ For all senior resolvers:
 **Status:** ✅ BondValuationLibrary complete and fully tested
 
 **Key Achievements:**
+
 - ✅ 18 tests, 3,588 runs, 100% pass rate
 - ✅ Critical invariants proven (coverage never exceeds bond, even at SEW=0)
 - ✅ Mix enforcement (80% stable minimum)
@@ -521,6 +568,7 @@ For all senior resolvers:
 - ✅ Gas-optimized pure functions
 
 **Security:**
+
 - ✅ No overflow/underflow vulnerabilities
 - ✅ Price manipulation resistant (80% stable minimum)
 - ✅ Rounding errors handled

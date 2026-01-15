@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "forge-std/Test.sol";
-import "../../../contracts/core/EscrowableERC20.sol";
-import "../../../contracts/YieldOps.sol";
-import "../../../contracts/DisputeOps.sol";
+import 'forge-std/Test.sol';
+import 'contracts/core/EscrowableERC20.sol';
+import 'contracts/YieldOps.sol';
+import 'contracts/DisputeOps.sol';
 
 contract Test_BaseEscrow_test is Test {
     EscrowableERC20 token;
@@ -15,7 +15,14 @@ contract Test_BaseEscrow_test is Test {
         // Deploy EscrowableERC20 with this contract as owner
         yieldOps = new YieldOps();
         disputeOps = new DisputeOps();
-        token = new EscrowableERC20("Test Token", "TEST", 100, address(this), address(yieldOps), address(disputeOps));
+        token = new EscrowableERC20(
+            'Test Token',
+            'TEST',
+            100,
+            address(this),
+            address(yieldOps),
+            address(disputeOps)
+        );
     }
 
     function test_supports_IERC165_interface() public {

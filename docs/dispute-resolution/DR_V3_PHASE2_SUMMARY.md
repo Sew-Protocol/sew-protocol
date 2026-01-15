@@ -19,6 +19,7 @@ Implemented Phase 2 of DR v3: **Real staking with mixed stable/SEW bonds, oracle
 ### 1. ResolverStakingModuleV1 (850 lines)
 
 **Core Features:**
+
 - ✅ ERC20 stablecoin staking (USDC primary)
 - ✅ SEW token staking (protocol token, non-transferable while bonded)
 - ✅ Mixed bond composition with automatic valuation
@@ -27,17 +28,20 @@ Implemented Phase 2 of DR v3: **Real staking with mixed stable/SEW bonds, oracle
 - ✅ Lifecycle hooks (lock/unlock on dispute assignment/resolution)
 
 **Mix Enforcement:**
+
 - Minimum 80% stable
 - Maximum 20% SEW (after 50% haircut)
 - Enforced on every stake/unstake operation
 
 **Coverage System:**
+
 - Juniors require 3x their bond in coverage
 - Seniors provide 50% of their bond as coverage
 - Reserved coverage tracked per senior
 - Cannot exceed available coverage
 
 **Unbonding System:**
+
 - Request unbond → wait delay → complete withdrawal
 - Cannot unbond if stake locked (active disputes)
 - Cannot unbond if coverage reserved (seniors)
@@ -53,6 +57,7 @@ Implemented Phase 2 of DR v3: **Real staking with mixed stable/SEW bonds, oracle
 **Property:** All bonds satisfy 80% stable minimum, 20% SEW maximum.
 
 **Test:** `testFuzz_MixConstraintsAlwaysHold` (256 runs)
+
 ```solidity
 // For any successful stake
 stablePct >= 8000  // >= 80%
@@ -61,6 +66,7 @@ stablePct + sewPct == 10000  // = 100%
 ```
 
 **Enforcement:**
+
 - Checked on `stake()` - reverts if invalid
 - Checked on `requestUnstake()` - ensures remaining bond valid
 - Cannot create invalid bond composition
@@ -70,6 +76,7 @@ stablePct + sewPct == 10000  // = 100%
 **Property:** `reservedCoverage[senior] <= maxCoverage[senior]` always holds.
 
 **Test:** `testFuzz_ReservedCoverageNeverExceedsAvailable` (257 runs)
+
 ```solidity
 // For any delegation
 maxCoverage = seniorBond × 0.5
@@ -78,6 +85,7 @@ availableCoverage = maxCoverage - reservedCoverage >= 0
 ```
 
 **Enforcement:**
+
 - Checked on `delegateStake()` - reverts if insufficient
 - Updated on `undelegateStake()` - releases coverage
 - Multiple juniors cannot over-reserve
@@ -87,10 +95,12 @@ availableCoverage = maxCoverage - reservedCoverage >= 0
 **Property:** Cannot withdraw before unbond delay passes.
 
 **Tests:**
+
 - `test_CannotWithdrawBeforeDelay` - enforces 14/21 day delays
 - `test_SeniorHasLongerDelay` - seniors wait 21 days vs 14 for resolvers
 
 **Enforcement:**
+
 - `requestUnstake()` sets `availableAt = now + delay`
 - `completeUnstake()` checks `now >= availableAt`
 - Cannot complete early
@@ -100,11 +110,13 @@ availableCoverage = maxCoverage - reservedCoverage >= 0
 **Property:** Cannot unbond while stake is locked or coverage is reserved.
 
 **Tests:**
+
 - `test_CannotUnbondWhileLocked` - locked in disputes
 - `test_CannotUnbondWithReservedCoverage` - seniors with coverage
 - `test_CannotUnbondWhileDelegated` - juniors with delegation
 
 **Enforcement:**
+
 - `requestUnstake()` checks `totalLockedStake[resolver] == 0`
 - `requestUnstake()` checks `reservedCoverage[senior] == 0`
 - `requestUnstake()` checks `!delegations[junior].active`
@@ -116,6 +128,7 @@ availableCoverage = maxCoverage - reservedCoverage >= 0
 **Test:** `testFuzz_MixRemainsValidAfterWithdrawal` (256 runs)
 
 **Enforcement:**
+
 - `requestUnstake()` calculates remaining bond
 - Checks remaining mix is valid
 - Reverts if remaining bond would be invalid
@@ -124,16 +137,16 @@ availableCoverage = maxCoverage - reservedCoverage >= 0
 
 ## Key Parameters
 
-| Parameter | Value | Description |
-|-----------|-------|-------------|
-| **MIN_STABLE_BPS** | 8000 (80%) | Minimum stable in bond |
-| **MAX_SEW_BPS** | 2000 (20%) | Maximum SEW in bond |
-| **SEW_HAIRCUT_BPS** | 5000 (50%) | Discount on SEW value |
-| **RESOLVER_UNBOND_DELAY** | 14 days | Resolver withdrawal delay |
-| **SENIOR_UNBOND_DELAY** | 21 days | Senior withdrawal delay |
-| **COVERAGE_MULTIPLIER** | 3 | Junior needs 3x bond in coverage |
-| **UTILIZATION_BPS** | 5000 (50%) | Senior provides 50% bond as coverage |
-| **Minimum Stakes** | 1K (resolver), 10K (senior) | Minimum effective bond USD |
+| Parameter                 | Value                       | Description                          |
+| ------------------------- | --------------------------- | ------------------------------------ |
+| **MIN_STABLE_BPS**        | 8000 (80%)                  | Minimum stable in bond               |
+| **MAX_SEW_BPS**           | 2000 (20%)                  | Maximum SEW in bond                  |
+| **SEW_HAIRCUT_BPS**       | 5000 (50%)                  | Discount on SEW value                |
+| **RESOLVER_UNBOND_DELAY** | 14 days                     | Resolver withdrawal delay            |
+| **SENIOR_UNBOND_DELAY**   | 21 days                     | Senior withdrawal delay              |
+| **COVERAGE_MULTIPLIER**   | 3                           | Junior needs 3x bond in coverage     |
+| **UTILIZATION_BPS**       | 5000 (50%)                  | Senior provides 50% bond as coverage |
+| **Minimum Stakes**        | 1K (resolver), 10K (senior) | Minimum effective bond USD           |
 
 ---
 
@@ -142,11 +155,13 @@ availableCoverage = maxCoverage - reservedCoverage >= 0
 **Challenge:** How to value SEW without price oracle?
 
 **Solution:** Conservative $1 valuation + 50% haircut
+
 ```
 effectiveBondUSD = stable + (sew × $1 × 0.5)
 ```
 
 **Example:**
+
 ```
 Bond: 800 USDC + 100 SEW
 Effective: 800 + (100 × 1 × 0.5) = 850 USD
@@ -158,12 +173,14 @@ Even if real SEW price is $2:
 ```
 
 **Benefits:**
+
 - ✅ No oracle dependency
 - ✅ No oracle manipulation risk
 - ✅ Conservative valuation protects system
 - ✅ Resolver can always add more stable if needed
 
 **Trade-off:**
+
 - Resolvers with SEW get less credit than market value
 - Acceptable because stable is primary (80% minimum)
 
@@ -174,6 +191,7 @@ Even if real SEW price is $2:
 ### Junior → Senior Delegation
 
 **Flow:**
+
 1. Junior has bond B
 2. Junior needs coverage = B × M = B × 3
 3. Senior has bond S
@@ -181,6 +199,7 @@ Even if real SEW price is $2:
 5. Junior delegates to senior if S × 0.5 >= B × 3
 
 **Example:**
+
 ```
 Junior: 3K bond → needs 9K coverage
 Senior: 30K bond → can provide 15K coverage
@@ -196,6 +215,7 @@ Delegation fails: 9K + 9K = 18K > 15K ✗
 **Ordering:** Junior's own stake is exhausted before senior's coverage.
 
 **Example:**
+
 ```
 Junior: 3K own stake + 9K coverage from senior
 Total exposure: 12K
@@ -248,6 +268,7 @@ If junior is slashed:
 ### Lifecycle Hooks
 
 **1. Resolver Assigned:**
+
 ```solidity
 resolutionModule.initializeDispute(...)
   → stakingModule.onResolverAssigned(workflowId, resolver, 0)
@@ -255,6 +276,7 @@ resolutionModule.initializeDispute(...)
 ```
 
 **2. Resolution Finalized:**
+
 ```solidity
 resolutionModule.recordResolution(...)
   → stakingModule.onResolutionFinalized(workflowId, resolver, outcome)
@@ -262,6 +284,7 @@ resolutionModule.recordResolution(...)
 ```
 
 **3. Dispute Escalated:**
+
 ```solidity
 resolutionModule.executeEscalation(...)
   → stakingModule.onDisputeEscalated(workflowId, priorResolver)
@@ -275,12 +298,15 @@ resolutionModule.executeEscalation(...)
 ## Files Created
 
 ### Contracts
+
 - `ResolverStakingModuleV1.sol` (850 lines)
 
 ### Tests
+
 - `StakingModuleInvariants.t.sol` (850 lines, 18 tests)
 
 ### Documentation
+
 - `DR_V3_PHASE2_SUMMARY.md` (this file)
 
 ---
@@ -290,26 +316,31 @@ resolutionModule.executeEscalation(...)
 ### Attack Vectors Tested
 
 **1. Mix Manipulation:**
+
 - ✅ Cannot stake invalid mix
 - ✅ Cannot withdraw to create invalid mix
 - ✅ Mix checked on every operation
 
 **2. Coverage Manipulation:**
+
 - ✅ Cannot over-reserve senior coverage
 - ✅ Multiple juniors cannot exceed limit
 - ✅ Coverage released on undelegate
 
 **3. Delay Bypass:**
+
 - ✅ Cannot withdraw before delay
 - ✅ Cannot cancel and re-request to reset timer
 - ✅ Different delays for different tiers
 
 **4. Lock Bypass:**
+
 - ✅ Cannot unbond while locked
 - ✅ Cannot unbond with reserved coverage
 - ✅ Cannot unbond while delegated
 
 **5. Oracle Manipulation:**
+
 - ✅ No oracle used (oracle-free design)
 - ✅ Conservative $1 valuation
 - ✅ 50% haircut provides safety margin
@@ -327,15 +358,15 @@ resolutionModule.executeEscalation(...)
 
 ## Comparison: No-Op vs Real
 
-| Feature | No-Op (Phase 1) | Real (Phase 2) |
-|---------|----------------|----------------|
-| **Stake Storage** | None | ERC20 custody |
-| **Mix Enforcement** | No | Yes (80/20) |
-| **Unbond Delay** | No | Yes (14/21 days) |
-| **Coverage Tracking** | No | Yes (reserved/available) |
-| **Lock Enforcement** | No | Yes (per dispute) |
-| **Bond Valuation** | Dummy | BondValuationLibrary |
-| **Production Ready** | No | Yes |
+| Feature               | No-Op (Phase 1) | Real (Phase 2)           |
+| --------------------- | --------------- | ------------------------ |
+| **Stake Storage**     | None            | ERC20 custody            |
+| **Mix Enforcement**   | No              | Yes (80/20)              |
+| **Unbond Delay**      | No              | Yes (14/21 days)         |
+| **Coverage Tracking** | No              | Yes (reserved/available) |
+| **Lock Enforcement**  | No              | Yes (per dispute)        |
+| **Bond Valuation**    | Dummy           | BondValuationLibrary     |
+| **Production Ready**  | No              | Yes                      |
 
 ---
 
@@ -344,6 +375,7 @@ resolutionModule.executeEscalation(...)
 ### Phase 3: Slashing Module
 
 **Remaining Work:**
+
 1. Implement `ResolverSlashingModuleV1`
 2. Graduated penalties (timeout 5%, reversal 10%, fraud 50%)
 3. Slash ordering (junior stake → senior coverage)
@@ -351,6 +383,7 @@ resolutionModule.executeEscalation(...)
 5. Circuit breakers
 
 **Integration:**
+
 ```solidity
 // On timeout
 slashingModule.slashForTimeout(workflowId, resolver, timeoutType)
@@ -367,12 +400,14 @@ slashingModule.slashForReversal(workflowId, resolver, priorRound)
 ### Phase 4: Price Oracle Integration (Optional)
 
 **If we want real-time SEW valuation:**
+
 1. Add Chainlink oracle for SEW price
 2. Revalue bonds on price updates
 3. Check coverage still sufficient after revaluation
 4. Trigger circuit breaker if coverage insufficient
 
 **Trade-off:**
+
 - Pro: More accurate valuation
 - Con: Oracle dependency and manipulation risk
 - Current: Oracle-free design is simpler and safer
@@ -384,6 +419,7 @@ slashingModule.slashForReversal(workflowId, resolver, priorRound)
 **Status:** ✅ Phase 2 Complete
 
 **Achievements:**
+
 - ✅ Real staking with ERC20 custody
 - ✅ Mixed stable/SEW bonds with 80/20 enforcement
 - ✅ Oracle-free conservative valuation
@@ -394,6 +430,7 @@ slashingModule.slashForReversal(workflowId, resolver, priorRound)
 - ✅ All critical invariants proven
 
 **Security:**
+
 - ✅ Mix constraints enforced
 - ✅ Coverage bounds respected
 - ✅ Delays cannot be bypassed
@@ -401,6 +438,7 @@ slashingModule.slashForReversal(workflowId, resolver, priorRound)
 - ✅ No oracle manipulation risk
 
 **Production Readiness:**
+
 - ✅ Real ERC20 custody
 - ✅ Comprehensive test coverage
 - ✅ All invariants proven
@@ -410,6 +448,7 @@ slashingModule.slashForReversal(workflowId, resolver, priorRound)
 **Next:** Proceed with Phase 3 (SlashingModule) to complete DR v3.
 
 **Total Progress:**
+
 - DR v1: ✅ Complete (decisions)
 - DR v2: ✅ Complete (incentives)
 - DR v3 Phase 1: ✅ Complete (interfaces)

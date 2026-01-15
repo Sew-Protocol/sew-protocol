@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "forge-std/Test.sol";
-import "../../../../contracts/YieldOps.sol";
-import "../../../../contracts/DisputeOps.sol";
-import "contracts/core/EscrowVault.sol";
-import "contracts/core/EscrowableERC20.sol";
+import 'forge-std/Test.sol';
+import 'contracts/YieldOps.sol';
+import 'contracts/DisputeOps.sol';
+import 'contracts/core/EscrowVault.sol';
+import 'contracts/core/EscrowableERC20.sol';
 
 contract Test_06_TimelockIntegration_test is Test {
     EscrowableERC20 token;
@@ -19,7 +19,14 @@ contract Test_06_TimelockIntegration_test is Test {
     function setUp() public {
         yieldOps = new YieldOps();
         disputeOps = new DisputeOps();
-        token = new EscrowableERC20("Test","TST", 100, address(this), address(yieldOps), address(disputeOps));
+        token = new EscrowableERC20(
+            'Test',
+            'TST',
+            100,
+            address(this),
+            address(yieldOps),
+            address(disputeOps)
+        );
         vault = new EscrowVault(100, address(this), address(yieldOps), address(disputeOps));
         token.grantRole(token.ROLE_TIMELOCK(), timelock);
         vault.grantRole(vault.ROLE_TIMELOCK(), timelock);

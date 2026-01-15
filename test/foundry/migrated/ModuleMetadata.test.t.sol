@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
-import "forge-std/Test.sol";
+import 'forge-std/Test.sol';
 contract Test_ModuleMetadata_test is Test {
     function setUp() public {}
     function test_migrated_to_forge() public {

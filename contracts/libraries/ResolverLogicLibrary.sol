@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
-import "../interfaces/IResolver.sol";
-import "../interfaces/IYieldGenerationModule.sol";
-import "../types/EscrowTypes.sol";
+import '../interfaces/IResolver.sol';
+import '../interfaces/IYieldGenerationModule.sol';
+import '../types/EscrowTypes.sol';
 
 // Payout struct is defined in IResolver.sol at file level
 
@@ -44,7 +44,11 @@ library ResolverLogicLibrary {
         if (totalAmount == 0) return 0;
         uint256 yieldToDistribute = 0;
         for (uint256 i = 0; i < payoutAmounts.length; i++) {
-            uint256 proportionalYield = calculateProportionalYield(totalYield, payoutAmounts[i], totalAmount);
+            uint256 proportionalYield = calculateProportionalYield(
+                totalYield,
+                payoutAmounts[i],
+                totalAmount
+            );
             if (proportionalYield > 0) {
                 yieldToDistribute += proportionalYield;
             }
@@ -86,22 +90,22 @@ library ResolverLogicLibrary {
         uint256 availableBalance
     ) internal pure returns (uint256 totalPayout) {
         if (payouts.length == 0) {
-            revert InvalidAmount("At least one payout required");
+            revert InvalidAmount('At least one payout required');
         }
 
         totalPayout = 0;
         for (uint256 i = 0; i < payouts.length; i++) {
             if (payouts[i].recipient == address(0)) {
-                revert InvalidAddress("Payout recipient cannot be zero", address(0));
+                revert InvalidAddress('Payout recipient cannot be zero', address(0));
             }
             if (payouts[i].amount == 0) {
-                revert InvalidAmount("Payout amount must be greater than zero");
+                revert InvalidAmount('Payout amount must be greater than zero');
             }
             totalPayout += payouts[i].amount;
         }
 
         if (totalPayout > availableBalance) {
-            revert InvalidAmount("Total payout exceeds available balance");
+            revert InvalidAmount('Total payout exceeds available balance');
         }
     }
 
@@ -110,9 +114,7 @@ library ResolverLogicLibrary {
      * @param payouts Array of payout structs
      * @return Array of payout amounts
      */
-    function copyPayoutAmounts(
-        Payout[] memory payouts
-    ) internal pure returns (uint256[] memory) {
+    function copyPayoutAmounts(Payout[] memory payouts) internal pure returns (uint256[] memory) {
         uint256[] memory amounts = new uint256[](payouts.length);
         for (uint256 i = 0; i < payouts.length; i++) {
             amounts[i] = payouts[i].amount;
@@ -120,4 +122,3 @@ library ResolverLogicLibrary {
         return amounts;
     }
 }
-

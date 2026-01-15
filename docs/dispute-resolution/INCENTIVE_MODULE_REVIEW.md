@@ -9,6 +9,7 @@
 ## Executive Summary
 
 This review covers the `IIncentiveModule` interface and its implementations (`ResolverIncentiveModuleV1` and `ResolverIncentiveModuleV2`), focusing on:
+
 - Interface completeness and correctness
 - Withdraw pattern (pull) vs push pattern migration
 - Upgrade path from V1 to V2
@@ -17,6 +18,7 @@ This review covers the `IIncentiveModule` interface and its implementations (`Re
 - Integration with `DecentralizedResolutionModule`
 
 **Key Findings:**
+
 1. ✅ Interface is well-designed and extensible
 2. ⚠️ **CRITICAL**: `onDisputeOpened` is never called - missing integration
 3. ⚠️ **CRITICAL**: `onDisputeFinalized` is never called - missing integration
@@ -33,11 +35,13 @@ This review covers the `IIncentiveModule` interface and its implementations (`Re
 ### 1.1 Interface Structure
 
 The interface is well-organized with clear sections:
+
 - Core Lifecycle Hooks (lines 15-99)
 - Payment Distribution (lines 101-124)
 - V2+ Functions (lines 126-168)
 
 **Strengths:**
+
 - Clear separation between required and optional (V2+) functions
 - Good documentation of version differences
 - Extensible design for future versions
@@ -45,18 +49,21 @@ The interface is well-organized with clear sections:
 ### 1.2 Missing Interface Methods
 
 **Issue**: The interface defines `distributePayments(uint256 workflowId, address token, uint256 totalFees)` but:
+
 - V1/V2 implementations use `onDisputeResolved(uint256 workflowId, address token)` instead
 - The interface method `distributePayments` is not implemented
 
 **Impact**: If external contracts call `distributePayments` via the interface, it will fail.
 
 **Recommendation**: Either:
+
 1. Implement `distributePayments` in V1/V2 that calls `onDisputeResolved` internally, OR
 2. Update interface documentation to clarify that `onDisputeResolved` is the actual method to use
 
 ### 1.3 Interface Completeness
 
 All lifecycle hooks are defined:
+
 - ✅ `onDisputeOpened` - defined but **never called** (see Integration Issues)
 - ✅ `onResolverAssigned` - called correctly
 - ✅ `onDecisionSubmitted` - called correctly
@@ -71,12 +78,14 @@ All lifecycle hooks are defined:
 ### 2.1 Current Implementation
 
 **V1 Implementation:**
+
 - Uses **pull pattern** for resolver payments (`claimPayment`)
 - Legacy `distributePayments` function exists but is marked deprecated (line 449)
 - Payments are calculated and stored in `claimablePayments` mapping
 - Resolvers must call `claimPayment()` to receive funds
 
 **V2 Implementation:**
+
 - Inherits pull pattern from V1
 - **BUT**: Appeal bond refunds use **push pattern** (`safeTransfer` in `_refundBond`, line 200)
 - Appeal bond payouts to resolvers use **pull pattern** (added to `claimablePayments`, line 259)
@@ -84,6 +93,7 @@ All lifecycle hooks are defined:
 ### 2.2 Issues with Mixed Patterns
 
 **Issue 1: Inconsistent Pattern for Bonds**
+
 - Bond refunds: **push** (immediate transfer)
 - Bond payouts to resolvers: **pull** (claimable)
 - This inconsistency could confuse users
@@ -91,11 +101,13 @@ All lifecycle hooks are defined:
 **Recommendation**: Consider making bond refunds also use pull pattern for consistency, OR document the rationale for the difference.
 
 **Issue 2: Bond Refund Gas Costs**
+
 - Push pattern means depositor pays gas for refund
 - If refund fails (e.g., contract reverts), bond is stuck
 - Pull pattern would allow depositor to claim when ready
 
 **Recommendation**: Consider switching bond refunds to pull pattern for:
+
 - Consistency
 - Gas efficiency (depositor controls when to claim)
 - Better error handling (failed transfers don't block distribution)
@@ -103,6 +115,7 @@ All lifecycle hooks are defined:
 ### 2.3 Migration from Push to Pull
 
 **Status**: ✅ Migration appears complete for resolver payments
+
 - Old `distributePayments` function kept for backward compatibility but deprecated
 - New `claimPayment` function is the primary method
 - Tests show pull pattern working correctly
@@ -116,11 +129,13 @@ All lifecycle hooks are defined:
 ### 3.1 Implementation Strategy
 
 **Current Approach**: V2 inherits from V1
+
 ```solidity
 contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1
 ```
 
 **Strengths:**
+
 - ✅ Clean inheritance model
 - ✅ All V1 functionality preserved
 - ✅ V2 adds new features without breaking changes
@@ -129,6 +144,7 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1
 ### 3.2 State Migration
 
 **V1 State Variables:**
+
 - `disputeResolvers` - preserved
 - `disputeEscrowFees` - preserved
 - `disputeEscalationFees` - preserved
@@ -136,6 +152,7 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1
 - `paymentsCalculated` - preserved
 
 **V2 Additional State:**
+
 - `appealBonds` - new mapping
 - `totalBondsPosted` - new metric
 - `totalBondsRefunded` - new metric
@@ -148,10 +165,12 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1
 ### 3.3 Function Compatibility
 
 **V1 Functions Available in V2:**
+
 - All V1 functions remain accessible
 - No function overrides that break compatibility
 
 **V2 New Functions:**
+
 - `getRequiredAppealBond` - returns (0, address(0)) (passthrough, actual calc in resolution module)
 - `recordAppealBond` - new, V2-specific
 - `distributeAppealBond` - new, V2-specific
@@ -162,6 +181,7 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1
 ### 3.4 Upgrade Process
 
 **Recommended Steps:**
+
 1. Deploy `ResolverIncentiveModuleV2` with same constructor params as V1
 2. Register new V2 contract as escrow contract (if needed)
 3. Update `DecentralizedResolutionModule.incentiveModule` to point to V2
@@ -178,6 +198,7 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1
 **Location**: `ResolverIncentiveModuleV2.sol:119-146`
 
 **Function Signature:**
+
 ```solidity
 function recordAppealBond(
     uint256 workflowId,
@@ -194,13 +215,15 @@ function recordAppealBond(
    - `DecentralizedResolutionModule.executeEscalation` does not call it
    - `BaseEscrow.escalateDispute` does not call it
    - `DisputeOps.escalateDispute` does not call it
-   
+
    **Impact**: Appeal bonds are never recorded, so `distributeAppealBond` will always fail.
 
-2. **Round Validation**: 
+2. **Round Validation**:
+
    ```solidity
    require(round > 0 && round <= 2, "Invalid round");
    ```
+
    This prevents recording bonds for round 0, but bonds should be recorded for the round being escalated TO (not FROM).
    - Escalation from round 0 → 1: bond should be recorded at round 1 ✅
    - Escalation from round 1 → 2: bond should be recorded at round 2 ✅
@@ -212,7 +235,8 @@ function recordAppealBond(
    ```
    Should also check if `amount > 0` to prevent overwriting existing bonds.
 
-**Recommendation**: 
+**Recommendation**:
+
 - Add call to `recordAppealBond` in escalation flow (see Integration Issues section)
 - Add check: `require(appealBonds[workflowId][round].amount == 0, "Bond already exists");`
 
@@ -221,6 +245,7 @@ function recordAppealBond(
 **Location**: `ResolverIncentiveModuleV2.sol:156-178`
 
 **Function Signature:**
+
 ```solidity
 function distributeAppealBond(
     uint256 workflowId,
@@ -232,22 +257,25 @@ function distributeAppealBond(
 **Issues Found:**
 
 1. **Round Logic Confusion**:
+
    ```solidity
    // Bond was posted to escalate FROM round to round+1
    // So we look up the bond at round+1
    uint8 bondRound = round + 1;
    ```
+
    This comment suggests `round` parameter is the round being appealed FROM, but the function should clarify:
    - If `round` = prior round (decision being appealed), then bond is at `round + 1` ✅
    - If `round` = bond round, then no addition needed ❌
-   
+
    **Current implementation assumes `round` = prior round**, which is correct if called from `recordReversal` with prior round.
 
 2. **Missing Integration**: This function is never called
    - Should be called when dispute is finalized and outcome is known
    - Should be called from `recordReversal` or `onDisputeFinalized`
 
-**Recommendation**: 
+**Recommendation**:
+
 - Add call to `distributeAppealBond` when dispute finalizes
 - Clarify parameter documentation: `round` = round whose decision was appealed
 
@@ -256,11 +284,13 @@ function distributeAppealBond(
 **Location**: `ResolverIncentiveModuleV2.sol:185-210`
 
 **Issues:**
+
 - Uses push pattern (immediate transfer)
 - ETH handling: uses low-level call without reentrancy guard
 - ERC20 handling: uses `safeTransfer` (good)
 
-**Recommendation**: 
+**Recommendation**:
+
 - Add `nonReentrant` modifier to `distributeAppealBond` (already present on contract level via inheritance)
 - Consider pull pattern for consistency
 
@@ -271,14 +301,17 @@ function distributeAppealBond(
 **Issues Found:**
 
 1. **Rounding Error**:
+
    ```solidity
    uint256 amountPerResolver = bond.amount / count;
    ```
+
    If `bond.amount` is not divisible by `count`, remainder is lost.
-   
+
    **Example**: 100 tokens, 3 resolvers = 33 tokens each, 1 token lost.
 
-   **Recommendation**: 
+   **Recommendation**:
+
    ```solidity
    uint256 amountPerResolver = bond.amount / count;
    uint256 remainder = bond.amount % count;
@@ -286,11 +319,13 @@ function distributeAppealBond(
    ```
 
 2. **Resolver Matching Logic**:
+
    ```solidity
    if (resolvers[i].level == priorRound) {
    ```
+
    This matches by `level` field, but `level` in V1 represents escalation level (0, 1, 2), which should match rounds.
-   
+
    **Verification Needed**: Confirm that `resolver.level` in `disputeResolvers` array matches the round number.
 
 3. **Empty Resolver Array Handling**:
@@ -309,14 +344,17 @@ function distributeAppealBond(
 ### 5.1 Round Representation
 
 **V1 Implementation:**
+
 - Uses `level` field in `ResolverRecord` struct (0, 1, 2)
 - `level` represents escalation level: 0 = standard, 1 = senior, 2 = external
 
 **V2 Implementation:**
+
 - Uses `round` parameter in appeal bond functions
 - `round` represents the round being escalated TO
 
 **Consistency Check**: ✅ `level` and `round` are equivalent:
+
 - Round 0 = Level 0 (standard resolver)
 - Round 1 = Level 1 (senior resolver)
 - Round 2 = Level 2 (external/Kleros)
@@ -324,6 +362,7 @@ function distributeAppealBond(
 ### 5.2 Round Tracking in Lifecycle Hooks
 
 **Interface Methods:**
+
 - `onDisputeOpened(..., uint8 round)` - round should be 0 (initial)
 - `onResolverAssigned(..., uint8 round)` - round when resolver assigned
 - `onDecisionSubmitted(..., uint8 round)` - round when decision made
@@ -331,6 +370,7 @@ function distributeAppealBond(
 - `onDisputeFinalized(..., uint8 finalRound)` - final deciding round
 
 **Implementation Status:**
+
 - ✅ `onResolverAssigned` - called with correct round
 - ✅ `onDecisionSubmitted` - called with correct round
 - ✅ `onEscalated` - called with correct fromRound/toRound
@@ -344,11 +384,13 @@ function distributeAppealBond(
 ### 6.1 Escalation Fee Tracking
 
 **V1 Implementation:**
+
 - `recordEscalationFee` accumulates fees per dispute
 - Fees are included in payment calculation
 - Escalation fees distributed to resolvers based on level weights
 
 **V2 Changes:**
+
 - Appeal bonds replace escalation fees (conceptually)
 - But escalation fees still tracked in V1 (for backward compatibility?)
 
@@ -357,11 +399,13 @@ function distributeAppealBond(
 ### 6.2 Incentive Module Hooks on Escalation
 
 **Current Flow:**
+
 1. `DecentralizedResolutionModule.executeEscalation` is called
 2. Calls `incentiveModule.onEscalated(workflowId, fromRound, toRound, escalatedBy)`
 3. Calls `incentiveModule.onResolverAssigned(workflowId, nextRes, toRound)`
 
 **Missing:**
+
 - `recordAppealBond` is not called
 - Bond should be recorded when escalation happens
 
@@ -372,6 +416,7 @@ function distributeAppealBond(
 **Location**: `DecentralizedResolutionModule.getRequiredAppealBond`
 
 **Implementation:**
+
 - Uses `EscalationCostLibrary.calculateEscalationCost`
 - Returns bond amount and token address
 - Called by `canEscalate` to determine required bond
@@ -389,17 +434,20 @@ function distributeAppealBond(
 **Issue**: `IIncentiveModule.onDisputeOpened` is defined but never called.
 
 **Expected Call Sites:**
+
 - `BaseEscrow.openDispute` - should call after dispute opened
 - `DecentralizedResolutionModule.initializeDispute` - should call after initialization
 
 **Current State**: No calls found in codebase.
 
-**Impact**: 
+**Impact**:
+
 - Incentive module cannot track dispute creation
 - Cannot record initial escrow fee
 - Metrics may be incomplete
 
-**Recommendation**: 
+**Recommendation**:
+
 ```solidity
 // In BaseEscrow.openDispute or DisputeInitializationLibrary
 if (address(incentiveModule) != address(0)) {
@@ -413,6 +461,7 @@ if (address(incentiveModule) != address(0)) {
 **Issue**: `IIncentiveModule.onDisputeFinalized` is defined but never called.
 
 **Expected Call Sites:**
+
 - When dispute reaches final state (no more appeals possible)
 - After appeal window expires and no escalation occurred
 - When final round decision is made and it's the last round
@@ -420,18 +469,20 @@ if (address(incentiveModule) != address(0)) {
 **Current State**: No calls found in codebase.
 
 **Impact**:
+
 - Incentive module cannot finalize dispute state
 - Cannot trigger final payment distribution
 - Appeal bond distribution may not be triggered
 
 **Recommendation**:
+
 ```solidity
 // In DecentralizedResolutionModule or BaseEscrow
 // When dispute is finalized (appeal window expired, or round 2 decision made)
 if (address(incentiveModule) != address(0)) {
     try incentiveModule.onDisputeFinalized(workflowId, finalRound, finalDecision) {}
     catch { /* log error */ }
-    
+
     // Then distribute appeal bonds if any
     // Check each round for bonds and distribute based on outcome
 }
@@ -442,18 +493,22 @@ if (address(incentiveModule) != address(0)) {
 **Issue**: `ResolverIncentiveModuleV2.recordAppealBond` is never called during escalation.
 
 **Expected Call Site:**
+
 - `BaseEscrow.escalateDispute` - after bond is collected
 - `DisputeOps.escalateDispute` - after bond validation
 
-**Current State**: 
+**Current State**:
+
 - `canEscalate` returns bond amount
 - But bond is never collected or recorded
 
-**Impact**: 
+**Impact**:
+
 - Appeal bonds are never stored
 - `distributeAppealBond` will always fail (no bond recorded)
 
 **Recommendation**:
+
 ```solidity
 // In BaseEscrow.escalateDispute or DisputeOps.escalateDispute
 // After collecting bond from user:
@@ -474,11 +529,13 @@ if (address(incentiveModule) != address(0)) {
 **Issue**: `ResolverIncentiveModuleV2.distributeAppealBond` is never called.
 
 **Expected Call Sites:**
+
 - When dispute finalizes and outcome is known
 - When `recordReversal` is called (outcome flipped)
 - In `onDisputeFinalized` hook implementation
 
 **Recommendation**:
+
 ```solidity
 // In DecentralizedResolutionModule.recordReversal
 // After recording reversal:
@@ -504,14 +561,15 @@ if (address(incentiveModule) != address(0)) {
 **Issue**: Interface defines `distributePayments(uint256, address, uint256)` but V1/V2 use `onDisputeResolved(uint256, address)`.
 
 **Recommendation**: Implement `distributePayments` as a wrapper:
+
 ```solidity
 function distributePayments(
-    uint256 workflowId,
-    address token,
-    uint256 totalFees
+  uint256 workflowId,
+  address token,
+  uint256 totalFees
 ) external override onlyEscrowContract {
-    // Delegate to onDisputeResolved for backward compatibility
-    onDisputeResolved(workflowId, token);
+  // Delegate to onDisputeResolved for backward compatibility
+  onDisputeResolved(workflowId, token);
 }
 ```
 
@@ -603,15 +661,15 @@ function distributePayments(
 ```
 Dispute Opened
   ❌ onDisputeOpened NOT CALLED
-  
+
 Escalation
   ✅ onEscalated CALLED
   ✅ onResolverAssigned CALLED
   ❌ recordAppealBond NOT CALLED
-  
+
 Decision Submitted
   ✅ onDecisionSubmitted CALLED
-  
+
 Dispute Finalized
   ❌ onDisputeFinalized NOT CALLED
   ❌ distributeAppealBond NOT CALLED
@@ -624,16 +682,16 @@ Dispute Opened
   ✅ onDisputeOpened CALLED
     → Record escrow fee
     → Initialize dispute tracking
-    
+
 Escalation
   ✅ Collect bond from user
   ✅ recordAppealBond CALLED
   ✅ onEscalated CALLED
   ✅ onResolverAssigned CALLED
-  
+
 Decision Submitted
   ✅ onDecisionSubmitted CALLED
-  
+
 Dispute Finalized
   ✅ onDisputeFinalized CALLED
   ✅ distributeAppealBond CALLED (for each bond)

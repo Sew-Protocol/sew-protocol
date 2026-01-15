@@ -6,10 +6,13 @@
 ## Implementation Summary
 
 ### Library Created
+
 - ✅ `ModuleQueueActivateLibrary.sol` - Consolidates module queue/activate/getPending logic
 
 ### Functions Refactored
+
 **EscrowVault & EscrowableERC20 each had 12 functions refactored:**
+
 - `queueDefaultReleaseStrategy()` - Now uses library
 - `activateDefaultReleaseStrategy()` - Now uses library
 - `getPendingDefaultReleaseStrategy()` - Now uses library
@@ -26,15 +29,19 @@
 ## Size Impact
 
 ### Before Extraction
+
 - **EscrowVault:** 38.86 KB (39,795 bytes)
 - **EscrowableERC20:** 41.19 KB (42,180 bytes)
 
 ### After Extraction
+
 - **EscrowVault:** 42.76 KB (43,786 bytes) - **+3,991 bytes** ⚠️
 - **EscrowableERC20:** 41.89 KB (42,895 bytes) - **+715 bytes** ⚠️
 
 ### Analysis
+
 **Why Size Increased:**
+
 1. **Library Linking Overhead:** Each library function call adds:
    - Function selector (4 bytes)
    - ABI encoding/decoding overhead
@@ -71,6 +78,7 @@
 **Revert ModuleQueueActivateLibrary extraction** - The size increase is too significant, especially for EscrowVault (+3.9 KB).
 
 **Alternative Approaches:**
+
 1. **Keep functions inline** - They're already quite simple
 2. **Consider a ModuleManager contract** - But this requires major architectural changes
 3. **Focus on other optimizations** - Governance library, dispute resolution simplification
@@ -80,5 +88,3 @@
 1. ⚠️ **Revert ModuleQueueActivateLibrary** (if size increase is unacceptable)
 2. ✅ **Proceed with Governance Library** (medium impact, lower risk)
 3. ⚠️ **Review other optimization opportunities**
-
-

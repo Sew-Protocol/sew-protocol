@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
-import "../types/EscrowTypes.sol";
-import "../interfaces/IYieldGenerationModule.sol";
-import "../interfaces/IYieldDistributionModule.sol";
-import "./YieldHandlingLibrary.sol";
+import '../types/EscrowTypes.sol';
+import '../interfaces/IYieldGenerationModule.sol';
+import '../interfaces/IYieldDistributionModule.sol';
+import './YieldHandlingLibrary.sol';
 
 /**
  * @title ResolverActionLibrary
@@ -19,8 +19,8 @@ library ResolverActionLibrary {
     struct ActionParams {
         uint256 workflowId;
         uint256 amount;
-        bool isRelease;      // true = release to recipient, false = cancel/refund to sender
-        address recipient;   // to (if release) or from (if cancel)
+        bool isRelease; // true = release to recipient, false = cancel/refund to sender
+        address recipient; // to (if release) or from (if cancel)
         address token;
     }
 
@@ -60,4 +60,3 @@ library ResolverActionLibrary {
         return result;
     }
 }
-

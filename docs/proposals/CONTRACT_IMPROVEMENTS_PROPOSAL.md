@@ -22,11 +22,13 @@ This document proposes improvements to `DecentralizedResolutionModule`, `Resolve
 **Issue**: No mechanism to check if a resolver is active/available before assignment
 
 **Problem**:
+
 - Round-robin may assign inactive resolvers
 - No way to skip unavailable resolvers
 - Resolvers might be removed but still in array
 
 **Proposal**:
+
 ```solidity
 // Add to DecentralizedResolutionModule
 mapping(address => bool) public resolverActive; // Quick check
@@ -36,32 +38,32 @@ function selectResolverRoundRobin(bytes32 category, bool useSeniorResolvers)
     internal view returns (address selectedResolver)
 {
     address[] memory resolverList = useSeniorResolvers ? approvedSeniorResolvers : approvedResolvers;
-    
+
     if (resolverList.length == 0) {
         return address(0);
     }
-    
-    uint256 currentIndex = useSeniorResolvers 
-        ? categorySeniorResolverIndex[category] 
+
+    uint256 currentIndex = useSeniorResolvers
+        ? categorySeniorResolverIndex[category]
         : categoryResolverIndex[category];
-    
+
     // Try up to resolverList.length times to find active resolver
     for (uint256 i = 0; i < resolverList.length; i++) {
         uint256 index = (currentIndex + i) % resolverList.length;
         address candidate = resolverList[index];
-        
+
         // Check if resolver is active
-        if (resolverActive[candidate] && 
+        if (resolverActive[candidate] &&
             (isApprovedResolver[candidate] || isApprovedSeniorResolver[candidate])) {
             return candidate;
         }
     }
-    
+
     return address(0); // No active resolvers
 }
 
-function setResolverActive(address resolver, bool active) 
-    external onlyRole(ROLE_TIMELOCK) 
+function setResolverActive(address resolver, bool active)
+    external onlyRole(ROLE_TIMELOCK)
 {
     resolverActive[resolver] = active;
     if (active) {
@@ -72,6 +74,7 @@ function setResolverActive(address resolver, bool active)
 ```
 
 **Benefits**:
+
 - Skip inactive resolvers automatically
 - Better user experience
 - Prevents assignment to removed resolvers
@@ -83,11 +86,13 @@ function setResolverActive(address resolver, bool active)
 **Issue**: Round-robin doesn't account for resolver capacity or current workload
 
 **Problem**:
+
 - High-capacity resolvers get same weight as low-capacity
 - No way to prioritize available resolvers
 - Can't handle resolver-specific limits
 
 **Proposal**:
+
 ```solidity
 struct ResolverCapacity {
     uint256 maxConcurrentDisputes;
@@ -101,26 +106,27 @@ function selectResolverRoundRobin(bytes32 category, bool useSeniorResolvers)
     internal view returns (address selectedResolver)
 {
     // ... existing code ...
-    
+
     // Filter by capacity
     for (uint256 i = 0; i < resolverList.length; i++) {
         uint256 index = (currentIndex + i) % resolverList.length;
         address candidate = resolverList[index];
-        
+
         ResolverCapacity memory capacity = resolverCapacity[candidate];
-        
-        if (capacity.acceptsNewDisputes && 
+
+        if (capacity.acceptsNewDisputes &&
             capacity.currentDisputes < capacity.maxConcurrentDisputes) {
             return candidate;
         }
     }
-    
+
     // Fallback: return first available even if at capacity
     return selectResolverRoundRobin(category, useSeniorResolvers);
 }
 ```
 
 **Benefits**:
+
 - Better workload distribution
 - Prevents resolver overload
 - More realistic for production use
@@ -132,11 +138,13 @@ function selectResolverRoundRobin(bytes32 category, bool useSeniorResolvers)
 **Issue**: No timeout mechanism for disputes - can remain unresolved indefinitely
 
 **Problem**:
+
 - Disputes can stall if resolver is unresponsive
 - No automatic escalation after timeout
 - Users have no recourse for slow resolvers
 
 **Proposal**:
+
 ```solidity
 struct DisputeMetadata {
     address currentResolver;
@@ -151,24 +159,25 @@ uint256 public disputeTimeout = 7 days; // Configurable via governance
 
 function initializeDispute(...) external onlyEscrowContract {
     // ... existing code ...
-    
+
     dm.timeoutTimestamp = block.timestamp + disputeTimeout;
     emit DisputeInitialized(workflowId, resolver, dm.timeoutTimestamp);
 }
 
 function checkAndAutoEscalate(uint256 workflowId) external {
     DisputeMetadata storage dm = disputeMetadata[workflowId];
-    
+
     require(dm.currentResolver != address(0), "No dispute");
     require(block.timestamp >= dm.timeoutTimestamp, "Not timed out");
     require(dm.escalationLevel < 2, "Max level reached");
-    
+
     // Auto-escalate
     executeEscalation(workflowId, "");
 }
 ```
 
 **Benefits**:
+
 - Prevents disputes from stalling
 - Automatic escalation path
 - Better user experience
@@ -180,56 +189,57 @@ function checkAndAutoEscalate(uint256 workflowId) external {
 **Issue**: Categories must be manually set - no automatic categorization
 
 **Problem**:
+
 - Escrow contracts must call `setEscrowCategory` manually
 - Easy to forget
 - Inconsistent categorization
 
 **Proposal**:
+
 ```solidity
 function getResolver(
-    uint256 workflowId,
-    bytes calldata escrowData
+  uint256 workflowId,
+  bytes calldata escrowData
 ) external view override returns (address resolver, uint8 escalationLevel) {
-    DisputeMetadata memory dm = disputeMetadata[workflowId];
-    
-    if (dm.currentResolver != address(0)) {
-        return (dm.currentResolver, dm.escalationLevel);
-    }
-    
-    // Auto-determine category if not set
-    bytes32 category = escrowCategory[workflowId];
-    if (category == bytes32(0)) {
-        // Auto-categorize based on escrow data
-        category = autoCategorizeEscrow(escrowData);
-        // Note: Can't write to storage in view function
-        // Escrow contract should call setEscrowCategory
-    }
-    
-    // ... rest of logic ...
+  DisputeMetadata memory dm = disputeMetadata[workflowId];
+
+  if (dm.currentResolver != address(0)) {
+    return (dm.currentResolver, dm.escalationLevel);
+  }
+
+  // Auto-determine category if not set
+  bytes32 category = escrowCategory[workflowId];
+  if (category == bytes32(0)) {
+    // Auto-categorize based on escrow data
+    category = autoCategorizeEscrow(escrowData);
+    // Note: Can't write to storage in view function
+    // Escrow contract should call setEscrowCategory
+  }
+
+  // ... rest of logic ...
 }
 
-function autoCategorizeEscrow(bytes calldata escrowData) 
-    public pure returns (bytes32) 
-{
-    // Decode escrow data
-    (address token, , , uint256 amount, ) = abi.decode(
-        escrowData, 
-        (address, address, address, uint256, uint256)
-    );
-    
-    // Generate category based on amount and token
-    return keccak256(abi.encodePacked(token, getAmountTier(amount)));
+function autoCategorizeEscrow(bytes calldata escrowData) public pure returns (bytes32) {
+  // Decode escrow data
+  (address token, , , uint256 amount, ) = abi.decode(
+    escrowData,
+    (address, address, address, uint256, uint256)
+  );
+
+  // Generate category based on amount and token
+  return keccak256(abi.encodePacked(token, getAmountTier(amount)));
 }
 
 function getAmountTier(uint256 amount) public pure returns (string memory) {
-    if (amount < 1 ether) return "SMALL";
-    if (amount < 10 ether) return "MEDIUM";
-    if (amount < 100 ether) return "LARGE";
-    return "VERY_LARGE";
+  if (amount < 1 ether) return 'SMALL';
+  if (amount < 10 ether) return 'MEDIUM';
+  if (amount < 100 ether) return 'LARGE';
+  return 'VERY_LARGE';
 }
 ```
 
 **Benefits**:
+
 - Automatic categorization
 - Less manual work
 - More consistent
@@ -241,11 +251,13 @@ function getAmountTier(uint256 amount) public pure returns (string memory) {
 **Issue**: No way to track resolver performance or quality
 
 **Problem**:
+
 - Can't identify good vs. bad resolvers
 - No data for future improvements
 - Can't weight selection by quality
 
 **Proposal**:
+
 ```solidity
 struct ResolverStats {
     uint256 disputesResolved;
@@ -263,24 +275,25 @@ function recordResolution(
     bool wasEscalated
 ) external onlyEscrowContract {
     ResolverStats storage stats = resolverStats[resolver];
-    
+
     if (wasEscalated) {
         stats.disputesEscalated++;
     } else {
         stats.disputesResolved++;
     }
-    
+
     // Update quality score (simplified)
     uint256 total = stats.disputesResolved + stats.disputesEscalated;
     if (total > 0) {
         stats.qualityScore = (stats.disputesResolved * 10000) / total;
     }
-    
+
     stats.lastResolutionTimestamp = block.timestamp;
 }
 ```
 
 **Benefits**:
+
 - Track resolver performance
 - Enable quality-based selection in future
 - Data for governance decisions
@@ -292,36 +305,38 @@ function recordResolution(
 **Issue**: No batch operations for common tasks
 
 **Problem**:
+
 - Gas inefficient for multiple operations
 - Slow for bulk resolver management
 - Poor UX for governance
 
 **Proposal**:
+
 ```solidity
 function batchAppointResolvers(
-    address[] calldata resolvers,
-    string[] calldata names,
-    string[] calldata descriptions
+  address[] calldata resolvers,
+  string[] calldata names,
+  string[] calldata descriptions
 ) external onlySeniorResolver {
-    require(
-        resolvers.length == names.length && 
-        names.length == descriptions.length,
-        "Array length mismatch"
-    );
-    
-    for (uint256 i = 0; i < resolvers.length; i++) {
-        appointResolver(resolvers[i], names[i], descriptions[i]);
-    }
+  require(
+    resolvers.length == names.length && names.length == descriptions.length,
+    'Array length mismatch'
+  );
+
+  for (uint256 i = 0; i < resolvers.length; i++) {
+    appointResolver(resolvers[i], names[i], descriptions[i]);
+  }
 }
 
 function batchRemoveResolvers(address[] calldata resolvers) external {
-    for (uint256 i = 0; i < resolvers.length; i++) {
-        removeResolver(resolvers[i]);
-    }
+  for (uint256 i = 0; i < resolvers.length; i++) {
+    removeResolver(resolvers[i]);
+  }
 }
 ```
 
 **Benefits**:
+
 - Gas efficient
 - Better governance UX
 - Faster setup
@@ -335,6 +350,7 @@ function batchRemoveResolvers(address[] calldata resolvers) external {
 #### Issue 1: Array Iteration in `removeResolver`
 
 **Current**:
+
 ```solidity
 for (uint256 i = 0; i < approvedResolvers.length; i++) {
     if (approvedResolvers[i] == resolver) {
@@ -348,24 +364,25 @@ for (uint256 i = 0; i < approvedResolvers.length; i++) {
 **Problem**: O(n) iteration, can be expensive for large arrays
 
 **Proposal**:
+
 ```solidity
 mapping(address => uint256) public resolverIndex; // Resolver => index in array
 
 function removeResolver(address resolver) external {
     // ... existing checks ...
-    
+
     uint256 index = resolverIndex[resolver];
     uint256 lastIndex = approvedResolvers.length - 1;
-    
+
     if (index != lastIndex) {
         address lastResolver = approvedResolvers[lastIndex];
         approvedResolvers[index] = lastResolver;
         resolverIndex[lastResolver] = index;
     }
-    
+
     approvedResolvers.pop();
     delete resolverIndex[resolver];
-    
+
     // ... rest of code ...
 }
 ```
@@ -381,51 +398,48 @@ function removeResolver(address resolver) external {
 **Problem**: Unnecessary external call overhead, more gas
 
 **Proposal**:
+
 ```solidity
 function executeEscalation(
-    uint256 workflowId,
-    bytes calldata escrowData
-) external override nonReentrant returns (
-    bool success,
-    address newResolver,
-    uint8 newLevel
-) {
-    DisputeMetadata storage dm = disputeMetadata[workflowId];
-    uint8 currentLevel = dm.escalationLevel;
-    uint8 nextLevel = currentLevel + 1;
-    
-    // Inline escalation check instead of external call
-    if (nextLevel > 2) {
-        return (false, address(0), currentLevel);
-    }
-    
-    EscalationConfig memory config = escalationConfig[nextLevel];
-    if (!config.enabled) {
+  uint256 workflowId,
+  bytes calldata escrowData
+) external override nonReentrant returns (bool success, address newResolver, uint8 newLevel) {
+  DisputeMetadata storage dm = disputeMetadata[workflowId];
+  uint8 currentLevel = dm.escalationLevel;
+  uint8 nextLevel = currentLevel + 1;
+
+  // Inline escalation check instead of external call
+  if (nextLevel > 2) {
+    return (false, address(0), currentLevel);
+  }
+
+  EscalationConfig memory config = escalationConfig[nextLevel];
+  if (!config.enabled) {
+    return (false, address(0), 0);
+  }
+
+  // Determine next resolver (inline logic from canEscalate)
+  address nextResolver;
+  if (nextLevel == 1) {
+    bytes32 category = escrowCategory[workflowId];
+    if (approvedSeniorResolvers.length > 0) {
+      nextResolver = selectResolverRoundRobin(category, true);
+      if (nextResolver == address(0)) {
         return (false, address(0), 0);
-    }
-    
-    // Determine next resolver (inline logic from canEscalate)
-    address nextResolver;
-    if (nextLevel == 1) {
-        bytes32 category = escrowCategory[workflowId];
-        if (approvedSeniorResolvers.length > 0) {
-            nextResolver = selectResolverRoundRobin(category, true);
-            if (nextResolver == address(0)) {
-                return (false, address(0), 0);
-            }
-        } else {
-            return (false, address(0), 0);
-        }
-    } else if (nextLevel == 2) {
-        nextResolver = externalResolver;
-        if (nextResolver == address(0)) {
-            return (false, address(0), 0);
-        }
+      }
     } else {
-        nextResolver = config.resolver;
+      return (false, address(0), 0);
     }
-    
-    // ... rest of function ...
+  } else if (nextLevel == 2) {
+    nextResolver = externalResolver;
+    if (nextResolver == address(0)) {
+      return (false, address(0), 0);
+    }
+  } else {
+    nextResolver = config.resolver;
+  }
+
+  // ... rest of function ...
 }
 ```
 
@@ -438,24 +452,24 @@ function executeEscalation(
 **Current**: Multiple storage reads in `selectResolverRoundRobin`
 
 **Proposal**:
+
 ```solidity
-function selectResolverRoundRobin(bytes32 category, bool useSeniorResolvers)
-    internal view returns (address selectedResolver)
-{
-    // Cache resolver list
-    address[] storage resolverList = useSeniorResolvers 
-        ? approvedSeniorResolvers 
-        : approvedResolvers;
-    
-    uint256 length = resolverList.length;
-    if (length == 0) return address(0);
-    
-    // Single storage read for index
-    uint256 currentIndex = useSeniorResolvers 
-        ? categorySeniorResolverIndex[category] 
-        : categoryResolverIndex[category];
-    
-    return resolverList[currentIndex % length];
+function selectResolverRoundRobin(
+  bytes32 category,
+  bool useSeniorResolvers
+) internal view returns (address selectedResolver) {
+  // Cache resolver list
+  address[] storage resolverList = useSeniorResolvers ? approvedSeniorResolvers : approvedResolvers;
+
+  uint256 length = resolverList.length;
+  if (length == 0) return address(0);
+
+  // Single storage read for index
+  uint256 currentIndex = useSeniorResolvers
+    ? categorySeniorResolverIndex[category]
+    : categoryResolverIndex[category];
+
+  return resolverList[currentIndex % length];
 }
 ```
 
@@ -470,19 +484,17 @@ function selectResolverRoundRobin(bytes32 category, bool useSeniorResolvers)
 **Current**: Some functions don't validate zero addresses
 
 **Proposal**:
+
 ```solidity
 function setIncentiveModule(address _incentiveModule) external onlyRole(ROLE_TIMELOCK) {
-    // Allow zero address to disable, but validate if non-zero
-    if (_incentiveModule != address(0)) {
-        require(
-            _incentiveModule.code.length > 0,
-            "Not a contract"
-        );
-    }
-    
-    address oldModule = address(incentiveModule);
-    incentiveModule = ResolverIncentiveModule(_incentiveModule);
-    emit IncentiveModuleUpdated(oldModule, _incentiveModule);
+  // Allow zero address to disable, but validate if non-zero
+  if (_incentiveModule != address(0)) {
+    require(_incentiveModule.code.length > 0, 'Not a contract');
+  }
+
+  address oldModule = address(incentiveModule);
+  incentiveModule = ResolverIncentiveModule(_incentiveModule);
+  emit IncentiveModuleUpdated(oldModule, _incentiveModule);
 }
 ```
 
@@ -493,19 +505,21 @@ function setIncentiveModule(address _incentiveModule) external onlyRole(ROLE_TIM
 **Current**: `onDisputeResolved` uses `nonReentrant` but could be improved
 
 **Proposal**: Already has `nonReentrant`, but add checks-effects-interactions validation:
+
 ```solidity
-function onDisputeResolved(uint256 workflowId, address token)
-    external onlyEscrowContract nonReentrant 
-{
-    // Checks
-    require(token != address(0), "Zero token");
-    require(!disputePaymentsDistributed[workflowId], "Payments already distributed");
-    
-    // Effects (state changes before external calls)
-    disputePaymentsDistributed[workflowId] = true;
-    
-    // Interactions (external calls last)
-    // ... payment calculation and distribution ...
+function onDisputeResolved(
+  uint256 workflowId,
+  address token
+) external onlyEscrowContract nonReentrant {
+  // Checks
+  require(token != address(0), 'Zero token');
+  require(!disputePaymentsDistributed[workflowId], 'Payments already distributed');
+
+  // Effects (state changes before external calls)
+  disputePaymentsDistributed[workflowId] = true;
+
+  // Interactions (external calls last)
+  // ... payment calculation and distribution ...
 }
 ```
 
@@ -520,21 +534,21 @@ function onDisputeResolved(uint256 workflowId, address token)
 **Problem**: Attacker could predict next resolver and manipulate selection
 
 **Proposal**: Add commit-reveal or use blockhash:
+
 ```solidity
-function selectResolverRoundRobin(bytes32 category, bool useSeniorResolvers)
-    internal view returns (address selectedResolver)
-{
-    // ... existing code ...
-    
-    // Add randomness from blockhash to prevent front-running
-    uint256 randomOffset = uint256(keccak256(abi.encodePacked(
-        blockhash(block.number - 1),
-        category,
-        block.timestamp
-    ))) % resolverList.length;
-    
-    uint256 index = (currentIndex + randomOffset) % resolverList.length;
-    return resolverList[index];
+function selectResolverRoundRobin(
+  bytes32 category,
+  bool useSeniorResolvers
+) internal view returns (address selectedResolver) {
+  // ... existing code ...
+
+  // Add randomness from blockhash to prevent front-running
+  uint256 randomOffset = uint256(
+    keccak256(abi.encodePacked(blockhash(block.number - 1), category, block.timestamp))
+  ) % resolverList.length;
+
+  uint256 index = (currentIndex + randomOffset) % resolverList.length;
+  return resolverList[index];
 }
 ```
 
@@ -551,6 +565,7 @@ function selectResolverRoundRobin(bytes32 category, bool useSeniorResolvers)
 **Problem**: Failures are hidden, hard to debug
 
 **Proposal**:
+
 ```solidity
 if (address(incentiveModule) != address(0)) {
     try incentiveModule.recordResolver(workflowId, resolver, 0) {
@@ -572,24 +587,22 @@ if (address(incentiveModule) != address(0)) {
 **Current**: Some functions lack comprehensive validation
 
 **Proposal**:
+
 ```solidity
 function recordEscalationFee(
-    uint256 workflowId,
-    address token,
-    uint256 amount
+  uint256 workflowId,
+  address token,
+  uint256 amount
 ) external onlyEscrowContract {
-    require(token != address(0), "Zero token");
-    require(amount > 0, "Zero amount");
-    require(amount < type(uint256).max / 2, "Amount too large"); // Prevent overflow
-    
-    // Check if dispute exists
-    require(
-        disputeResolvers[workflowId].length > 0,
-        "Dispute not initialized"
-    );
-    
-    disputeEscalationFees[workflowId] += amount;
-    emit EscalationFeeRecorded(workflowId, token, amount);
+  require(token != address(0), 'Zero token');
+  require(amount > 0, 'Zero amount');
+  require(amount < type(uint256).max / 2, 'Amount too large'); // Prevent overflow
+
+  // Check if dispute exists
+  require(disputeResolvers[workflowId].length > 0, 'Dispute not initialized');
+
+  disputeEscalationFees[workflowId] += amount;
+  emit EscalationFeeRecorded(workflowId, token, amount);
 }
 ```
 
@@ -604,29 +617,26 @@ function recordEscalationFee(
 **Problem**: Close to contract size limit, harder to maintain
 
 **Proposal**: Split into multiple contracts:
+
 ```solidity
 // ResolverRegistry.sol - Resolver management
 contract ResolverRegistry {
-    // Resolver appointment, removal, metadata
+  // Resolver appointment, removal, metadata
 }
 
 // EscalationManager.sol - Escalation logic
 contract EscalationManager {
-    // Escalation paths, configuration
+  // Escalation paths, configuration
 }
 
 // ResolutionTable.sol - Category management
 contract ResolutionTable {
-    // Category assignment, resolution table
+  // Category assignment, resolution table
 }
 
 // DecentralizedResolutionModule.sol - Orchestrator
-contract DecentralizedResolutionModule is 
-    ResolverRegistry, 
-    EscalationManager, 
-    ResolutionTable 
-{
-    // Main logic, coordinates sub-modules
+contract DecentralizedResolutionModule is ResolverRegistry, EscalationManager, ResolutionTable {
+  // Main logic, coordinates sub-modules
 }
 ```
 
@@ -639,6 +649,7 @@ contract DecentralizedResolutionModule is
 **Current**: Hard-coded values like `level <= 2`, `10000` (basis points)
 
 **Proposal**:
+
 ```solidity
 uint8 public constant MAX_ESCALATION_LEVEL = 2;
 uint256 public constant BASIS_POINTS_DENOMINATOR = 10000;
@@ -664,19 +675,14 @@ uint256 public constant DEFAULT_DISPUTE_TIMEOUT = 7 days;
 **Current**: Some state changes don't emit events
 
 **Proposal**:
-```solidity
-event RoundRobinCounterAdvanced(
-    bytes32 indexed category,
-    bool seniorResolvers,
-    uint256 newIndex
-);
 
-function advanceRoundRobinCounter(bytes32 category, bool useSeniorResolvers) 
-    internal 
-{
-    // ... existing code ...
-    
-    emit RoundRobinCounterAdvanced(category, useSeniorResolvers, newIndex);
+```solidity
+event RoundRobinCounterAdvanced(bytes32 indexed category, bool seniorResolvers, uint256 newIndex);
+
+function advanceRoundRobinCounter(bytes32 category, bool useSeniorResolvers) internal {
+  // ... existing code ...
+
+  emit RoundRobinCounterAdvanced(category, useSeniorResolvers, newIndex);
 }
 ```
 
@@ -693,18 +699,19 @@ function advanceRoundRobinCounter(bytes32 category, bool useSeniorResolvers)
 **Problem**: Unfair if first resolver is different each time
 
 **Proposal**: Distribute remainder proportionally:
+
 ```solidity
 // Distribute remainder proportionally
 if (paymentSum < resolverShare) {
     uint256 remainder = resolverShare - paymentSum;
     uint256 distributed = 0;
-    
+
     for (uint256 i = 0; i < payments.length && distributed < remainder; i++) {
         uint256 add = (remainder - distributed) / (payments.length - i);
         payments[i] += add;
         distributed += add;
     }
-    
+
     // Any final remainder to last resolver
     if (distributed < remainder) {
         payments[payments.length - 1] += (remainder - distributed);
@@ -719,6 +726,7 @@ if (paymentSum < resolverShare) {
 **Current**: Zero payments are skipped silently
 
 **Proposal**: Emit event for zero payments:
+
 ```solidity
 if (output.payments[i] > 0 && output.resolvers[i] != address(0)) {
     tokenContract.safeTransfer(output.resolvers[i], output.payments[i]);
@@ -736,27 +744,28 @@ if (output.payments[i] > 0 && output.resolvers[i] != address(0)) {
 **Issue**: Escrow contracts must manually call multiple functions
 
 **Proposal**: Add helper function in escrow contract:
+
 ```solidity
 function _initializeDisputeWithIncentive(uint256 workflowId) internal {
     // Initialize in resolution module
     if (address(resolutionModule) != address(0)) {
         bytes memory escrowData = _encodeResolutionData(...);
         (address resolver, ) = IResolutionModule(resolutionModule).getResolver(
-            workflowId, 
+            workflowId,
             escrowData
         );
-        
+
         // Get category
         bytes32 category = IResolutionModule(resolutionModule).autoCategorizeEscrow(escrowData);
-        
+
         // Initialize dispute
         IResolutionModule(resolutionModule).initializeDispute(
-            workflowId, 
-            resolver, 
+            workflowId,
+            resolver,
             category
         );
     }
-    
+
     // Record fees in incentive module
     if (address(incentiveModule) != address(0)) {
         uint256 fee = calculateEscrowFee(et.totalDeposited);
@@ -798,6 +807,7 @@ function _initializeDisputeWithIncentive(uint256 workflowId) internal {
 ### Breaking Changes
 
 Most improvements are **non-breaking** and can be added incrementally:
+
 - New functions (additive)
 - New state variables (additive)
 - Enhanced validation (more restrictive, but safer)
@@ -820,6 +830,7 @@ Most improvements are **non-breaking** and can be added incrementally:
 ## 6. Summary
 
 ### Real-World Use
+
 - ✅ Resolver availability checks
 - ✅ Workload balancing
 - ✅ Dispute timeouts
@@ -828,6 +839,7 @@ Most improvements are **non-breaking** and can be added incrementally:
 - ✅ Reputation tracking
 
 ### Code Quality
+
 - ✅ Gas optimizations
 - ✅ Security hardening
 - ✅ Better error handling
@@ -836,6 +848,7 @@ Most improvements are **non-breaking** and can be added incrementally:
 - ✅ Input validation
 
 **Estimated Impact**:
+
 - **Gas Savings**: 25-35% for common operations (especially escalation)
 - **Security**: Improved with additional validations
 - **Usability**: Significantly better for production use
@@ -854,25 +867,27 @@ Most improvements are **non-breaking** and can be added incrementally:
 **Problem**: Will revert with unclear error if insufficient balance
 
 **Proposal**:
+
 ```solidity
-function onDisputeResolved(uint256 workflowId, address token)
-    external onlyEscrowContract nonReentrant 
-{
-    // ... existing checks ...
-    
-    // Calculate payments
-    PaymentOutput memory output = calculatePaymentsWithVersion(input);
-    
-    // Check contract has sufficient balance
-    IERC20 tokenContract = IERC20(token);
-    uint256 contractBalance = tokenContract.balanceOf(address(this));
-    require(contractBalance >= output.totalResolverShare, "Insufficient balance");
-    
-    // Mark as distributed before external calls
-    disputePaymentsDistributed[workflowId] = true;
-    
-    // Distribute payments
-    distributePayments(workflowId, token, output);
+function onDisputeResolved(
+  uint256 workflowId,
+  address token
+) external onlyEscrowContract nonReentrant {
+  // ... existing checks ...
+
+  // Calculate payments
+  PaymentOutput memory output = calculatePaymentsWithVersion(input);
+
+  // Check contract has sufficient balance
+  IERC20 tokenContract = IERC20(token);
+  uint256 contractBalance = tokenContract.balanceOf(address(this));
+  require(contractBalance >= output.totalResolverShare, 'Insufficient balance');
+
+  // Mark as distributed before external calls
+  disputePaymentsDistributed[workflowId] = true;
+
+  // Distribute payments
+  distributePayments(workflowId, token, output);
 }
 ```
 
@@ -882,36 +897,38 @@ function onDisputeResolved(uint256 workflowId, address token)
 
 **Issue**: Resolvers can be removed while they have active disputes
 
-**Problem**: 
+**Problem**:
+
 - Removed resolver might still be assigned to disputes
 - No way to reassign active disputes
 - Could lead to stuck disputes
 
 **Proposal**:
+
 ```solidity
 mapping(address => uint256) public resolverActiveDisputes;
 
 function removeResolver(address resolver) external {
     require(isApprovedResolver[resolver], "Not a resolver");
     require(
-        resolverMetadata[resolver].appointedBy == _msgSender() || 
+        resolverMetadata[resolver].appointedBy == _msgSender() ||
         hasRole(ROLE_TIMELOCK, _msgSender()),
         "Not authorized to remove"
     );
-    
+
     // Check if resolver has active disputes
     require(
         resolverActiveDisputes[resolver] == 0,
         "Resolver has active disputes"
     );
-    
+
     // ... rest of removal logic ...
 }
 
 // Track active disputes
 function initializeDispute(...) external onlyEscrowContract {
     // ... existing code ...
-    
+
     resolverActiveDisputes[resolver]++;
 }
 
@@ -926,6 +943,7 @@ function initializeDispute(...) external onlyEscrowContract {
 **Issue**: `generateCategoryKey` uses simple hash - potential collisions
 
 **Current**:
+
 ```solidity
 keccak256(abi.encodePacked(token, amount, categoryType))
 ```
@@ -933,14 +951,15 @@ keccak256(abi.encodePacked(token, amount, categoryType))
 **Problem**: Different inputs could hash to same category
 
 **Proposal**: Use more robust hashing:
+
 ```solidity
 function generateCategoryKey(
-    address token,
-    uint256 amount,
-    string memory categoryType
+  address token,
+  uint256 amount,
+  string memory categoryType
 ) external pure returns (bytes32) {
-    // Use abi.encode instead of abi.encodePacked for better collision resistance
-    return keccak256(abi.encode(token, amount, categoryType));
+  // Use abi.encode instead of abi.encodePacked for better collision resistance
+  return keccak256(abi.encode(token, amount, categoryType));
 }
 ```
 
@@ -954,39 +973,44 @@ function generateCategoryKey(
 
 **Current**: Incentive module transfers from its own balance
 
-**Problem**: 
+**Problem**:
+
 - Escrow contract must transfer tokens to incentive module first
 - Not clear from integration guide
 - Easy to forget, causing payment failures
 
 **Proposal**: Add pull pattern or make transfer explicit:
+
 ```solidity
 // Option 1: Pull pattern (incentive module pulls from escrow)
-function onDisputeResolved(uint256 workflowId, address token)
-    external onlyEscrowContract nonReentrant 
-{
-    // ... calculate payments ...
-    
-    // Pull tokens from escrow contract
-    IERC20(token).safeTransferFrom(_msgSender(), address(this), output.totalResolverShare);
-    
-    // Distribute
-    distributePayments(workflowId, token, output);
+function onDisputeResolved(
+  uint256 workflowId,
+  address token
+) external onlyEscrowContract nonReentrant {
+  // ... calculate payments ...
+
+  // Pull tokens from escrow contract
+  IERC20(token).safeTransferFrom(_msgSender(), address(this), output.totalResolverShare);
+
+  // Distribute
+  distributePayments(workflowId, token, output);
 }
 
 // Option 2: Explicit transfer requirement (better error message)
-function onDisputeResolved(uint256 workflowId, address token, uint256 amountToTransfer)
-    external onlyEscrowContract nonReentrant 
-{
-    // ... calculate payments ...
-    
-    require(amountToTransfer >= output.totalResolverShare, "Insufficient transfer");
-    
-    // Transfer from caller (escrow contract)
-    IERC20(token).safeTransferFrom(_msgSender(), address(this), output.totalResolverShare);
-    
-    // Distribute
-    distributePayments(workflowId, token, output);
+function onDisputeResolved(
+  uint256 workflowId,
+  address token,
+  uint256 amountToTransfer
+) external onlyEscrowContract nonReentrant {
+  // ... calculate payments ...
+
+  require(amountToTransfer >= output.totalResolverShare, 'Insufficient transfer');
+
+  // Transfer from caller (escrow contract)
+  IERC20(token).safeTransferFrom(_msgSender(), address(this), output.totalResolverShare);
+
+  // Distribute
+  distributePayments(workflowId, token, output);
 }
 ```
 
@@ -1001,23 +1025,23 @@ function onDisputeResolved(uint256 workflowId, address token, uint256 amountToTr
 **Problem**: Same resolver could be recorded multiple times with different levels
 
 **Proposal**:
+
 ```solidity
-function calculatePayments(PaymentInput memory input)
-    external pure override returns (PaymentOutput memory output)
-{
-    // ... existing validation ...
-    
-    // Check for duplicate resolvers (same address, different levels are OK)
-    // But validate addresses are not zero
-    for (uint256 i = 0; i < input.resolvers.length; i++) {
-        require(input.resolvers[i].resolver != address(0), "Zero resolver address");
-    }
-    
-    // ... rest of calculation ...
+function calculatePayments(
+  PaymentInput memory input
+) external pure override returns (PaymentOutput memory output) {
+  // ... existing validation ...
+
+  // Check for duplicate resolvers (same address, different levels are OK)
+  // But validate addresses are not zero
+  for (uint256 i = 0; i < input.resolvers.length; i++) {
+    require(input.resolvers[i].resolver != address(0), 'Zero resolver address');
+  }
+
+  // ... rest of calculation ...
 }
 ```
 
 ---
 
-*This proposal focuses on practical improvements that enhance both security and usability while maintaining backward compatibility where possible.*
-
+_This proposal focuses on practical improvements that enhance both security and usability while maintaining backward compatibility where possible._

@@ -36,7 +36,8 @@ Base remains authoritative for escrow state transitions.
 Modules can be audited independently and swapped via your existing governance lanes.
 
 Where to cut 13–15KB safely (high-confidence removals)
-1) Move all yield distribution logic out (big win, low protocol risk)
+
+1. Move all yield distribution logic out (big win, low protocol risk)
 
 You already identified yield as a high-impact chunk.
 
@@ -48,7 +49,7 @@ fallback distribution logic
 
 per-workflow distribution config setters/getters
 
-_encodeYieldDistribution / _validateYieldDistribution
+\_encodeYieldDistribution / \_validateYieldDistribution
 
 any “remainder handling”
 
@@ -60,7 +61,7 @@ If you need configuration, store it in the yield module, not in BaseEscrow.
 
 Why it’s safe: yield is usually “nice-to-have.” If it fails, worst case should be “yield not distributed” (and you can route to fee address), but it shouldn’t block escrow liveness.
 
-2) Move dispute escalation orchestration out (big win, medium risk if done carefully)
+2. Move dispute escalation orchestration out (big win, medium risk if done carefully)
 
 Keep BaseEscrow responsible for:
 
@@ -87,7 +88,7 @@ and BaseEscrow writes it to its own escrow transfer struct.
 
 Key low-risk rule: module returns a decision; BaseEscrow applies it.
 
-3) Move “rare-path” ops out (surprisingly large bytecode wins)
+3. Move “rare-path” ops out (surprisingly large bytecode wins)
 
 These often cost a lot of runtime size for little day-to-day value:
 

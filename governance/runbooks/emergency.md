@@ -10,12 +10,14 @@
 This runbook provides step-by-step procedures for activating emergency controls. Emergency controls can only **reduce risk** (down-only). They cannot be used to increase risk or modify protocol parameters.
 
 **Guardian Powers:**
+
 - `pause()` - Pause all protocol operations
 - `guardianDisableAave()` - Disable Aave yield generation
 - `guardianLowerTokenCap()` - Lower token exposure cap
 - `guardianLowerGlobalCap()` - Lower global exposure cap
 
 **Guardian Limitations:**
+
 - Cannot unpause (only timelock can)
 - Cannot enable Aave (only timelock can)
 - Cannot raise caps (down-only)
@@ -43,6 +45,7 @@ Activate emergency controls when:
 5. **Regulatory Requirement** - Legal/regulatory requirement to pause operations
 
 **Do NOT activate for:**
+
 - Routine parameter adjustments
 - Planned upgrades
 - Non-critical bugs
@@ -68,6 +71,7 @@ Activate emergency controls when:
 **Role Required:** `ROLE_GUARDIAN`
 
 **Transaction Details:**
+
 ```solidity
 function pause() external onlyRole(ROLE_GUARDIAN);
 ```
@@ -121,6 +125,7 @@ function pause() external onlyRole(ROLE_GUARDIAN);
 **Role Required:** `ROLE_GUARDIAN`
 
 **Transaction Details:**
+
 ```solidity
 function guardianDisableAave() external onlyRole(ROLE_GUARDIAN);
 ```
@@ -163,15 +168,15 @@ function guardianDisableAave() external onlyRole(ROLE_GUARDIAN);
 **Contract:** `AaveYieldGenerationModule` (or relevant contract)  
 **Function:** `guardianLowerTokenCap(address token, uint256 newCap)`  
 **Parameters:**
+
 - `token`: Token address
 - `newCap`: New cap (must be ≤ current cap)
-**Role Required:** `ROLE_GUARDIAN`
+  **Role Required:** `ROLE_GUARDIAN`
 
 **Transaction Details:**
+
 ```solidity
-function guardianLowerTokenCap(address token, uint256 newCap) 
-    external 
-    onlyRole(ROLE_GUARDIAN);
+function guardianLowerTokenCap(address token, uint256 newCap) external onlyRole(ROLE_GUARDIAN);
 ```
 
 ### Step 3: Execute via Multisig
@@ -213,14 +218,14 @@ function guardianLowerTokenCap(address token, uint256 newCap)
 **Contract:** `AaveYieldGenerationModule` (or relevant contract)  
 **Function:** `guardianLowerGlobalCap(uint256 newCap)`  
 **Parameters:**
+
 - `newCap`: New global cap (must be ≤ current cap)
-**Role Required:** `ROLE_GUARDIAN`
+  **Role Required:** `ROLE_GUARDIAN`
 
 **Transaction Details:**
+
 ```solidity
-function guardianLowerGlobalCap(uint256 newCap) 
-    external 
-    onlyRole(ROLE_GUARDIAN);
+function guardianLowerGlobalCap(uint256 newCap) external onlyRole(ROLE_GUARDIAN);
 ```
 
 ### Step 3: Execute via Multisig
@@ -293,6 +298,3 @@ See `docs/OUTSTANDING_ISSUES.md` for drill requirements.
 ---
 
 **Note:** This runbook should be tested regularly. Update transaction hashes and block numbers after each drill.
-
-
-

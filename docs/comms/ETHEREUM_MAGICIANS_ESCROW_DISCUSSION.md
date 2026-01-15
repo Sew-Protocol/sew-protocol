@@ -13,11 +13,13 @@ Hello Ethereum community! 👋
 I'd like to start a discussion about standardizing escrow and dispute resolution mechanisms for everyday purchases on Ethereum. As we move toward mainstream adoption, we need better tools for handling transactions where trust between parties is limited—whether that's buying goods online, hiring freelancers, or peer-to-peer sales.
 
 **The Problem**: Traditional on-chain token transfers are irreversible. This creates significant friction for everyday purchases where:
+
 - Buyers want protection against non-delivery
 - Sellers want assurance of payment
 - Both parties need a way to resolve disputes
 
 **The Opportunity**: We can create a standard interface that enables:
+
 - Secure, reversible payments
 - Built-in dispute resolution
 - Automated time-based settlements
@@ -71,6 +73,7 @@ NONE → PENDING → RELEASED (happy path)
 ### Example Use Cases
 
 **E-commerce Purchase**:
+
 ```solidity
 // Buyer creates escrow for $100 purchase
 uint256 workflowId = escrow.createEscrow(
@@ -91,6 +94,7 @@ escrow.releaseEscrow(workflowId);
 ```
 
 **Freelance Service**:
+
 ```solidity
 // Client creates escrow for $500 project
 uint256 workflowId = escrow.createEscrow(
@@ -124,16 +128,19 @@ I'd love to hear the community's thoughts on these questions:
 ### 1. Dispute Resolution Model
 
 **Option A: Single Resolver**
+
 - One trusted address per escrow
 - Simple, but requires trust in resolver
 - Good for: Small transactions, known parties
 
 **Option B: Resolution Module**
+
 - Pluggable resolution mechanisms
 - Could support: Decentralized juries, reputation-based, DAO governance
 - Good for: Complex disputes, large transactions
 
 **Option C: Hybrid**
+
 - Default resolver for simple cases
 - Optional resolution modules for complex cases
 - Good for: Flexibility, backward compatibility
@@ -145,6 +152,7 @@ I'd love to hear the community's thoughts on these questions:
 **Current Proposal**: Block timestamp-based (with known limitations)
 
 **Alternatives**:
+
 - Oracle-based timing (more accurate, but requires trust)
 - Event-based triggers (delivery confirmation, etc.)
 - Hybrid approach
@@ -156,11 +164,13 @@ I'd love to hear the community's thoughts on these questions:
 **Question**: Should escrowed funds generate yield?
 
 **Pros**:
+
 - Fair compensation for time value of locked funds
 - Incentivizes longer escrow periods
 - Can be distributed according to resolution
 
 **Cons**:
+
 - Adds complexity
 - Requires DeFi integration
 - Potential for yield-based attacks
@@ -172,6 +182,7 @@ I'd love to hear the community's thoughts on these questions:
 **Challenge**: Escrow operations can be gas-intensive, especially with attachments and metadata.
 
 **Options**:
+
 - Make features optional (attachments, metadata, yield)
 - Use events for off-chain data
 - Optimize for L2 deployment
@@ -245,6 +256,7 @@ I'd love to hear the community's thoughts on these questions:
 ## Conclusion
 
 Escrow and dispute resolution are critical for mainstream Ethereum adoption. By standardizing an interface, we can:
+
 - Enable better user experiences
 - Improve composability
 - Foster innovation in dispute resolution
@@ -256,6 +268,4 @@ I'm excited to hear your thoughts, concerns, and suggestions! Let's build someth
 
 ---
 
-*This post is part of an ongoing effort to standardize escrow functionality on Ethereum. Your feedback is invaluable!*
-
-
+_This post is part of an ongoing effort to standardize escrow functionality on Ethereum. Your feedback is invaluable!_

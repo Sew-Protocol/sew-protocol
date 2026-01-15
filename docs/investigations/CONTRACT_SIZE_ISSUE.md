@@ -5,6 +5,7 @@
 Contracts are exceeding the 24KB (24576 bytes) size limit introduced in Spurious Dragon upgrade.
 
 **Current Status** (as of latest refactor):
+
 - BaseEscrow: ~33KB (exceeds limit by ~9KB)
 - EscrowVault: ~34KB (exceeds limit by ~10KB)
 - EscrowableERC20: ~36KB (exceeds limit by ~12KB)
@@ -22,12 +23,14 @@ Contracts are exceeding the 24KB (24576 bytes) size limit introduced in Spurious
 **Status**: Partially Complete
 
 **Libraries Created**:
+
 - ✅ `SettingsValidationLibrary` - Settings validation logic
 - ✅ `YieldDistributionLibrary` - Yield distribution validation and encoding
 - ✅ `EscrowEncodingLibrary` - Encoding/decoding utilities
 - ✅ `EscrowTypes` - Shared types and errors
 
 **Functions Extracted**:
+
 - ✅ `_validateAutoTime()` → `SettingsValidationLibrary.validateAutoTime()`
 - ✅ `_validateEscrowSettings()` → `SettingsValidationLibrary.validateEscrowSettings()`
 - ✅ `_getDefaultSettings()` → `SettingsValidationLibrary.getDefaultSettings()`
@@ -42,6 +45,7 @@ Contracts are exceeding the 24KB (24576 bytes) size limit introduced in Spurious
 **Status**: Complete
 
 **Modules Created**:
+
 - ✅ `AaveYieldGenerationModule` - All Aave-specific logic moved here
 - ✅ `DefaultYieldDistributionModule` - Yield distribution logic
 - ✅ Module registries in EscrowVault/EscrowableERC20
@@ -57,11 +61,13 @@ Contracts are exceeding the 24KB (24576 bytes) size limit introduced in Spurious
 ## Current Workaround
 
 For testing purposes:
+
 1. ✅ Use `viaIR: true` with high optimizer runs (already done)
 2. ✅ Enable `allowUnlimitedContractSize: true` in Hardhat network config (for tests only)
 3. ⚠️ **Note**: This only works in test environment. Production deployment still requires size reduction.
 
 **Applied Configuration**:
+
 ```typescript
 hardhat: {
   allowUnlimitedContractSize: true, // Test environment only
@@ -74,12 +80,14 @@ hardhat: {
 ### 🔄 1. Simplify Module Wrapper Functions (HIGH IMPACT)
 
 **Current State**: BaseEscrow has thin wrapper functions that just delegate to modules:
+
 - `_depositToAave()` - 17 lines, just delegates
 - `_withdrawFromAave()` - 17 lines, just delegates
 - `_withdrawFromAaveProportional()` - 17 lines, just delegates
 - `_calculateYield()` - 11 lines, just delegates
 
 **Proposal**: Inline these functions directly at call sites. This would:
+
 - Remove ~60 lines of wrapper code
 - Reduce contract size by ~2-3KB
 - Simplify codebase (less indirection)
@@ -92,6 +100,7 @@ hardhat: {
 **Current State**: `_distributeYield()` has ~60 lines of fallback logic when no module is set.
 
 **Proposal**: Extract fallback distribution logic to `YieldDistributionLibrary`:
+
 - Move fallback distribution loop to library
 - Keep module delegation in BaseEscrow
 - Library handles both module and fallback cases
@@ -104,6 +113,7 @@ hardhat: {
 **Current State**: Resolver functions (`resolverRelease`, `resolverPartialRelease`, etc.) have complex logic.
 
 **Proposal**: Extract common resolver patterns to `ResolverLogicLibrary`:
+
 - Extract payout calculation logic
 - Extract state transition logic
 - Extract yield calculation for resolvers
@@ -116,6 +126,7 @@ hardhat: {
 **Current State**: Attachment functions (`addAttachment`, `addAttachmentSet`, etc.) have validation and storage logic.
 
 **Proposal**: Extract to `AttachmentLibrary`:
+
 - Validation logic
 - Storage updates
 - Event emission patterns
@@ -128,6 +139,7 @@ hardhat: {
 **Current State**: `_applyEscrowSettings()` has complex conditional logic for auto times.
 
 **Proposal**: Extract to `SettingsApplicationLibrary`:
+
 - Auto time application logic
 - Default settings merging
 - State updates
@@ -138,6 +150,7 @@ hardhat: {
 ### 🔄 6. Remove Unused/Optional Features (MEDIUM IMPACT)
 
 **Proposal**: Review and potentially remove/disable:
+
 - Permit functionality (if not critical)
 - Complex attachment handling (if simplified version works)
 - Some resolver flexibility (if standard resolution is sufficient)
@@ -148,6 +161,7 @@ hardhat: {
 ### 🔄 7. Split BaseEscrow (HIGH IMPACT, HIGH EFFORT)
 
 **Proposal**: Split BaseEscrow into:
+
 - `BaseEscrowCore` - Core escrow logic (create, release, cancel)
 - `BaseEscrowResolvers` - Resolver functions
 - `BaseEscrowSettings` - Settings management

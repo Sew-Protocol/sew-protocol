@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.33;
 
-import "forge-std/Test.sol";
-import "../../../contracts/core/EscrowVault.sol";
-import "../../../contracts/mocks/ERC20Mock.sol";
-import "../../../contracts/core/modules/DefaultResolutionModule.sol";
-import "../../../contracts/modules/DefaultReleaseStrategy.sol";
-import "../../../contracts/types/EscrowTypes.sol";
-import "../../../contracts/YieldOps.sol";
-import "../../../contracts/DisputeOps.sol";
+import 'forge-std/Test.sol';
+import '../../../contracts/core/EscrowVault.sol';
+import '../../../contracts/mocks/ERC20Mock.sol';
+import '../../../contracts/core/modules/DefaultResolutionModule.sol';
+import '../../../contracts/modules/DefaultReleaseStrategy.sol';
+import '../../../contracts/types/EscrowTypes.sol';
+import '../../../contracts/YieldOps.sol';
+import '../../../contracts/DisputeOps.sol';
 
 /**
  * @title BaseEscrowComprehensive
@@ -22,7 +22,7 @@ contract BaseEscrowComprehensive is Test {
     DefaultReleaseStrategy public releaseStrategy;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
-    
+
     address public owner;
     address public timelock;
     address public guardian;
@@ -30,9 +30,9 @@ contract BaseEscrowComprehensive is Test {
     address public resolver;
     address public buyer;
     address public seller;
-    
+
     uint256 public constant ESCROW_FEE = 100; // 1%
-    
+
     function setUp() public {
         owner = address(this);
         timelock = address(0x1111);
@@ -41,30 +41,30 @@ contract BaseEscrowComprehensive is Test {
         resolver = address(0x1234);
         buyer = address(0x1001);
         seller = address(0x1002);
-        
+
         resolutionModule = new DefaultResolutionModule(owner, resolver);
         releaseStrategy = new DefaultReleaseStrategy();
-        
-        token = new ERC20Mock("Test Token", "TEST", owner, 10000000e18);
+
+        token = new ERC20Mock('Test Token', 'TEST', owner, 10000000e18);
         yieldOps = new YieldOps();
         disputeOps = new DisputeOps();
         vault = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps));
-        
+
         bytes32 ROLE_TIMELOCK = vault.ROLE_TIMELOCK();
         bytes32 ROLE_GUARDIAN = vault.ROLE_GUARDIAN();
         vault.grantRole(ROLE_TIMELOCK, owner);
         vault.grantRole(ROLE_TIMELOCK, timelock);
         vault.grantRole(ROLE_GUARDIAN, guardian);
-        
+
         vault.queueResolutionModule(address(resolutionModule));
         vault.queueDefaultReleaseStrategy(address(releaseStrategy));
         vm.warp(block.timestamp + 14 days + 1);
         vault.activateResolutionModule();
         vault.activateDefaultReleaseStrategy();
     }
-    
+
     // ============ Governance Functions ============
-    
+
     function test_setDefaultAutoCancelTime() public {
         // Default auto cancel time is a future timestamp
         uint256 newTime = block.timestamp + 7 days;
@@ -72,7 +72,7 @@ contract BaseEscrowComprehensive is Test {
         vault.setDefaultAutoCancelTime(newTime);
         assertEq(vault.defaultAutoCancelTime(), newTime);
     }
-    
+
     function test_setDefaultAutoReleaseTime() public {
         // Default auto release time is a future timestamp
         uint256 newTime = block.timestamp + 7 days;
@@ -80,42 +80,42 @@ contract BaseEscrowComprehensive is Test {
         vault.setDefaultAutoReleaseTime(newTime);
         assertEq(vault.defaultAutoReleaseTime(), newTime);
     }
-    
+
     function test_setMaxDisputeDuration() public {
         uint256 newDuration = 30 days;
         vm.prank(timelock);
         vault.setMaxDisputeDuration(newDuration);
         assertEq(vault.maxDisputeDuration(), newDuration);
     }
-    
+
     function test_setMaxDisputeDuration_revertsIfTooShort() public {
         vm.prank(timelock);
         // vm.expectRevert("Too short");
         // vault.setMaxDisputeDuration(6 days);
     }
-    
+
     function test_setMaxDisputeDuration_revertsIfTooLong() public {
         vm.prank(timelock);
         // vm.expectRevert("Too long");
         // vault.setMaxDisputeDuration(366 days);
     }
-    
+
     // function test_setMaxAttachments() public {
     //     uint256 newMax = 15;
     //     vm.prank(timelock);
     //     vault.setMaxAttachments(newMax);
     //     assertEq(vault.maxAttachments(), newMax);
     // }
-    
+
     // function test_setResolutionModuleDelay() public {
     //     uint256 newDelay = 10 days;
     //     vm.prank(timelock);
     //     vault.setResolutionModuleDelay(newDelay);
     //     assertEq(vault.disputeResolutionModuleDelay(), newDelay);
     // }
-    
+
     // ============ Fee Management ============
-    
+
     function test_queueEscrowFee() public {
         uint256 newFee = 200; // 2%
         vm.prank(timelock);
@@ -124,7 +124,7 @@ contract BaseEscrowComprehensive is Test {
         assertTrue(exists);
         assertEq(value, newFee);
     }
-    
+
     function test_activateEscrowFee() public {
         uint256 newFee = 200;
         vm.prank(timelock);
@@ -134,7 +134,7 @@ contract BaseEscrowComprehensive is Test {
         vault.activateEscrowFee();
         assertEq(vault.escrowFee(), newFee);
     }
-    
+
     function test_queueEscrowFeeAddress() public {
         address newFeeAddress = address(0x9999);
         vm.prank(timelock);
@@ -143,7 +143,7 @@ contract BaseEscrowComprehensive is Test {
         assertTrue(exists);
         assertEq(value, newFeeAddress);
     }
-    
+
     function test_activateEscrowFeeAddress() public {
         address newFeeAddress = address(0x9999);
         vm.prank(timelock);
@@ -153,15 +153,15 @@ contract BaseEscrowComprehensive is Test {
         vault.activateEscrowFeeAddress();
         assertEq(vault.escrowFeeAddress(), newFeeAddress);
     }
-    
+
     // ============ Pause/Unpause ============
-    
+
     function test_pause() public {
         vm.prank(guardian);
         vault.pause();
         assertTrue(vault.paused());
     }
-    
+
     function test_unpause() public {
         vm.prank(guardian);
         vault.pause();
@@ -169,16 +169,16 @@ contract BaseEscrowComprehensive is Test {
         vault.unpause();
         assertFalse(vault.paused());
     }
-    
+
     // ============ Module Management ============
-    
+
     // function test_proposeResolutionModule() public {
     //     DefaultResolutionModule newModule = new DefaultResolutionModule(owner, resolver);
     //     vm.prank(timelock);
     //     vault.proposeResolutionModule(address(newModule));
     //     assertEq(vault.pendingDisputeResolutionModule(), address(newModule));
     // }
-    
+
     // function test_activateResolutionModule() public {
     //     DefaultResolutionModule newModule = new DefaultResolutionModule(owner, resolver);
     //     vm.prank(timelock);
@@ -188,92 +188,92 @@ contract BaseEscrowComprehensive is Test {
     //     vault.activateResolutionModule();
     //     assertEq(vault.disputeResolutionModule(), address(newModule));
     // }
-    
+
     // ============ Dispute Timeout ============
-    
+
     function test_autoCancelDisputedEscrow() public {
         uint256 amount = 1000e18;
         token.mint(buyer, amount);
         vm.prank(buyer);
         token.approve(address(vault), amount);
-        
+
         vm.prank(buyer);
         uint256 workflowId = vault.createEscrow(address(token), seller, amount);
-        
+
         vm.prank(buyer);
         vault.raiseDispute(workflowId);
-        
+
         // Set max dispute duration to short time (minimum is 7 days)
         vm.prank(timelock);
         vault.setMaxDisputeDuration(7 days);
-        
+
         // Warp past max dispute duration
         vm.warp(block.timestamp + 7 days + 1);
-        
+
         bool success = vault.autoCancelDisputedEscrow(workflowId);
-         // assertTrue(success);
+        // assertTrue(success);
     }
-    
+
     function test_isDisputeTimedOut() public {
         uint256 amount = 1000e18;
         token.mint(buyer, amount);
         vm.prank(buyer);
         token.approve(address(vault), amount);
-        
+
         vm.prank(buyer);
         uint256 workflowId = vault.createEscrow(address(token), seller, amount);
-        
+
         vm.prank(buyer);
         vault.raiseDispute(workflowId);
-        
+
         vm.prank(timelock);
         vault.setMaxDisputeDuration(7 days);
-        
+
         vm.warp(block.timestamp + 7 days + 1);
-        
+
         (bool isTimedOut, uint256 timeRemaining) = vault.isDisputeTimedOut(workflowId);
         assertTrue(isTimedOut);
         assertEq(timeRemaining, 0);
     }
-    
+
     // ============ Timed Actions ============
-    
+
     function test_automateTimedActions_single() public {
         uint256 amount = 1000e18;
         token.mint(buyer, amount);
         vm.prank(buyer);
         token.approve(address(vault), amount);
-        
+
         // Set default auto cancel time to future timestamp
         uint256 autoCancelTime = block.timestamp + 1 days;
         vm.prank(timelock);
         vault.setDefaultAutoCancelTime(autoCancelTime);
-        
+
         // Create escrow - it will use default auto cancel time
         vm.prank(buyer);
         uint256 workflowId = vault.createEscrow(address(token), seller, amount);
-        
+
         // Get the escrow to verify auto cancel time
         EscrowTransfer memory et = vault.getEscrowTransfer(workflowId);
         assertEq(et.autoCancelTime, autoCancelTime);
-        
+
         vm.warp(autoCancelTime + 1);
-        
+
         bool success = vault.automateTimedActions(workflowId);
-         // assertTrue(success);
+        // assertTrue(success);
     }
-    
+
     function test_automateTimedActions_range() public {
         uint256 amount = 1000e18;
         token.mint(buyer, amount * 3);
         vm.prank(buyer);
         token.approve(address(vault), amount * 3);
-        
+
         // Set default auto cancel time to future timestamp
         uint256 autoCancelTime = block.timestamp + 1 days;
         vm.prank(timelock);
         vault.setDefaultAutoCancelTime(autoCancelTime);
-        
+
         // Create escrows - they will use default auto cancel time
         vm.prank(buyer);
         uint256 workflowId1 = vault.createEscrow(address(token), seller, amount);
@@ -281,172 +281,172 @@ contract BaseEscrowComprehensive is Test {
         uint256 workflowId2 = vault.createEscrow(address(token), seller, amount);
         vm.prank(buyer);
         uint256 workflowId3 = vault.createEscrow(address(token), seller, amount);
-        
+
         vm.warp(autoCancelTime + 1);
-        
+
         bool success = vault.automateTimedActions(workflowId1);
-         // assertTrue(success);
+        // assertTrue(success);
     }
-    
+
     // ============ Attachments ============
-    
+
     // function test_addAttachment() public {
     //     uint256 amount = 1000e18;
     //     token.mint(buyer, amount);
     //     vm.prank(buyer);
     //     token.approve(address(vault), amount);
-        
+
     //     vm.prank(buyer);
     //     uint256 workflowId = vault.createEscrow(address(token), seller, amount);
-        
+
     //     string memory uri = "https://example.com/attachment";
     //     bytes32 hash = keccak256("attachment data");
-        
+
     //     vm.prank(buyer);
     //     bool success = vault.addAttachment(workflowId, uri, hash);
     //      // assertTrue(success);
     // }
-    
+
     // function test_addAttachment_revertsIfMaxReached() public {
     //     uint256 amount = 1000e18;
     //     token.mint(buyer, amount);
     //     vm.prank(buyer);
     //     token.approve(address(vault), amount);
-        
+
     //     vm.prank(buyer);
     //     uint256 workflowId = vault.createEscrow(address(token), seller, amount);
-        
+
     //     vm.prank(timelock);
     //     vault.setMaxAttachments(1);
-        
+
     //     string memory uri = "https://example.com/attachment";
     //     bytes32 hash = keccak256("attachment data");
-        
+
     //     vm.prank(buyer);
     //     vault.addAttachment(workflowId, uri, hash);
-        
+
     //     vm.prank(buyer);
     //     vm.expectRevert();
     //     vault.addAttachment(workflowId, uri, hash);
     // }
-    
+
     // ============ Cancellation ============
-    
+
     function test_recipientCancel() public {
         uint256 amount = 1000e18;
         token.mint(buyer, amount);
         vm.prank(buyer);
         token.approve(address(vault), amount);
-        
+
         vm.prank(buyer);
         uint256 workflowId = vault.createEscrow(address(token), seller, amount);
-        
+
         vm.prank(seller);
         bool success = vault.recipientCancel(workflowId);
-         // assertTrue(success);
+        // assertTrue(success);
     }
-    
+
     function test_senderCancel() public {
         uint256 amount = 1000e18;
         token.mint(buyer, amount);
         vm.prank(buyer);
         token.approve(address(vault), amount);
-        
+
         vm.prank(buyer);
         uint256 workflowId = vault.createEscrow(address(token), seller, amount);
-        
+
         vm.prank(buyer);
         bool success = vault.senderCancel(workflowId);
-         // assertTrue(success);
+        // assertTrue(success);
     }
-    
+
     function test_bothPartiesCancel() public {
         uint256 amount = 1000e18;
         token.mint(buyer, amount);
         vm.prank(buyer);
         token.approve(address(vault), amount);
-        
+
         vm.prank(buyer);
         uint256 workflowId = vault.createEscrow(address(token), seller, amount);
-        
+
         vm.prank(seller);
         vault.recipientCancel(workflowId);
-        
+
         vm.prank(buyer);
         bool success = vault.senderCancel(workflowId);
-         // assertTrue(success);
-        
+        // assertTrue(success);
+
         EscrowTransfer memory et = vault.getEscrowTransfer(workflowId);
         assertEq(uint256(et.escrowState), uint256(EscrowState.REFUNDED));
     }
-    
+
     // ============ Resolver Actions ============
-    
+
     function test_cancelAsDisputeResolver() public {
         uint256 amount = 1000e18;
         token.mint(buyer, amount);
         vm.prank(buyer);
         token.approve(address(vault), amount);
-        
+
         vm.prank(buyer);
         uint256 workflowId = vault.createEscrow(address(token), seller, amount);
-        
+
         vm.prank(buyer);
         vault.raiseDispute(workflowId);
-        
+
         vm.prank(resolver);
         bool success = vault.cancelAsDisputeResolver(workflowId, bytes32(0));
-         // assertTrue(success);
+        // assertTrue(success);
     }
-    
+
     function test_releaseAsDisputeResolver() public {
         uint256 amount = 1000e18;
         token.mint(buyer, amount);
         vm.prank(buyer);
         token.approve(address(vault), amount);
-        
+
         vm.prank(buyer);
         uint256 workflowId = vault.createEscrow(address(token), seller, amount);
-        
+
         vm.prank(buyer);
         vault.raiseDispute(workflowId);
-        
+
         vm.prank(resolver);
         bool success = vault.releaseAsDisputeResolver(workflowId, bytes32(0));
-         // assertTrue(success);
+        // assertTrue(success);
     }
-    
+
     // ============ Dispute Functions ============
-    
+
     function test_raiseDispute() public {
         uint256 amount = 1000e18;
         token.mint(buyer, amount);
         vm.prank(buyer);
         token.approve(address(vault), amount);
-        
+
         vm.prank(buyer);
         uint256 workflowId = vault.createEscrow(address(token), seller, amount);
-        
+
         vm.prank(buyer);
         bool success = vault.raiseDispute(workflowId);
-         // assertTrue(success);
-        
+        // assertTrue(success);
+
         EscrowTransfer memory et = vault.getEscrowTransfer(workflowId);
         assertEq(uint256(et.escrowState), uint256(EscrowState.DISPUTED));
     }
-    
+
     function test_escalateDispute() public {
         uint256 amount = 1000e18;
         token.mint(buyer, amount);
         vm.prank(buyer);
         token.approve(address(vault), amount);
-        
+
         vm.prank(buyer);
         uint256 workflowId = vault.createEscrow(address(token), seller, amount);
-        
+
         vm.prank(buyer);
         vault.raiseDispute(workflowId);
-        
+
         // Escalation may not be supported by DefaultResolutionModule
         // This test verifies the function exists and handles the case
         vm.deal(buyer, 1 ether);
@@ -456,77 +456,77 @@ contract BaseEscrowComprehensive is Test {
             // If escalation fails (module doesn't support it), that's also fine
         }
     }
-    
+
     // ============ View Functions ============
-    
+
     function test_getEscrowTransfer() public {
         uint256 amount = 1000e18;
         token.mint(buyer, amount);
         vm.prank(buyer);
         token.approve(address(vault), amount);
-        
+
         vm.prank(buyer);
         uint256 workflowId = vault.createEscrow(address(token), seller, amount);
-        
+
         EscrowTransfer memory et = vault.getEscrowTransfer(workflowId);
         assertEq(et.from, buyer);
         assertEq(et.to, seller);
         // amountAfterFee is stored after fee deduction - it's the actual escrow amount
-        uint256 expectedTotal = amount - (amount * ESCROW_FEE / 10000);
+        uint256 expectedTotal = amount - ((amount * ESCROW_FEE) / 10000);
         assertEq(et.amountAfterFee, expectedTotal);
     }
-    
+
     function test_getTotalDeposited() public {
         uint256 amount = 1000e18;
         token.mint(buyer, amount);
         vm.prank(buyer);
         token.approve(address(vault), amount);
-        
+
         vm.prank(buyer);
         uint256 workflowId = vault.createEscrow(address(token), seller, amount);
-        
+
         // getTotalDeposited returns the amount after fee deduction
-        uint256 expectedTotal = amount - (amount * ESCROW_FEE / 10000);
+        uint256 expectedTotal = amount - ((amount * ESCROW_FEE) / 10000);
         assertEq(vault.getTotalDeposited(workflowId), expectedTotal);
     }
-    
+
     function test_getParticipants() public {
         uint256 amount = 1000e18;
         token.mint(buyer, amount);
         vm.prank(buyer);
         token.approve(address(vault), amount);
-        
+
         vm.prank(buyer);
         uint256 workflowId = vault.createEscrow(address(token), seller, amount);
-        
+
         EscrowTransfer memory et = vault.getEscrowTransfer(workflowId);
         assertEq(et.from, buyer);
         assertEq(et.to, seller);
     }
-    
+
     function test_getTotalEscrowsByStatus() public {
         uint256 amount = 1000e18;
         token.mint(buyer, amount * 3);
         vm.prank(buyer);
         token.approve(address(vault), amount * 3);
-        
+
         vm.prank(buyer);
         uint256 workflowId1 = vault.createEscrow(address(token), seller, amount);
         vm.prank(buyer);
         uint256 workflowId2 = vault.createEscrow(address(token), seller, amount);
         vm.prank(buyer);
         uint256 workflowId3 = vault.createEscrow(address(token), seller, amount);
-        
+
         // uint256 pendingCount = vault.getTotalEscrowsByStatus(EscrowState.PENDING);
         // assertGe(pendingCount, 3);
     }
-    
+
     function test_getEscrowSettings() public {
         uint256 amount = 1000e18;
         token.mint(buyer, amount);
         vm.prank(buyer);
         token.approve(address(vault), amount);
-        
+
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
             yieldEnabled: false,
@@ -534,23 +534,23 @@ contract BaseEscrowComprehensive is Test {
             autoCancelTime: 0,
             escrowType: EscrowType.STANDARD
         });
-        
+
         vm.prank(buyer);
         uint256 workflowId = vault.createEscrow(address(token), seller, amount, settings);
-        
+
         EscrowSettings memory retrieved = vault.getEscrowSettings(workflowId);
         assertEq(uint256(retrieved.escrowType), uint256(EscrowType.STANDARD));
     }
-    
+
     function test_updateEscrowSettings() public {
         uint256 amount = 1000e18;
         token.mint(buyer, amount);
         vm.prank(buyer);
         token.approve(address(vault), amount);
-        
+
         vm.prank(buyer);
         uint256 workflowId = vault.createEscrow(address(token), seller, amount);
-        
+
         EscrowSettings memory newSettings = EscrowSettings({
             customResolver: address(0),
             yieldEnabled: false,
@@ -558,38 +558,37 @@ contract BaseEscrowComprehensive is Test {
             autoCancelTime: 0,
             escrowType: EscrowType.STANDARD
         });
-        
+
         vault.updateEscrowSettings(workflowId, newSettings);
-        
+
         EscrowSettings memory retrieved = vault.getEscrowSettings(workflowId);
         assertEq(retrieved.autoReleaseTime, newSettings.autoReleaseTime);
     }
-    
+
     // ============ Error Cases ============
-    
+
     function test_validateWorkflowId_reverts() public {
         vm.expectRevert();
         vault.getEscrowTransfer(999);
     }
-    
+
     function test_requirePending_reverts() public {
         uint256 amount = 1000e18;
         token.mint(buyer, amount);
         vm.prank(buyer);
         token.approve(address(vault), amount);
-        
+
         vm.prank(buyer);
         uint256 workflowId = vault.createEscrow(address(token), seller, amount);
-        
+
         vm.prank(buyer);
         vault.releaseEscrowTransfer(workflowId);
-        
+
         vm.expectRevert();
         vault.senderCancel(workflowId);
     }
-    
+
     function test_supportsInterface() public {
         assertTrue(vault.supportsInterface(0x01ffc9a7)); // IERC165
     }
 }
-

@@ -17,12 +17,12 @@ This approach minimizes risk by introducing adversarial pressure gradually, only
 
 ## Implementation Status
 
-| Phase | Status | Tests | Description |
-|-------|--------|-------|-------------|
-| **IEO** | ✅ Complete | N/A | Centralized resolution (excluded from IEO) |
-| **DR v1** | ✅ Complete | 47 | Decentralize decisions (workload routing, EMA scoring) |
-| **DR v2** | ✅ Complete | 36 | Decentralize incentives (appeal bonds, cost curves) |
-| **DR v3** | 🚧 Phase 1 | 20 | Decentralize capital (interfaces + no-ops) |
+| Phase     | Status      | Tests | Description                                            |
+| --------- | ----------- | ----- | ------------------------------------------------------ |
+| **IEO**   | ✅ Complete | N/A   | Centralized resolution (excluded from IEO)             |
+| **DR v1** | ✅ Complete | 47    | Decentralize decisions (workload routing, EMA scoring) |
+| **DR v2** | ✅ Complete | 36    | Decentralize incentives (appeal bonds, cost curves)    |
+| **DR v3** | 🚧 Phase 1  | 20    | Decentralize capital (interfaces + no-ops)             |
 
 **Total Tests:** 177 (all passing ✅)
 
@@ -35,6 +35,7 @@ This approach minimizes risk by introducing adversarial pressure gradually, only
 **Completion Date:** 2026-01-13
 
 ### Key Features
+
 - ✅ Round-based dispute flow (k=0 resolver, k=1 senior, k=2 Kleros)
 - ✅ EMA-based reputation scoring (0-1e6 fixed-point)
 - ✅ Workload routing (performance-based gating)
@@ -42,12 +43,14 @@ This approach minimizes risk by introducing adversarial pressure gradually, only
 - ✅ Phase gate metrics (escalation rate, avg response time)
 
 ### Contracts
+
 - `DecentralizedResolutionModule.sol` (1,012 lines)
 - `ResolutionAnalytics.sol` (309 lines)
 - `DecentralizedResolverStructs.sol` (135 lines)
 - `ResolverIncentiveModuleV1.sol` (700 lines)
 
 ### Test Coverage
+
 - **Unit Tests:** 33 tests (round flow, workload routing)
 - **Invariant Tests:** 7 tests (896K calls)
   - EMA score bounds [0, 1e6]
@@ -62,6 +65,7 @@ This approach minimizes risk by introducing adversarial pressure gradually, only
   - Multiple resolvers parallel
 
 ### Economics
+
 - **Incentive:** Workload-to-zero (low performers gated out)
 - **Penalty:** Loss of assignments (not capital)
 - **Threshold:** 50% EMA score, 30% timeout rate
@@ -76,6 +80,7 @@ This approach minimizes risk by introducing adversarial pressure gradually, only
 **Completion Date:** 2026-01-13
 
 ### Key Features
+
 - ✅ Appeal bonds (users post bonds to escalate)
 - ✅ Escalation cost curves (linear, quadratic, geometric)
 - ✅ Bond refund on successful appeal
@@ -84,11 +89,13 @@ This approach minimizes risk by introducing adversarial pressure gradually, only
 - ✅ Observability metrics (bonds posted/refunded/forfeited)
 
 ### Contracts
+
 - `ResolverIncentiveModuleV2.sol` (370 lines)
 - `EscalationCostLibrary.sol` (82 lines)
 - Extended `DecentralizedResolverStructs.sol` with bond tracking
 
 ### Test Coverage
+
 - **Unit Tests:** 23 tests (bond recording, distribution, governance)
 - **Invariant Tests:** 7 tests (896K calls)
   - Bond accounting balance
@@ -103,7 +110,9 @@ This approach minimizes risk by introducing adversarial pressure gradually, only
   - Multiple operations sequence
 
 ### Economics
+
 **Quadratic Cost Curve (Recommended):**
+
 ```
 base=100, step=50
 Round 0→1: 100 tokens (first appeal)
@@ -112,6 +121,7 @@ Round 2→3: 300 tokens (hypothetical)
 ```
 
 **Incentive Alignment:**
+
 - Resolver earns ~$100 (escrow fee)
 - If appeal fails, resolver earns +$100 (bond)
 - **Total: $200 for correct decisions** vs $100 baseline
@@ -127,6 +137,7 @@ Round 2→3: 300 tokens (hypothetical)
 ### Phase 1: Interface Boundaries ✅
 
 **Completed:**
+
 - ✅ `IStakingModule` interface (230 lines)
 - ✅ `ISlashingModule` interface (330 lines)
 - ✅ `StakingModuleNoOp` implementation (250 lines)
@@ -138,6 +149,7 @@ Round 2→3: 300 tokens (hypothetical)
 - ✅ 20 integration tests passing
 
 **Test Coverage:**
+
 - Module governance (queue/activate)
 - Lifecycle hooks (staking lock/unlock, slashing proposals)
 - Backward compatibility (v1/v2 work without v3)
@@ -147,6 +159,7 @@ Round 2→3: 300 tokens (hypothetical)
 ### Phase 2-7: Pending
 
 **Remaining Work:**
+
 - [ ] Phase 2: Real staking implementation (ERC20, time-locks, delegation)
 - [ ] Phase 3: Real slashing implementation (graduated penalties, appeals)
 - [ ] Phase 4: Fraud lane (off-chain proofs, collusion detection)
@@ -163,18 +176,21 @@ Round 2→3: 300 tokens (hypothetical)
 ### Total Tests: 177 ✅
 
 **By Phase:**
+
 - DR v1: 47 tests (33 unit + 7 invariant + 7 fuzz)
 - DR v2: 36 tests (23 unit + 7 invariant + 6 fuzz)
 - DR v3: 20 tests (integration)
 - Shared: 74 tests (payment, escalation, governance, yield, etc.)
 
 **By Type:**
+
 - Unit Tests: 130
 - Invariant Tests: 14 (1.79M random calls)
 - Fuzz Tests: 13 (3.3K runs)
 - Integration Tests: 20
 
 **Coverage:**
+
 - Contracts: 13 files, 4,360 lines
 - Tests: 8 files, 3,910 lines
 - Docs: 10+ files
@@ -184,6 +200,7 @@ Round 2→3: 300 tokens (hypothetical)
 ## Code Statistics
 
 ### Contracts (decentralized-resolution-module/)
+
 ```
 DecentralizedResolutionModule.sol    1,012 lines  (core)
 ResolverIncentiveModuleV1.sol          700 lines  (v1)
@@ -203,6 +220,7 @@ TOTAL:                               4,360 lines
 ```
 
 ### Tests (decentralized-resolution-module/)
+
 ```
 DRv1RoundBasedFlow.t.sol              450 lines  (15 tests)
 DRv1WorkloadRouting.t.sol             550 lines  (18 tests)
@@ -221,6 +239,7 @@ TOTAL:                              3,910 lines
 ## Phase Gate Criteria
 
 ### V1 → V2 (Met ✅)
+
 - ✅ Escalation rate stable (20-40%)
 - ✅ Average response time acceptable (<48 hours)
 - ✅ Resolver pool active (10+ resolvers)
@@ -228,6 +247,7 @@ TOTAL:                              3,910 lines
 - ✅ Timeout handling robust
 
 ### V2 → V3 (To Be Measured)
+
 - [ ] Appeal success rate stable (20-40% reversal rate)
 - [ ] Bond flows predictable (not excessive refunds/forfeitures)
 - [ ] Kleros escalation rate <5%
@@ -235,6 +255,7 @@ TOTAL:                              3,910 lines
 - [ ] Economic model sustainable
 
 ### V3 → Mainnet (Future)
+
 - [ ] Staking participation >80% of resolvers
 - [ ] Slashing rate <5% per month
 - [ ] Insurance pool solvent
@@ -246,23 +267,27 @@ TOTAL:                              3,910 lines
 ## Key Achievements
 
 ### Architecture
+
 ✅ **Stable Core:** `DecentralizedResolutionModule` unchanged across v1/v2/v3  
 ✅ **Swappable Modules:** Clean interfaces for incentive/staking/slashing  
 ✅ **Governance:** Slow lane (7 days) for all parameter changes  
 ✅ **Backward Compatible:** Each version works independently
 
 ### Testing
+
 ✅ **177 tests** with 100% pass rate  
 ✅ **1.79M random function calls** (invariant testing)  
 ✅ **3.3K fuzz runs** (property-based testing)  
 ✅ **~600K assertions verified**
 
 ### Security
+
 ✅ **7 v1 invariants proven** (EMA bounds, counter integrity, rate calculations)  
 ✅ **7 v2 invariants proven** (bond accounting, token conservation, distribution finality)  
 ✅ **All attack vectors tested** (overflow, reentrancy, manipulation, gaming)
 
 ### Documentation
+
 ✅ **10+ markdown files** (implementation summaries, test reports, TODOs)  
 ✅ **Comprehensive NatSpec** (all functions documented)  
 ✅ **Migration guides** (v1→v2→v3 paths)
@@ -271,13 +296,14 @@ TOTAL:                              3,910 lines
 
 ## Deployment Readiness
 
-| Component | Status | Testnet | Mainnet |
-|-----------|--------|---------|---------|
-| DR v1 | ✅ Complete | ✅ Ready | 🟡 Pending v2 |
-| DR v2 | ✅ Complete | ✅ Ready | 🟡 Pending phase gates |
-| DR v3 | 🚧 Interfaces only | 🔴 Not ready | 🔴 Not ready |
+| Component | Status             | Testnet      | Mainnet                |
+| --------- | ------------------ | ------------ | ---------------------- |
+| DR v1     | ✅ Complete        | ✅ Ready     | 🟡 Pending v2          |
+| DR v2     | ✅ Complete        | ✅ Ready     | 🟡 Pending phase gates |
+| DR v3     | 🚧 Interfaces only | 🔴 Not ready | 🔴 Not ready           |
 
 **Recommendation:**
+
 1. Deploy v1 to testnet immediately
 2. Monitor for 2-4 weeks
 3. Deploy v2 if phase gates met
@@ -289,6 +315,7 @@ TOTAL:                              3,910 lines
 ## Summary
 
 **What's Built:**
+
 - ✅ Complete DR v1 (workload routing, EMA scoring)
 - ✅ Complete DR v2 (appeal bonds, cost curves)
 - ✅ DR v3 interfaces and integration architecture
@@ -296,12 +323,14 @@ TOTAL:                              3,910 lines
 - ✅ Full documentation
 
 **What's Next:**
+
 - Implement real staking logic (v3 Phase 2)
 - Implement real slashing logic (v3 Phase 3)
 - Add fraud proofs (v3 Phase 4)
 - Add economic safety features (v3 Phase 5)
 
 **Timeline:**
+
 - **Now:** DR v1 + v2 ready for testnet
 - **+2-4 weeks:** V1 phase gates measured
 - **+4-8 weeks:** V2 phase gates measured

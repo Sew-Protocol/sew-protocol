@@ -15,6 +15,7 @@ This plan implements two critical improvements:
 2. **Appeal window enforcement** (finality discipline): No funds move until appeal window expires
 
 **Rationale for doing pull model first:**
+
 - Simplifies the appeal-window fix (finalization is pure state, withdrawals are separate)
 - Reduces reentrancy surface in critical dispute logic
 - Enables continuous splits (1-99%) without single-point-of-failure
@@ -31,11 +32,13 @@ This plan implements two critical improvements:
 ### Design: Claimable Balance Ledger
 
 **Core concept:**
+
 - Store `claimable[workflowId][recipient][token] = amount` (computed at finalization)
 - Parties call `withdrawEscrow(workflowId, token)` to pull funds
 - Finalization becomes pure state transition (no external transfers)
 
 **State machine addition:**
+
 ```
 ... → FINALIZED → WITHDRAWABLE (claimable balances set)
 ```
@@ -51,6 +54,7 @@ This plan implements two critical improvements:
 - Add event: `event EscrowWithdrawn(uint256 indexed workflowId, address indexed recipient, address indexed token, uint256 amount);`
 
 **Tests:**
+
 - Verify claimable balances are set correctly at finalization
 - Verify withdrawals are idempotent (set to 0 before transfer)
 - Verify multiple recipients can withdraw independently
@@ -60,12 +64,14 @@ This plan implements two critical improvements:
 **File:** `contracts/core/BaseEscrow.sol`
 
 **Functions to modify:**
+
 - `_executeFullResolution()`: Remove `_transferTokens()` call; instead set `claimable[workflowId][recipient][token] = amount`
 - `_executePartialResolution()`: Remove `_transferTokens()` call; instead set `claimable[workflowId][recipient][token] = result.actualAmount`
 - `_cancelAndRefund()`: Remove `_transferTokens()` call; set claimable for sender
 - `_releaseEscrowTransfer()`: Remove `_transferTokens()` call; set claimable for recipient
 
 **Invariant:**
+
 - Finalization functions must **never** call `_transferTokens()` directly
 - All token movement happens in `withdrawEscrow()`
 
@@ -75,32 +81,33 @@ This plan implements two critical improvements:
 
 ```solidity
 function withdrawEscrow(uint256 workflowId, address token) external nonReentrant returns (uint256) {
-    _validateWorkflowId(workflowId);
-    EscrowTransfer storage et = escrowTransfers[workflowId];
-    
-    // Verify escrow is finalized (or released/cancelled)
-    require(
-        et.escrowState == EscrowState.RESOLVED ||
-        et.escrowState == EscrowState.RELEASED ||
-        et.escrowState == EscrowState.REFUNDED,
-        "Not finalized"
-    );
-    
-    uint256 amount = claimable[workflowId][msg.sender][token];
-    require(amount > 0, "No claimable balance");
-    
-    // Idempotent: set to 0 before transfer
-    claimable[workflowId][msg.sender][token] = 0;
-    
-    _updateEscrowBalance(token, amount, false);
-    _transferTokens(token, msg.sender, amount);
-    
-    emit EscrowWithdrawn(workflowId, msg.sender, token, amount);
-    return amount;
+  _validateWorkflowId(workflowId);
+  EscrowTransfer storage et = escrowTransfers[workflowId];
+
+  // Verify escrow is finalized (or released/cancelled)
+  require(
+    et.escrowState == EscrowState.RESOLVED ||
+      et.escrowState == EscrowState.RELEASED ||
+      et.escrowState == EscrowState.REFUNDED,
+    'Not finalized'
+  );
+
+  uint256 amount = claimable[workflowId][msg.sender][token];
+  require(amount > 0, 'No claimable balance');
+
+  // Idempotent: set to 0 before transfer
+  claimable[workflowId][msg.sender][token] = 0;
+
+  _updateEscrowBalance(token, amount, false);
+  _transferTokens(token, msg.sender, amount);
+
+  emit EscrowWithdrawn(workflowId, msg.sender, token, amount);
+  return amount;
 }
 ```
 
 **Security:**
+
 - `nonReentrant` guard
 - Set claimable to 0 before transfer (checks-effects-interactions)
 - Verify escrow is in final state
@@ -110,26 +117,31 @@ function withdrawEscrow(uint256 workflowId, address token) external nonReentrant
 **File:** `contracts/core/BaseEscrow.sol`
 
 **Yield distribution:**
+
 - At finalization, compute yield-to-distribute
 - Set `claimable[workflowId][buyer][token] += yieldBuyerShare`
 - Set `claimable[workflowId][seller][token] += yieldSellerShare`
 - Yield withdrawals use the same `withdrawEscrow()` path
 
 **Fee distribution (if paid from escrow):**
+
 - Set `claimable[workflowId][feeRecipient][token] = feeAmount`
 - Or handle separately if fees go to treasury immediately
 
 #### 0.5 Edge Cases
 
 **Non-standard ERC20 tokens:**
+
 - Pull model isolates risk to withdrawal calls (not finalization)
 - Document that token hooks may revert withdrawals (user's problem, not protocol failure)
 
 **Griefing by never withdrawing:**
+
 - Not a protocol safety issue
 - Optional: time-locked sweep to recovery address after long period (controversial; recommend not implementing in v1)
 
 **Continuous splits (1-99%):**
+
 - Store `claimable[buyer]` and `claimable[seller]` separately
 - Each party withdraws independently
 - No single withdrawal failure blocks the other
@@ -144,6 +156,7 @@ function withdrawEscrow(uint256 workflowId, address token) external nonReentrant
 ### Design: Decision → Appeal Window → Finalization → Withdrawable
 
 **State machine:**
+
 ```
 DISPUTED_OPEN → DECIDED_PENDING_APPEAL → FINALIZABLE → FINALIZED → WITHDRAWABLE
                                        ↓ (if escalated)
@@ -159,11 +172,13 @@ DISPUTED_OPEN → DECIDED_PENDING_APPEAL → FINALIZABLE → FINALIZED → WITHD
 **Function:** `_executeResolution()` (internal entry point)
 
 **Current behavior:**
+
 1. Transfer tokens (PUSH) ❌
 2. Call `recordResolution()` ❌
 3. Set state to `RESOLVED` ❌
 
 **Target behavior:**
+
 1. Call `recordResolution()` **first** (sets appeal deadline in module)
 2. Query appeal deadline from resolution module
 3. If appeal window = 0 (final level) → finalize immediately
@@ -175,6 +190,7 @@ DISPUTED_OPEN → DECIDED_PENDING_APPEAL → FINALIZABLE → FINALIZED → WITHD
 **File:** `contracts/core/BaseEscrow.sol`
 
 **Storage:**
+
 ```solidity
 struct PendingSettlement {
     bool exists;
@@ -188,6 +204,7 @@ mapping(uint256 => PendingSettlement) public pendingSettlements;
 ```
 
 **Logic:**
+
 - Set when resolution is recorded (if appeal window > 0)
 - Cancel when escalation happens
 - Finalize when appeal window expires
@@ -198,33 +215,33 @@ mapping(uint256 => PendingSettlement) public pendingSettlements;
 
 ```solidity
 function finalizeAfterAppealWindow(uint256 workflowId) external nonReentrant {
-    _validateWorkflowId(workflowId);
-    PendingSettlement storage pending = pendingSettlements[workflowId];
-    require(pending.exists, "No pending settlement");
-    require(block.timestamp >= pending.appealDeadline, "Appeal window not expired");
-    
-    // Check if escalated (status should be DECIDED, not ESCALATED)
-    IResolutionModule module = _getResolutionModule(workflowId);
-    // Query module: disputeMetadata[workflowId].status
-    // If status == Escalated, revert (cancelled by escalation)
-    
-    // Finalize: set claimable balances
-    EscrowTransfer storage et = escrowTransfers[workflowId];
-    address recipient = pending.isRelease ? et.to : et.from;
-    
-    // Handle yield
-    if (address(yieldOps) != address(0)) {
-        // ... yield handling
-    }
-    
-    // Set claimable (pull model)
-    claimable[workflowId][recipient][et.token] += pending.amount;
-    
-    // Update state
-    et.escrowState = EscrowState.RESOLVED;
-    delete pendingSettlements[workflowId];
-    
-    emit EscrowFinalized(workflowId, recipient, pending.amount);
+  _validateWorkflowId(workflowId);
+  PendingSettlement storage pending = pendingSettlements[workflowId];
+  require(pending.exists, 'No pending settlement');
+  require(block.timestamp >= pending.appealDeadline, 'Appeal window not expired');
+
+  // Check if escalated (status should be DECIDED, not ESCALATED)
+  IResolutionModule module = _getResolutionModule(workflowId);
+  // Query module: disputeMetadata[workflowId].status
+  // If status == Escalated, revert (cancelled by escalation)
+
+  // Finalize: set claimable balances
+  EscrowTransfer storage et = escrowTransfers[workflowId];
+  address recipient = pending.isRelease ? et.to : et.from;
+
+  // Handle yield
+  if (address(yieldOps) != address(0)) {
+    // ... yield handling
+  }
+
+  // Set claimable (pull model)
+  claimable[workflowId][recipient][et.token] += pending.amount;
+
+  // Update state
+  et.escrowState = EscrowState.RESOLVED;
+  delete pendingSettlements[workflowId];
+
+  emit EscrowFinalized(workflowId, recipient, pending.amount);
 }
 ```
 
@@ -235,11 +252,13 @@ function finalizeAfterAppealWindow(uint256 workflowId) external nonReentrant {
 **Function:** `escalateDispute()`
 
 **Add logic:**
+
 - Before executing escalation, check if `pendingSettlements[workflowId].exists`
 - If exists, delete it (cancel pending settlement)
 - Emit `PendingSettlementCancelled(workflowId)` event
 
 **Invariant:**
+
 - Escalation deterministically cancels any pending settlement
 - Funds never move during appeal window
 
@@ -250,6 +269,7 @@ function finalizeAfterAppealWindow(uint256 workflowId) external nonReentrant {
 **Function:** `_executeResolution()`
 
 **Logic:**
+
 - After calling `recordResolution()`, query `appealWindows[currentRound]` from module
 - If `appealWindows[currentRound] == 0` (e.g., Kleros round):
   - Finalize immediately (set claimable balances)
@@ -257,6 +277,7 @@ function finalizeAfterAppealWindow(uint256 workflowId) external nonReentrant {
   - Set state to `RESOLVED`
 
 **Tests:**
+
 - Verify final-level resolutions (round 2) finalize immediately
 - Verify non-final resolutions require appeal window expiry
 
@@ -265,6 +286,7 @@ function finalizeAfterAppealWindow(uint256 workflowId) external nonReentrant {
 **File:** `contracts/core/BaseEscrow.sol` (if enum needs extension)
 
 **Consideration:**
+
 - Current `EscrowState` enum: `PENDING`, `DISPUTED`, `RESOLVED`, `RELEASED`, `REFUNDED`
 - Option A: Reuse `DISPUTED` (simpler, but less explicit)
 - Option B: Add `DECIDED_PENDING_APPEAL` state (more explicit, requires enum change)
@@ -276,11 +298,13 @@ function finalizeAfterAppealWindow(uint256 workflowId) external nonReentrant {
 **File:** `contracts/core/BaseEscrow.sol`
 
 **Query functions needed:**
+
 - Query `appealDeadline[currentRound]` from resolution module
 - Query `status` (Decided vs Escalated) from resolution module
 - Query `appealWindows[currentRound]` to check if final level
 
 **Interface additions (if needed):**
+
 - Add view function to `IResolutionModule`: `getAppealDeadline(uint256 workflowId, uint8 round) returns (uint256)`
 - Or: expose `disputeMetadata[workflowId].appealDeadline[round]` as public
 
@@ -304,12 +328,14 @@ function finalizeAfterAppealWindow(uint256 workflowId) external nonReentrant {
 **Function:** `escalateDispute()` (already collects escalation fee)
 
 **Add bond collection:**
+
 - Query required bond from resolution module (via incentive module or path config)
 - Collect bond from escalator (same pattern as escalation fee)
 - Store bond custody: `appealBonds[workflowId][round] = { depositor, amount, token }`
 - Bond is held in escrow contract (or dedicated custody)
 
 **Important:** Bond collection doesn't violate pull model because:
+
 - Bonds are collected **separately** from finalization
 - Bonds are held in custody (not transferred to recipient yet)
 - Bond distribution happens later (via incentive module)
@@ -319,11 +345,13 @@ function finalizeAfterAppealWindow(uint256 workflowId) external nonReentrant {
 **File:** `contracts/core/BaseEscrow.sol` or incentive module integration
 
 **Logic:**
+
 - After round k+1 decision is recorded, incentive module computes distribution
 - If appeal succeeds (`decision[k+1] != decision[k]`): refund bond to escalator
 - If appeal fails: bond goes to prior resolver set (or treasury/protocol cut)
 
 **Distribution pattern (pull model):**
+
 - Set `claimable[workflowId][recipient][token] = bondAmount` (or refundAmount)
 - Recipients call `withdrawEscrow()` to claim
 - Or: incentive module has separate withdrawal path for bond payouts
@@ -335,10 +363,12 @@ function finalizeAfterAppealWindow(uint256 workflowId) external nonReentrant {
 **File:** `contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol`
 
 **Events to emit:**
+
 - `AppealBondPosted(workflowId, round, depositor, amount, token)`
 - `AppealBondDistributionComputed(workflowId, round, recipient, amount, token, reason)`
 
 **Incentive module hooks:**
+
 - `onAppealBondPosted(workflowId, round, depositor, amount)` - record bond custody
 - `onRoundDecisionRecorded(workflowId, round, outcome)` - compute bond distribution when next round decides
 - `distributeAppealBond(workflowId, round)` - set claimable balances for bond payouts
@@ -348,10 +378,12 @@ function finalizeAfterAppealWindow(uint256 workflowId) external nonReentrant {
 **File:** `contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol`
 
 **Add to path config (future):**
+
 - Per-round bond curve parameters (base, step, curve type)
 - Distribution policy (refund on success, pay resolver on failure)
 
 **For now (v2):**
+
 - Bond requirements can be computed in incentive module
 - Path config integration can be deferred to v3
 
@@ -373,14 +405,17 @@ function finalizeAfterAppealWindow(uint256 workflowId) external nonReentrant {
 **File:** `contracts/core/BaseEscrow.sol` or incentive module
 
 **Current behavior (if any):**
+
 - Resolvers might receive payments during finalization (push)
 
 **Target behavior:**
+
 - Compute resolver payments at finalization
 - Set `claimable[workflowId][resolver][token] = paymentAmount`
 - Resolvers call `withdrawEscrow(workflowId, token)` or dedicated `withdrawResolverPayment()` function
 
 **Benefits:**
+
 - Prevents "pay resolver, then appeal reverses decision" awkwardness
 - Resolver payments only withdrawable after outcome is final
 - Aligns with "court" framing (resolvers are service providers, not immediate beneficiaries)
@@ -390,11 +425,13 @@ function finalizeAfterAppealWindow(uint256 workflowId) external nonReentrant {
 **File:** `contracts/decentralized-resolution-module/InsurancePoolVault.sol`
 
 **Already implemented (check):**
+
 - Insurance pool uses pull model for payouts (slow lane governance)
 - Slashed funds go to pool
 - Payouts are proposed → activated → withdrawn
 
 **Verification:**
+
 - Ensure insurance pool payouts use pull pattern (not push)
 - If not, migrate to `withdrawInsurancePayout()` pattern
 
@@ -404,6 +441,7 @@ function finalizeAfterAppealWindow(uint256 workflowId) external nonReentrant {
 **File:** `contracts/decentralized-resolution-module/ResolverSlashingModuleV1.sol`
 
 **No changes needed:**
+
 - Staking/slashing modules operate independently of escrow settlement
 - Slashed funds go to insurance pool (already pull-model)
 - Stake locks/unlocks are separate from escrow withdrawals
@@ -417,6 +455,7 @@ function finalizeAfterAppealWindow(uint256 workflowId) external nonReentrant {
 **File:** `test/foundry/core/BaseEscrowPullModel.t.sol` (new)
 
 **Test cases:**
+
 - ✅ `test_WithdrawEscrow_FullResolution()` - buyer/seller can withdraw after finalization
 - ✅ `test_WithdrawEscrow_PartialResolution()` - partial splits work independently
 - ✅ `test_WithdrawEscrow_ContinuousSplit()` - 1% buyer, 99% seller both withdraw independently
@@ -430,6 +469,7 @@ function finalizeAfterAppealWindow(uint256 workflowId) external nonReentrant {
 **File:** `test/foundry/core/BaseEscrowAppealWindow.t.sol` (new)
 
 **Test cases:**
+
 - ✅ `test_FinalizeAfterAppealWindow_Success()` - can finalize after appeal window expires
 - ✅ `test_FinalizeAfterAppealWindow_TooEarly()` - finalization fails before appeal deadline
 - ✅ `test_FinalizeAfterAppealWindow_Escalated()` - finalization fails if escalated during window
@@ -444,6 +484,7 @@ function finalizeAfterAppealWindow(uint256 workflowId) external nonReentrant {
 **File:** `test/foundry/core/BaseEscrowAppealBonds.t.sol` (new)
 
 **Test cases:**
+
 - ✅ `test_AppealBondCollection()` - bond collected during escalation
 - ✅ `test_AppealBondRefund_Success()` - bond refunded to escalator when appeal succeeds
 - ✅ `test_AppealBondPayment_Failure()` - bond paid to prior resolver when appeal fails
@@ -455,6 +496,7 @@ function finalizeAfterAppealWindow(uint256 workflowId) external nonReentrant {
 **File:** `test/foundry/core/BaseEscrowResolverPayments.t.sol` (new)
 
 **Test cases:**
+
 - ✅ `test_ResolverPaymentWithdrawal()` - resolvers can withdraw payments after finality
 - ✅ `test_ResolverPayment_PreventedDuringAppeal()` - payments not withdrawable until final
 - ✅ `test_InsurancePoolPayout_PullModel()` - insurance payouts use pull pattern
@@ -468,11 +510,13 @@ function finalizeAfterAppealWindow(uint256 workflowId) external nonReentrant {
 **Risk:** Medium (changes core settlement logic, but backward compatible if old push paths are removed)
 
 **Deployment:**
+
 1. Deploy updated `BaseEscrow` with pull model
 2. Migrate existing escrows (if any) to use `withdrawEscrow()` pattern
 3. Update frontend/UX to show "withdraw" button instead of "automatic transfer"
 
 **Rollback plan:**
+
 - Keep old push paths as emergency fallback (gated by admin)
 - Or: deploy as new escrow factory, migrate gradually
 
@@ -481,12 +525,14 @@ function finalizeAfterAppealWindow(uint256 workflowId) external nonReentrant {
 **Risk:** High (critical security fix, but changes dispute lifecycle)
 
 **Deployment:**
+
 1. Deploy updated `BaseEscrow` with appeal window enforcement
 2. Deploy updated `DecentralizedResolutionModule` (if interface changes needed)
 3. Test extensively on testnet
 4. Monitor for edge cases (timeouts, escalations during window)
 
 **Rollback plan:**
+
 - Emergency function to bypass appeal window (admin-only, time-locked)
 - Or: deploy as new module version, swap via governance
 
@@ -495,11 +541,13 @@ function finalizeAfterAppealWindow(uint256 workflowId) external nonReentrant {
 **Risk:** Medium (adds economic mechanics, but incentive module is swappable)
 
 **Deployment:**
+
 1. Deploy incentive module with bond logic
 2. Deploy updated `BaseEscrow` with bond collection
 3. Activate bonds via governance (slow lane)
 
 **Rollback plan:**
+
 - Bonds can be disabled via governance (set bond amount to 0)
 - Incentive module can be swapped to fee-only version
 
@@ -508,6 +556,7 @@ function finalizeAfterAppealWindow(uint256 workflowId) external nonReentrant {
 **Risk:** Low (mostly verification, resolver modules already exist)
 
 **Deployment:**
+
 1. Verify resolver payment flows use pull model
 2. Verify insurance pool payouts use pull model
 3. No code changes expected (already implemented)
@@ -526,23 +575,27 @@ function finalizeAfterAppealWindow(uint256 workflowId) external nonReentrant {
 ## Success Criteria
 
 ### Phase 0 (Pull Model)
+
 - ✅ All token transfers happen in `withdrawEscrow()` (no push payments)
 - ✅ Finalization functions are pure state transitions (no external calls)
 - ✅ Continuous splits work independently (1% buyer, 99% seller)
 - ✅ Yield distribution uses claimable ledger
 
 ### Phase 1 (Appeal Window)
+
 - ✅ Funds never move until appeal window expires (or final level)
 - ✅ Escalation cancels pending settlement deterministically
 - ✅ Final-level resolutions (Kleros) finalize immediately
 - ✅ `recordResolution()` is called before claimable balances are set
 
 ### Phase 2 (Appeal Bonds)
+
 - ✅ Bonds are collected during escalation
 - ✅ Bond distribution uses pull model (claimable ledger)
 - ✅ Bond refunds/payments work correctly with appeal outcomes
 
 ### Phase 3 (Resolver Compensation)
+
 - ✅ Resolver payments use pull model
 - ✅ Insurance pool payouts use pull model
 - ✅ No push payments anywhere in dispute lifecycle

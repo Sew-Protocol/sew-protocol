@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.33;
 
-import "forge-std/Test.sol";
-import "contracts/core/EscrowVault.sol";
-import "contracts/mocks/ERC20Mock.sol";
-import "contracts/core/modules/DefaultResolutionModule.sol";
-import "contracts/types/EscrowTypes.sol";
-import "contracts/YieldOps.sol";
-import "contracts/DisputeOps.sol";
+import 'forge-std/Test.sol';
+import 'contracts/core/EscrowVault.sol';
+import 'contracts/mocks/ERC20Mock.sol';
+import 'contracts/core/modules/DefaultResolutionModule.sol';
+import 'contracts/types/EscrowTypes.sol';
+import 'contracts/YieldOps.sol';
+import 'contracts/DisputeOps.sol';
 
 contract WithdrawEscrowTest is Test {
     EscrowVault vault;
@@ -28,7 +28,7 @@ contract WithdrawEscrowTest is Test {
         yieldOps = new YieldOps();
         disputeOps = new DisputeOps();
         vault = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps));
-        token = new ERC20Mock("Test", "TST", address(this), 1e24);
+        token = new ERC20Mock('Test', 'TST', address(this), 1e24);
         rm = new DefaultResolutionModule(address(this), resolver);
 
         // Setup roles and modules
@@ -73,7 +73,7 @@ contract WithdrawEscrowTest is Test {
 
         assertEq(withdrawn, expected);
         assertEq(token.balanceOf(recipient), expected);
-        
+
         // After withdrawal, claimable should be 0
         uint256 claimableFinal = vault.claimable(wid, recipient, address(token));
         assertEq(claimableFinal, 0);
@@ -100,7 +100,7 @@ contract WithdrawEscrowTest is Test {
 
         // Second withdrawal should fail (no claimable balance)
         vm.prank(recipient);
-        vm.expectRevert("No claimable balance");
+        vm.expectRevert('No claimable balance');
         vault.withdrawEscrow(wid);
     }
 
@@ -114,7 +114,7 @@ contract WithdrawEscrowTest is Test {
 
         // Recipient tries to withdraw while escrow is PENDING
         vm.prank(recipient);
-        vm.expectRevert("Not finalized");
+        vm.expectRevert('Not finalized');
         vault.withdrawEscrow(wid);
     }
 

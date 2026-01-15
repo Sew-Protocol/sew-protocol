@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
-import "./DecentralizedResolverStructs.sol";
+import './DecentralizedResolverStructs.sol';
 
 /**
  * @title EscalationCostLibrary
@@ -27,7 +27,7 @@ library EscalationCostLibrary {
         if (!config.enabled) {
             return 0;
         }
-        
+
         if (config.curveType == DecentralizedResolverStructs.CostCurveType.LINEAR) {
             // Linear: cost(k) = baseCost + stepSize * k
             return config.baseCost + (config.stepSize * uint256(escalationCount));
@@ -45,7 +45,7 @@ library EscalationCostLibrary {
             if (escalationCount == 0) {
                 return config.baseCost;
             }
-            
+
             // Use repeated multiplication (safer than exponentiation for small k)
             uint256 result = config.baseCost;
             for (uint8 i = 0; i < escalationCount; i++) {
@@ -53,11 +53,11 @@ library EscalationCostLibrary {
             }
             return result;
         }
-        
+
         // Default: return base cost
         return config.baseCost;
     }
-    
+
     /**
      * @notice Calculate escalation cost for a specific level
      * @param level Escalation level (0 = first escalation, 1 = second, etc.)
@@ -73,7 +73,7 @@ library EscalationCostLibrary {
         if (level == 0) {
             return 0;
         }
-        
+
         // Level 1 = first escalation (k=0), Level 2 = second escalation (k=1), etc.
         uint8 escalationCount = level - 1;
         return calculateEscalationCost(escalationCount, config);

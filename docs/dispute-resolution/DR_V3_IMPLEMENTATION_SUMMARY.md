@@ -21,6 +21,7 @@ Capital at risk creates adversarial pressure. We only introduce this after v1 (d
 ### 1. Interface Definitions
 
 **`IStakingModule.sol` (230 lines)**
+
 - Core staking functions (stake, unstake, delegation)
 - Lifecycle hooks (onResolverAssigned, onResolutionFinalized, onDisputeEscalated)
 - Query functions (getStakeInfo, isStakeSufficient, getEffectiveStake)
@@ -28,6 +29,7 @@ Capital at risk creates adversarial pressure. We only introduce this after v1 (d
 - Comprehensive events for observability
 
 **`ISlashingModule.sol` (330 lines)**
+
 - Slashing proposal and execution
 - Appeals process (appealSlash, resolveAppeal)
 - Automated slashing hooks (slashForTimeout, slashForReversal, slashForFraud)
@@ -38,6 +40,7 @@ Capital at risk creates adversarial pressure. We only introduce this after v1 (d
 ### 2. No-Op Implementations
 
 **`StakingModuleNoOp.sol` (250 lines)**
+
 - Implements IStakingModule with no actual staking logic
 - All functions return success but do nothing
 - Emits events for observability
@@ -46,6 +49,7 @@ Capital at risk creates adversarial pressure. We only introduce this after v1 (d
 - **WARNING:** Not for production - testing only!
 
 **`SlashingModuleNoOp.sol` (280 lines)**
+
 - Implements ISlashingModule with no actual slashing logic
 - All functions return success but do nothing
 - Emits events for observability
@@ -56,12 +60,14 @@ Capital at risk creates adversarial pressure. We only introduce this after v1 (d
 ### 3. Integration into DecentralizedResolutionModule
 
 **Module Storage:**
+
 ```solidity
 IStakingModule public stakingModule;   // Can be address(0)
 ISlashingModule public slashingModule; // Can be address(0)
 ```
 
 **Governance Functions (Slow Lane):**
+
 - `queueStakingModule(address)` / `activateStakingModule()`
 - `queueSlashingModule(address)` / `activateSlashingModule()`
 - `getPendingStakingModule()` / `getPendingSlashingModule()`
@@ -69,15 +75,16 @@ ISlashingModule public slashingModule; // Can be address(0)
 
 **Lifecycle Hook Integration:**
 
-| Event | Hook Called | Module |
-|-------|-------------|--------|
-| Resolver assigned | `onResolverAssigned(workflowId, resolver, 0)` | Staking |
-| Resolution finalized | `onResolutionFinalized(workflowId, resolver, true)` | Staking |
-| Dispute escalated | `onDisputeEscalated(workflowId, priorResolver)` | Staking |
-| Timeout occurred | `slashForTimeout(workflowId, resolver, 1)` | Slashing |
-| Decision reversed | `slashForReversal(workflowId, resolver, priorRound)` | Slashing |
+| Event                | Hook Called                                          | Module   |
+| -------------------- | ---------------------------------------------------- | -------- |
+| Resolver assigned    | `onResolverAssigned(workflowId, resolver, 0)`        | Staking  |
+| Resolution finalized | `onResolutionFinalized(workflowId, resolver, true)`  | Staking  |
+| Dispute escalated    | `onDisputeEscalated(workflowId, priorResolver)`      | Staking  |
+| Timeout occurred     | `slashForTimeout(workflowId, resolver, 1)`           | Slashing |
+| Decision reversed    | `slashForReversal(workflowId, resolver, priorRound)` | Slashing |
 
 **Backward Compatibility:**
+
 - All hooks wrapped in `if (address(module) != address(0))` checks
 - V1 and V2 functionality unchanged when v3 modules not set
 - Hooks wrapped in try/catch (non-critical failures)
@@ -87,6 +94,7 @@ ISlashingModule public slashingModule; // Can be address(0)
 ## Architecture: Stable Core + Swappable V3
 
 **Module Hierarchy:**
+
 ```
 DecentralizedResolutionModule (stable core)
 ├─ IIncentiveModule (v1/v2/v3)
@@ -101,6 +109,7 @@ DecentralizedResolutionModule (stable core)
 ```
 
 **Swap Path:**
+
 1. Deploy new module (e.g., `ResolverStakingModuleV1`)
 2. Queue via governance: `queueStakingModule(address)`
 3. Wait 7 days (slow lane)
@@ -112,6 +121,7 @@ DecentralizedResolutionModule (stable core)
 ## Test Coverage (20 tests)
 
 ### Module Governance (5 tests) ✅
+
 - Queue and activate staking module
 - Queue and activate slashing module
 - Access control (only timelock)
@@ -119,6 +129,7 @@ DecentralizedResolutionModule (stable core)
 - Check v3 active status
 
 ### Lifecycle Hooks (5 tests) ✅
+
 - Staking hook on resolver assigned
 - Staking hook on resolution finalized
 - Staking hook on dispute escalated
@@ -126,11 +137,13 @@ DecentralizedResolutionModule (stable core)
 - Slashing hook on reversal
 
 ### Backward Compatibility (3 tests) ✅
+
 - V1 works without v3 modules
 - V2 works without v3 modules
 - Modules can be address(0)
 
 ### No-Op Behavior (6 tests) ✅
+
 - Staking always returns true (sufficient stake)
 - Slashing always returns zero (no slash amount)
 - Access control enforced
@@ -139,6 +152,7 @@ DecentralizedResolutionModule (stable core)
 - Circuit breaker functionality
 
 ### Integration (1 test) ✅
+
 - Full flow with v3 modules active
 - Timeout with slashing
 - Module swap documentation
@@ -148,17 +162,21 @@ DecentralizedResolutionModule (stable core)
 ## Files Created
 
 ### Interfaces
+
 - `/contracts/decentralized-resolution-module/IStakingModule.sol` (230 lines)
 - `/contracts/decentralized-resolution-module/ISlashingModule.sol` (330 lines)
 
 ### No-Op Implementations
+
 - `/contracts/decentralized-resolution-module/StakingModuleNoOp.sol` (250 lines)
 - `/contracts/decentralized-resolution-module/SlashingModuleNoOp.sol` (280 lines)
 
 ### Tests
+
 - `/test/foundry/decentralized-resolution-module/DRv3Integration.t.sol` (420 lines, 20 tests)
 
 ### Documentation
+
 - `/docs/dispute-resolution/DR_V3_TODO.md` (comprehensive implementation plan)
 - `/docs/dispute-resolution/DR_V3_IMPLEMENTATION_SUMMARY.md` (this file)
 
@@ -167,6 +185,7 @@ DecentralizedResolutionModule (stable core)
 ## Files Modified
 
 **`DecentralizedResolutionModule.sol`:**
+
 - Added `IStakingModule` and `ISlashingModule` imports
 - Added module storage variables
 - Added pending module config structs
@@ -185,6 +204,7 @@ DecentralizedResolutionModule (stable core)
 ## Integration Flow
 
 ### Without V3 Modules (Current State)
+
 ```
 User → Escrow → DecentralizedResolutionModule → IncentiveModule
                  ↓
@@ -192,6 +212,7 @@ User → Escrow → DecentralizedResolutionModule → IncentiveModule
 ```
 
 ### With V3 Modules (Future)
+
 ```
 User → Escrow → DecentralizedResolutionModule → IncentiveModule
                  ↓                ↓              ↓
@@ -203,25 +224,30 @@ User → Escrow → DecentralizedResolutionModule → IncentiveModule
 ### Hook Call Sequence (with v3 active)
 
 **Dispute Initialization:**
+
 1. `DecentralizedResolutionModule.initializeDispute()`
 2. → `incentiveModule.onResolverAssigned()`
 3. → `stakingModule.onResolverAssigned()` (locks stake)
 
 **Resolution:**
+
 1. `DecentralizedResolutionModule.recordResolution()`
 2. → `incentiveModule.onDecisionSubmitted()`
 3. → `stakingModule.onResolutionFinalized()` (unlocks stake)
 
 **Timeout:**
+
 1. `DecentralizedResolutionModule.forceProgress()`
 2. → `incentiveModule.onResolverTimeout()`
 3. → `slashingModule.slashForTimeout()` (proposes slash)
 
 **Reversal:**
+
 1. `DecentralizedResolutionModule.recordReversal()`
 2. → `slashingModule.slashForReversal()` (proposes slash)
 
 **Escalation:**
+
 1. `DecentralizedResolutionModule.executeEscalation()`
 2. → `stakingModule.onDisputeEscalated()` (unlocks prior resolver)
 3. → `stakingModule.onResolverAssigned()` (locks new resolver)
@@ -257,6 +283,7 @@ User → Escrow → DecentralizedResolutionModule → IncentiveModule
 ## Next Steps (Phase 2-7)
 
 ### Phase 2: Staking Module Implementation
+
 - [ ] Implement `ResolverStakingModuleV1`
 - [ ] ERC20 stake token support
 - [ ] Minimum stake requirements
@@ -265,6 +292,7 @@ User → Escrow → DecentralizedResolutionModule → IncentiveModule
 - [ ] Tests + invariants
 
 ### Phase 3: Slashing Module Implementation
+
 - [ ] Implement `ResolverSlashingModuleV1`
 - [ ] Graduated penalties (timeout < reversal < fraud)
 - [ ] Appeals process
@@ -273,24 +301,28 @@ User → Escrow → DecentralizedResolutionModule → IncentiveModule
 - [ ] Tests + invariants
 
 ### Phase 4: Fraud Lane
+
 - [ ] Implement `FraudProofModule`
 - [ ] Off-chain proof verification
 - [ ] Collusion detection
 - [ ] Tests + invariants
 
 ### Phase 5: Economic Safety
+
 - [ ] Insurance pool
 - [ ] Circuit breakers
 - [ ] Stake liquidity protection
 - [ ] Tests + simulations
 
 ### Phase 6: Testing
+
 - [ ] Invariant tests (stake conservation, slashing bounds)
 - [ ] Fuzz tests (random stake/slash sequences)
 - [ ] Economic simulations
 - [ ] Formal verification (optional)
 
 ### Phase 7: Integration
+
 - [ ] Full stack testing (v1 + v2 + v3)
 - [ ] Migration path
 - [ ] Governance proposal templates
@@ -319,6 +351,7 @@ User → Escrow → DecentralizedResolutionModule → IncentiveModule
 **Phase 1 Status:** ✅ Complete
 
 **What's Working:**
+
 - Clean interface boundaries for v3 modules
 - No-op implementations for testing architecture
 - Governance controls (slow lane activation)
@@ -327,6 +360,7 @@ User → Escrow → DecentralizedResolutionModule → IncentiveModule
 - All tests passing (177 total)
 
 **What's Next:**
+
 - Implement real staking logic (Phase 2)
 - Implement real slashing logic (Phase 3)
 - Add fraud proofs (Phase 4)
@@ -337,6 +371,7 @@ User → Escrow → DecentralizedResolutionModule → IncentiveModule
 **Recommendation:** Phase 1 provides a solid foundation. The architecture is proven, the interfaces are clean, and the integration points are tested. Ready to proceed with real implementations once v2 is stable in production.
 
 **Estimated Timeline:**
+
 - Phase 2 (Staking): 2-3 weeks
 - Phase 3 (Slashing): 2-3 weeks
 - Phase 4 (Fraud): 1-2 weeks

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
-import "../../shared/interfaces/IResolutionModule.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import '../../shared/interfaces/IResolutionModule.sol';
+import '@openzeppelin/contracts/access/AccessControl.sol';
 
 /**
  * @title DefaultResolutionModule
@@ -12,7 +12,7 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
  */
 contract DefaultResolutionModule is AccessControl, IResolutionModule {
     // Role constants for governance
-    bytes32 public constant ROLE_TIMELOCK = keccak256("ROLE_TIMELOCK");
+    bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');
     address public resolver;
 
     event ResolverUpdated(address indexed oldResolver, address indexed newResolver);
@@ -61,11 +61,7 @@ contract DefaultResolutionModule is AccessControl, IResolutionModule {
         uint256 /* workflowId */,
         uint8 /* currentLevel */,
         bytes calldata /* escrowData */
-    ) external pure override returns (
-        bool allowed,
-        address nextResolver,
-        uint256 escalationFee
-    ) {
+    ) external pure override returns (bool allowed, address nextResolver, uint256 escalationFee) {
         return (false, address(0), 0);
     }
 
@@ -75,11 +71,7 @@ contract DefaultResolutionModule is AccessControl, IResolutionModule {
     function executeEscalation(
         uint256 /* workflowId */,
         bytes calldata /* escrowData */
-    ) external pure override returns (
-        bool success,
-        address newResolver,
-        uint8 newLevel
-    ) {
+    ) external pure override returns (bool success, address newResolver, uint8 newLevel) {
         return (false, address(0), 0);
     }
 
@@ -99,34 +91,28 @@ contract DefaultResolutionModule is AccessControl, IResolutionModule {
      * @notice Get module name
      */
     function moduleName() external pure override returns (string memory) {
-        return "DefaultSingleResolver";
+        return 'DefaultSingleResolver';
     }
-    
+
     /**
      * @notice Get the module version
      * @return version The module version (semantic versioning)
      */
     function moduleVersion() external pure override returns (string memory version) {
-        return "1.0.0";
+        return '1.0.0';
     }
-    
+
     /**
      * @notice Check if contract supports an interface
      * @param interfaceId The interface identifier
      * @return supported True if interface is supported
      * @dev AccessControl already includes ERC165
      */
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        virtual
-        override(AccessControl, IERC165)
-        returns (bool)
-    {
+    function supportsInterface(
+        bytes4 interfaceId
+    ) public view virtual override(AccessControl, IERC165) returns (bool) {
         return
             interfaceId == type(IResolutionModule).interfaceId ||
             super.supportsInterface(interfaceId);
     }
 }
-
-

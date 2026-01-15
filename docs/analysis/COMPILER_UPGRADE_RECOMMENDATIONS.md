@@ -9,6 +9,7 @@
 ### Will 0.8.31 Help?
 
 **Likely Yes, but Impact is Small:**
+
 - Solidity 0.8.26+ introduced improved Yul optimizer
 - 0.8.31 likely has additional optimizations
 - Expected savings: **-0.2 to -0.5 KB per contract**
@@ -35,12 +36,14 @@
 ### Priority 1: Test Solidity 0.8.31 ⭐
 
 **Why:**
+
 - Easy to test (just change version)
 - Low risk (backward compatible)
 - Potential small savings
 - Bug fixes and improvements
 
 **Steps:**
+
 1. Update `hardhat.config.ts`: `version: "0.8.31"`
 2. Update all `pragma solidity ^0.8.28` to `^0.8.31`
 3. Compile and measure sizes
@@ -52,11 +55,13 @@
 ### Priority 2: Test Higher Optimizer Runs
 
 **Why:**
+
 - Easy to test
 - Known to reduce size
 - Already at 50000, can go higher
 
 **Steps:**
+
 1. Test `runs: 100000`
 2. Test `runs: 200000` (if 100k helps)
 3. Measure size impact
@@ -67,10 +72,12 @@
 ### Priority 3: Test viaIR: false
 
 **Why:**
+
 - IR can sometimes increase size due to inlining
 - Worth testing both options
 
 **Steps:**
+
 1. Test `viaIR: false` with 0.8.31
 2. Compare with `viaIR: true`
 3. Choose best option
@@ -100,10 +107,11 @@ solidity: {
 
 ```solidity
 // All contracts
-pragma solidity ^0.8.31;  // Changed from ^0.8.28
+pragma solidity ^0.8.31; // Changed from ^0.8.28
 ```
 
 **Test:**
+
 ```bash
 pnpm compile
 pnpm size:check
@@ -129,6 +137,7 @@ optimizer: {
 ```
 
 **Test:**
+
 ```bash
 # Update hardhat.config.ts
 pnpm compile
@@ -150,6 +159,7 @@ settings: {
 ```
 
 **Test:**
+
 ```bash
 # Update hardhat.config.ts
 pnpm compile
@@ -162,6 +172,7 @@ pnpm size:check
 ### Step 4: Combine Best Settings
 
 Use the configuration that gives the best results:
+
 - Solidity 0.8.31
 - Best `runs` value (likely 100000)
 - Best `viaIR` setting (likely true, but test both)
@@ -177,6 +188,7 @@ ts-node scripts/test-compiler-settings.ts
 ```
 
 This will:
+
 1. Test current settings
 2. Test 0.8.31 with various configurations
 3. Show size comparisons
@@ -189,22 +201,26 @@ This will:
 ## Expected Final Results
 
 ### Best Case Scenario
+
 - Solidity 0.8.31: -0.5 KB
 - Optimizer runs 100000: -0.5 KB
 - viaIR optimization: -0.2 KB
 - **Total: ~-1.2 KB per contract**
 
 ### Realistic Scenario
+
 - Solidity 0.8.31: -0.3 KB
 - Optimizer runs 100000: -0.3 KB
 - viaIR: No change
 - **Total: ~-0.6 KB per contract**
 
 ### Current Status
+
 - EscrowVault: 38.91 KB
 - EscrowableERC20: 38.90 KB
 
 ### After Compiler Optimizations (Realistic)
+
 - EscrowVault: ~38.3 KB (still 59% over limit)
 - EscrowableERC20: ~38.3 KB (still 59% over limit)
 
@@ -230,7 +246,7 @@ outputSelection: {
 
 ```typescript
 metadata: {
-  bytecodeHash: "none"  // or "ipfs"
+  bytecodeHash: 'none'; // or "ipfs"
 }
 ```
 
@@ -249,16 +265,19 @@ metadata: {
 ## Risk Assessment
 
 ### Solidity 0.8.31 Upgrade
+
 - **Risk:** Low - Backward compatible
 - **Testing:** Run all tests
 - **Rollback:** Easy (just change version back)
 
 ### Optimizer Runs Increase
+
 - **Risk:** Low - Only affects compilation
 - **Testing:** Test gas costs if significant
 - **Rollback:** Easy (just change runs value)
 
 ### viaIR Change
+
 - **Risk:** Medium - Can affect bytecode generation
 - **Testing:** Run all tests, check gas costs
 - **Rollback:** Easy (just change setting)
@@ -273,5 +292,3 @@ metadata: {
 4. **Focus on code optimizations** - This is where the real savings are
 
 **Remember:** Compiler optimizations are incremental. The real solution is architectural (Module Management Contract, etc.)
-
-
