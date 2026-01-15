@@ -1,7 +1,7 @@
 # DR v3 Implementation TODO
 
 **Target:** Decentralize Capital (Resolver Staking + Slashing)  
-**Status:** Planning Phase  
+**Status:** Implementation In Progress (Phase 1-3 Complete, Phase 5 Partial)  
 **Approach:** Interface-first, no-op stubs, then real implementations with invariants
 
 ---
@@ -22,47 +22,47 @@ Define clean interfaces for staking and slashing modules, integrate them into `D
 ### Tasks
 
 #### 1.1 Create `IStakingModule.sol` Interface
-- [ ] Define stake/unstake functions
-- [ ] Define stake queries (getStake, getAvailableStake, isStakeSufficient)
-- [ ] Define delegation functions (for senior backing)
-- [ ] Define lifecycle hooks (onStakeChanged, onResolverAssigned)
-- [ ] Define emergency functions (pause, emergencyWithdraw)
-- [ ] Add events (StakeDeposited, StakeWithdrawn, StakeDelegated, etc.)
+- [x] Define stake/unstake functions
+- [x] Define stake queries (getStake, getAvailableStake, isStakeSufficient)
+- [x] Define delegation functions (for senior backing)
+- [x] Define lifecycle hooks (onStakeChanged, onResolverAssigned)
+- [x] Define emergency functions (pause, emergencyWithdraw)
+- [x] Add events (StakeDeposited, StakeWithdrawn, StakeDelegated, etc.)
 
 #### 1.2 Create `ISlashingModule.sol` Interface
-- [ ] Define slash functions (slashForTimeout, slashForReversal, slashForFraud)
-- [ ] Define slash calculation functions (getSlashAmount, getSlashableStake)
-- [ ] Define appeal functions (appealSlash, resolveSlashAppeal)
-- [ ] Define lifecycle hooks (onSlashingEvent, onResolverRemoved)
-- [ ] Add events (ResolverSlashed, SlashAppealed, SlashReversed, etc.)
+- [x] Define slash functions (slashForTimeout, slashForReversal, slashForFraud)
+- [x] Define slash calculation functions (getSlashAmount, getSlashableStake)
+- [x] Define appeal functions (appealSlash, resolveSlashAppeal)
+- [x] Define lifecycle hooks (onSlashingEvent, onResolverRemoved)
+- [x] Add events (ResolverSlashed, SlashAppealed, SlashReversed, etc.)
 
 #### 1.3 Create `StakingModuleNoOp.sol`
-- [ ] Implement IStakingModule with no-op functions
-- [ ] All functions return success but do nothing
-- [ ] Emit events for observability
-- [ ] Document "This is a placeholder for testing"
+- [x] Implement IStakingModule with no-op functions
+- [x] All functions return success but do nothing
+- [x] Emit events for observability
+- [x] Document "This is a placeholder for testing"
 
 #### 1.4 Create `SlashingModuleNoOp.sol`
-- [ ] Implement ISlashingModule with no-op functions
-- [ ] All functions return success but do nothing
-- [ ] Emit events for observability
-- [ ] Document "This is a placeholder for testing"
+- [x] Implement ISlashingModule with no-op functions
+- [x] All functions return success but do nothing
+- [x] Emit events for observability
+- [x] Document "This is a placeholder for testing"
 
 #### 1.5 Integrate into `DecentralizedResolutionModule`
-- [ ] Add `IStakingModule public stakingModule` storage variable
-- [ ] Add `ISlashingModule public slashingModule` storage variable
-- [ ] Add governance functions to set modules (slow lane)
-- [ ] Wire lifecycle hooks:
+- [x] Add `IStakingModule public stakingModule` storage variable
+- [x] Add `ISlashingModule public slashingModule` storage variable
+- [x] Add governance functions to set modules (slow lane)
+- [x] Wire lifecycle hooks:
   - Call `stakingModule.onResolverAssigned()` when resolver assigned
   - Call `slashingModule.onSlashingEvent()` on timeout/reversal
-- [ ] Add view functions to check if modules are active
-- [ ] Ensure backward compatibility (modules can be address(0))
+- [x] Add view functions to check if modules are active
+- [x] Ensure backward compatibility (modules can be address(0))
 
 #### 1.6 Write Integration Tests
-- [ ] Test module swapping (no-op → real)
-- [ ] Test lifecycle hooks called correctly
-- [ ] Test backward compatibility (v1/v2 work without v3 modules)
-- [ ] Test governance controls (only timelock can set modules)
+- [x] Test module swapping (no-op → real)
+- [x] Test lifecycle hooks called correctly
+- [x] Test backward compatibility (v1/v2 work without v3 modules)
+- [x] Test governance controls (only timelock can set modules)
 
 ---
 
@@ -74,31 +74,31 @@ Implement real staking logic with ERC20 tokens, time-locks, and delegation suppo
 ### Tasks
 
 #### 2.1 Create `ResolverStakingModuleV1.sol`
-- [ ] ERC20 stake token support
-- [ ] Minimum stake requirements per resolver tier
-- [ ] Stake time-lock periods (prevent instant withdrawal after bad decision)
-- [ ] Delegation support (senior resolvers back standard resolvers)
-- [ ] Stake utilization tracking (how much is "at risk" vs "available")
-- [ ] Emergency pause mechanism
+- [x] ERC20 stake token support
+- [x] Minimum stake requirements per resolver tier
+- [x] Stake time-lock periods (prevent instant withdrawal after bad decision)
+- [x] Delegation support (senior resolvers back standard resolvers)
+- [x] Stake utilization tracking (how much is "at risk" vs "available")
+- [x] Emergency pause mechanism
 
 #### 2.2 Staking Features
-- [ ] `stake(uint256 amount)` - Deposit stake tokens
-- [ ] `unstake(uint256 amount)` - Withdraw (after time-lock)
-- [ ] `delegateStake(address resolver, uint256 amount)` - Senior backs resolver
-- [ ] `undelegateStake(address resolver, uint256 amount)` - Remove backing
-- [ ] View functions for stake status
+- [x] `stake(uint256 amount)` - Deposit stake tokens
+- [x] `unstake(uint256 amount)` - Withdraw (after time-lock)
+- [x] `delegateStake(address resolver, uint256 amount)` - Senior backs resolver
+- [x] `undelegateStake(address resolver, uint256 amount)` - Remove backing
+- [x] View functions for stake status
 
 #### 2.3 Stake Requirements
-- [ ] Standard resolver: minimum stake (e.g., 1000 tokens)
-- [ ] Senior resolver: higher minimum (e.g., 10000 tokens)
-- [ ] Stake multiplier for workload capacity
+- [x] Standard resolver: minimum stake (e.g., 1000 tokens)
+- [x] Senior resolver: higher minimum (e.g., 10000 tokens)
+- [x] Stake multiplier for workload capacity
 - [ ] Grace period for falling below minimum
 
 #### 2.4 Stake Time-Locks
-- [ ] Post-decision lock (e.g., 7 days after resolution)
-- [ ] Appeal window lock (stake frozen during appeals)
-- [ ] Escalation lock (stake frozen if escalated)
-- [ ] Configurable lock durations per scenario
+- [x] Post-decision lock (e.g., 7 days after resolution)
+- [x] Appeal window lock (stake frozen during appeals)
+- [x] Escalation lock (stake frozen if escalated)
+- [x] Configurable lock durations per scenario
 
 ---
 
@@ -110,30 +110,30 @@ Implement slashing logic with graduated penalties, appeals, and fraud proofs.
 ### Tasks
 
 #### 3.1 Create `ResolverSlashingModuleV1.sol`
-- [ ] Slashing calculation logic (percentage-based)
-- [ ] Graduated penalties (timeout < reversal < fraud)
-- [ ] Slashing appeals process
-- [ ] Slash distribution (protocol, counter-party, insurance pool)
+- [x] Slashing calculation logic (percentage-based)
+- [x] Graduated penalties (timeout < reversal < fraud)
+- [x] Slashing appeals process
+- [x] Slash distribution (protocol, counter-party, insurance pool)
 - [ ] Fraud proof verification
 
 #### 3.2 Slashing Rules
-- [ ] **Timeout Slash:** 1-5% of stake (configurable)
-- [ ] **Reversal Slash:** 5-20% of stake (based on severity)
-- [ ] **Fraud Slash:** 50-100% of stake (provable malicious behavior)
-- [ ] Max slash per period (prevent cascading losses)
-- [ ] Accumulated slash tracking
+- [x] **Timeout Slash:** 1-5% of stake (configurable)
+- [x] **Reversal Slash:** 5-20% of stake (based on severity)
+- [x] **Fraud Slash:** 50-100% of stake (provable malicious behavior)
+- [x] Max slash per period (prevent cascading losses)
+- [x] Accumulated slash tracking
 
 #### 3.3 Slashing Appeals
-- [ ] Resolver can appeal slash within window (e.g., 3 days)
-- [ ] Appeal requires bond (to prevent spam)
-- [ ] Senior resolver or DAO reviews appeal
-- [ ] Slash reversed or upheld
-- [ ] Appeal bond returned or forfeited
+- [x] Resolver can appeal slash within window (e.g., 3 days)
+- [x] Appeal requires bond (to prevent spam)
+- [x] Senior resolver or DAO reviews appeal
+- [x] Slash reversed or upheld
+- [x] Appeal bond returned or forfeited
 
 #### 3.4 Slash Distribution
-- [ ] 50% to protocol treasury
-- [ ] 30% to counter-party (user harmed by bad decision)
-- [ ] 20% to insurance pool (covers catastrophic failures)
+- [x] 50% to protocol treasury
+- [x] 30% to counter-party (user harmed by bad decision)
+- [x] 20% to insurance pool (covers catastrophic failures)
 - [ ] Configurable percentages via governance
 
 ---
@@ -174,13 +174,13 @@ Implement safety mechanisms to prevent catastrophic failures and black swan even
 ### Tasks
 
 #### 5.1 Stake Insurance Pool
-- [ ] Pool funded by protocol fees + slash distributions
-- [ ] Covers user losses when resolver stake insufficient
+- [x] Pool funded by protocol fees + slash distributions
+- [x] Covers user losses when resolver stake insufficient
 - [ ] Caps on insurance payouts per incident
 - [ ] Pool rebalancing mechanism
 
 #### 5.2 Circuit Breakers
-- [ ] Max slash per resolver per period (e.g., 50% per month)
+- [x] Max slash per resolver per period (e.g., 50% per month)
 - [ ] Total slash cap across system (prevent bank run)
 - [ ] Emergency pause if anomalies detected
 - [ ] Gradual resume mechanism
@@ -190,6 +190,24 @@ Implement safety mechanisms to prevent catastrophic failures and black swan even
 - [ ] Staged withdrawal (e.g., 10% per week)
 - [ ] Exit queue (prevents mass exodus)
 - [ ] Notice period before full exit
+
+#### 5.4 Appeal Window Enforcement (Critical)
+- [ ] **Requirement:** Tokens must only be transferred to seller AFTER appeal window expires
+- [ ] Record resolution decision first (sets appeal deadline in module)
+- [ ] Check appeal deadline before executing token transfer
+- [ ] Transfer tokens only after appeal window has passed
+- [ ] Cancel pending resolution if escalation happens during appeal window
+- [ ] Ensure final-level resolutions (e.g., Kleros, round 2) can transfer immediately (no appeal window)
+- [ ] Implementation: Modify `_executeResolution` in BaseEscrow to:
+  - Record resolution decision (calls `recordResolution` on module, sets appeal deadline)
+  - Query appeal deadline from resolution module
+  - Only execute transfer if appeal deadline has passed (or is final level)
+  - Handle escalations during appeal window (cancel pending resolution)
+- [ ] Add function to execute pending resolution after appeal window expires
+- [ ] Update `escalateDispute` to cancel any pending resolution if appeal happens during window
+- [ ] Tests: Verify tokens not transferred until appeal window passes
+- [ ] Tests: Verify escalation during window cancels pending resolution
+- [ ] Tests: Verify final-level resolutions transfer immediately
 
 ---
 
@@ -230,10 +248,10 @@ Integrate v3 with v1/v2, create migration path, and ensure backward compatibilit
 ### Tasks
 
 #### 7.1 Module Integration
-- [ ] Wire staking module into resolution flow
-- [ ] Wire slashing module into timeout/reversal handling
-- [ ] Ensure v1 (workload) and v2 (bonds) still work
-- [ ] Test full stack: v1 EMA + v2 bonds + v3 staking
+- [x] Wire staking module into resolution flow
+- [x] Wire slashing module into timeout/reversal handling
+- [x] Ensure v1 (workload) and v2 (bonds) still work
+- [x] Test full stack: v1 EMA + v2 bonds + v3 staking
 
 #### 7.2 Migration Path
 - [ ] Phase-in period (staking optional initially)

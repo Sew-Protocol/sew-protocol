@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
 import "../interfaces/IYieldDistributionModule.sol";
@@ -16,7 +16,7 @@ contract DefaultYieldDistributionModule is IYieldDistributionModule, ERC165 {
     using SafeERC20 for IERC20;
     
     // Events
-    event YieldDistributed(uint256 indexed workflowId, address indexed recipient, uint256 amount);
+    event YieldDistributed(uint256 indexed escrowId, address indexed recipient, uint256 amount);
 
     /**
      * @notice Distribute yield according to distribution data

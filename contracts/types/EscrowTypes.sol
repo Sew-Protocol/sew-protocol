@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
 // Custom errors for better user experience
@@ -53,19 +53,29 @@ enum RecipientStatus {
 }
 
 // EscrowTransfer struct (shared across contracts)
+// Note: workflowId is redundant - use array index (escrowTransfers[index]) instead
+// Optimized packing: 4 addresses (80 bytes = 3 slots), 3 uint256 (96 bytes = 3 slots), 3 enums (3 bytes = 1 slot)
 struct EscrowTransfer {
-    uint256 workflowId;
     address token; // ERC20 token address (for EscrowVault) or address(this) for EscrowableERC20
     address to;
     address from;
-    uint256 remainingBalance; // remaining balance held in escrow (may be less than totalDeposited if partially released/cancelled)
-    uint256 totalDeposited; // total amount originally deposited (before any releases/cancellations)
-    EscrowState escrowState;
-    SenderStatus senderStatus;
-    RecipientStatus recipientStatus;
-    address disputeResolver;
+    address disputeResolver; // Pack 4 addresses together (80 bytes = 3 slots)
+    uint256 amountAfterFee; // amount after fee deduction (what's actually held in escrow)
     uint256 autoReleaseTime;
     uint256 autoCancelTime;
+    EscrowState escrowState; // Pack 3 enums together (3 bytes + 29 padding = 1 slot)
+    SenderStatus senderStatus;
+    RecipientStatus recipientStatus;
+}
+
+struct TimeoutConfig {
+    // Auto-execution defaults (0 = disabled, absolute timestamps)
+    uint256 defaultAutoReleaseTime;    // Default auto-release timestamp (0 = disabled)
+    uint256 defaultAutoCancelTime;     // Default auto-cancel timestamp (0 = disabled)
+    
+    // Safety timeouts (durations in seconds)
+    uint256 maxDisputeDuration;        // Max time for disputes (7-365 days)
+    uint256 appealWindowDuration;      // Time to appeal resolution (1-7 days)
 }
 
 

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
 /**
@@ -57,11 +57,11 @@ interface IStakingModule {
     event StakeDelegated(address indexed delegator, address indexed delegatee, uint256 amount);
     event StakeUndelegated(address indexed delegator, address indexed delegatee, uint256 amount);
     
-    event StakeLocked(address indexed resolver, uint256 amount, uint256 workflowId, string reason);
-    event StakeUnlocked(address indexed resolver, uint256 amount, uint256 workflowId);
+    event StakeLocked(address indexed resolver, uint256 amount, uint256 indexed escrowId, string reason);
+    event StakeUnlocked(address indexed resolver, uint256 amount, uint256 indexed escrowId);
     
-    event StakeSlashed(address indexed resolver, uint256 amount, uint256 workflowId, string reason);
-    event StakeRestored(address indexed resolver, uint256 amount, uint256 workflowId, string reason);
+    event StakeSlashed(address indexed resolver, uint256 amount, uint256 indexed escrowId, string reason);
+    event StakeRestored(address indexed resolver, uint256 amount, uint256 indexed escrowId, string reason);
     
     event MinimumStakeUpdated(uint8 resolverTier, uint256 oldMinimum, uint256 newMinimum);
     event StakeTokenUpdated(address indexed oldToken, address indexed newToken);

@@ -1,10 +1,8 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
 import "./IStakingModule.sol";
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 
 /**
  * @title StakingModuleNoOp
@@ -19,11 +17,9 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
  */
 contract StakingModuleNoOp is 
     IStakingModule, 
-    Initializable, 
-    AccessControlUpgradeable, 
-    UUPSUpgradeable 
+    AccessControl
 {
-    bytes32 public constant ROLE_ADMIN = keccak256("ROLE_ADMIN");
+    bytes32 public constant ROLE_TIMELOCK = keccak256("ROLE_TIMELOCK");
     bytes32 public constant ROLE_RESOLUTION_MODULE = keccak256("ROLE_RESOLUTION_MODULE");
     
     bool public paused;
@@ -36,25 +32,16 @@ contract StakingModuleNoOp is
     address private _dummyStakeToken;
     uint256 private _dummyUnstakePeriod;
     
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
-        _disableInitializers();
-    }
-    
-    function initialize(address initialOwner) public initializer {
-        __AccessControl_init();
-        __UUPSUpgradeable_init();
-        
+    constructor(address initialOwner) {
+        // OpenZeppelin best practice: Grant DEFAULT_ADMIN_ROLE to deployer
+        // Deployment scripts will transfer this to TimelockController
         _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
-        _grantRole(ROLE_ADMIN, initialOwner);
         
         paused = false;
         _dummyUnstakePeriod = 7 days;
         _dummyMinimumStakes[0] = 1000 ether; // Standard resolver
         _dummyMinimumStakes[1] = 10000 ether; // Senior resolver
     }
-    
-    function _authorizeUpgrade(address newImplementation) internal override onlyRole(ROLE_ADMIN) {}
     
     // ============ Core Staking Functions (No-Op) ============
     
@@ -197,35 +184,35 @@ contract StakingModuleNoOp is
     
     // ============ Admin Functions (No-Op) ============
     
-    function setMinimumStake(uint8 tier, uint256 minimum) external override onlyRole(ROLE_ADMIN) {
+    function setMinimumStake(uint8 tier, uint256 minimum) external override onlyRole(ROLE_TIMELOCK) {
         uint256 oldMinimum = _dummyMinimumStakes[tier];
         _dummyMinimumStakes[tier] = minimum;
         emit MinimumStakeUpdated(tier, oldMinimum, minimum);
     }
     
-    function setUnstakePeriod(uint256 period) external override onlyRole(ROLE_ADMIN) {
+    function setUnstakePeriod(uint256 period) external override onlyRole(ROLE_TIMELOCK) {
         uint256 oldPeriod = _dummyUnstakePeriod;
         _dummyUnstakePeriod = period;
         emit UnstakePeriodUpdated(oldPeriod, period);
     }
     
-    function pause(string memory reason) external override onlyRole(ROLE_ADMIN) {
+    function pause(string memory reason) external override onlyRole(ROLE_TIMELOCK) {
         paused = true;
         emit EmergencyPaused(msg.sender, reason);
     }
     
-    function unpause() external override onlyRole(ROLE_ADMIN) {
+    function unpause() external override onlyRole(ROLE_TIMELOCK) {
         paused = false;
         emit EmergencyUnpaused(msg.sender);
     }
     
     // ============ Setup Functions ============
     
-    function setResolutionModule(address module) external onlyRole(ROLE_ADMIN) {
+    function setResolutionModule(address module) external onlyRole(ROLE_TIMELOCK) {
         _grantRole(ROLE_RESOLUTION_MODULE, module);
     }
     
-    function setStakeToken(address token) external onlyRole(ROLE_ADMIN) {
+    function setStakeToken(address token) external onlyRole(ROLE_TIMELOCK) {
         address oldToken = _dummyStakeToken;
         _dummyStakeToken = token;
         emit StakeTokenUpdated(oldToken, token);

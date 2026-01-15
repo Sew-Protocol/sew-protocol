@@ -1,12 +1,10 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
 import "./IStakingModule.sol";
 import "./BondValuationLibrary.sol";
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -29,18 +27,17 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
  */
 contract ResolverStakingModuleV1 is 
     IStakingModule,
-    Initializable,
-    AccessControlUpgradeable,
-    ReentrancyGuardUpgradeable,
-    UUPSUpgradeable
+    AccessControl,
+    ReentrancyGuard
 {
     using SafeERC20 for IERC20;
     using BondValuationLibrary for *;
     
     // ============ Constants ============
     
-    bytes32 public constant ROLE_ADMIN = keccak256("ROLE_ADMIN");
+    bytes32 public constant ROLE_TIMELOCK = keccak256("ROLE_TIMELOCK");
     bytes32 public constant ROLE_RESOLUTION_MODULE = keccak256("ROLE_RESOLUTION_MODULE");
+    bytes32 public constant ROLE_SLASHING_MODULE = keccak256("ROLE_SLASHING_MODULE");
     
     uint256 public constant PRECISION = 1e18;
     uint256 public constant BASIS_POINTS = 10000;
@@ -118,6 +115,9 @@ contract ResolverStakingModuleV1 is
     mapping(uint256 => mapping(address => uint256)) public lockedStakes; // workflowId => resolver => locked amount
     mapping(address => uint256) public totalLockedStake; // Total locked across all disputes
     
+    // Slashing module reference (for freeze checks)
+    address public slashingModule;
+    
     // ============ Events ============
     
     event BondDeposited(address indexed resolver, uint256 stableAmount, uint256 sewAmount, uint256 effectiveBondUSD);
@@ -128,25 +128,22 @@ contract ResolverStakingModuleV1 is
     event CoverageReleased(address indexed junior, address indexed senior, uint256 amount);
     event BondRevalued(address indexed resolver, uint256 oldBond, uint256 newBond);
     event TierUpdated(address indexed resolver, uint8 oldTier, uint8 newTier);
+    event BondSlashed(address indexed resolver, uint256 stableSlashed, uint256 sewSlashed, uint256 totalSlashed);
+    event CoverageSlashed(address indexed senior, uint256 amount, address indexed slashedFor);
     
     // ============ Initialization ============
     
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
-        _disableInitializers();
-    }
-    
-    function initialize(
+    constructor(
         address initialOwner,
         address _stableToken,
         address _sewToken
-    ) public initializer {
-        __AccessControl_init();
-        __ReentrancyGuard_init();
-        __UUPSUpgradeable_init();
+    ) {
+        require(_stableToken != address(0), "Zero stable token");
+        require(_sewToken != address(0), "Zero SEW token");
         
+        // OpenZeppelin best practice: Grant DEFAULT_ADMIN_ROLE to deployer
+        // Deployment scripts will transfer this to TimelockController
         _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
-        _grantRole(ROLE_ADMIN, initialOwner);
         
         stableToken = IERC20(_stableToken);
         sewToken = IERC20(_sewToken);
@@ -157,8 +154,6 @@ contract ResolverStakingModuleV1 is
         minimumStakes[0] = 1000e18;  // Resolver: 1000 USD
         minimumStakes[1] = 10000e18; // Senior: 10000 USD
     }
-    
-    function _authorizeUpgrade(address newImplementation) internal override onlyRole(ROLE_ADMIN) {}
     
     // ============ Core Staking Functions ============
     
@@ -267,6 +262,10 @@ contract ResolverStakingModuleV1 is
         require(stableAmount > 0 || sewAmount > 0, "Zero amount");
         
         address resolver = msg.sender;
+        
+        // CRITICAL: Check if resolver is frozen (recent slash)
+        require(!isResolverFrozen(resolver), "Resolver frozen");
+        
         BondComposition storage bond = resolverBonds[resolver];
         
         require(bond.stableAmount >= stableAmount, "Insufficient stable");
@@ -312,8 +311,8 @@ contract ResolverStakingModuleV1 is
                 STABLE_DECIMALS,
                 SEW_DECIMALS
             );
-            uint8 tier = resolverTier[resolver];
-            require(remainingBond >= minimumStakes[tier], "Below minimum after unbond");
+            uint8 tierCheck = resolverTier[resolver];
+            require(remainingBond >= minimumStakes[tierCheck], "Below minimum after unbond");
         }
         
         // Calculate unbond delay based on tier
@@ -405,7 +404,7 @@ contract ResolverStakingModuleV1 is
      * @notice Emergency withdraw (admin only, for contract migration)
      * @param to Address to send tokens to
      */
-    function emergencyWithdraw(address to) external onlyRole(ROLE_ADMIN) {
+    function emergencyWithdraw(address to) external onlyRole(ROLE_TIMELOCK) {
         address resolver = msg.sender;
         BondComposition storage bond = resolverBonds[resolver];
         
@@ -792,12 +791,205 @@ contract ResolverStakingModuleV1 is
         numDelegates = seniorDelegates[senior].length;
     }
     
+    // ============ Slashing Functions ============
+    
+    /**
+     * @notice Slash resolver's bond (called by slashing module)
+     * @param resolver Address of resolver to slash
+     * @param amount Amount to slash (in USD, 18 decimals)
+     * @return stableSlashed Amount of stable slashed
+     * @return sewSlashed Amount of SEW slashed
+     */
+    function slash(address resolver, uint256 amount) 
+        external 
+        onlyRole(ROLE_SLASHING_MODULE) 
+        returns (uint256 stableSlashed, uint256 sewSlashed) 
+    {
+        BondComposition storage bond = resolverBonds[resolver];
+        
+        // Clamp amount to available bond (prevents underflow after multiple slashes)
+        if (amount > bond.effectiveBondUSD) {
+            amount = bond.effectiveBondUSD;
+        }
+        require(bond.effectiveBondUSD > 0 && amount > 0, "Insufficient bond");
+        
+        // Calculate proportional slash from stable and SEW
+        uint256 totalBond = bond.effectiveBondUSD;
+        
+        // Calculate proportional slash from stable and SEW
+        // Slash proportionally based on effective bond value
+        if (totalBond > 0) {
+            // Calculate stable slash (in stable's native units, then convert)
+            uint256 stableValueUSD = BondValuationLibrary.calculateEffectiveBondUSD(
+                bond.stableAmount,
+                0,
+                PRECISION,
+                SEW_HAIRCUT_BPS,
+                STABLE_DECIMALS,
+                SEW_DECIMALS
+            );
+            
+            if (stableValueUSD > 0 && bond.stableAmount > 0) {
+                // Proportional: stableSlashed = (stableValueUSD / totalBond) * amount
+                // Convert back to stable units
+                stableSlashed = (bond.stableAmount * amount) / totalBond;
+                if (stableSlashed > bond.stableAmount) stableSlashed = bond.stableAmount;
+            }
+            
+            if (bond.sewAmount > 0) {
+                // SEW value = totalBond - stableValueUSD
+                uint256 sewValueUSD = totalBond - stableValueUSD;
+                if (sewValueUSD > 0) {
+                    sewSlashed = (bond.sewAmount * amount) / totalBond;
+                    if (sewSlashed > bond.sewAmount) sewSlashed = bond.sewAmount;
+                }
+            }
+        }
+        
+        // Update bond
+        bond.stableAmount -= stableSlashed;
+        bond.sewAmount -= sewSlashed;
+        
+        // Recalculate effectiveBondUSD from remaining amounts (ensures consistency)
+        if (bond.stableAmount > 0 || bond.sewAmount > 0) {
+            bond.effectiveBondUSD = BondValuationLibrary.calculateEffectiveBondUSD(
+                bond.stableAmount,
+                bond.sewAmount,
+                PRECISION,
+                SEW_HAIRCUT_BPS,
+                STABLE_DECIMALS,
+                SEW_DECIMALS
+            );
+        } else {
+            bond.effectiveBondUSD = 0;
+        }
+        
+        bond.lastUpdated = block.timestamp;
+        
+        // Transfer slashed funds to slashing module
+        if (stableSlashed > 0) {
+            stableToken.safeTransfer(msg.sender, stableSlashed);
+        }
+        if (sewSlashed > 0) {
+            sewToken.safeTransfer(msg.sender, sewSlashed);
+        }
+        
+        emit BondSlashed(resolver, stableSlashed, sewSlashed, amount);
+    }
+    
+    /**
+     * @notice Slash senior's coverage (called by slashing module)
+     * @param senior Address of senior to slash
+     * @param amount Amount to slash (in USD, 18 decimals)
+     * @param slashedFor Address of junior this slash is for
+     * @return stableSlashed Amount of stable slashed
+     * @return sewSlashed Amount of SEW slashed
+     */
+    function slashCoverage(address senior, uint256 amount, address slashedFor) 
+        external 
+        onlyRole(ROLE_SLASHING_MODULE) 
+        returns (uint256 stableSlashed, uint256 sewSlashed) 
+    {
+        BondComposition storage bond = resolverBonds[senior];
+        
+        // Clamp amount to available bond (prevents underflow after multiple slashes)
+        if (amount > bond.effectiveBondUSD) {
+            amount = bond.effectiveBondUSD;
+        }
+        require(bond.effectiveBondUSD > 0 && amount > 0, "Insufficient bond");
+        
+        // Calculate proportional slash (same as slash())
+        uint256 totalBond = bond.effectiveBondUSD;
+        
+        if (totalBond > 0) {
+            uint256 stableValueUSD = BondValuationLibrary.calculateEffectiveBondUSD(
+                bond.stableAmount,
+                0,
+                PRECISION,
+                SEW_HAIRCUT_BPS,
+                STABLE_DECIMALS,
+                SEW_DECIMALS
+            );
+            
+            if (stableValueUSD > 0 && bond.stableAmount > 0) {
+                stableSlashed = (bond.stableAmount * amount) / totalBond;
+                if (stableSlashed > bond.stableAmount) stableSlashed = bond.stableAmount;
+            }
+            
+            if (bond.sewAmount > 0) {
+                uint256 sewValueUSD = totalBond - stableValueUSD;
+                if (sewValueUSD > 0) {
+                    sewSlashed = (bond.sewAmount * amount) / totalBond;
+                    if (sewSlashed > bond.sewAmount) sewSlashed = bond.sewAmount;
+                }
+            }
+        }
+        
+        // Update bond
+        bond.stableAmount -= stableSlashed;
+        bond.sewAmount -= sewSlashed;
+        
+        // Recalculate effectiveBondUSD from remaining amounts (ensures consistency)
+        if (bond.stableAmount > 0 || bond.sewAmount > 0) {
+            bond.effectiveBondUSD = BondValuationLibrary.calculateEffectiveBondUSD(
+                bond.stableAmount,
+                bond.sewAmount,
+                PRECISION,
+                SEW_HAIRCUT_BPS,
+                STABLE_DECIMALS,
+                SEW_DECIMALS
+            );
+        } else {
+            bond.effectiveBondUSD = 0;
+        }
+        
+        bond.lastUpdated = block.timestamp;
+        
+        // Also reduce reserved coverage if this senior was providing coverage
+        if (reservedCoverage[senior] > 0) {
+            uint256 coverageReduction = amount;
+            if (coverageReduction > reservedCoverage[senior]) {
+                coverageReduction = reservedCoverage[senior];
+            }
+            reservedCoverage[senior] -= coverageReduction;
+        }
+        
+        // Transfer slashed funds to slashing module
+        if (stableSlashed > 0) {
+            stableToken.safeTransfer(msg.sender, stableSlashed);
+        }
+        if (sewSlashed > 0) {
+            sewToken.safeTransfer(msg.sender, sewSlashed);
+        }
+        
+        emit CoverageSlashed(senior, amount, slashedFor);
+        emit BondSlashed(senior, stableSlashed, sewSlashed, amount);
+    }
+    
+    /**
+     * @notice Check if resolver is frozen (by slashing module)
+     * @param resolver Address to check
+     * @return frozen True if frozen
+     */
+    function isResolverFrozen(address resolver) public view returns (bool frozen) {
+        if (slashingModule == address(0)) return false;
+        
+        // Call slashing module to check freeze status
+        (bool success, bytes memory data) = slashingModule.staticcall(
+            abi.encodeWithSignature("isResolverFrozen(address)", resolver)
+        );
+        
+        if (success && data.length >= 32) {
+            frozen = abi.decode(data, (bool));
+        }
+    }
+    
     // ============ Admin Functions ============
     
     /**
      * @notice Set minimum stake for tier
      */
-    function setMinimumStake(uint8 tier, uint256 minimum) external onlyRole(ROLE_ADMIN) {
+    function setMinimumStake(uint8 tier, uint256 minimum) external onlyRole(ROLE_TIMELOCK) {
         uint256 oldMinimum = minimumStakes[tier];
         minimumStakes[tier] = minimum;
         emit MinimumStakeUpdated(tier, oldMinimum, minimum);
@@ -806,7 +998,7 @@ contract ResolverStakingModuleV1 is
     /**
      * @notice Set unstake period (not used in this version, delays are constants)
      */
-    function setUnstakePeriod(uint256 period) external onlyRole(ROLE_ADMIN) {
+    function setUnstakePeriod(uint256 period) external onlyRole(ROLE_TIMELOCK) {
         // No-op: Delays are constants in this version
         emit UnstakePeriodUpdated(0, period);
     }
@@ -814,7 +1006,7 @@ contract ResolverStakingModuleV1 is
     /**
      * @notice Pause staking
      */
-    function pause(string memory reason) external onlyRole(ROLE_ADMIN) {
+    function pause(string memory reason) external onlyRole(ROLE_TIMELOCK) {
         paused = true;
         emit EmergencyPaused(msg.sender, reason);
     }
@@ -822,7 +1014,7 @@ contract ResolverStakingModuleV1 is
     /**
      * @notice Unpause staking
      */
-    function unpause() external onlyRole(ROLE_ADMIN) {
+    function unpause() external onlyRole(ROLE_TIMELOCK) {
         paused = false;
         emit EmergencyUnpaused(msg.sender);
     }
@@ -830,7 +1022,7 @@ contract ResolverStakingModuleV1 is
     /**
      * @notice Set resolver tier (0 = resolver, 1 = senior)
      */
-    function setResolverTier(address resolver, uint8 tier) external onlyRole(ROLE_ADMIN) {
+    function setResolverTier(address resolver, uint8 tier) external onlyRole(ROLE_TIMELOCK) {
         require(tier <= 1, "Invalid tier");
         uint8 oldTier = resolverTier[resolver];
         resolverTier[resolver] = tier;
@@ -840,7 +1032,15 @@ contract ResolverStakingModuleV1 is
     /**
      * @notice Set resolution module address
      */
-    function setResolutionModule(address module) external onlyRole(ROLE_ADMIN) {
+    function setResolutionModule(address module) external onlyRole(ROLE_TIMELOCK) {
         _grantRole(ROLE_RESOLUTION_MODULE, module);
+    }
+    
+    /**
+     * @notice Set slashing module address
+     */
+    function setSlashingModule(address module) external onlyRole(ROLE_TIMELOCK) {
+        slashingModule = module;
+        _grantRole(ROLE_SLASHING_MODULE, module);
     }
 }

@@ -238,7 +238,7 @@ function escalateDispute(uint256 workflowId) public payable nonReentrant returns
 
 **Implementation**:
 ```solidity
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";

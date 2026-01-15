@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
 import "../types/EscrowTypes.sol";
@@ -20,7 +20,6 @@ library StateManagementLibrary {
     ) internal returns (EscrowState oldStatus) {
         oldStatus = et.escrowState;
         et.escrowState = EscrowState.RELEASED;
-        et.remainingBalance = 0;
         return oldStatus;
     }
 
@@ -35,7 +34,6 @@ library StateManagementLibrary {
     ) internal returns (EscrowState oldStatus) {
         oldStatus = et.escrowState;
         et.escrowState = EscrowState.REFUNDED;
-        et.remainingBalance = 0;
         return oldStatus;
     }
 

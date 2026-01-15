@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
 import "../interfaces/IYieldGenerationModule.sol";
@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 import "../governance/SlowLaneQueueActivate.sol";
 import "../types/EscrowTypes.sol";
 
@@ -17,6 +18,8 @@ interface IPoolAddressesProvider {
 interface IPool {
     function supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode) external;
     function withdraw(address asset, uint256 amount, address to) external returns (uint256);
+    // Optional: Add more interface methods for validation if needed
+    // function getReserveData(address asset) external view returns (ReserveData memory);
 }
 
 interface IAToken {
@@ -31,6 +34,9 @@ error InvalidATokenAddress(address token, address aToken);
 // InvalidAddress and ArrayLengthMismatch imported from EscrowTypes.sol
 error AaveWithdrawalFailed(uint256 workflowId, address token);
 error CapExceeded(address token, uint256 requested, uint256 cap);
+error InvalidPoolAddress(address pool);
+error PoolAddressIsNotContract(address pool);
+error PoolProviderCallFailed(address provider);
 
 /**
  * @title AaveYieldGenerationModule
@@ -71,9 +77,9 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
     PendingAddress private _pendingPoolProvider;
 
     // Events
-    event EscrowDepositedToAave(uint256 indexed workflowId, address indexed token, uint256 amount, uint256 aTokenBalance);
-    event EscrowWithdrawnFromAave(uint256 indexed workflowId, address indexed token, uint256 originalAmount, uint256 actualAmount, uint256 yield);
-    event AaveWithdrawalFailedEvent(uint256 indexed workflowId, address indexed token);
+    event EscrowDepositedToAave(uint256 indexed escrowId, address indexed token, uint256 amount, uint256 aTokenBalance);
+    event EscrowWithdrawnFromAave(uint256 indexed escrowId, address indexed token, uint256 originalAmount, uint256 actualAmount, uint256 yield);
+    event AaveWithdrawalFailedEvent(uint256 indexed escrowId, address indexed token);
     event AavePoolConfigured(address indexed provider, address indexed pool);
     event AaveEnabledUpdated(bool enabled);
     event TokenRegisteredForAave(address indexed token, address indexed aToken);
@@ -223,76 +229,6 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
     }
 
     /**
-     * @notice Withdraw proportional amount (for partial operations)
-     * @param workflowId The escrow transfer ID
-     * @param token Token address
-     * @param amount Amount to withdraw proportionally
-     * @param originalDeposit Original total deposit
-     * @return success True if withdrawal was successful
-     * @return actualAmount Actual amount withdrawn (including proportional yield)
-     * @dev Called by BaseEscrow for partial release/cancel operations
-     */
-    function withdrawProportional(
-        uint256 workflowId,
-        address token,
-        uint256 amount,
-        uint256 originalDeposit
-    ) external override returns (bool success, uint256 actualAmount) {
-        address escrowContract = msg.sender; // BaseEscrow contract calling this
-
-        if (!escrowInAave[escrowContract][workflowId]) {
-            return (true, amount); // Not in Aave, return requested amount
-        }
-
-        address aToken = tokenToAToken[token];
-        if (aToken == address(0)) {
-            return (true, amount); // Token not supported
-        }
-
-        uint256 aTokenBalance = escrowATokenBalance[escrowContract][workflowId];
-        if (aTokenBalance == 0 || originalDeposit == 0) {
-            return (true, amount); // No balance to withdraw
-        }
-
-        // Calculate proportional aToken amount to withdraw
-        // proportionalATokens = (amount / originalDeposit) * aTokenBalance
-        uint256 proportionalATokens = (aTokenBalance * amount) / originalDeposit;
-
-        if (proportionalATokens == 0) {
-            return (true, amount); // Too small to withdraw
-        }
-
-        // State changes BEFORE external call (checks-effects-interactions pattern)
-        // Update tracking (reduce aToken balance and original deposit proportionally)
-        escrowATokenBalance[escrowContract][workflowId] -= proportionalATokens;
-        escrowOriginalDeposit[escrowContract][workflowId] -= amount;
-
-        // Update total deposited
-        if (totalDepositedToAave[token] >= amount) {
-            totalDepositedToAave[token] -= amount;
-        }
-
-        // Reduce exposure (Phase 4)
-        _reduceExposure(token, amount);
-
-        // Withdraw proportional amount from Aave
-        // Use low-level call for error handling
-        (bool callSuccess, bytes memory returnData) = address(aavePool).call(
-            abi.encodeWithSelector(IPool.withdraw.selector, token, proportionalATokens, escrowContract)
-        );
-
-        if (callSuccess) {
-            actualAmount = abi.decode(returnData, (uint256));
-        } else {
-            // Aave withdrawal failed, emit event and return requested amount
-            emit AaveWithdrawalFailedEvent(workflowId, token);
-            return (false, amount);
-        }
-
-        return (true, actualAmount);
-    }
-
-    /**
      * @notice Calculate current yield for an escrow
      * @param workflowId The escrow transfer ID
      * @param token Token address
@@ -408,17 +344,50 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
 
     /**
      * @notice Activate the queued Aave Pool Addresses Provider
-     * @dev Reverts if no pending change or 7-day delay has not elapsed
+     * @dev Reverts if no pending change or 7-day delay has not elapsed.
+     *      Validates that the provider returns a valid, non-zero pool address that is a contract.
+     * @dev Safety validations:
+     *      1. Provider must return non-zero pool address
+     *      2. Pool address must be a contract (has code)
+     *      3. Provider call must succeed (not revert)
      */
     function activateAavePoolProvider() public onlyRole(ROLE_TIMELOCK) {
         address oldProvider = address(aavePoolAddressesProvider);
         address newProvider = _activateAddress(_pendingPoolProvider);
+        
+        // Safety validation 1: Provider must be a contract (has code)
+        if (newProvider.code.length == 0) {
+            revert PoolAddressIsNotContract(newProvider);
+        }
+        
+        // Safety validation 2: Get pool address with error handling
+        address poolAddress;
+        try IPoolAddressesProvider(newProvider).getPool() returns (address pool) {
+            poolAddress = pool;
+        } catch {
+            revert PoolProviderCallFailed(newProvider);
+        }
+        
+        // Safety validation 3: Pool address must be non-zero
+        if (poolAddress == address(0)) {
+            revert InvalidPoolAddress(poolAddress);
+        }
+        
+        // Safety validation 4: Pool address must be a contract (has code)
+        if (poolAddress.code.length == 0) {
+            revert PoolAddressIsNotContract(poolAddress);
+        }
+        
+        // Safety validation 5: Optional - Verify pool implements expected interface
+        // Note: Full interface validation is complex and gas-intensive.
+        // Governance should verify the pool address is correct before activation.
+        // The pool will be validated during first use (depositForYield will fail if invalid).
+        
+        // All validations passed - update state (checks-effects-interactions pattern)
         aavePoolAddressesProvider = IPoolAddressesProvider(newProvider);
-        // Get pool address first (external call)
-        address poolAddress = aavePoolAddressesProvider.getPool();
-        // Then update state (checks-effects-interactions pattern)
         aavePool = IPool(poolAddress);
-        aaveEnabled = poolAddress != address(0);
+        aaveEnabled = true;
+        
         emit AavePoolProviderActivated(oldProvider, newProvider);
         emit AavePoolConfigured(newProvider, poolAddress);
     }

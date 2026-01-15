@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
 /**
@@ -39,22 +39,6 @@ interface IYieldModule {
         uint256 actualAmount,
         uint256 yieldAmount
     );
-
-    /**
-     * @notice Withdraw proportional amount (for partial operations)
-     * @param workflowId The escrow transfer ID
-     * @param token Token address
-     * @param amount Amount to withdraw proportionally
-     * @param originalDeposit Original total deposit
-     * @return success True if withdrawal was successful
-     * @return actualAmount Actual amount withdrawn (including proportional yield)
-     */
-    function withdrawProportional(
-        uint256 workflowId,
-        address token,
-        uint256 amount,
-        uint256 originalDeposit
-    ) external returns (bool success, uint256 actualAmount);
 
     /**
      * @notice Calculate current yield for an escrow

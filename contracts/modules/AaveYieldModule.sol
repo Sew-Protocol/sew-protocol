@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
 import "../interfaces/IYieldModule.sol";
@@ -54,9 +54,9 @@ contract AaveYieldModule is IYieldModule, Ownable, ERC165 {
     mapping(address => mapping(uint256 => uint256)) public escrowOriginalDeposit; // escrowContract => workflowId => original deposit amount
 
     // Events
-    event EscrowDepositedToAave(uint256 indexed workflowId, address indexed token, uint256 amount, uint256 aTokenBalance);
-    event EscrowWithdrawnFromAave(uint256 indexed workflowId, address indexed token, uint256 originalAmount, uint256 actualAmount, uint256 yield);
-    event AaveWithdrawalFailedEvent(uint256 indexed workflowId, address indexed token);
+    event EscrowDepositedToAave(uint256 indexed escrowId, address indexed token, uint256 amount, uint256 aTokenBalance);
+    event EscrowWithdrawnFromAave(uint256 indexed escrowId, address indexed token, uint256 originalAmount, uint256 actualAmount, uint256 yield);
+    event AaveWithdrawalFailedEvent(uint256 indexed escrowId, address indexed token);
     event AavePoolConfigured(address indexed provider, address indexed pool);
     event AaveEnabledUpdated(bool enabled);
     event TokenRegisteredForAave(address indexed token, address indexed aToken);
@@ -181,73 +181,6 @@ contract AaveYieldModule is IYieldModule, Ownable, ERC165 {
         emit EscrowWithdrawnFromAave(workflowId, token, originalAmount, actualAmount, yieldAmount);
 
         return (true, actualAmount, yieldAmount);
-    }
-
-    /**
-     * @notice Withdraw proportional amount (for partial operations)
-     * @param workflowId The escrow transfer ID
-     * @param token Token address
-     * @param amount Amount to withdraw proportionally
-     * @param originalDeposit Original total deposit
-     * @return success True if withdrawal was successful
-     * @return actualAmount Actual amount withdrawn (including proportional yield)
-     * @dev Called by BaseEscrow for partial release/cancel operations
-     */
-    function withdrawProportional(
-        uint256 workflowId,
-        address token,
-        uint256 amount,
-        uint256 originalDeposit
-    ) external override returns (bool success, uint256 actualAmount) {
-        address escrowContract = msg.sender; // BaseEscrow contract calling this
-
-        if (!escrowInAave[escrowContract][workflowId]) {
-            return (true, amount); // Not in Aave, return requested amount
-        }
-
-        address aToken = tokenToAToken[token];
-        if (aToken == address(0)) {
-            return (true, amount); // Token not supported
-        }
-
-        uint256 aTokenBalance = escrowATokenBalance[escrowContract][workflowId];
-        if (aTokenBalance == 0 || originalDeposit == 0) {
-            return (true, amount); // No balance to withdraw
-        }
-
-        // Calculate proportional aToken amount to withdraw
-        // proportionalATokens = (amount / originalDeposit) * aTokenBalance
-        uint256 proportionalATokens = (aTokenBalance * amount) / originalDeposit;
-
-        if (proportionalATokens == 0) {
-            return (true, amount); // Too small to withdraw
-        }
-
-        // State changes BEFORE external call (checks-effects-interactions pattern)
-        // Update tracking (reduce aToken balance and original deposit proportionally)
-        escrowATokenBalance[escrowContract][workflowId] -= proportionalATokens;
-        escrowOriginalDeposit[escrowContract][workflowId] -= amount;
-
-        // Update total deposited
-        if (totalDepositedToAave[token] >= amount) {
-            totalDepositedToAave[token] -= amount;
-        }
-
-        // Withdraw proportional amount from Aave
-        // Use low-level call for error handling
-        (bool callSuccess, bytes memory returnData) = address(aavePool).call(
-            abi.encodeWithSelector(IPool.withdraw.selector, token, proportionalATokens, escrowContract)
-        );
-
-        if (callSuccess) {
-            actualAmount = abi.decode(returnData, (uint256));
-        } else {
-            // Aave withdrawal failed, emit event and return requested amount
-            emit AaveWithdrawalFailedEvent(workflowId, token);
-            return (false, amount);
-        }
-
-        return (true, actualAmount);
     }
 
     /**

@@ -1,13 +1,10 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
 import "../shared/interfaces/IResolutionModule.sol";
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
-import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
-import "../shared/governance/SlowLaneQueueActivateUpgradeable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "../governance/SlowLaneQueueActivate.sol";
 import "./IIncentiveModule.sol";
 import "./IStakingModule.sol";
 import "./ISlashingModule.sol";
@@ -27,15 +24,15 @@ import "../libraries/ResolutionTableLibrary.sol";
  *      Not implemented until v1/v2 phase gates are met. Implementation guarded behind module swap.
  */
 contract DecentralizedResolutionModule is 
-    AccessControlUpgradeable,
-    ReentrancyGuardUpgradeable,
+    SlowLaneQueueActivate,
+    AccessControl,
+    ReentrancyGuard,
     IResolutionModule,
-    SlowLaneQueueActivateUpgradeable,
-    UUPSUpgradeable,
     DecentralizedResolverStructs
 {
     using ResolutionAnalytics for mapping(address => ResolverStats);
     using ResolutionTableLibrary for bytes;
+    using EscalationCostLibrary for EscalationCostConfig;
 
     bytes32 public constant ROLE_TIMELOCK = keccak256("ROLE_TIMELOCK");
     uint8 public constant MAX_ROUND = 2; // 0=resolver, 1=senior, 2=external (Kleros)
@@ -71,7 +68,6 @@ contract DecentralizedResolutionModule is
     
     mapping(address => ResolverMetadata) public resolverMetadata;
     mapping(uint256 => DisputeMetadata) public disputeMetadata;
-    mapping(uint256 => bool) public escalationFeePaid; // Track if escalation fee was paid for a dispute
     uint256 public disputeTimeout = DEFAULT_DISPUTE_TIMEOUT;
     mapping(uint8 => EscalationConfig) public escalationConfig;
     mapping(uint8 => PendingEscalationConfig) private _pendingEscalationConfig;
@@ -93,6 +89,9 @@ contract DecentralizedResolutionModule is
     mapping(address => bool) public registeredEscrowContracts;
     IIncentiveModule public incentiveModule; // Swappable incentive module (v1/v2/v3)
     
+    // DR v3 Phase 5: Emergency controls
+    bool public newAssignmentsPaused; // Emergency toggle to freeze all new assignments
+    
     // DR v3: Module configuration structs
     struct PendingModuleConfig {
         address module;
@@ -111,10 +110,10 @@ contract DecentralizedResolutionModule is
     event ResolverAppointed(address indexed resolver, ResolverRole role, address indexed appointedBy);
     event ResolverRemoved(address indexed resolver, address indexed removedBy);
     event ResolverMetadataUpdated(address indexed resolver, ResolverMetadata metadata);
-    event DisputeEscalatedToRound(uint256 indexed workflowId, uint8 fromRound, uint8 toRound, address indexed newResolver);
-    event DecisionSubmitted(uint256 indexed workflowId, uint8 round, address indexed resolver, ResolutionOutcome decision);
+    event DisputeEscalatedToRound(uint256 indexed escrowId, uint8 fromRound, uint8 toRound, address indexed newResolver);
+    event DecisionSubmitted(uint256 indexed escrowId, uint8 round, address indexed resolver, ResolutionOutcome decision);
     event ResolutionTableEntrySet(bytes32 indexed categoryKey, ResolutionTableEntry entry);
-    event ResolverAssigned(uint256 indexed workflowId, address indexed resolver, bytes32 category, uint8 round);
+    event ResolverAssigned(uint256 indexed escrowId, address indexed resolver, bytes32 category, uint8 round);
     event EscalationConfigUpdated(uint8 level, EscalationConfig config);
     event ExternalResolverUpdated(address indexed oldResolver, address indexed newResolver);
     event EscrowContractRegistered(address indexed escrowContract);
@@ -123,17 +122,15 @@ contract DecentralizedResolutionModule is
     event EscalationConfigActivated(uint8 level, EscalationConfig oldConfig, EscalationConfig newConfig);
     event IncentiveModuleUpdated(address indexed oldModule, address indexed newModule);
     event ResolverActiveStatusChanged(address indexed resolver, bool active);
-    event IncentiveModuleCallFailed(uint256 indexed workflowId, string functionName, string reason);
+    event IncentiveModuleCallFailed(uint256 indexed escrowId, string functionName, string reason);
     event RoundRobinCounterAdvanced(bytes32 indexed category, bool seniorResolvers, uint256 newIndex);
     event ResolverCapacityUpdated(address indexed resolver, ResolverCapacity capacity);
-    event ModuleUpgraded(address indexed oldImplementation, address indexed newImplementation, address indexed upgradedBy, uint256 timestamp);
-    event EscalationFeePaid(uint256 indexed workflowId, uint256 fee);
     event ResolverAssignmentWeightUpdated(address indexed resolver, uint256 oldWeight, uint256 newWeight); // DR v1
     
     // DR v2 events
     event EscalationCostConfigQueued(EscalationCostConfig config, uint64 eta);
     event EscalationCostConfigActivated(EscalationCostConfig oldConfig, EscalationCostConfig newConfig);
-    event AppealBondRequired(uint256 indexed workflowId, uint8 round, uint256 amount, address token);
+    event AppealBondRequired(uint256 indexed escrowId, uint8 round, uint256 amount, address token);
     event MinEscrowValueUpdated(uint256 oldValue, uint256 newValue);
     
     // DR v3 events
@@ -141,14 +138,20 @@ contract DecentralizedResolutionModule is
     event StakingModuleActivated(address indexed oldModule, address indexed newModule);
     event SlashingModuleQueued(address indexed module, uint64 eta);
     event SlashingModuleActivated(address indexed oldModule, address indexed newModule);
+    
+    // DR v3 Phase 5: Emergency controls events
+    event NewAssignmentsPaused(address indexed pausedBy, string reason);
+    event NewAssignmentsResumed(address indexed resumedBy);
 
     modifier onlySeniorResolver() { require(isApprovedSeniorResolver[_msgSender()], "Not senior resolver"); _; }
     modifier onlyResolver() { require(isApprovedResolver[_msgSender()] || isApprovedSeniorResolver[_msgSender()], "Not authorized resolver"); _; }
     modifier onlyEscrowContract() { require(registeredEscrowContracts[_msgSender()], "Not registered escrow contract"); _; }
 
-    function initialize(address initialOwner) public initializer {
-        __AccessControl_init(); __ReentrancyGuard_init(); __UUPSUpgradeable_init();
-        _grantRole(DEFAULT_ADMIN_ROLE, initialOwner); _grantRole(ROLE_TIMELOCK, initialOwner);
+    constructor(address initialOwner) {
+        // OpenZeppelin best practice: Grant DEFAULT_ADMIN_ROLE to deployer
+        // Deployment scripts will transfer this to TimelockController
+        _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
+        
         escalationConfig[0] = EscalationConfig({resolver: address(0), fee: 0, enabled: true});
         escalationConfig[1] = EscalationConfig({resolver: address(0), fee: 0, enabled: true});
         escalationConfig[2] = EscalationConfig({resolver: address(0), fee: 0, enabled: false});
@@ -162,15 +165,18 @@ contract DecentralizedResolutionModule is
         minEmaScoreThreshold = 500000; // 50% minimum score
         maxTimeoutRateBps = 3000; // 30% maximum timeout rate
         
-        // Initialize DR v2 parameters (disabled by default)
-        escalationCostConfig.enabled = false;
+        // Initialize DR v1 escalation bond configuration (enabled in DR v1)
+        escalationCostConfig = EscalationCostConfig({
+            enabled: true,
+            curveType: CostCurveType.QUADRATIC,
+            baseCost: 0.01 ether,
+            stepSize: 0.01 ether,
+            multiplier: 0,
+            bondToken: address(0)
+        });
         minEscrowValueForEscalation = 0; // No minimum by default
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override {
-        require(hasRole(ROLE_TIMELOCK, _msgSender()), "Not authorized to upgrade");
-        emit ModuleUpgraded(ERC1967Utils.getImplementation(), newImplementation, _msgSender(), block.timestamp);
-    }
 
     function appointResolver(address resolver, string memory name, string memory description) external onlySeniorResolver {
         require(resolver != address(0) && !isApprovedResolver[resolver] && !isApprovedSeniorResolver[resolver], "Invalid resolver");
@@ -257,7 +263,15 @@ contract DecentralizedResolutionModule is
         if (nextRound > MAX_ROUND || !escalationConfig[nextRound].enabled) return (false, address(0), 0);
         if (nextRound == 1) nextResolver = selectResolverRoundRobin(escrowCategory[workflowId], true);
         else if (nextRound == 2) nextResolver = externalResolver;
-        return (nextResolver != address(0), nextResolver, escalationConfig[nextRound].fee);
+        if (nextResolver == address(0)) return (false, address(0), 0);
+        
+        // Return escalation bond amount (from escalationCostConfig) instead of fee
+        uint256 bondAmount = 0;
+        if (escalationCostConfig.enabled) {
+            uint8 escalationCount = currentLevel;
+            bondAmount = EscalationCostLibrary.calculateEscalationCost(escalationCount, escalationCostConfig);
+        }
+        return (true, nextResolver, bondAmount);
     }
 
     function executeEscalation(uint256 workflowId, bytes calldata) external override nonReentrant returns (bool success, address newResolver, uint8 newLevel) {
@@ -267,17 +281,6 @@ contract DecentralizedResolutionModule is
         
         if (toRound > MAX_ROUND || !escalationConfig[toRound].enabled) {
             return (false, address(0), dm.currentRound);
-        }
-        
-        // Verify escalation fee was paid (if required)
-        uint256 requiredFee = escalationConfig[toRound].fee;
-        if (requiredFee > 0) {
-            // Escrow contract must mark fee as paid before calling executeEscalation()
-            // This is done by calling markEscalationFeePaid() after collecting the fee
-            require(escalationFeePaid[workflowId], "Escalation fee not paid");
-            
-            // Clear the flag after verification (prevents reuse)
-            escalationFeePaid[workflowId] = false;
         }
         
         address nextRes;
@@ -361,7 +364,7 @@ contract DecentralizedResolutionModule is
 
     function moduleName() external pure override returns (string memory) { return "DecentralizedResolution"; }
     function moduleVersion() external pure override returns (string memory) { return "1.0.0"; }
-    function supportsInterface(bytes4 interfaceId) public view virtual override(AccessControlUpgradeable, IERC165) returns (bool) {
+    function supportsInterface(bytes4 interfaceId) public view virtual override(AccessControl, IERC165) returns (bool) {
         return interfaceId == type(IResolutionModule).interfaceId || super.supportsInterface(interfaceId);
     }
 
@@ -398,6 +401,11 @@ contract DecentralizedResolutionModule is
     }
 
     function selectResolverRoundRobin(bytes32 category, bool useSenior) internal view returns (address) {
+        // Phase 5: Emergency pause check - freeze all new assignments
+        if (newAssignmentsPaused) {
+            return address(0);
+        }
+        
         address[] storage list = useSenior ? approvedSeniorResolvers : approvedResolvers;
         uint256 len = list.length; if (len == 0) return address(0);
         uint256 curIdx = useSenior ? categorySeniorResolverIndex[category] : categoryResolverIndex[category];
@@ -426,6 +434,11 @@ contract DecentralizedResolutionModule is
     }
     
     function selectResolverWithQuality(bytes32 category, bool useSenior) internal view returns (address) {
+        // Phase 5: Emergency pause check - freeze all new assignments
+        if (newAssignmentsPaused) {
+            return address(0);
+        }
+        
         address[] storage list = useSenior ? approvedSeniorResolvers : approvedResolvers;
         uint256 len = list.length; if (len == 0) return address(0);
         
@@ -542,18 +555,6 @@ contract DecentralizedResolutionModule is
 
     function registerEscrowContract(address c) external onlyRole(ROLE_TIMELOCK) { registeredEscrowContracts[c] = true; emit EscrowContractRegistered(c); }
     function unregisterEscrowContract(address c) external onlyRole(ROLE_TIMELOCK) { registeredEscrowContracts[c] = false; emit EscrowContractUnregistered(c); }
-    
-    /**
-     * @notice Mark escalation fee as paid for a dispute
-     * @param workflowId The escrow transfer ID
-     * @param fee The escalation fee amount paid
-     * @dev Called by escrow contract after collecting escalation fee
-     *      Must be called before executeEscalation() for fee-required escalations
-     */
-    function markEscalationFeePaid(uint256 workflowId, uint256 fee) external onlyEscrowContract {
-        escalationFeePaid[workflowId] = true;
-        emit EscalationFeePaid(workflowId, fee);
-    }
     function setIncentiveModule(address m) external onlyRole(ROLE_TIMELOCK) { incentiveModule = IIncentiveModule(m); emit IncentiveModuleUpdated(address(0), m); }
     function setResolverActive(address r, bool a) external onlyRole(ROLE_TIMELOCK) { resolverActive[r] = a; emit ResolverActiveStatusChanged(r, a); }
     function decrementResolverActiveDisputes(address r) external onlyEscrowContract { if (resolverActiveDisputes[r] > 0) resolverActiveDisputes[r]--; if (resolverCapacity[r].currentDisputes > 0) resolverCapacity[r].currentDisputes--; }
@@ -652,6 +653,15 @@ contract DecentralizedResolutionModule is
         }
         
         if (newResolver != address(0) && newResolver != timedOutResolver) {
+            // DR v3: Unlock old resolver's stake when reassigning
+            if (address(stakingModule) != address(0)) {
+                try stakingModule.unlockStake(workflowId, timedOutResolver) {
+                    // Success - old resolver's stake unlocked
+                } catch {
+                    // Non-critical: Continue even if unlock fails
+                }
+            }
+            
             // Reassign within same round
             dm.resolverAtRound[currentRound] = newResolver;
             dm.assignedAt = block.timestamp;
@@ -665,8 +675,25 @@ contract DecentralizedResolutionModule is
                 try incentiveModule.onResolverAssigned(workflowId, newResolver, currentRound) {}
                 catch { emit IncentiveModuleCallFailed(workflowId, "onResolverAssigned", "FAILED"); }
             }
+            
+            // DR v3: Lock stake for new resolver
+            if (address(stakingModule) != address(0)) {
+                try stakingModule.onResolverAssigned(workflowId, newResolver, currentRound) {
+                    // Success - new resolver's stake locked
+                } catch {
+                    // Non-critical: Continue even if lock fails
+                }
+            }
         } else {
             // No suitable replacement, mark as timed out
+            // DR v3: Unlock timed out resolver's stake
+            if (address(stakingModule) != address(0)) {
+                try stakingModule.unlockStake(workflowId, timedOutResolver) {
+                    // Success - resolver's stake unlocked
+                } catch {
+                    // Non-critical: Continue even if unlock fails
+                }
+            }
             dm.status = DisputeStatus.Final;
         }
     }
@@ -1006,6 +1033,48 @@ contract DecentralizedResolutionModule is
     function isV3Active() external view returns (bool stakingActive, bool slashingActive) {
         return (address(stakingModule) != address(0), address(slashingModule) != address(0));
     }
+    
+    // ============ DR v3 Phase 5: Emergency Controls ============
+    
+    /**
+     * @notice Pause all new resolver assignments (emergency control)
+     * @param reason Reason for pausing
+     * @dev When paused, selectResolverRoundRobin() and selectResolverWithQuality() return address(0)
+     *      Existing disputes continue processing normally
+     *      Requires ROLE_TIMELOCK (slow lane) or ROLE_GUARDIAN (emergency)
+     */
+    function pauseNewAssignments(string memory reason) external {
+        require(
+            hasRole(ROLE_TIMELOCK, msg.sender) || hasRole(DEFAULT_ADMIN_ROLE, msg.sender),
+            "Not authorized"
+        );
+        require(!newAssignmentsPaused, "Already paused");
+        
+        newAssignmentsPaused = true;
+        emit NewAssignmentsPaused(msg.sender, reason);
+    }
+    
+    /**
+     * @notice Resume new resolver assignments
+     * @dev Requires ROLE_TIMELOCK (slow lane) or ROLE_GUARDIAN (emergency)
+     */
+    function resumeNewAssignments() external {
+        require(
+            hasRole(ROLE_TIMELOCK, msg.sender) || hasRole(DEFAULT_ADMIN_ROLE, msg.sender),
+            "Not authorized"
+        );
+        require(newAssignmentsPaused, "Not paused");
+        
+        newAssignmentsPaused = false;
+        emit NewAssignmentsResumed(msg.sender);
+    }
+    
+    /**
+     * @notice Check if new assignments are paused
+     * @return paused Whether new assignments are paused
+     */
+    function areNewAssignmentsPaused() external view returns (bool paused) {
+        return newAssignmentsPaused;
+    }
 
-    uint256[50] private __gap;
 }

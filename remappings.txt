@@ -3,3 +3,4 @@ forge-std/=lib/forge-std/src/
 @core/=contracts/core/
 @decentralized-resolution-module/=contracts/decentralized-resolution-module/
 @shared/=contracts/shared/
+@governance/=contracts/governance/

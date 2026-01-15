@@ -20,35 +20,35 @@ DR v1 & DR v2 --- Engineering TODOs
 
 ### Core dispute state
 
--   Add / verify `Dispute` struct includes:
+-   ✅ `DisputeMetadata` struct includes:
 
-    -   `round` (uint)
+    -   ✅ `currentRound` (uint8) - per-round tracking
 
-    -   `status` (Open, Resolved, Escalated, Final)
+    -   ✅ `status` (Open, Decided, Escalated, Final)
 
-    -   `currentResolverSet`
+    -   ✅ `resolverAtRound[3]` - resolver set per round
 
-    -   `decision[round]`
+    -   ✅ `decisionAtRound[3]` - decision per round
 
-    -   `appealDeadline[round]`
+    -   ✅ `appealDeadline[3]` - appeal deadline per round
 
-    -   `appealBond[round]`
+    -   ✅ `bondAmountAtRound[3]` - bond storage per round (DR v2 fields exist)
 
--   Store resolver set per round so that appeal bonds can be paid to the correct prior resolvers.
+-   ✅ Resolver set stored per round (`resolverAtRound[3]`) so appeal bonds can be paid to correct prior resolvers.
 
--   Emit events for:
+-   Events:
 
-    -   `DisputeOpened`
+    -   ✅ `DisputeOpened` (BaseEscrow)
 
-    -   `DecisionSubmitted`
+    -   ✅ `DecisionSubmitted` (DecentralizedResolutionModule)
 
-    -   `AppealOpened`
+    -   ⚠️ `DisputeEscalatedToRound` (exists, but no `AppealOpened` event)
 
-    -   `AppealBondPosted`
+    -   ⚠️ `AppealBondRequired` (exists, but `AppealBondPosted` not emitted)
 
-    -   `AppealResolved`
+    -   ❌ `AppealResolved` (not emitted)
 
-    -   `DisputeFinalised`
+    -   ⚠️ `DisputeFinalised` (status exists, but event not emitted)
 
 * * * * *
 
@@ -57,43 +57,43 @@ DR v1 & DR v2 --- Engineering TODOs
 
 ### Resolver selection & routing
 
--   Implement resolver pool with:
+-   ✅ Resolver pool implemented with:
 
-    -   `active` flag
+    -   ✅ `resolverActive` flag
 
-    -   `availability` flag
+    -   ✅ `resolverCapacity.acceptsNewDisputes` flag
 
-    -   `performanceScore`
+    -   ✅ `resolverStats.emaScore` as performance score
 
--   Implement **random selection from suitable resolvers** per dispute round.
+-   ✅ **Category-based round-robin selection** per dispute round (uses `escrowCategory[workflowId]`).
 
--   Exclude resolvers whose workload weight is zero.
+-   ✅ Excludes resolvers whose workload weight is zero (via `calculateWorkloadWeight`).
 
 * * * * *
 
 ### Performance tracking (EMA-based)
 
--   Add `ResolverStats`:
+-   ✅ `ResolverStats` includes:
 
-    -   `emaScore`
+    -   ✅ `emaScore` (0-1e6 fixed point)
 
-    -   `casesHandled`
+    -   ✅ `casesDecided` (cases handled)
 
-    -   `timeouts`
+    -   ✅ `timeoutsAccept` + `timeoutsResolve` (timeouts)
 
-    -   `reversals`
+    -   ✅ `reversals`
 
-    -   `lastActive`
+    -   ✅ `lastActive` (via `resolverLastActive` mapping)
 
--   Implement EMA update:
+-   ✅ EMA update implemented:
 
-    `score_new = score_old * (1 - α) + outcome * α`
+    `score_new = score_old * (1 - α) + outcome * α` (in `ResolutionAnalytics.updateEMAScore`)
 
--   Define `outcome`:
+-   ✅ Outcome defined:
 
-    -   1.0 for upheld decision
+    -   1.0 (EMA_PRECISION) for upheld decision
 
-    -   <1.0 for reversed on escalation
+    -   0.5 (EMA_PRECISION / 2) for reversed on escalation
 
     -   0 for timeout / no response
 
@@ -101,57 +101,51 @@ DR v1 & DR v2 --- Engineering TODOs
 
 ### Workload as incentive
 
--   Implement `WorkloadWeight(resolver)`:
+-   ✅ `calculateWorkloadWeight(resolver)` implemented:
 
-    `f(emaScore, availability, recentTimeoutRate)`
+    `f(emaScore, assignmentWeight, minScoreThreshold)` (in `ResolutionAnalytics`)
 
--   Resolver selection must be weighted by `WorkloadWeight`.
+-   ✅ Resolver selection weighted by workload weight (in `selectResolverRoundRobin`).
 
--   If score < threshold → weight becomes 0 (resolver receives no new cases).
+-   ✅ If score < threshold → weight becomes 0 (resolver receives no new cases).
 
 * * * * *
 
 ### Timeouts & reassignment
 
--   Define per-round:
+-   ✅ Per-round `resolveDeadlines[3]` defined: `[3 days, 5 days, 7 days]`
 
-    -   `t_accept`
+-   ⚠️ `t_accept` not separately defined (resolvers are pre-assigned)
 
-    -   `t_resolve`
+-   ✅ Resolver fails to resolve → auto-reassign via `forceProgress()` + record penalty.
 
--   If resolver fails to accept → auto-reassign + record penalty.
-
--   If resolver fails to resolve → auto-reassign + record penalty.
-
--   Repeated failures push EMA down and thus workload to zero.
+-   ✅ Repeated failures push EMA down (via `recordTimeout`) and thus workload to zero.
 
 * * * * *
 
-### Escalation flow (without bonds)
+### Escalation flow (with bonds - note: bonds enabled in DR v1)
 
--   Implement:
+-   ✅ Escalation to next round implemented (`executeEscalation`)
 
-    -   escalation to next round
+-   ✅ Resolver reassignment implemented (category-based round-robin per round)
 
-    -   resolver reassignment
+-   ✅ Kleros escalation option (if enabled via `escalationConfig[2].enabled`)
 
-    -   Kleros escalation option (if enabled)
-
--   Ensure escalation does not move money yet.
+-   ⚠️ Bonds are enabled in DR v1 (via `escalationCostConfig.enabled = true`), but collection/storage not yet implemented in BaseEscrow
 
 * * * * *
 
 ### DR v1 exit metrics (for governance)
 
--   Track:
+-   ✅ Tracked:
 
-    -   appeal rate per dispute
+    -   ✅ Escalation rate (via `getV1PhaseGateMetrics`)
 
-    -   timeout rate
+    -   ✅ Timeout rate (via resolver stats)
 
-    -   average resolution time
+    -   ✅ Average resolution time (via `getAverageResolutionTime`)
 
--   Expose read-only views for governance dashboards.
+-   ✅ Read-only views exposed for governance dashboards (`getV1PhaseGateMetrics`, `getAverageResolutionTime`, `getDisputeResolverStats`).
 
 * * * * *
 
@@ -160,72 +154,69 @@ DR v1 & DR v2 --- Engineering TODOs
 
 ### Appeal bond plumbing
 
--   Add function `appealBondForRound(uint k)` using quadratic curve:
+-   ✅ `getRequiredAppealBond(uint k)` function exists (calculates bond using quadratic curve via `EscalationCostLibrary`)
 
-    `base + step * k^2`
+-   ✅ Bond storage fields exist: `bondAmountAtRound[3]` in `DisputeMetadata`
 
--   Store `appealBond[k]` per dispute.
-
--   Require bond to be paid to open round `k+1`.
+-   ⚠️ Bond collection not yet implemented in `BaseEscrow.escalateDispute()` (still uses old fee collection)
 
 * * * * *
 
 ### Bond custody & accounting
 
--   On appeal:
+-   ⚠️ On appeal:
 
-    -   Escalator pays `appealBond[k+1]`
+    -   ⚠️ Bond amount calculated but not collected/stored in BaseEscrow
 
-    -   Funds held in dispute escrow
+    -   ⚠️ `ResolverIncentiveModuleV2` exists with `recordAppealBond`, `handleBondRefund`, `handleBondPayout`, but not integrated
 
 * * * * *
 
 ### Bond payout rules
 
--   When round `k+1` resolves:
+-   ⚠️ When round resolves:
 
-    -   If `decision[k+1] != decision[k]` → refund bond to escalator
+    -   ⚠️ `ResolverIncentiveModuleV2` has `handleBondRefund` and `handleBondPayout` but not integrated
 
-    -   Else → pay bond to `resolverSet[k]` (prior round)
-
--   Emit `AppealBondPaid(resolvers[], amount)` or `AppealBondRefunded(user, amount)`
+    -   ⚠️ Events exist: `AppealBondRefunded`, `AppealBondPaidToResolvers` (in ResolverIncentiveModuleV2)
 
 * * * * *
 
 ### Increasing delays
 
--   Add:
+-   ⚠️ Fixed arrays `resolveDeadlines[3]` and `appealWindows[3]` exist (not calculated with steps)
 
-    `t_resolve[k] = baseResolve + k * resolveStep
-    t_appeal[k]  = baseAppeal  + k * appealStep`
+    -   Current: `[3 days, 5 days, 7 days]` and `[2 days, 3 days, 0]`
 
--   Enforce these windows on-chain.
+    -   TODO: Change to `baseResolve + k * resolveStep` and `baseAppeal + k * appealStep`
+
+-   ⚠️ Enforced on-chain (via `resolveBy` timestamp).
 
 * * * * *
 
 ### Anti-griefing rules
 
--   Add `maxRounds` cap.
+-   ✅ `MAX_ROUND = 2` cap exists.
 
--   Require minimum escrow value to allow k ≥ 2 (optional but recommended).
+-   ✅ `minEscrowValueForEscalation` exists (currently 0 by default).
 
--   Forfeit bond if escalator does not submit required data/signature in next round.
+-   ⚠️ Bond forfeiture logic exists in `ResolverIncentiveModuleV2.handleBondForfeit` but not integrated.
 
 * * * * *
 
 ### Reporting & observability
 
--   Expose:
+-   ⚠️ Exposed in `ResolverIncentiveModuleV2` (not integrated):
 
-    -   total bonds posted
+    -   ✅ `totalBondsPosted`
 
-    -   bonds forfeited
+    -   ✅ `totalBondsForfeited`
 
-    -   bonds refunded
+    -   ✅ `totalBondsRefunded`
 
-    -   escalation depth histogram
+    -   ✅ `escalationDepthHistogram`
 
--   These metrics become governance signals for v3 readiness.
+-   ⚠️ These metrics exist but module not integrated into resolution flow.
 
 * * * * *
 
@@ -256,3 +247,30 @@ Why this sequencing is safe (from `RESOLVER_ECONOMICS_2026.md`)
 -   DR v2 introduces economic friction for users (escalation bonds) but keeps resolvers non-adversarial.
 
 -   Only after real-world griefing and appeal patterns are known do you introduce slashing and capital risk.
+
+* * * * *
+
+## Implementation Status Summary
+
+### ✅ Completed (DR v1)
+
+- Core dispute state structure
+- Resolver selection & routing (category-based round-robin)
+- Performance tracking (EMA-based)
+- Workload weighting
+- Timeouts & reassignment
+- Escalation flow
+- DR v1 exit metrics
+
+### ⚠️ Partially Complete (DR v2)
+
+- Bond calculation (implemented)
+- Bond storage fields (exist but not populated)
+- Bond collection (not implemented in BaseEscrow)
+- Bond payout logic (exists in ResolverIncentiveModuleV2 but not integrated)
+
+### ❌ Not Implemented
+
+- Increasing delays (fixed arrays instead of calculated)
+- Bond integration (ResolverIncentiveModuleV2 not integrated)
+- Some events (AppealOpened, AppealBondPosted, AppealResolved, DisputeFinalised)

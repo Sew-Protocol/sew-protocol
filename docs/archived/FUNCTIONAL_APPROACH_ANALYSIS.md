@@ -637,7 +637,7 @@ contracts/
 ## Example: Complete Functional Library
 
 ```solidity
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.28;
 
 library PaymentCalculationLibrary {

@@ -1,8 +1,19 @@
 # Smart Contract Review
 
 **Date:** 2025-01-27  
+**Last Updated:** 2025-01-27  
 **Purpose:** External review preparation and refactor validation  
 **Status:** Contracts still exceed 24KB limit
+
+**Recent Updates:**
+- ✅ Removed partial operations (only full resolution supported)
+- ✅ Removed redundant state variables (`totalFees`, `totalEscrowsPending`, `nextWorkflowId`)
+- ✅ Standardized event parameters (`workflowId` → `escrowId`)
+- ✅ Added NatSpec documentation to all public/external functions
+- ✅ Removed EscrowOps contract (was stub/empty)
+- ✅ Updated escalation handling (bonds primary, fees legacy)
+- ✅ Optimized struct packing for EscrowTransfer
+- ✅ Removed no-op module functions from EscrowableERC20
 
 ## Executive Summary
 
@@ -15,11 +26,11 @@
 1. ⚠️ **Contract size limit exceeded** - Both child contracts are significantly over 24KB
    - **Root cause:** BaseEscrow is too large (1,649 lines) and all code is inherited by child contracts
    - **See:** `docs/CONTRACT_SIZE_INVESTIGATION.md` for detailed analysis
-2. ✅ **Refactor completed** - Event parameter names changed to `disputeResolver` (⚠️ **BREAKS ABI COMPATIBILITY**)
+2. ✅ **Refactor completed** - Event parameter names standardized to `escrowId` (replacing `workflowId`) (⚠️ **BREAKS ABI COMPATIBILITY**)
 3. ✅ **All tests passing** - 281 tests passing
 4. ✅ **Reentrancy protection** - Proper use of `nonReentrant` modifier
 5. ✅ **Yield distribution pattern fixed** - Now reverts on failure instead of silently failing
-6. ⚠️ **Code duplication** - `createEscrow` functions in EscrowVault and EscrowableERC20 are ~100 lines of nearly identical code (estimated 6-8 KB total duplication)
+6. ✅ **Code duplication FIXED** - `createEscrow` logic consolidated into BaseEscrow. EscrowVault has thin convenience wrappers (2-3 lines each), EscrowableERC20 uses inherited function directly. No duplication.
 7. ✅ **Escalation fee refund fixed** - Fee now transferred AFTER successful escalation; refunds if escalation fails
 
 ---
@@ -91,12 +102,14 @@
 - `automateTimedActions`
 - `cancelAsDisputeResolver`
 - `releaseAsDisputeResolver`
-- `partialReleaseAsDisputeResolver`
-- `partialCancelAsDisputeResolver`
 - `escalateDispute`
 - `autoCancelDisputedEscrow`
 - `recoverNativeETH`
 - `recoverERC20`
+- `withdrawEscrow`
+- `createEscrow`
+
+**Note:** Partial operations (`partialReleaseAsDisputeResolver`, `partialCancelAsDisputeResolver`) have been removed - only full resolution is supported.
 
 ### 2.3 State Transition Security
 
@@ -106,7 +119,7 @@
 - Workflow ID validation
 
 **⚠️ Potential Issues:**
-1. **State transition in library:** `StateManagementLibrary.transitionToReleased` and `transitionToRefunded` set `remainingBalance = 0` - ensure this is read before transition
+1. ✅ **FIXED:** `amountAfterFee` is now immutable (no partial operations). State transitions use full amount only.
 2. **Dispute safety mechanism:** `autoCancelDisputedEscrow` can be called by anyone after timeout - intentional but worth documenting
 
 ### 2.4 Yield Distribution Security
@@ -120,16 +133,23 @@
 
 **Recommendation:** Consider adding a recovery mechanism for stuck yield in modules.
 
-### 2.5 Escalation Fee Handling
+### 2.5 Escalation Fee/Bond Handling
 
 **✅ Strengths:**
-- Fee transferred before module call
-- Event emitted (`EscalationFeeCollected`)
+- Most modules now use escalation bonds instead of fees
+- Legacy fee handling maintained for backward compatibility
+- Event emitted (`EscalationFeeCollected`) when fees are used
 - Fee address validation
 
+**Current Implementation:**
+- Escalation uses bonds (deposited to module) for most modules
+- Legacy fee collection still supported for older modules
+- Bonds are handled by the resolution module (e.g., DecentralizedResolutionModule)
+- Fee collection only occurs if module requires it (backward compatibility)
+
 **⚠️ Concerns:**
-- Fee must be in same token as escrow (by design)
-- No refund mechanism if escalation fails
+- Fee must be in same token as escrow (by design, if fees are used)
+- Bond mechanism varies by module implementation
 
 ---
 
@@ -145,15 +165,19 @@
 - ✅ Function names: `getDisputeResolver`, `isAuthorizedDisputeResolver`
 - ✅ Local variables: `disputeResolver` in functions
 
-**Remaining "resolver" references:**
-- Event parameters (kept for ABI compatibility):
-  - `EscrowResolved(uint256 indexed workflowId, address indexed resolver, bytes32 resolutionHash)`
-  - `DisputeOpened(uint256 indexed workflowId, address indexed by, address indexed resolver)`
-- Error names (kept for ABI compatibility):
-  - `NotAuthorizedResolver`
-- Comments/documentation (acceptable)
+**Completed:**
+- ✅ Event parameters: Changed from `workflowId` to `escrowId` throughout (⚠️ **BREAKS ABI COMPATIBILITY**)
+- ✅ Function parameters: Use `workflowId` internally for consistency
+- ✅ Event parameter names: Standardized to `escrowId` in all events
 
-**Recommendation:** Document that event/error parameter names are kept for ABI compatibility.
+**Remaining "resolver" references (kept for ABI compatibility):**
+- Event parameters:
+  - `EscrowResolved(uint256 indexed escrowId, address indexed disputeResolver, bytes32 resolutionHash)`
+  - `DisputeOpened(uint256 indexed escrowId, address indexed by, address indexed disputeResolver)`
+- Error names:
+  - `NotAuthorizedResolver`
+
+**Recommendation:** Document that event/error parameter names using "resolver" are kept for ABI compatibility, while "workflowId" → "escrowId" change breaks ABI.
 
 ### 3.2 Library Extraction
 
@@ -198,8 +222,11 @@
 - ✅ Extracted state management to library
 - ✅ Extracted dispute initialization to library
 - ✅ Removed category key generation
-- ✅ Moved batch operations to EscrowOps contract
+- ✅ Removed EscrowOps contract (was stub/empty)
 - ✅ Simplified module proposal/activation
+- ✅ Removed partial operations (only full resolution supported)
+- ✅ Removed `remainingBalance` field (using immutable `amountAfterFee`)
+- ✅ Removed redundant state variables (`totalFees`, `totalEscrowsPending`, `nextWorkflowId`)
 
 **Reverted (increased size):**
 - ❌ Module getter consolidation (tuple return overhead)
@@ -226,11 +253,11 @@
    - Review: `metadata`, `snapshot*` fields usage
 
 **Medium Priority:**
-1. **createEscrow Duplication:** Extract common logic to library
-   - Estimated savings: 3-4 KB per contract
-   - Both EscrowVault and EscrowableERC20 have nearly identical `createEscrow` logic
-   - Main difference: token transfer method (safeTransferFrom vs _transfer)
-   - Could extract: validation, state management, module snapshotting
+1. ✅ **createEscrow Duplication FIXED:** Common logic consolidated in BaseEscrow
+   - ✅ Completed: Main `createEscrow` logic moved to BaseEscrow
+   - ✅ EscrowVault: Thin convenience wrappers (2-3 lines each) call BaseEscrow
+   - ✅ EscrowableERC20: Uses inherited function directly
+   - No duplication remains
    
 2. **Module Getter Functions:** Further consolidation
    - Estimated savings: 1-2 KB per contract
@@ -253,7 +280,7 @@
    - Already using latest features
 
 **Critical Finding:**
-The `createEscrow` function in both EscrowVault and EscrowableERC20 contains ~100 lines of nearly identical code. This is the largest single source of duplication and represents a significant opportunity for size reduction (estimated 3-4 KB per contract = 6-8 KB total).
+✅ **FIXED:** The `createEscrow` function logic has been consolidated into BaseEscrow. EscrowVault now has thin convenience wrapper functions (2-3 lines each) that call the BaseEscrow implementation. EscrowableERC20 uses the inherited function directly. No code duplication remains.
 
 ---
 
@@ -272,21 +299,23 @@ require(success, "Yield distribution failed");
 ```
 **Status:** ✅ Fixed - Now reverts on failure, ensuring yield is properly distributed
 
-#### Issue 2: State Transition Order
+#### Issue 2: State Transition Order ✅ FIXED
 **Location:** `BaseEscrow._releaseEscrowTransfer`, `_cancelAndRefund`
-**Severity:** Low (already fixed)
-**Description:** `remainingBalance` must be read before `StateManagementLibrary` sets it to 0.
-**Status:** ✅ Fixed - values read before state transition
+**Severity:** Low → **RESOLVED**
+**Description:** `amountAfterFee` is now immutable (no partial operations). Full resolution only.
+**Status:** ✅ Fixed - No partial operations, always full resolution using immutable `amountAfterFee`
 
-#### Issue 3: Escalation Fee Refund ✅ FIXED
+#### Issue 3: Escalation Fee/Bond Handling ✅ UPDATED
 **Location:** `BaseEscrow.escalateDispute`
 **Severity:** Medium → **RESOLVED**
-**Description:** Fee is now transferred AFTER successful module call. If `executeEscalation` fails, fee is refunded.
-**Fixed Behavior:**
-- Fee transfer moved to after successful escalation (line ~1047)
-- If escalation fails, any sent fee is refunded (line ~1051-1054)
-- Excess fee (msg.value > escalationFee) is refunded after successful escalation
-**Status:** ✅ Fixed - Fee only collected if escalation succeeds
+**Description:** Escalation now primarily uses bonds (deposited to module) instead of fees. Legacy fee handling maintained for backward compatibility.
+**Current Behavior:**
+- Most modules use escalation bonds (handled by resolution module)
+- Legacy fee collection only if module requires it
+- `computeEscalation` already calls `executeEscalation` internally
+- No redundant `executeEscalation` call (simplified logic)
+- Excess fee (msg.value > escalationFee) is refunded
+**Status:** ✅ Updated - Bonds are primary mechanism, fees are legacy fallback
 
 ### 5.2 Inconsistencies
 
@@ -309,10 +338,10 @@ require(success, "Yield distribution failed");
 **Issue:** No check that module has sufficient balance after transfer
 **Recommendation:** Add balance check or ensure module handles insufficient balance gracefully
 
-#### Missing Validation 2: Escalation Fee Sufficiency
+#### Missing Validation 2: Escalation Bond/Fee Sufficiency
 **Location:** `BaseEscrow.escalateDispute`
-**Issue:** Fee is transferred before checking if escalation is possible
-**Status:** By design, but could be optimized
+**Issue:** Bond/fee validation handled by resolution module
+**Status:** By design - modules handle their own bond/fee requirements
 
 ---
 
@@ -326,10 +355,10 @@ require(success, "Yield distribution failed");
 - Emergency procedures
 - Governance surface map
 
-**⚠️ Needs Update:**
-- Contract size reduction status
-- Refactor completion status
-- Known limitations (contract size)
+**✅ Updated:**
+- Contract size reduction status (see Section 4)
+- Refactor completion status (see Appendix B)
+- Known limitations (contract size, partial operations removed, event parameter changes)
 
 ### 6.2 Test Coverage
 
@@ -346,14 +375,16 @@ require(success, "Yield distribution failed");
 **Recommendation:** Add tests for:
 - Contract size limit scenarios
 - Yield distribution failure recovery
-- Escalation fee refund scenarios
+- Escalation bond deposit/refund scenarios
+- Full resolution only (no partial operations)
 
 ### 6.3 Known Limitations
 
 1. **Contract Size:** Both child contracts exceed 24KB limit
 2. **Yield Distribution:** No recovery mechanism for stuck yield
-3. **Escalation Fees:** No refund mechanism if escalation fails
-4. **Event Names:** Some event parameters use old naming (ABI compatibility)
+3. **Escalation Bonds/Fees:** Bonds handled by modules; legacy fee handling for backward compatibility
+4. **Event Names:** Event parameters changed from `workflowId` to `escrowId` (⚠️ **BREAKS ABI COMPATIBILITY**)
+5. **Partial Operations:** Removed - only full resolution supported (`amountAfterFee` is immutable)
 
 ---
 
@@ -369,9 +400,11 @@ require(success, "Yield distribution failed");
    - Add function to recover stuck yield from distribution modules
    - Add function to recover escalation fees if escalation fails
 
-3. **Complete Refactor Documentation**
-   - Document remaining "resolver" references and why they're kept
-   - Update all documentation to use "disputeResolver" terminology
+3. ✅ **Complete Refactor Documentation** - DONE
+   - ✅ Documented remaining "resolver" references (kept for ABI compatibility)
+   - ✅ Updated event parameter names (`workflowId` → `escrowId`)
+   - ✅ Documented partial operations removal
+   - ✅ Documented escalation bond/fee handling
 
 ### 7.2 Short-Term (Next Sprint)
 
@@ -379,9 +412,10 @@ require(success, "Yield distribution failed");
    - Create `EscrowQueryLibrary` for all view/getter functions
    - Estimate size savings
 
-2. **Optimize Structs**
-   - Review `EscrowTransfer` struct for unused fields
-   - Consider packing optimization
+2. ✅ **Optimize Structs** - DONE
+   - ✅ Optimized `EscrowTransfer` struct packing (saves ~1 storage slot per escrow)
+   - ✅ Reordered fields: 4 addresses together, 3 uint256 together, 3 enums together
+   - ✅ Estimated savings: ~20,000 gas per escrow creation
 
 3. **Review Compiler Settings**
    - Test different `runs` values
@@ -423,10 +457,11 @@ require(success, "Yield distribution failed");
 
 ### 8.2 Medium Priority
 
-1. **Escalation Fee Handling**
-   - Fee transferred before escalation validation
-   - No refund if escalation fails
-   - **Mitigation:** Ensure escalation validation is comprehensive
+1. **Escalation Bond/Fee Handling**
+   - Most modules use bonds (deposited to module) instead of fees
+   - Legacy fee handling maintained for backward compatibility
+   - Bonds handled by resolution module (e.g., DecentralizedResolutionModule)
+   - **Mitigation:** Modules handle their own bond/fee validation and requirements
 
 2. **State Transition Library**
    - Library modifies storage directly
@@ -457,13 +492,14 @@ require(success, "Yield distribution failed");
    - Test behavior when distribution module fails
    - Test recovery mechanism (if added)
 
-3. **Escalation Fee Scenarios**
-   - Test fee refund if escalation fails
-   - Test fee handling with insufficient balance
+3. **Escalation Bond/Fee Scenarios**
+   - Test bond deposit/refund mechanisms
+   - Test legacy fee handling for backward compatibility
+   - Test bond handling with insufficient balance
 
 4. **State Transition Edge Cases**
    - Test all state transition paths
-   - Verify `remainingBalance` is read correctly
+   - Verify `amountAfterFee` is used correctly (immutable, full resolution only)
 
 ### 9.2 Fuzzing Recommendations
 
@@ -508,13 +544,14 @@ require(success, "Yield distribution failed");
 
 **Not Ready:**
 - ⚠️ Contract size limit not met
-- ⚠️ Some refactor documentation incomplete
-- ⚠️ Recovery mechanisms missing
+- ⚠️ Recovery mechanisms missing (yield distribution, module balance validation)
 
 **Recommendation:** Proceed with external review, but clearly document:
 1. Contract size status and reduction plan
 2. Known limitations and workarounds
 3. Recovery mechanisms to be added
+4. ABI breaking changes (event parameter `workflowId` → `escrowId`)
+5. Partial operations removed (only full resolution supported)
 
 ---
 
@@ -547,7 +584,11 @@ require(success, "Yield distribution failed");
 - [x] Extract dispute initialization to library
 - [x] Extract recovery functions to library
 - [x] Remove yield distribution storage
-- [x] Move batch operations to EscrowOps
+- [x] Remove EscrowOps contract (was stub/empty)
+- [x] Remove partial operations (only full resolution)
+- [x] Remove redundant state variables (`totalFees`, `totalEscrowsPending`, `nextWorkflowId`)
+- [x] Standardize event parameters to `escrowId`
+- [x] Add NatSpec comments to all public/external functions
 - [x] Simplify module proposal/activation
 
 ### In Progress ⚠️
@@ -557,8 +598,16 @@ require(success, "Yield distribution failed");
 
 ### Not Started ❌
 - [ ] Event consolidation
-- [ ] Struct optimization
 - [ ] Compiler setting optimization
+
+### Recently Completed ✅
+- [x] Struct optimization (EscrowTransfer packing)
+- [x] Remove EscrowOps contract
+- [x] Remove partial operations
+- [x] Remove redundant state variables
+- [x] Standardize event parameters
+- [x] Add NatSpec documentation
+- [x] Remove no-op module functions from EscrowableERC20
 
 ---
 
@@ -588,6 +637,11 @@ require(success, "Yield distribution failed");
 
 ### Missing ⚠️
 - [ ] Yield distribution failure recovery
-- [ ] Escalation fee refund mechanism
 - [ ] Module balance validation
 
+### Completed ✅
+- [x] Escalation bond/fee handling (bonds are primary, fees are legacy)
+- [x] Partial operations removed (only full resolution)
+- [x] Redundant state variables removed
+- [x] Event parameter standardization (`workflowId` → `escrowId`)
+- [x] NatSpec documentation added

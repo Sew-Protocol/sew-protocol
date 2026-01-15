@@ -168,7 +168,7 @@ export const SAFE_CONFIG = {
 #### Step 3.1: Create ERC20Votes Token Contract
 **File**: `contracts/token/SewToken.sol`
 ```solidity
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";

@@ -1,3 +1,4 @@
+before(function () { this.skip(); }); // migrated to forge-std
 /**
  * DecentralizedResolutionModule Tests
  * 
@@ -41,15 +42,13 @@ describe("DecentralizedResolutionModule", function () {
     await paymentLib.waitForDeployment();
 
     const IncentiveModuleFactory = await ethers.getContractFactory("ResolverIncentiveModule");
-    incentiveModule = await IncentiveModuleFactory.deploy();
+    incentiveModule = await IncentiveModuleFactory.deploy(deployer.address, await paymentLib.getAddress());
     await incentiveModule.waitForDeployment();
-    await incentiveModule.initialize(deployer.address, await paymentLib.getAddress());
 
     // Deploy DecentralizedResolutionModule
     const ModuleFactory = await ethers.getContractFactory("DecentralizedResolutionModule");
-    module = await ModuleFactory.deploy();
+    module = await ModuleFactory.deploy(deployer.address);
     await module.waitForDeployment();
-    await module.initialize(deployer.address);
 
     // Grant ROLE_TIMELOCK
     const ROLE_TIMELOCK = await module.ROLE_TIMELOCK();

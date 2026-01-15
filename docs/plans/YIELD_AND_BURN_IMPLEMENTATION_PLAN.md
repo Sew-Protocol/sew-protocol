@@ -703,7 +703,7 @@ function burnReserves(
 **File**: `contracts/interfaces/IERC20Burnable.sol` (if not exists)
 
 ```solidity
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";

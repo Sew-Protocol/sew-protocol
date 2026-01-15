@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
 import "./ResolverIncentiveModuleV1.sol";
@@ -50,10 +50,16 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
     // Escalation depth histogram: round => count
     mapping(uint8 => uint256) public escalationDepthHistogram;
     
+    // ============ DR v2 Constructor ============
+    
+    constructor(address initialOwner, address initialLibrary) 
+        ResolverIncentiveModuleV1(initialOwner, initialLibrary) 
+    {}
+    
     // ============ DR v2 Events ============
     
     event AppealBondRecorded(
-        uint256 indexed workflowId,
+        uint256 indexed escrowId,
         uint8 round,
         address indexed depositor,
         uint256 amount,
@@ -61,7 +67,7 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
     );
     
     event AppealBondRefunded(
-        uint256 indexed workflowId,
+        uint256 indexed escrowId,
         uint8 round,
         address indexed depositor,
         uint256 amount,
@@ -69,7 +75,7 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
     );
     
     event AppealBondPaidToResolvers(
-        uint256 indexed workflowId,
+        uint256 indexed escrowId,
         uint8 round,
         address[] resolvers,
         uint256 totalAmount,
@@ -77,7 +83,7 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
     );
     
     event AppealBondForfeited(
-        uint256 indexed workflowId,
+        uint256 indexed escrowId,
         uint8 round,
         uint256 amount,
         address token,

@@ -1,11 +1,10 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
 import "forge-std/Test.sol";
 import "../../../contracts/decentralized-resolution-module/ResolverIncentiveModuleV1.sol";
 import "../../../contracts/decentralized-resolution-module/PaymentCalculationLibraryV1.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
-import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract ResolverIncentiveModuleComprehensiveTest is Test {
     ResolverIncentiveModuleV1 public incentiveModule;
@@ -42,23 +41,12 @@ contract ResolverIncentiveModuleComprehensiveTest is Test {
         // Deploy Payment Library
         paymentLib = new PaymentCalculationLibraryV1();
 
-        // Deploy Implementation
-        ResolverIncentiveModuleV1 implementation = new ResolverIncentiveModuleV1();
-
-        // Deploy Proxy and Initialize
-        ERC1967Proxy proxy = new ERC1967Proxy(
-            address(implementation),
-            abi.encodeCall(ResolverIncentiveModuleV1.initialize, (owner, address(paymentLib)))
-        );
-        incentiveModule = ResolverIncentiveModuleV1(address(proxy));
+        // Deploy ResolverIncentiveModuleV1 directly (immutable pattern)
+        incentiveModule = new ResolverIncentiveModuleV1(owner, address(paymentLib));
 
         // Setup Roles
         incentiveModule.grantRole(ROLE_TIMELOCK, timelock);
-        incentiveModule.registerEscrowContract(escrow); // Via owner (who has ROLE_TIMELOCK by default in init? No wait, check init)
-
-        // Correction: Initialize grants DEFAULT_ADMIN and ROLE_TIMELOCK to initialOwner.
-        // registerEscrowContract requires ROLE_TIMELOCK.
-        // owner (this) has ROLE_TIMELOCK.
+        incentiveModule.grantRole(ROLE_TIMELOCK, address(this));
         incentiveModule.registerEscrowContract(escrow);
 
         // Deploy Mock Token

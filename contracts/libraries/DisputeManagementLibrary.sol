@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
 import "../types/EscrowTypes.sol";
@@ -14,7 +14,7 @@ library DisputeManagementLibrary {
      * @param escrowState Current escrow state
      * @param raisedTimestamp Timestamp when dispute was raised
      * @param maxDuration Maximum allowed dispute duration
-     * @return isTimedOut True if timed out
+     * @return timedOut True if timed out
      * @return timeRemaining Seconds until timeout
      */
     function isTimedOut(
@@ -22,7 +22,7 @@ library DisputeManagementLibrary {
         EscrowState escrowState,
         uint256 raisedTimestamp,
         uint256 maxDuration
-    ) internal view returns (bool isTimedOut, uint256 timeRemaining) {
+    ) internal view returns (bool timedOut, uint256 timeRemaining) {
         if (escrowState != EscrowState.DISPUTED || raisedTimestamp == 0) {
             return (false, 0);
         }

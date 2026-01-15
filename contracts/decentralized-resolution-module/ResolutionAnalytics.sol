@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
 import "./DecentralizedResolverStructs.sol";
@@ -42,7 +42,7 @@ library ResolutionAnalytics {
     );
     
     event ResolutionReversed(
-        uint256 indexed workflowId,
+        uint256 indexed escrowId,
         address indexed resolver,
         DecentralizedResolverStructs.ResolutionOutcome originalOutcome,
         DecentralizedResolverStructs.ResolutionOutcome newOutcome,
@@ -51,7 +51,7 @@ library ResolutionAnalytics {
     );
     
     event ResolverTimeout(
-        uint256 indexed workflowId,
+        uint256 indexed escrowId,
         address indexed resolver,
         uint8 round,
         uint8 timeoutType // 0=accept, 1=resolve

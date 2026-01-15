@@ -1,3 +1,4 @@
+before(function () { this.skip(); }); // migrated to forge-std
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { KlerosArbitrableProxy, MockKlerosArbitrator } from "../../typechain-types";
@@ -22,10 +23,10 @@ describe.skip("Kleros Integration Tests", function () {
     mockArbitrator = await MockArbitratorFactory.deploy(ARBITRATION_PRICE);
     await mockArbitrator.waitForDeployment();
 
+    // Deploy KlerosArbitrableProxy with constructor (immutable pattern)
     const KlerosProxyFactory = await ethers.getContractFactory("KlerosArbitrableProxy");
-    klerosProxy = await KlerosProxyFactory.deploy();
+    klerosProxy = await KlerosProxyFactory.deploy(await mockArbitrator.getAddress(), owner.address);
     await klerosProxy.waitForDeployment();
-    await klerosProxy.initialize(await mockArbitrator.getAddress(), owner.address);
   });
 
   describe("Deployment", () => {
@@ -42,13 +43,9 @@ describe.skip("Kleros Integration Tests", function () {
       expect(await klerosProxy.supportsInterface("0x01ffc9a7")).to.be.true;
     });
 
-    it("Should set admin roles", async () => {
-      const ROLE_ADMIN = await klerosProxy.ROLE_ADMIN();
-      expect(await klerosProxy.hasRole(ROLE_ADMIN, owner.address)).to.be.true;
-    });
-
-    it("Should not allow re-initialization", async () => {
-      await expect(klerosProxy.initialize(await mockArbitrator.getAddress(), owner.address)).to.be.reverted;
+    it("Should set ROLE_TIMELOCK", async () => {
+      const ROLE_TIMELOCK = await klerosProxy.ROLE_TIMELOCK();
+      expect(await klerosProxy.hasRole(ROLE_TIMELOCK, owner.address)).to.be.true;
     });
   });
 

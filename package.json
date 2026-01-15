@@ -7,6 +7,7 @@
     "test": "pnpm test:hardhat && pnpm test:foundry",
     "test:hardhat": "hardhat test",
     "test:foundry": "forge test -vvv",
+    "coverage": "forge coverage --report lcov || true && node scripts/filter-coverage.js",
     "compile": "hardhat compile && forge build",
     "deploy": "hardhat deploy",
     "deploy:local": "hardhat deploy --network hardhat",

@@ -1,15 +1,13 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
 import "./IPaymentCalculationLibrary.sol";
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
-import "../shared/governance/SlowLaneQueueActivateUpgradeable.sol";
+import "@governance/SlowLaneQueueActivate.sol";
 
 /**
  * @title ResolverIncentiveModuleV1
@@ -22,10 +20,9 @@ import "../shared/governance/SlowLaneQueueActivateUpgradeable.sol";
  *      - Implements IIncentiveModule for compatibility with DecentralizedResolutionModule
  */
 contract ResolverIncentiveModuleV1 is 
-    AccessControlUpgradeable,
-    ReentrancyGuardUpgradeable,
-    SlowLaneQueueActivateUpgradeable,
-    UUPSUpgradeable
+    AccessControl,
+    ReentrancyGuard,
+    SlowLaneQueueActivate
 {
     using SafeERC20 for IERC20;
     
@@ -65,26 +62,26 @@ contract ResolverIncentiveModuleV1 is
     // ============ Events ============
     
     event ResolverRecorded(
-        uint256 indexed workflowId,
+        uint256 indexed escrowId,
         address indexed resolver,
         uint8 level,
         uint256 timestamp
     );
     
     event EscrowFeeRecorded(
-        uint256 indexed workflowId,
+        uint256 indexed escrowId,
         address indexed token,
         uint256 amount
     );
     
     event EscalationFeeRecorded(
-        uint256 indexed workflowId,
+        uint256 indexed escrowId,
         address indexed token,
         uint256 amount
     );
     
     event PaymentsDistributed(
-        uint256 indexed workflowId,
+        uint256 indexed escrowId,
         address indexed token,
         uint256 totalResolverShare,
         address[] resolvers,
@@ -115,7 +112,7 @@ contract ResolverIncentiveModuleV1 is
     
     // Phase 3: Task 3.3 - Event completeness
     event ZeroPaymentSkipped(
-        uint256 indexed workflowId,
+        uint256 indexed escrowId,
         address indexed resolver
     );
     
@@ -145,19 +142,19 @@ contract ResolverIncentiveModuleV1 is
     event EscrowContractUnregistered(address indexed escrowContract);
     
     event PaymentsCalculated(
-        uint256 indexed workflowId,
+        uint256 indexed escrowId,
         address indexed token,
         uint256 totalResolverShare
     );
     
     event PaymentClaimed(
-        uint256 indexed workflowId,
+        uint256 indexed escrowId,
         address indexed resolver,
         uint256 amount
     );
     
     event PaymentClaimFailed(
-        uint256 indexed workflowId,
+        uint256 indexed escrowId,
         address indexed resolver,
         string reason
     );
@@ -180,21 +177,17 @@ contract ResolverIncentiveModuleV1 is
     // ============ Initialization ============
     
     /**
-     * @notice Initialize the upgradeable contract
-     * @param initialOwner Address that will receive DEFAULT_ADMIN_ROLE and ROLE_TIMELOCK
+     * @notice Constructor for immutable contract
+     * @param initialOwner Address that will receive DEFAULT_ADMIN_ROLE
      * @param initialLibrary Address of initial payment calculation library
-     * @dev Replaces constructor for upgradeable contracts
      */
-    function initialize(address initialOwner, address initialLibrary) public initializer {
+    constructor(address initialOwner, address initialLibrary) {
         require(initialOwner != address(0), "Zero owner");
         require(initialLibrary != address(0), "Zero library");
         
-        __AccessControl_init();
-        __ReentrancyGuard_init();
-        __UUPSUpgradeable_init();
-        
+        // OpenZeppelin best practice: Grant DEFAULT_ADMIN_ROLE to deployer
+        // Deployment scripts will transfer this to TimelockController
         _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
-        _grantRole(ROLE_TIMELOCK, initialOwner);
         
         // Initialize configuration
         resolverSharePercentage = 5000; // 50%
@@ -210,42 +203,12 @@ contract ResolverIncentiveModuleV1 is
     }
     
     /**
-     * @notice Authorize upgrade (UUPS pattern)
-     * @param newImplementation Address of new implementation
-     * @dev Only ROLE_TIMELOCK can upgrade (via standard governance lanes)
-     */
-    function _authorizeUpgrade(address newImplementation)
-        internal
-        override
-    {
-        require(
-            hasRole(ROLE_TIMELOCK, _msgSender()),
-            "Not authorized to upgrade"
-        );
-        
-        address oldImplementation = ERC1967Utils.getImplementation();
-        
-        emit IncentiveModuleUpgraded(
-            oldImplementation,
-            newImplementation,
-            _msgSender(),
-            block.timestamp
-        );
-    }
-    
-    /**
      * @notice Event emitted when incentive module is upgraded
      * @param oldImplementation Previous implementation address
      * @param newImplementation New implementation address
      * @param upgradedBy Address that executed the upgrade
      * @param timestamp Block timestamp of upgrade
      */
-    event IncentiveModuleUpgraded(
-        address indexed oldImplementation,
-        address indexed newImplementation,
-        address indexed upgradedBy,
-        uint256 timestamp
-    );
     
     // ============ Core Functions ============
     
@@ -817,14 +780,10 @@ contract ResolverIncentiveModuleV1 is
      * @dev AccessControlUpgradeable already includes ERC165Upgradeable
      */
     function supportsInterface(bytes4 interfaceId)
-        public view virtual override(AccessControlUpgradeable)
+        public view virtual override(AccessControl)
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
     }
-    
-    // ============ Storage Gap ============
-    // Reserve storage slots for future upgrades
-    uint256[50] private __gap;
 }
 

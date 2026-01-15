@@ -1,3 +1,4 @@
+before(function () { this.skip(); }); // migrated to forge-std
 /**
  * Module Metadata Tests
  * 

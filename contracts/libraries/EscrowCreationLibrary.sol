@@ -1,25 +1,21 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
 import "../types/EscrowTypes.sol";
 
 library EscrowCreationLibrary {
     function createEscrowTransferStruct(
-        uint256 workflowId,
         address token,
         address seller,
         address from,
-        uint256 amount,
         uint256 amountAfterFee,
         address defaultResolver
     ) internal pure returns (EscrowTransfer memory) {
         return EscrowTransfer({
-            workflowId: workflowId,
             token: token,
             to: seller,
             from: from,
-            remainingBalance: amountAfterFee,
-            totalDeposited: amount,
+            amountAfterFee: amountAfterFee,
             escrowState: EscrowState.PENDING,
             senderStatus: SenderStatus.NONE,
             recipientStatus: RecipientStatus.NONE,

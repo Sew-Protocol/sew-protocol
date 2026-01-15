@@ -52,7 +52,7 @@ All modules must implement:
 If creating a new module type, define the interface:
 
 ```solidity
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
@@ -70,7 +70,7 @@ interface IMyModule is IERC165 {
 ### Step 2: Implement the Module
 
 ```solidity
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.28;
 
 import "./interfaces/IMyModule.sol";
@@ -385,7 +385,7 @@ describe("MyModule", function () {
 ### Example 1: Simple Resolution Module
 
 ```solidity
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.28;
 
 import "../interfaces/IResolutionModule.sol";
@@ -465,7 +465,7 @@ contract SimpleResolutionModule is AccessControl, IResolutionModule {
 ### Example 2: Upgradeable Module (UUPS)
 
 ```solidity
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.28;
 
 import "../interfaces/IResolutionModule.sol";

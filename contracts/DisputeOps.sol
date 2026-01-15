@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
 import "./shared/interfaces/IResolutionModule.sol";
@@ -42,8 +42,7 @@ contract DisputeOps {
      * @param from Escrow sender address
      * @param to Escrow recipient address
      * @param token Token address
-     * @param remainingBalance Current remaining balance
-     * @param totalDeposited Original total deposited amount
+     * @param amountAfterFee Amount after fee deduction (what's actually held in escrow)
      * @param escrowState Current escrow state
      * @return result Escalation computation result
      * @dev This function is "compute-only" - it does NOT modify BaseEscrow state.
@@ -57,8 +56,7 @@ contract DisputeOps {
         address from,
         address to,
         address token,
-        uint256 remainingBalance,
-        uint256 totalDeposited,
+        uint256 amountAfterFee,
         EscrowState escrowState
     ) external returns (EscalationResult memory result) {
         result.success = false;
@@ -82,7 +80,7 @@ contract DisputeOps {
         }
         
         // Encode escrow data for module
-        bytes memory escrowData = abi.encode(token, from, to, remainingBalance, totalDeposited);
+        bytes memory escrowData = abi.encode(token, from, to, amountAfterFee);
         
         // Get current level from module
         try IResolutionModule(resolutionModule).getDisputeResolver(workflowId, escrowData) 
@@ -161,8 +159,7 @@ contract DisputeOps {
      * @param token Token address
      * @param from Sender address
      * @param to Recipient address
-     * @param remainingBalance Current balance
-     * @param totalDeposited Original deposit
+     * @param amountAfterFee Amount after fee deduction (what's actually held in escrow)
      * @return Encoded escrow data
      * @dev Public helper for encoding - can be used by BaseEscrow or externally
      */
@@ -170,9 +167,8 @@ contract DisputeOps {
         address token,
         address from,
         address to,
-        uint256 remainingBalance,
-        uint256 totalDeposited
+        uint256 amountAfterFee
     ) external pure returns (bytes memory) {
-        return abi.encode(token, from, to, remainingBalance, totalDeposited);
+        return abi.encode(token, from, to, amountAfterFee);
     }
 }

@@ -12,6 +12,12 @@ verbosity = 3
 ffi = false
 fs_permissions = [{ access = "read", path = "./" }]
 
+[profile.coverage]
+# Use IR + optimizer for coverage to avoid stack-too-deep in complex contracts
+via_ir = true
+optimizer = true
+optimizer_runs = 200
+
 [fuzz]
 runs = 256
 max_test_rejects = 65536

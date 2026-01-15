@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
 /**
@@ -81,7 +81,7 @@ interface ISlashingModule {
     
     event SlashProposed(
         uint256 indexed slashId,
-        uint256 indexed workflowId,
+        uint256 indexed escrowId,
         address indexed resolver,
         SlashReason reason,
         uint256 amount,
@@ -129,7 +129,7 @@ interface ISlashingModule {
     );
     
     event InsurancePoolFunded(uint256 amount, uint256 newBalance);
-    event InsurancePoolPayout(address indexed to, uint256 amount, uint256 workflowId);
+    event InsurancePoolPayout(address indexed to, uint256 amount, uint256 indexed escrowId);
     
     // ============ Core Slashing Functions ============
     

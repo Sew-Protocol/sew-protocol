@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
 import "../interfaces/IYieldGenerationModule.sol";
@@ -38,18 +38,6 @@ contract DefaultYieldModule is IYieldGenerationModule, ERC165 {
         uint256 yieldAmount
     ) {
         return (true, originalAmount, 0);
-    }
-
-    /**
-     * @notice Withdraw proportional (returns requested amount)
-     */
-    function withdrawProportional(
-        uint256 /* workflowId */,
-        address /* token */,
-        uint256 amount,
-        uint256 /* originalDeposit */
-    ) external pure override returns (bool success, uint256 actualAmount) {
-        return (true, amount);
     }
 
     /**

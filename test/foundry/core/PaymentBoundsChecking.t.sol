@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
 import "forge-std/Test.sol";
@@ -6,7 +6,6 @@ import "../../../contracts/decentralized-resolution-module/ResolverIncentiveModu
 import "../../../contracts/decentralized-resolution-module/PaymentCalculationLibraryV1.sol";
 import "../../../contracts/decentralized-resolution-module/IPaymentCalculationLibrary.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
-import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract PaymentBoundsCheckingTest is Test {
     ResolverIncentiveModuleV1 public incentiveModule;
@@ -37,22 +36,11 @@ contract PaymentBoundsCheckingTest is Test {
         // Deploy Payment Library
         paymentLib = new PaymentCalculationLibraryV1();
         
-        // Deploy Implementation
-        ResolverIncentiveModuleV1 implementation = new ResolverIncentiveModuleV1();
+        // Deploy ResolverIncentiveModuleV1 directly (immutable pattern)
+        incentiveModule = new ResolverIncentiveModuleV1(owner, address(paymentLib));
         
-        // Deploy Proxy and Initialize
-        ERC1967Proxy proxy = new ERC1967Proxy(
-            address(implementation),
-            abi.encodeWithSelector(
-                ResolverIncentiveModuleV1.initialize.selector,
-                owner,
-                address(paymentLib)
-            )
-        );
-        
-        incentiveModule = ResolverIncentiveModuleV1(address(proxy));
-        
-        // Grant roles
+        // Grant roles (owner has DEFAULT_ADMIN_ROLE from constructor, grant ROLE_TIMELOCK)
+        incentiveModule.grantRole(ROLE_TIMELOCK, address(this));
         incentiveModule.grantRole(ROLE_TIMELOCK, timelock);
         incentiveModule.registerEscrowContract(escrow);
     }

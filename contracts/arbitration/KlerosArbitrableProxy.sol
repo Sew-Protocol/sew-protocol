@@ -4,10 +4,8 @@ pragma solidity 0.8.33;
 import "./IArbitrator.sol";
 import "./IArbitrable.sol";
 import "../shared/interfaces/IResolutionModule.sol";
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 /**
@@ -16,14 +14,12 @@ import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
  * @dev Implements IArbitrable to receive rulings from Kleros and IResolutionModule to integrate with BaseEscrow
  */
 contract KlerosArbitrableProxy is 
-    Initializable, 
-    AccessControlUpgradeable, 
-    UUPSUpgradeable, 
-    ReentrancyGuardUpgradeable,
+    AccessControl, 
+    ReentrancyGuard,
     IArbitrable,
     IResolutionModule 
 {
-    bytes32 public constant ROLE_ADMIN = keccak256("ROLE_ADMIN");
+    bytes32 public constant ROLE_TIMELOCK = keccak256("ROLE_TIMELOCK");
     bytes32 public constant ROLE_ESCROW_CONTRACT = keccak256("ROLE_ESCROW_CONTRACT");
 
     IArbitrator public arbitrator;
@@ -53,50 +49,39 @@ contract KlerosArbitrableProxy is
     }
 
     event DisputeCreated(
-        uint256 indexed workflowId, 
+        uint256 indexed escrowId, 
         uint256 indexed klerosDisputeId, 
         IArbitrator indexed arbitrator
     );
     
     event EvidenceSubmitted(
-        uint256 indexed workflowId,
+        uint256 indexed escrowId,
         uint256 indexed klerosDisputeId,
         address indexed submitter,
         string evidence
     );
     
     event RulingExecuted(
-        uint256 indexed workflowId,
+        uint256 indexed escrowId,
         uint256 indexed klerosDisputeId,
         uint256 ruling
     );
 
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
-        // Don't disable initializers for direct deployment in tests
-        // _disableInitializers();
-    }
-
-    function initialize(address _arbitrator, address _admin) external initializer {
+    constructor(address _arbitrator, address _admin) {
         require(_arbitrator != address(0), "Invalid arbitrator");
         require(_admin != address(0), "Invalid admin");
         
-        __AccessControl_init();
-        __UUPSUpgradeable_init();
-        __ReentrancyGuard_init();
-        
         arbitrator = IArbitrator(_arbitrator);
         
+        // OpenZeppelin best practice: Grant DEFAULT_ADMIN_ROLE to deployer
+        // Deployment scripts will transfer this to TimelockController
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
-        _grantRole(ROLE_ADMIN, _admin);
     }
-
-    function _authorizeUpgrade(address newImplementation) internal override onlyRole(ROLE_ADMIN) {}
 
     /**
      * @notice Register an escrow contract that can create disputes
      */
-    function registerEscrowContract(address escrow) external onlyRole(ROLE_ADMIN) {
+    function registerEscrowContract(address escrow) external onlyRole(ROLE_TIMELOCK) {
         require(escrow != address(0), "Invalid escrow address");
         _grantRole(ROLE_ESCROW_CONTRACT, escrow);
     }
@@ -310,7 +295,7 @@ contract KlerosArbitrableProxy is
     function supportsInterface(bytes4 interfaceId) 
         public 
         view 
-        override(AccessControlUpgradeable, IERC165) 
+        override(AccessControl, IERC165) 
         returns (bool) 
     {
         return interfaceId == type(IResolutionModule).interfaceId ||

@@ -1,10 +1,8 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
 import "./ISlashingModule.sol";
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 
 /**
  * @title SlashingModuleNoOp
@@ -19,11 +17,9 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
  */
 contract SlashingModuleNoOp is 
     ISlashingModule, 
-    Initializable, 
-    AccessControlUpgradeable, 
-    UUPSUpgradeable 
+    AccessControl
 {
-    bytes32 public constant ROLE_ADMIN = keccak256("ROLE_ADMIN");
+    bytes32 public constant ROLE_TIMELOCK = keccak256("ROLE_TIMELOCK");
     bytes32 public constant ROLE_RESOLUTION_MODULE = keccak256("ROLE_RESOLUTION_MODULE");
     
     bool public circuitBreakerActive;
@@ -36,17 +32,10 @@ contract SlashingModuleNoOp is
     SlashConfig private _dummyConfig;
     uint256 private _dummyInsurancePoolBalance;
     
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
-        _disableInitializers();
-    }
-    
-    function initialize(address initialOwner) public initializer {
-        __AccessControl_init();
-        __UUPSUpgradeable_init();
-        
+    constructor(address initialOwner) {
+        // OpenZeppelin best practice: Grant DEFAULT_ADMIN_ROLE to deployer
+        // Deployment scripts will transfer this to TimelockController
         _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
-        _grantRole(ROLE_ADMIN, initialOwner);
         
         circuitBreakerActive = false;
         _nextSlashId = 1;
@@ -62,8 +51,6 @@ contract SlashingModuleNoOp is
             appealBond: 100 ether
         });
     }
-    
-    function _authorizeUpgrade(address newImplementation) internal override onlyRole(ROLE_ADMIN) {}
     
     // ============ Core Slashing Functions (No-Op) ============
     
@@ -109,7 +96,7 @@ contract SlashingModuleNoOp is
         emit SlashAppealed(slashId, msg.sender, _dummyConfig.appealBond, reason);
     }
     
-    function resolveAppeal(uint256 slashId, bool upheld) external override onlyRole(ROLE_ADMIN) {
+    function resolveAppeal(uint256 slashId, bool upheld) external override onlyRole(ROLE_TIMELOCK) {
         emit SlashAppealResolved(slashId, upheld, address(0), 0);
         
         if (upheld) {
@@ -276,7 +263,7 @@ contract SlashingModuleNoOp is
     function setSlashPercentage(SlashReason reason, uint256 bps) 
         external 
         override 
-        onlyRole(ROLE_ADMIN) 
+        onlyRole(ROLE_TIMELOCK) 
     {
         uint256 oldBps;
         
@@ -297,17 +284,17 @@ contract SlashingModuleNoOp is
     function setMaxSlashPerPeriod(uint256 max, uint256 period) 
         external 
         override 
-        onlyRole(ROLE_ADMIN) 
+        onlyRole(ROLE_TIMELOCK) 
     {
         _dummyConfig.maxSlashPerPeriod = max;
         _dummyConfig.slashPeriod = period;
     }
     
-    function setAppealWindow(uint256 window) external override onlyRole(ROLE_ADMIN) {
+    function setAppealWindow(uint256 window) external override onlyRole(ROLE_TIMELOCK) {
         _dummyConfig.appealWindow = window;
     }
     
-    function setAppealBond(uint256 bond) external override onlyRole(ROLE_ADMIN) {
+    function setAppealBond(uint256 bond) external override onlyRole(ROLE_TIMELOCK) {
         _dummyConfig.appealBond = bond;
     }
     
@@ -316,18 +303,18 @@ contract SlashingModuleNoOp is
         emit InsurancePoolFunded(amount, _dummyInsurancePoolBalance);
     }
     
-    function triggerCircuitBreaker(string memory reason) external override onlyRole(ROLE_ADMIN) {
+    function triggerCircuitBreaker(string memory reason) external override onlyRole(ROLE_TIMELOCK) {
         circuitBreakerActive = true;
         emit CircuitBreakerTriggered(address(0), 0, 0, reason);
     }
     
-    function resetCircuitBreaker() external override onlyRole(ROLE_ADMIN) {
+    function resetCircuitBreaker() external override onlyRole(ROLE_TIMELOCK) {
         circuitBreakerActive = false;
     }
     
     // ============ Setup Functions ============
     
-    function setResolutionModule(address module) external onlyRole(ROLE_ADMIN) {
+    function setResolutionModule(address module) external onlyRole(ROLE_TIMELOCK) {
         _grantRole(ROLE_RESOLUTION_MODULE, module);
     }
 }

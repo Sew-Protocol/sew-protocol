@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
 /**
@@ -184,7 +184,20 @@ library BondValuationLibrary {
         
         // If SEW is 20%, stable must be 80% = SEW × 4
         uint256 minStableUSD = (sewUSD * MIN_STABLE_BPS) / MAX_SEW_BPS;
-        minStableAmount = _normalizeDecimals(minStableUSD, 18, stableDecimals);
+        
+        // Custom normalization with ceiling for minStable calculation
+        if (18 == stableDecimals) {
+            minStableAmount = minStableUSD;
+        } else if (18 < stableDecimals) {
+            // Scale up
+            uint8 diff = stableDecimals - 18;
+            minStableAmount = minStableUSD * (10 ** diff);
+        } else {
+            // Scale down with ceil to ensure we meet the minimum requirement
+            uint8 diff = 18 - stableDecimals;
+            uint256 divisor = 10 ** diff;
+            minStableAmount = (minStableUSD + divisor - 1) / divisor;
+        }
     }
     
     /**

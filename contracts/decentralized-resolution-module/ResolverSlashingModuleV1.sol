@@ -1,12 +1,13 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
 import "./ISlashingModule.sol";
 import "./ResolverStakingModuleV1.sol";
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "./InsurancePoolVault.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title ResolverSlashingModuleV1
@@ -26,14 +27,13 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
  */
 contract ResolverSlashingModuleV1 is 
     ISlashingModule,
-    Initializable,
-    AccessControlUpgradeable,
-    ReentrancyGuardUpgradeable,
-    UUPSUpgradeable
+    AccessControl,
+    ReentrancyGuard
 {
+    using SafeERC20 for IERC20;
     // ============ Constants ============
     
-    bytes32 public constant ROLE_ADMIN = keccak256("ROLE_ADMIN");
+    bytes32 public constant ROLE_TIMELOCK = keccak256("ROLE_TIMELOCK");
     bytes32 public constant ROLE_RESOLUTION_MODULE = keccak256("ROLE_RESOLUTION_MODULE");
     
     uint256 public constant BASIS_POINTS = 10000;
@@ -56,6 +56,8 @@ contract ResolverSlashingModuleV1 is
     // ============ State Variables ============
     
     ResolverStakingModuleV1 public stakingModule;
+    InsurancePoolVault public insurancePoolVault;
+    IERC20 public stableToken;
     
     bool public circuitBreakerActive;
     uint256 public lastCircuitBreakerTrigger;
@@ -90,9 +92,6 @@ contract ResolverSlashingModuleV1 is
     // Slash config (governance-controlled)
     SlashConfig public slashConfig;
     
-    // Insurance pool (for compensating users)
-    uint256 public insurancePoolBalance;
-    
     // ============ Events ============
     
     event SlashExecutedWithWaterfall(
@@ -112,23 +111,26 @@ contract ResolverSlashingModuleV1 is
     
     // ============ Initialization ============
     
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
-        _disableInitializers();
-    }
-    
-    function initialize(
+    constructor(
         address initialOwner,
-        address _stakingModule
-    ) public initializer {
-        __AccessControl_init();
-        __ReentrancyGuard_init();
-        __UUPSUpgradeable_init();
+        address _stakingModule,
+        address _insurancePoolVault,
+        address _stableToken
+    ) {
+        require(_stakingModule != address(0), "Zero staking module");
+        require(_insurancePoolVault != address(0), "Zero insurance vault");
+        require(_stableToken != address(0), "Zero stable token");
         
+        // OpenZeppelin best practice: Grant DEFAULT_ADMIN_ROLE to deployer
+        // Deployment scripts will transfer this to TimelockController
         _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
-        _grantRole(ROLE_ADMIN, initialOwner);
         
         stakingModule = ResolverStakingModuleV1(_stakingModule);
+        insurancePoolVault = InsurancePoolVault(_insurancePoolVault);
+        stableToken = IERC20(_stableToken);
+        
+        // Note: ROLE_SLASHING_MODULE must be granted by vault admin after initialization
+        // This is done in test setup and deployment scripts
         
         _nextSlashId = 1;
         circuitBreakerActive = false;
@@ -145,8 +147,6 @@ contract ResolverSlashingModuleV1 is
         });
     }
     
-    function _authorizeUpgrade(address newImplementation) internal override onlyRole(ROLE_ADMIN) {}
-    
     // ============ Core Slashing Functions ============
     
     /**
@@ -157,7 +157,7 @@ contract ResolverSlashingModuleV1 is
         address resolver,
         SlashReason reason,
         bytes calldata evidence
-    ) external onlyRole(ROLE_ADMIN) returns (uint256 slashId) {
+    ) external onlyRole(ROLE_TIMELOCK) returns (uint256 slashId) {
         require(!workflowSlashed[workflowId][resolver], "Already slashed for this workflow");
         
         slashId = _nextSlashId++;
@@ -184,7 +184,7 @@ contract ResolverSlashingModuleV1 is
     /**
      * @notice Execute a slash (with waterfall: resolver → senior)
      */
-    function executeSlash(uint256 slashId) external nonReentrant onlyRole(ROLE_ADMIN) {
+    function executeSlash(uint256 slashId) external nonReentrant onlyRole(ROLE_TIMELOCK) {
         SlashEvent storage slashEvent = slashEvents[slashId];
         
         require(slashEvent.status == SlashStatus.PENDING, "Not pending");
@@ -192,6 +192,10 @@ contract ResolverSlashingModuleV1 is
         
         address resolver = slashEvent.resolver;
         uint256 slashAmount = slashEvent.amount;
+        
+        // Reset tracking before slash
+        _currentSlashStableAmount = 0;
+        _currentSlashSewAmount = 0;
         
         // Execute waterfall slash
         (
@@ -212,8 +216,12 @@ contract ResolverSlashingModuleV1 is
         // Freeze resolver
         _freezeResolver(resolver);
         
-        // Distribute slashed funds
-        SlashDistribution memory distribution = _distributeSlashedFunds(totalSlashed, slashEvent.reason);
+        // Distribute slashed funds (using actual token amounts received)
+        SlashDistribution memory distribution = _distributeSlashedFunds(_currentSlashStableAmount, slashEvent.reason, slashEvent.workflowId);
+        
+        // Reset tracking after distribution
+        _currentSlashStableAmount = 0;
+        _currentSlashSewAmount = 0;
         
         emit SlashExecuted(slashId, resolver, totalSlashed, distribution);
         emit SlashExecutedWithWaterfall(slashId, resolver, senior, resolverSlashed, seniorSlashed, totalSlashed);
@@ -252,7 +260,7 @@ contract ResolverSlashingModuleV1 is
     /**
      * @notice Resolve an appeal
      */
-    function resolveAppeal(uint256 slashId, bool upheld) external onlyRole(ROLE_ADMIN) {
+    function resolveAppeal(uint256 slashId, bool upheld) external onlyRole(ROLE_TIMELOCK) {
         SlashAppeal storage appeal = slashAppeals[slashId];
         SlashEvent storage slashEvent = slashEvents[slashId];
         
@@ -343,8 +351,12 @@ contract ResolverSlashingModuleV1 is
         // Freeze resolver
         _freezeResolver(resolver);
         
-        // Distribute slashed funds
-        SlashDistribution memory distribution = _distributeSlashedFunds(totalSlashed, reason);
+        // Distribute slashed funds (using actual token amounts received from staking module)
+        SlashDistribution memory distribution = _distributeSlashedFunds(_currentSlashStableAmount, reason, workflowId);
+        
+        // Reset tracking after distribution
+        _currentSlashStableAmount = 0;
+        _currentSlashSewAmount = 0;
         
         // Update unavailability stats
         _updateUnavailabilityStats(resolver, true);
@@ -514,29 +526,66 @@ contract ResolverSlashingModuleV1 is
         tracker.totalSlashedInPeriod += actualSlash;
     }
     
+    // Track slashed token amounts for distribution
+    uint256 private _currentSlashStableAmount;
+    uint256 private _currentSlashSewAmount;
+    
     /**
-     * @notice Slash resolver's stake (simplified - actual implementation would interact with staking module)
+     * @notice Slash resolver's stake (real implementation)
      */
     function _slashResolverStake(address resolver, uint256 amount) internal {
-        // In production, this would call stakingModule.slash(resolver, amount)
-        // For now, we just emit an event
-        // The actual slashing would reduce the resolver's bond in the staking module
+        if (amount == 0) return;
+        
+        // Call staking module to slash resolver's bond
+        (uint256 stableSlashed, uint256 sewSlashed) = stakingModule.slash(resolver, amount);
+        
+        // Track amounts for distribution
+        _currentSlashStableAmount += stableSlashed;
+        _currentSlashSewAmount += sewSlashed;
     }
     
     /**
-     * @notice Slash senior's coverage (simplified)
+     * @notice Slash senior's coverage (real implementation)
      */
     function _slashSeniorCoverage(address senior, uint256 amount) internal {
-        // In production, this would call stakingModule.slashCoverage(senior, amount)
-        // This reduces the senior's bond by the coverage amount
+        if (amount == 0) return;
+        
+        // Call staking module to slash senior's coverage
+        (uint256 stableSlashed, uint256 sewSlashed) = stakingModule.slashCoverage(senior, amount, address(0));
+        
+        // Track amounts for distribution
+        _currentSlashStableAmount += stableSlashed;
+        _currentSlashSewAmount += sewSlashed;
     }
     
     /**
-     * @notice Find delegation for a resolver (simplified)
+     * @notice Find delegation for a resolver
+     * @dev Accesses the public delegations mapping in staking module
+     *      Uses a low-level call to access the public mapping since it's not in the interface
      */
     function _findDelegation(address resolver) internal view returns (IStakingModule.DelegationInfo memory) {
-        // In production, would query staking module for delegation
-        // For now, return empty delegation
+        // Access the public delegations mapping via low-level call
+        // delegations(junior) returns (address senior, uint256 coverageAmount, uint256 delegatedAt, bool active)
+        (bool success, bytes memory data) = address(stakingModule).staticcall(
+            abi.encodeWithSignature("delegations(address)", resolver)
+        );
+        
+        if (success && data.length >= 128) {
+            // Decode the tuple: (address senior, uint256 coverageAmount, uint256 delegatedAt, bool active)
+            (address senior, uint256 coverageAmount, uint256 delegatedAt, bool active) = 
+                abi.decode(data, (address, uint256, uint256, bool));
+            
+            if (active && senior != address(0)) {
+                return IStakingModule.DelegationInfo({
+                    delegator: resolver,
+                    delegatee: senior,
+                    amount: coverageAmount,
+                    delegatedAt: delegatedAt,
+                    active: true
+                });
+            }
+        }
+        
         return IStakingModule.DelegationInfo({
             delegator: resolver,
             delegatee: address(0),
@@ -551,7 +600,8 @@ contract ResolverSlashingModuleV1 is
      */
     function _distributeSlashedFunds(
         uint256 amount,
-        SlashReason reason
+        SlashReason reason,
+        uint256 workflowId
     ) internal returns (SlashDistribution memory distribution) {
         // Conservative distribution:
         // - 50% to insurance pool (protect users)
@@ -563,8 +613,17 @@ contract ResolverSlashingModuleV1 is
         distribution.toCounterParty = 0; // Not implemented yet
         distribution.toSlashProposer = 0; // Not implemented yet
         
-        // Update insurance pool
-        insurancePoolBalance += distribution.toInsurancePool;
+        // Transfer insurance pool portion to vault (with source tag)
+        if (distribution.toInsurancePool > 0 && address(insurancePoolVault) != address(0)) {
+            // Transfer funds directly to vault (they're already in this contract from staking module)
+            stableToken.safeTransfer(address(insurancePoolVault), distribution.toInsurancePool);
+            
+            // Record the deposit in vault accounting
+            insurancePoolVault.recordDeposit(distribution.toInsurancePool, reason, workflowId);
+        }
+        
+        // TODO: Transfer protocol portion to treasury (when treasury contract exists)
+        // For now, protocol portion remains in this contract
         
         return distribution;
     }
@@ -654,7 +713,10 @@ contract ResolverSlashingModuleV1 is
     }
     
     function getInsurancePoolBalance() external view returns (uint256 balance) {
-        return insurancePoolBalance;
+        if (address(insurancePoolVault) != address(0)) {
+            return insurancePoolVault.getTotalBalance();
+        }
+        return 0;
     }
     
     function isResolverFrozen(address resolver) external view returns (bool frozen, uint256 until) {
@@ -679,17 +741,17 @@ contract ResolverSlashingModuleV1 is
         uint256 workflowId,
         address to,
         uint256 amount
-    ) external onlyRole(ROLE_ADMIN) {
-        require(insurancePoolBalance >= amount, "Insufficient insurance pool");
-        insurancePoolBalance -= amount;
-        emit InsurancePoolPayout(to, amount, workflowId);
+    ) external onlyRole(ROLE_TIMELOCK) {
+        // This function is deprecated - use InsurancePoolVault.proposePayout() instead
+        // Kept for backward compatibility, but should route through vault
+        revert("Use InsurancePoolVault.proposePayout() instead");
     }
     
     // ============ Admin Functions ============
     
     function setSlashPercentage(SlashReason reason, uint256 bps) 
         external 
-        onlyRole(ROLE_ADMIN) 
+        onlyRole(ROLE_TIMELOCK) 
     {
         require(bps <= BASIS_POINTS, "Invalid bps");
         
@@ -711,30 +773,54 @@ contract ResolverSlashingModuleV1 is
     
     function setMaxSlashPerPeriod(uint256 max, uint256 period) 
         external 
-        onlyRole(ROLE_ADMIN) 
+        onlyRole(ROLE_TIMELOCK) 
     {
         slashConfig.maxSlashPerPeriod = max;
         slashConfig.slashPeriod = period;
     }
     
-    function setAppealWindow(uint256 window) external onlyRole(ROLE_ADMIN) {
+    function setAppealWindow(uint256 window) external onlyRole(ROLE_TIMELOCK) {
         slashConfig.appealWindow = window;
     }
     
-    function setAppealBond(uint256 bond) external onlyRole(ROLE_ADMIN) {
+    function setAppealBond(uint256 bond) external onlyRole(ROLE_TIMELOCK) {
         slashConfig.appealBond = bond;
     }
     
     function fundInsurancePool(uint256 amount) external {
-        insurancePoolBalance += amount;
-        emit InsurancePoolFunded(amount, insurancePoolBalance);
+        // This function is deprecated - use InsurancePoolVault.deposit() directly
+        // Kept for backward compatibility
+        if (address(insurancePoolVault) != address(0)) {
+            stableToken.safeTransferFrom(msg.sender, address(this), amount);
+            stableToken.safeTransfer(address(insurancePoolVault), amount);
+            insurancePoolVault.recordDeposit(amount, SlashReason.TIMEOUT_ACCEPT, 0);
+        }
     }
     
-    function triggerCircuitBreaker(string memory reason) external onlyRole(ROLE_ADMIN) {
+    /**
+     * @notice Set insurance pool vault (governance)
+     * @param vault New vault address
+     */
+    function setInsurancePoolVault(address vault) external onlyRole(ROLE_TIMELOCK) {
+        address oldVault = address(insurancePoolVault);
+        insurancePoolVault = InsurancePoolVault(vault);
+        
+        if (vault != address(0)) {
+            // Grant role to this contract
+            InsurancePoolVault(vault).grantRole(InsurancePoolVault(vault).ROLE_SLASHING_MODULE(), address(this));
+        }
+        
+        if (oldVault != address(0)) {
+            // Revoke role from old vault
+            InsurancePoolVault(oldVault).revokeRole(InsurancePoolVault(oldVault).ROLE_SLASHING_MODULE(), address(this));
+        }
+    }
+    
+    function triggerCircuitBreaker(string memory reason) external onlyRole(ROLE_TIMELOCK) {
         _triggerCircuitBreaker(reason);
     }
     
-    function resetCircuitBreaker() external onlyRole(ROLE_ADMIN) {
+    function resetCircuitBreaker() external onlyRole(ROLE_TIMELOCK) {
         require(
             block.timestamp >= lastCircuitBreakerTrigger + CIRCUIT_BREAKER_COOLDOWN,
             "Cooldown not passed"
@@ -743,14 +829,14 @@ contract ResolverSlashingModuleV1 is
         emit CircuitBreakerDeactivated();
     }
     
-    function unfreezeResolver(address resolver) external onlyRole(ROLE_ADMIN) {
+    function unfreezeResolver(address resolver) external onlyRole(ROLE_TIMELOCK) {
         frozenUntil[resolver] = 0;
         emit ResolverUnfrozen(resolver);
     }
     
     function setUnavailabilityStats(uint256 totalResolvers, uint256 unavailableCount) 
         external 
-        onlyRole(ROLE_ADMIN) 
+        onlyRole(ROLE_TIMELOCK) 
     {
         unavailabilityStats.totalResolvers = totalResolvers;
         unavailabilityStats.unavailableCount = unavailableCount;
