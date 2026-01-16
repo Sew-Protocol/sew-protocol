@@ -1,7 +1,7 @@
 # Sew Protocol Whitepaper
 
 **Version:** 1.0  
-**Last Updated:** 2026-01-06  
+**Last Updated:** 2026-01-16  
 **Network:** Base (Ethereum L2)  
 **Status:** Pre-Mainnet
 
@@ -9,17 +9,35 @@
 
 ## Vision & Why
 
-We want to see accelerating consumer adoption of Ethereum for payments. The biggest problem is risk of lost money through errors or fraud. We want to enable that protection in an Ethereum-native way. It's genuinely decentralised, opensource, ethical and human first. No monitoring or unclear terms and conditions. No lock in. We introduce new primitives that augment the already proven account abstraction primitives (and also function independently with legacy EOA).
+We exist to make Ethereum usable for everyday payments.
+The primary blocker is not throughput or UX — it is risk: users cannot safely transact for physical goods without protection against fraud, non-delivery, or mistakes.
 
-Sew Protocol provides the foundational infrastructure to make Ethereum payments safe for everyday purchases, enabling trustless transactions for physical goods while maintaining the decentralized, transparent, and user-controlled principles of Web3.
+Sew introduces Ethereum-native payment protection.
+It provides onchain escrow, resolution, and accountability without custodians, surveillance, or platform control. Users retain custody, contracts enforce outcomes, and disputes are handled by decentralized resolver networks rather than centralized intermediaries.
+
+The protocol adds new primitives for conditional settlement, dispute escalation, and incentive-aligned resolution. These integrate with account abstraction but also work with standard EOAs, making Sew deployable across today’s Ethereum ecosystem.
+
+Sew is open-source, non-custodial, and governance-controlled — designed to protect people, not platforms.
 
 ---
 
 ## Executive Summary
 
-Sew Protocol is a decentralized, trustless escrow system built on Base that enables secure peer-to-peer transactions for everyday purchases with built-in dispute resolution, optional yield generation, and comprehensive onchain governance. The protocol addresses the fundamental trust problem in blockchain transactions by providing a secure, transparent, and flexible escrow mechanism that protects both buyers and sellers while maintaining the decentralized ethos of Web3.
+Sew Protocol is a decentralized escrow and dispute-resolution layer on Base for real-world commerce.
 
-**Primary Use Case**: Safe everyday purchases of physical goods, enabling consumers to use Ethereum for payments with protection against fraud and errors.
+It enables peer-to-peer Ethereum payments for physical goods with:
+
+Trustless settlement: funds lock and release by contract rules
+Trust-minimized dispute resolution: escalation + incentives + accountable resolver tiers
+Optional yield: bounded by caps and pause controls
+Time-delayed governance: upgrades apply to new escrows only (snapshot immutability)
+
+Sew removes the need for marketplaces, chargebacks, or custodians by embedding buyer and seller protection directly into smart contracts. Funds are locked, conditions are enforced, and disputes are resolved by economically incentivized, accountable resolvers.
+
+The result is a payment primitive that makes Ethereum viable for everyday transactions without sacrificing decentralization, self-custody, or transparency.
+
+**Primary Use Case**: Safe everyday purchases of physical goods.
+Sew allows consumers to pay with Ethereum while being protected against fraud, non-delivery, and errors — enabling trustless commerce without intermediaries.
 
 **Key Innovations:**
 
@@ -65,13 +83,24 @@ Sew Protocol provides a **standardized, modular, and governance-controlled** esc
 - Maintains composability with account abstraction and existing DeFi protocols
 - Works with both account abstraction wallets and legacy EOA wallets
 - Evolves transparently through onchain governance
-- No monitoring, no unclear terms, no lock-in - genuinely decentralized and human-first
+- No custodians, no user surveillance, and no platform lock-in — rules are enforced onchain, and upgrades are transparent and time-delayed
 
 ---
 
 ## 2. Protocol Overview
 
-### 2.1 Core Principles
+### 2.1 Non-Goals
+
+To clarify scope and reduce liability-style misreadings, Sew Protocol is explicitly **not**:
+
+- **An oracle of truth**: Does not verify off-chain facts or authenticate goods/services
+- **A shipping provider**: Does not track packages or coordinate delivery
+- **An identity/KYC system**: Does not verify identities or perform Know Your Customer checks
+- **Consumer law enforcement**: Does not enforce legal regulations or replace legal recourse
+
+Sew is a **payment and dispute resolution primitive** that provides escrow functionality and cryptoeconomic dispute resolution. Off-chain verification, shipping, identity, and legal compliance remain the responsibility of users or integrated services.
+
+### 2.2 Core Principles
 
 The protocol is built on four fundamental principles:
 
@@ -179,16 +208,150 @@ A simple, single-resolver resolution module:
 - **Governance-Controlled**: Resolver updates require governance approval
 - **Use Case**: Simple disputes that don't need escalation
 
-#### DecentralizedResolutionModule (Future Swap-In)
+#### DecentralizedResolutionModule (Staged Rollout: DR v1 → v2 → v3)
 
-An advanced decentralized resolution system (in separate package, **not included in initial mainnet release**. When ready, will be deployed and swapped in via Slow lane governance - queue + activate via Timelock, ~9 days):
+An advanced decentralized resolution system implementing a **staged rollout approach** following the principle: **"Decentralise decisions first, decentralise incentives second, decentralise capital last."** This minimizes risk by introducing adversarial pressure gradually, only after each phase proves stable.
 
-- **Resolver Registry**: Standard and senior resolvers
-- **Round-Robin Selection**: Fair distribution of disputes
-- **Governance**: Uses same pattern as other modules - deploy new version and swap via Slow lane (queue + activate via Timelock, ~9 days total)
-- **Three-Level Escalation**: Standard → Senior → External
-- **Category-Based Assignment**: Dynamic resolution table
-- **Resolver Incentives**: Automatic payment distribution
+**Location**: Separate package (`contracts/decentralized-resolution-module/`)  
+**Status**: DR v1 ✅ Complete, DR v2 ✅ Complete, DR v3 🚧 Phase 1 Complete  
+**Not included in initial mainnet release** - will be deployed and swapped in via Slow lane governance (~9 days total: queue 48h + 7 days + activate 48h)
+
+**Staged Rollout Strategy:**
+
+| Phase | Status | What's Decentralized | What's Centralized | Risk Mitigation |
+|-------|--------|---------------------|-------------------|----------------|
+| **IEO** | ✅ Ready | Governance only | Dispute resolution | Minimal surface area |
+| **DR v1** | ✅ Complete | Decision-making | Incentives, capital | No resolver capital at risk |
+| **DR v2** | ✅ Complete | Decisions, incentives | Capital | Users post bonds (not resolvers) |
+| **DR v3** | 🚧 Phase 1 | Decisions, incentives, capital | Nothing | Resolver capital at risk (future) |
+
+**DR v1: Decentralize Decisions** ✅
+
+**Status**: ✅ Complete and Production-Ready (47 tests passing)
+
+**What's Decentralized:**
+- ✅ Multiple independent resolvers (curated set)
+- ✅ Round-robin selection from resolver pool
+- ✅ Three-level escalation: Standard → Senior → External (Kleros)
+- ✅ Category-based dispute routing
+- ✅ Performance-based workload routing (EMA scoring)
+
+**What's Centralized:**
+- ❌ Incentives (optional fee share, no capital at risk)
+- ❌ Capital (no resolver staking/slashing)
+
+**Key Features:**
+- Round-based dispute flow (k=0 resolver, k=1 senior, k=2 Kleros)
+- EMA-based reputation scoring (0-1e6 fixed-point)
+- Workload routing (performance determines assignment eligibility)
+- Timeout handling with auto-reassignment
+- Phase gate metrics (`getV1PhaseGateMetrics()`)
+
+**Risk Mitigation:**
+- **No Resolver Capital at Risk**: Resolvers cannot lose money (no staking/slashing)
+- **Soft Incentives**: Workload-to-zero (low performers gated out) rather than capital loss
+- **Mechanical Enforcement**: Timeout handling is automatic, not governance-dependent
+- **Gradual Decentralization**: Multiple resolvers with fair distribution
+
+**Phase Gate (DR v1 → DR v2):**
+- ✅ Stable escalation rate (<20%) over N weeks
+- ✅ Predictable response times (<3 days avg)
+- ✅ Multiple operational resolvers (≥3 active)
+- ✅ No evidence of systematic griefing
+- ✅ Incident runbooks tested
+
+**DR v2: Decentralize Incentives** ✅
+
+**Status**: ✅ Complete and Production-Ready (36 tests passing)
+
+**What's Decentralized:**
+- ✅ Decision-making (from DR v1)
+- ✅ Incentives (appeal bonds, cost curves)
+- ✅ Economic friction (increasing escalation costs)
+
+**What's Centralized:**
+- ❌ Capital (no resolver staking/slashing)
+
+**Key Features:**
+- **Appeal bonds** (users post bonds to escalate disputes)
+- **Escalation cost curves** (linear, quadratic, geometric - quadratic recommended)
+- **Bond refund** on successful appeal (decision changes)
+- **Bond payment** to resolvers on failed appeal (decision upheld)
+- **Anti-griefing measures** (minimum escrow value for escalation)
+- **Observability metrics** (bonds posted/refunded/forfeited)
+
+**Economics:**
+
+Every escalation requires the appealing party to post an appeal bond. If escalation succeeds (outcome reversed), the bond is refunded to the escalator. If escalation fails (outcome upheld), the bond is paid to the prior resolver set. **No protocol fee is charged in DR v2 unless explicitly enabled in a later module version.** Any processing fee or protocol share (if enabled in future versions) is a bounded parameter controlled by governance and applies only to new escrows due to snapshot immutability.
+
+- **Quadratic Cost Curve** (recommended): `bond(k) = baseCost + stepSize × k²`
+  - Round 0→1: base cost (e.g., 100 tokens) - "painful but possible"
+  - Round 1→2: base + step (e.g., 150 tokens) - increasing cost
+  - Round 2→3: base + 4×step (e.g., 300 tokens) - "almost never rational"
+- **Incentive Alignment**: Resolvers earn bonds when appeals fail (decision upheld), creating strong incentive for correct decisions
+- **Spam Prevention**: Increasing costs and lockup time make frivolous appeals financially irrational
+
+**Attack Vectors Designed Against:**
+
+1. **Griefing (blocking funds / wasting time)**: Increasing appeal bond curve (quadratic/geometric), appeal deadlines (time-boxed windows), max escalation depth, delay scaling (deep escalation takes longer and costs more), bond forfeiture on no-show
+
+2. **Appeal spam (cheap harassment of resolvers)**: Escalator bond paid to resolver if appeal fails, minimum escrow size gating for multi-appeals, reputation-weighted routing (spam goes to hardened resolvers)
+
+3. **Bribe-farming**: Can't profit by forcing repeated appeals unless outcomes flip—harder with random assignment and multi-resolver rounds. Increasing costs reduce attack throughput
+
+4. **Governance capture**: If appeals are cheap, attackers can generate massive dispute volume and pressure governance; expensive appeals reduce attack throughput
+
+**Risk Mitigation:**
+- **No Resolver Capital at Risk**: Resolvers still cannot lose money
+- **User Bonds Only**: Users post bonds to escalate (not resolvers)
+- **Economic Friction**: Increasing costs prevent griefing and strategic escalation
+- **Refund Mechanism**: Successful appeals return bonds to users (protects legitimate disputes)
+- **Resolver Incentives**: Failed appeals pay bonds to resolvers (incentivizes correct decisions)
+
+**Phase Gate (DR v2 → DR v3):**
+- ✅ Appeal spam economically suppressed (cost > benefit)
+- ✅ No viable "cheap griefing" strategy
+- ✅ Clear evidence bonds reduce low-quality escalations
+- ✅ Stable appeal economics (20-40% reversal rate)
+- ✅ Bond flows predictable
+
+**DR v3: Decentralize Capital** 🚧
+
+**Status**: 🚧 Phase 1 Complete (Interfaces + No-Ops), Full Implementation Pending
+
+**What's Decentralized (Target):**
+- ✅ Decision-making (from DR v1)
+- ✅ Incentives (from DR v2)
+- 🚧 Capital (resolver staking/slashing - Phase 2-7 pending)
+
+**Key Features (Planned):**
+- Resolver staking (resolvers post bonds to participate)
+- Slashing (objective penalties for timeouts, provable non-response)
+- Senior backing (delegation/underwriting for new resolvers)
+- Fraud lane (investigation + execution path)
+- Insurance pool (economic safety net)
+
+**Risk Mitigation (Planned):**
+- **Resolver Capital at Risk**: Resolvers stake capital, creating strong incentive alignment
+- **Objective Slashing**: Only contract-executed penalties (timeouts, provable non-response)
+- **Gradual Introduction**: Only after DR v1/v2 behavior is known
+- **Economic Safety**: Insurance pool and circuit breakers
+
+**Phase Gate (DR v3 → Mainnet):**
+- ⏸️ Staking participation >80% of resolvers
+- ⏸️ Slashing rate <5% per month
+- ⏸️ Insurance pool solvent
+- ⏸️ Security audit complete
+
+**Why This Staged Approach Mitigates Risk:**
+
+The dangerous part of dispute resolution is not who makes the decision—it's **what happens financially when someone is wrong**. By staging the rollout:
+
+1. **DR v1** proves decision-making stability without financial adversarial pressure
+2. **DR v2** introduces economic friction for users (bonds) while keeping resolvers risk-free
+3. **DR v3** introduces resolver capital at risk only after we understand system behavior
+
+This approach enables **adversarial learning** (observing real attacks on mainnet) without catastrophic loss, reaching confidence faster than trying to predict all attack vectors upfront.
 
 ### 3.3 Yield Generation
 
@@ -231,12 +394,15 @@ The protocol supports escrowing **any ERC20 token**:
 
 ### 4.2 Dispute Resolution
 
-Built-in dispute resolution with multiple options:
+Built-in dispute resolution with **staged decentralization** approach. The protocol uses a staged rollout following the principle: "Decentralise decisions first, decentralise incentives second, decentralise capital last." This minimizes risk by introducing adversarial pressure gradually, only after each phase proves stable.
 
-- **Simple Resolution**: Single resolver for straightforward disputes
-- **Advanced Resolution**: Multi-resolver system with escalation (future)
-- **Escalation Paths**: Standard → Senior → External resolver
-- **Fair Selection**: Round-robin resolver assignment
+The current implementation supports:
+- **Initial Deployment (IEO)**: Simple single-resolver system (`DefaultResolutionModule`)
+- **DR v1**: Decentralize decisions (multiple resolvers, workload routing, EMA scoring) ✅
+- **DR v2**: Decentralize incentives (appeal bonds, cost curves, anti-griefing measures) ✅
+- **DR v3**: Decentralize capital (resolver staking, slashing, fraud lane) 🚧
+
+See Section 3.2 for detailed staging information, phase gates, attack vectors, and risk mitigation strategies.
 
 ### 4.3 Optional Yield Generation
 
@@ -246,6 +412,7 @@ Escrowed funds can generate yield via Aave:
 - **Protected**: Exposure caps and pause mechanisms
 - **Transparent**: All yield operations are onchain
 - **Distributable**: Yield can be distributed to recipients
+- **Important**: Yield is optional per-escrow; if disabled or paused, escrow settlement continues without yield. Yield integration does not change the escrow state machine and is designed to be unwindable under pause controls and caps
 
 ### 4.4 Automated Settlements
 
@@ -364,18 +531,18 @@ Sew Protocol is designed with the following security goals:
 - **Aave Integration**: Protected by exposure caps and pause mechanisms
 - **Cap Enforcement**: Deposits enforce `exposure[token] + amount <= cap[token]`
 - **Guardian Controls**: Guardian can disable Aave or lower caps immediately
-- **No Direct Fund Risk**: External protocol failures don't result in direct fund loss
+- **Bounded exposure caps**: External protocol failures are bounded by exposure caps and can be mitigated via pause/withdrawal procedures; residual risk remains within the capped exposure.
 
 ### 6.3 Trust Model
 
 #### What Users Must Trust
 
-1. **Token Contracts**: ERC20 tokens behave as specified (standard ERC20 required)
-2. **Chain Liveness**: Base mainnet remains operational and accessible
-3. **Block Timestamps**: `block.timestamp` is reasonably accurate for auto-settlement
-4. **External Protocols**: If yield enabled, Aave protocol functions correctly
-5. **Governance Process**: Token holders vote honestly and timelock executes correctly
-6. **Resolver Honesty**: Dispute resolution relies on resolver behavior (mitigated by escalation and incentives)
+1. **Token contracts**: ERC20 tokens behave as specified (standard ERC20 required)
+2. **Chain liveness**: Base mainnet remains operational and accessible
+3. **Block timestamps**: `block.timestamp` is reasonably accurate for auto-settlement
+4. **External protocols**: If yield enabled, Aave protocol functions correctly
+5. **Governance process**: Token holders vote honestly and timelock executes correctly
+6. **Resolver behaviour**: Disputes rely on human judgment; the protocol mitigates this via escalation, economic friction (appeal bonds), objective timeouts, performance gating, and (in later phases) staking/slashing
 
 #### What Users Do NOT Need to Trust
 
@@ -383,7 +550,7 @@ Sew Protocol is designed with the following security goals:
 2. **Governance**: Cannot change rules of existing escrows. Can only affect new escrows
 3. **Guardian**: Cannot steal funds, unpause without timelock, or increase risk. Powers are strictly down-only
 4. **Deployer**: All deployer roles are revoked after deployment
-5. **Future Code Changes**: Core contracts are non-upgradeable. Module upgrades are time-delayed and transparent
+5. **Future code changes**: Core contracts are non-upgradeable. Module upgrades are time-delayed and transparent
 
 ### 6.4 Security Measures
 
@@ -398,7 +565,6 @@ Sew Protocol is designed with the following security goals:
 
 - **Emergency Procedures**: Clear runbooks for emergency situations
 - **Guardian Multisig**: Hardware wallet-based multisig for emergency controls
-- **Monitoring**: Onchain monitoring for suspicious activity
 - **Incident Response**: Documented procedures for security incidents
 
 #### Audit & Verification
@@ -539,6 +705,8 @@ Sew Protocol provides the following security guarantees:
 
 ## 9. Roadmap
 
+All timeline targets are conditional on audits, drills, and meeting phase-gate metrics under real usage.
+
 ### Phase 1: Initial Mainnet Deployment
 
 **Goal**: Launch Sew Protocol on Base mainnet with core escrow functionality
@@ -575,7 +743,7 @@ Sew Protocol provides the following security guarantees:
 
 **Status**: Module extracted, testing in progress
 
-**Timeline**: Q2-Q3 2026 (target)
+**Timeline**: Q2-Q3 2026 (target, subject to audits and phase gates)
 
 ---
 
@@ -627,21 +795,34 @@ Sew Protocol provides the following security guarantees:
 - **Protocol Share**: 30% of generated yield goes to protocol treasury
 - **User Share**: 70% of generated yield distributed to escrow participants (buyer/seller) based on escrow configuration
 
-#### Dispute Resolution Fees (After DecentralizedResolutionModule Launch)
+#### Dispute Resolution Economics (DR v1 / DR v2 / DR v3)
 
-**Escalation Fees**:
+**DR v1: Workload-Based Incentives** ✅
 
-- **Level 1 Escalation** (Standard → Senior): Fee set by governance
-- **Level 2 Escalation** (Senior → External): Fee set by governance
-- **Fee Distribution**:
-  - 50% to resolver network (incentives for resolvers)
-  - 50% to protocol treasury
+- **Incentive Mechanism**: Workload routing (performance determines assignment)
+- **Payment Distribution**: Fee sharing optional (no capital at risk)
+- **Resolver Rewards**: Based on workload eligibility (EMA score threshold)
+- **No Appeal Fees**: Escalation does not require fees (bonds introduced in DR v2)
 
-**Resolver Incentives**:
+**DR v2: Appeal Bonds** ✅
 
-- Resolvers receive 50% of escalation fees as incentives
-- Payment distribution based on resolver activity and quality metrics
-- Automatic distribution via ResolverIncentiveModule
+- **Appeal Bonds**: Users post bonds to escalate (replaces fees entirely)
+  - Round 0→1: Base cost (e.g., 100 tokens)
+  - Round 1→2: Base + step × k² (e.g., 150 tokens with quadratic curve)
+- **Bond Distribution**:
+  - **Successful Appeal** (decision changes): Bond refunded to user (minus small processing fee if enabled)
+  - **Failed Appeal** (decision upheld): Bond paid to prior round's resolvers (and protocol share if enabled)
+- **Fee Parameters**: Any processing fee or protocol share is a bounded parameter controlled by governance and applies only to new escrows due to snapshot immutability
+- **Resolver Incentives**: Resolvers earn bonds when appeals fail (incentivizes correct decisions)
+- **Economic Friction**: Increasing costs prevent griefing and strategic escalation
+
+**DR v3: Resolver Staking** 🚧 (Planned)
+
+- **Resolver Staking**: Resolvers post bonds to participate
+- **Slashing**: Objective penalties for timeouts, provable non-response
+- **Bond Distribution**: Appeal bonds + slashing penalties
+- **Insurance Pool**: Economic safety net for slashing events
+- **Senior Backing**: Delegation/underwriting for new resolvers
 
 ### 10.2 Governance Token (SEW)
 
@@ -668,9 +849,9 @@ Sew Protocol provides the following security guarantees:
 
 **Protocol Revenue**:
 
-1. **Escrow Fees**: 1% of all escrow amounts
-2. **Yield Share**: 30% of generated yield (when yield enabled)
-3. **Escalation Fees**: 50% of escalation fees (after DecentralizedResolutionModule launch)
+1. **Escrow fees**: 1% of all escrow amounts
+2. **Yield share**: 30% of generated yield (when yield enabled)
+3. **Appeal bonds**: Protocol share from failed appeal bonds (only if explicitly enabled in a module version after DR v2; DR v2 charges no protocol fee)
 
 **Revenue Use**:
 
@@ -739,7 +920,7 @@ Sew Protocol provides a secure, transparent, and flexible solution to the trust 
 5. **Comprehensive Security**: Multiple layers of security and emergency controls
 6. **User-Centric Design**: Focus on protecting both buyers and sellers in everyday purchases
 7. **Account Abstraction Compatible**: Works with smart contract wallets and legacy EOAs
-8. **Genuinely Decentralized**: No monitoring, no unclear terms, no lock-in - ethical and human-first
+8. **Genuinely Decentralized**: No custodians, no user surveillance, and no platform lock-in — rules are enforced onchain, and upgrades are transparent and time-delayed
 
 **Vision**: Sew Protocol is designed to accelerate consumer adoption of Ethereum for payments by solving the fundamental problem of lost money through errors or fraud. We introduce new primitives that augment account abstraction, enabling safe, trustless transactions for physical goods while maintaining the decentralized, transparent, and user-controlled principles of Web3.
 
@@ -798,11 +979,9 @@ _To be filled after mainnet deployment_
 
 ---
 
-**Document Version**: 1.0  
-**Last Updated**: 2026-01-06  
-**Status**: Pre-Mainnet  
-**Next Review**: After mainnet deployment
+
 
 ---
+
 
 _This whitepaper is a living document and will be updated as the protocol evolves._

@@ -541,6 +541,9 @@ contract DRv2FuzzTest is Test {
         uint256 expectedPaid = 0;
         uint256 expectedForfeited = 0;
 
+        // Create a mock resolver for payments
+        address mockResolver = address(0x1000);
+        
         for (uint256 i = 0; i < numOperations; i++) {
             uint256 opType = uint256(keccak256(abi.encodePacked(seed, i))) % 3;
             uint256 workflowId = i + 1;
@@ -552,6 +555,12 @@ contract DRv2FuzzTest is Test {
             vm.prank(escrowContract);
             incentiveModuleV2.recordAppealBond(workflowId, depositor, amount, address(token), 1);
             expectedPosted += amount;
+            
+            // For payment operations, record a resolver so the bond can be paid
+            if (opType == 1) {
+                vm.prank(escrowContract);
+                incentiveModuleV2.recordResolver(workflowId, mockResolver, 0); // Record resolver at round 0
+            }
 
             // Distribute based on operation type
             if (opType == 0) {

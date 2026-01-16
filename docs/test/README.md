@@ -40,6 +40,8 @@ The protocol uses a **hybrid testing approach** with both Hardhat (TypeScript) a
 
 - **[FIX_INCENTIVE_MODULE_TESTS_PROMPT.md](./FIX_INCENTIVE_MODULE_TESTS_PROMPT.md)** - Prompt for fixing incentive module tests
 - **[INCENTIVE_MODULE_TEST_PLAN.md](./INCENTIVE_MODULE_TEST_PLAN.md)** - Test plan for incentive module
+- **[ESCALATION_DEPTH_HISTOGRAM_REVIEW.md](./ESCALATION_DEPTH_HISTOGRAM_REVIEW.md)** - Review and test strategy for escalation depth histogram
+- **[ESCALATION_DEPTH_HISTOGRAM_TEST_IMPLEMENTATION.md](./ESCALATION_DEPTH_HISTOGRAM_TEST_IMPLEMENTATION.md)** - Implementation summary for histogram tests
 
 ### Production Testing
 

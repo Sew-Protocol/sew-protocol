@@ -30,7 +30,10 @@ Comprehensive test suite for `escalationDepthHistogram` has been created with un
 - ✅ Edge cases (ERC20 tokens, max workflow ID, many bonds, failed recordings)
 
 **Helper Functions:**
-- `_recordBond()` - Helper function to record bonds (ETH or ERC20)
+- `_recordBond(workflowId, depositorAddr, amount, tokenAddr, round)` - Helper function to record bonds (ETH or ERC20)
+  - Automatically funds escrow contract with ETH if needed
+  - Handles both ETH (address(0)) and ERC20 token bonds
+  - Reduces code duplication across tests
 
 ### 2. Integration Tests
 **File:** `test/foundry/decentralized-resolution-module/EscalationDepthHistogram.integration.t.sol`
@@ -48,6 +51,14 @@ Comprehensive test suite for `escalationDepthHistogram` has been created with un
 - Full integration with EscrowVault, DecentralizedResolutionModule
 - Real escalation flow simulation
 - Bond count verification
+- Proper role management (timelock, resolver setup)
+- Escalation cost config activation (required for bonds)
+
+**Test Setup Improvements:**
+- Proper role grants (timelock roles for both resolution and incentive modules)
+- Correct resolver appointment flow (timelock → seniorResolver → resolvers)
+- Resolver activation and capacity setup
+- Escalation cost config properly activated with timelock delay
 
 ### 3. Invariant Tests
 **File:** `test/foundry/decentralized-resolution-module/EscalationDepthHistogram.invariants.t.sol`
@@ -180,14 +191,27 @@ forge test --match-path "*EscalationDepthHistogram*" -vv
 
 ### Test Setup
 - All tests use consistent setup pattern
-- Proper role management (timelock, escrow contract registration)
-- Escalation cost config activation (required for bonds)
+- Proper role management:
+  - Timelock roles granted to both `deployer` and `timelock` address
+  - Escrow contract registration via timelock
+  - Resolver appointment flow (timelock → seniorResolver → resolvers)
+  - Resolver activation and capacity configuration
+- Escalation cost config activation (required for bonds):
+  - Config queued via timelock
+  - 7-day delay bypassed for tests using `vm.warp()`
+  - Config activated before test execution
+- Contract funding:
+  - `vm.deal()` used to fund escrow contract with ETH before bond operations
+  - ERC20 tokens transferred to incentive module before recording
 
 ### Best Practices
-- Descriptive test names
-- Clear assertions with messages
-- Proper state verification
-- Edge case coverage
+- Descriptive test names following `test_<what>_<expected>` pattern
+- Clear assertions with descriptive messages
+- Proper state verification before and after operations
+- Edge case coverage (invalid inputs, boundaries, failures)
+- Specific revert message checks (e.g., `vm.expectRevert("Invalid round")`)
+- Helper functions to reduce code duplication
+- Proper funding of contracts before operations (`vm.deal()` for ETH)
 
 ---
 
@@ -220,4 +244,27 @@ forge test --match-path "*EscalationDepthHistogram*" -vv
 
 ---
 
-**Implementation Complete:** 2026-01-09
+**Implementation Complete:** 2026-01-09  
+**Last Updated:** 2026-01-09 (improvements applied)
+
+---
+
+## Recent Improvements Summary
+
+### Code Quality Enhancements
+- ✅ Consistent use of `_recordBond()` helper function reduces code duplication
+- ✅ Specific revert message checks improve test clarity and debugging
+- ✅ Proper contract funding (`vm.deal()`) ensures tests work correctly
+- ✅ Better error message specificity for easier debugging
+
+### Integration Test Improvements
+- ✅ Proper role management (both deployer and timelock have necessary roles)
+- ✅ Correct resolver appointment flow (timelock → seniorResolver → resolvers)
+- ✅ Resolver activation and capacity configuration
+- ✅ Escalation cost config properly activated with timelock delay bypass
+
+### Test Coverage
+- ✅ All edge cases covered
+- ✅ Proper state verification before and after operations
+- ✅ Comprehensive error handling tests
+- ✅ Fuzz testing for random inputs

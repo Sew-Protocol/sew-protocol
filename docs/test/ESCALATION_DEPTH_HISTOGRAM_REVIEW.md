@@ -1,8 +1,9 @@
 # Escalation Depth Histogram Review & Test Strategy
 
 **Date:** 2026-01-09  
+**Last Updated:** 2026-01-09  
 **Component:** `ResolverIncentiveModuleV2.escalationDepthHistogram`  
-**Status:** Review Complete - Test Strategy Required
+**Status:** ✅ Complete - All Tests Implemented and Compiling
 
 ---
 
@@ -105,6 +106,12 @@ function getEscalationDepthHistogram()
 
 **Purpose:** Test histogram updates in isolation, independent of full escalation flow
 
+**Helper Function:**
+- `_recordBond(workflowId, depositorAddr, amount, tokenAddr, round)` - Unified helper for recording bonds
+  - Handles both ETH and ERC20 tokens
+  - Automatically funds escrow contract with ETH if needed
+  - Reduces code duplication
+
 **Test Cases:**
 
 1. **`test_histogramIncrementOnRecordBond_Round1`**
@@ -144,25 +151,25 @@ function getEscalationDepthHistogram()
      - `escalationDepthHistogram[0] == 0`
 
 5. **`test_histogramNeverIncrementsRound0`**
-   - Setup: Attempt to record bond at round=0
+   - Setup: Fund escrow contract with ETH, attempt to record bond at round=0
    - Action: Call `recordAppealBond()` with round=0
-   - Verify: Transaction reverts (round must be > 0)
+   - Verify: Transaction reverts with `"Invalid round"` message (round must be > 0)
    - Verify: `escalationDepthHistogram[0]` remains 0
 
 6. **`test_histogramRound3Rejected`**
-   - Setup: Attempt to record bond at round=3
+   - Setup: Fund escrow contract with ETH, attempt to record bond at round=3
    - Action: Call `recordAppealBond()` with round=3
-   - Verify: Transaction reverts (round must be <= 2)
+   - Verify: Transaction reverts with `"Invalid round"` message (round must be <= 2)
    - Verify: Histogram unchanged
 
 7. **`test_histogramPersistsAcrossDistributions`**
-   - Setup: Record bond, then distribute it
+   - Setup: Fund escrow contract with ETH, record bond, then distribute it
    - Action:
-     - Record bond at round=1
+     - Record bond at round=1 using `_recordBond()` helper
      - Verify histogram[1] == 1
-     - Distribute bond (refund)
+     - Distribute bond (refund via `distributeAppealBond()`)
      - Verify histogram[1] == 1 (unchanged - histogram is cumulative)
-   - Verify: Histogram never decreases
+   - Verify: Histogram never decreases after distribution
 
 8. **`test_histogramGetterReturnsCorrectValues`**
    - Setup: Record bonds at various rounds
@@ -177,6 +184,21 @@ function getEscalationDepthHistogram()
 #### Test File: `test/foundry/decentralized-resolution-module/EscalationDepthHistogram.integration.t.sol`
 
 **Purpose:** Test histogram updates during actual dispute escalation flows
+
+**Test Setup Details:**
+- **Role Management:**
+  - Timelock roles granted to both `deployer` and `timelock` address
+  - Allows both addresses to queue/activate configurations
+  - Escrow contract registration via timelock
+- **Resolver Setup:**
+  - Timelock appoints seniorResolver first
+  - SeniorResolver then appoints regular resolvers
+  - Resolvers activated and capacity configured via timelock
+- **Escalation Cost Config:**
+  - Config queued via timelock
+  - 7-day delay (`SLOW_DELAY`) bypassed using `vm.warp(block.timestamp + 7 days + 1)`
+  - Config activated before test execution
+  - Required for bonds to be recorded
 
 **Test Cases:**
 
@@ -337,28 +359,34 @@ function getEscalationDepthHistogram()
 - ✅ Simple, clear increment logic
 - ✅ Efficient storage (single mapping)
 - ✅ Public getter for observability
+- ✅ Monotonicity guaranteed (only increments, never decrements)
+- ✅ Round validation in `recordAppealBond()` (rounds 1-2 only)
 
 ### Potential Enhancements
 1. **Add Events:**
    ```solidity
    event EscalationDepthHistogramUpdated(uint8 round, uint256 newCount);
    ```
-   Emit when histogram is incremented for better observability
+   Emit when histogram is incremented for better observability and indexing
 
 2. **Add Reset Function (Emergency Only):**
    ```solidity
    function resetEscalationDepthHistogram() external onlyRole(ROLE_TIMELOCK);
    ```
-   For emergency situations (requires governance)
+   For emergency situations (requires governance). Note: Should only be used in extreme cases.
 
 3. **Add Time-Series Tracking:**
    - Track histogram per time period (e.g., per week)
-   - Would require new storage structure
-   - Useful for analytics but may be overkill
+   - Would require new storage structure (e.g., `mapping(uint256 => mapping(uint8 => uint256))`)
+   - Useful for analytics but may be overkill for current needs
 
 4. **Add Round 0 Validation:**
    - Explicit check in getter that round 0 is always 0
-   - Could help catch bugs earlier
+   - Could help catch bugs earlier, though current tests already verify this
+
+5. **Add Histogram Bounds Check:**
+   - Verify histogram values don't exceed reasonable bounds (e.g., < type(uint256).max / 2)
+   - Prevent potential overflow issues (though unlikely with current usage)
 
 ---
 
@@ -367,14 +395,43 @@ function getEscalationDepthHistogram()
 The `escalationDepthHistogram` implementation is **simple and correct**, but needs **comprehensive test coverage**. The existing invariant test provides basic coverage, but unit tests and edge case tests are missing.
 
 **Recommended Next Steps:**
-1. Implement unit tests for histogram increments (Priority 1)
-2. Add integration tests for escalation flows (Priority 1)
-3. Enhance invariant tests with fuzzing (Priority 2)
-4. Add edge case tests (Priority 2)
-5. Consider adding events for better observability (Priority 3)
+1. ✅ Implement unit tests for histogram increments (Priority 1) - **COMPLETE**
+2. ✅ Add integration tests for escalation flows (Priority 1) - **COMPLETE**
+3. ✅ Enhance invariant tests with fuzzing (Priority 2) - **COMPLETE**
+4. ✅ Add edge case tests (Priority 2) - **COMPLETE**
+5. ⚪ Consider adding events for better observability (Priority 3) - **OPTIONAL**
+
+---
+
+## Test Implementation Status
+
+**All test suites implemented and compiling:**
+
+✅ **Unit Tests** - 14 test cases  
+✅ **Integration Tests** - 5 test cases  
+✅ **Invariant Tests** - 8 test cases (3 invariants + 5 fuzz)  
+✅ **Enhanced Invariants** - 1 additional invariant in DRv2Invariants.t.sol
+
+**Total:** 27+ comprehensive test cases
+
+### Recent Improvements Applied
+
+✅ **Code Quality:**
+- Consistent use of `_recordBond()` helper function throughout tests
+- Specific revert message checks (`vm.expectRevert("Invalid round")`)
+- Proper contract funding before operations (`vm.deal()` for ETH)
+- Better error message specificity for debugging
+
+✅ **Integration Test Setup:**
+- Proper role management (both deployer and timelock have roles)
+- Correct resolver appointment flow (timelock → seniorResolver → resolvers)
+- Resolver activation and capacity configuration
+- Escalation cost config properly activated with timelock delay
 
 ---
 
 **Review Status:** ✅ Complete  
 **Test Strategy Status:** ✅ Complete  
-**Implementation Priority:** High
+**Implementation Status:** ✅ Complete  
+**Test Files:** ✅ All compiling successfully  
+**Code Quality:** ✅ Improved with helper functions and better practices

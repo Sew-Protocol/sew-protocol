@@ -66,12 +66,14 @@ contract EscalationDepthHistogramIntegrationTest is Test {
         // Setup roles - deployer has DEFAULT_ADMIN_ROLE from constructors
         bytes32 ROLE_TIMELOCK = resolutionModule.ROLE_TIMELOCK();
         bytes32 INCENTIVE_ROLE_TIMELOCK = incentiveModule.ROLE_TIMELOCK();
+        bytes32 ESCROW_ROLE_TIMELOCK = escrow.ROLE_TIMELOCK();
         
         vm.startPrank(deployer);
         resolutionModule.grantRole(ROLE_TIMELOCK, timelock);
         resolutionModule.grantRole(ROLE_TIMELOCK, deployer);
         incentiveModule.grantRole(INCENTIVE_ROLE_TIMELOCK, timelock);
         incentiveModule.grantRole(INCENTIVE_ROLE_TIMELOCK, deployer);
+        escrow.grantRole(ESCROW_ROLE_TIMELOCK, deployer);
         vm.stopPrank();
 
         // Register contracts
@@ -79,6 +81,13 @@ contract EscalationDepthHistogramIntegrationTest is Test {
         resolutionModule.registerEscrowContract(address(escrow));
         incentiveModule.registerEscrowContract(address(escrow));
         resolutionModule.setIncentiveModule(address(incentiveModule));
+        vm.stopPrank();
+        
+        // Configure resolution module in escrow (required for dispute operations)
+        vm.startPrank(deployer);
+        escrow.queueResolutionModule(address(resolutionModule));
+        vm.warp(block.timestamp + 7 days + 1);
+        escrow.activateResolutionModule();
         vm.stopPrank();
 
         // Setup resolvers - first appoint seniorResolver via timelock, then it can appoint others
@@ -109,7 +118,14 @@ contract EscalationDepthHistogramIntegrationTest is Test {
 
         vm.startPrank(timelock);
         resolutionModule.queueEscalationCostConfig(costConfig);
-        vm.warp(block.timestamp + 7 days + 1); // Fast forward past timelock
+        vm.stopPrank();
+        
+        // Get the ETA and warp past it
+        (, uint64 eta, bool exists) = resolutionModule.getPendingEscalationCostConfig();
+        require(exists, "Config should be queued");
+        vm.warp(eta + 1);
+        
+        vm.startPrank(timelock);
         resolutionModule.activateEscalationCostConfig();
         vm.stopPrank();
     }
