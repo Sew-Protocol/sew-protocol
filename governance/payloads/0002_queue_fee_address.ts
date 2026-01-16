@@ -9,6 +9,7 @@
 
 import { PayloadBuilder } from '../../scripts/gov/types';
 import { getDeployedAddress } from '../../scripts/gov/addresses';
+import { validateAddress, isZeroAddress, ZERO_ADDRESS } from '../../scripts/_lib/addresses';
 
 export const metadata = {
   id: '0002_queue_fee_address',
@@ -36,12 +37,12 @@ const buildPayload: PayloadBuilder = async (hre, config) => {
   const targetContractName = config?.targetContract || metadata.config.targetContract;
   const contractAddress = await getDeployedAddress(hre, targetContractName, true);
 
-  const newFeeAddress = config?.newFeeAddress || metadata.config.newFeeAddress;
+  const newFeeAddressRaw = config?.newFeeAddress || metadata.config.newFeeAddress;
 
   // Allow placeholder for offline proposal building
   if (
-    newFeeAddress === '0x0000000000000000000000000000000000000000' &&
-    !newFeeAddress.startsWith('0xPLACEHOLDER_')
+    isZeroAddress(newFeeAddressRaw) &&
+    !newFeeAddressRaw.startsWith('0xPLACEHOLDER_')
   ) {
     // Use placeholder if not set
     const placeholderAddress = '0xPLACEHOLDER_NEW_FEE_ADDRESS';
@@ -58,6 +59,9 @@ const buildPayload: PayloadBuilder = async (hre, config) => {
       },
     ];
   }
+
+  // Validate and normalize address
+  const newFeeAddress = validateAddress(newFeeAddressRaw, 'NEW_FEE_ADDRESS', false);
 
   return [
     {

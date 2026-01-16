@@ -222,9 +222,11 @@ contract AppealWindowEnforcementTest is Test {
         EscrowTransfer memory et = escrow.getEscrowTransfer(workflowId);
         assertEq(uint8(et.escrowState), uint8(EscrowState.RELEASED), 'State should be RELEASED');
 
-        // Check tokens transferred
+        // Check tokens transferred via autotransfer
         uint256 sellerClaimable = escrow.claimable(workflowId, seller, address(token));
-        assertGt(sellerClaimable, 0, 'Seller should have claimable balance');
+        uint256 sellerBalance = token.balanceOf(seller);
+        // Either claimable > 0 (fallback) or balance > 0 (autotransfer succeeded)
+        assertTrue(sellerClaimable > 0 || sellerBalance > 0, 'Seller should have either claimable balance or received funds via autotransfer');
     }
 
     // ============ Test: Appeal Window Expires - Settlement Can Be Executed ============
@@ -255,9 +257,11 @@ contract AppealWindowEnforcementTest is Test {
         EscrowTransfer memory et = escrow.getEscrowTransfer(workflowId);
         assertEq(uint8(et.escrowState), uint8(EscrowState.RELEASED), 'State should be RELEASED');
 
-        // Check tokens transferred
+        // Check tokens transferred via autotransfer
         uint256 sellerClaimable = escrow.claimable(workflowId, seller, address(token));
-        assertGt(sellerClaimable, 0, 'Seller should have claimable balance');
+        uint256 sellerBalance = token.balanceOf(seller);
+        // Either claimable > 0 (fallback) or balance > 0 (autotransfer succeeded)
+        assertTrue(sellerClaimable > 0 || sellerBalance > 0, 'Seller should have either claimable balance or received funds via autotransfer');
 
         // Check pending settlement cleared
         (exists, , , ) = escrow.getPendingSettlement(workflowId);
@@ -363,9 +367,11 @@ contract AppealWindowEnforcementTest is Test {
         EscrowTransfer memory et = escrow.getEscrowTransfer(workflowId);
         assertEq(uint8(et.escrowState), uint8(EscrowState.RELEASED), 'State should be RELEASED');
 
-        // Check tokens transferred
+        // Check tokens transferred via autotransfer
         uint256 sellerClaimable = escrow.claimable(workflowId, seller, address(token));
-        assertGt(sellerClaimable, 0, 'Seller should have claimable balance');
+        uint256 sellerBalance = token.balanceOf(seller);
+        // Either claimable > 0 (fallback) or balance > 0 (autotransfer succeeded)
+        assertTrue(sellerClaimable > 0 || sellerBalance > 0, 'Seller should have either claimable balance or received funds via autotransfer');
     }
 
     // ============ Test: Multiple Calls to executePendingSettlement Revert ============
@@ -462,9 +468,11 @@ contract AppealWindowEnforcementTest is Test {
         EscrowTransfer memory et = escrow.getEscrowTransfer(workflowId);
         assertEq(uint8(et.escrowState), uint8(EscrowState.REFUNDED), 'State should be REFUNDED');
 
-        // Check tokens refunded to buyer
+        // Check tokens refunded to buyer via autotransfer
         uint256 buyerClaimable = escrow.claimable(workflowId, buyer, address(token));
-        assertGt(buyerClaimable, 0, 'Buyer should have claimable balance');
+        uint256 buyerBalance = token.balanceOf(buyer);
+        // Either claimable > 0 (fallback) or balance > 0 (autotransfer succeeded)
+        assertTrue(buyerClaimable > 0 || buyerBalance > 0, 'Buyer should have either claimable balance or received funds via autotransfer');
     }
 
     // ============ Test: getPendingSettlement View Function ============

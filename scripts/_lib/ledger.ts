@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { network, ethers, artifacts, deployments } from 'hardhat';
+import { network, ethers, artifacts, deployments, HardhatRuntimeEnvironment } from 'hardhat';
+import { getChainConfig } from '../../config/chains.config';
 
 export function isoStamp(): string {
   const d = new Date();
@@ -31,12 +32,13 @@ export async function snapshotAbi(contractName: string, outDir: string) {
   writeJson(path.join(outDir, `${contractName}.abi.json`), artifact.abi);
 }
 
-export async function metaBundle() {
+export async function metaBundle(hre?: HardhatRuntimeEnvironment) {
   const [signer] = await ethers.getSigners();
   const net = await ethers.provider.getNetwork();
   const blockNumber = await ethers.provider.getBlockNumber();
   const gitSha = process.env.GIT_SHA;
-  return {
+  
+  const baseMeta = {
     network: network.name,
     chainId: Number(net.chainId),
     timestamp: new Date().toISOString(),
@@ -44,6 +46,26 @@ export async function metaBundle() {
     blockNumber,
     gitSha,
   };
+  
+  // Get chain configuration if hre is provided
+  if (hre) {
+    try {
+      const chainConfig = getChainConfig(hre);
+      return {
+        ...baseMeta,
+        chain: {
+          name: chainConfig.name,
+          displayName: chainConfig.displayName,
+          networkType: chainConfig.networkType,
+          blockExplorer: chainConfig.blockExplorer.url,
+        },
+      };
+    } catch {
+      // Fallback if chain not in registry
+    }
+  }
+  
+  return baseMeta;
 }
 
 export async function addressesBundle() {

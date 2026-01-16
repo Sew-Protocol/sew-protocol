@@ -28,15 +28,15 @@
 3. initializeDispute(workflowId=1, resolver1, category=0)
    ├─ Event: ResolverAssigned(workflowId=1, resolver=resolver1, round=0)
    ├─ Hook: stakingModule.onResolverAssigned(workflowId=1, resolver1, 0)
-   │   ├─ Event: StakeLocked(resolver1, amount=1,000 USD, workflowId=1)
-   │   └─ State: resolver1.lockedStake = 1,000 USD, availableStake = 4,000 USD ✓
+   │   ├─ Event: StakeLocked(resolver1, amount=250 USD, workflowId=1)
+   │   └─ State: resolver1.lockedStake = 250 USD, availableStake = 4,750 USD ✓
    └─ State: dispute.resolverAtRound[0] = resolver1 ✓
 ```
 
 **Verification:**
 
 - ✅ Resolver1 assigned to workflowId=1
-- ✅ 1,000 USD (minimum stake) locked
+- ✅ $250 USD (v3 minimum stake for resolver) locked
 - ✅ Available stake reduced from 5,000 → 4,000 USD
 
 ---
@@ -429,7 +429,7 @@ Both traces demonstrate:
 **Verification:**
 
 - ✅ Resolver1 assigned to workflowId=1
-- ✅ 1,000 USD (minimum stake) locked
+- ✅ $250 USD (v3 minimum stake for resolver) locked
 - ✅ Available stake reduced from 1,100 → 100 USD
 
 ---

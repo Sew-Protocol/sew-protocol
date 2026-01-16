@@ -31,6 +31,12 @@ contract YieldOps {
         uint256 yieldAmount,
         string reason
     );
+    event YieldProtocolFeeCollected(
+        uint256 indexed escrowId,
+        address indexed token,
+        uint256 yieldAmount,
+        uint256 protocolFeeAmount
+    );
 
     /**
      * @dev Result of yield handling operation
@@ -43,22 +49,27 @@ contract YieldOps {
     }
 
     /**
-     * @notice Handle yield for full withdrawal (complete release/cancel)
+     * @notice Handle yield withdrawal and distribution
      * @param genModule Yield generation module
      * @param distModule Yield distribution module
      * @param workflowId Escrow workflow ID
      * @param token Token address
      * @param amount Original escrow amount
+     * @param protocolFeeBps Protocol fee in basis points (0-3000 = 0-30%)
+     * @param feeRecipient Address to receive protocol fee
      * @return result Yield operation result
      * @dev Non-blocking: Returns success=false if distribution fails, doesn't revert
      *      Caller (BaseEscrow) should handle failure case (e.g., route to fee address)
+     *      Protocol fee is deducted from yield before distribution to recipients
      */
-    function handleFullYield(
+    function handleYield(
         IYieldGenerationModule genModule,
         IYieldDistributionModule distModule,
         uint256 workflowId,
         address token,
-        uint256 amount
+        uint256 amount,
+        uint256 protocolFeeBps,
+        address feeRecipient
     ) external returns (YieldResult memory result) {
         result.actualAmount = amount;
         result.yield = 0;
@@ -88,17 +99,38 @@ contract YieldOps {
             emit YieldDistributionFailed(workflowId, token, 0, 'Yield withdrawal failed');
         }
 
-        // Distribute yield if any (try/catch for non-blocking)
-        if (result.yield > 0 && address(distModule) != address(0)) {
-            try this._distributeYieldInternal(distModule, workflowId, token, result.yield) {
-                result.yieldDistributed = result.yield;
+        // Deduct protocol fee and distribute remaining yield if any
+        if (result.yield > 0) {
+            uint256 protocolFeeAmount = 0;
+            uint256 yieldToDistribute = result.yield;
+
+            // Calculate and collect protocol fee if enabled
+            if (protocolFeeBps > 0 && feeRecipient != address(0)) {
+                protocolFeeAmount = (result.yield * protocolFeeBps) / 10000;
+                if (protocolFeeAmount > 0) {
+                    yieldToDistribute = result.yield - protocolFeeAmount;
+                    // Transfer protocol fee to fee recipient
+                    IERC20(token).safeTransfer(feeRecipient, protocolFeeAmount);
+                    emit YieldProtocolFeeCollected(workflowId, token, result.yield, protocolFeeAmount);
+                }
+            }
+
+            // Distribute remaining yield to recipients if distribution module is set
+            if (yieldToDistribute > 0 && address(distModule) != address(0)) {
+                try this._distributeYieldInternal(distModule, workflowId, token, yieldToDistribute) {
+                    result.yieldDistributed = yieldToDistribute;
+                    result.success = true;
+                } catch Error(string memory reason) {
+                    emit YieldDistributionFailed(workflowId, token, yieldToDistribute, reason);
+                    result.success = false;
+                } catch {
+                    emit YieldDistributionFailed(workflowId, token, yieldToDistribute, 'Unknown error');
+                    result.success = false;
+                }
+            } else if (yieldToDistribute > 0) {
+                // No distribution module - protocol fee already collected, remaining yield stays in contract
+                result.yieldDistributed = 0;
                 result.success = true;
-            } catch Error(string memory reason) {
-                emit YieldDistributionFailed(workflowId, token, result.yield, reason);
-                result.success = false;
-            } catch {
-                emit YieldDistributionFailed(workflowId, token, result.yield, 'Unknown error');
-                result.success = false;
             }
         }
 
@@ -112,7 +144,7 @@ contract YieldOps {
      * @param token Token address
      * @param yieldAmount Yield amount to distribute
      * @dev This function is public to allow try/catch from within the contract
-     *      but should only be called by handleFullYield
+     *      but should only be called by handleYield
      */
     function _distributeYieldInternal(
         IYieldDistributionModule distModule,

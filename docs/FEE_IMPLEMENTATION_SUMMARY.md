@@ -1,13 +1,17 @@
 # Current Fee Implementation in Contracts
 
-**Date:** 2026-01-09  
-**Status:** Current Implementation Analysis
+**Date:** 2026-01-16  
+**Status:** Updated (Yield protocol fee + appeal bond protocol fee implemented)
 
 ---
 
 ## Summary
 
-The current contract implementation has **only one fee**: the escrow fee (1% of escrow amount). **No fees are charged on appeal bonds** in DR v2.
+The current contract implementation supports:
+
+1. **Escrow fee** (charged on escrow principal at creation; governance-controlled)
+2. **Yield protocol fee** (charged on yield only; default 30%; governance-controlled)
+3. **Appeal bond protocol fee** (charged on appeal bonds at posting time; default 0% at launch; governance-controlled)
 
 ---
 
@@ -40,64 +44,63 @@ uint256 amountAfterFee = amount - fee;
 
 ---
 
-## 2. Appeal Bond Fees ❌ (NOT IMPLEMENTED)
+## 2. Yield Protocol Fee ✅ (Active)
 
-**Location:** `ResolverIncentiveModuleV2.sol`
+**What it is:** A protocol fee charged on **generated yield only** (never escrow principal), when a yield generation module is enabled.
 
-**Current Implementation:**
+**Locations:**
+- `contracts/core/BaseEscrow.sol` (parameter + governance controls)
+- `contracts/YieldOps.sol` (fee deduction + transfer + event)
 
-### `recordAppealBond()` (lines 129-174)
-- Records the full bond amount
-- **No fee deducted** - entire bond amount is stored
+**Current default:**
+- `yieldProtocolFeeBps = 3000` (30%)
 
-### `distributeAppealBond()` (lines 185-210)
-- **If appeal succeeds (outcomeFlipped = true):**
-  - Calls `_refundBond()` (lines 217-236)
-  - **Full bond amount refunded** to depositor
-  - **No fee deducted**
+**Collection behavior (high level):**
+- If yield is generated (`actualAmount > amount`), compute:
+  - `protocolFeeAmount = yield * yieldProtocolFeeBps / 10000`
+  - `yieldToDistribute = yield - protocolFeeAmount`
+- Transfer `protocolFeeAmount` to `escrowFeeAddress` (fee recipient)
+- Distribute remaining yield via the configured yield distribution module
 
-- **If appeal fails (outcomeFlipped = false):**
-  - Calls `_payBondToResolvers()` (lines 246-338)
-  - **Full bond amount distributed** to resolvers from prior round
-  - **No fee deducted** - entire `bond.amount` is split among resolvers (line 298)
-
-**Code Evidence:**
-```solidity
-// _refundBond() - line 228 (ETH) or 232 (ERC20)
-bond.depositor.call{value: bond.amount}('');  // Full amount
-IERC20(bond.token).safeTransfer(bond.depositor, bond.amount);  // Full amount
-
-// _payBondToResolvers() - line 298
-uint256 amountPerResolver = bond.amount / count;  // Full bond split among resolvers
-```
-
-**Edge Case:**
-- If no resolvers found at prior round, bond remains in contract (not counted as "paid" to resolvers)
-- This is a failure case, not a fee mechanism
+**Events:**
+- `YieldProtocolFeeBpsUpdated(oldFeeBps, newFeeBps)` (BaseEscrow)
+- `YieldProtocolFeeCollected(escrowId, token, yieldAmount, protocolFeeAmount)` (YieldOps)
 
 ---
 
-## 3. Revenue Streams
+## 3. Appeal Bond Protocol Fee ✅ (Implemented; inactive by default at launch)
+
+**What it is:** A configurable protocol fee charged on **appeal bonds** at the time they are posted.
+
+**Where it is applied:** In the escalation flow on the escrow contract side (before the bond is recorded in the incentive module):
+- `contracts/core/BaseEscrow.sol` deducts `appealBondProtocolFeeBps` from the bond amount and transfers the fee portion to `escrowFeeAddress`.
+
+**Defaults (launch-safe):**
+- `appealBondProtocolFeeBps = 0` (0% at launch; bonds are refunded/distributed in full)
+
+**Governance controls:**
+- `queueAppealBondProtocolFeeBps(feeBps)` + `activateAppealBondProtocolFeeBps()` (slow lane, timelock role)
+- Fee is **bounded** by `MAX_PROTOCOL_FEE_BPS` (immutable constant in `BaseEscrow`)
+
+**Events:**
+- `AppealBondProtocolFeeBpsUpdated(oldFeeBps, newFeeBps)` (BaseEscrow)
+- `AppealBondProtocolFeeCollected(escrowId, token, bondAmount, protocolFeeAmount)` (BaseEscrow)
+
+---
+
+## 4. Revenue Streams (current implementation)
 
 **Current Protocol Revenue:**
 
-1. **Escrow fees:** 1% of escrow amounts ✅
-2. **Yield share:** 30% of generated yield (when yield enabled) ✅
-3. **Appeal bonds:** No protocol fee in DR v2 ❌
+1. **Escrow fees:** basis-points fee on escrow principal at creation ✅
+2. **Yield protocol fee:** basis-points fee on generated yield only ✅
+3. **Appeal bond protocol fee:** basis-points fee on appeal bonds (default 0 at launch; can be activated later) ✅
 
 ---
 
 ## Conclusion
 
 **Current Fee Implementation:**
-- ✅ **Escrow fee:** 1% of escrow amount (collected at creation)
-- ❌ **Appeal bond fee:** None - bonds are refunded in full or paid to resolvers in full
-
-**To Add Appeal Bond Fees (Future):**
-Would require changes to `ResolverIncentiveModuleV2`:
-1. Add fee parameters (protocol fee percentage, fee recipient)
-2. Modify `distributeAppealBond()` to calculate and deduct fee before refund/payment
-3. Transfer fee to protocol treasury
-4. Update metrics to track fees collected
-
-This would be a module upgrade (deploy new version, swap via governance).
+- ✅ **Escrow fee:** charged at escrow creation
+- ✅ **Yield protocol fee:** charged only on yield, default 30%
+- ✅ **Appeal bond protocol fee:** implemented but default 0% at launch (no impact until activated)

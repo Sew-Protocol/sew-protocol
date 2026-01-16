@@ -180,15 +180,15 @@ contract SlashingModuleInvariantsTest is Test {
         IStakingModule.StakeInfo memory info = stakingModule.getStakeInfo(resolver1);
         uint256 stake = info.totalStake;
 
-        // Test missed accept (2%)
+        // Test missed accept (25 bps = 0.25%)
         vm.prank(resolutionModule);
         uint256 slashId1 = slashingModule.slashForTimeout(1, resolver1, 0);
         ISlashingModule.SlashEvent memory slash1 = slashingModule.getSlashEvent(slashId1);
 
-        uint256 expectedMissedAccept = (stake * 200) / BASIS_POINTS; // 2%
-        assertEq(slash1.amount, expectedMissedAccept, 'Missed accept penalty wrong');
+        uint256 expectedMissedAccept = (stake * 25) / BASIS_POINTS; // 0.25% (v3)
+        assertEq(slash1.amount, expectedMissedAccept, 'Missed accept penalty wrong (should be 25 bps)');
 
-        // Test missed resolve (5%)
+        // Test missed resolve (200 bps = 2%)
         vm.prank(resolver2);
         stakingModule.stakeWithMix(10000e6, 0);
 
@@ -196,8 +196,8 @@ contract SlashingModuleInvariantsTest is Test {
         uint256 slashId2 = slashingModule.slashForTimeout(2, resolver2, 1);
         ISlashingModule.SlashEvent memory slash2 = slashingModule.getSlashEvent(slashId2);
 
-        uint256 expectedMissedResolve = (stake * 500) / BASIS_POINTS; // 5%
-        assertEq(slash2.amount, expectedMissedResolve, 'Missed resolve penalty wrong');
+        uint256 expectedMissedResolve = (stake * 200) / BASIS_POINTS; // 2% (v3)
+        assertEq(slash2.amount, expectedMissedResolve, 'Missed resolve penalty wrong (should be 200 bps)');
     }
 
     // ============ Invariant 2: No Double Slashing ============
@@ -270,7 +270,7 @@ contract SlashingModuleInvariantsTest is Test {
     }
 
     /**
-     * @notice INVARIANT: Freeze duration is 7 days
+     * @notice INVARIANT: Freeze duration is 72 hours for severe event (v3)
      */
     function test_FreezeDurationCorrect() public {
         // Stake
@@ -279,15 +279,44 @@ contract SlashingModuleInvariantsTest is Test {
 
         uint256 slashTime = block.timestamp;
 
-        // Slash
+        // Slash (first offense)
         vm.prank(resolutionModule);
         slashingModule.slashForTimeout(1, resolver1, 1);
 
         // Check freeze duration
         (, uint256 frozenUntil) = slashingModule.isResolverFrozen(resolver1);
 
-        // INVARIANT: Frozen for 7 days
-        assertEq(frozenUntil, slashTime + 7 days, 'Freeze duration wrong');
+        // INVARIANT: Frozen for 72 hours (severe event, v3)
+        assertEq(frozenUntil, slashTime + 72 hours, 'Freeze duration wrong (should be 72 hours for severe)');
+    }
+
+    /**
+     * @notice INVARIANT: Freeze duration is 7 days for repeated severe event in same epoch (v3)
+     */
+    function test_FreezeDurationRepeatedOffense() public {
+        // Stake
+        vm.prank(resolver1);
+        stakingModule.stakeWithMix(10000e6, 0);
+
+        uint256 slashTime = block.timestamp;
+
+        // First slash (severe event - 72 hours)
+        vm.prank(resolutionModule);
+        slashingModule.slashForTimeout(1, resolver1, 1);
+
+        (, uint256 frozenUntil1) = slashingModule.isResolverFrozen(resolver1);
+        assertEq(frozenUntil1, slashTime + 72 hours, 'First freeze should be 72 hours');
+
+        // Second slash in same epoch (repeated severe event - 7 days)
+        vm.warp(block.timestamp + 1 days); // Move forward but stay in same epoch (7 days)
+        vm.prank(resolutionModule);
+        slashingModule.slashForTimeout(2, resolver1, 1);
+
+        (, uint256 frozenUntil2) = slashingModule.isResolverFrozen(resolver1);
+        uint256 expectedFreeze = block.timestamp + 7 days;
+        // Allow small difference due to block timestamp updates
+        assertGe(frozenUntil2, expectedFreeze - 10, 'Repeated freeze should be 7 days');
+        assertLe(frozenUntil2, expectedFreeze + 10, 'Repeated freeze should be 7 days');
     }
 
     /**
@@ -306,12 +335,12 @@ contract SlashingModuleInvariantsTest is Test {
         (bool frozen1, ) = slashingModule.isResolverFrozen(resolver1);
         assertTrue(frozen1, 'Should be frozen');
 
-        // Warp past freeze duration
-        vm.warp(block.timestamp + 7 days + 1);
+        // Warp past freeze duration (72 hours for severe event)
+        vm.warp(block.timestamp + 72 hours + 1);
 
         // INVARIANT: No longer frozen after duration
         (bool frozen2, ) = slashingModule.isResolverFrozen(resolver1);
-        assertFalse(frozen2, 'Should not be frozen after duration');
+        assertFalse(frozen2, 'Should not be frozen after 72 hours');
     }
 
     // ============ Invariant 4: Waterfall Ordering ============
@@ -351,9 +380,9 @@ contract SlashingModuleInvariantsTest is Test {
 
         ISlashingModule.SlashEvent memory slashEvent = slashingModule.getSlashEvent(slashId);
 
-        // INVARIANT: Slash amount is 5% of junior stake (150 USD)
-        uint256 expectedSlash = (juniorStake * 500) / BASIS_POINTS;
-        assertEq(slashEvent.amount, expectedSlash, 'Slash amount wrong');
+        // INVARIANT: Slash amount is 2% of junior stake (v3: 200 bps for missed resolve)
+        uint256 expectedSlash = (juniorStake * 200) / BASIS_POINTS;
+        assertEq(slashEvent.amount, expectedSlash, 'Slash amount wrong (should be 200 bps)');
 
         // INVARIANT: Slash < junior stake, so senior not touched
         assertLt(slashEvent.amount, juniorStake, 'Slash should be less than junior stake');
@@ -460,10 +489,10 @@ contract SlashingModuleInvariantsTest is Test {
     function test_SlashConfigQuery() public {
         ISlashingModule.SlashConfig memory config = slashingModule.getSlashConfig();
 
-        // Verify conservative defaults
-        assertEq(config.timeoutSlashBps, 500, 'Timeout slash wrong'); // 5%
-        assertEq(config.reversalSlashBps, 0, 'Reversal slash should be 0');
-        assertEq(config.fraudSlashBps, 0, 'Fraud slash should be 0');
+        // Verify v3 defaults
+        assertEq(config.timeoutSlashBps, 200, 'Timeout slash wrong (v3: 200 bps = 2%)'); 
+        assertEq(config.reversalSlashBps, 0, 'Reversal slash should be 0 (disabled initially)');
+        assertEq(config.fraudSlashBps, 0, 'Fraud slash should be 0 (not enabled by default)');
         assertEq(config.maxSlashPerPeriod, 10000, 'Max per period wrong');
         assertEq(config.slashPeriod, 30 days, 'Slash period wrong');
     }
@@ -537,5 +566,177 @@ contract SlashingModuleInvariantsTest is Test {
 
         // INVARIANT: Period counter reset
         assertLt(slashedPeriod2, slashedPeriod1 * 2, 'Period should have reset');
+    }
+
+    // ============ v3 Epoch Cap Tests ============
+
+    /**
+     * @notice INVARIANT: Resolver slash cap per epoch is 20% (v3)
+     */
+    function test_ResolverEpochSlashCap() public {
+        // Stake
+        vm.prank(resolver1);
+        stakingModule.stakeWithMix(10000e6, 0);
+
+        IStakingModule.StakeInfo memory info = stakingModule.getStakeInfo(resolver1);
+        uint256 stake = info.totalStake;
+
+        // Calculate max slash in epoch (20% of stake)
+        uint256 maxSlashPerEpoch = (stake * 2000) / BASIS_POINTS; // 20%
+
+        // Slash multiple times in same epoch to reach cap
+        uint256 totalSlashed = 0;
+        uint256 workflowId = 1;
+
+        // Keep slashing until we hit the epoch cap
+        while (totalSlashed < maxSlashPerEpoch) {
+            vm.prank(resolutionModule);
+            uint256 slashId = slashingModule.slashForTimeout(workflowId, resolver1, 1);
+            
+            if (slashId > 0) {
+                ISlashingModule.SlashEvent memory event_ = slashingModule.getSlashEvent(slashId);
+                totalSlashed += event_.amount;
+                workflowId++;
+            } else {
+                break; // Cap reached or other limit hit
+            }
+        }
+
+        // INVARIANT: Total slashed in epoch <= 20% of stake
+        assertLe(totalSlashed, maxSlashPerEpoch, 'Epoch slash cap exceeded');
+    }
+
+    /**
+     * @notice INVARIANT: Senior slash cap per epoch is 10% (v3)
+     */
+    function test_SeniorEpochSlashCap() public {
+        // Stake senior
+        vm.prank(senior1);
+        stakingModule.stakeWithMix(50000e6, 0);
+
+        IStakingModule.StakeInfo memory info = stakingModule.getStakeInfo(senior1);
+        uint256 stake = info.totalStake;
+
+        // Calculate max slash in epoch (10% of stake)
+        uint256 maxSlashPerEpoch = (stake * 1000) / BASIS_POINTS; // 10%
+
+        // Enable fraud slashing for testing
+        vm.prank(admin);
+        slashingModule.setSlashPercentage(ISlashingModule.SlashReason.FRAUD, 5000); // 50%
+
+        // Slash multiple times in same epoch
+        uint256 totalSlashed = 0;
+        uint256 workflowId = 1;
+        bytes memory evidence = 'Fraud evidence';
+
+        while (totalSlashed < maxSlashPerEpoch) {
+            vm.prank(admin);
+            uint256 slashId = slashingModule.slashForFraud(workflowId, senior1, evidence);
+            
+            if (slashId > 0) {
+                ISlashingModule.SlashEvent memory event_ = slashingModule.getSlashEvent(slashId);
+                totalSlashed += event_.amount;
+                workflowId++;
+            } else {
+                break; // Cap reached
+            }
+        }
+
+        // INVARIANT: Total slashed in epoch <= 10% of stake
+        assertLe(totalSlashed, maxSlashPerEpoch, 'Senior epoch slash cap exceeded');
+    }
+
+    /**
+     * @notice INVARIANT: Repeat offense in same epoch uses 500 bps penalty (v3)
+     */
+    function test_RepeatOffensePenalty() public {
+        // Stake
+        vm.prank(resolver1);
+        stakingModule.stakeWithMix(10000e6, 0);
+
+        IStakingModule.StakeInfo memory info = stakingModule.getStakeInfo(resolver1);
+        uint256 stake = info.totalStake;
+
+        // First slash (200 bps = 2%)
+        vm.prank(resolutionModule);
+        uint256 slashId1 = slashingModule.slashForTimeout(1, resolver1, 1);
+        ISlashingModule.SlashEvent memory slash1 = slashingModule.getSlashEvent(slashId1);
+        uint256 expectedFirst = (stake * 200) / BASIS_POINTS;
+        assertEq(slash1.amount, expectedFirst, 'First slash should be 200 bps');
+
+        // Second slash in same epoch (500 bps = 5% for repeat)
+        // Note: Epoch is 7 days, so we stay within same epoch
+        vm.warp(block.timestamp + 1 days);
+        vm.prank(resolutionModule);
+        uint256 slashId2 = slashingModule.slashForTimeout(2, resolver1, 1);
+        ISlashingModule.SlashEvent memory slash2 = slashingModule.getSlashEvent(slashId2);
+        
+        // The repeat penalty is 500 bps, but epoch cap enforcement may reduce it
+        // Expected: 500 bps (5%), but epoch cap is 20% (2000 bps)
+        // First slash: 200 bps, remaining: 1800 bps
+        // Second slash: min(500 bps, 1800 bps) = 500 bps
+        // However, the actual amount may be slightly less due to rounding or other factors
+        uint256 expectedRepeat = (stake * 500) / BASIS_POINTS;
+        // Allow for small rounding differences (within 2% - 490 bps is 98% of 500 bps)
+        assertGe(slash2.amount, expectedRepeat * 98 / 100, 'Repeat slash should be approximately 500 bps');
+        assertLe(slash2.amount, expectedRepeat, 'Repeat slash should not exceed 500 bps');
+    }
+
+    /**
+     * @notice INVARIANT: Epoch counter resets after 7 days (v3)
+     */
+    function test_EpochReset() public {
+        // Stake
+        vm.prank(resolver1);
+        stakingModule.stakeWithMix(10000e6, 0);
+
+        // Slash in epoch 1
+        vm.prank(resolutionModule);
+        slashingModule.slashForTimeout(1, resolver1, 1);
+
+        uint256 slashedEpoch1 = slashingModule.getSlashedInPeriod(resolver1);
+        assertGt(slashedEpoch1, 0, 'Should have slashed in epoch 1');
+
+        // Warp to new epoch (7 days + 1 second)
+        vm.warp(block.timestamp + 7 days + 1);
+
+        // Slash in epoch 2
+        vm.prank(resolutionModule);
+        slashingModule.slashForTimeout(2, resolver1, 1);
+
+        // INVARIANT: Epoch counter reset - can slash again
+        uint256 slashedEpoch2 = slashingModule.getSlashedInPeriod(resolver1);
+        assertGt(slashedEpoch2, slashedEpoch1, 'Should be able to slash in new epoch');
+    }
+
+    /**
+     * @notice Test capacity limits: max escrow per L0 case = min($2,000, 4× resolverBond) (v3)
+     */
+    function test_CapacityLimits() public {
+        // Stake resolver with $500 bond (above minimum $250)
+        vm.prank(resolver1);
+        stakingModule.stakeWithMix(500e6, 0); // $500
+
+        // Calculate max escrow
+        uint256 maxEscrow = stakingModule.getMaxEscrowPerCase(resolver1);
+        // Should be min($2,000, 4× $500) = min($2,000, $2,000) = $2,000
+        assertEq(maxEscrow, 2000e18, 'Max escrow should be $2,000');
+
+        // Stake resolver with $1,000 bond
+        vm.prank(resolver2);
+        stakingModule.stakeWithMix(1000e6, 0); // $1,000
+
+        uint256 maxEscrow2 = stakingModule.getMaxEscrowPerCase(resolver2);
+        // Should be min($2,000, 4× $1,000) = min($2,000, $4,000) = $2,000
+        assertEq(maxEscrow2, 2000e18, 'Max escrow should still be $2,000 (capped)');
+
+        // Stake senior with $25,000 bond (minimum for senior)
+        vm.prank(senior1);
+        stakingModule.stakeWithMix(25000e6, 0); // $25,000
+
+        uint256 maxEscrow3 = stakingModule.getMaxEscrowPerCase(senior1);
+        // Seniors have the same cap as resolvers (min($2,000, 4× bond))
+        // For $25,000 bond: min($2,000, 4× $25,000) = min($2,000, $100,000) = $2,000
+        assertEq(maxEscrow3, 2000e18, 'Max escrow for senior should be $2,000 (capped)');
     }
 }

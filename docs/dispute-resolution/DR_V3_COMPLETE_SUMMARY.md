@@ -140,18 +140,20 @@ Senior: 30K bond → provides 15K coverage
 - Senior only exposed if junior exhausted
 - Fair risk allocation
 
-### 3. Slashing System
+### 3. Slashing System (v3 objective schedule)
 
 **Triggers (Objective Only):**
 
-- Missed accept: 2%
-- Missed resolve: 5%
-- Unresponsive: 10%
+- Missed accept: 0.25% (25 bps)
+- Missed resolve: 2% (200 bps) + 72h freeze
+- Repeated missed resolve (same epoch): 5% (500 bps) + 7d freeze
+- Reversal on escalation: 0 bps initially (disabled)
 
 **Caps:**
 
 - Per-offense: 50% max
 - Per-period: 100% max (30 days)
+- Per-epoch: 20% resolver, 10% senior (7-day epochs)
 
 **Waterfall:**
 
@@ -228,11 +230,12 @@ Senior: 30K bond → provides 15K coverage
 
 ### Slashing
 
-1. ✅ Slashes never exceed caps (50% per-offense, 100% per-period)
+1. ✅ Slashes never exceed caps (50% per-offense, 100% per-period, 20% per-epoch resolver, 10% per-epoch senior)
 2. ✅ No double slashing (one per workflow)
-3. ✅ Freeze logic correct (7 days)
+3. ✅ Freeze logic correct (72h severe, 7d repeated)
 4. ✅ Waterfall ordering (resolver → senior)
 5. ✅ Circuit breaker prevents cascades
+6. ✅ Epoch-based caps prevent insolvency cascades
 
 ---
 
@@ -429,9 +432,9 @@ Senior: 30K bond → provides 15K coverage
 
 ### Security
 
-✅ **Conservative by design** (2-10% penalties)  
+✅ **Conservative by design** (0.25%-5% penalties, v3 launch defaults)  
 ✅ **Objective triggers only** (no subjective judgment)  
-✅ **Multiple safety layers** (caps, circuit breakers, freezes)  
+✅ **Multiple safety layers** (caps, epoch caps, circuit breakers, freezes)  
 ✅ **Formal properties proven** (via fuzz & invariant tests)
 
 ---

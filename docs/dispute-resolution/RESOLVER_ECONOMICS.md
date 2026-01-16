@@ -1,5 +1,7 @@
 ## Detailed overview: Resolver staking, escalation deposits, incentives, and slashing (Ethereum-native 2026)
 
+**Launch-safe v3 defaults (single source):** `docs/dispute-resolution/DR_V3_LAUNCH_SAFE_DEFAULTS.md`
+
 ### Executive design rule
 
 **Decentralise decisions first.\
@@ -16,9 +18,9 @@ The system becomes adversarial when _capital is at risk_. A resolver making a wr
 
 **Every escalation requires the losing party to post an appeal bond.**
 
-- If escalation succeeds (the outcome is reversed): the escalator gets the bond back (minus a small processing fee).
+- If escalation succeeds (the outcome is reversed): the escalator gets the bond back **in full when the protocol appeal fee is inactive**, and receives the refundable portion when the protocol appeal fee is active.
 
-- If escalation fails (outcome upheld): the bond is paid to the prior resolver set (and a protocol cut).
+- If escalation fails (outcome upheld): the bond is paid to the prior resolver set **in full when the protocol appeal fee is inactive**, and pays the resolvers from the post-fee bond amount when the protocol appeal fee is active.
 
 **Result:** "Appeal because I'm angry" becomes financially irrational.
 

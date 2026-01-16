@@ -1,6 +1,7 @@
 import { HardhatRuntimeEnvironment } from 'hardhat/types';
 import { DeployFunction } from 'hardhat-deploy/types';
 import { getGovConfig, validateGovConfig } from './_config';
+import { registerDeployment } from '../config/deployments.registry';
 
 /**
  * Deploy GovGovernor
@@ -73,6 +74,24 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
     // Note: quorum() requires checkpoints to exist, so we can't call it immediately after deployment
     // The quorum will be calculated as: totalSupply * quorumNumerator / 100
+
+    // Register deployment
+    if (governorDeployment.receipt) {
+      await registerDeployment(hre, 'GovGovernor', {
+        address: governorDeployment.address,
+        txHash: governorDeployment.receipt.hash,
+        blockNumber: governorDeployment.receipt.blockNumber,
+        constructorArgs: [
+          tokenDeployment.address,
+          timelockDeployment.address,
+          config.governor.votingDelayBlocks,
+          config.governor.votingPeriodBlocks,
+          config.governor.proposalThreshold,
+          config.governor.quorumBps / 100,
+        ],
+        tags: ['governor', 'governance'],
+      });
+    }
   } else {
     console.log(`✅ GovGovernor already deployed at: ${governorDeployment.address}`);
   }

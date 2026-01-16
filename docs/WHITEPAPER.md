@@ -257,6 +257,21 @@ An advanced decentralized resolution system implementing a **staged rollout appr
 - ✅ Stable escalation rate (<20%) over N weeks
 - ✅ Predictable response times (<3 days avg)
 - ✅ Multiple operational resolvers (≥3 active)
+
+---
+
+### DR v3 (Decentralize Capital): Mixed stable + SEW bonds (oracle‑free)
+
+When DR v3 is enabled, resolver capital is secured using an **oracle‑free mixed bond design**:
+
+- **EffectiveBondUSD** = `stablecoinBond + (sewBond × 0.5 haircut)`
+- **Composition enforced**:
+  - ≥ 80% of effective security from stablecoin
+  - ≤ 20% from SEW (after haircut)
+
+This acts as a **protocol‑level shock absorber**: dispute resolution solvency is anchored primarily in stable USD collateral, while SEW provides alignment and structural demand without becoming a single point of failure.
+
+For full launch‑safe defaults and rationale, see: `docs/dispute-resolution/DR_V3_LAUNCH_SAFE_DEFAULTS.md`.
 - ✅ No evidence of systematic griefing
 - ✅ Incident runbooks tested
 

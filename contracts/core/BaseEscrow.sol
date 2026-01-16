@@ -67,8 +67,13 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
     uint256 public escrowFee;
     uint256 public constant ESCROW_FEE_DENOMINATOR = 10000;
     uint256 public constant MAX_AUTOMATION_RANGE = 100;
+    uint256 public constant MAX_PROTOCOL_FEE_BPS = 3000; // 30% maximum
     EscrowTransfer[] public escrowTransfers; // Array index IS the escrowId
     address public escrowFeeAddress;
+
+    // Protocol fees (in basis points)
+    uint256 public yieldProtocolFeeBps; // Protocol fee on yield (0-3000 bps = 0-30%)
+    uint256 public appealBondProtocolFeeBps; // Protocol fee on appeal bonds (0-3000 bps = 0-30%)
 
     address public disputeResolutionModule;
 
@@ -108,6 +113,8 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
     PendingAddress private _pendingFeeRecipient;
     PendingUint private _pendingEscrowFee;
     PendingUint private _pendingAppealWindowDuration;
+    PendingUint private _pendingYieldProtocolFeeBps;
+    PendingUint private _pendingAppealBondProtocolFeeBps;
 
     mapping(ModuleType => PendingAddress) private _pendingModules;
 
@@ -200,6 +207,33 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
     event DefaultAutoReleaseTimeUpdated(uint256 newTime);
     event DefaultAutoCancelTimeUpdated(uint256 newTime);
     event EscrowFinalized(uint256 indexed escrowId, address indexed recipient, uint256 amount);
+    event EscrowTransferAutoCompleted(
+        uint256 indexed workflowId,
+        address indexed recipient,
+        address indexed token,
+        uint256 amount
+    );
+    event EscrowTransferAutoFailed(
+        uint256 indexed workflowId,
+        address indexed recipient,
+        address indexed token,
+        uint256 amount,
+        string reason
+    );
+    event YieldProtocolFeeBpsUpdated(uint256 oldFeeBps, uint256 newFeeBps);
+    event AppealBondProtocolFeeBpsUpdated(uint256 oldFeeBps, uint256 newFeeBps);
+    event YieldProtocolFeeCollected(
+        uint256 indexed escrowId,
+        address indexed token,
+        uint256 yieldAmount,
+        uint256 protocolFeeAmount
+    );
+    event AppealBondProtocolFeeCollected(
+        uint256 indexed escrowId,
+        address indexed token,
+        uint256 bondAmount,
+        uint256 protocolFeeAmount
+    );
 
     // ============ Pause/Unpause ============
     /**
@@ -276,6 +310,77 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         returns (uint256 value, uint64 eta, bool exists)
     {
         return getPendingUint(_pendingEscrowFee);
+    }
+
+    // ============ Protocol Fee Management ============
+    /**
+     * @notice Queue a new yield protocol fee in basis points
+     * @param feeBps New fee in basis points (0-3000 = 0-30%)
+     * @dev Uses slow lane activation pattern. Requires ROLE_TIMELOCK.
+     */
+    function queueYieldProtocolFeeBps(uint256 feeBps) public virtual onlyRole(ROLE_TIMELOCK) {
+        require(feeBps <= MAX_PROTOCOL_FEE_BPS, 'Fee exceeds maximum');
+        _queueUint(_pendingYieldProtocolFeeBps, feeBps);
+    }
+
+    /**
+     * @notice Activate the queued yield protocol fee
+     * @dev Activates after timelock delay. Requires ROLE_TIMELOCK.
+     */
+    function activateYieldProtocolFeeBps() public virtual onlyRole(ROLE_TIMELOCK) {
+        uint256 oldFee = yieldProtocolFeeBps;
+        yieldProtocolFeeBps = _activateUint(_pendingYieldProtocolFeeBps);
+        emit YieldProtocolFeeBpsUpdated(oldFee, yieldProtocolFeeBps);
+    }
+
+    /**
+     * @notice Get pending yield protocol fee information
+     * @return value Pending fee in basis points
+     * @return eta Timestamp when activation becomes available
+     * @return exists Whether a pending fee exists
+     */
+    function getPendingYieldProtocolFeeBps()
+        public
+        view
+        virtual
+        returns (uint256 value, uint64 eta, bool exists)
+    {
+        return getPendingUint(_pendingYieldProtocolFeeBps);
+    }
+
+    /**
+     * @notice Queue a new appeal bond protocol fee in basis points
+     * @param feeBps New fee in basis points (0-3000 = 0-30%)
+     * @dev Uses slow lane activation pattern. Requires ROLE_TIMELOCK.
+     */
+    function queueAppealBondProtocolFeeBps(uint256 feeBps) public virtual onlyRole(ROLE_TIMELOCK) {
+        require(feeBps <= MAX_PROTOCOL_FEE_BPS, 'Fee exceeds maximum');
+        _queueUint(_pendingAppealBondProtocolFeeBps, feeBps);
+    }
+
+    /**
+     * @notice Activate the queued appeal bond protocol fee
+     * @dev Activates after timelock delay. Requires ROLE_TIMELOCK.
+     */
+    function activateAppealBondProtocolFeeBps() public virtual onlyRole(ROLE_TIMELOCK) {
+        uint256 oldFee = appealBondProtocolFeeBps;
+        appealBondProtocolFeeBps = _activateUint(_pendingAppealBondProtocolFeeBps);
+        emit AppealBondProtocolFeeBpsUpdated(oldFee, appealBondProtocolFeeBps);
+    }
+
+    /**
+     * @notice Get pending appeal bond protocol fee information
+     * @return value Pending fee in basis points
+     * @return eta Timestamp when activation becomes available
+     * @return exists Whether a pending fee exists
+     */
+    function getPendingAppealBondProtocolFeeBps()
+        public
+        view
+        virtual
+        returns (uint256 value, uint64 eta, bool exists)
+    {
+        return getPendingUint(_pendingAppealBondProtocolFeeBps);
     }
 
     // ============ Timeout Configuration ============
@@ -470,6 +575,11 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         EscrowSettings memory settings
     ) public nonReentrant whenNotPaused returns (uint256) {
         if (amount == 0) revert InvalidAmount('Amount > 0');
+        
+        // Validate amount and recipient
+        SettingsValidationLibrary.validateEscrowAmount(amount);
+        SettingsValidationLibrary.validateRecipient(to, _msgSender());
+        
         _validateEscrowSettings(settings);
 
         uint256 workflowId = escrowTransfers.length; // Array index IS the workflowId
@@ -501,7 +611,13 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         _applyEscrowSettings(workflowId, settings); // calldata -> memory conversion happens automatically
         _snapshotModulesForEscrow(workflowId);
 
-        if (settings.yieldEnabled) {
+        // Validate yield opt-in and adjust if necessary (graceful degradation)
+        bool shouldEnableYield = SettingsValidationLibrary.validateYieldOptIn(
+            amountAfterFee,
+            settings.yieldEnabled
+        );
+        
+        if (shouldEnableYield) {
             IYieldGenerationModule genModule = _getYieldGenerationModule(workflowId);
             if (address(genModule) != address(0) && genModule.isTokenSupported(token))
                 _depositForYield(genModule, workflowId, token, amountAfterFee);
@@ -855,12 +971,32 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
                         if (address(incentiveMod) != address(0)) {
                             // Bond token is ETH (address(0)) or ERC20
                             if (bondToken == address(0)) {
-                                // ETH bond - send with call (recordAppealBond is now payable)
+                                // ETH bond - deduct protocol fee and send remainder
                                 // Extract exact bond amount from msg.value
                                 uint256 ethToSend = bondAmount;
                                 if (msg.value > bondAmount) {
                                     ethToSend = bondAmount; // Use exact amount, refund excess later
                                 }
+                                
+                                // Deduct protocol fee if enabled
+                                uint256 protocolFeeAmount = 0;
+                                if (appealBondProtocolFeeBps > 0 && escrowFeeAddress != address(0)) {
+                                    protocolFeeAmount = (ethToSend * appealBondProtocolFeeBps) / 10000;
+                                    if (protocolFeeAmount > 0) {
+                                        ethToSend = ethToSend - protocolFeeAmount;
+                                        // Transfer protocol fee to fee recipient
+                                        (bool feeSuccess, ) = payable(escrowFeeAddress).call{value: protocolFeeAmount}('');
+                                        if (feeSuccess) {
+                                            emit AppealBondProtocolFeeCollected(
+                                                workflowId,
+                                                bondToken,
+                                                bondAmount,
+                                                protocolFeeAmount
+                                            );
+                                        }
+                                    }
+                                }
+                                
                                 if (ethToSend > 0) {
                                     // Call recordAppealBond with ETH value
                                     // Note: We need to use a low-level call to forward msg.value
@@ -892,19 +1028,40 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
                                     }
                                 }
                             } else {
-                                // ERC20 bond - transfer to incentive module first, then record
-                                // Escrow contract transfers tokens to incentive module
-                                IERC20(bondToken).safeTransfer(address(incentiveMod), bondAmount);
-                                // Then record (function will verify balance increase)
-                                try
-                                    incentiveMod.recordAppealBond(
-                                        workflowId,
-                                        _msgSender(),
-                                        bondAmount,
-                                        bondToken,
-                                        result.newLevel
-                                    )
-                                {} catch {}
+                                // ERC20 bond - deduct protocol fee and transfer remainder
+                                uint256 protocolFeeAmount = 0;
+                                uint256 bondToRecord = bondAmount;
+                                
+                                // Deduct protocol fee if enabled
+                                if (appealBondProtocolFeeBps > 0 && escrowFeeAddress != address(0)) {
+                                    protocolFeeAmount = (bondAmount * appealBondProtocolFeeBps) / 10000;
+                                    if (protocolFeeAmount > 0) {
+                                        bondToRecord = bondAmount - protocolFeeAmount;
+                                        // Transfer protocol fee to fee recipient
+                                        IERC20(bondToken).safeTransfer(escrowFeeAddress, protocolFeeAmount);
+                                        emit AppealBondProtocolFeeCollected(
+                                            workflowId,
+                                            bondToken,
+                                            bondAmount,
+                                            protocolFeeAmount
+                                        );
+                                    }
+                                }
+                                
+                                // Transfer remaining bond to incentive module
+                                if (bondToRecord > 0) {
+                                    IERC20(bondToken).safeTransfer(address(incentiveMod), bondToRecord);
+                                    // Then record (function will verify balance increase)
+                                    try
+                                        incentiveMod.recordAppealBond(
+                                            workflowId,
+                                            _msgSender(),
+                                            bondToRecord,
+                                            bondToken,
+                                            result.newLevel
+                                        )
+                                    {} catch {}
+                                }
                             }
                         }
                     } catch {}
@@ -1417,6 +1574,56 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
         SettingsValidationLibrary.validateEscrowSettings(settings, block.timestamp);
     }
 
+    /**
+     * @notice Attempt automatic transfer with graceful fallback to claimable balance
+     * @param workflowId The escrow ID
+     * @param recipient Address to receive funds
+     * @param token Token address
+     * @param amount Amount to transfer
+     * @return transferred True if transfer succeeded, false if fell back to claimable
+     * @dev Always attempts transfer first, falls back to claimable if transfer fails
+     *      This provides best UX while maintaining compatibility with non-standard contracts
+     *      Uses low-level call to enable try-catch pattern for external calls
+     */
+    function _attemptAutoTransfer(
+        uint256 workflowId,
+        address recipient,
+        address token,
+        uint256 amount
+    ) internal returns (bool transferred) {
+        if (amount == 0) {
+            return false;
+        }
+
+        // Always attempt automatic transfer first
+        // Use low-level call to enable try-catch (required for external calls in Solidity)
+        // SafeERC20.safeTransfer will revert on failure, which we catch here
+        try this._safeTransferExternal(token, recipient, amount) {
+            // Transfer succeeded - emit event and return
+            emit EscrowTransferAutoCompleted(workflowId, recipient, token, amount);
+            return true;
+        } catch {
+            // Transfer failed - fallback to pull model (existing behavior)
+            claimable[workflowId][recipient][token] += amount;
+            emit ClaimableBalanceSet(workflowId, recipient, token, amount);
+            emit EscrowTransferAutoFailed(workflowId, recipient, token, amount, 'Transfer failed');
+            return false;
+        }
+    }
+
+    /**
+     * @notice External wrapper for safeTransfer to enable try-catch
+     * @param token Token address
+     * @param recipient Address to receive funds
+     * @param amount Amount to transfer
+     * @dev This function must be external (not internal) to allow try-catch
+     *      Only callable by this contract itself
+     */
+    function _safeTransferExternal(address token, address recipient, uint256 amount) external {
+        require(msg.sender == address(this), 'Internal only');
+        IERC20(token).safeTransfer(recipient, amount);
+    }
+
     function _cancelAndRefund(uint256 workflowId) internal {
         EscrowTransfer storage et = escrowTransfers[workflowId];
         uint256 amount = et.amountAfterFee;
@@ -1428,13 +1635,20 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
             IYieldGenerationModule genModule = _getYieldGenerationModule(workflowId);
             IYieldDistributionModule distModule = _getYieldDistributionModule(workflowId);
             try
-                yieldOps.handleFullYield(genModule, distModule, workflowId, token, amount)
+                yieldOps.handleYield(
+                    genModule,
+                    distModule,
+                    workflowId,
+                    token,
+                    amount,
+                    yieldProtocolFeeBps,
+                    escrowFeeAddress
+                )
             {} catch {}
         }
         _updateEscrowBalance(token, amount, false);
-        // Pull model: Set claimable balance instead of transferring tokens
-        claimable[workflowId][from][token] += amount;
-        emit ClaimableBalanceSet(workflowId, from, token, amount);
+        // Auto-transfer: Attempt automatic transfer, fallback to claimable if fails
+        _attemptAutoTransfer(workflowId, from, token, amount);
         _emitEscrowTransferCancelled(workflowId, token, from, amount);
     }
 
@@ -1449,13 +1663,20 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable, SlowLa
             IYieldGenerationModule genModule = _getYieldGenerationModule(workflowId);
             IYieldDistributionModule distModule = _getYieldDistributionModule(workflowId);
             try
-                yieldOps.handleFullYield(genModule, distModule, workflowId, token, amount)
+                yieldOps.handleYield(
+                    genModule,
+                    distModule,
+                    workflowId,
+                    token,
+                    amount,
+                    yieldProtocolFeeBps,
+                    escrowFeeAddress
+                )
             {} catch {}
         }
         _updateEscrowBalance(token, amount, false);
-        // Pull model: Set claimable balance instead of transferring tokens
-        claimable[workflowId][to][token] += amount;
-        emit ClaimableBalanceSet(workflowId, to, token, amount);
+        // Auto-transfer: Attempt automatic transfer, fallback to claimable if fails
+        _attemptAutoTransfer(workflowId, to, token, amount);
         _emitEscrowTransferReleased(workflowId, token, to, amount);
     }
 

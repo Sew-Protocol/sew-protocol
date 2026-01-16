@@ -35,12 +35,18 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
     uint256 public constant BASIS_POINTS = 10000;
     uint256 public constant PRECISION = 1e18;
 
-    // Conservative penalty schedule (basis points)
-    uint256 public constant PENALTY_MISSED_ACCEPT = 200; // 2%
-    uint256 public constant PENALTY_MISSED_RESOLVE = 500; // 5%
-    uint256 public constant PENALTY_UNRESPONSIVE = 1000; // 10%
+    // v3 objective slashing schedule (basis points)
+    uint256 public constant PENALTY_MISSED_ACCEPT = 25; // 0.25% (25 bps)
+    uint256 public constant PENALTY_MISSED_RESOLVE = 200; // 2% (200 bps)
+    uint256 public constant PENALTY_REPEAT_RESOLVE = 500; // 5% (500 bps) - repeat missed resolve in same epoch
+    uint256 public constant PENALTY_REVERSAL = 0; // 0 bps initially (use reputation/workload only)
 
-    // Slash caps
+    // Epoch-based slash caps (v3)
+    uint256 public constant EPOCH_LENGTH = 7 days;
+    uint256 public constant RESOLVER_SLASH_CAP_BPS = 2000; // 20% per resolver per epoch
+    uint256 public constant SENIOR_SLASH_CAP_BPS = 1000; // 10% per senior per epoch
+
+    // Legacy slash caps (kept for backward compatibility)
     uint256 public constant MAX_SLASH_PER_OFFENSE = 5000; // 50% max per slash
     uint256 public constant MAX_SLASH_PER_PERIOD = 10000; // 100% max per 30 days
     uint256 public constant SLASH_PERIOD = 30 days;
@@ -48,6 +54,11 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
     // Circuit breaker thresholds
     uint256 public constant MASS_UNAVAILABILITY_THRESHOLD = 3000; // 30% of resolvers
     uint256 public constant CIRCUIT_BREAKER_COOLDOWN = 1 hours;
+
+    // SEW burn handling:
+    // Prefer reducing totalSupply via ERC20Burnable.burn(uint256) if the token supports it.
+    // Fallback is a transfer to a well-known dead address (effective burn, but supply not reduced).
+    address public constant DEAD_BURN_ADDRESS = 0x000000000000000000000000000000000000dEaD;
 
     // ============ State Variables ============
 
@@ -73,9 +84,23 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
     }
     mapping(address => SlashPeriodTracker) public slashTrackers;
 
+    // v3 epoch-based slash tracking
+    struct EpochSlashTracker {
+        uint256 epochStart;
+        uint256 totalSlashedInEpoch;
+        uint256 lastSlashTime;
+        uint8 slashCount; // Count of slashes in this epoch
+    }
+    mapping(address => EpochSlashTracker) public epochSlashTrackers;
+
     // Freeze tracking (prevents withdrawal during slash processing)
     mapping(address => uint256) public frozenUntil; // resolver => timestamp
-    uint256 public constant FREEZE_DURATION = 7 days;
+    mapping(address => uint256) public freezeUntil; // resolver => timestamp (for insufficient bond)
+    
+    // v3 freeze durations
+    uint256 public constant FREEZE_DURATION_SEVERE = 72 hours; // Severe event (missed resolve deadline)
+    uint256 public constant FREEZE_DURATION_REPEATED = 7 days; // Repeated severe event within epoch
+    uint256 public constant FREEZE_DURATION_LEGACY = 7 days; // Legacy freeze duration (backward compatibility)
 
     // Mass unavailability tracking
     struct UnavailabilityStats {
@@ -114,6 +139,8 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         string reason
     );
 
+    event SlashedSEWHandled(uint256 indexed workflowId, uint256 amount, bool supplyReduced);
+
     // ============ Initialization ============
 
     constructor(
@@ -142,8 +169,8 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
 
         // Initialize slash config with conservative defaults
         slashConfig = SlashConfig({
-            timeoutSlashBps: PENALTY_MISSED_RESOLVE,
-            reversalSlashBps: 0, // Disabled initially
+            timeoutSlashBps: PENALTY_MISSED_RESOLVE, // 200 bps (2%)
+            reversalSlashBps: PENALTY_REVERSAL, // 0 bps initially (disabled)
             fraudSlashBps: 0, // Not implemented yet
             maxSlashPerPeriod: MAX_SLASH_PER_PERIOD,
             slashPeriod: SLASH_PERIOD,
@@ -404,15 +431,101 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
     }
 
     /**
-     * @notice Slash for fraud (not implemented yet)
+     * @notice Slash for fraud (provable malicious behavior)
+     * @param workflowId Dispute ID
+     * @param resolver Resolver who committed fraud
+     * @param evidence Proof of fraud (on-chain or off-chain evidence)
+     * @dev Requires TIMELOCK role for manual fraud verification
+     *      Fraud slashing uses fraudSlashBps from slash config (typically 50-100%)
+     *      Evidence should be provided for audit trail
      */
     function slashForFraud(
         uint256 workflowId,
         address resolver,
         bytes calldata evidence
-    ) external returns (uint256 slashId) {
-        // Fraud slashing not implemented yet
-        revert('Not implemented');
+    ) external onlyRole(ROLE_TIMELOCK) returns (uint256 slashId) {
+        // Check if already slashed for this workflow
+        if (workflowSlashed[workflowId][resolver]) {
+            return 0; // Already slashed, skip
+        }
+
+        // Check circuit breaker
+        if (circuitBreakerActive) {
+            emit SlashCapEnforced(resolver, 0, 0, 'Circuit breaker active');
+            return 0;
+        }
+
+        // Verify fraud slash percentage is configured
+        require(slashConfig.fraudSlashBps > 0, 'Fraud slashing not enabled');
+
+        // Determine slash reason and amount
+        SlashReason reason = SlashReason.FRAUD;
+        uint256 slashAmount = _calculateSlashAmount(resolver, reason);
+
+        // Check if slash would exceed caps
+        slashAmount = _enforceSlashCaps(resolver, slashAmount);
+
+        if (slashAmount == 0) {
+            return 0; // Cap reached, skip slash
+        }
+
+        // Create slash event with evidence
+        slashId = _nextSlashId++;
+
+        slashEvents[slashId] = SlashEvent({
+            slashId: slashId,
+            workflowId: workflowId,
+            resolver: resolver,
+            reason: reason,
+            amount: slashAmount,
+            proposedAt: block.timestamp,
+            executedAt: block.timestamp, // Auto-execute for TIMELOCK-initiated fraud slashes
+            appealDeadline: block.timestamp + slashConfig.appealWindow, // Allow appeal
+            status: SlashStatus.EXECUTED,
+            proposer: msg.sender,
+            evidence: evidence // Store evidence for audit
+        });
+
+        // Execute waterfall slash immediately
+        (uint256 resolverSlashed, uint256 seniorSlashed, address senior) = _executeWaterfallSlash(
+            resolver,
+            slashAmount
+        );
+
+        uint256 totalSlashed = resolverSlashed + seniorSlashed;
+
+        // Mark as slashed
+        workflowSlashed[workflowId][resolver] = true;
+
+        // Freeze resolver (fraud is severe)
+        _freezeResolver(resolver);
+
+        // Distribute slashed funds (using actual token amounts received from staking module)
+        SlashDistribution memory distribution = _distributeSlashedFunds(
+            _currentSlashStableAmount,
+            reason,
+            workflowId
+        );
+
+        // Reset tracking after distribution
+        _currentSlashStableAmount = 0;
+        _currentSlashSewAmount = 0;
+
+        // Update unavailability stats
+        _updateUnavailabilityStats(resolver, true);
+
+        emit SlashProposed(slashId, workflowId, resolver, reason, slashAmount, msg.sender);
+        emit SlashExecuted(slashId, resolver, totalSlashed, distribution);
+        emit SlashExecutedWithWaterfall(
+            slashId,
+            resolver,
+            senior,
+            resolverSlashed,
+            seniorSlashed,
+            totalSlashed
+        );
+
+        return slashId;
     }
 
     // ============ Internal Functions ============
@@ -493,16 +606,25 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         uint256 penaltyBps;
 
         if (reason == SlashReason.TIMEOUT_ACCEPT) {
-            penaltyBps = PENALTY_MISSED_ACCEPT; // 2%
+            penaltyBps = PENALTY_MISSED_ACCEPT; // 25 bps (0.25%)
         } else if (reason == SlashReason.TIMEOUT_RESOLVE) {
-            penaltyBps = PENALTY_MISSED_RESOLVE; // 5%
+            // Check if this is a repeat offense in the same epoch
+            EpochSlashTracker storage epochTracker = epochSlashTrackers[resolver];
+            uint256 currentEpochStart = (block.timestamp / EPOCH_LENGTH) * EPOCH_LENGTH;
+            
+            // If resolver already slashed in this epoch, use repeat penalty
+            if (epochTracker.epochStart == currentEpochStart && epochTracker.slashCount > 0) {
+                penaltyBps = PENALTY_REPEAT_RESOLVE; // 500 bps (5%) for repeat
+            } else {
+                penaltyBps = PENALTY_MISSED_RESOLVE; // 200 bps (2%) for first offense
+            }
         } else if (reason == SlashReason.REVERSAL) {
-            penaltyBps = slashConfig.reversalSlashBps; // 0% initially
+            penaltyBps = PENALTY_REVERSAL; // 0 bps initially (disabled)
         } else if (reason == SlashReason.FRAUD) {
             penaltyBps = slashConfig.fraudSlashBps; // 0% initially
         } else {
             // COLLUSION, BRIBERY, or custom
-            penaltyBps = PENALTY_UNRESPONSIVE; // 10%
+            penaltyBps = PENALTY_REPEAT_RESOLVE; // Use repeat penalty as fallback
         }
 
         uint256 slashAmount = (totalStake * penaltyBps) / BASIS_POINTS;
@@ -517,13 +639,14 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
     }
 
     /**
-     * @notice Enforce slash caps (per-period limit)
+     * @notice Enforce slash caps (per-period limit and per-epoch limit)
      */
     function _enforceSlashCaps(
         address resolver,
         uint256 requestedSlash
     ) internal returns (uint256 actualSlash) {
         SlashPeriodTracker storage tracker = slashTrackers[resolver];
+        EpochSlashTracker storage epochTracker = epochSlashTrackers[resolver];
 
         // Check if new period
         if (block.timestamp >= tracker.periodStart + slashConfig.slashPeriod) {
@@ -532,25 +655,49 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
             tracker.totalSlashedInPeriod = 0;
         }
 
-        // Get resolver's total stake
+        // Check if new epoch (v3 epoch-based caps)
+        uint256 currentEpochStart = (block.timestamp / EPOCH_LENGTH) * EPOCH_LENGTH;
+        if (epochTracker.epochStart != currentEpochStart) {
+            // Reset epoch
+            epochTracker.epochStart = currentEpochStart;
+            epochTracker.totalSlashedInEpoch = 0;
+            epochTracker.slashCount = 0;
+        }
+
+        // Get resolver's total stake and tier
         IStakingModule.StakeInfo memory stakeInfo = stakingModule.getStakeInfo(resolver);
         uint256 totalStake = stakeInfo.totalStake;
+        uint8 tier = stakingModule.resolverTier(resolver);
 
-        // Calculate max allowed in period
+        // Calculate max allowed in period (legacy cap)
         uint256 maxInPeriod = (totalStake * slashConfig.maxSlashPerPeriod) / BASIS_POINTS;
         uint256 remainingInPeriod = maxInPeriod > tracker.totalSlashedInPeriod
             ? maxInPeriod - tracker.totalSlashedInPeriod
             : 0;
 
-        if (requestedSlash > remainingInPeriod) {
-            actualSlash = remainingInPeriod;
-            emit SlashCapEnforced(resolver, requestedSlash, actualSlash, 'Period cap reached');
+        // Calculate max allowed in epoch (v3 cap)
+        uint256 epochCapBps = (tier == 1) ? SENIOR_SLASH_CAP_BPS : RESOLVER_SLASH_CAP_BPS;
+        uint256 maxInEpoch = (totalStake * epochCapBps) / BASIS_POINTS;
+        uint256 remainingInEpoch = maxInEpoch > epochTracker.totalSlashedInEpoch
+            ? maxInEpoch - epochTracker.totalSlashedInEpoch
+            : 0;
+
+        // Enforce both caps (use the more restrictive)
+        uint256 maxAllowed = remainingInPeriod < remainingInEpoch ? remainingInPeriod : remainingInEpoch;
+
+        if (requestedSlash > maxAllowed) {
+            actualSlash = maxAllowed;
+            string memory reason = remainingInPeriod < remainingInEpoch ? 'Period cap reached' : 'Epoch cap reached';
+            emit SlashCapEnforced(resolver, requestedSlash, actualSlash, reason);
         } else {
             actualSlash = requestedSlash;
         }
 
-        // Update tracker
+        // Update trackers
         tracker.totalSlashedInPeriod += actualSlash;
+        epochTracker.totalSlashedInEpoch += actualSlash;
+        epochTracker.slashCount++;
+        epochTracker.lastSlashTime = block.timestamp;
     }
 
     // Track slashed token amounts for distribution
@@ -640,10 +787,10 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         SlashReason reason,
         uint256 workflowId
     ) internal returns (SlashDistribution memory distribution) {
-        // Conservative distribution:
+        // Conservative stable-token distribution:
         // - 50% to insurance pool (protect users)
-        // - 30% to protocol treasury
-        // - 20% burned (deflationary)
+        // - 30% to protocol treasury (currently retained here until treasury integration)
+        // Note: SEW (protocol token) slashed from bonds is handled separately (burned).
 
         distribution.toInsurancePool = (amount * 5000) / BASIS_POINTS;
         distribution.toProtocol = (amount * 3000) / BASIS_POINTS;
@@ -662,15 +809,72 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         // TODO: Transfer protocol portion to treasury (when treasury contract exists)
         // For now, protocol portion remains in this contract
 
+        // Burn any slashed SEW received from the staking module for this slash
+        _handleSlashedSEW(workflowId);
+
         return distribution;
     }
 
     /**
+     * @notice Handle slashed SEW from the staking module (burn)
+     * @dev If SEW token supports ERC20Burnable.burn(uint256), supply is reduced.
+     *      Otherwise, SEW is transferred to a dead address (effective burn).
+     */
+    function _handleSlashedSEW(uint256 workflowId) internal {
+        uint256 amount = _currentSlashSewAmount;
+        if (amount == 0) return;
+
+        IERC20 sew = IERC20(address(stakingModule.sewToken()));
+
+        // Try to burn (preferred: reduces totalSupply)
+        (bool ok, ) = address(sew).call(abi.encodeWithSignature('burn(uint256)', amount));
+        if (ok) {
+            emit SlashedSEWHandled(workflowId, amount, true);
+            return;
+        }
+
+        // Fallback: transfer to dead address (effective burn)
+        sew.safeTransfer(DEAD_BURN_ADDRESS, amount);
+        emit SlashedSEWHandled(workflowId, amount, false);
+    }
+
+    /**
      * @notice Freeze resolver (prevents withdrawal during slash processing)
+     * @dev v3: Uses different freeze durations based on severity
+     *      - Severe event: 72 hours
+     *      - Repeated severe event within epoch: 7 days
+     *      - Insufficient bond: until topped up (minimum 72 hours)
      */
     function _freezeResolver(address resolver) internal {
-        frozenUntil[resolver] = block.timestamp + FREEZE_DURATION;
+        EpochSlashTracker storage epochTracker = epochSlashTrackers[resolver];
+        uint256 currentEpochStart = (block.timestamp / EPOCH_LENGTH) * EPOCH_LENGTH;
+        
+        // Determine freeze duration based on context
+        uint256 freezeDuration;
+        
+        // Check if this is a repeated offense in the same epoch
+        if (epochTracker.epochStart == currentEpochStart && epochTracker.slashCount > 1) {
+            // Repeated severe event within epoch
+            freezeDuration = FREEZE_DURATION_REPEATED; // 7 days
+        } else {
+            // First or new epoch - severe event
+            freezeDuration = FREEZE_DURATION_SEVERE; // 72 hours
+        }
+        
+        frozenUntil[resolver] = block.timestamp + freezeDuration;
         emit ResolverFrozen(resolver, frozenUntil[resolver]);
+    }
+
+    /**
+     * @notice Freeze resolver due to insufficient bond (v3)
+     * @dev Freeze until topped up, minimum 72 hours
+     */
+    function _freezeResolverInsufficientBond(address resolver) internal {
+        uint256 minFreezeUntil = block.timestamp + FREEZE_DURATION_SEVERE; // Minimum 72 hours
+        if (freezeUntil[resolver] < minFreezeUntil) {
+            freezeUntil[resolver] = minFreezeUntil;
+        }
+        // Note: This is separate from frozenUntil - can be checked separately
     }
 
     /**

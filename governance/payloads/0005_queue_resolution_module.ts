@@ -10,6 +10,7 @@
 
 import { PayloadBuilder } from '../../scripts/gov/types';
 import { getDeployedAddress } from '../../scripts/gov/addresses';
+import { validateAddress, isZeroAddress } from '../../scripts/_lib/addresses';
 
 export const metadata = {
   id: '0005_queue_resolution_module',
@@ -37,11 +38,19 @@ const buildPayload: PayloadBuilder = async (hre, config) => {
   const targetContractName = config?.targetContract || metadata.config.targetContract;
   const contractAddress = await getDeployedAddress(hre, targetContractName, true);
 
-  const newResolutionModule = config?.newResolutionModule || metadata.config.newResolutionModule;
+  const newResolutionModuleRaw =
+    config?.newResolutionModule || metadata.config.newResolutionModule;
 
-  if (newResolutionModule === '0x0000000000000000000000000000000000000000') {
+  if (isZeroAddress(newResolutionModuleRaw)) {
     throw new Error('NEW_RESOLUTION_MODULE must be set to a valid address');
   }
+
+  // Validate and normalize address
+  const newResolutionModule = validateAddress(
+    newResolutionModuleRaw,
+    'NEW_RESOLUTION_MODULE',
+    false,
+  );
 
   return [
     {

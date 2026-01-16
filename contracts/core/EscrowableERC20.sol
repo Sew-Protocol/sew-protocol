@@ -29,6 +29,10 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _grantRole(ROLE_TIMELOCK, _msgSender());
 
+        // Initialize protocol fees
+        yieldProtocolFeeBps = 3000; // 30% default
+        appealBondProtocolFeeBps = 0; // 0% default
+
         // Initialize timeout config
         timeoutConfig = TimeoutConfig({
             defaultAutoReleaseTime: 0,

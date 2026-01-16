@@ -1,7 +1,7 @@
 # DR v3 Implementation TODO
 
 **Target:** Decentralize Capital (Resolver Staking + Slashing)  
-**Status:** Implementation In Progress (Phase 1-3 Complete, Phase 5 Partial)  
+**Status:** Core Implementation Complete (Phase 1-3 Complete, Phase 5 Mostly Complete, Phase 4 Deferred, Phase 6-7 Partial)  
 **Approach:** Interface-first, no-op stubs, then real implementations with invariants
 
 ---
@@ -98,10 +98,12 @@ Implement real staking logic with ERC20 tokens, time-locks, and delegation suppo
 - [x] `undelegateStake(address resolver, uint256 amount)` - Remove backing
 - [x] View functions for stake status
 
-#### 2.3 Stake Requirements
+#### 2.3 Stake Requirements (v3 launch defaults)
 
-- [x] Standard resolver: minimum stake (e.g., 1000 tokens)
-- [x] Senior resolver: higher minimum (e.g., 10000 tokens)
+- [x] Standard resolver: minimum stake $250 (250e18 in 18 decimals)
+- [x] Senior resolver: minimum stake $25,000 (25000e18 in 18 decimals)
+- [x] Suggested operating bond: $500 for resolvers
+- [x] Recommended senior bond: $50,000-$100,000
 - [x] Stake multiplier for workload capacity
 - [ ] Grace period for falling below minimum
 
@@ -130,8 +132,8 @@ Implement slashing logic with graduated penalties, appeals, and fraud proofs.
 - [x] Slash distribution (protocol, counter-party, insurance pool)
   - ⚠️ Counter-party portion not implemented (set to 0)
   - ⚠️ Slash proposer rewards not implemented (set to 0)
-- [ ] Fraud proof verification
-- [ ] `slashForFraud()` - **STUBBED** (reverts with "Not implemented")
+- [x] Fraud proof verification (evidence storage)
+- [x] `slashForFraud()` - **IMPLEMENTED** (requires TIMELOCK role, supports evidence)
 
 #### 3.2 Slashing Rules
 

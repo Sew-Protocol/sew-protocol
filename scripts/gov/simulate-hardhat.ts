@@ -16,6 +16,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { ProposalArtifact, ProposalCall, ExecutionResult } from './types';
 import { getDeployedAddress } from './addresses';
+import { isZeroAddress, formatAddressFull, prettyPrintAddress } from '../_lib/addresses';
 
 interface SimulationConfig {
   forkUrl?: string;
@@ -185,8 +186,8 @@ async function main() {
   let executor: string;
   if (proposal.lane === 'emergency') {
     // Emergency lane uses Guardian
-    executor = process.env.GUARDIAN_ADDRESS || '0x0000000000000000000000000000000000000000';
-    if (executor === '0x0000000000000000000000000000000000000000') {
+    executor = process.env.GUARDIAN_ADDRESS || '';
+    if (!executor || isZeroAddress(executor)) {
       throw new Error('GUARDIAN_ADDRESS must be set for emergency lane proposals');
     }
   } else {
@@ -198,14 +199,14 @@ async function main() {
         console.warn(`   ⚠️  Using placeholder Timelock: ${executor}`);
       }
     } catch (error) {
-      executor = process.env.TIMELOCK_ADDRESS || '0x0000000000000000000000000000000000000000';
-      if (executor === '0x0000000000000000000000000000000000000000') {
+      executor = process.env.TIMELOCK_ADDRESS || '';
+      if (!executor || isZeroAddress(executor)) {
         throw new Error('TIMELOCK_ADDRESS must be set or TimelockController must be deployed');
       }
     }
   }
 
-  console.log(`\n👤 Executor: ${executor}`);
+  console.log(`\n👤 Executor: ${prettyPrintAddress('Executor', executor, { full: true })}`);
 
   // Execute calls
   console.log('\n⚡ Executing proposal calls...');

@@ -59,6 +59,10 @@ contract EscrowVault is BaseEscrow {
         disputeOps = DisputeOps(d);
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
 
+        // Initialize protocol fees
+        yieldProtocolFeeBps = 3000; // 30% default
+        appealBondProtocolFeeBps = 0; // 0% default
+
         // Initialize timeout config
         timeoutConfig = TimeoutConfig({
             defaultAutoReleaseTime: 0,

@@ -74,6 +74,21 @@ contract ReentrancyProtectionTest is Test {
         vm.warp(block.timestamp + 7 days + 1);
         escrow.activateResolutionModule();
 
+        // Appoint resolvers
+        vm.startPrank(timelock);
+        resolutionModule.appointSeniorResolver(resolver1, 'Senior Resolver', 'Test');
+        vm.stopPrank();
+        
+        vm.prank(resolver1);
+        resolutionModule.appointResolver(user1, 'Resolver 1', 'Test');
+        
+        vm.startPrank(timelock);
+        resolutionModule.setResolverActive(resolver1, true);
+        resolutionModule.setResolverActive(user1, true);
+        resolutionModule.setResolverCapacity(resolver1, 0, true);
+        resolutionModule.setResolverCapacity(user1, 0, true);
+        vm.stopPrank();
+
         // Deploy token
         token = new ERC20Mock('Test Token', 'TEST', deployer, 1_000_000 ether);
         token.mint(user1, 1_000_000 ether);
@@ -245,14 +260,14 @@ contract ReentrancyProtectionTest is Test {
         );
         vm.stopPrank();
 
-        // Attempt to release twice - second should fail due to state change
-        vm.startPrank(user1);
+        // Sender can release escrow
+        vm.prank(user1);
         escrow.releaseEscrowTransfer(workflowId);
 
         // Second release should revert (escrow already released)
+        vm.prank(user1);
         vm.expectRevert();
         escrow.releaseEscrowTransfer(workflowId);
-        vm.stopPrank();
     }
 
     /**
@@ -276,9 +291,12 @@ contract ReentrancyProtectionTest is Test {
         );
         vm.stopPrank();
 
-        // Cancel escrow - sender can cancel
+        // Both sender and recipient agree to cancel
         vm.prank(user1);
         escrow.senderCancel(workflowId);
+        
+        vm.prank(user2);
+        escrow.recipientCancel(workflowId);
 
         // Attempt to cancel again - should revert (already cancelled)
         vm.prank(user1);

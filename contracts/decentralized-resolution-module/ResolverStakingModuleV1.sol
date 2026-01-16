@@ -9,6 +9,14 @@ import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 
 /**
+ * @notice Minimal interface for burnable ERC20 tokens
+ * @dev Used for burning SEW tokens when slashed
+ */
+interface IERC20Burnable {
+    function burn(uint256 amount) external;
+}
+
+/**
  * @title ResolverStakingModuleV1
  * @notice Real staking implementation for DR v3 with mixed stable/SEW bonds
  * @dev Key Features:
@@ -49,6 +57,10 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
     // Coverage parameters
     uint256 public constant COVERAGE_MULTIPLIER = 3; // M = 3x
     uint256 public constant UTILIZATION_BPS = 5000; // U = 50%
+
+    // Capacity limits (v3)
+    uint256 public constant MAX_ESCROW_PER_L0_CASE = 2000e18; // $2,000 max escrow per L0 case (18 decimals)
+    uint256 public constant CAPACITY_MULTIPLIER = 4; // Max escrow = 4× resolverBond
 
     // Haircut for SEW
     uint256 public constant SEW_HAIRCUT_BPS = 5000; // 50% haircut
@@ -157,9 +169,11 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
 
         paused = false;
 
-        // Set default minimum stakes
-        minimumStakes[0] = 1000e18; // Resolver: 1000 USD
-        minimumStakes[1] = 10000e18; // Senior: 10000 USD
+        // Set default minimum stakes (v3 launch-safe defaults)
+        // Resolver: min $250, suggested operating bond $500
+        minimumStakes[0] = 250e18; // Resolver: 250 USD (min)
+        // Senior: min $25,000, recommended $50,000-$100,000
+        minimumStakes[1] = 25000e18; // Senior: 25,000 USD (min)
     }
 
     // ============ Core Staking Functions ============
@@ -744,6 +758,19 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
     }
 
     /**
+     * @notice Get max escrow per L0 case for a resolver (v3 capacity limit)
+     * @param resolver Resolver address
+     * @return maxEscrow Max escrow value (18 decimals) = min($2,000, 4× resolverBond)
+     * @dev v3: Capacity gating forces high-value cases to flow only to resolvers with higher bond
+     */
+    function getMaxEscrowPerCase(address resolver) external view returns (uint256 maxEscrow) {
+        BondComposition storage bond = resolverBonds[resolver];
+        uint256 bondBasedLimit = bond.effectiveBondUSD * CAPACITY_MULTIPLIER;
+        maxEscrow = bondBasedLimit < MAX_ESCROW_PER_L0_CASE ? bondBasedLimit : MAX_ESCROW_PER_L0_CASE;
+        return maxEscrow;
+    }
+
+    /**
      * @notice Get stake token (returns stable token)
      */
     function getStakeToken() external view returns (address token) {
@@ -891,10 +918,12 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
 
         bond.lastUpdated = block.timestamp;
 
-        // Transfer slashed funds to slashing module
+        // Transfer slashed stable to slashing module
         if (stableSlashed > 0) {
             stableToken.safeTransfer(msg.sender, stableSlashed);
         }
+        // Burn slashed SEW tokens (deflationary)
+        // Transfer to slashing module first, then it burns
         if (sewSlashed > 0) {
             sewToken.safeTransfer(msg.sender, sewSlashed);
         }
@@ -979,10 +1008,11 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
             reservedCoverage[senior] -= coverageReduction;
         }
 
-        // Transfer slashed funds to slashing module
+        // Transfer slashed stable to slashing module
         if (stableSlashed > 0) {
             stableToken.safeTransfer(msg.sender, stableSlashed);
         }
+        // Transfer slashed SEW tokens to slashing module (for burning)
         if (sewSlashed > 0) {
             sewToken.safeTransfer(msg.sender, sewSlashed);
         }

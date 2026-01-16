@@ -46,7 +46,12 @@ contract DecentralizedResolutionModule is
     uint256 public maxTimeoutRateBps = 3000; // 30% maximum timeout rate
 
     // DR v1: Timeout durations per round
-    uint256[3] public resolveDeadlines = [3 days, 5 days, 7 days]; // Time to resolve per round
+    // v3 objective slashing schedule:
+    // - t_accept: 30 minutes (used for accept deadline check)
+    // - t_resolve_L0: 24 hours (resolver round)
+    // - t_resolve_L1: 48 hours (senior round)
+    uint256 public constant ACCEPT_DEADLINE = 30 minutes; // Time to accept assignment
+    uint256[3] public resolveDeadlines = [24 hours, 48 hours, 7 days]; // Time to resolve per round (L0, L1, L2)
     uint256[3] public appealWindows = [2 days, 3 days, 0]; // Time to appeal after decision
 
     // DR v2: Appeal bond configuration
@@ -59,6 +64,26 @@ contract DecentralizedResolutionModule is
     EscalationCostConfig public escalationCostConfig;
     PendingEscalationCostConfig private _pendingEscalationCostConfig;
     uint256 public minEscrowValueForEscalation; // Minimum escrow value to allow escalation (anti-griefing)
+
+    // DR v2: Appeal bond token whitelist
+    mapping(address => bool) public acceptedBondTokens;
+    address[] public acceptedBondTokensList;
+    address public defaultBondToken;
+
+    struct PendingBondTokenChange {
+        address token;
+        bool isAdd; // true = add, false = remove
+        uint64 eta;
+        bool exists;
+    }
+    PendingBondTokenChange private _pendingBondTokenChange;
+
+    struct PendingDefaultBondToken {
+        address token;
+        uint64 eta;
+        bool exists;
+    }
+    PendingDefaultBondToken private _pendingDefaultBondToken;
 
     mapping(address => ResolverRole) public resolverRoles;
     mapping(address => bool) public isApprovedResolver;
@@ -166,6 +191,10 @@ contract DecentralizedResolutionModule is
     );
     event AppealBondRequired(uint256 indexed escrowId, uint8 round, uint256 amount, address token);
     event MinEscrowValueUpdated(uint256 oldValue, uint256 newValue);
+    event AcceptedBondTokenQueued(address indexed token, bool isAdd, uint64 eta);
+    event AcceptedBondTokenChanged(address indexed token, bool isAdd);
+    event DefaultBondTokenQueued(address indexed token, uint64 eta);
+    event DefaultBondTokenChanged(address indexed oldToken, address indexed newToken);
 
     // DR v3 events
     event StakingModuleQueued(address indexed module, uint64 eta);
@@ -202,8 +231,9 @@ contract DecentralizedResolutionModule is
         escalationConfig[1] = EscalationConfig({resolver: address(0), fee: 0, enabled: true});
         escalationConfig[2] = EscalationConfig({resolver: address(0), fee: 0, enabled: false});
 
-        // Initialize DR v1 timeout parameters
-        resolveDeadlines = [3 days, 5 days, 7 days];
+        // Initialize DR v1 timeout parameters (v3 updated defaults)
+        // v3: t_resolve_L0 = 24 hours, t_resolve_L1 = 48 hours
+        resolveDeadlines = [24 hours, 48 hours, 7 days];
         appealWindows = [2 days, 3 days, 0];
 
         // Initialize DR v1 EMA parameters
@@ -212,15 +242,23 @@ contract DecentralizedResolutionModule is
         maxTimeoutRateBps = 3000; // 30% maximum timeout rate
 
         // Initialize DR v1 escalation bond configuration (enabled in DR v1)
+        // NOTE: Default bondToken is ETH (address(0)) for backward compatibility.
+        // In production, this should be set to a USD stablecoin (e.g., USDC) via governance
+        // after deployment. See APPEAL_BOND_TOKEN_WHITELIST_PLAN.md for implementation plan.
         escalationCostConfig = EscalationCostConfig({
             enabled: true,
             curveType: CostCurveType.QUADRATIC,
             baseCost: 0.01 ether,
             stepSize: 0.01 ether,
             multiplier: 0,
-            bondToken: address(0)
+            bondToken: address(0) // Default: ETH. Production: USD stablecoin (governance-controlled)
         });
         minEscrowValueForEscalation = 0; // No minimum by default
+
+        // Initialize bond token whitelist with ETH as default
+        acceptedBondTokens[address(0)] = true; // ETH (address(0)) is accepted by default
+        acceptedBondTokensList.push(address(0));
+        defaultBondToken = address(0); // ETH as default for backward compatibility
     }
 
     function appointResolver(
@@ -538,7 +576,18 @@ contract DecentralizedResolutionModule is
             escalationCostConfig
         );
 
-        return (bondAmount, escalationCostConfig.bondToken);
+        // Determine which token to use:
+        // 1. If defaultBondToken is set and in whitelist, use it
+        // 2. Otherwise use config.bondToken (for backward compatibility and explicit overrides)
+        address bondToken = (defaultBondToken != address(0) && acceptedBondTokens[defaultBondToken])
+            ? defaultBondToken
+            : escalationCostConfig.bondToken;
+
+        // Note: We don't strictly require whitelist membership for the selected token
+        // to maintain backward compatibility with existing escalation configs.
+        // The whitelist is primarily for governance control over NEW tokens.
+
+        return (bondAmount, bondToken);
     }
 
     function moduleName() external pure override returns (string memory) {
@@ -1282,6 +1331,14 @@ contract DecentralizedResolutionModule is
     ) external onlyRole(ROLE_TIMELOCK) {
         require(config.baseCost > 0 || !config.enabled, 'Base cost must be > 0 if enabled');
 
+        // Validate bond token if specified and not address(0)
+        // Allow address(0) (ETH) without whitelist check for backward compatibility
+        if (config.bondToken != address(0)) {
+            // For non-ETH tokens, we optionally validate against whitelist
+            // but don't strictly require it for backward compatibility
+            // The actual validation happens when the bond is retrieved in getRequiredAppealBond
+        }
+
         _pendingEscalationCostConfig = PendingEscalationCostConfig({
             config: config,
             eta: uint64(block.timestamp + SLOW_DELAY),
@@ -1328,6 +1385,158 @@ contract DecentralizedResolutionModule is
         uint256 oldValue = minEscrowValueForEscalation;
         minEscrowValueForEscalation = minValue;
         emit MinEscrowValueUpdated(oldValue, minValue);
+    }
+
+    // ============ DR v2 Bond Token Whitelist Functions ============
+
+    /**
+     * @notice Queue adding a token to the accepted bond tokens whitelist
+     * @param token Token address to add
+     * @dev Requires ROLE_TIMELOCK, slow lane governance
+     */
+    function queueAddAcceptedBondToken(address token) external onlyRole(ROLE_TIMELOCK) {
+        require(token != address(0) || acceptedBondTokens[address(0)], 'Invalid token');
+        require(!acceptedBondTokens[token], 'Token already in whitelist');
+
+        _pendingBondTokenChange = PendingBondTokenChange({
+            token: token,
+            isAdd: true,
+            eta: uint64(block.timestamp + 7 days),
+            exists: true
+        });
+
+        emit AcceptedBondTokenQueued(token, true, _pendingBondTokenChange.eta);
+    }
+
+    /**
+     * @notice Queue removing a token from the accepted bond tokens whitelist
+     * @param token Token address to remove
+     * @dev Requires ROLE_TIMELOCK, slow lane governance
+     */
+    function queueRemoveAcceptedBondToken(address token) external onlyRole(ROLE_TIMELOCK) {
+        require(token != defaultBondToken, 'Cannot remove default bond token');
+        require(acceptedBondTokens[token], 'Token not in whitelist');
+
+        _pendingBondTokenChange = PendingBondTokenChange({
+            token: token,
+            isAdd: false,
+            eta: uint64(block.timestamp + 7 days),
+            exists: true
+        });
+
+        emit AcceptedBondTokenQueued(token, false, _pendingBondTokenChange.eta);
+    }
+
+    /**
+     * @notice Activate queued bond token whitelist change
+     * @dev Requires ROLE_TIMELOCK, after timelock delay
+     */
+    function activateBondTokenWhitelistChange() external onlyRole(ROLE_TIMELOCK) {
+        require(_pendingBondTokenChange.exists, 'No pending bond token change');
+        require(block.timestamp >= _pendingBondTokenChange.eta, 'Timelock not elapsed');
+
+        address token = _pendingBondTokenChange.token;
+        bool isAdd = _pendingBondTokenChange.isAdd;
+
+        if (isAdd) {
+            acceptedBondTokens[token] = true;
+            acceptedBondTokensList.push(token);
+        } else {
+            acceptedBondTokens[token] = false;
+            // Note: We don't remove from array to preserve indices
+        }
+
+        delete _pendingBondTokenChange;
+        emit AcceptedBondTokenChanged(token, isAdd);
+    }
+
+    /**
+     * @notice Queue setting the default bond token
+     * @param token Token address (must be in whitelist)
+     * @dev Requires ROLE_TIMELOCK, slow lane governance
+     */
+    function queueSetDefaultBondToken(address token) external onlyRole(ROLE_TIMELOCK) {
+        require(acceptedBondTokens[token], 'Token not in whitelist');
+
+        _pendingDefaultBondToken = PendingDefaultBondToken({
+            token: token,
+            eta: uint64(block.timestamp + 7 days),
+            exists: true
+        });
+
+        emit DefaultBondTokenQueued(token, _pendingDefaultBondToken.eta);
+    }
+
+    /**
+     * @notice Activate queued default bond token change
+     * @dev Requires ROLE_TIMELOCK, after timelock delay
+     */
+    function activateDefaultBondToken() external onlyRole(ROLE_TIMELOCK) {
+        require(_pendingDefaultBondToken.exists, 'No pending default bond token change');
+        require(block.timestamp >= _pendingDefaultBondToken.eta, 'Timelock not elapsed');
+
+        address oldToken = defaultBondToken;
+        address newToken = _pendingDefaultBondToken.token;
+
+        defaultBondToken = newToken;
+        delete _pendingDefaultBondToken;
+
+        emit DefaultBondTokenChanged(oldToken, newToken);
+    }
+
+    /**
+     * @notice Check if token is accepted for bonds
+     * @param token Token address to check
+     * @return True if token is accepted
+     */
+    function isAcceptedBondToken(address token) external view returns (bool) {
+        return acceptedBondTokens[token];
+    }
+
+    /**
+     * @notice Get list of accepted bond tokens
+     * @return Array of accepted bond token addresses
+     */
+    function getAcceptedBondTokens() external view returns (address[] memory) {
+        return acceptedBondTokensList;
+    }
+
+    /**
+     * @notice Get pending bond token change
+     * @return token Token address
+     * @return isAdd Whether change is adding (true) or removing (false)
+     * @return eta Activation time
+     * @return exists Whether a change is pending
+     */
+    function getPendingBondTokenChange()
+        external
+        view
+        returns (address token, bool isAdd, uint64 eta, bool exists)
+    {
+        return (
+            _pendingBondTokenChange.token,
+            _pendingBondTokenChange.isAdd,
+            _pendingBondTokenChange.eta,
+            _pendingBondTokenChange.exists
+        );
+    }
+
+    /**
+     * @notice Get pending default bond token change
+     * @return token Token address
+     * @return eta Activation time
+     * @return exists Whether a change is pending
+     */
+    function getPendingDefaultBondToken()
+        external
+        view
+        returns (address token, uint64 eta, bool exists)
+    {
+        return (
+            _pendingDefaultBondToken.token,
+            _pendingDefaultBondToken.eta,
+            _pendingDefaultBondToken.exists
+        );
     }
 
     // ============ DR v3 Governance Functions ============

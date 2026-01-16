@@ -21,6 +21,11 @@ library SettingsValidationLibrary {
     uint256 public constant MIN_YIELD_RECIPIENTS = 1;
     uint256 public constant MAX_YIELD_RECIPIENTS = 10;
     uint256 public constant BPS_DENOMINATOR = 10_000;
+    
+    // New constraints
+    uint256 public constant MIN_ESCROW_AMOUNT = 1000; // Minimum escrow amount (1000 wei)
+    uint256 public constant MAX_ESCROW_DURATION = 365 days; // Maximum escrow duration (1 year)
+    uint256 public constant MIN_YIELD_DEPOSIT = 1000e6; // Minimum yield deposit (1000 tokens with 6 decimals)
 
     // Phase 6: Custom errors (using different names to avoid conflicts with EscrowTypes)
     error OutOfBounds(bytes32 key, uint256 value, uint256 min, uint256 max);
@@ -71,7 +76,7 @@ library SettingsValidationLibrary {
     function validateEscrowSettings(
         EscrowSettings memory settings,
         uint256 currentTime
-    ) internal pure {
+    ) internal view {
         // Validate auto times
         if (settings.autoReleaseTime != 0 && settings.autoCancelTime != 0) {
             revert CannotSetBothAutoTimes(settings.autoReleaseTime, settings.autoCancelTime);
@@ -80,12 +85,97 @@ library SettingsValidationLibrary {
         // Validate auto times using helper function
         validateAutoTime(settings.autoReleaseTime, currentTime, 'Auto release time');
         validateAutoTime(settings.autoCancelTime, currentTime, 'Auto cancel time');
+        
+        // Validate maximum escrow duration (for auto times)
+        if (settings.autoReleaseTime > 0) {
+            uint256 maxAllowedTime = currentTime + MAX_ESCROW_DURATION;
+            if (settings.autoReleaseTime > maxAllowedTime) {
+                revert OutOfBounds(
+                    'autoReleaseTime',
+                    settings.autoReleaseTime,
+                    currentTime + 1,
+                    maxAllowedTime
+                );
+            }
+        }
+        if (settings.autoCancelTime > 0) {
+            uint256 maxAllowedTime = currentTime + MAX_ESCROW_DURATION;
+            if (settings.autoCancelTime > maxAllowedTime) {
+                revert OutOfBounds(
+                    'autoCancelTime',
+                    settings.autoCancelTime,
+                    currentTime + 1,
+                    maxAllowedTime
+                );
+            }
+        }
 
         // Validate custom dispute resolver if set
         if (settings.customResolver != address(0)) {
-            // Could add additional validation here (e.g., isContract check)
-            // For now, just ensure it's not zero address (already checked above)
+            // Validate resolver is a contract
+            if (settings.customResolver.code.length == 0) {
+                revert InvalidAddressKey('customResolver');
+            }
         }
+        
+        // Validate escrow type
+        if (uint8(settings.escrowType) > uint8(EscrowType.CUSTOM)) {
+            revert OutOfBounds(
+                'escrowType',
+                uint256(uint8(settings.escrowType)),
+                0,
+                uint256(uint8(EscrowType.CUSTOM))
+            );
+        }
+    }
+    
+    /**
+     * @notice Validate escrow amount
+     * @param amount The escrow amount to validate
+     * @dev Reverts if amount is below minimum
+     */
+    function validateEscrowAmount(uint256 amount) internal pure {
+        if (amount < MIN_ESCROW_AMOUNT) {
+            revert OutOfBounds(
+                'amount',
+                amount,
+                MIN_ESCROW_AMOUNT,
+                type(uint256).max
+            );
+        }
+    }
+    
+    /**
+     * @notice Validate recipient address
+     * @param recipient The recipient address
+     * @param sender The sender address
+     * @dev Reverts if recipient is zero address or same as sender
+     */
+    function validateRecipient(address recipient, address sender) internal pure {
+        if (recipient == address(0)) {
+            revert InvalidAddressKey('recipient');
+        }
+        if (recipient == sender) {
+            revert InvalidAddressKey('sender');
+        }
+    }
+    
+    /**
+     * @notice Validate yield opt-in amount
+     * @param amount The amount to validate (amount after fee)
+     * @param yieldEnabled Whether yield is enabled
+     * @return shouldEnableYield Whether yield should actually be enabled (may be disabled if amount too small)
+     * @dev Returns false if yield is enabled but amount is below minimum (graceful degradation)
+     */
+    function validateYieldOptIn(uint256 amount, bool yieldEnabled) internal pure returns (bool shouldEnableYield) {
+        if (!yieldEnabled) {
+            return false;
+        }
+        // Graceful degradation: disable yield if amount is too small
+        if (amount < MIN_YIELD_DEPOSIT) {
+            return false; // Don't revert, just disable yield
+        }
+        return true;
     }
 
     /**

@@ -33,6 +33,7 @@ contract Test_05_ModuleSnapshotting_test is Test {
     function test_snapshot_emitted_on_createEscrow() public {
         ERC20Mock token = new ERC20Mock('TKN', 'TKN', deployer, 1e24);
         address sender = address(0x5);
+        address recipient = address(0x6); // Different from sender
         token.transfer(sender, 1e20);
         vm.prank(sender);
         token.approve(address(vault), 1e20);
@@ -46,7 +47,7 @@ contract Test_05_ModuleSnapshotting_test is Test {
             escrowType: EscrowType.STANDARD
         });
         vm.prank(sender);
-        vault.createEscrow(address(token), sender, 1e18, settings);
+        vault.createEscrow(address(token), recipient, 1e18, settings);
 
         // verify snapshot exists for workflowId 0
         (uint256 _a, uint256 _b, uint256 _c, uint256 _d) = (0, 0, 0, 0); // placeholder to avoid unused-local-warning

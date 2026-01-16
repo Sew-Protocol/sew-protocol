@@ -1,6 +1,7 @@
 import { HardhatRuntimeEnvironment } from 'hardhat/types';
 import { DeployFunction } from 'hardhat-deploy/types';
 import { getGovConfig, validateGovConfig } from './_config';
+import { registerDeployment } from '../config/deployments.registry';
 
 /**
  * Deploy TimelockController
@@ -48,6 +49,22 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     const timelock = await ethers.getContractAt('TimelockController', timelockDeployment.address);
     const minDelay = await timelock.getMinDelay();
     console.log(`   Verified min delay: ${minDelay.toString()}s`);
+
+    // Register deployment
+    if (timelockDeployment.receipt) {
+      await registerDeployment(hre, 'TimelockController', {
+        address: timelockDeployment.address,
+        txHash: timelockDeployment.receipt.hash,
+        blockNumber: timelockDeployment.receipt.blockNumber,
+        constructorArgs: [
+          config.timelock.minDelaySec,
+          [],
+          [ethers.ZeroAddress],
+          deployer,
+        ],
+        tags: ['timelock', 'governance'],
+      });
+    }
   } else {
     console.log(`✅ TimelockController already deployed at: ${timelockDeployment.address}`);
   }

@@ -146,7 +146,7 @@ availableCoverage = maxCoverage - reservedCoverage >= 0
 | **SENIOR_UNBOND_DELAY**   | 21 days                     | Senior withdrawal delay              |
 | **COVERAGE_MULTIPLIER**   | 3                           | Junior needs 3x bond in coverage     |
 | **UTILIZATION_BPS**       | 5000 (50%)                  | Senior provides 50% bond as coverage |
-| **Minimum Stakes**        | 1K (resolver), 10K (senior) | Minimum effective bond USD           |
+| **Minimum Stakes**        | $250 (resolver), $25K (senior) | Minimum effective bond USD (v3 launch defaults) |
 
 ---
 

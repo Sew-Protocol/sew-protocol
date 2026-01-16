@@ -271,6 +271,12 @@
 
 6. **Fraud Slashing** - Keep stubbed until v3
 7. **Treasury Integration** - Wait for treasury contract
+
+### Future Enhancements
+
+8. **Appeal Bond Token Whitelist** - Add governance-controlled list of accepted tokens
+   - See `APPEAL_BOND_TOKEN_WHITELIST_PLAN.md` for implementation plan
+   - Default will be USD stablecoin (currently ETH for backward compatibility)
 8. **Slash Proposer Rewards** - Future enhancement
 
 ---

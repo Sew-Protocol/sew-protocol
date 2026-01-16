@@ -1,6 +1,7 @@
 import { HardhatRuntimeEnvironment } from 'hardhat/types';
 import { DeployFunction } from 'hardhat-deploy/types';
 import { getGovConfig, validateGovConfig } from './_config';
+import { isLocal } from '../config/chains.config';
 
 /**
  * Deploy Safe Multisig Wallet
@@ -17,9 +18,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   validateGovConfig(config, hre);
 
   // For local development, if no Safe owners are configured, use deployer as a single owner
-  const isLocal = hre.network.name === 'hardhat' || hre.network.config.chainId === 31337;
+  const isLocalNetwork = isLocal(hre);
 
-  if (config.safe.owners.length === 0 && isLocal) {
+  if (config.safe.owners.length === 0 && isLocalNetwork) {
     console.log(
       '⚠️  No Safe owners configured. Using deployer as single owner for local development.',
     );

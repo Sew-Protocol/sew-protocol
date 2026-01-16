@@ -6,6 +6,13 @@
  */
 
 import { HardhatRuntimeEnvironment } from 'hardhat/types';
+import {
+  validateAddress,
+  validateAndNormalizeAddress,
+  isZeroAddress,
+  ZERO_ADDRESS,
+} from '../scripts/_lib/addresses';
+import { isLocal as isLocalNetwork } from '../config/chains.config';
 
 export type GovDeployConfig = {
   // Token configuration
@@ -47,19 +54,55 @@ export type GovDeployConfig = {
 };
 
 /**
+ * Safely parse an integer from an environment variable
+ * @param envVar Environment variable value
+ * @param defaultValue Default value if env var is not set
+ * @param name Variable name for error messages
+ * @returns Parsed integer
+ * @throws Error if value cannot be parsed as an integer
+ */
+function parseInteger(
+  envVar: string | undefined,
+  defaultValue: number,
+  name: string,
+): number {
+  const value = envVar || defaultValue.toString();
+  
+  // Trim whitespace
+  const trimmed = value.trim();
+  
+  // Check if the entire string is numeric (allows negative numbers)
+  if (!/^-?\d+$/.test(trimmed)) {
+    throw new Error(
+      `Invalid ${name}: "${value}" is not a valid integer. Expected a whole number.`,
+    );
+  }
+  
+  const parsed = parseInt(trimmed, 10);
+
+  // Double-check parsing succeeded (should not happen after regex check, but safety first)
+  if (isNaN(parsed) || !Number.isInteger(parsed)) {
+    throw new Error(
+      `Invalid ${name}: "${value}" could not be parsed as an integer.`,
+    );
+  }
+
+  return parsed;
+}
+
+/**
  * Get governance deployment configuration from environment variables
  *
  * @param hre Hardhat runtime environment
  * @returns Governance configuration object
- * @throws Error if required values are missing for non-local networks
+ * @throws Error if required values are missing for non-local networks or if parsing fails
  */
 export function getGovConfig(hre: HardhatRuntimeEnvironment): GovDeployConfig {
-  const chainId = hre.network.config.chainId ?? 31337;
-  const isLocal = hre.network.name === 'hardhat' || chainId === 31337;
+  const isLocal = isLocalNetwork(hre);
 
   // Token configuration
   const tokenName = process.env.GOVERNANCE_TOKEN_NAME || 'Sew Token';
-  const tokenSymbol = process.env.GOVERNANCE_TOKEN_SYMBOL || '$EW';
+  const tokenSymbol = process.env.GOVERNANCE_TOKEN_SYMBOL || 'SEW';
   const tokenSupply = process.env.GOVERNANCE_TOKEN_SUPPLY || '1000000000000000000000000000'; // 1B tokens
 
   // Safe multisig configuration
@@ -69,11 +112,15 @@ export function getGovConfig(hre: HardhatRuntimeEnvironment): GovDeployConfig {
     process.env.SAFE_OWNER_3,
     process.env.SAFE_OWNER_4,
     process.env.SAFE_OWNER_5,
-  ].filter(
-    (addr): addr is string => !!addr && addr !== '0x0000000000000000000000000000000000000000',
-  );
+  ]
+    .filter((addr): addr is string => !!addr && !isZeroAddress(addr))
+    .map((addr) => validateAndNormalizeAddress(addr, 'SAFE_OWNER'));
 
-  const safeThreshold = parseInt(process.env.SAFE_THRESHOLD || '3');
+  const safeThreshold = parseInteger(
+    process.env.SAFE_THRESHOLD,
+    3,
+    'SAFE_THRESHOLD',
+  );
 
   // Validate Safe configuration
   if (!isLocal && safeOwners.length < safeThreshold) {
@@ -84,13 +131,25 @@ export function getGovConfig(hre: HardhatRuntimeEnvironment): GovDeployConfig {
   }
 
   // Timelock configuration
-  const timelockMinDelaySec = Number(process.env.TIMELOCK_DELAY || 48 * 60 * 60); // 48 hours default
+  const timelockMinDelaySec = parseInteger(
+    process.env.TIMELOCK_DELAY,
+    48 * 60 * 60, // 48 hours default
+    'TIMELOCK_DELAY',
+  );
 
   // Governor configuration
-  const votingDelayBlocks = Number(process.env.VOTING_DELAY || 1);
-  const votingPeriodBlocks = Number(process.env.VOTING_PERIOD || 45818); // ~1 week @ 13s/block
+  const votingDelayBlocks = parseInteger(
+    process.env.VOTING_DELAY,
+    1,
+    'VOTING_DELAY',
+  );
+  const votingPeriodBlocks = parseInteger(
+    process.env.VOTING_PERIOD,
+    45818, // ~1 week @ 13s/block
+    'VOTING_PERIOD',
+  );
   const proposalThreshold = process.env.PROPOSAL_THRESHOLD || '10000000000000000000000000'; // 10M tokens
-  const quorumBps = Number(process.env.QUORUM_BPS || 400); // 4%
+  const quorumBps = parseInteger(process.env.QUORUM_BPS, 400, 'QUORUM_BPS'); // 4%
 
   // Guardian configuration
   const guardianMultisig = process.env.GUARDIAN_MULTISIG || '';
@@ -115,10 +174,10 @@ export function getGovConfig(hre: HardhatRuntimeEnvironment): GovDeployConfig {
     if (safeOwners.length === 0) {
       throw new Error('Missing SAFE_OWNER_* environment variables for non-local network');
     }
-    if (!guardianMultisig || guardianMultisig === '0x0000000000000000000000000000000000000000') {
+    if (!guardianMultisig || isZeroAddress(guardianMultisig)) {
       throw new Error('Missing GUARDIAN_MULTISIG environment variable for non-local network');
     }
-    if (!feeRecipient || feeRecipient === '0x0000000000000000000000000000000000000000') {
+    if (!feeRecipient || isZeroAddress(feeRecipient)) {
       throw new Error('Missing FEE_RECIPIENT environment variable for non-local network');
     }
   }
@@ -158,14 +217,25 @@ export function getGovConfig(hre: HardhatRuntimeEnvironment): GovDeployConfig {
  * @throws Error if configuration is invalid
  */
 export function validateGovConfig(config: GovDeployConfig, hre?: HardhatRuntimeEnvironment): void {
-  const isLocal = hre && (hre.network.name === 'hardhat' || hre.network.config.chainId === 31337);
+  const isLocal = hre ? isLocalNetwork(hre) : false;
 
   // Validate token
   if (!config.token.name || !config.token.symbol) {
     throw new Error('Token name and symbol are required');
   }
-  if (!config.token.initialSupply || BigInt(config.token.initialSupply) === 0n) {
-    throw new Error('Token initial supply must be greater than 0');
+  if (!config.token.initialSupply) {
+    throw new Error('Token initial supply is required');
+  }
+  // Validate initialSupply is a valid BigInt string
+  try {
+    const supply = BigInt(config.token.initialSupply);
+    if (supply === 0n) {
+      throw new Error('Token initial supply must be greater than 0');
+    }
+  } catch (error) {
+    throw new Error(
+      `Invalid token initial supply: "${config.token.initialSupply}" is not a valid BigInt string. ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 
   // Validate Safe (allow empty for local development)
@@ -173,6 +243,9 @@ export function validateGovConfig(config: GovDeployConfig, hre?: HardhatRuntimeE
     throw new Error('At least one Safe owner is required for non-local networks');
   }
   if (config.safe.owners.length > 0) {
+    if (!Number.isInteger(config.safe.threshold) || isNaN(config.safe.threshold)) {
+      throw new Error(`Safe threshold must be a valid integer, got: ${config.safe.threshold}`);
+    }
     if (config.safe.threshold < 1 || config.safe.threshold > config.safe.owners.length) {
       throw new Error(
         `Safe threshold (${config.safe.threshold}) must be between 1 and number of owners (${config.safe.owners.length})`,
@@ -181,32 +254,72 @@ export function validateGovConfig(config: GovDeployConfig, hre?: HardhatRuntimeE
   }
 
   // Validate timelock
+  if (!Number.isInteger(config.timelock.minDelaySec) || isNaN(config.timelock.minDelaySec)) {
+    throw new Error(
+      `Timelock min delay must be a valid integer, got: ${config.timelock.minDelaySec}`,
+    );
+  }
   if (config.timelock.minDelaySec < 0) {
     throw new Error('Timelock min delay must be non-negative');
   }
 
   // Validate governor
+  if (!Number.isInteger(config.governor.votingDelayBlocks) || isNaN(config.governor.votingDelayBlocks)) {
+    throw new Error(
+      `Voting delay must be a valid integer, got: ${config.governor.votingDelayBlocks}`,
+    );
+  }
   if (config.governor.votingDelayBlocks < 0) {
     throw new Error('Voting delay must be non-negative');
   }
+  if (
+    !Number.isInteger(config.governor.votingPeriodBlocks) ||
+    isNaN(config.governor.votingPeriodBlocks)
+  ) {
+    throw new Error(
+      `Voting period must be a valid integer, got: ${config.governor.votingPeriodBlocks}`,
+    );
+  }
   if (config.governor.votingPeriodBlocks <= 0) {
     throw new Error('Voting period must be greater than 0');
+  }
+  if (!Number.isInteger(config.governor.quorumBps) || isNaN(config.governor.quorumBps)) {
+    throw new Error(`Quorum must be a valid integer, got: ${config.governor.quorumBps}`);
   }
   if (config.governor.quorumBps < 0 || config.governor.quorumBps > 10000) {
     throw new Error('Quorum must be between 0 and 10000 basis points');
   }
 
-  // Validate addresses (basic format check)
-  const addressRegex = /^0x[a-fA-F0-9]{40}$/;
+  // Validate addresses (format + checksum)
   for (const owner of config.safe.owners) {
-    if (!addressRegex.test(owner)) {
-      throw new Error(`Invalid Safe owner address: ${owner}`);
+    try {
+      validateAddress(owner, 'Safe owner', false);
+    } catch (error) {
+      throw new Error(
+        error instanceof Error ? error.message : `Invalid Safe owner address: ${owner}`,
+      );
     }
   }
-  if (config.guardian.multisig && !addressRegex.test(config.guardian.multisig)) {
-    throw new Error(`Invalid guardian multisig address: ${config.guardian.multisig}`);
+  if (config.guardian.multisig) {
+    try {
+      validateAddress(config.guardian.multisig, 'Guardian multisig', false);
+    } catch (error) {
+      throw new Error(
+        error instanceof Error
+          ? error.message
+          : `Invalid guardian multisig address: ${config.guardian.multisig}`,
+      );
+    }
   }
-  if (config.feeRecipient && !addressRegex.test(config.feeRecipient)) {
-    throw new Error(`Invalid fee recipient address: ${config.feeRecipient}`);
+  if (config.feeRecipient) {
+    try {
+      validateAddress(config.feeRecipient, 'Fee recipient', false);
+    } catch (error) {
+      throw new Error(
+        error instanceof Error
+          ? error.message
+          : `Invalid fee recipient address: ${config.feeRecipient}`,
+      );
+    }
   }
 }

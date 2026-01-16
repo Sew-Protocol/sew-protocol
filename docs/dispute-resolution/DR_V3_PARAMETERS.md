@@ -8,10 +8,13 @@ These are "start-safe" numbers intended to minimize tail risk while you observe 
 
 - **7 days** (weekly accounting is common for operational monitoring and reduces tuning noise)
 
-**Withdrawal / unbonding delay (resolver + senior):**
+**Withdrawal / unbonding delay (resolver + senior) - v3 defaults:**
 
-- **21 days** default\
-  Rationale: long delays are standard in restaking/staking designs to keep stake slashable during the window and give time to detect issues; EigenLayer discusses withdrawal delays and slashability windows in this range.
+- **Resolvers: 14 days**\
+  Rationale: EigenLayer's native restaking uses a mandatory withdrawal delay (historically 7 days; increased to 14 days after slashing-related upgrades).
+
+- **Seniors: 21 days**\
+  Rationale: You want seniors (insurance layer) to have longer slashability than resolvers. Long delays are standard in restaking/staking designs to keep stake slashable during the window and give time to detect issues.
 
 **Freeze duration (on insufficient bond / repeated objective failures):**
 
@@ -20,13 +23,13 @@ These are "start-safe" numbers intended to minimize tail risk while you observe 
 - **7 days** for repeat severe events within an epoch\
   Freeze means: workload weight forced to 0, cannot accept new disputes, cannot withdraw.
 
-**Liveness / deadlines (objective triggers):**
+**Liveness / deadlines (objective triggers - v3 launch defaults):**
 
-- `t_accept`: **15 minutes** (or 30m if you expect mobile-only operators)
+- `t_accept`: **30 minutes** (sufficient time to accept assignment)
 
-- `t_resolve_L0`: **24 hours**
+- `t_resolve_L0`: **24 hours** (resolver round)
 
-- `t_resolve_L1 (senior)`: **48 hours**\
+- `t_resolve_L1 (senior)`: **48 hours** (senior round)\
   These are forgiving enough to avoid accidental slashes, but tight enough to prevent hostage-taking via latency games.
 
 ---
@@ -41,23 +44,24 @@ You need two things simultaneously:
 
 Because you didn't provide expected escrow sizes yet, use a **hybrid: absolute floor + capacity-based scaling**.
 
-#### Resolver bond (L0)
+#### Resolver bond (L0) - v3 launch defaults
 
-- **Minimum resolver bond:** **$500** (or equivalent in bond token)
+- **Minimum resolver bond:** **$250** (or equivalent in bond token)
 
-- **Target resolver bond:** **max($500, 1% of "max escrow amount per dispute" you allow L0 to handle)**
+- **Suggested operating bond:** **$500** (recommended target for "reliable operator" status)
 
-- **Hard cap coverage rule:** a resolver cannot be assigned disputes above a configured `maxEscrowPerResolver` unless they top up bond.
+- **Hard cap coverage rule:** Max escrow per L0 case = **min($2,000, 4× resolverBond)**
+  - With $500 bond → up to $2,000 (fits upper range)
+  - With $250 bond → up to $1,000 (covers most cases)
+  - This forces high-value disputes to flow to better-capitalized operators
 
-#### Senior bond (L1)
+#### Senior bond (L1) - v3 launch defaults
 
-- **Senior bond multiple:** **200× resolver min** to start (within your earlier 100--1000× concept)
+- **Minimum senior bond:** **$25,000**
 
-- So if resolver min is $500 → senior min is **$100,000**.
+- **Recommended senior bond:** **$50,000-$100,000** (for mainnet confidence)
 
-Why so high? Seniors are your "insurance layer." If the senior layer is weak, capital-weighted delegation has no bite.
-
-> If that feels too high for launch, keep the multiple, but reduce the resolver floor only if dispute sizes are tiny.
+Why these amounts? Seniors are the "insurance layer." If seniors can be cheaply capitalized, delegation has no teeth and bribery pressure concentrates.
 
 ---
 
