@@ -10,6 +10,9 @@ import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/YieldOps.sol';
 import '../../../contracts/DisputeOps.sol';
+import '../../../contracts/SettlementOps.sol';
+import '../../../contracts/core/ModuleManagementContract.sol';
+import '../../../contracts/admin/EscrowAdminContract.sol';
 
 /**
  * @title AppealWindowEnforcementTest
@@ -24,6 +27,9 @@ contract AppealWindowEnforcementTest is Test {
     ERC20Mock public token;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
+    SettlementOps public settlementOps;
+    ModuleManagementContract public moduleManagement;
+    EscrowAdminContract public adminContract;
 
     address public deployer;
     address public timelock;
@@ -62,9 +68,43 @@ contract AppealWindowEnforcementTest is Test {
         resolutionModule = new DecentralizedResolutionModule(deployer);
 
         // Deploy escrow
-        yieldOps = new YieldOps();
+        yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps();
-        escrow = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps));
+        settlementOps = new SettlementOps();
+        moduleManagement = new ModuleManagementContract(deployer);
+        adminContract = new EscrowAdminContract(deployer);
+        escrow = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
+        moduleManagement.registerEscrowContract(address(escrow));
+        
+        // Set SettlementOps in escrow (no setter function, so use storage slot)
+        // settlementOps is declared after yieldOps and disputeOps in BaseEscrow
+        // Find yieldOps slot by checking multiple slots
+        uint256 yieldOpsSlot = type(uint256).max; // Use max as "not found" marker
+        for (uint256 i = 0; i < 50; i++) {
+            bytes32 value = vm.load(address(escrow), bytes32(i));
+            if (address(uint160(uint256(value))) == address(yieldOps)) {
+                yieldOpsSlot = i;
+                break;
+            }
+        }
+        require(yieldOpsSlot != type(uint256).max, "Could not find yieldOps storage slot");
+        
+        // settlementOps should be at yieldOpsSlot + 2 (yieldOps, disputeOps, settlementOps)
+        uint256 settlementOpsSlotNum = yieldOpsSlot + 2;
+        
+        // Set settlementOps
+        vm.store(
+            address(escrow),
+            bytes32(settlementOpsSlotNum),
+            bytes32(uint256(uint160(address(settlementOps))))
+        );
+        
+        // Verify it was set correctly
+        bytes32 settlementOpsValue = vm.load(address(escrow), bytes32(settlementOpsSlotNum));
+        require(
+            address(uint160(uint256(settlementOpsValue))) == address(settlementOps),
+            "settlementOps not set correctly"
+        );
 
         // Setup roles
         bytes32 ROLE_TIMELOCK = resolutionModule.ROLE_TIMELOCK();
@@ -91,9 +131,9 @@ contract AppealWindowEnforcementTest is Test {
         resolutionModule.setIncentiveModule(address(incentiveModule));
 
         // Set resolution module in escrow
-        escrow.queueResolutionModule(address(resolutionModule));
+        adminContract.queueResolutionModule(address(escrow), address(resolutionModule));
         vm.warp(block.timestamp + 7 days + 1);
-        escrow.activateResolutionModule();
+        adminContract.activateResolutionModule(address(escrow));
 
         // Appoint resolvers
         vm.prank(timelock);
@@ -137,10 +177,9 @@ contract AppealWindowEnforcementTest is Test {
             ESCROW_AMOUNT,
             EscrowSettings({
                 customResolver: address(0),
-                yieldEnabled: false,
+                yieldPreset: YieldPreset.OFF,
                 autoReleaseTime: 0,
-                autoCancelTime: 0,
-                escrowType: EscrowType.STANDARD
+                autoCancelTime: 0
             })
         );
         vm.stopPrank();
@@ -185,7 +224,7 @@ contract AppealWindowEnforcementTest is Test {
         assertEq(uint8(et.escrowState), uint8(EscrowState.DISPUTED), 'State should be DISPUTED');
 
         // Check tokens not transferred yet
-        uint256 sellerClaimable = escrow.claimable(workflowId, seller, address(token));
+        uint256 sellerClaimable = escrow.claimableBalances(workflowId, seller);
         assertEq(sellerClaimable, 0, 'Seller should not have claimable balance yet');
     }
 
@@ -223,7 +262,7 @@ contract AppealWindowEnforcementTest is Test {
         assertEq(uint8(et.escrowState), uint8(EscrowState.RELEASED), 'State should be RELEASED');
 
         // Check tokens transferred via autotransfer
-        uint256 sellerClaimable = escrow.claimable(workflowId, seller, address(token));
+        uint256 sellerClaimable = escrow.claimableBalances(workflowId, seller);
         uint256 sellerBalance = token.balanceOf(seller);
         // Either claimable > 0 (fallback) or balance > 0 (autotransfer succeeded)
         assertTrue(sellerClaimable > 0 || sellerBalance > 0, 'Seller should have either claimable balance or received funds via autotransfer');
@@ -258,7 +297,7 @@ contract AppealWindowEnforcementTest is Test {
         assertEq(uint8(et.escrowState), uint8(EscrowState.RELEASED), 'State should be RELEASED');
 
         // Check tokens transferred via autotransfer
-        uint256 sellerClaimable = escrow.claimable(workflowId, seller, address(token));
+        uint256 sellerClaimable = escrow.claimableBalances(workflowId, seller);
         uint256 sellerBalance = token.balanceOf(seller);
         // Either claimable > 0 (fallback) or balance > 0 (autotransfer succeeded)
         assertTrue(sellerClaimable > 0 || sellerBalance > 0, 'Seller should have either claimable balance or received funds via autotransfer');
@@ -289,7 +328,7 @@ contract AppealWindowEnforcementTest is Test {
         vm.warp(appealDeadline - 1);
 
         // Try to execute pending settlement (should revert)
-        vm.expectRevert('Appeal window not expired');
+        vm.expectRevert(abi.encodeWithSignature("AppealWindowNotExpired(uint256,uint256,uint256)", workflowId, appealDeadline, block.timestamp));
         escrow.executePendingSettlement(workflowId);
 
         // Check state is still DISPUTED
@@ -368,7 +407,7 @@ contract AppealWindowEnforcementTest is Test {
         assertEq(uint8(et.escrowState), uint8(EscrowState.RELEASED), 'State should be RELEASED');
 
         // Check tokens transferred via autotransfer
-        uint256 sellerClaimable = escrow.claimable(workflowId, seller, address(token));
+        uint256 sellerClaimable = escrow.claimableBalances(workflowId, seller);
         uint256 sellerBalance = token.balanceOf(seller);
         // Either claimable > 0 (fallback) or balance > 0 (autotransfer succeeded)
         assertTrue(sellerClaimable > 0 || sellerBalance > 0, 'Seller should have either claimable balance or received funds via autotransfer');
@@ -398,7 +437,7 @@ contract AppealWindowEnforcementTest is Test {
         escrow.executePendingSettlement(workflowId);
 
         // Second call should revert
-        vm.expectRevert('No pending settlement');
+        vm.expectRevert(abi.encodeWithSignature("NoPendingSettlement(uint256)", workflowId));
         escrow.executePendingSettlement(workflowId);
     }
 
@@ -427,7 +466,7 @@ contract AppealWindowEnforcementTest is Test {
 
         // Now pending settlement is deleted and state is RELEASED, so second call should revert
         // The revert happens because pending settlement no longer exists (not because state changed)
-        vm.expectRevert('No pending settlement');
+        vm.expectRevert(abi.encodeWithSignature("NoPendingSettlement(uint256)", workflowId));
         escrow.executePendingSettlement(workflowId);
 
         // Verify state is RELEASED
@@ -469,7 +508,7 @@ contract AppealWindowEnforcementTest is Test {
         assertEq(uint8(et.escrowState), uint8(EscrowState.REFUNDED), 'State should be REFUNDED');
 
         // Check tokens refunded to buyer via autotransfer
-        uint256 buyerClaimable = escrow.claimable(workflowId, buyer, address(token));
+        uint256 buyerClaimable = escrow.claimableBalances(workflowId, buyer);
         uint256 buyerBalance = token.balanceOf(buyer);
         // Either claimable > 0 (fallback) or balance > 0 (autotransfer succeeded)
         assertTrue(buyerClaimable > 0 || buyerBalance > 0, 'Buyer should have either claimable balance or received funds via autotransfer');
@@ -512,7 +551,7 @@ contract AppealWindowEnforcementTest is Test {
         uint256 workflowId = createEscrow();
 
         // Try to execute without pending settlement
-        vm.expectRevert('No pending settlement');
+        vm.expectRevert(abi.encodeWithSignature("NoPendingSettlement(uint256)", workflowId));
         escrow.executePendingSettlement(workflowId);
     }
 }

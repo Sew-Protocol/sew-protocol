@@ -92,6 +92,46 @@ contract DisputeOps {
             return result;
         }
 
+        // Validate only the disagreed-with participant can appeal
+        // Try to get decision at current round from module (if supported)
+        // For DecentralizedResolutionModule, we can call getDecisionAtRound
+        // Use low-level call since this function is not in IResolutionModule interface
+        (bool decisionSuccess, bytes memory decisionData) = resolutionModule.staticcall(
+            abi.encodeWithSignature('getDecisionAtRound(uint256,uint8)', workflowId, result.currentLevel)
+        );
+        
+        if (decisionSuccess && decisionData.length >= 32) {
+            // Decode the uint8 return value
+            uint8 decision;
+            assembly {
+                decision := mload(add(decisionData, 0x20))
+                // Mask to get only the first byte (uint8)
+                decision := and(decision, 0xff)
+            }
+            
+            // decision: 0 = NONE, 1 = RELEASE, 2 = CANCEL (matching ResolutionOutcome enum)
+            if (decision == 1) {
+                // RELEASE means recipient wins, so only sender (from) can appeal
+                if (caller != from) {
+                    result.failureReason = 'Only sender can appeal RELEASE decision';
+                    return result;
+                }
+            } else if (decision == 2) {
+                // CANCEL means sender wins, so only recipient (to) can appeal
+                if (caller != to) {
+                    result.failureReason = 'Only recipient can appeal CANCEL decision';
+                    return result;
+                }
+            } else if (decision == 0) {
+                // NONE - no decision yet, can't appeal
+                result.failureReason = 'No decision to appeal';
+                return result;
+            }
+            // If decision is valid and caller matches, continue
+        }
+        // If we can't get decision (e.g., module doesn't support it), allow escalation
+        // This maintains backward compatibility with modules that don't track decisions
+
         // Check if escalation is allowed and get fee
         try
             IResolutionModule(resolutionModule).canEscalate(
@@ -177,4 +217,5 @@ contract DisputeOps {
     ) external pure returns (bytes memory) {
         return abi.encode(token, from, to, amountAfterFee);
     }
+
 }

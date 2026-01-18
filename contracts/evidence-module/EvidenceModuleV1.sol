@@ -50,7 +50,7 @@ contract EvidenceModuleV1 is IEvidenceModule, AccessControlUpgradeable, Reentran
     // ============ Events ============
 
     event EvidenceSubmitted(
-        uint256 indexed escrowId,
+        uint256 indexed workflowId,
         uint256 indexed evidenceId,
         address indexed submitter,
         bytes32 evidenceHash,

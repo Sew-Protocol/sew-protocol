@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import "../../../contracts/types/YieldPresets.sol";
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
@@ -9,6 +10,8 @@ import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/YieldOps.sol';
 import '../../../contracts/DisputeOps.sol';
 
+import '../../../contracts/core/ModuleManagementContract.sol';
+import '../../../contracts/admin/EscrowAdminContract.sol';
 /**
  * @title AccessControlEdgeCasesTest
  * @notice Tests edge cases for access control:
@@ -22,6 +25,8 @@ contract AccessControlEdgeCasesTest is Test {
     DefaultResolutionModule public resolutionModule;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
+    ModuleManagementContract public moduleManagement;
+    EscrowAdminContract public adminContract;
 
     address public deployer;
     address public timelock;
@@ -40,14 +45,17 @@ contract AccessControlEdgeCasesTest is Test {
         newAdmin = makeAddr('newAdmin');
         attacker = makeAddr('attacker');
 
-        yieldOps = new YieldOps();
+        yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps();
-        escrow = new EscrowVault(100, makeAddr('feeAddress'), address(yieldOps), address(disputeOps));
+        moduleManagement = new ModuleManagementContract(address(this));
+        adminContract = new EscrowAdminContract(address(this));
+        escrow = new EscrowVault(100, makeAddr('feeAddress'), address(yieldOps), address(disputeOps), address(moduleManagement));
         resolutionModule = new DefaultResolutionModule(deployer, makeAddr('resolver'));
 
         // Initial role setup
         escrow.grantRole(ROLE_TIMELOCK, timelock);
         escrow.grantRole(ROLE_GUARDIAN, guardian);
+        adminContract.grantRole(adminContract.ROLE_TIMELOCK(), address(this));
     }
 
     // ============ Role Revocation Tests ============
@@ -58,19 +66,21 @@ contract AccessControlEdgeCasesTest is Test {
     function test_RoleRevocation_PreventsAccess() public {
         // Grant timelock role to attacker temporarily
         escrow.grantRole(ROLE_TIMELOCK, attacker);
+        adminContract.grantRole(adminContract.ROLE_TIMELOCK(), attacker);
 
         // Attacker can queue module
         vm.prank(attacker);
-        escrow.queueResolutionModule(address(resolutionModule));
+        adminContract.queueResolutionModule(address(escrow), address(resolutionModule));
 
         // Revoke role
         escrow.revokeRole(ROLE_TIMELOCK, attacker);
+        adminContract.revokeRole(adminContract.ROLE_TIMELOCK(), attacker);
 
         // Attacker cannot activate (role revoked)
         vm.warp(block.timestamp + 7 days + 1);
         vm.prank(attacker);
         vm.expectRevert();
-        escrow.activateResolutionModule();
+        adminContract.activateResolutionModule(address(escrow));
     }
 
     /**
@@ -120,7 +130,7 @@ contract AccessControlEdgeCasesTest is Test {
 
         // newAdmin can perform timelock operations
         vm.prank(newAdmin);
-        escrow.queueResolutionModule(address(resolutionModule));
+        adminContract.queueResolutionModule(address(escrow), address(resolutionModule));
 
         // newAdmin can perform guardian operations
         vm.prank(newAdmin);
@@ -183,9 +193,9 @@ contract AccessControlEdgeCasesTest is Test {
         // System should still work - newAdmin can manage
         vm.startPrank(newAdmin);
         escrow.grantRole(ROLE_TIMELOCK, newAdmin); // newAdmin needs ROLE_TIMELOCK to call queueResolutionModule
-        escrow.queueResolutionModule(address(resolutionModule));
+        adminContract.queueResolutionModule(address(escrow), address(resolutionModule));
         vm.warp(block.timestamp + 7 days + 1);
-        escrow.activateResolutionModule();
+        adminContract.activateResolutionModule(address(escrow));
         vm.stopPrank();
 
         // Verify module is activated
@@ -200,7 +210,7 @@ contract AccessControlEdgeCasesTest is Test {
     function test_RoleTransition_DuringOperation() public {
         // Queue module as timelock
         vm.prank(timelock);
-        escrow.queueResolutionModule(address(resolutionModule));
+        adminContract.queueResolutionModule(address(escrow), address(resolutionModule));
 
         // Revoke timelock role before activation
         escrow.revokeRole(ROLE_TIMELOCK, timelock);
@@ -209,7 +219,7 @@ contract AccessControlEdgeCasesTest is Test {
         vm.warp(block.timestamp + 7 days + 1);
         escrow.grantRole(ROLE_TIMELOCK, deployer);
         vm.prank(deployer);
-        escrow.activateResolutionModule();
+        adminContract.activateResolutionModule(address(escrow));
         
         // Verify module is activated
         assertEq(address(escrow.disputeResolutionModule()), address(resolutionModule));
@@ -258,6 +268,6 @@ contract AccessControlEdgeCasesTest is Test {
         // Cannot perform any protected operations
         vm.prank(attacker);
         vm.expectRevert();
-        escrow.queueResolutionModule(address(resolutionModule));
+        adminContract.queueResolutionModule(address(escrow), address(resolutionModule));
     }
 }

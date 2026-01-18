@@ -8,6 +8,7 @@ import '@openzeppelin/contracts/governance/extensions/GovernorVotes.sol';
 import '@openzeppelin/contracts/governance/extensions/GovernorVotesQuorumFraction.sol';
 import '@openzeppelin/contracts/governance/extensions/GovernorTimelockControl.sol';
 import '@openzeppelin/contracts/governance/TimelockController.sol';
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 
 /**
  * @title GovGovernor
@@ -15,14 +16,27 @@ import '@openzeppelin/contracts/governance/TimelockController.sol';
  * @dev Combines multiple Governor extensions:
  * - GovernorSettings: voting delay, voting period, proposal threshold
  * - GovernorVotes: token-weighted voting
- * - GovernorVotesQuorumFraction: quorum based on token supply
+ * - GovernorVotesQuorumFraction: quorum based on absolute token amount (not percentage)
  * - GovernorTimelockControl: execution via TimelockController
+ *
+ * Quorum Calculation:
+ * - Quorum is an ABSOLUTE amount of tokens (e.g., 4M tokens)
+ * - Can be updated via governance proposal (setAbsoluteQuorum)
+ * - Simple, safe, and predictable
+ * - Non-circulating addresses are tracked for transparency/APIs (CoinGecko, etc.)
+ *   but NOT used for quorum calculation
+ *
+ * Non-Circulating Token Tracking:
+ * - Tracks addresses that hold non-circulating tokens (vesting, treasury, etc.)
+ * - Used for external APIs (CoinGecko, CoinMarketCap) and transparency
+ * - getCirculatingSupply() provides accurate circulating supply for reporting
+ * - Can be migrated to circulating-based quorum later if desired
  *
  * Configuration:
  * - Voting delay: 1 block (configurable, longer for mainnet)
  * - Voting period: ~1 week (configurable)
- * - Proposal threshold: 10M tokens (1% of supply, configurable)
- * - Quorum: 4% (configurable)
+ * - Proposal threshold: 500k tokens (0.05% of supply, configurable)
+ * - Quorum: Absolute amount (e.g., 4M tokens, configurable via governance)
  * - Timelock: 48h delay for all executions
  */
 contract GovGovernor is
@@ -33,6 +47,36 @@ contract GovGovernor is
     GovernorVotesQuorumFraction,
     GovernorTimelockControl
 {
+    /// @notice Maximum number of non-circulating addresses (prevents DoS)
+    uint256 public constant MAX_NON_CIRCULATING_ADDRESSES = 100;
+
+    /// @notice Mapping of addresses that are considered non-circulating
+    mapping(address => bool) public nonCirculatingAddresses;
+
+    /// @notice Array of non-circulating addresses (for iteration)
+    address[] public nonCirculatingAddressesList;
+
+    /// @notice Event emitted when a non-circulating address is added
+    event NonCirculatingAddressAdded(address indexed addr);
+
+    /// @notice Event emitted when a non-circulating address is removed
+    event NonCirculatingAddressRemoved(address indexed addr);
+
+    /// @notice Absolute quorum amount (in tokens)
+    uint256 public absoluteQuorum;
+
+    /// @notice Event emitted when absolute quorum is updated
+    event AbsoluteQuorumUpdated(uint256 oldQuorum, uint256 newQuorum);
+
+    // Custom errors
+    error QuorumMustBePositive();
+    error TooManyInitialAddresses(uint256 length, uint256 max);
+    error ZeroAddress();
+    error DuplicateAddress(address addr);
+    error MaxAddressesReached();
+    error AddressNotInList(address addr);
+    error OnlyTimelock(address caller, address timelock);
+
     /**
      * @notice Deploy Governor with all extensions
      * @param token ERC20Votes token address (SewToken)
@@ -40,7 +84,8 @@ contract GovGovernor is
      * @param votingDelayBlocks Voting delay in blocks
      * @param votingPeriodBlocks Voting period in blocks
      * @param proposalThresholdTokens Minimum tokens needed to propose
-     * @param quorumBps Quorum numerator (denominator is 100, so 4 = 4%)
+     * @param absoluteQuorumTokens Absolute quorum amount in tokens (e.g., 4M tokens)
+     * @param initialNonCirculatingAddresses Initial addresses to track for transparency/APIs (e.g., vesting contracts)
      */
     constructor(
         address token,
@@ -48,15 +93,32 @@ contract GovGovernor is
         uint48 votingDelayBlocks,
         uint32 votingPeriodBlocks,
         uint256 proposalThresholdTokens,
-        uint256 quorumBps
+        uint256 absoluteQuorumTokens,
+        address[] memory initialNonCirculatingAddresses
     )
         Governor('Sew Protocol DAO')
         GovernorSettings(votingDelayBlocks, votingPeriodBlocks, proposalThresholdTokens)
         GovernorVotes(IVotes(token))
-        GovernorVotesQuorumFraction(quorumBps)
+        GovernorVotesQuorumFraction(0) // Not used - we override quorum() to use absoluteQuorum
         GovernorTimelockControl(timelock)
     {
-        // All configuration done via parent constructors
+        if (absoluteQuorumTokens == 0) revert QuorumMustBePositive();
+        absoluteQuorum = absoluteQuorumTokens;
+        // Add initial non-circulating addresses
+        uint256 length = initialNonCirculatingAddresses.length;
+        if (length > MAX_NON_CIRCULATING_ADDRESSES) {
+            revert TooManyInitialAddresses(length, MAX_NON_CIRCULATING_ADDRESSES);
+        }
+        
+        for (uint256 i = 0; i < length; i++) {
+            address addr = initialNonCirculatingAddresses[i];
+            if (addr == address(0)) revert ZeroAddress();
+            if (nonCirculatingAddresses[addr]) revert DuplicateAddress(addr);
+            
+            nonCirculatingAddresses[addr] = true;
+            nonCirculatingAddressesList.push(addr);
+            emit NonCirculatingAddressAdded(addr);
+        }
     }
 
     /**
@@ -79,10 +141,138 @@ contract GovGovernor is
         return super.proposalThreshold();
     }
 
+    /**
+     * @notice Calculate quorum as absolute amount (not percentage-based)
+     * @return Quorum amount in tokens (absolute value, e.g., 4M tokens)
+     * @dev Overrides GovernorVotesQuorumFraction to use absolute quorum instead of percentage
+     *      Simple, safe, and predictable. Can be updated via governance (setAbsoluteQuorum)
+     *      blockNumber parameter is unused but required by interface
+     */
     function quorum(
-        uint256 blockNumber
+        uint256 /* blockNumber */
     ) public view override(Governor, GovernorVotesQuorumFraction) returns (uint256) {
-        return super.quorum(blockNumber);
+        return absoluteQuorum;
+    }
+
+    /**
+     * @notice Get circulating supply at a specific block number
+     * @param blockNumber Block number to calculate circulating supply for
+     * @return Circulating supply = total supply - sum of tokens in non-circulating addresses
+     * @dev Used for external APIs (CoinGecko, CoinMarketCap) and transparency
+     *      NOT used for quorum calculation (quorum uses absoluteQuorum)
+     *      For current block: uses balanceOf() (more accurate, works even if not delegated)
+     *      For historical blocks: uses getPastVotes() (limitation of ERC20Votes)
+     */
+    function getCirculatingSupply(uint256 blockNumber) public view returns (uint256) {
+        IVotes token = token();
+        uint256 totalSupply = token.getPastTotalSupply(blockNumber);
+        uint256 nonCirculating = 0;
+
+        uint256 length = nonCirculatingAddressesList.length;
+        for (uint256 i = 0; i < length; i++) {
+            address addr = nonCirculatingAddressesList[i];
+            if (nonCirculatingAddresses[addr]) {
+                if (blockNumber == block.number) {
+                    // For current block, use balance (more accurate)
+                    // Works even if address hasn't delegated
+                    nonCirculating += IERC20(address(token)).balanceOf(addr);
+                } else {
+                    // For historical blocks, use voting power (only available historical data)
+                    // Limitation: If address didn't delegate at that block, tokens won't be excluded
+                    nonCirculating += token.getPastVotes(addr, blockNumber);
+                }
+            }
+        }
+
+        // Circulating supply = total supply - non-circulating
+        // Use unchecked for gas efficiency (nonCirculating <= totalSupply by design)
+        unchecked {
+            return totalSupply - nonCirculating;
+        }
+    }
+
+    /**
+     * @notice Get current circulating supply
+     * @return Current circulating supply
+     */
+    function getCurrentCirculatingSupply() public view returns (uint256) {
+        return getCirculatingSupply(block.number);
+    }
+
+    /**
+     * @notice Add a non-circulating address (e.g., vesting contract, locked tokens)
+     * @param addr Address to mark as non-circulating
+     * @dev Can only be called by the timelock (via governance proposal)
+     * @dev Reverts if address is zero, already added, or would exceed MAX_NON_CIRCULATING_ADDRESSES
+     */
+    function addNonCirculatingAddress(address addr) external {
+        if (msg.sender != address(timelock())) {
+            revert OnlyTimelock(msg.sender, address(timelock()));
+        }
+        if (addr == address(0)) revert ZeroAddress();
+        if (nonCirculatingAddresses[addr]) revert DuplicateAddress(addr);
+        if (nonCirculatingAddressesList.length >= MAX_NON_CIRCULATING_ADDRESSES) {
+            revert MaxAddressesReached();
+        }
+
+        nonCirculatingAddresses[addr] = true;
+        nonCirculatingAddressesList.push(addr);
+        emit NonCirculatingAddressAdded(addr);
+    }
+
+    /**
+     * @notice Remove a non-circulating address
+     * @param addr Address to remove from non-circulating list
+     * @dev Can only be called by the timelock (via governance proposal)
+     * @dev Removes from mapping and array (swaps with last element for gas efficiency)
+     */
+    function removeNonCirculatingAddress(address addr) external {
+        if (msg.sender != address(timelock())) {
+            revert OnlyTimelock(msg.sender, address(timelock()));
+        }
+        if (!nonCirculatingAddresses[addr]) revert AddressNotInList(addr);
+
+        // Remove from mapping
+        delete nonCirculatingAddresses[addr];
+
+        // Remove from array (swap with last element and pop)
+        uint256 length = nonCirculatingAddressesList.length;
+        for (uint256 i = 0; i < length; i++) {
+            if (nonCirculatingAddressesList[i] == addr) {
+                // Swap with last element
+                nonCirculatingAddressesList[i] = nonCirculatingAddressesList[length - 1];
+                // Pop last element
+                nonCirculatingAddressesList.pop();
+                break;
+            }
+        }
+
+        emit NonCirculatingAddressRemoved(addr);
+    }
+
+    /**
+     * @notice Get the number of non-circulating addresses
+     * @return Number of addresses marked as non-circulating
+     */
+    function getNonCirculatingAddressesCount() external view returns (uint256) {
+        return nonCirculatingAddressesList.length;
+    }
+
+    /**
+     * @notice Update absolute quorum amount
+     * @param newQuorum New absolute quorum amount in tokens
+     * @dev Can only be called by the timelock (via governance proposal)
+     * @dev Reverts if new quorum is zero
+     */
+    function setAbsoluteQuorum(uint256 newQuorum) external {
+        if (msg.sender != address(timelock())) {
+            revert OnlyTimelock(msg.sender, address(timelock()));
+        }
+        if (newQuorum == 0) revert QuorumMustBePositive();
+
+        uint256 oldQuorum = absoluteQuorum;
+        absoluteQuorum = newQuorum;
+        emit AbsoluteQuorumUpdated(oldQuorum, newQuorum);
     }
 
     function state(

@@ -1,0 +1,243 @@
+{
+  "address": "0xEA663A8B10d26CDAd0d82c4f02c3F0Cf9946C82c",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "resolutionModule",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "workflowId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "caller",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "from",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amountAfterFee",
+          "type": "uint256"
+        },
+        {
+          "internalType": "enum EscrowState",
+          "name": "escrowState",
+          "type": "uint8"
+        }
+      ],
+      "name": "computeEscalation",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "bool",
+              "name": "success",
+              "type": "bool"
+            },
+            {
+              "internalType": "address",
+              "name": "newResolver",
+              "type": "address"
+            },
+            {
+              "internalType": "uint8",
+              "name": "newLevel",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "currentLevel",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint256",
+              "name": "escalationFee",
+              "type": "uint256"
+            },
+            {
+              "internalType": "string",
+              "name": "failureReason",
+              "type": "string"
+            }
+          ],
+          "internalType": "struct DisputeOps.EscalationResult",
+          "name": "result",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "from",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amountAfterFee",
+          "type": "uint256"
+        }
+      ],
+      "name": "encodeEscrowData",
+      "outputs": [
+        {
+          "internalType": "bytes",
+          "name": "",
+          "type": "bytes"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "requiredFee",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "paidFee",
+          "type": "uint256"
+        }
+      ],
+      "name": "validateEscalationFee",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "valid",
+          "type": "bool"
+        },
+        {
+          "internalType": "uint256",
+          "name": "excessRefund",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    }
+  ],
+  "transactionHash": "0xa5c54b945a3a506f2c4faa7c7d8e9fac9e624e85d134cb559ccac4b71b211e49",
+  "receipt": {
+    "to": null,
+    "from": "0x5F13B5089a0B23c74AD9A22a2db59F5F48ab09bC",
+    "contractAddress": "0xEA663A8B10d26CDAd0d82c4f02c3F0Cf9946C82c",
+    "transactionIndex": 7,
+    "gasUsed": "545078",
+    "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "blockHash": "0xf2a2e53be6182c0e00df379c8b86e10b91d168d6b822eb608227bf76cd9e83c9",
+    "transactionHash": "0xa5c54b945a3a506f2c4faa7c7d8e9fac9e624e85d134cb559ccac4b71b211e49",
+    "logs": [],
+    "blockNumber": 36444773,
+    "cumulativeGasUsed": "8544932",
+    "status": 1,
+    "byzantium": true
+  },
+  "args": [],
+  "numDeployments": 1,
+  "solcInputHash": "b5eab744d6e3a338e8290d2dddf0c995",
+  "metadata": "{\"compiler\":{\"version\":\"0.8.33+commit.64118f21\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"resolutionModule\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"workflowId\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"caller\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amountAfterFee\",\"type\":\"uint256\"},{\"internalType\":\"enum EscrowState\",\"name\":\"escrowState\",\"type\":\"uint8\"}],\"name\":\"computeEscalation\",\"outputs\":[{\"components\":[{\"internalType\":\"bool\",\"name\":\"success\",\"type\":\"bool\"},{\"internalType\":\"address\",\"name\":\"newResolver\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"newLevel\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"currentLevel\",\"type\":\"uint8\"},{\"internalType\":\"uint256\",\"name\":\"escalationFee\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"failureReason\",\"type\":\"string\"}],\"internalType\":\"struct DisputeOps.EscalationResult\",\"name\":\"result\",\"type\":\"tuple\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amountAfterFee\",\"type\":\"uint256\"}],\"name\":\"encodeEscrowData\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"requiredFee\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"paidFee\",\"type\":\"uint256\"}],\"name\":\"validateEscalationFee\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"valid\",\"type\":\"bool\"},{\"internalType\":\"uint256\",\"name\":\"excessRefund\",\"type\":\"uint256\"}],\"stateMutability\":\"pure\",\"type\":\"function\"}],\"devdoc\":{\"details\":\"Extracted from BaseEscrow to reduce contract size (Phase 2 size optimization)      Key design principles (from updated plan):      - Compute \\u2192 Apply: Returns escalation result, BaseEscrow applies to state      - No callbacks: Does not write to BaseEscrow state      - Atomic: Single call computes all escalation logic      - View-ish: Could be view function but module may update counters      Pattern:      BaseEscrow calls: computeEscalation(workflowId, caller, escrowData)      DisputeOps returns: (newResolver, newLevel, escalationFee)      BaseEscrow applies: Updates state and collects fees\",\"kind\":\"dev\",\"methods\":{\"computeEscalation(address,uint256,address,address,address,address,uint256,uint8)\":{\"details\":\"This function is \\\"compute-only\\\" - it does NOT modify BaseEscrow state.      It may call the resolution module which might update its own counters.      BaseEscrow will apply the result after receiving it.\",\"params\":{\"amountAfterFee\":\"Amount after fee deduction (what's actually held in escrow)\",\"caller\":\"Address initiating the escalation (msg.sender from BaseEscrow)\",\"escrowState\":\"Current escrow state\",\"from\":\"Escrow sender address\",\"resolutionModule\":\"Address of the resolution module\",\"to\":\"Escrow recipient address\",\"token\":\"Token address\",\"workflowId\":\"Escrow workflow ID\"},\"returns\":{\"result\":\"Escalation computation result\"}},\"encodeEscrowData(address,address,address,uint256)\":{\"details\":\"Public helper for encoding - can be used by BaseEscrow or externally\",\"params\":{\"amountAfterFee\":\"Amount after fee deduction (what's actually held in escrow)\",\"from\":\"Sender address\",\"to\":\"Recipient address\",\"token\":\"Token address\"},\"returns\":{\"_0\":\"Encoded escrow data\"}},\"validateEscalationFee(uint256,uint256)\":{\"details\":\"Helper function for BaseEscrow to validate fee payment\",\"params\":{\"paidFee\":\"Fee actually paid (msg.value)\",\"requiredFee\":\"Fee required by escalation\"},\"returns\":{\"excessRefund\":\"Amount to refund to caller\",\"valid\":\"Whether payment is sufficient\"}}},\"title\":\"DisputeOps\",\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{\"computeEscalation(address,uint256,address,address,address,address,uint256,uint8)\":{\"notice\":\"Compute escalation for a disputed escrow\"},\"encodeEscrowData(address,address,address,uint256)\":{\"notice\":\"Encode escrow data for resolution module\"},\"validateEscalationFee(uint256,uint256)\":{\"notice\":\"Validate escalation fee payment\"}},\"notice\":\"External contract for dispute escalation orchestration\",\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/DisputeOps.sol\":\"DisputeOps\"},\"evmVersion\":\"cancun\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\",\"useLiteralContent\":true},\"optimizer\":{\"enabled\":true,\"runs\":1000},\"remappings\":[],\"viaIR\":true},\"sources\":{\"@openzeppelin/contracts/utils/introspection/IERC165.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.4.0) (utils/introspection/IERC165.sol)\\n\\npragma solidity >=0.4.16;\\n\\n/**\\n * @dev Interface of the ERC-165 standard, as defined in the\\n * https://eips.ethereum.org/EIPS/eip-165[ERC].\\n *\\n * Implementers can declare support of contract interfaces, which can then be\\n * queried by others ({ERC165Checker}).\\n *\\n * For an implementation, see {ERC165}.\\n */\\ninterface IERC165 {\\n    /**\\n     * @dev Returns true if this contract implements the interface defined by\\n     * `interfaceId`. See the corresponding\\n     * https://eips.ethereum.org/EIPS/eip-165#how-interfaces-are-identified[ERC section]\\n     * to learn more about how these ids are created.\\n     *\\n     * This function call must use less than 30 000 gas.\\n     */\\n    function supportsInterface(bytes4 interfaceId) external view returns (bool);\\n}\\n\",\"keccak256\":\"0x8891738ffe910f0cf2da09566928589bf5d63f4524dd734fd9cedbac3274dd5c\",\"license\":\"MIT\"},\"contracts/DisputeOps.sol\":{\"content\":\"// SPDX-License-Identifier: Apache-2.0\\npragma solidity ^0.8.33;\\n\\nimport './shared/interfaces/IResolutionModule.sol';\\nimport './types/EscrowTypes.sol';\\n\\n/**\\n * @title DisputeOps\\n * @notice External contract for dispute escalation orchestration\\n * @dev Extracted from BaseEscrow to reduce contract size (Phase 2 size optimization)\\n *\\n *      Key design principles (from updated plan):\\n *      - Compute \\u2192 Apply: Returns escalation result, BaseEscrow applies to state\\n *      - No callbacks: Does not write to BaseEscrow state\\n *      - Atomic: Single call computes all escalation logic\\n *      - View-ish: Could be view function but module may update counters\\n *\\n *      Pattern:\\n *      BaseEscrow calls: computeEscalation(workflowId, caller, escrowData)\\n *      DisputeOps returns: (newResolver, newLevel, escalationFee)\\n *      BaseEscrow applies: Updates state and collects fees\\n */\\ncontract DisputeOps {\\n    /**\\n     * @dev Result of escalation computation\\n     */\\n    struct EscalationResult {\\n        bool success; // Whether escalation is allowed\\n        address newResolver; // New dispute resolver address\\n        uint8 newLevel; // New escalation level\\n        uint8 currentLevel; // Current escalation level (for event)\\n        uint256 escalationFee; // Fee required for escalation\\n        string failureReason; // Reason if escalation not allowed\\n    }\\n\\n    /**\\n     * @notice Compute escalation for a disputed escrow\\n     * @param resolutionModule Address of the resolution module\\n     * @param workflowId Escrow workflow ID\\n     * @param caller Address initiating the escalation (msg.sender from BaseEscrow)\\n     * @param from Escrow sender address\\n     * @param to Escrow recipient address\\n     * @param token Token address\\n     * @param amountAfterFee Amount after fee deduction (what's actually held in escrow)\\n     * @param escrowState Current escrow state\\n     * @return result Escalation computation result\\n     * @dev This function is \\\"compute-only\\\" - it does NOT modify BaseEscrow state.\\n     *      It may call the resolution module which might update its own counters.\\n     *      BaseEscrow will apply the result after receiving it.\\n     */\\n    function computeEscalation(\\n        address resolutionModule,\\n        uint256 workflowId,\\n        address caller,\\n        address from,\\n        address to,\\n        address token,\\n        uint256 amountAfterFee,\\n        EscrowState escrowState\\n    ) external returns (EscalationResult memory result) {\\n        result.success = false;\\n\\n        // Validate caller is participant (BaseEscrow should have checked this, but double-check)\\n        if (caller != from && caller != to) {\\n            result.failureReason = 'Caller not participant';\\n            return result;\\n        }\\n\\n        // Validate state is DISPUTED\\n        if (escrowState != EscrowState.DISPUTED) {\\n            result.failureReason = 'Not in disputed state';\\n            return result;\\n        }\\n\\n        // Validate module exists\\n        if (resolutionModule == address(0)) {\\n            result.failureReason = 'Resolution module not configured';\\n            return result;\\n        }\\n\\n        // Encode escrow data for module\\n        bytes memory escrowData = abi.encode(token, from, to, amountAfterFee);\\n\\n        // Get current level from module\\n        try IResolutionModule(resolutionModule).getDisputeResolver(workflowId, escrowData) returns (\\n            address /* currentResolver */,\\n            uint8 currentLevel\\n        ) {\\n            result.currentLevel = currentLevel;\\n        } catch {\\n            result.failureReason = 'Failed to get current level';\\n            return result;\\n        }\\n\\n        // Check if escalation is allowed and get fee\\n        try\\n            IResolutionModule(resolutionModule).canEscalate(\\n                workflowId,\\n                result.currentLevel,\\n                escrowData\\n            )\\n        returns (bool canEscalate, address /* nextResolver */, uint256 fee) {\\n            if (!canEscalate) {\\n                result.failureReason = 'Escalation not allowed';\\n                return result;\\n            }\\n            result.escalationFee = fee;\\n        } catch {\\n            result.failureReason = 'Failed to check escalation eligibility';\\n            return result;\\n        }\\n\\n        // Execute escalation in module (module may update its state)\\n        try IResolutionModule(resolutionModule).executeEscalation(workflowId, escrowData) returns (\\n            bool escalationSuccess,\\n            address newResolver,\\n            uint8 newLevel\\n        ) {\\n            if (!escalationSuccess) {\\n                result.failureReason = 'Module rejected escalation';\\n                return result;\\n            }\\n\\n            // Validate returned values\\n            if (newResolver == address(0)) {\\n                result.failureReason = 'Module returned zero address';\\n                return result;\\n            }\\n\\n            result.success = true;\\n            result.newResolver = newResolver;\\n            result.newLevel = newLevel;\\n            return result;\\n        } catch {\\n            result.failureReason = 'Module escalation call failed';\\n            return result;\\n        }\\n    }\\n\\n    /**\\n     * @notice Validate escalation fee payment\\n     * @param requiredFee Fee required by escalation\\n     * @param paidFee Fee actually paid (msg.value)\\n     * @return valid Whether payment is sufficient\\n     * @return excessRefund Amount to refund to caller\\n     * @dev Helper function for BaseEscrow to validate fee payment\\n     */\\n    function validateEscalationFee(\\n        uint256 requiredFee,\\n        uint256 paidFee\\n    ) external pure returns (bool valid, uint256 excessRefund) {\\n        if (requiredFee > 0 && paidFee < requiredFee) {\\n            return (false, 0);\\n        }\\n\\n        valid = true;\\n        if (paidFee > requiredFee) {\\n            excessRefund = paidFee - requiredFee;\\n        }\\n        return (valid, excessRefund);\\n    }\\n\\n    /**\\n     * @notice Encode escrow data for resolution module\\n     * @param token Token address\\n     * @param from Sender address\\n     * @param to Recipient address\\n     * @param amountAfterFee Amount after fee deduction (what's actually held in escrow)\\n     * @return Encoded escrow data\\n     * @dev Public helper for encoding - can be used by BaseEscrow or externally\\n     */\\n    function encodeEscrowData(\\n        address token,\\n        address from,\\n        address to,\\n        uint256 amountAfterFee\\n    ) external pure returns (bytes memory) {\\n        return abi.encode(token, from, to, amountAfterFee);\\n    }\\n}\\n\",\"keccak256\":\"0x14375758f62095e7717fe3c194e30345911ca6a4bdd4dfc01f91db0afa97af99\",\"license\":\"Apache-2.0\"},\"contracts/shared/interfaces/IResolutionModule.sol\":{\"content\":\"// SPDX-License-Identifier: Apache-2.0\\npragma solidity ^0.8.33;\\n\\nimport '@openzeppelin/contracts/utils/introspection/IERC165.sol';\\n\\n/**\\n * @title IResolutionModule\\n * @notice Interface for dispute resolution modules\\n * @dev Handles resolution logic including escalation paths, resolver roles, and dynamic resolution\\n *      All resolution modules must implement ERC-165 for interface detection\\n */\\ninterface IResolutionModule is IERC165 {\\n    /**\\n     * @notice Check if an address is authorized to resolve a dispute\\n     * @param workflowId The escrow transfer ID\\n     * @param disputeResolver The address attempting to resolve\\n     * @param escrowData Encoded escrow data\\n     * @return authorized True if authorized\\n     * @return role The dispute resolver role (0 = standard resolver, 1 = senior resolver, etc.)\\n     */\\n    function isAuthorizedDisputeResolver(\\n        uint256 workflowId,\\n        address disputeResolver,\\n        bytes calldata escrowData\\n    ) external view returns (bool authorized, uint8 role);\\n\\n    /**\\n     * @notice Get the appropriate dispute resolver for a dispute\\n     * @param workflowId The escrow transfer ID\\n     * @param escrowData Encoded escrow data\\n     * @return disputeResolver The dispute resolver address\\n     * @return escalationLevel Current escalation level (0 = initial, 1+ = escalated)\\n     */\\n    function getDisputeResolver(\\n        uint256 workflowId,\\n        bytes calldata escrowData\\n    ) external view returns (address disputeResolver, uint8 escalationLevel);\\n\\n    /**\\n     * @notice Check if escalation is allowed and get next resolver\\n     * @param workflowId The escrow transfer ID\\n     * @param currentLevel Current escalation level\\n     * @param escrowData Encoded escrow data\\n     * @return canEscalate True if escalation is allowed\\n     * @return nextDisputeResolver Address of next dispute resolver (address(0) if cannot escalate)\\n     * @return escalationFee Fee required for escalation (0 if none)\\n     */\\n    function canEscalate(\\n        uint256 workflowId,\\n        uint8 currentLevel,\\n        bytes calldata escrowData\\n    ) external view returns (bool canEscalate, address nextDisputeResolver, uint256 escalationFee);\\n\\n    /**\\n     * @notice Execute escalation to next level\\n     * @param workflowId The escrow transfer ID\\n     * @param escrowData Encoded escrow data\\n     * @return success True if escalation was successful\\n     * @return newDisputeResolver Address of new dispute resolver\\n     * @return newLevel New escalation level\\n     */\\n    function executeEscalation(\\n        uint256 workflowId,\\n        bytes calldata escrowData\\n    ) external returns (bool success, address newDisputeResolver, uint8 newLevel);\\n\\n    /**\\n     * @notice Get required appeal bond for escalation (DR v2)\\n     * @param workflowId The escrow transfer ID\\n     * @param currentLevel Current escalation level\\n     * @param escrowData Encoded escrow data\\n     * @return amount Bond amount required (0 if bonds not enabled)\\n     * @return token Token address for bond (address(0) if native token)\\n     * @dev In DR v2, escalation requires a bond deposit from the escalator.\\n     *      If bonds are not enabled, returns (0, address(0)).\\n     *      For v1 modules, this function should return (0, address(0)).\\n     */\\n    function getRequiredAppealBond(\\n        uint256 workflowId,\\n        uint8 currentLevel,\\n        bytes calldata escrowData\\n    ) external view returns (uint256 amount, address token);\\n\\n    /**\\n     * @notice Get the module name/identifier\\n     * @return name The module name\\n     */\\n    function moduleName() external pure returns (string memory name);\\n\\n    /**\\n     * @notice Get the module version\\n     * @return version The module version (semantic versioning, e.g., \\\"1.0.0\\\")\\n     * @dev Must follow semantic versioning: MAJOR.MINOR.PATCH\\n     *      Major version changes indicate breaking changes\\n     */\\n    function moduleVersion() external pure returns (string memory version);\\n}\\n\",\"keccak256\":\"0xf1192c10e24e4708e4c21561903d3fb86087479485fa286c6a75e8914d1cea5a\",\"license\":\"Apache-2.0\"},\"contracts/types/EscrowTypes.sol\":{\"content\":\"// SPDX-License-Identifier: Apache-2.0\\npragma solidity ^0.8.33;\\n\\n// Custom errors for better user experience\\nerror InvalidAutoTime(string reason, uint256 providedTime, uint256 currentTime);\\nerror CannotSetBothAutoTimes(uint256 autoReleaseTime, uint256 autoCancelTime);\\nerror AutoTimeExceedsMaxLimit(uint256 providedTime, uint256 maxTime);\\nerror InvalidAddress(string reason, address addr);\\nerror InvalidAmount(string reason);\\nerror ArrayLengthMismatch(uint256 expectedLength, uint256 actualLength);\\n\\nstruct EscrowSettings {\\n    address customResolver; // Override default resolver (address(0) = use default)\\n    bool yieldEnabled; // Opt-in for yield generation (future: Aave integration)\\n    uint256 autoReleaseTime; // Custom release time (0 = use default)\\n    uint256 autoCancelTime; // Custom cancel time (0 = use default)\\n}\\n\\nstruct YieldDistribution {\\n    address[] recipients; // Addresses to receive yield\\n    uint256[] percentages; // Percentage per recipient (basis points, sum to 10000)\\n    bool isSet; // Whether distribution is configured\\n}\\n\\n// Escrow state and status enums (shared across contracts)\\nenum EscrowState {\\n    NONE,\\n    PENDING,\\n    RELEASED,\\n    REFUNDED,\\n    DISPUTED,\\n    RESOLVED\\n}\\n\\nenum SenderStatus {\\n    NONE,\\n    AGREE_TO_CANCEL,\\n    RAISE_DISPUTE\\n}\\n\\nenum RecipientStatus {\\n    NONE,\\n    AGREE_TO_CANCEL,\\n    RAISE_DISPUTE\\n}\\n\\n// EscrowTransfer struct (shared across contracts)\\n// Note: workflowId is redundant - use array index (escrowTransfers[index]) instead\\n// Optimized packing: 4 addresses (80 bytes = 3 slots), 3 uint256 (96 bytes = 3 slots), 3 enums (3 bytes = 1 slot)\\nstruct EscrowTransfer {\\n    address token; // ERC20 token address (for EscrowVault) or address(this) for EscrowableERC20\\n    address to;\\n    address from;\\n    address disputeResolver; // Pack 4 addresses together (80 bytes = 3 slots)\\n    uint256 amountAfterFee; // amount after fee deduction (what's actually held in escrow)\\n    uint256 autoReleaseTime;\\n    uint256 autoCancelTime;\\n    EscrowState escrowState; // Pack 3 enums together (3 bytes + 29 padding = 1 slot)\\n    SenderStatus senderStatus;\\n    RecipientStatus recipientStatus;\\n}\\n\\nstruct TimeoutConfig {\\n    // Auto-execution defaults (0 = disabled, absolute timestamps)\\n    uint256 defaultAutoReleaseTime; // Default auto-release timestamp (0 = disabled)\\n    uint256 defaultAutoCancelTime; // Default auto-cancel timestamp (0 = disabled)\\n    // Safety timeouts (durations in seconds)\\n    uint256 maxDisputeDuration; // Max time for disputes (7-365 days)\\n    uint256 appealWindowDuration; // Time to appeal resolution (1-7 days)\\n}\\n\",\"keccak256\":\"0x157317d8d584a83fe3f144ffc118f5cb1e128cfeb156b9520a1d4c878526ceb0\",\"license\":\"Apache-2.0\"}},\"version\":1}",
+  "bytecode": "0x608080604052346015576108ec908161001a8239f35b5f80fdfe60806040526004361015610011575f80fd5b5f3560e01c8063177caaf3146101075780632ccc0ebd146100d85763ed2a88011461003a575f80fd5b346100d45760803660031901126100d4576100536101e3565b602435906001600160a01b03821682036100d4576100bc6100d0926100ae6100796101f9565b604080516001600160a01b039687166020820152938616908401529093166060820152606435608082015291829060a0820190565b03601f198101835282610233565b60405191829160208352602083019061020f565b0390f35b5f80fd5b346100d45760403660031901126100d45760406100f9602435600435610859565b825191151582526020820152f35b346100d4576101003660031901126100d4576101216101e3565b6101296101f9565b606435916001600160a01b03831683036100d457608435906001600160a01b03821682036100d45760a4356001600160a01b03811681036100d45760e4359260068410156100d45760a0956101859560c43594602435906102b2565b6100d0604051928392602084528051151560208501526001600160a01b03602082015116604085015260ff604082015116606085015260ff6060820151166080850152608081015182850152015160c08084015260e083019061020f565b600435906001600160a01b03821682036100d457565b604435906001600160a01b03821682036100d457565b805180835260209291819084018484015e5f828201840152601f01601f1916010190565b90601f8019910116810190811067ffffffffffffffff82111761025557604052565b634e487b7160e01b5f52604160045260245ffd5b51906001600160a01b03821682036100d457565b519060ff821682036100d457565b6040906102a293928152816020820152019061020f565b90565b519081151582036100d457565b9095929394919660405160c0810181811067ffffffffffffffff821117610255576040525f60208201525f60408201525f60608201525f608082015260a08101606081526001600160a01b03829a5f8452166001600160a01b0388168114159081610845575b506107fe57505060068110156107ea576004036107a4576001600160a01b031693841561075e57604080516001600160a01b0393841660208201529483169085015216606083015260808201526103728160a081016100ae565b6040517f3cc8dc57000000000000000000000000000000000000000000000000000000008152604081806103aa85886004840161028b565b0381865afa5f9181610715575b5061040057505050506040516103ce604082610233565b601b81527f4661696c656420746f206765742063757272656e74206c6576656c0000000000602082015260a082015290565b60ff16606085015260ff60608501511691604051927f4e3a5f0d0000000000000000000000000000000000000000000000000000000084528460048501526024840152606060448401526060838061045b606482018661020f565b0381845afa92835f915f956106c6575b506104db575050505050604051610483606082610233565b602681527f4661696c656420746f20636865636b20657363616c6174696f6e20656c69676960208201527f62696c6974790000000000000000000000000000000000000000000000000000604082015260a082015290565b15610682576105229360609360808701525f6040518096819582947fd5918acb0000000000000000000000000000000000000000000000000000000084526004840161028b565b03925af1905f825f925f94610628575b5061057a57505050604051610548604082610233565b601d81527f4d6f64756c6520657363616c6174696f6e2063616c6c206661696c6564000000602082015260a082015290565b156105e6576001600160a01b03169081156105a45760ff9160018452602084015216604082015290565b50506040516105b4604082610233565b601c81527f4d6f64756c652072657475726e6564207a65726f206164647265737300000000602082015260a082015290565b50506040516105f6604082610233565b601a81527f4d6f64756c652072656a656374656420657363616c6174696f6e000000000000602082015260a082015290565b92509250506060813d60601161067a575b8161064660609383610233565b810103126100d457610657816102a5565b90610670604061066960208401610269565b920161027d565b919091925f610532565b3d9150610639565b50505050604051610694604082610233565b601681527f457363616c6174696f6e206e6f7420616c6c6f77656400000000000000000000602082015260a082015290565b915093506060813d60601161070d575b816106e360609383610233565b810103126100d45760406106f6826102a5565b9161070360208201610269565b500151935f61046b565b3d91506106d6565b9091506040813d604011610756575b8161073160409383610233565b810103126100d45760208161074861074f93610269565b500161027d565b905f6103b7565b3d9150610724565b505050505050604051610772604082610233565b602081527f5265736f6c7574696f6e206d6f64756c65206e6f7420636f6e66696775726564602082015260a082015290565b5050505050506040516107b8604082610233565b601581527f4e6f7420696e2064697370757465642073746174650000000000000000000000602082015260a082015290565b634e487b7160e01b5f52602160045260245ffd5b9750975050505050505060405190610817604083610233565b601682527f43616c6c6572206e6f74207061727469636970616e740000000000000000000060208301525290565b90506001600160a01b03891614155f610318565b91905f92801515806108ad575b6108a35780821161087a575b505060019190565b90809293500390811161088f57905f80610872565b634e487b7160e01b5f52601160045260245ffd5b505090505f905f90565b5080821061086656fea26469706673582212206cb6d54889460f923425f2c4ba9f7e37e692e9487738a7856e4e5eb6b2eaf7e264736f6c63430008210033",
+  "deployedBytecode": "0x60806040526004361015610011575f80fd5b5f3560e01c8063177caaf3146101075780632ccc0ebd146100d85763ed2a88011461003a575f80fd5b346100d45760803660031901126100d4576100536101e3565b602435906001600160a01b03821682036100d4576100bc6100d0926100ae6100796101f9565b604080516001600160a01b039687166020820152938616908401529093166060820152606435608082015291829060a0820190565b03601f198101835282610233565b60405191829160208352602083019061020f565b0390f35b5f80fd5b346100d45760403660031901126100d45760406100f9602435600435610859565b825191151582526020820152f35b346100d4576101003660031901126100d4576101216101e3565b6101296101f9565b606435916001600160a01b03831683036100d457608435906001600160a01b03821682036100d45760a4356001600160a01b03811681036100d45760e4359260068410156100d45760a0956101859560c43594602435906102b2565b6100d0604051928392602084528051151560208501526001600160a01b03602082015116604085015260ff604082015116606085015260ff6060820151166080850152608081015182850152015160c08084015260e083019061020f565b600435906001600160a01b03821682036100d457565b604435906001600160a01b03821682036100d457565b805180835260209291819084018484015e5f828201840152601f01601f1916010190565b90601f8019910116810190811067ffffffffffffffff82111761025557604052565b634e487b7160e01b5f52604160045260245ffd5b51906001600160a01b03821682036100d457565b519060ff821682036100d457565b6040906102a293928152816020820152019061020f565b90565b519081151582036100d457565b9095929394919660405160c0810181811067ffffffffffffffff821117610255576040525f60208201525f60408201525f60608201525f608082015260a08101606081526001600160a01b03829a5f8452166001600160a01b0388168114159081610845575b506107fe57505060068110156107ea576004036107a4576001600160a01b031693841561075e57604080516001600160a01b0393841660208201529483169085015216606083015260808201526103728160a081016100ae565b6040517f3cc8dc57000000000000000000000000000000000000000000000000000000008152604081806103aa85886004840161028b565b0381865afa5f9181610715575b5061040057505050506040516103ce604082610233565b601b81527f4661696c656420746f206765742063757272656e74206c6576656c0000000000602082015260a082015290565b60ff16606085015260ff60608501511691604051927f4e3a5f0d0000000000000000000000000000000000000000000000000000000084528460048501526024840152606060448401526060838061045b606482018661020f565b0381845afa92835f915f956106c6575b506104db575050505050604051610483606082610233565b602681527f4661696c656420746f20636865636b20657363616c6174696f6e20656c69676960208201527f62696c6974790000000000000000000000000000000000000000000000000000604082015260a082015290565b15610682576105229360609360808701525f6040518096819582947fd5918acb0000000000000000000000000000000000000000000000000000000084526004840161028b565b03925af1905f825f925f94610628575b5061057a57505050604051610548604082610233565b601d81527f4d6f64756c6520657363616c6174696f6e2063616c6c206661696c6564000000602082015260a082015290565b156105e6576001600160a01b03169081156105a45760ff9160018452602084015216604082015290565b50506040516105b4604082610233565b601c81527f4d6f64756c652072657475726e6564207a65726f206164647265737300000000602082015260a082015290565b50506040516105f6604082610233565b601a81527f4d6f64756c652072656a656374656420657363616c6174696f6e000000000000602082015260a082015290565b92509250506060813d60601161067a575b8161064660609383610233565b810103126100d457610657816102a5565b90610670604061066960208401610269565b920161027d565b919091925f610532565b3d9150610639565b50505050604051610694604082610233565b601681527f457363616c6174696f6e206e6f7420616c6c6f77656400000000000000000000602082015260a082015290565b915093506060813d60601161070d575b816106e360609383610233565b810103126100d45760406106f6826102a5565b9161070360208201610269565b500151935f61046b565b3d91506106d6565b9091506040813d604011610756575b8161073160409383610233565b810103126100d45760208161074861074f93610269565b500161027d565b905f6103b7565b3d9150610724565b505050505050604051610772604082610233565b602081527f5265736f6c7574696f6e206d6f64756c65206e6f7420636f6e66696775726564602082015260a082015290565b5050505050506040516107b8604082610233565b601581527f4e6f7420696e2064697370757465642073746174650000000000000000000000602082015260a082015290565b634e487b7160e01b5f52602160045260245ffd5b9750975050505050505060405190610817604083610233565b601682527f43616c6c6572206e6f74207061727469636970616e740000000000000000000060208301525290565b90506001600160a01b03891614155f610318565b91905f92801515806108ad575b6108a35780821161087a575b505060019190565b90809293500390811161088f57905f80610872565b634e487b7160e01b5f52601160045260245ffd5b505090505f905f90565b5080821061086656fea26469706673582212206cb6d54889460f923425f2c4ba9f7e37e692e9487738a7856e4e5eb6b2eaf7e264736f6c63430008210033",
+  "devdoc": {
+    "details": "Extracted from BaseEscrow to reduce contract size (Phase 2 size optimization)      Key design principles (from updated plan):      - Compute → Apply: Returns escalation result, BaseEscrow applies to state      - No callbacks: Does not write to BaseEscrow state      - Atomic: Single call computes all escalation logic      - View-ish: Could be view function but module may update counters      Pattern:      BaseEscrow calls: computeEscalation(workflowId, caller, escrowData)      DisputeOps returns: (newResolver, newLevel, escalationFee)      BaseEscrow applies: Updates state and collects fees",
+    "kind": "dev",
+    "methods": {
+      "computeEscalation(address,uint256,address,address,address,address,uint256,uint8)": {
+        "details": "This function is \"compute-only\" - it does NOT modify BaseEscrow state.      It may call the resolution module which might update its own counters.      BaseEscrow will apply the result after receiving it.",
+        "params": {
+          "amountAfterFee": "Amount after fee deduction (what's actually held in escrow)",
+          "caller": "Address initiating the escalation (msg.sender from BaseEscrow)",
+          "escrowState": "Current escrow state",
+          "from": "Escrow sender address",
+          "resolutionModule": "Address of the resolution module",
+          "to": "Escrow recipient address",
+          "token": "Token address",
+          "workflowId": "Escrow workflow ID"
+        },
+        "returns": {
+          "result": "Escalation computation result"
+        }
+      },
+      "encodeEscrowData(address,address,address,uint256)": {
+        "details": "Public helper for encoding - can be used by BaseEscrow or externally",
+        "params": {
+          "amountAfterFee": "Amount after fee deduction (what's actually held in escrow)",
+          "from": "Sender address",
+          "to": "Recipient address",
+          "token": "Token address"
+        },
+        "returns": {
+          "_0": "Encoded escrow data"
+        }
+      },
+      "validateEscalationFee(uint256,uint256)": {
+        "details": "Helper function for BaseEscrow to validate fee payment",
+        "params": {
+          "paidFee": "Fee actually paid (msg.value)",
+          "requiredFee": "Fee required by escalation"
+        },
+        "returns": {
+          "excessRefund": "Amount to refund to caller",
+          "valid": "Whether payment is sufficient"
+        }
+      }
+    },
+    "title": "DisputeOps",
+    "version": 1
+  },
+  "userdoc": {
+    "kind": "user",
+    "methods": {
+      "computeEscalation(address,uint256,address,address,address,address,uint256,uint8)": {
+        "notice": "Compute escalation for a disputed escrow"
+      },
+      "encodeEscrowData(address,address,address,uint256)": {
+        "notice": "Encode escrow data for resolution module"
+      },
+      "validateEscalationFee(uint256,uint256)": {
+        "notice": "Validate escalation fee payment"
+      }
+    },
+    "notice": "External contract for dispute escalation orchestration",
+    "version": 1
+  },
+  "storageLayout": {
+    "storage": [],
+    "types": null
+  }
+}

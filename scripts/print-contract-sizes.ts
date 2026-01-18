@@ -1,7 +1,10 @@
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import { execSync } from 'child_process';
 
-const ARTIFACTS_DIR = join(__dirname, '../artifacts/contracts');
+// Try Foundry artifacts first (more accurate), fallback to Hardhat
+const FOUNDRY_ARTIFACTS_DIR = join(__dirname, '../out');
+const HARDHAT_ARTIFACTS_DIR = join(__dirname, '../artifacts/contracts');
 const SIZE_LIMIT = 24 * 1024; // 24KB in bytes
 
 interface ContractSize {
@@ -19,33 +22,72 @@ function getContractSize(contractPath: string): number | null {
 
   try {
     const artifact = JSON.parse(readFileSync(contractPath, 'utf-8'));
-    const bytecode = artifact.deployedBytecode;
+    let bytecode = artifact.deployedBytecode;
 
-    if (!bytecode || bytecode === '0x') {
+    // Handle Foundry artifacts which store bytecode as object with 'object' key
+    if (typeof bytecode === 'object' && bytecode !== null && 'object' in bytecode) {
+      bytecode = bytecode.object;
+    }
+
+    if (!bytecode || bytecode === '0x' || typeof bytecode !== 'string') {
       return null; // Abstract contract or no bytecode
     }
 
     // Remove '0x' prefix and calculate size (each byte is 2 hex chars)
-    return (bytecode.length - 2) / 2;
+    const size = (bytecode.length - 2) / 2;
+    return isNaN(size) || size <= 0 ? null : size;
   } catch (error) {
     console.error(`Error reading ${contractPath}:`, error);
     return null;
   }
 }
 
+function getContractSizeFromFoundry(contractName: string): number | null {
+  // Extract base name (last part after /)
+  const baseName = contractName.split('/').pop() || contractName;
+  
+  // Try Foundry artifact path: out/ContractName.sol/ContractName.json
+  const foundryPath = join(FOUNDRY_ARTIFACTS_DIR, `${baseName}.sol`, `${baseName}.json`);
+  if (existsSync(foundryPath)) {
+    const size = getContractSize(foundryPath);
+    if (size !== null) return size;
+  }
+  
+  // Try with full path for subdirectories: out/decentralized-resolution-module/DecentralizedResolutionModule.sol/...
+  if (contractName.includes('/')) {
+    const parts = contractName.split('/');
+    const dir = parts.slice(0, -1).join('/');
+    const name = parts[parts.length - 1];
+    const foundryPathWithDir = join(FOUNDRY_ARTIFACTS_DIR, dir, `${name}.sol`, `${name}.json`);
+    if (existsSync(foundryPathWithDir)) {
+      const size = getContractSize(foundryPathWithDir);
+      if (size !== null) return size;
+    }
+  }
+  
+  // Fallback to Hardhat artifact path
+  const hardhatPath = join(HARDHAT_ARTIFACTS_DIR, contractName.includes('/') ? contractName : `core/${contractName}.sol`, `${baseName}.json`);
+  if (existsSync(hardhatPath)) {
+    const size = getContractSize(hardhatPath);
+    if (size !== null) return size;
+  }
+  
+  return null;
+}
+
 function findContracts(): ContractSize[] {
   const contracts: ContractSize[] = [];
-  const contractFiles = [
-    'BaseEscrow.sol/BaseEscrow.json',
-    'EscrowVault.sol/EscrowVault.json',
-    'EscrowableERC20.sol/EscrowableERC20.json',
-    'modules/DecentralizedResolutionModule.sol/DecentralizedResolutionModule.json',
-    'modules/ResolverIncentiveModule.sol/ResolverIncentiveModule.json',
+  const contractNames = [
+    'BaseEscrow',
+    'EscrowVault',
+    'EscrowableERC20',
+    'decentralized-resolution-module/DecentralizedResolutionModule',
+    'decentralized-resolution-module/ResolverIncentiveModuleV1',
+    'decentralized-resolution-module/ResolverIncentiveModuleV2',
   ];
 
-  for (const file of contractFiles) {
-    const contractPath = join(ARTIFACTS_DIR, file);
-    const size = getContractSize(contractPath);
+  for (const contractName of contractNames) {
+    const size = getContractSizeFromFoundry(contractName);
 
     if (size !== null) {
       const sizeKB = size / 1024;
@@ -53,7 +95,7 @@ function findContracts(): ContractSize[] {
       const overLimitPercent = overLimit ? ((size - SIZE_LIMIT) / SIZE_LIMIT) * 100 : 0;
 
       contracts.push({
-        name: file.split('/').pop()?.replace('.json', '') || file,
+        name: contractName.split('/').pop() || contractName,
         size,
         sizeKB,
         overLimit,

@@ -8,6 +8,8 @@ import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/YieldOps.sol';
 import '../../../contracts/DisputeOps.sol';
+import '../../../contracts/core/ModuleManagementContract.sol';
+import '../../../contracts/admin/EscrowAdminContract.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 
 /**
@@ -22,6 +24,8 @@ contract EscalationDepthHistogramTest is Test {
     EscrowVault public escrow;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
+    ModuleManagementContract public moduleManagement;
+    EscrowAdminContract public adminContract;
 
     address public deployer;
     address public depositor;
@@ -44,9 +48,11 @@ contract EscalationDepthHistogramTest is Test {
         paymentLib = new PaymentCalculationLibraryV1();
         incentiveModule = new ResolverIncentiveModuleV2(deployer, address(paymentLib));
         token = new ERC20Mock('Test Token', 'TEST', address(this), 0);
-        yieldOps = new YieldOps();
+        yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps();
-        escrow = new EscrowVault(100, feeAddress, address(yieldOps), address(disputeOps));
+        moduleManagement = new ModuleManagementContract(address(this));
+        adminContract = new EscrowAdminContract(address(this));
+        escrow = new EscrowVault(100, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
 
         // Setup tokens
         token.mint(depositor, INITIAL_BALANCE);
@@ -157,6 +163,7 @@ contract EscalationDepthHistogramTest is Test {
         incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
             WORKFLOW_ID_1,
             depositor,
+            depositor,
             BOND_AMOUNT,
             address(0),
             0
@@ -179,6 +186,7 @@ contract EscalationDepthHistogramTest is Test {
         vm.expectRevert("Invalid round");
         incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
             WORKFLOW_ID_1,
+            depositor,
             depositor,
             BOND_AMOUNT,
             address(0),
@@ -203,6 +211,7 @@ contract EscalationDepthHistogramTest is Test {
         vm.expectRevert("Invalid round");
         incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
             WORKFLOW_ID_1,
+            depositor,
             depositor,
             BOND_AMOUNT,
             address(0),
@@ -298,19 +307,16 @@ contract EscalationDepthHistogramTest is Test {
      * @notice Test histogram with ERC20 tokens (not just ETH)
      */
     function test_histogramWithERC20Token() public {
-        // Mint tokens to escrow
-        token.mint(address(escrow), BOND_AMOUNT * 10);
-
-        // Approve and transfer tokens to incentive module
-        vm.prank(address(escrow));
+        // Mint tokens to depositor and approve incentive module (pull-based pattern)
+        token.mint(depositor, BOND_AMOUNT * 10);
+        vm.prank(depositor);
         token.approve(address(incentiveModule), BOND_AMOUNT);
-        vm.prank(address(escrow));
-        token.transfer(address(incentiveModule), BOND_AMOUNT);
 
-        // Record bond with ERC20 token
+        // Record bond with ERC20 token - incentive module will pull tokens
         vm.prank(address(escrow));
         incentiveModule.recordAppealBond(
             WORKFLOW_ID_1,
+            depositor,
             depositor,
             BOND_AMOUNT,
             address(token),
@@ -371,6 +377,7 @@ contract EscalationDepthHistogramTest is Test {
         incentiveModule.recordAppealBond{value: 0}(
             WORKFLOW_ID_1,
             depositor,
+            depositor,
             0, // Invalid: zero amount
             address(0),
             1
@@ -390,6 +397,7 @@ contract EscalationDepthHistogramTest is Test {
         vm.expectRevert("Bond already exists");
         incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
             WORKFLOW_ID_1,
+            depositor,
             depositor,
             BOND_AMOUNT,
             address(0),
@@ -425,19 +433,21 @@ contract EscalationDepthHistogramTest is Test {
             incentiveModule.recordAppealBond{value: amount}(
                 workflowId,
                 depositorAddr,
+                depositorAddr,
                 amount,
                 address(0),
                 round
             );
         } else {
-            // ERC20 bond - transfer tokens first (escrow transfers to incentive module)
-            vm.prank(address(escrow));
-            IERC20(tokenAddr).transfer(address(incentiveModule), amount);
+            // ERC20 bond - approve incentive module to pull tokens
+            vm.prank(depositorAddr);
+            IERC20(tokenAddr).approve(address(incentiveModule), amount);
 
-            // Then record
+            // Record bond - incentive module will pull tokens from depositor
             vm.prank(address(escrow));
             incentiveModule.recordAppealBond(
                 workflowId,
+                depositorAddr,
                 depositorAddr,
                 amount,
                 tokenAddr,

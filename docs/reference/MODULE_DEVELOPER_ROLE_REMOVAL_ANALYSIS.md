@@ -15,10 +15,9 @@
 - `DecentralizedResolutionModule.sol` (line 33)
 - `ResolverIncentiveModule.sol` (line 33)
 
-**What it allows:**
+**What it would have allowed (if it existed):**
 
-- Upgrade `DecentralizedResolutionModule` via UUPS (with staged delays)
-- Upgrade `ResolverIncentiveModule` via UUPS (with staged delays)
+- Upgrade modules via proxy patterns (UUPS/Transparent) - **Note: Modules are actually immutable, upgraded via swapping**
 - Queue/activate upgrades with time-based delays (1h/24h/7d)
 
 **What it cannot do:**
@@ -223,9 +222,8 @@
 
 **Decision point:** Keep queue/activate functions for timelock use?
 
-- **Option A:** Remove entirely, use standard UUPS `upgradeTo()` via timelock
-- **Option B:** Keep functions but require `ROLE_TIMELOCK` instead
-- **Recommendation:** Option A - Use standard governance, no special queue/activate needed
+- **Note:** Modules are immutable and upgraded via swapping (deploy new version + swap reference), not via proxy upgrades
+- **Recommendation:** Remove role entirely - module upgrades follow standard slow-lane governance (queue/activate pattern)
 
 ### Documentation Changes Required
 
@@ -248,9 +246,9 @@
 
 **After removal:**
 
-- Only Timelock can upgrade (via slow-lane governance)
-- All upgrades follow standard ~9 day process
-- No special queue/activate pattern needed
+- Only Timelock can swap modules (via slow-lane governance)
+- All module swaps follow standard ~9 day process (queue + activate)
+- Modules are immutable - upgrades via deploy new version + swap reference
 
 ---
 
@@ -290,10 +288,10 @@
 
 **Changes:**
 
-- Remove `ROLE_MODULE_DEVELOPER` constant
-- Simplify `_authorizeUpgrade()` to only allow `ROLE_TIMELOCK`
-- Remove `queueUpgrade()` and `activateUpgrade()` functions
-- Use standard UUPS `upgradeTo()` via timelock
+- Remove `ROLE_MODULE_DEVELOPER` constant (if it exists)
+- Modules are immutable - no upgrade functions needed
+- Module swaps handled via BaseEscrow queue/activate pattern (slow lane)
+- All module changes follow standard governance process
 
 **Benefits:**
 
@@ -368,7 +366,7 @@
 - Standard: Direct function calls via timelock
 - Slow: Queue/activate via timelock (if needed)
 - Emergency: Direct function calls via guardian
-- **Module: Standard UUPS upgrade via timelock** ✅
+- **Module: Immutable, upgraded via swapping (slow lane governance)** ✅
 
 **Role management:**
 
@@ -461,7 +459,7 @@
 - Remove role from both contracts
 - Simplify upgrade authorization to timelock-only
 - Remove queue/activate functions (or update to timelock-only)
-- Use standard UUPS `upgradeTo()` via timelock governance
+- Use standard module swap pattern via slow-lane governance (queue + activate)
 
 ### Timing
 

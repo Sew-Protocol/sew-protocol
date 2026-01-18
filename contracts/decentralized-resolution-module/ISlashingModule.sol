@@ -80,7 +80,7 @@ interface ISlashingModule {
 
     event SlashProposed(
         uint256 indexed slashId,
-        uint256 indexed escrowId,
+        uint256 indexed workflowId,
         address indexed resolver,
         SlashReason reason,
         uint256 amount,
@@ -120,7 +120,7 @@ interface ISlashingModule {
     );
 
     event InsurancePoolFunded(uint256 amount, uint256 newBalance);
-    event InsurancePoolPayout(address indexed to, uint256 amount, uint256 indexed escrowId);
+    event InsurancePoolPayout(address indexed to, uint256 amount, uint256 indexed workflowId);
 
     // ============ Core Slashing Functions ============
 

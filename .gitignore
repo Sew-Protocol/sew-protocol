@@ -10,6 +10,8 @@ cache-foundry
 artifacts
 typechain-types
 coverage
+coverage.json
+*.tsbuildinfo
 
 # Deployment artifacts
 deploy-ledger
@@ -17,6 +19,10 @@ deploy-ledger
 # Environment files
 .env
 .envq
+
+# Codacy logs
+.codacy/logs/
+.codacy/*.log
 
 # OS files
 .DS_Store

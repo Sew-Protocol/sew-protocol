@@ -117,16 +117,9 @@ library SettingsValidationLibrary {
                 revert InvalidAddressKey('customResolver');
             }
         }
-        
-        // Validate escrow type
-        if (uint8(settings.escrowType) > uint8(EscrowType.CUSTOM)) {
-            revert OutOfBounds(
-                'escrowType',
-                uint256(uint8(settings.escrowType)),
-                0,
-                uint256(uint8(EscrowType.CUSTOM))
-            );
-        }
+
+        // DEPRECATED: Per-escrow yield distribution has been removed in favor of yield presets.
+        // Distribution is derived at runtime from `settings.yieldPreset` and participant addresses.
     }
     
     /**
@@ -186,10 +179,9 @@ library SettingsValidationLibrary {
         return
             EscrowSettings({
                 customResolver: address(0),
-                yieldEnabled: false,
+                yieldPreset: YieldPreset.OFF, // Default: yield off
                 autoReleaseTime: 0,
-                autoCancelTime: 0,
-                escrowType: EscrowType.STANDARD
+                autoCancelTime: 0
             });
     }
 

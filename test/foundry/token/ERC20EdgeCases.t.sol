@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import "../../../contracts/types/YieldPresets.sol";
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';

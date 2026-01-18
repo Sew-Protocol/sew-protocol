@@ -12,8 +12,24 @@ DR v3 (Decentralize Capital) is **substantially complete** with core functionali
 - Phase 6: Additional testing (partial - core invariants exist)
 - Minor features: Counter-party distribution, some economic safety caps
 
-**Critical Update (2026-01-16):**
-- ✅ **`slashForFraud()` implemented** - Previously stubbed, now fully functional
+## Latest changes (newest first)
+
+**Updates (2026-01-16):**
+- ✅ **Launch‑safe v3 staking defaults wired in** (mixed stable+SEW bonds, haircut, minimums, capacity gating)
+  - Mixed bond enforcement: **≥80% stable / ≤20% SEW**, with **50% SEW haircut**
+  - Minimums: **$250 resolver**, **$25,000 senior**
+  - Capacity gating: `maxEscrowPerL0Case = min($2,000, 4× effectiveBondUSD)`
+- ✅ **Objective slashing schedule + epoch caps implemented**
+  - Missed accept: **25 bps (0.25%)**
+  - Missed resolve: **200 bps (2%)**, repeat in epoch: **500 bps (5%)**
+  - Epoch caps: **20% resolver / 10% senior per 7‑day epoch**
+  - Freeze durations: **72h severe**, **7d repeated**
+- ✅ **Slashed SEW is handled as burned**
+  - Prefer `burn(amount)` when supported; otherwise transfer to `0x…dEaD`
+  - Emits `SlashedSEWHandled(workflowId, amount, supplyReduced)`
+- ✅ **`slashForFraud()` implemented** (was stubbed) and evidence/appeal plumbing in place
+
+**Docs pointer:** the canonical parameter narrative is now centralized in `docs/dispute-resolution/DR_V3_LAUNCH_SAFE_DEFAULTS.md`.
 
 ---
 
@@ -79,25 +95,27 @@ DR v3 (Decentralize Capital) is **substantially complete** with core functionali
 - ✅ Slash distribution (protocol, insurance pool)
 - ✅ **`slashForFraud()` - IMPLEMENTED** ✅ (2026-01-16)
 
-**Slashing Rules:**
-- ✅ Timeout Slash: 1-5% of stake (configurable)
-- ✅ Reversal Slash: 5-20% of stake (disabled initially, can be enabled)
-- ✅ **Fraud Slash: 50-100% of stake** ✅ (now functional)
-- ✅ Max slash per period (prevent cascading losses)
-- ✅ Accumulated slash tracking
+**Slashing Rules (v3 objective schedule):**
+- ✅ Missed accept: **25 bps (0.25%)**
+- ✅ Missed resolve: **200 bps (2%)**; repeat in same epoch: **500 bps (5%)**
+- ✅ Reversal slashing: **0 bps initially** (disabled; can be enabled later by governance)
+- ✅ Fraud slashing: governance-configurable (implemented and callable; severity policy TBD)
+- ✅ Caps enforced:
+  - v3 epoch caps: **20% resolver / 10% senior per 7‑day epoch**
+  - legacy per-period cap retained for backward compatibility
 
 **Appeals:**
 - ✅ Resolver can appeal slash within window (3 days)
-- ✅ Appeal requires bond (anti-spam)
-- ✅ Senior resolver or DAO reviews appeal
-- ✅ Slash reversed or upheld
-- ✅ Appeal bond returned or forfeited
+- ⚠️ Appeal bond parameter exists (anti-spam), but **bond custody/collection is not implemented** (bond amount is recorded on-chain only)
+- ✅ Appeal resolved by TIMELOCK (`resolveAppeal(slashId, upheld)`)
+- ✅ Slash can be reversed or upheld (on-chain state + events)
 
 **Slash Distribution:**
 - ✅ 50% to protocol treasury (funds remain in contract)
 - ✅ 20% to insurance pool
 - ⚠️ 30% to counter-party - **NOT IMPLEMENTED** (set to 0, low priority)
 - ⚠️ Slash proposer rewards - **NOT IMPLEMENTED** (set to 0, low priority)
+ - ✅ Slashed **SEW portion is handled as burned** (not protocol revenue)
 
 **Files:**
 - `contracts/decentralized-resolution-module/ResolverSlashingModuleV1.sol`
@@ -105,8 +123,9 @@ DR v3 (Decentralize Capital) is **substantially complete** with core functionali
 
 **Recent Updates:**
 - ✅ `slashForFraud()` now fully implemented (was stubbed)
-- ✅ Evidence storage for fraud proofs
-- ✅ Appeals support for fraud slashes
+- ✅ v3 objective slashing schedule + epoch caps + freeze durations
+- ✅ SEW burn handling for slashed SEW
+- ⚠️ Appeal bond custody still pending (parameter exists; collection not implemented)
 
 ---
 

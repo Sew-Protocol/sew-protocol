@@ -1,33 +1,42 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
 import 'contracts/YieldOps.sol';
 import 'contracts/DisputeOps.sol';
+import 'contracts/core/ModuleManagementContract.sol';
 import 'contracts/core/EscrowVault.sol';
 import 'contracts/mocks/ERC20Mock.sol';
 import 'contracts/core/modules/DefaultResolutionModule.sol';
+import 'contracts/types/YieldPresets.sol';
+import 'contracts/admin/EscrowAdminContract.sol';
+import 'contracts/types/EscrowTypes.sol';
 
 contract Test_05_ModuleSnapshotting_test is Test {
     EscrowVault vault;
+    EscrowAdminContract adminContract;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
+    ModuleManagementContract public moduleManagement;
     address deployer = address(this);
     address timelock = address(0x1);
 
     function setUp() public {
-        yieldOps = new YieldOps();
+        yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps();
-        vault = new EscrowVault(100, address(this), address(yieldOps), address(disputeOps));
+        moduleManagement = new ModuleManagementContract(address(this));
+        vault = new EscrowVault(100, address(this), address(yieldOps), address(disputeOps), address(moduleManagement));
+        adminContract = new EscrowAdminContract(address(this));
         vault.grantRole(vault.ROLE_TIMELOCK(), timelock);
+        adminContract.grantRole(adminContract.ROLE_TIMELOCK(), timelock);
 
         // deploy and activate a default resolution module so createEscrow can succeed
         DefaultResolutionModule rm = new DefaultResolutionModule(address(this), address(0x2));
         vm.prank(timelock);
-        vault.queueResolutionModule(address(rm));
+        adminContract.queueResolutionModule(address(vault), address(rm));
         vm.warp(block.timestamp + 7 days + 1);
         vm.prank(timelock);
-        vault.activateResolutionModule();
+        adminContract.activateResolutionModule(address(vault));
     }
 
     function test_snapshot_emitted_on_createEscrow() public {
@@ -41,19 +50,13 @@ contract Test_05_ModuleSnapshotting_test is Test {
         // create escrow
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
-            yieldEnabled: false,
+            yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
-            autoCancelTime: 0,
-            escrowType: EscrowType.STANDARD
+            autoCancelTime: 0
         });
         vm.prank(sender);
-        vault.createEscrow(address(token), recipient, 1e18, settings);
-
-        // verify snapshot exists for workflowId 0
-        (uint256 _a, uint256 _b, uint256 _c, uint256 _d) = (0, 0, 0, 0); // placeholder to avoid unused-local-warning
-        // ensure snapshotResolutionModule mapping has an entry (can't access internal mapping directly)
-        // check that escrowTransfers length is at least 1
-        uint256 len = vault.getEscrowCount();
-        assertTrue(len > 0);
+        uint256 workflowId = vault.createEscrow(address(token), recipient, 1e20, settings);
+        assertEq(workflowId, 0);
     }
+
 }

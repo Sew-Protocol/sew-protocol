@@ -443,35 +443,35 @@ contract SimpleResolutionModule is AccessControl, IResolutionModule {
 }
 ```
 
-### Example 2: Upgradeable Module (UUPS)
+### Example 2: Stateful Resolution Module
 
 ```solidity
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.28;
 
 import '../interfaces/IResolutionModule.sol';
-import '@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol';
-import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
+import '@openzeppelin/contracts/access/AccessControl.sol';
 
-contract UpgradeableResolutionModule is
-  AccessControlUpgradeable,
-  IResolutionModule,
-  UUPSUpgradeable
-{
+contract StatefulResolutionModule is AccessControl, IResolutionModule {
   bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');
-
-  function initialize(address initialOwner) public initializer {
-    __AccessControl_init();
-    __UUPSUpgradeable_init();
+  
+  mapping(address => bool) public isApprovedResolver;
+  address[] public approvedResolvers;
+  
+  constructor(address initialOwner) {
     _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
   }
 
-  function _authorizeUpgrade(address newImplementation) internal override onlyRole(ROLE_TIMELOCK) {}
+  function appointResolver(address resolver) external onlyRole(ROLE_TIMELOCK) {
+    require(!isApprovedResolver[resolver], "Resolver already approved");
+    isApprovedResolver[resolver] = true;
+    approvedResolvers.push(resolver);
+  }
 
   // ... implement IResolutionModule functions ...
 
   function moduleName() external pure override returns (string memory name) {
-    return 'UpgradeableResolution';
+    return 'StatefulResolution';
   }
 
   function moduleVersion() external pure override returns (string memory version) {
@@ -480,12 +480,14 @@ contract UpgradeableResolutionModule is
 
   function supportsInterface(
     bytes4 interfaceId
-  ) public view virtual override(AccessControlUpgradeable, IERC165) returns (bool) {
+  ) public view virtual override(AccessControl, IERC165) returns (bool) {
     return
       interfaceId == type(IResolutionModule).interfaceId || super.supportsInterface(interfaceId);
   }
 }
 ```
+
+**Note**: This module maintains state (resolver registry). When upgrading to a new version, you'll need to implement a migration strategy (see [Module Upgrade Strategy](./MODULE_UPGRADE_STRATEGY.md)).
 
 ---
 

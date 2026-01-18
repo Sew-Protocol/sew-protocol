@@ -116,8 +116,7 @@ describe('BaseEscrow', function () {
         customResolver: resolver.address,
         yieldEnabled: true,
         autoReleaseTime: autoReleaseTime,
-        autoCancelTime: 0,
-        escrowType: 0, // STANDARD
+        autoCancelTime: 0
       };
 
       const tx = await escrowableERC20
@@ -136,40 +135,7 @@ describe('BaseEscrow', function () {
       expect(escrowTransfer.disputeResolver).to.equal(resolver.address);
     });
 
-    it('Should update escrow settings for pending escrow', async function () {
-      const workflowId = await createEscrowTransfer(INITIAL_TRANSFER_AMOUNT);
-
-      const newSettings = {
-        customResolver: resolver.address,
-        yieldEnabled: true,
-        autoReleaseTime: 0,
-        autoCancelTime: 0,
-        escrowType: 0,
-      };
-
-      await escrowableERC20.connect(sender).updateEscrowSettings(workflowId, newSettings);
-
-      const escrowSettings = await escrowableERC20.getEscrowSettings(workflowId);
-      expect(escrowSettings.customResolver).to.equal(resolver.address);
-      expect(escrowSettings.yieldEnabled).to.equal(true);
-    });
-
-    it('Should not allow updating settings for non-pending escrow', async function () {
-      const workflowId = await createEscrowTransfer(INITIAL_TRANSFER_AMOUNT);
-      await escrowableERC20.connect(sender).releaseEscrowTransfer(workflowId);
-
-      const newSettings = {
-        customResolver: resolver.address,
-        yieldEnabled: false,
-        autoReleaseTime: 0,
-        autoCancelTime: 0,
-        escrowType: 0,
-      };
-
-      await expect(
-        escrowableERC20.connect(sender).updateEscrowSettings(workflowId, newSettings),
-      ).to.be.revertedWithCustomError(escrowableERC20, 'TransferNotPending');
-    });
+    // NOTE: updateEscrowSettings() was removed to enforce strict snapshot immutability.
 
     it('Should validate auto time limits', async function () {
       await escrowableERC20.transfer(sender.address, INITIAL_TRANSFER_AMOUNT);
@@ -182,8 +148,7 @@ describe('BaseEscrow', function () {
         customResolver: ethers.ZeroAddress,
         yieldEnabled: false,
         autoReleaseTime: invalidTime,
-        autoCancelTime: 0,
-        escrowType: 0,
+        autoCancelTime: 0
       };
 
       await expect(

@@ -6,7 +6,7 @@ libs = ["lib"]
 cache_path = "cache-foundry"
 solc = "0.8.33"
 optimizer = true
-optimizer_runs = 1000
+optimizer_runs = 20000
 via_ir = true
 verbosity = 3
 ffi = false
@@ -16,7 +16,7 @@ fs_permissions = [{ access = "read", path = "./" }]
 # Use IR + optimizer for coverage to avoid stack-too-deep in complex contracts
 via_ir = true
 optimizer = true
-optimizer_runs = 1000
+optimizer_runs = 20000
 
 [fuzz]
 runs = 256

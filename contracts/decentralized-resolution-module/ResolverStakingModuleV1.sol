@@ -37,6 +37,38 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
     using SafeERC20 for IERC20;
     using BondValuationLibrary for *;
 
+    // ============ Custom Errors ============
+    error ZeroAddress(string field);
+    error NoStake(address resolver);
+    error ContractPaused();
+    error ZeroStakeAmount();
+    error InvalidBondMix(uint256 stableBps, uint256 sewBps);
+    error BelowMinimumStake(address resolver, uint256 effectiveBond, uint256 minimumStake, uint8 tier);
+    error ResolverFrozen(address resolver);
+    error InsufficientStableBalance(address resolver, uint256 available, uint256 required);
+    error InsufficientSEWBalance(address resolver, uint256 available, uint256 required);
+    error NotActive(address resolver, StakeStatus status);
+    error UnbondRequestPending(address resolver);
+    error StakeLockedInDisputes(address resolver, uint256 lockedAmount);
+    error CoverageAlreadyReserved(address resolver, uint256 reservedAmount);
+    error MustUndelegateFirst(address resolver);
+    error RemainingBondInvalidMix(uint256 stableBps, uint256 sewBps);
+    error BelowMinimumAfterUnbond(address resolver, uint256 remainingBond, uint256 minimumStake, uint8 tier);
+    error NoUnbondRequest(address resolver);
+    error UnbondDelayNotPassed(address resolver, uint256 availableAt, uint256 currentTime);
+    error CannotDelegateToSelf(address resolver);
+    error OnlyResolversCanDelegate(address junior, uint8 tier);
+    error MustDelegateToSenior(address senior, uint8 tier);
+    error AlreadyDelegated(address junior);
+    error JuniorNotActive(address junior, StakeStatus status);
+    error SeniorNotActive(address senior, StakeStatus status);
+    error InsufficientSeniorCoverage(address senior, uint256 available, uint256 required);
+    error NotDelegated(address junior);
+    error WrongSenior(address junior, address expected, address actual);
+    error InsufficientAvailableStake(address resolver, uint256 available, uint256 required);
+    error InsufficientBond(address resolver, uint256 effectiveBond, uint256 required);
+    error InvalidTier(uint8 tier, uint8 maxTier);
+
     // ============ Constants ============
 
     bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');
@@ -157,8 +189,8 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
     // ============ Initialization ============
 
     constructor(address initialOwner, address _stableToken, address _sewToken) {
-        require(_stableToken != address(0), 'Zero stable token');
-        require(_sewToken != address(0), 'Zero SEW token');
+        if (_stableToken == address(0)) revert ZeroAddress('stableToken');
+        if (_sewToken == address(0)) revert ZeroAddress('sewToken');
 
         // OpenZeppelin best practice: Grant DEFAULT_ADMIN_ROLE to deployer
         // Deployment scripts will transfer this to TimelockController
@@ -196,7 +228,7 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
 
         // Calculate proportional withdrawal
         uint256 totalBond = bond.stableAmount + bond.sewAmount;
-        require(totalBond > 0, 'No stake');
+        if (totalBond == 0) revert NoStake(resolver);
 
         uint256 stableAmount = (bond.stableAmount * amount) / totalBond;
         uint256 sewAmount = (bond.sewAmount * amount) / totalBond;
@@ -211,8 +243,8 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
      * @dev Enforces 80/20 mix rule with 50% SEW haircut
      */
     function stakeWithMix(uint256 stableAmount, uint256 sewAmount) public nonReentrant {
-        require(!paused, 'Paused');
-        require(stableAmount > 0 || sewAmount > 0, 'Zero stake');
+        if (paused) revert ContractPaused();
+        if (stableAmount == 0 && sewAmount == 0) revert ZeroStakeAmount();
 
         address resolver = msg.sender;
         BondComposition storage bond = resolverBonds[resolver];
@@ -230,7 +262,7 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
             STABLE_DECIMALS,
             SEW_DECIMALS
         );
-        require(valid, 'Invalid bond mix');
+        if (!valid) revert InvalidBondMix(stablePct, sewPct);
 
         // Calculate effective bond value
         uint256 effectiveBond = BondValuationLibrary.calculateEffectiveBondUSD(
@@ -244,7 +276,9 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
 
         // Check minimum stake for tier
         uint8 tier = resolverTier[resolver];
-        require(effectiveBond >= minimumStakes[tier], 'Below minimum stake');
+        if (effectiveBond < minimumStakes[tier]) {
+            revert BelowMinimumStake(resolver, effectiveBond, minimumStakes[tier], tier);
+        }
 
         // Transfer tokens
         if (stableAmount > 0) {
@@ -279,32 +313,32 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
      * @dev Cannot unbond if coverage is reserved or stake is locked
      */
     function requestUnstakeWithMix(uint256 stableAmount, uint256 sewAmount) public nonReentrant {
-        require(!paused, 'Paused');
-        require(stableAmount > 0 || sewAmount > 0, 'Zero amount');
+        if (paused) revert ContractPaused();
+        if (stableAmount == 0 && sewAmount == 0) revert ZeroStakeAmount();
 
         address resolver = msg.sender;
 
         // CRITICAL: Check if resolver is frozen (recent slash)
-        require(!isResolverFrozen(resolver), 'Resolver frozen');
+        if (isResolverFrozen(resolver)) revert ResolverFrozen(resolver);
 
         BondComposition storage bond = resolverBonds[resolver];
 
-        require(bond.stableAmount >= stableAmount, 'Insufficient stable');
-        require(bond.sewAmount >= sewAmount, 'Insufficient SEW');
-        require(stakeStatus[resolver] == StakeStatus.ACTIVE, 'Not active');
-        require(!unbondRequests[resolver].exists, 'Unbond pending');
+        if (bond.stableAmount < stableAmount) revert InsufficientStableBalance(resolver, bond.stableAmount, stableAmount);
+        if (bond.sewAmount < sewAmount) revert InsufficientSEWBalance(resolver, bond.sewAmount, sewAmount);
+        if (stakeStatus[resolver] != StakeStatus.ACTIVE) revert NotActive(resolver, stakeStatus[resolver]);
+        if (unbondRequests[resolver].exists) revert UnbondRequestPending(resolver);
 
         // Check if resolver has locked stakes
-        require(totalLockedStake[resolver] == 0, 'Stake locked in disputes');
+        if (totalLockedStake[resolver] > 0) revert StakeLockedInDisputes(resolver, totalLockedStake[resolver]);
 
         // Check if resolver is a senior with reserved coverage
         if (resolverTier[resolver] == 1) {
-            require(reservedCoverage[resolver] == 0, 'Coverage reserved');
+            if (reservedCoverage[resolver] > 0) revert CoverageAlreadyReserved(resolver, reservedCoverage[resolver]);
         }
 
         // Check if resolver is a junior with delegation
         if (delegations[resolver].active) {
-            require(false, 'Must undelegate first');
+            revert MustUndelegateFirst(resolver);
         }
 
         // Calculate remaining bond after unbond
@@ -321,7 +355,7 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
                 STABLE_DECIMALS,
                 SEW_DECIMALS
             );
-            require(valid, 'Remaining bond invalid mix');
+            if (!valid) revert RemainingBondInvalidMix(0, 0); // Mix validation failed
 
             // Check remaining bond meets minimum
             uint256 remainingBond = BondValuationLibrary.calculateEffectiveBondUSD(
@@ -333,7 +367,9 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
                 SEW_DECIMALS
             );
             uint8 tierCheck = resolverTier[resolver];
-            require(remainingBond >= minimumStakes[tierCheck], 'Below minimum after unbond');
+            if (remainingBond < minimumStakes[tierCheck]) {
+                revert BelowMinimumAfterUnbond(resolver, remainingBond, minimumStakes[tierCheck], tierCheck);
+            }
         }
 
         // Calculate unbond delay based on tier
@@ -360,7 +396,7 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
      */
     function cancelUnstake() external nonReentrant {
         address resolver = msg.sender;
-        require(unbondRequests[resolver].exists, 'No unbond request');
+        if (!unbondRequests[resolver].exists) revert NoUnbondRequest(resolver);
 
         uint256 amount = unbondRequests[resolver].stableAmount + unbondRequests[resolver].sewAmount;
 
@@ -378,8 +414,10 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
         address resolver = msg.sender;
         UnbondRequest storage request = unbondRequests[resolver];
 
-        require(request.exists, 'No unbond request');
-        require(block.timestamp >= request.availableAt, 'Unbond delay not passed');
+        if (!request.exists) revert NoUnbondRequest(resolver);
+        if (block.timestamp < request.availableAt) {
+            revert UnbondDelayNotPassed(resolver, request.availableAt, block.timestamp);
+        }
 
         uint256 stableAmount = request.stableAmount;
         uint256 sewAmount = request.sewAmount;
@@ -433,7 +471,7 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
         uint256 sewAmount = bond.sewAmount;
         uint256 totalAmount = stableAmount + sewAmount;
 
-        require(totalAmount > 0, 'No stake');
+        if (totalAmount == 0) revert NoStake(resolver);
 
         // Clear bond
         bond.stableAmount = 0;
@@ -464,15 +502,15 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
         address senior,
         uint256 /* amount - unused, calculated automatically */
     ) external nonReentrant {
-        require(!paused, 'Paused');
+        if (paused) revert ContractPaused();
 
         address junior = msg.sender;
-        require(junior != senior, 'Cannot delegate to self');
-        require(resolverTier[junior] == 0, 'Only resolvers can delegate');
-        require(resolverTier[senior] == 1, 'Must delegate to senior');
-        require(!delegations[junior].active, 'Already delegated');
-        require(stakeStatus[junior] == StakeStatus.ACTIVE, 'Junior not active');
-        require(stakeStatus[senior] == StakeStatus.ACTIVE, 'Senior not active');
+        if (junior == senior) revert CannotDelegateToSelf(junior);
+        if (resolverTier[junior] != 0) revert OnlyResolversCanDelegate(junior, resolverTier[junior]);
+        if (resolverTier[senior] != 1) revert MustDelegateToSenior(senior, resolverTier[senior]);
+        if (delegations[junior].active) revert AlreadyDelegated(junior);
+        if (stakeStatus[junior] != StakeStatus.ACTIVE) revert JuniorNotActive(junior, stakeStatus[junior]);
+        if (stakeStatus[senior] != StakeStatus.ACTIVE) revert SeniorNotActive(senior, stakeStatus[senior]);
 
         // Calculate required coverage for junior
         BondComposition storage juniorBond = resolverBonds[junior];
@@ -486,7 +524,9 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
         );
         uint256 seniorAvailableCoverage = seniorMaxCoverage - reservedCoverage[senior];
 
-        require(seniorAvailableCoverage >= requiredCoverage, 'Insufficient senior coverage');
+        if (seniorAvailableCoverage < requiredCoverage) {
+            revert InsufficientSeniorCoverage(senior, seniorAvailableCoverage, requiredCoverage);
+        }
 
         // Reserve coverage
         reservedCoverage[senior] += requiredCoverage;
@@ -514,11 +554,11 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
         address junior = msg.sender;
         DelegationRecord storage delegation = delegations[junior];
 
-        require(delegation.active, 'Not delegated');
-        require(delegation.senior == senior, 'Wrong senior');
+        if (!delegation.active) revert NotDelegated(junior);
+        if (delegation.senior != senior) revert WrongSenior(junior, delegation.senior, senior);
 
         // Check junior has no locked stakes
-        require(totalLockedStake[junior] == 0, 'Stake locked in disputes');
+        if (totalLockedStake[junior] > 0) revert StakeLockedInDisputes(junior, totalLockedStake[junior]);
 
         uint256 coverageAmount = delegation.coverageAmount;
 
@@ -565,7 +605,7 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
         // Check resolver has sufficient available stake
         BondComposition storage bond = resolverBonds[resolver];
         uint256 availableStake = bond.effectiveBondUSD - totalLockedStake[resolver];
-        require(availableStake >= lockAmount, 'Insufficient available stake');
+        if (availableStake < lockAmount) revert InsufficientAvailableStake(resolver, availableStake, lockAmount);
 
         // Lock stake
         lockedStakes[workflowId][resolver] = lockAmount;
@@ -627,7 +667,7 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
     ) external onlyRole(ROLE_RESOLUTION_MODULE) {
         BondComposition storage bond = resolverBonds[resolver];
         uint256 availableStake = bond.effectiveBondUSD - totalLockedStake[resolver];
-        require(availableStake >= amount, 'Insufficient available stake');
+        if (availableStake < amount) revert InsufficientAvailableStake(resolver, availableStake, amount);
 
         lockedStakes[workflowId][resolver] = amount;
         totalLockedStake[resolver] += amount;
@@ -863,7 +903,9 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
         if (amount > bond.effectiveBondUSD) {
             amount = bond.effectiveBondUSD;
         }
-        require(bond.effectiveBondUSD > 0 && amount > 0, 'Insufficient bond');
+        if (bond.effectiveBondUSD == 0 || amount == 0) {
+            revert InsufficientBond(resolver, bond.effectiveBondUSD, amount);
+        }
 
         // Calculate proportional slash from stable and SEW
         uint256 totalBond = bond.effectiveBondUSD;
@@ -950,7 +992,9 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
         if (amount > bond.effectiveBondUSD) {
             amount = bond.effectiveBondUSD;
         }
-        require(bond.effectiveBondUSD > 0 && amount > 0, 'Insufficient bond');
+        if (bond.effectiveBondUSD == 0 || amount == 0) {
+            revert InsufficientBond(senior, bond.effectiveBondUSD, amount);
+        }
 
         // Calculate proportional slash (same as slash())
         uint256 totalBond = bond.effectiveBondUSD;
@@ -1078,7 +1122,7 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
      * @notice Set resolver tier (0 = resolver, 1 = senior)
      */
     function setResolverTier(address resolver, uint8 tier) external onlyRole(ROLE_TIMELOCK) {
-        require(tier <= 1, 'Invalid tier');
+        if (tier > 1) revert InvalidTier(tier, 1);
         uint8 oldTier = resolverTier[resolver];
         resolverTier[resolver] = tier;
         emit TierUpdated(resolver, oldTier, tier);

@@ -1,7 +1,7 @@
 # Sew Protocol Whitepaper
 
 **Version:** 1.0  
-**Last Updated:** 2026-01-16  
+**Last Updated:** 2026-01-28 (Added Fee Snapshot Immutability)  
 **Network:** Base (Ethereum L2)  
 **Status:** Pre-Mainnet
 
@@ -50,6 +50,46 @@ Sew allows consumers to pay with Ethereum while being protected against fraud, n
 
 ---
 
+## Release & Activation Matrix (Authoritative)
+
+This document distinguishes four separate “truths” and makes status explicit:
+
+- **Code status**: implemented in this repository
+- **Testing status**:
+  - (a) local tests (unit / fuzz / invariants)
+  - (b) testnet validation (deployment + scenario runs)
+  - (c) simulation / chaos testing with published results
+  - (d) external audit(s)
+- **Deployment status**: whether contracts are deployed to a network
+- **Activation scope**: whether a component is active by default and whether it applies to new escrows only (snapshot immutability)
+
+### Strict status terms (used everywhere)
+- **Deployed** = contract exists on a network
+- **Activated** = selected/used for **new escrows by default** (or selected module), via governance where applicable
+- **Validated** = testnet and/or simulation validation performed with documented results (separate from local unit/fuzz/invariant tests)
+
+### Initial mainnet release vs DR phases (canonical)
+
+**Initial mainnet release (IEO launch configuration):** Core escrow contracts + governance + `DefaultResolutionModule` (single resolver).
+
+**DR v1/v2/v3 modules:** Implemented in code and passing local test suites, but **not yet validated on testnet or through simulation testing** at the time of this document. They are **not active** in the initial mainnet release.
+
+**Activation method:** DR modules are activated only via a **governance-activated module swap** and affect **new escrows only** due to snapshot immutability.
+
+### Matrix
+
+| Component | Code Status | Testing Status | Deployment Status | Activation Scope |
+| --- | --- | --- | --- | --- |
+| Core escrow (`BaseEscrow`, `EscrowVault`, `EscrowableERC20`) | Implemented | Local unit/integration/fuzz/invariants passing | Planned for mainnet | Applies to all escrows |
+| Governance (Governor, Timelock, Guardian) | Implemented | Local unit/integration passing | Planned for mainnet | Applies to all governance actions |
+| `DefaultResolutionModule` (single resolver) | Implemented | Local tests passing | Initial mainnet launch module | Applies to new escrows created under it |
+| DR v1 module (decentralize decisions) | Implemented | Local unit/fuzz/invariants passing | Not yet testnet/sim validated | Governance-activated module swap; affects new escrows only |
+| DR v2 module (appeal bonds) | Implemented | Local unit/fuzz/invariants passing | Not yet testnet/sim validated | Governance-activated module swap; affects new escrows only |
+| DR v3 module (staking/slashing) | Implemented | Local unit/fuzz/invariants passing | Not yet testnet/sim validated | Governance-activated module swap; affects new escrows only |
+| Aave yield module | Implemented | Local unit/integration/fuzz/invariants | Optional at launch (if enabled) | Per-escrow enablement + caps |
+
+---
+
 ## 1. Introduction
 
 ### 1.1 The Trust Problem in Blockchain Transactions
@@ -83,7 +123,7 @@ Sew Protocol provides a **standardized, modular, and governance-controlled** esc
 - Maintains composability with account abstraction and existing DeFi protocols
 - Works with both account abstraction wallets and legacy EOA wallets
 - Evolves transparently through onchain governance
-- No custodians, no user surveillance, and no platform lock-in — rules are enforced onchain, and upgrades are transparent and time-delayed
+- No custodians, no user surveillance, and no platform lock-in — rules are enforced onchain, any module swapping is transparent and time-delayed
 
 ---
 
@@ -105,7 +145,7 @@ Sew is a **payment and dispute resolution primitive** that provides escrow funct
 The protocol is built on four fundamental principles:
 
 1. **Trustlessness**: No single party controls funds or can unilaterally modify escrow rules
-2. **Immutability**: Escrow rules are snapshotted at creation and cannot be changed
+2. **Immutability**: Escrow rules, modules, and fees are snapshotted at creation and cannot be changed during the escrow's lifetime
 3. **Modularity**: Pluggable modules for resolution, yield, and distribution
 4. **Transparency**: All operations are onchain and publicly verifiable
 
@@ -122,7 +162,8 @@ Sew Protocol is built on a modular architecture that enables safe, trustless tra
 **Key Features**:
 
 - Immutable core contracts (no proxies) for maximum security and auditability
-- Snapshot semantics: Escrow rules locked at creation, immune to governance changes
+- Snapshot semantics: Escrow rules, modules, and fees locked at creation, immune to governance changes
+- Fee immutability: Protocol fees (yield and appeal bond) snapshotted per-escrow at creation, ensuring fees cannot change during escrow lifetime
 - Account abstraction compatible: Works with smart contract wallets and legacy EOAs
 
 #### Resolution Modules (Swappable via Governance)
@@ -132,7 +173,7 @@ Sew Protocol is built on a modular architecture that enables safe, trustless tra
   - Governance-controlled resolver updates
   - Suitable for initial launch and simple disputes
 
-- **DecentralizedResolutionModule**: Advanced multi-resolver system with escalation (future swap-in)
+- **DecentralizedResolutionModule**: Advanced multi-resolver system with escalation (governance-activated module swap)
   - Multi-resolver registry with round-robin selection
   - Three-level escalation: Standard → Senior → External resolver
   - Category-based dispute routing
@@ -212,161 +253,39 @@ A simple, single-resolver resolution module:
 
 An advanced decentralized resolution system implementing a **staged rollout approach** following the principle: **"Decentralise decisions first, decentralise incentives second, decentralise capital last."** This minimizes risk by introducing adversarial pressure gradually, only after each phase proves stable.
 
-**Location**: Separate package (`contracts/decentralized-resolution-module/`)  
-**Status**: DR v1 ✅ Complete, DR v2 ✅ Complete, DR v3 🚧 Phase 1 Complete  
-**Not included in initial mainnet release** - will be deployed and swapped in via Slow lane governance (~9 days total: queue 48h + 7 days + activate 48h)
 
-**Staged Rollout Strategy:**
+### Staged Dispute-Resolution Rollout (DR v1 → v3)
 
-| Phase | Status | What's Decentralized | What's Centralized | Risk Mitigation |
-|-------|--------|---------------------|-------------------|----------------|
-| **IEO** | ✅ Ready | Governance only | Dispute resolution | Minimal surface area |
-| **DR v1** | ✅ Complete | Decision-making | Incentives, capital | No resolver capital at risk |
-| **DR v2** | ✅ Complete | Decisions, incentives | Capital | Users post bonds (not resolvers) |
-| **DR v3** | 🚧 Phase 1 | Decisions, incentives, capital | Nothing | Resolver capital at risk (future) |
+The protocol is designed to progressively decentralize dispute resolution. **Only the initial mainnet release configuration is active at launch**; DR modules are **implemented and locally tested**, but **not yet validated on testnet/simulation** and therefore **not activated** until governance phase-gates are met.
 
-**DR v1: Decentralize Decisions** ✅
+**Initial mainnet release (IEO configuration)**
 
-**Status**: ✅ Complete and Production-Ready (47 tests passing)
+* Uses **DefaultResolutionModule** (single resolver)
+* Goal: minimal surface area while core escrow and governance are proven under real usage
 
-**What's Decentralized:**
-- ✅ Multiple independent resolvers (curated set)
-- ✅ Round-robin selection from resolver pool
-- ✅ Three-level escalation: Standard → Senior → External (Kleros)
-- ✅ Category-based dispute routing
-- ✅ Performance-based workload routing (EMA scoring)
+**DR v1 — Decentralize Decisions (multi-resolver escalation)**
 
-**What's Centralized:**
-- ❌ Incentives (optional fee share, no capital at risk)
-- ❌ Capital (no resolver staking/slashing)
+* **What changes:** multiple resolvers, fair selection, escalation ladder (Standard → Senior → External)
+* **What stays centralized:** incentives and capital (no resolver staking/slashing)
+* **Why safer:** no resolver capital at risk; performance-based routing and automatic timeout handling reduce reliance on governance intervention
 
-**Key Features:**
-- Round-based dispute flow (k=0 resolver, k=1 senior, k=2 Kleros)
-- EMA-based reputation scoring (0-1e6 fixed-point)
-- Workload routing (performance determines assignment eligibility)
-- Timeout handling with auto-reassignment
-- Phase gate metrics (`getV1PhaseGateMetrics()`)
+**DR v2 — Decentralize Incentives (appeal bonds + cost curves)**
 
-**Risk Mitigation:**
-- **No Resolver Capital at Risk**: Resolvers cannot lose money (no staking/slashing)
-- **Soft Incentives**: Workload-to-zero (low performers gated out) rather than capital loss
-- **Mechanical Enforcement**: Timeout handling is automatic, not governance-dependent
-- **Gradual Decentralization**: Multiple resolvers with fair distribution
+* **What changes:** users post **appeal bonds** to escalate; costs increase by round (quadratic recommended)
+* **Bond outcomes:** refunded if appeal succeeds (decision changes); paid to prior resolver set if appeal fails (decision upheld)
+* **What stays centralized:** capital (still no resolver staking/slashing)
+* **Why safer:** economic friction suppresses griefing and low-quality escalation without introducing resolver slashing risk
 
-**Phase Gate (DR v1 → DR v2):**
-- ✅ Stable escalation rate (<20%) over N weeks
-- ✅ Predictable response times (<3 days avg)
-- ✅ Multiple operational resolvers (≥3 active)
+**DR v3 — Decentralize Capital (staking + objective slashing)**
 
----
+* **What changes:** resolver staking, objective penalties, freezes/caps, fraud slashing path
+* **Security model:** oracle-free mixed bond design
 
-### DR v3 (Decentralize Capital): Mixed stable + SEW bonds (oracle‑free)
+  * Composition enforced: ≥80% stablecoin security, ≤20% SEW (post-haircut)
+* **Why safer (when activated):** capital at risk aligns incentives, while stablecoin anchoring reduces volatility-driven solvency risk
 
-When DR v3 is enabled, resolver capital is secured using an **oracle‑free mixed bond design**:
+For launch-safe parameter defaults and rationale (DR v3), see: `docs/dispute-resolution/DR_V3_LAUNCH_SAFE_DEFAULTS.md`.
 
-- **EffectiveBondUSD** = `stablecoinBond + (sewBond × 0.5 haircut)`
-- **Composition enforced**:
-  - ≥ 80% of effective security from stablecoin
-  - ≤ 20% from SEW (after haircut)
-
-This acts as a **protocol‑level shock absorber**: dispute resolution solvency is anchored primarily in stable USD collateral, while SEW provides alignment and structural demand without becoming a single point of failure.
-
-For full launch‑safe defaults and rationale, see: `docs/dispute-resolution/DR_V3_LAUNCH_SAFE_DEFAULTS.md`.
-- ✅ No evidence of systematic griefing
-- ✅ Incident runbooks tested
-
-**DR v2: Decentralize Incentives** ✅
-
-**Status**: ✅ Complete and Production-Ready (36 tests passing)
-
-**What's Decentralized:**
-- ✅ Decision-making (from DR v1)
-- ✅ Incentives (appeal bonds, cost curves)
-- ✅ Economic friction (increasing escalation costs)
-
-**What's Centralized:**
-- ❌ Capital (no resolver staking/slashing)
-
-**Key Features:**
-- **Appeal bonds** (users post bonds to escalate disputes)
-- **Escalation cost curves** (linear, quadratic, geometric - quadratic recommended)
-- **Bond refund** on successful appeal (decision changes)
-- **Bond payment** to resolvers on failed appeal (decision upheld)
-- **Anti-griefing measures** (minimum escrow value for escalation)
-- **Observability metrics** (bonds posted/refunded/forfeited)
-
-**Economics:**
-
-Every escalation requires the appealing party to post an appeal bond. If escalation succeeds (outcome reversed), the bond is refunded to the escalator. If escalation fails (outcome upheld), the bond is paid to the prior resolver set. **No protocol fee is charged in DR v2 unless explicitly enabled in a later module version.** Any processing fee or protocol share (if enabled in future versions) is a bounded parameter controlled by governance and applies only to new escrows due to snapshot immutability.
-
-- **Quadratic Cost Curve** (recommended): `bond(k) = baseCost + stepSize × k²`
-  - Round 0→1: base cost (e.g., 100 tokens) - "painful but possible"
-  - Round 1→2: base + step (e.g., 150 tokens) - increasing cost
-  - Round 2→3: base + 4×step (e.g., 300 tokens) - "almost never rational"
-- **Incentive Alignment**: Resolvers earn bonds when appeals fail (decision upheld), creating strong incentive for correct decisions
-- **Spam Prevention**: Increasing costs and lockup time make frivolous appeals financially irrational
-
-**Attack Vectors Designed Against:**
-
-1. **Griefing (blocking funds / wasting time)**: Increasing appeal bond curve (quadratic/geometric), appeal deadlines (time-boxed windows), max escalation depth, delay scaling (deep escalation takes longer and costs more), bond forfeiture on no-show
-
-2. **Appeal spam (cheap harassment of resolvers)**: Escalator bond paid to resolver if appeal fails, minimum escrow size gating for multi-appeals, reputation-weighted routing (spam goes to hardened resolvers)
-
-3. **Bribe-farming**: Can't profit by forcing repeated appeals unless outcomes flip—harder with random assignment and multi-resolver rounds. Increasing costs reduce attack throughput
-
-4. **Governance capture**: If appeals are cheap, attackers can generate massive dispute volume and pressure governance; expensive appeals reduce attack throughput
-
-**Risk Mitigation:**
-- **No Resolver Capital at Risk**: Resolvers still cannot lose money
-- **User Bonds Only**: Users post bonds to escalate (not resolvers)
-- **Economic Friction**: Increasing costs prevent griefing and strategic escalation
-- **Refund Mechanism**: Successful appeals return bonds to users (protects legitimate disputes)
-- **Resolver Incentives**: Failed appeals pay bonds to resolvers (incentivizes correct decisions)
-
-**Phase Gate (DR v2 → DR v3):**
-- ✅ Appeal spam economically suppressed (cost > benefit)
-- ✅ No viable "cheap griefing" strategy
-- ✅ Clear evidence bonds reduce low-quality escalations
-- ✅ Stable appeal economics (20-40% reversal rate)
-- ✅ Bond flows predictable
-
-**DR v3: Decentralize Capital** 🚧
-
-**Status**: 🚧 Phase 1 Complete (Interfaces + No-Ops), Full Implementation Pending
-
-**What's Decentralized (Target):**
-- ✅ Decision-making (from DR v1)
-- ✅ Incentives (from DR v2)
-- 🚧 Capital (resolver staking/slashing - Phase 2-7 pending)
-
-**Key Features (Planned):**
-- Resolver staking (resolvers post bonds to participate)
-- Slashing (objective penalties for timeouts, provable non-response)
-- Senior backing (delegation/underwriting for new resolvers)
-- Fraud lane (investigation + execution path)
-- Insurance pool (economic safety net)
-
-**Risk Mitigation (Planned):**
-- **Resolver Capital at Risk**: Resolvers stake capital, creating strong incentive alignment
-- **Objective Slashing**: Only contract-executed penalties (timeouts, provable non-response)
-- **Gradual Introduction**: Only after DR v1/v2 behavior is known
-- **Economic Safety**: Insurance pool and circuit breakers
-
-**Phase Gate (DR v3 → Mainnet):**
-- ⏸️ Staking participation >80% of resolvers
-- ⏸️ Slashing rate <5% per month
-- ⏸️ Insurance pool solvent
-- ⏸️ Security audit complete
-
-**Why This Staged Approach Mitigates Risk:**
-
-The dangerous part of dispute resolution is not who makes the decision—it's **what happens financially when someone is wrong**. By staging the rollout:
-
-1. **DR v1** proves decision-making stability without financial adversarial pressure
-2. **DR v2** introduces economic friction for users (bonds) while keeping resolvers risk-free
-3. **DR v3** introduces resolver capital at risk only after we understand system behavior
-
-This approach enables **adversarial learning** (observing real attacks on mainnet) without catastrophic loss, reaching confidence faster than trying to predict all attack vectors upfront.
 
 ### 3.3 Yield Generation
 
@@ -411,11 +330,9 @@ The protocol supports escrowing **any ERC20 token**:
 
 Built-in dispute resolution with **staged decentralization** approach. The protocol uses a staged rollout following the principle: "Decentralise decisions first, decentralise incentives second, decentralise capital last." This minimizes risk by introducing adversarial pressure gradually, only after each phase proves stable.
 
-The current implementation supports:
-- **Initial Deployment (IEO)**: Simple single-resolver system (`DefaultResolutionModule`)
-- **DR v1**: Decentralize decisions (multiple resolvers, workload routing, EMA scoring) ✅
-- **DR v2**: Decentralize incentives (appeal bonds, cost curves, anti-griefing measures) ✅
-- **DR v3**: Decentralize capital (resolver staking, slashing, fraud lane) 🚧
+The protocol is designed for staged activation:
+- **Initial mainnet release (IEO configuration)**: `DefaultResolutionModule` (single resolver) + governance + core escrow
+- **DR v1/v2/v3 modules**: implemented and passing local tests, but **not active** at initial mainnet release and **not yet validated** on testnet/simulation at the time of this document. Activation requires a **governance-activated module swap** and affects **new escrows only**.
 
 See Section 3.2 for detailed staging information, phase gates, attack vectors, and risk mitigation strategies.
 
@@ -466,6 +383,10 @@ The protocol uses a multi-layered governance system:
 2. **TimelockController**: Time-delayed execution (48h standard, ~9 days slow lane)
 3. **Guardian Multisig**: Emergency controls (down-only)
 
+**Canonical references (exchange/audit):**
+- Governance powers, lanes, and delays (authoritative): `docs/governance/GOVERNANCE_SURFACE_MAP.md`
+- Deployment defaults (token/supply, timelock delay, governor params): `config/governance.config.ts`
+
 ### 5.2 Governance Lanes
 
 #### Emergency Lane (0h delay, Guardian only)
@@ -477,10 +398,9 @@ The protocol uses a multi-layered governance system:
 
 #### Standard Lane (48h delay, Timelock)
 
-- Parameter changes
+- Operational parameter changes (non-economic)
 - Unpause protocol
-- Fee configuration updates
-- Operational configuration
+- Module allowlists/registrations and routine operational config (bounded)
 
 #### Slow Lane (~9 days delay, Timelock)
 
@@ -489,6 +409,7 @@ The protocol uses a multi-layered governance system:
   - Total time: ~9 days wall-clock (48h + 7d + 48h)
   - Both queue and activate require Timelock execution (ROLE_TIMELOCK)
   - All modules are immutable; upgrades are performed by deploying a new version and swapping
+- Economic parameter changes (fees, protocol fee recipients, and other high-impact economic settings)
 - Fee recipient changes
 - Critical parameter changes
 
@@ -565,7 +486,7 @@ Sew Protocol is designed with the following security goals:
 2. **Governance**: Cannot change rules of existing escrows. Can only affect new escrows
 3. **Guardian**: Cannot steal funds, unpause without timelock, or increase risk. Powers are strictly down-only
 4. **Deployer**: All deployer roles are revoked after deployment
-5. **Future code changes**: Core contracts are non-upgradeable. Module upgrades are time-delayed and transparent
+5. **Future code changes**: Core contracts are immutable, swappable modules. Module swaps are time-delayed and transparent
 
 ### 6.4 Security Measures
 
@@ -698,9 +619,7 @@ Sew Protocol provides the following security guarantees:
 ### 8.2 Smart Contract Infrastructure
 
 - **Solidity Version**: 0.8.33
-- **EVM Version**: Cancun (supports `mcopy` instruction)
 - **OpenZeppelin Contracts**: v5.4.0
-- **Compiler Settings**: Optimizer enabled (50,000 runs), via-IR enabled
 
 ### 8.3 Contract Deployment
 
@@ -798,46 +717,29 @@ All timeline targets are conditional on audits, drills, and meeting phase-gate m
 
 ### 10.1 Fee Structure
 
+#### Fees TL;DR (defaults at launch)
+
+| Fee | Base | Default | Max (onchain) | Recipient | Notes |
+| --- | --- | --- | --- | --- | --- |
+| **Escrow fee** | Escrow principal (at creation) | **1% (100 bps)** | **2% (200 bps)** | `escrowFeeAddress` | Collected at creation; **immutable per-escrow** - affects only new escrows created under that fee |
+| **Yield protocol fee** (`yieldProtocolFeeBps`) | **Yield only** (never principal) | **30% (3000 bps)** | **30% (3000 bps)** | `escrowFeeAddress` | **Snapshotted per-escrow at creation** - fee cannot change during escrow lifetime; deducted before yield distribution; if yield distribution fails, yield can be routed to fee recipient |
+| **Appeal bond protocol fee** (`appealBondProtocolFeeBps`) | Appeal bond (at posting time) | **0%** | **30% (3000 bps)** | `escrowFeeAddress` | **Snapshotted per-escrow at creation** - fee cannot change during escrow lifetime; implemented but inactive by default at launch; when enabled, bond accounting uses the post-fee amount |
+
 #### Escrow Fees
 
 - **Escrow Fee**: 1% of escrow amount (100 basis points)
 - **Fee Recipient**: Protocol treasury (governance-controlled)
 - **Collection**: Fees are collected at escrow creation and held in protocol treasury
+- **Immutability**: Escrow fee is immutable per-escrow - once set at creation, it cannot change for that escrow, even if governance changes the global escrow fee for new escrows
 
 #### Yield Distribution
 
 - **Yield Generation**: Optional per-escrow (via Aave integration)
-- **Protocol Share**: 30% of generated yield goes to protocol treasury
-- **User Share**: 70% of generated yield distributed to escrow participants (buyer/seller) based on escrow configuration
+- **Protocol share (default)**: 30% of generated yield goes to protocol fee recipient (governance-controlled, bounded)
+- **Fee Immutability**: **Protocol fee on yield (`yieldProtocolFeeBps`) is snapshotted per-escrow at creation** - the fee rate is locked for that escrow and cannot change, even if governance changes the global yield protocol fee for new escrows
+- **User share (default)**: 70% of generated yield distributed to configured recipients
+- **Important**: Yield fees apply to yield only (never escrow principal); if yield is disabled or fails, escrow settlement is unaffected.
 
-#### Dispute Resolution Economics (DR v1 / DR v2 / DR v3)
-
-**DR v1: Workload-Based Incentives** ✅
-
-- **Incentive Mechanism**: Workload routing (performance determines assignment)
-- **Payment Distribution**: Fee sharing optional (no capital at risk)
-- **Resolver Rewards**: Based on workload eligibility (EMA score threshold)
-- **No Appeal Fees**: Escalation does not require fees (bonds introduced in DR v2)
-
-**DR v2: Appeal Bonds** ✅
-
-- **Appeal Bonds**: Users post bonds to escalate (replaces fees entirely)
-  - Round 0→1: Base cost (e.g., 100 tokens)
-  - Round 1→2: Base + step × k² (e.g., 150 tokens with quadratic curve)
-- **Bond Distribution**:
-  - **Successful Appeal** (decision changes): Bond refunded to user (minus small processing fee if enabled)
-  - **Failed Appeal** (decision upheld): Bond paid to prior round's resolvers (and protocol share if enabled)
-- **Fee Parameters**: Any processing fee or protocol share is a bounded parameter controlled by governance and applies only to new escrows due to snapshot immutability
-- **Resolver Incentives**: Resolvers earn bonds when appeals fail (incentivizes correct decisions)
-- **Economic Friction**: Increasing costs prevent griefing and strategic escalation
-
-**DR v3: Resolver Staking** 🚧 (Planned)
-
-- **Resolver Staking**: Resolvers post bonds to participate
-- **Slashing**: Objective penalties for timeouts, provable non-response
-- **Bond Distribution**: Appeal bonds + slashing penalties
-- **Insurance Pool**: Economic safety net for slashing events
-- **Senior Backing**: Delegation/underwriting for new resolvers
 
 ### 10.2 Governance Token (SEW)
 
@@ -860,13 +762,28 @@ All timeline targets are conditional on audits, drills, and meeting phase-gate m
 - Proposal thresholds
 - Timelock execution
 
+#### SEW economic utility beyond governance (when DR v3 is activated)
+
+SEW is designed to have **economic utility** in the decentralized resolver network once DR v3 is **activated** (via governance module swap; affects new escrows only):
+
+- **Mixed-bond requirement (oracle-free)**: resolvers/seniors stake a mix of **USDC (stable)** and **SEW**:
+  - Effective bond: `EffectiveBondUSD = stablecoinBond + (sewBond × 0.5)`
+  - Composition enforced: **≥80% stablecoin security / ≤20% SEW** (post-haircut), i.e., “**20% SEW / 80% USDC**” at the margin.
+- **Coverage / underwriting mechanics**: seniors can underwrite multiple resolvers subject to on-chain coverage accounting (coverage multiplier + utilization buffer).
+- **Deflationary sink on misconduct**: when SEW is **slashed from resolver/senior stake**, it is treated as **burned** (supply-reducing when supported; otherwise effectively burned via transfer to a dead address).  
+  **Note:** this refers to **slashing of staked SEW** (DR v3 capital), not appeal bonds posted by disputing parties.
+
+**Staking rewards:** any explicit “staking rewards” program (e.g., SEW incentives for staking) is **not assumed by default** and should be treated as **planned / governance-defined** if introduced later (separately specified and disclosed).
+
 ### 10.3 Revenue Streams
 
 **Protocol Revenue**:
 
-1. **Escrow fees**: 1% of all escrow amounts
-2. **Yield share**: 30% of generated yield (when yield enabled)
-3. **Appeal bonds**: Protocol share from failed appeal bonds (only if explicitly enabled in a module version after DR v2; DR v2 charges no protocol fee)
+1. **Escrow fees**: 1% of all escrow amounts (immutable per-escrow)
+2. **Yield protocol fee**: 30% of generated yield by default (when yield enabled; **snapshotted per-escrow at creation**; governance-controlled, bounded)
+3. **Appeal bond protocol fee**: Implemented but **0% by default at launch**; can be enabled later by governance (**snapshotted per-escrow at creation**; bounded; applies at bond posting for new escrows)
+
+**Fee Immutability Guarantee**: All fees (escrow fee, yield protocol fee, and appeal bond protocol fee) are **snapshotted per-escrow at creation time**. Once an escrow is created, its fees are immutable and cannot change, even if governance changes global fee parameters. This ensures predictable economics for users and prevents unexpected fee increases during escrow lifetime.
 
 **Revenue Use**:
 
@@ -880,9 +797,9 @@ All timeline targets are conditional on audits, drills, and meeting phase-gate m
 
 **Resolver Incentives** (After DecentralizedResolutionModule):
 
-- 50% of escalation fees distributed to resolvers
-- Quality-based payment weighting
-- Activity tracking and rewards
+- Appeal-bond incentives: resolvers earn bonds when appeals fail (decision upheld)
+- Quality-based payment weighting (by escalation level)
+- Activity tracking and rewards (program details, if any, are governance-defined)
 - Fair workload distribution via round-robin selection
 
 **User Benefits**:
@@ -902,7 +819,7 @@ All timeline targets are conditional on audits, drills, and meeting phase-gate m
 
 2. **Dispute Resolution is a Social Process**: While dispute resolution is executed onchain, the decision-making process (resolver judgment) is inherently social. The protocol provides technical guarantees (access control, time delays, escalation) but cannot eliminate the need for human judgment in disputes.
 
-3. **Governance Can Change Defaults for New Escrows**: By design, governance can change default modules, timeouts, and other parameters. These changes affect only escrows created after the change (snapshot immutability), but users should be aware that protocol defaults may evolve.
+3. **Governance Can Change Defaults for New Escrows**: By design, governance can change default modules, fees, timeouts, and other parameters. These changes affect only escrows created after the change (snapshot immutability). **Fees are snapshotted per-escrow at creation** - protocol fees (yield and appeal bond) cannot change during an escrow's lifetime, ensuring predictable economics for users.
 
 4. **External Protocol Dependencies**: If yield generation is enabled, the protocol depends on Aave functioning correctly. Aave protocol failures or exploits could affect yield generation, though caps and pause mechanisms limit exposure.
 
@@ -953,11 +870,6 @@ The protocol is designed to become a foundational piece of infrastructure for tr
 - [Contracts Summary](CONTRACTS_SUMMARY.md) - Contract overview
 - [Upgrade Policy](UPGRADE_POLICY.md) - Upgrade procedures
 
-### Code & Deployment
-
-- **Repository**: [GitHub Repository](https://github.com/your-org/hardhat-deploy-hybrid)
-- **Network**: Base Mainnet (Chain ID: 8453)
-- **Testnet**: Base Sepolia (Chain ID: 84532)
 
 ### Security
 

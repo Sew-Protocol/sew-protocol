@@ -3,7 +3,7 @@ pragma solidity ^0.8.33;
 
 import '@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol';
 import '@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol';
-import '@openzeppelin/contracts/access/Ownable.sol';
+import '@openzeppelin/contracts/access/Ownable2Step.sol';
 import '@openzeppelin/contracts/utils/cryptography/EIP712.sol';
 
 /**
@@ -15,11 +15,11 @@ import '@openzeppelin/contracts/utils/cryptography/EIP712.sol';
  * - ERC20Votes for onchain governance voting (includes ERC20Permit)
  * - ERC20Burnable for token burning (used when SEW is slashed)
  * - Fixed supply (1B tokens, no minting after initial)
- * - Ownable (will be transferred to Safe, then Timelock)
+ * - Ownable2Step (will be transferred to Safe, then Timelock) - two-step ownership transfer for security
  *
  * Note: ERC20Votes already includes ERC20Permit, so no need to inherit separately
  */
-contract SewToken is ERC20Votes, ERC20Burnable, Ownable {
+contract SewToken is ERC20Votes, ERC20Burnable, Ownable2Step {
     /**
      * @notice Deploy SewToken with initial supply
      * @param name Token name ("Sew Token")

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+import "../../../contracts/types/YieldPresets.sol";
+pragma solidity ^0.8.33;
 import 'forge-std/Test.sol';
 contract Test_DecentralizedResolutionModule_test is Test {
     function setUp() public {}

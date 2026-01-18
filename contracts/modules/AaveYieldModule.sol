@@ -4,7 +4,7 @@ pragma solidity ^0.8.33;
 import '../interfaces/IYieldModule.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
-import '@openzeppelin/contracts/access/Ownable.sol';
+import '@openzeppelin/contracts/access/Ownable2Step.sol';
 import '@openzeppelin/contracts/utils/introspection/ERC165.sol';
 import '@openzeppelin/contracts/utils/introspection/IERC165.sol';
 
@@ -41,7 +41,7 @@ error AaveWithdrawalFailed(uint256 workflowId, address token);
  * @notice Yield module implementing Aave V3 integration for yield generation
  * @dev Handles all Aave-specific logic: deposits, withdrawals, yield calculation, and configuration
  */
-contract AaveYieldModule is IYieldModule, Ownable, ERC165 {
+contract AaveYieldModule is IYieldModule, Ownable2Step, ERC165 {
     using SafeERC20 for IERC20;
 
     // Aave configuration
@@ -60,19 +60,19 @@ contract AaveYieldModule is IYieldModule, Ownable, ERC165 {
 
     // Events
     event EscrowDepositedToAave(
-        uint256 indexed escrowId,
+        uint256 indexed workflowId,
         address indexed token,
         uint256 amount,
         uint256 aTokenBalance
     );
     event EscrowWithdrawnFromAave(
-        uint256 indexed escrowId,
+        uint256 indexed workflowId,
         address indexed token,
         uint256 originalAmount,
         uint256 actualAmount,
         uint256 yield
     );
-    event AaveWithdrawalFailedEvent(uint256 indexed escrowId, address indexed token);
+    event AaveWithdrawalFailedEvent(uint256 indexed workflowId, address indexed token);
     event AavePoolConfigured(address indexed provider, address indexed pool);
     event AaveEnabledUpdated(bool enabled);
     event TokenRegisteredForAave(address indexed token, address indexed aToken);

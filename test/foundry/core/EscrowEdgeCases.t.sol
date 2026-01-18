@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import "../../../contracts/types/YieldPresets.sol";
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
@@ -9,6 +10,9 @@ import '../../../contracts/core/modules/DefaultResolutionModule.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/YieldOps.sol';
 import '../../../contracts/DisputeOps.sol';
+import '../../../contracts/core/ModuleManagementContract.sol';
+import '../../../contracts/admin/EscrowAdminContract.sol';
+import '../../../contracts/libraries/SettingsValidationLibrary.sol';
 
 /**
  * @title EscrowEdgeCasesTest
@@ -21,6 +25,8 @@ contract EscrowEdgeCasesTest is Test {
     DefaultResolutionModule public resolutionModule;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
+    ModuleManagementContract public moduleManagement;
+    EscrowAdminContract public adminContract;
 
     address public owner;
     address public timelock;
@@ -44,18 +50,23 @@ contract EscrowEdgeCasesTest is Test {
         // Fee token with 1% fee (100 bps)
         feeToken = new MockFeeOnTransfer('FeeToken', 'FEE', owner, 10000000e18, 100, address(0xdead));
         
-        yieldOps = new YieldOps();
+        yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps();
-        vault = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps));
+        moduleManagement = new ModuleManagementContract(address(this));
+        adminContract = new EscrowAdminContract(address(this));
+        vault = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
+        moduleManagement.registerEscrowContract(address(vault));
 
         // Setup vault
         vault.grantRole(vault.ROLE_TIMELOCK(), owner);
         vault.grantRole(vault.ROLE_TIMELOCK(), timelock);
+        adminContract.grantRole(adminContract.ROLE_TIMELOCK(), owner);
+        adminContract.grantRole(adminContract.ROLE_TIMELOCK(), timelock);
 
         // Queue and activate resolution module
-        vault.queueResolutionModule(address(resolutionModule));
+        adminContract.queueResolutionModule(address(vault), address(resolutionModule));
         vm.warp(block.timestamp + 7 days + 1);
-        vault.activateResolutionModule();
+        adminContract.activateResolutionModule(address(vault));
     }
 
     // ============ Fee-on-Transfer Tests ============
@@ -80,7 +91,7 @@ contract EscrowEdgeCasesTest is Test {
         // So vault thinks it has 'amount', but it has 'amount * 0.99'
         // This is a deficit of 1%
         
-        uint256 escrowId = vault.createEscrow(address(feeToken), seller, amount);
+        uint256 escrowId = vault.createEscrow(address(feeToken), seller, amount, SettingsValidationLibrary.getDefaultSettings());
         vm.stopPrank();
 
         // Verify the deficit
@@ -124,7 +135,7 @@ contract EscrowEdgeCasesTest is Test {
         // Autotransfer may have automatically transferred funds
         // If autotransfer succeeded, withdraw will fail (no claimable balance)
         // If autotransfer failed (fallback), withdraw will succeed
-        uint256 claimable = vault.claimable(escrowId, seller, address(feeToken));
+        uint256 claimable = vault.claimableBalances(escrowId, seller);
         if (claimable > 0) {
             // Fallback occurred, can withdraw
             vm.prank(seller); // Seller is the recipient
@@ -146,19 +157,20 @@ contract EscrowEdgeCasesTest is Test {
     // ============ Large Amount Tests ============
 
     function test_createEscrow_MaxAmount_Overflow() public {
-        // ESCROW_FEE is 100 (1%)
-        // Max safe amount is type(uint256).max / 100
-        uint256 maxSafeAmount = type(uint256).max / 100;
-        
-        // Try slightly more - should revert due to multiplication overflow
-        uint256 unsafeAmount = maxSafeAmount + 1;
+        // ESCROW_FEE is 100 (1%), ESCROW_FEE_DENOMINATOR is 10000
+        // Fee calculation: fee = (amount * 100) / 10000
+        // For overflow: amount * 100 > type(uint256).max
+        // So: amount > type(uint256).max / 100
+        // Use an amount that will definitely cause overflow
+        uint256 unsafeAmount = (type(uint256).max / 100) + 1;
         
         token.mint(buyer, unsafeAmount);
         vm.startPrank(buyer);
         token.approve(address(vault), unsafeAmount);
         
+        // Should revert due to arithmetic overflow when calculating fee
         vm.expectRevert(); // Arithmetic overflow/panic
-        vault.createEscrow(address(token), seller, unsafeAmount);
+        vault.createEscrow(address(token), seller, unsafeAmount, SettingsValidationLibrary.getDefaultSettings());
         vm.stopPrank();
     }
 
@@ -169,13 +181,13 @@ contract EscrowEdgeCasesTest is Test {
         vm.startPrank(buyer);
         token.approve(address(vault), maxSafeAmount);
         
-        uint256 escrowId = vault.createEscrow(address(token), seller, maxSafeAmount);
+        uint256 escrowId = vault.createEscrow(address(token), seller, maxSafeAmount, SettingsValidationLibrary.getDefaultSettings());
         
         uint256 fee = (maxSafeAmount * 100) / 10000;
         uint256 expectedAmountAfterFee = maxSafeAmount - fee;
         
-        uint256 deposited = vault.getTotalDeposited(escrowId);
-        assertEq(deposited, expectedAmountAfterFee);
+        EscrowTransfer memory escrow = vault.getEscrowTransfer(escrowId);
+        assertEq(escrow.amountAfterFee, expectedAmountAfterFee);
         vm.stopPrank();
     }
 }

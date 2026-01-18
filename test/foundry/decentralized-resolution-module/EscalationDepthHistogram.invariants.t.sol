@@ -8,6 +8,8 @@ import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/YieldOps.sol';
 import '../../../contracts/DisputeOps.sol';
+import '../../../contracts/core/ModuleManagementContract.sol';
+import '../../../contracts/admin/EscrowAdminContract.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 
 /**
@@ -22,6 +24,8 @@ contract EscalationDepthHistogramInvariantsTest is Test {
     EscrowVault public escrow;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
+    ModuleManagementContract public moduleManagement;
+    EscrowAdminContract public adminContract;
 
     address public deployer;
     address public timelock;
@@ -44,9 +48,11 @@ contract EscalationDepthHistogramInvariantsTest is Test {
         paymentLib = new PaymentCalculationLibraryV1();
         incentiveModule = new ResolverIncentiveModuleV2(deployer, address(paymentLib));
         token = new ERC20Mock('Test Token', 'TEST', address(this), 0);
-        yieldOps = new YieldOps();
+        yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps();
-        escrow = new EscrowVault(100, makeAddr('feeAddress'), address(yieldOps), address(disputeOps));
+        moduleManagement = new ModuleManagementContract(address(this));
+        adminContract = new EscrowAdminContract(address(this));
+        escrow = new EscrowVault(100, makeAddr('feeAddress'), address(yieldOps), address(disputeOps), address(moduleManagement));
 
         // Setup roles
         incentiveModule.grantRole(incentiveModule.ROLE_TIMELOCK(), timelock);
@@ -135,6 +141,7 @@ contract EscalationDepthHistogramInvariantsTest is Test {
                 try incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
                     workflowId,
                     depositor,
+                    depositor,
                     BOND_AMOUNT,
                     address(0),
                     round
@@ -185,6 +192,7 @@ contract EscalationDepthHistogramInvariantsTest is Test {
             incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
                 1,
                 depositor,
+                depositor,
                 BOND_AMOUNT,
                 address(0),
                 round
@@ -217,6 +225,7 @@ contract EscalationDepthHistogramInvariantsTest is Test {
         for (uint256 i = 0; i < numBondsBounded; i++) {
             incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
                 i,
+                depositor,
                 depositor,
                 BOND_AMOUNT,
                 address(0),
@@ -256,6 +265,7 @@ contract EscalationDepthHistogramInvariantsTest is Test {
         for (uint256 i = 0; i < numBondsBounded; i++) {
             incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
                 i,
+                depositor,
                 depositor,
                 BOND_AMOUNT,
                 address(0),

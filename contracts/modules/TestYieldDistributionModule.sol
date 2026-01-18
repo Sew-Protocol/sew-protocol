@@ -18,7 +18,7 @@ contract TestYieldDistributionModule is IYieldDistributionModule, ERC165 {
     uint256[] public defaultPercentages;
 
     // Events
-    event YieldDistributed(uint256 indexed escrowId, address indexed recipient, uint256 amount);
+    event YieldDistributed(uint256 indexed workflowId, address indexed recipient, uint256 amount);
     event DefaultDistributionSet(address[] recipients, uint256[] percentages);
 
     /**

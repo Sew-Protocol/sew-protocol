@@ -1,23 +1,27 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+import "../../../contracts/types/YieldPresets.sol";
+pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
 import 'contracts/YieldOps.sol';
 import 'contracts/DisputeOps.sol';
+import 'contracts/core/ModuleManagementContract.sol';
 import 'contracts/core/EscrowVault.sol';
 
 contract Test_04_GuardianControls_test is Test {
     EscrowVault vault;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
+    ModuleManagementContract public moduleManagement;
     address timelock = address(0x1);
     address guardian = address(0x2);
     address unauthorized = address(0x3);
 
     function setUp() public {
-        yieldOps = new YieldOps();
+        yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps();
-        vault = new EscrowVault(100, address(this), address(yieldOps), address(disputeOps));
+        moduleManagement = new ModuleManagementContract(address(this));
+        vault = new EscrowVault(100, address(this), address(yieldOps), address(disputeOps), address(moduleManagement));
         vault.grantRole(vault.ROLE_TIMELOCK(), timelock);
         vault.grantRole(vault.ROLE_GUARDIAN(), guardian);
     }

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import "../../../contracts/types/YieldPresets.sol";
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
@@ -79,7 +80,8 @@ contract ResolverIncentiveModuleComprehensiveTest is Test {
         vm.startPrank(escrow);
         incentiveModule.recordResolver(1, resolver, 0);
 
-        // Should not record again
+        // HIGH-2: Should revert when trying to record same resolver again (at any level)
+        vm.expectRevert(abi.encodeWithSignature("ResolverAlreadyRecorded(address)", resolver));
         incentiveModule.recordResolver(1, resolver, 0);
         vm.stopPrank();
 
@@ -88,30 +90,36 @@ contract ResolverIncentiveModuleComprehensiveTest is Test {
     }
 
     function test_RecordResolver_MultipleLevels() public {
+        address resolver2 = makeAddr('resolver2');
         vm.startPrank(escrow);
         incentiveModule.recordResolver(1, resolver, 0);
-        incentiveModule.recordResolver(1, resolver, 1);
+        // HIGH-2: Cannot record same resolver at different levels - use different resolver instead
+        incentiveModule.recordResolver(1, resolver2, 1);
         vm.stopPrank();
 
         ResolverRecord[] memory resolvers = incentiveModule.getDisputeResolvers(1);
         assertEq(resolvers.length, 2);
+        assertEq(resolvers[0].resolver, resolver);
+        assertEq(resolvers[0].level, 0);
+        assertEq(resolvers[1].resolver, resolver2);
+        assertEq(resolvers[1].level, 1);
     }
 
     function test_RecordResolver_RevertZeroAddress() public {
         vm.prank(escrow);
-        vm.expectRevert('Zero resolver');
+        vm.expectRevert(abi.encodeWithSignature("ZeroResolver()"));
         incentiveModule.recordResolver(1, address(0), 0);
     }
 
     function test_RecordResolver_RevertInvalidLevel() public {
         vm.prank(escrow);
-        vm.expectRevert('Invalid level');
+        vm.expectRevert(abi.encodeWithSignature("InvalidLevel(uint8,uint8)", 3, 2));
         incentiveModule.recordResolver(1, resolver, 3);
     }
 
     function test_RecordResolver_RevertUnauthorized() public {
         vm.prank(otherAccount);
-        vm.expectRevert('Not registered escrow contract');
+        vm.expectRevert(abi.encodeWithSignature("NotRegisteredEscrowContract(address)", otherAccount));
         incentiveModule.recordResolver(1, resolver, 0);
     }
 
@@ -160,7 +168,7 @@ contract ResolverIncentiveModuleComprehensiveTest is Test {
 
     function test_RecordEscalationFee_RevertNoDispute() public {
         vm.prank(escrow);
-        vm.expectRevert('Dispute not initialized');
+        vm.expectRevert(abi.encodeWithSignature("DisputeNotInitialized(uint256)", 1));
         incentiveModule.recordEscalationFee(1, address(token), 50 ether);
     }
 
@@ -271,7 +279,7 @@ contract ResolverIncentiveModuleComprehensiveTest is Test {
 
         // Try to calculate again - should revert
         vm.prank(escrow);
-        vm.expectRevert('Payments already calculated');
+        vm.expectRevert(abi.encodeWithSignature("PaymentsAlreadyCalculated(uint256)", 1));
         incentiveModule.onDisputeResolved(1, address(token));
     }
 }

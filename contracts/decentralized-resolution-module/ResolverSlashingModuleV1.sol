@@ -27,6 +27,20 @@ import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
  */
 contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyGuard {
     using SafeERC20 for IERC20;
+
+    // ============ Custom Errors ============
+    error ZeroAddress(string field);
+    error AlreadySlashedForWorkflow(uint256 workflowId, address resolver);
+    error SlashNotPending(uint256 slashId, SlashStatus currentStatus);
+    error AppealWindowOpen(uint256 slashId, uint256 appealDeadline, uint256 currentTime);
+    error AppealWindowClosed(uint256 slashId, uint256 appealDeadline, uint256 currentTime);
+    error NotResolver(address caller, address expectedResolver);
+    error AlreadyAppealed(uint256 slashId);
+    error AppealAlreadyResolved(uint256 appealId);
+    error FraudSlashingNotEnabled();
+    error InvalidBps(uint256 bps, uint256 maxBps);
+    error CooldownNotPassed(uint256 availableAt, uint256 currentTime);
+
     // ============ Constants ============
 
     bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');
@@ -149,9 +163,9 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         address _insurancePoolVault,
         address _stableToken
     ) {
-        require(_stakingModule != address(0), 'Zero staking module');
-        require(_insurancePoolVault != address(0), 'Zero insurance vault');
-        require(_stableToken != address(0), 'Zero stable token');
+        if (_stakingModule == address(0)) revert ZeroAddress('stakingModule');
+        if (_insurancePoolVault == address(0)) revert ZeroAddress('insurancePoolVault');
+        if (_stableToken == address(0)) revert ZeroAddress('stableToken');
 
         // OpenZeppelin best practice: Grant DEFAULT_ADMIN_ROLE to deployer
         // Deployment scripts will transfer this to TimelockController
@@ -190,7 +204,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         SlashReason reason,
         bytes calldata evidence
     ) external onlyRole(ROLE_TIMELOCK) returns (uint256 slashId) {
-        require(!workflowSlashed[workflowId][resolver], 'Already slashed for this workflow');
+        if (workflowSlashed[workflowId][resolver]) revert AlreadySlashedForWorkflow(workflowId, resolver);
 
         slashId = _nextSlashId++;
 
@@ -219,8 +233,10 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
     function executeSlash(uint256 slashId) external nonReentrant onlyRole(ROLE_TIMELOCK) {
         SlashEvent storage slashEvent = slashEvents[slashId];
 
-        require(slashEvent.status == SlashStatus.PENDING, 'Not pending');
-        require(block.timestamp > slashEvent.appealDeadline, 'Appeal window open');
+        if (slashEvent.status != SlashStatus.PENDING) revert SlashNotPending(slashId, slashEvent.status);
+        if (block.timestamp <= slashEvent.appealDeadline) {
+            revert AppealWindowOpen(slashId, slashEvent.appealDeadline, block.timestamp);
+        }
 
         address resolver = slashEvent.resolver;
         uint256 slashAmount = slashEvent.amount;
@@ -279,10 +295,12 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
     ) external nonReentrant {
         SlashEvent storage slashEvent = slashEvents[slashId];
 
-        require(slashEvent.status == SlashStatus.PENDING, 'Not pending');
-        require(block.timestamp <= slashEvent.appealDeadline, 'Appeal window closed');
-        require(msg.sender == slashEvent.resolver, 'Not resolver');
-        require(!slashAppeals[slashId].resolved, 'Already appealed');
+        if (slashEvent.status != SlashStatus.PENDING) revert SlashNotPending(slashId, slashEvent.status);
+        if (block.timestamp > slashEvent.appealDeadline) {
+            revert AppealWindowClosed(slashId, slashEvent.appealDeadline, block.timestamp);
+        }
+        if (msg.sender != slashEvent.resolver) revert NotResolver(msg.sender, slashEvent.resolver);
+        if (slashAppeals[slashId].resolved) revert AlreadyAppealed(slashId);
 
         // Record appeal
         slashAppeals[slashId] = SlashAppeal({
@@ -306,8 +324,8 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         SlashAppeal storage appeal = slashAppeals[slashId];
         SlashEvent storage slashEvent = slashEvents[slashId];
 
-        require(!appeal.resolved, 'Already resolved');
-        require(slashEvent.status == SlashStatus.PENDING, 'Not pending');
+        if (appeal.resolved) revert AppealAlreadyResolved(slashId);
+        if (slashEvent.status != SlashStatus.PENDING) revert SlashNotPending(slashId, slashEvent.status);
 
         appeal.resolved = true;
         appeal.upheld = upheld;
@@ -456,7 +474,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         }
 
         // Verify fraud slash percentage is configured
-        require(slashConfig.fraudSlashBps > 0, 'Fraud slashing not enabled');
+        if (slashConfig.fraudSlashBps == 0) revert FraudSlashingNotEnabled();
 
         // Determine slash reason and amount
         SlashReason reason = SlashReason.FRAUD;
@@ -999,7 +1017,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
     // ============ Admin Functions ============
 
     function setSlashPercentage(SlashReason reason, uint256 bps) external onlyRole(ROLE_TIMELOCK) {
-        require(bps <= BASIS_POINTS, 'Invalid bps');
+        if (bps > BASIS_POINTS) revert InvalidBps(bps, BASIS_POINTS);
 
         uint256 oldBps;
 
@@ -1070,10 +1088,10 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
     }
 
     function resetCircuitBreaker() external onlyRole(ROLE_TIMELOCK) {
-        require(
-            block.timestamp >= lastCircuitBreakerTrigger + CIRCUIT_BREAKER_COOLDOWN,
-            'Cooldown not passed'
-        );
+        uint256 availableAt = lastCircuitBreakerTrigger + CIRCUIT_BREAKER_COOLDOWN;
+        if (block.timestamp < availableAt) {
+            revert CooldownNotPassed(availableAt, block.timestamp);
+        }
         circuitBreakerActive = false;
         emit CircuitBreakerDeactivated();
     }

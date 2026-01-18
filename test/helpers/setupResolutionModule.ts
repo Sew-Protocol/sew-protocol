@@ -38,18 +38,42 @@ export async function setupResolutionModule(
 
   // Set default resolution module (Derived contract level)
   // Phase 8: EscrowVault now uses Slow lane (queue/activate) like EscrowableERC20
-  if ('queueDefaultResolutionModule' in contract) {
-    // EscrowableERC20 or EscrowVault (after Phase 8 fix) - uses 7-day delay
-    await contract
-      .connect(deployer)
-      .queueDefaultResolutionModule(await resolutionModule.getAddress());
-    const [, eta, exists] = await (contract as any).getPendingDefaultResolutionModule();
+  // Updated: EscrowableERC20 now uses consolidated queueDefaultModule/activateDefaultModule
+  if ('queueDefaultModule' in contract || 'queueDefaultResolutionModule' in contract) {
+    // EscrowableERC20 uses consolidated functions, EscrowVault may still use old or new
+    const moduleAddress = await resolutionModule.getAddress();
+    let eta: bigint;
+    let exists: boolean;
+    
+    if ('queueDefaultModule' in contract) {
+      // New consolidated function (EscrowableERC20)
+      await (contract as any)
+        .connect(deployer)
+        .queueDefaultModule(0, moduleAddress); // 0 = ModuleType.RESOLUTION
+      const [, etaVal, existsVal] = await (contract as any).getPendingDefaultModule(0);
+      eta = etaVal;
+      exists = existsVal;
+    } else {
+      // Old function (EscrowVault or legacy)
+      await (contract as any)
+        .connect(deployer)
+        .queueDefaultResolutionModule(moduleAddress);
+      const [, etaVal, existsVal] = await (contract as any).getPendingDefaultResolutionModule();
+      eta = etaVal;
+      exists = existsVal;
+    }
+    
     if (!exists) {
       throw new Error('Failed to queue resolution module');
     }
     // Fast-forward time to allow activation (7 days = 604800 seconds)
     await time.increaseTo(Number(eta) + 1);
-    await (contract as any).connect(deployer).activateDefaultResolutionModule();
+    
+    if ('activateDefaultModule' in contract) {
+      await (contract as any).connect(deployer).activateDefaultModule(0); // 0 = ModuleType.RESOLUTION
+    } else {
+      await (contract as any).connect(deployer).activateDefaultResolutionModule();
+    }
   }
 
   // Set resolution module (BaseEscrow level) - now uses slow lane (7-day delay)
@@ -68,7 +92,7 @@ export async function setupResolutionModule(
   }
 
   // Ensure at least one was set
-  if (!('queueDefaultResolutionModule' in contract) && !('queueResolutionModule' in contract)) {
+  if (!('queueDefaultModule' in contract) && !('queueDefaultResolutionModule' in contract) && !('queueResolutionModule' in contract)) {
     throw new Error('Contract does not have a method to set resolution module.');
   }
 

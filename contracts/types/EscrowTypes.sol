@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
+import './YieldPresets.sol';
+
 // Custom errors for better user experience
 error InvalidAutoTime(string reason, uint256 providedTime, uint256 currentTime);
 error CannotSetBothAutoTimes(uint256 autoReleaseTime, uint256 autoCancelTime);
@@ -9,26 +11,30 @@ error InvalidAddress(string reason, address addr);
 error InvalidAmount(string reason);
 error ArrayLengthMismatch(uint256 expectedLength, uint256 actualLength);
 
-enum EscrowType {
-    STANDARD, // Default escrow
-    MILESTONE, // Future: milestone-based releases
-    RECURRING, // Future: recurring payments
-    CUSTOM // Future: custom logic
-}
+// Specific errors without string parameters (saves bytecode)
+error ZeroDisputeOps();
+error ZeroSettlementOps();
+error InvalidResolutionModule(address module);
+error ModuleNotContract(address module);
+error AmountZero();
+error FeeOverflow();
+error NoTokensToRecover();
+error NoETHToRecover();
+error AmountExceedsBalance(uint256 requested, uint256 available);
 
 struct EscrowSettings {
     address customResolver; // Override default resolver (address(0) = use default)
-    bool yieldEnabled; // Opt-in for yield generation (future: Aave integration)
+    YieldPreset yieldPreset; // Yield configuration preset (OFF, TO_SENDER, etc.)
     uint256 autoReleaseTime; // Custom release time (0 = use default)
     uint256 autoCancelTime; // Custom cancel time (0 = use default)
-    EscrowType escrowType; // For future extensibility
 }
 
-struct YieldDistribution {
-    address[] recipients; // Addresses to receive yield
-    uint256[] percentages; // Percentage per recipient (basis points, sum to 10000)
-    bool isSet; // Whether distribution is configured
-}
+// DEPRECATED: YieldDistribution struct removed - distribution now derived from preset
+// struct YieldDistribution {
+//     address[] recipients; // Addresses to receive yield
+//     uint256[] percentages; // Percentage per recipient (basis points, sum to 10000)
+//     bool isSet; // Whether distribution is configured
+// }
 
 // Escrow state and status enums (shared across contracts)
 enum EscrowState {

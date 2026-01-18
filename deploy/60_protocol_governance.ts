@@ -21,13 +21,22 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   console.log('\n🔄 Granting protocol roles to governance...');
 
   const timelockDeployment = await get('TimelockController');
-  const safeDeployment = await get('Safe');
-  const guardianMultisig = config.guardian.multisig || safeDeployment.address;
+  
+  // Safe deployment is optional (skipped if @safe-global/safe-contracts not installed)
+  let safeDeployment;
+  try {
+    safeDeployment = await get('Safe');
+  } catch (error: any) {
+    console.log('   ℹ️  Safe deployment not found (this is OK if Safe was not deployed)');
+    safeDeployment = null;
+  }
+  
+  const guardianMultisig = config.guardian.multisig || safeDeployment?.address || timelockDeployment.address;
 
   // Role constants (must match contracts)
-  const ROLE_TIMELOCK = ethers.utils.keccak256(ethers.utils.toUtf8Bytes('ROLE_TIMELOCK'));
-  const ROLE_GUARDIAN = ethers.utils.keccak256(ethers.utils.toUtf8Bytes('ROLE_GUARDIAN'));
-  const DEFAULT_ADMIN_ROLE = ethers.constants.Zero; // AccessControl uses 0x00 for DEFAULT_ADMIN_ROLE
+  const ROLE_TIMELOCK = ethers.keccak256(ethers.toUtf8Bytes('ROLE_TIMELOCK'));
+  const ROLE_GUARDIAN = ethers.keccak256(ethers.toUtf8Bytes('ROLE_GUARDIAN'));
+  const DEFAULT_ADMIN_ROLE = ethers.ZeroAddress; // AccessControl uses 0x00 for DEFAULT_ADMIN_ROLE
 
   const allDeployments = await all();
   const contractsToGovern = [

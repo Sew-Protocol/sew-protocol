@@ -12,7 +12,8 @@ import '../../../contracts/decentralized-resolution-module/DecentralizedResolver
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/YieldOps.sol';
 import '../../../contracts/DisputeOps.sol';
-
+import '../../../contracts/core/ModuleManagementContract.sol';
+import '../../../contracts/admin/EscrowAdminContract.sol';
 /**
  * @title IncentiveModuleIntegrationTest
  * @notice Comprehensive integration tests for incentive module lifecycle hooks
@@ -27,6 +28,8 @@ contract IncentiveModuleIntegrationTest is Test {
     ERC20Mock public token;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
+    ModuleManagementContract public moduleManagement;
+    EscrowAdminContract public adminContract;
 
     address public deployer;
     address public timelock;
@@ -63,10 +66,12 @@ contract IncentiveModuleIntegrationTest is Test {
         resolutionModule = new DecentralizedResolutionModule(deployer);
 
         // Deploy escrow
-        YieldOps yOps = new YieldOps();
+        YieldOps yOps = new YieldOps(address(this));
         DisputeOps dOps = new DisputeOps();
         // Assign to state variables if they exist, but here we just need address
-        escrow = new EscrowVault(100, makeAddr('feeAddress'), address(yOps), address(dOps));
+        moduleManagement = new ModuleManagementContract(address(this));
+        adminContract = new EscrowAdminContract(address(this));
+        escrow = new EscrowVault(100, makeAddr('feeAddress'), address(yOps), address(dOps), address(moduleManagement));
 
         // Setup roles
         bytes32 ROLE_TIMELOCK = resolutionModule.ROLE_TIMELOCK();
@@ -100,10 +105,11 @@ contract IncentiveModuleIntegrationTest is Test {
         // Grant TIMELOCK to this contract to queue/activate
         bytes32 ESCROW_ROLE_TIMELOCK = escrow.ROLE_TIMELOCK();
         escrow.grantRole(ESCROW_ROLE_TIMELOCK, address(this));
+        adminContract.grantRole(adminContract.ROLE_TIMELOCK(), address(this));
 
-        escrow.queueResolutionModule(address(resolutionModule));
+        adminContract.queueResolutionModule(address(escrow), address(resolutionModule));
         vm.warp(block.timestamp + 7 days + 1);
-        escrow.activateResolutionModule();
+        adminContract.activateResolutionModule(address(escrow));
 
         // Appoint resolvers
         vm.prank(timelock);
@@ -141,10 +147,9 @@ contract IncentiveModuleIntegrationTest is Test {
             1000 ether,
             EscrowSettings({
                 customResolver: address(0),
-                yieldEnabled: false,
+                yieldPreset: YieldPreset.OFF,
                 autoReleaseTime: 0,
-                autoCancelTime: 0,
-                escrowType: EscrowType.STANDARD
+                autoCancelTime: 0
             })
         );
         vm.stopPrank();
@@ -171,10 +176,9 @@ contract IncentiveModuleIntegrationTest is Test {
             1000 ether,
             EscrowSettings({
                 customResolver: address(0),
-                yieldEnabled: false,
+                yieldPreset: YieldPreset.OFF,
                 autoReleaseTime: 0,
-                autoCancelTime: 0,
-                escrowType: EscrowType.STANDARD
+                autoCancelTime: 0
             })
         );
         vm.stopPrank();
@@ -235,10 +239,9 @@ contract IncentiveModuleIntegrationTest is Test {
             1000 ether,
             EscrowSettings({
                 customResolver: address(0),
-                yieldEnabled: false,
+                yieldPreset: YieldPreset.OFF,
                 autoReleaseTime: 0,
-                autoCancelTime: 0,
-                escrowType: EscrowType.STANDARD
+                autoCancelTime: 0
             })
         );
         escrow.raiseDispute(workflowId);
@@ -308,10 +311,9 @@ contract IncentiveModuleIntegrationTest is Test {
             1000 ether,
             EscrowSettings({
                 customResolver: address(0),
-                yieldEnabled: false,
+                yieldPreset: YieldPreset.OFF,
                 autoReleaseTime: 0,
-                autoCancelTime: 0,
-                escrowType: EscrowType.STANDARD
+                autoCancelTime: 0
             })
         );
         escrow.raiseDispute(workflowId);
@@ -322,6 +324,7 @@ contract IncentiveModuleIntegrationTest is Test {
         vm.prank(address(escrow));
         incentiveModuleV2.recordAppealBond{value: 0.01 ether}(
             workflowId,
+            user1,
             user1,
             0.01 ether,
             address(0),
@@ -334,6 +337,7 @@ contract IncentiveModuleIntegrationTest is Test {
         vm.expectRevert('Bond already exists');
         incentiveModuleV2.recordAppealBond{value: 0.01 ether}(
             workflowId,
+            user1,
             user1,
             0.01 ether,
             address(0),
@@ -378,10 +382,9 @@ contract IncentiveModuleIntegrationTest is Test {
             1000 ether,
             EscrowSettings({
                 customResolver: address(0),
-                yieldEnabled: false,
+                yieldPreset: YieldPreset.OFF,
                 autoReleaseTime: 0,
-                autoCancelTime: 0,
-                escrowType: EscrowType.STANDARD
+                autoCancelTime: 0
             })
         );
         escrow.raiseDispute(workflowId);
@@ -392,6 +395,7 @@ contract IncentiveModuleIntegrationTest is Test {
         vm.prank(address(escrow));
         incentiveModuleV2.recordAppealBond{value: 0.01 ether}(
             workflowId,
+            user1,
             user1,
             0.01 ether,
             address(0),
@@ -473,10 +477,9 @@ contract IncentiveModuleIntegrationTest is Test {
             1000 ether,
             EscrowSettings({
                 customResolver: address(0),
-                yieldEnabled: false,
+                yieldPreset: YieldPreset.OFF,
                 autoReleaseTime: 0,
-                autoCancelTime: 0,
-                escrowType: EscrowType.STANDARD
+                autoCancelTime: 0
             })
         );
         escrow.raiseDispute(workflowId);
@@ -491,6 +494,7 @@ contract IncentiveModuleIntegrationTest is Test {
         vm.prank(address(escrow));
         incentiveModuleV2.recordAppealBond{value: 0.01 ether}(
             workflowId,
+            user1,
             user1,
             0.01 ether,
             address(0),
@@ -574,10 +578,9 @@ contract IncentiveModuleIntegrationTest is Test {
             1000 ether,
             EscrowSettings({
                 customResolver: address(0),
-                yieldEnabled: false,
+                yieldPreset: YieldPreset.OFF,
                 autoReleaseTime: 0,
-                autoCancelTime: 0,
-                escrowType: EscrowType.STANDARD
+                autoCancelTime: 0
             })
         );
         escrow.raiseDispute(workflowId);
@@ -596,7 +599,7 @@ contract IncentiveModuleIntegrationTest is Test {
         // Send ETH with call
         vm.deal(address(escrow), 100);
         vm.prank(address(escrow));
-        incentiveModuleV2.recordAppealBond{value: 100}(workflowId, user1, 100, address(0), 1);
+        incentiveModuleV2.recordAppealBond{value: 100}(workflowId, user1, user1, 100, address(0), 1);
 
         // Simulate decision and escalation
         vm.prank(address(escrow));
@@ -653,10 +656,9 @@ contract IncentiveModuleIntegrationTest is Test {
             1000 ether,
             EscrowSettings({
                 customResolver: address(0),
-                yieldEnabled: false,
+                yieldPreset: YieldPreset.OFF,
                 autoReleaseTime: 0,
-                autoCancelTime: 0,
-                escrowType: EscrowType.STANDARD
+                autoCancelTime: 0
             })
         );
         escrow.raiseDispute(workflowId);

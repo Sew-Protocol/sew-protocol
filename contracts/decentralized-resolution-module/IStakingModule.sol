@@ -59,21 +59,21 @@ interface IStakingModule {
     event StakeLocked(
         address indexed resolver,
         uint256 amount,
-        uint256 indexed escrowId,
+        uint256 indexed workflowId,
         string reason
     );
-    event StakeUnlocked(address indexed resolver, uint256 amount, uint256 indexed escrowId);
+    event StakeUnlocked(address indexed resolver, uint256 amount, uint256 indexed workflowId);
 
     event StakeSlashed(
         address indexed resolver,
         uint256 amount,
-        uint256 indexed escrowId,
+        uint256 indexed workflowId,
         string reason
     );
     event StakeRestored(
         address indexed resolver,
         uint256 amount,
-        uint256 indexed escrowId,
+        uint256 indexed workflowId,
         string reason
     );
 

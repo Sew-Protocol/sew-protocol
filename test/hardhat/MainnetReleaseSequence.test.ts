@@ -234,20 +234,22 @@ describe('Mainnet Release Sequence', function () {
       await escrowVault.grantRole(ROLE_TIMELOCK_VAULT, deployer.address);
 
       // Wire modules to contracts (Phase 3: queue/activate pattern for EscrowableERC20)
+      // EscrowableERC20 uses consolidated module management functions
+      // ModuleType: RESOLUTION=0, RELEASE=1, YIELD_GEN=2, YIELD_DIST=3
       await escrowableERC20
         .connect(deployer)
-        .queueDefaultReleaseStrategy(await defaultReleaseStrategy.getAddress());
+        .queueDefaultModule(1, await defaultReleaseStrategy.getAddress()); // RELEASE
       await escrowableERC20
         .connect(deployer)
-        .queueDefaultResolutionModule(await defaultResolutionModule.getAddress());
+        .queueDefaultModule(0, await defaultResolutionModule.getAddress()); // RESOLUTION
       await escrowableERC20
         .connect(deployer)
-        .queueDefaultYieldDistributionModule(await defaultYieldDistributionModule.getAddress());
+        .queueDefaultModule(3, await defaultYieldDistributionModule.getAddress()); // YIELD_DIST
       // Fast-forward time for testing
       await time.increase(7 * 24 * 60 * 60 + 1);
-      await escrowableERC20.connect(deployer).activateDefaultReleaseStrategy();
-      await escrowableERC20.connect(deployer).activateDefaultResolutionModule();
-      await escrowableERC20.connect(deployer).activateDefaultYieldDistributionModule();
+      await escrowableERC20.connect(deployer).activateDefaultModule(1); // RELEASE
+      await escrowableERC20.connect(deployer).activateDefaultModule(0); // RESOLUTION
+      await escrowableERC20.connect(deployer).activateDefaultModule(3); // YIELD_DIST
 
       // EscrowVault uses direct setters (Standard lane)
       // Phase 8: EscrowVault now uses Slow lane (queue/activate) for consistency

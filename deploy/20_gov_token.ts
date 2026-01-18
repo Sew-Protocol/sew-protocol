@@ -84,12 +84,36 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       }
     }
 
-    // Verify token balance
+    // Wait for transaction confirmation before verifying
+    if (tokenDeployment.receipt) {
+      await tokenDeployment.receipt.wait();
+    }
+
+    // Verify token balance (with retry for timing issues)
     const token = await ethers.getContractAt('SewToken', tokenDeployment.address);
-    const deployerBalance = await token.balanceOf(deployer);
-    console.log(`\n📊 Token balances:`);
-    const balanceFormatted = (deployerBalance / BigInt(10 ** 18)).toString();
-    console.log(`   Deployer: ${balanceFormatted} ${config.token.symbol}`);
+    let deployerBalance;
+    let retries = 3;
+    while (retries > 0) {
+      try {
+        deployerBalance = await token.balanceOf(deployer);
+        break;
+      } catch (error: any) {
+        retries--;
+        if (retries === 0) {
+          console.log(`   ⚠️  Could not verify balance (this is non-critical): ${error.message}`);
+          console.log(`   ✅ Deployment succeeded at: ${tokenDeployment.address}`);
+          return; // Exit gracefully if balance check fails
+        }
+        // Wait a bit before retry
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+    }
+
+    if (deployerBalance !== undefined) {
+      console.log(`\n📊 Token balances:`);
+      const balanceFormatted = (deployerBalance / BigInt(10 ** 18)).toString();
+      console.log(`   Deployer: ${balanceFormatted} ${config.token.symbol}`);
+    }
   } else {
     console.log(`✅ SewToken already deployed at: ${tokenDeployment.address}`);
   }

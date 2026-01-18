@@ -1,0 +1,80 @@
+{
+  "chainId": 84532,
+  "networkName": "baseSepolia",
+  "deployments": [
+    {
+      "chainId": 84532,
+      "networkName": "baseSepolia",
+      "contractName": "SewToken",
+      "address": "0xDb48E8b489179Bf395f74c80f09b40406f5c95A5",
+      "blockNumber": 36421038,
+      "deployer": "0x5F13B5089a0B23c74AD9A22a2db59F5F48ab09bC",
+      "timestamp": "2026-01-17T00:39:23.434Z",
+      "verified": false,
+      "blockExplorerUrl": "https://sepolia.basescan.org/address/0xDb48E8b489179Bf395f74c80f09b40406f5c95A5",
+      "constructorArgs": [
+        "Sew Token",
+        "SEW",
+        "0x5F13B5089a0B23c74AD9A22a2db59F5F48ab09bC",
+        "1000000000000000000000000000"
+      ],
+      "tags": [
+        "token",
+        "governance"
+      ],
+      "compilerVersion": "0.8.33",
+      "optimizationRuns": 1000,
+      "proxyType": "none"
+    },
+    {
+      "chainId": 84532,
+      "networkName": "baseSepolia",
+      "contractName": "YieldOps",
+      "address": "0xe228a6DDFE93471390199342114ab806C49dA75a",
+      "blockNumber": 36444755,
+      "deployer": "0x5F13B5089a0B23c74AD9A22a2db59F5F48ab09bC",
+      "timestamp": "2026-01-17T13:49:57.121Z",
+      "verified": false,
+      "blockExplorerUrl": "https://sepolia.basescan.org/address/0xe228a6DDFE93471390199342114ab806C49dA75a",
+      "constructorArgs": [
+        "0x5F13B5089a0B23c74AD9A22a2db59F5F48ab09bC"
+      ],
+      "tags": [
+        "core",
+        "yield"
+      ],
+      "compilerVersion": "0.8.33",
+      "optimizationRuns": 1000,
+      "proxyType": "none"
+    },
+    {
+      "chainId": 84532,
+      "networkName": "baseSepolia",
+      "contractName": "DisputeOps",
+      "address": "0xEA663A8B10d26CDAd0d82c4f02c3F0Cf9946C82c",
+      "blockNumber": 36444773,
+      "deployer": "0x5F13B5089a0B23c74AD9A22a2db59F5F48ab09bC",
+      "timestamp": "2026-01-17T13:50:32.917Z",
+      "verified": false,
+      "blockExplorerUrl": "https://sepolia.basescan.org/address/0xEA663A8B10d26CDAd0d82c4f02c3F0Cf9946C82c",
+      "constructorArgs": [],
+      "tags": [
+        "core",
+        "dispute"
+      ],
+      "compilerVersion": "0.8.33",
+      "optimizationRuns": 1000,
+      "proxyType": "none"
+    }
+  ],
+  "deployedAt": "2026-01-17T00:39:23.435Z",
+  "deployer": "0x5F13B5089a0B23c74AD9A22a2db59F5F48ab09bC",
+  "chainConfig": {
+    "name": "baseSepolia",
+    "displayName": "Base Sepolia",
+    "networkType": "testnet"
+  },
+  "deploymentEnvironment": {
+    "nodeVersion": "v22.15.0"
+  }
+}

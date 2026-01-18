@@ -219,8 +219,7 @@ describe('EscrowVault', function () {
         customResolver: resolver.address,
         yieldEnabled: true,
         autoReleaseTime: autoReleaseTime,
-        autoCancelTime: 0,
-        escrowType: 0,
+        autoCancelTime: 0
       };
 
       const tx = await escrowVault

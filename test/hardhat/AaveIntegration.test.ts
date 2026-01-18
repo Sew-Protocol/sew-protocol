@@ -120,18 +120,19 @@ describe('Aave Integration', function () {
       await escrowTokenAToken.getAddress(),
     );
 
-    // Phase 2: Grant ROLE_TIMELOCK to owner for escrowableERC20 (must be before queueDefaultYieldGenerationModule)
+    // Phase 2: Grant ROLE_TIMELOCK to owner for escrowableERC20 (must be before queueDefaultModule for YIELD_GEN)
     const ROLE_TIMELOCK_ERC20 = await escrowableERC20.ROLE_TIMELOCK();
     await escrowableERC20.grantRole(ROLE_TIMELOCK_ERC20, owner.address);
 
     // Phase 3: Set the module as default yield generation module (queue/activate pattern)
+    // ModuleType.YIELD_GEN = 2
     await escrowableERC20
       .connect(owner)
-      .queueDefaultYieldGenerationModule(await aaveModule.getAddress());
+      .queueDefaultModule(2, await aaveModule.getAddress()); // YIELD_GEN
     // Fast-forward time for testing (skip 7-day delay)
-    const [, etaYield] = await escrowableERC20.getPendingDefaultYieldGenerationModule();
+    const [, etaYield] = await escrowableERC20.getPendingDefaultModule(2); // YIELD_GEN
     await time.increaseTo(Number(etaYield) + 1);
-    await escrowableERC20.connect(owner).activateDefaultYieldGenerationModule();
+    await escrowableERC20.connect(owner).activateDefaultModule(2); // YIELD_GEN
 
     // Phase 7: Setup resolution module (required for escrow creation)
     const { setupResolutionModule } = await import('../helpers/setupResolutionModule');
@@ -148,12 +149,13 @@ describe('Aave Integration', function () {
     const percentages = [6000, 4000]; // 60% and 40%
     await yieldDistModule.setDefaultDistribution(recipients, percentages);
 
+    // ModuleType.YIELD_DIST = 3
     await escrowableERC20
       .connect(owner)
-      .queueDefaultYieldDistributionModule(await yieldDistModule.getAddress());
-    const [, etaYieldDist] = await escrowableERC20.getPendingDefaultYieldDistributionModule();
+      .queueDefaultModule(3, await yieldDistModule.getAddress()); // YIELD_DIST
+    const [, etaYieldDist] = await escrowableERC20.getPendingDefaultModule(3); // YIELD_DIST
     await time.increaseTo(Number(etaYieldDist) + 1);
-    await escrowableERC20.connect(owner).activateDefaultYieldDistributionModule();
+    await escrowableERC20.connect(owner).activateDefaultModule(3); // YIELD_DIST
 
     // Transfer tokens to sender
     await escrowableERC20.transfer(sender.address, INITIAL_TRANSFER_AMOUNT);
@@ -235,8 +237,7 @@ describe('Aave Integration', function () {
         customResolver: ethers.ZeroAddress,
         yieldEnabled: true,
         autoReleaseTime: 0,
-        autoCancelTime: 0,
-        escrowType: 0,
+        autoCancelTime: 0
       };
 
       const tx = await escrowableERC20
@@ -270,8 +271,7 @@ describe('Aave Integration', function () {
         customResolver: ethers.ZeroAddress,
         yieldEnabled: false,
         autoReleaseTime: 0,
-        autoCancelTime: 0,
-        escrowType: 0,
+        autoCancelTime: 0
       };
 
       const tx = await escrowableERC20
@@ -293,8 +293,7 @@ describe('Aave Integration', function () {
         customResolver: ethers.ZeroAddress,
         yieldEnabled: true,
         autoReleaseTime: 0,
-        autoCancelTime: 0,
-        escrowType: 0,
+        autoCancelTime: 0
       };
 
       const tx = await escrowableERC20
@@ -317,8 +316,7 @@ describe('Aave Integration', function () {
         customResolver: ethers.ZeroAddress,
         yieldEnabled: true,
         autoReleaseTime: 0,
-        autoCancelTime: 0,
-        escrowType: 0,
+        autoCancelTime: 0
       };
 
       const tx = await escrowableERC20
@@ -412,8 +410,7 @@ describe('Aave Integration', function () {
         customResolver: ethers.ZeroAddress,
         yieldEnabled: true,
         autoReleaseTime: 0,
-        autoCancelTime: 0,
-        escrowType: 0,
+        autoCancelTime: 0
       };
 
       const tx = await escrowableERC20
@@ -461,8 +458,7 @@ describe('Aave Integration', function () {
         customResolver: ethers.ZeroAddress,
         yieldEnabled: true,
         autoReleaseTime: 0,
-        autoCancelTime: 0,
-        escrowType: 0,
+        autoCancelTime: 0
       };
 
       const tx = await escrowableERC20
@@ -539,8 +535,7 @@ describe('Aave Integration', function () {
         customResolver: ethers.ZeroAddress,
         yieldEnabled: true,
         autoReleaseTime: 0,
-        autoCancelTime: 0,
-        escrowType: 0,
+        autoCancelTime: 0
       };
 
       const tx = await escrowableERC20
@@ -610,8 +605,7 @@ describe('Aave Integration', function () {
         customResolver: ethers.ZeroAddress,
         yieldEnabled: true,
         autoReleaseTime: 0,
-        autoCancelTime: 0,
-        escrowType: 0,
+        autoCancelTime: 0
       };
 
       const tx = await escrowableERC20
@@ -651,8 +645,7 @@ describe('Aave Integration', function () {
         customResolver: ethers.ZeroAddress,
         yieldEnabled: true,
         autoReleaseTime: 0,
-        autoCancelTime: 0,
-        escrowType: 0,
+        autoCancelTime: 0
       };
 
       const totalBefore = await aaveModule.getTotalDepositedToAave(

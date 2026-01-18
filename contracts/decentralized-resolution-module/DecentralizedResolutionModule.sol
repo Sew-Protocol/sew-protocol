@@ -34,7 +34,43 @@ contract DecentralizedResolutionModule is
     using ResolutionTableLibrary for bytes;
     using EscalationCostLibrary for EscalationCostConfig;
 
+    // Custom errors
+    error InvalidDisputeTimeout(uint256 timeout, uint256 minTimeout, uint256 maxTimeout);
+    error NotSeniorResolver(address caller);
+    error NotRegisteredEscrowContract(address caller);
+    error InvalidLevel(uint8 level, uint8 maxLevel);
+    error AlreadyInitialized(uint256 workflowId);
+    error ResolverInactive(address resolver);
+    error ResolverNotAcceptingDisputes(address resolver);
+    error WeightExceedsMaximum(uint256 weight, uint256 maxWeight);
+    error ZeroAddress(string field);
+    error InvalidAlpha(uint256 alphaBps, uint256 maxAlpha);
+    error InvalidThreshold(uint256 threshold, uint256 maxThreshold);
+    error InvalidTimeoutRate(uint256 rate, uint256 maxRate);
+    error InvalidRound(uint8 priorRound, uint8 currentRound);
+    error NoPriorDecision(uint8 round);
+    error AlreadyFinalized(uint256 workflowId);
+    error NoDecision(uint256 workflowId, uint8 round);
+    error CannotFinalizeYet(uint256 workflowId, string reason);
+    error InvalidBaseCost(uint256 baseCost, bool enabled);
+    error InvalidBondToken(address token);
+    error TokenAlreadyInWhitelist(address token);
+    error CannotRemoveDefaultToken(address token);
+    error TokenNotInWhitelist(address token);
+    error NoPendingBondTokenChange();
+    error TimelockNotElapsed(uint64 eta, uint256 currentTime);
+    error AlreadyPaused();
+    error NotPaused();
+    error NotAuthorized(address caller);
+    error ResolverCapacityExceeded(address resolver, uint256 currentDisputes, uint256 maxDisputes);
+    error NotAuthorizedResolver(address caller);
+    error InvalidResolver(address resolver);
+    error InvalidSeniorResolver(address resolver);
+    error CannotRemoveResolver(address resolver, uint256 activeDisputes);
+    error Unauthorized(address caller);
+
     bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');
+    bytes32 public constant ROLE_GUARDIAN = keccak256('ROLE_GUARDIAN');
     uint8 public constant MAX_ROUND = 2; // 0=resolver, 1=senior, 2=external (Kleros)
     uint256 public constant BASIS_POINTS_DENOMINATOR = 10000;
     uint256 public constant DEFAULT_DISPUTE_TIMEOUT = 7 days;
@@ -140,20 +176,20 @@ contract DecentralizedResolutionModule is
     event ResolverRemoved(address indexed resolver, address indexed removedBy);
     event ResolverMetadataUpdated(address indexed resolver, ResolverMetadata metadata);
     event DisputeEscalatedToRound(
-        uint256 indexed escrowId,
+        uint256 indexed workflowId,
         uint8 fromRound,
         uint8 toRound,
         address indexed newResolver
     );
     event DecisionSubmitted(
-        uint256 indexed escrowId,
+        uint256 indexed workflowId,
         uint8 round,
         address indexed resolver,
         ResolutionOutcome decision
     );
     event ResolutionTableEntrySet(bytes32 indexed categoryKey, ResolutionTableEntry entry);
     event ResolverAssigned(
-        uint256 indexed escrowId,
+        uint256 indexed workflowId,
         address indexed resolver,
         bytes32 category,
         uint8 round
@@ -170,7 +206,7 @@ contract DecentralizedResolutionModule is
     );
     event IncentiveModuleUpdated(address indexed oldModule, address indexed newModule);
     event ResolverActiveStatusChanged(address indexed resolver, bool active);
-    event IncentiveModuleCallFailed(uint256 indexed escrowId, string functionName, string reason);
+    event IncentiveModuleCallFailed(uint256 indexed workflowId, string functionName, string reason);
     event RoundRobinCounterAdvanced(
         bytes32 indexed category,
         bool seniorResolvers,
@@ -189,7 +225,7 @@ contract DecentralizedResolutionModule is
         EscalationCostConfig oldConfig,
         EscalationCostConfig newConfig
     );
-    event AppealBondRequired(uint256 indexed escrowId, uint8 round, uint256 amount, address token);
+    event AppealBondRequired(uint256 indexed workflowId, uint8 round, uint256 amount, address token);
     event MinEscrowValueUpdated(uint256 oldValue, uint256 newValue);
     event AcceptedBondTokenQueued(address indexed token, bool isAdd, uint64 eta);
     event AcceptedBondTokenChanged(address indexed token, bool isAdd);
@@ -207,18 +243,17 @@ contract DecentralizedResolutionModule is
     event NewAssignmentsResumed(address indexed resumedBy);
 
     modifier onlySeniorResolver() {
-        require(isApprovedSeniorResolver[_msgSender()], 'Not senior resolver');
+        if (!isApprovedSeniorResolver[_msgSender()]) revert NotSeniorResolver(_msgSender());
         _;
     }
     modifier onlyResolver() {
-        require(
-            isApprovedResolver[_msgSender()] || isApprovedSeniorResolver[_msgSender()],
-            'Not authorized resolver'
-        );
+        if (!isApprovedResolver[_msgSender()] && !isApprovedSeniorResolver[_msgSender()]) {
+            revert NotAuthorizedResolver(_msgSender());
+        }
         _;
     }
     modifier onlyEscrowContract() {
-        require(registeredEscrowContracts[_msgSender()], 'Not registered escrow contract');
+        if (!registeredEscrowContracts[_msgSender()]) revert NotRegisteredEscrowContract(_msgSender());
         _;
     }
 
@@ -266,12 +301,9 @@ contract DecentralizedResolutionModule is
         string memory name,
         string memory description
     ) external onlySeniorResolver {
-        require(
-            resolver != address(0) &&
-                !isApprovedResolver[resolver] &&
-                !isApprovedSeniorResolver[resolver],
-            'Invalid resolver'
-        );
+        if (resolver == address(0) || isApprovedResolver[resolver] || isApprovedSeniorResolver[resolver]) {
+            revert InvalidResolver(resolver);
+        }
         resolverRoles[resolver] = ResolverRole.RESOLVER;
         isApprovedResolver[resolver] = true;
         resolverIndex[resolver] = approvedResolvers.length;
@@ -297,12 +329,9 @@ contract DecentralizedResolutionModule is
         string memory name,
         string memory description
     ) external onlyRole(ROLE_TIMELOCK) {
-        require(
-            resolver != address(0) &&
-                !isApprovedResolver[resolver] &&
-                !isApprovedSeniorResolver[resolver],
-            'Invalid senior resolver'
-        );
+        if (resolver == address(0) || isApprovedResolver[resolver] || isApprovedSeniorResolver[resolver]) {
+            revert InvalidSeniorResolver(resolver);
+        }
         resolverRoles[resolver] = ResolverRole.SENIOR_RESOLVER;
         isApprovedSeniorResolver[resolver] = true;
         seniorResolverIndex[resolver] = approvedSeniorResolvers.length;
@@ -329,15 +358,12 @@ contract DecentralizedResolutionModule is
     }
 
     function removeResolver(address resolver) external {
-        require(
-            isApprovedResolver[resolver] && resolverActiveDisputes[resolver] == 0,
-            'Cannot remove'
-        );
-        require(
-            resolverMetadata[resolver].appointedBy == _msgSender() ||
-                hasRole(ROLE_TIMELOCK, _msgSender()),
-            'Unauthorized'
-        );
+        if (!isApprovedResolver[resolver] || resolverActiveDisputes[resolver] > 0) {
+            revert CannotRemoveResolver(resolver, resolverActiveDisputes[resolver]);
+        }
+        if (resolverMetadata[resolver].appointedBy != _msgSender() && !hasRole(ROLE_TIMELOCK, _msgSender())) {
+            revert Unauthorized(_msgSender());
+        }
         _removeFromArray(approvedResolvers, resolverIndex, resolver);
         resolverRoles[resolver] = ResolverRole.NONE;
         isApprovedResolver[resolver] = false;
@@ -346,10 +372,9 @@ contract DecentralizedResolutionModule is
     }
 
     function removeSeniorResolver(address resolver) external onlyRole(ROLE_TIMELOCK) {
-        require(
-            isApprovedSeniorResolver[resolver] && resolverActiveDisputes[resolver] == 0,
-            'Cannot remove'
-        );
+        if (!isApprovedSeniorResolver[resolver] || resolverActiveDisputes[resolver] > 0) {
+            revert CannotRemoveResolver(resolver, resolverActiveDisputes[resolver]);
+        }
         _removeFromArray(approvedSeniorResolvers, seniorResolverIndex, resolver);
         resolverRoles[resolver] = ResolverRole.NONE;
         isApprovedSeniorResolver[resolver] = false;
@@ -378,11 +403,9 @@ contract DecentralizedResolutionModule is
         string memory name,
         string memory description
     ) external {
-        require(
-            resolverMetadata[resolver].appointedBy == _msgSender() ||
-                hasRole(ROLE_TIMELOCK, _msgSender()),
-            'Unauthorized'
-        );
+        if (resolverMetadata[resolver].appointedBy != _msgSender() && !hasRole(ROLE_TIMELOCK, _msgSender())) {
+            revert Unauthorized(_msgSender());
+        }
         resolverMetadata[resolver].name = name;
         resolverMetadata[resolver].description = description;
         emit ResolverMetadataUpdated(resolver, resolverMetadata[resolver]);
@@ -399,6 +422,19 @@ contract DecentralizedResolutionModule is
     }
     function getDisputeMetadata(uint256 workflowId) external view returns (DisputeMetadata memory) {
         return disputeMetadata[workflowId];
+    }
+
+    /**
+     * @notice Get decision at a specific round (helper for appeal access control)
+     * @param workflowId Dispute ID
+     * @param round Round to check (0, 1, or 2)
+     * @return decision ResolutionOutcome enum value (0 = NONE, 1 = RELEASE, 2 = CANCEL)
+     * @dev Returns the decision made at the specified round
+     */
+    function getDecisionAtRound(uint256 workflowId, uint8 round) external view returns (uint8 decision) {
+        require(round < 3, 'Invalid round');
+        DisputeMetadata storage dm = disputeMetadata[workflowId];
+        decision = uint8(dm.decisionAtRound[round]);
     }
 
     /**
@@ -559,7 +595,7 @@ contract DecentralizedResolutionModule is
     function getRequiredAppealBond(
         uint256 /* workflowId */,
         uint8 currentLevel,
-        bytes calldata /* escrowData */
+        bytes calldata escrowData
     ) external view override returns (uint256 amount, address token) {
         if (!escalationCostConfig.enabled) {
             return (0, address(0));
@@ -576,16 +612,16 @@ contract DecentralizedResolutionModule is
             escalationCostConfig
         );
 
-        // Determine which token to use:
-        // 1. If defaultBondToken is set and in whitelist, use it
-        // 2. Otherwise use config.bondToken (for backward compatibility and explicit overrides)
-        address bondToken = (defaultBondToken != address(0) && acceptedBondTokens[defaultBondToken])
-            ? defaultBondToken
-            : escalationCostConfig.bondToken;
+        // SECURITY: Enforce bond token matches escrow token
+        // This ensures participants always have the required bond token
+        // Decode escrowData to get escrow token
+        (address escrowToken, , , ) = abi.decode(escrowData, (address, address, address, uint256));
+        
+        // Use escrow token as bond token (participants already have this token)
+        address bondToken = escrowToken;
 
-        // Note: We don't strictly require whitelist membership for the selected token
-        // to maintain backward compatibility with existing escalation configs.
-        // The whitelist is primarily for governance control over NEW tokens.
+        // Note: escalationCostConfig.bondToken and defaultBondToken are now ignored
+        // for security and simplicity - bond must match escrow token
 
         return (bondAmount, bondToken);
     }
@@ -643,7 +679,7 @@ contract DecentralizedResolutionModule is
         uint8 level,
         EscalationConfig memory config
     ) external onlyRole(ROLE_TIMELOCK) {
-        require(level <= MAX_ROUND, 'Invalid level');
+        if (level > MAX_ROUND) revert InvalidLevel(level, MAX_ROUND);
         _pendingEscalationConfig[level] = PendingEscalationConfig({
             level: level,
             config: config,
@@ -815,17 +851,16 @@ contract DecentralizedResolutionModule is
         bytes32 categoryKey
     ) external onlyEscrowContract {
         DisputeMetadata storage dm = disputeMetadata[workflowId];
-        require(dm.resolverAtRound[0] == address(0), 'Already initialized');
+        if (dm.resolverAtRound[0] != address(0)) revert AlreadyInitialized(workflowId);
 
         // Atomic capacity check and increment
-        require(resolverActive[resolver], 'Resolver inactive');
+        if (!resolverActive[resolver]) revert ResolverInactive(resolver);
         ResolverCapacity storage capacity = resolverCapacity[resolver];
-        require(capacity.acceptsNewDisputes, 'Resolver not accepting new disputes');
+        if (!capacity.acceptsNewDisputes) revert ResolverNotAcceptingDisputes(resolver);
         if (capacity.maxConcurrentDisputes > 0) {
-            require(
-                capacity.currentDisputes < capacity.maxConcurrentDisputes,
-                'Resolver capacity exceeded'
-            );
+            if (capacity.currentDisputes >= capacity.maxConcurrentDisputes) {
+                revert ResolverCapacityExceeded(resolver, capacity.currentDisputes, capacity.maxConcurrentDisputes);
+            }
         }
 
         // Increment atomically (both counters to maintain consistency)
@@ -901,8 +936,8 @@ contract DecentralizedResolutionModule is
         address resolver,
         uint256 weight
     ) external onlyRole(ROLE_TIMELOCK) {
-        require(weight <= BASIS_POINTS_DENOMINATOR, 'Weight exceeds max');
-        require(resolver != address(0), 'Zero address');
+        if (weight > BASIS_POINTS_DENOMINATOR) revert WeightExceedsMaximum(weight, BASIS_POINTS_DENOMINATOR);
+        if (resolver == address(0)) revert ZeroAddress('resolver');
 
         uint256 oldWeight = resolverStats[resolver].assignmentWeight;
         resolverStats[resolver].assignmentWeight = weight;
@@ -1036,7 +1071,9 @@ contract DecentralizedResolutionModule is
         }
     }
     function setDisputeTimeout(uint256 t) external onlyRole(ROLE_TIMELOCK) {
-        require(t > 0 && t <= MAX_DISPUTE_TIMEOUT, 'T');
+        if (t == 0 || t > MAX_DISPUTE_TIMEOUT) {
+            revert InvalidDisputeTimeout(t, 1, MAX_DISPUTE_TIMEOUT);
+        }
         disputeTimeout = t;
     }
 
@@ -1188,9 +1225,13 @@ contract DecentralizedResolutionModule is
         uint256 minScoreThreshold,
         uint256 maxTimeoutRate
     ) external onlyRole(ROLE_TIMELOCK) {
-        require(alphaBps <= BASIS_POINTS_DENOMINATOR, 'Invalid alpha');
-        require(minScoreThreshold <= ResolutionAnalytics.EMA_PRECISION, 'Invalid threshold');
-        require(maxTimeoutRate <= BASIS_POINTS_DENOMINATOR, 'Invalid timeout rate');
+        if (alphaBps > BASIS_POINTS_DENOMINATOR) revert InvalidAlpha(alphaBps, BASIS_POINTS_DENOMINATOR);
+        if (minScoreThreshold > ResolutionAnalytics.EMA_PRECISION) {
+            revert InvalidThreshold(minScoreThreshold, ResolutionAnalytics.EMA_PRECISION);
+        }
+        if (maxTimeoutRate > BASIS_POINTS_DENOMINATOR) {
+            revert InvalidTimeoutRate(maxTimeoutRate, BASIS_POINTS_DENOMINATOR);
+        }
 
         emaAlphaBps = alphaBps;
         minEmaScoreThreshold = minScoreThreshold;
@@ -1207,10 +1248,9 @@ contract DecentralizedResolutionModule is
         uint256[3] memory roundAppealWindows
     ) external onlyRole(ROLE_TIMELOCK) {
         for (uint256 i = 0; i < 3; i++) {
-            require(
-                roundResolveDeadlines[i] > 0 && roundResolveDeadlines[i] <= MAX_DISPUTE_TIMEOUT,
-                'Invalid resolve deadline'
-            );
+            if (roundResolveDeadlines[i] == 0 || roundResolveDeadlines[i] > MAX_DISPUTE_TIMEOUT) {
+                revert InvalidDisputeTimeout(roundResolveDeadlines[i], 1, MAX_DISPUTE_TIMEOUT);
+            }
             resolveDeadlines[i] = roundResolveDeadlines[i];
             appealWindows[i] = roundAppealWindows[i];
         }
@@ -1226,12 +1266,11 @@ contract DecentralizedResolutionModule is
     function recordReversal(uint256 workflowId, uint8 priorRound) external onlyEscrowContract {
         DisputeMetadata storage dm = disputeMetadata[workflowId];
 
-        require(priorRound < dm.currentRound, 'Invalid round');
-        require(dm.decisionAtRound[priorRound] != ResolutionOutcome.NONE, 'No prior decision');
-        require(
-            dm.decisionAtRound[dm.currentRound] != ResolutionOutcome.NONE,
-            'No current decision'
-        );
+        if (priorRound >= dm.currentRound) revert InvalidRound(priorRound, dm.currentRound);
+        if (dm.decisionAtRound[priorRound] == ResolutionOutcome.NONE) revert NoPriorDecision(priorRound);
+        if (dm.decisionAtRound[dm.currentRound] == ResolutionOutcome.NONE) {
+            revert NoDecision(workflowId, dm.currentRound);
+        }
 
         // Check if decisions differ (reversal occurred)
         if (dm.decisionAtRound[priorRound] != dm.decisionAtRound[dm.currentRound]) {
@@ -1277,8 +1316,10 @@ contract DecentralizedResolutionModule is
     function finalizeDispute(uint256 workflowId) external onlyEscrowContract {
         DisputeMetadata storage dm = disputeMetadata[workflowId];
 
-        require(dm.status != DisputeStatus.Final, 'Already finalized');
-        require(dm.decisionAtRound[dm.currentRound] != ResolutionOutcome.NONE, 'No decision');
+        if (dm.status == DisputeStatus.Final) revert AlreadyFinalized(workflowId);
+        if (dm.decisionAtRound[dm.currentRound] == ResolutionOutcome.NONE) {
+            revert NoDecision(workflowId, dm.currentRound);
+        }
 
         // Check if appeal window has expired or this is final round
         bool canFinalize = false;
@@ -1290,7 +1331,7 @@ contract DecentralizedResolutionModule is
             canFinalize = block.timestamp >= dm.appealDeadline[dm.currentRound];
         }
 
-        require(canFinalize, 'Cannot finalize yet');
+        if (!canFinalize) revert CannotFinalizeYet(workflowId, 'Appeal window not expired or not final round');
 
         dm.status = DisputeStatus.Final;
         ResolutionOutcome finalDecision = dm.decisionAtRound[dm.currentRound];
@@ -1329,7 +1370,7 @@ contract DecentralizedResolutionModule is
     function queueEscalationCostConfig(
         EscalationCostConfig memory config
     ) external onlyRole(ROLE_TIMELOCK) {
-        require(config.baseCost > 0 || !config.enabled, 'Base cost must be > 0 if enabled');
+        if (config.baseCost == 0 && config.enabled) revert InvalidBaseCost(config.baseCost, config.enabled);
 
         // Validate bond token if specified and not address(0)
         // Allow address(0) (ETH) without whitelist check for backward compatibility
@@ -1395,8 +1436,8 @@ contract DecentralizedResolutionModule is
      * @dev Requires ROLE_TIMELOCK, slow lane governance
      */
     function queueAddAcceptedBondToken(address token) external onlyRole(ROLE_TIMELOCK) {
-        require(token != address(0) || acceptedBondTokens[address(0)], 'Invalid token');
-        require(!acceptedBondTokens[token], 'Token already in whitelist');
+        if (token == address(0) && !acceptedBondTokens[address(0)]) revert InvalidBondToken(token);
+        if (acceptedBondTokens[token]) revert TokenAlreadyInWhitelist(token);
 
         _pendingBondTokenChange = PendingBondTokenChange({
             token: token,
@@ -1414,8 +1455,8 @@ contract DecentralizedResolutionModule is
      * @dev Requires ROLE_TIMELOCK, slow lane governance
      */
     function queueRemoveAcceptedBondToken(address token) external onlyRole(ROLE_TIMELOCK) {
-        require(token != defaultBondToken, 'Cannot remove default bond token');
-        require(acceptedBondTokens[token], 'Token not in whitelist');
+        if (token == defaultBondToken) revert CannotRemoveDefaultToken(token);
+        if (!acceptedBondTokens[token]) revert TokenNotInWhitelist(token);
 
         _pendingBondTokenChange = PendingBondTokenChange({
             token: token,
@@ -1432,8 +1473,10 @@ contract DecentralizedResolutionModule is
      * @dev Requires ROLE_TIMELOCK, after timelock delay
      */
     function activateBondTokenWhitelistChange() external onlyRole(ROLE_TIMELOCK) {
-        require(_pendingBondTokenChange.exists, 'No pending bond token change');
-        require(block.timestamp >= _pendingBondTokenChange.eta, 'Timelock not elapsed');
+        if (!_pendingBondTokenChange.exists) revert NoPendingBondTokenChange();
+        if (block.timestamp < _pendingBondTokenChange.eta) {
+            revert TimelockNotElapsed(_pendingBondTokenChange.eta, block.timestamp);
+        }
 
         address token = _pendingBondTokenChange.token;
         bool isAdd = _pendingBondTokenChange.isAdd;
@@ -1456,7 +1499,7 @@ contract DecentralizedResolutionModule is
      * @dev Requires ROLE_TIMELOCK, slow lane governance
      */
     function queueSetDefaultBondToken(address token) external onlyRole(ROLE_TIMELOCK) {
-        require(acceptedBondTokens[token], 'Token not in whitelist');
+        if (!acceptedBondTokens[token]) revert TokenNotInWhitelist(token);
 
         _pendingDefaultBondToken = PendingDefaultBondToken({
             token: token,
@@ -1472,8 +1515,10 @@ contract DecentralizedResolutionModule is
      * @dev Requires ROLE_TIMELOCK, after timelock delay
      */
     function activateDefaultBondToken() external onlyRole(ROLE_TIMELOCK) {
-        require(_pendingDefaultBondToken.exists, 'No pending default bond token change');
-        require(block.timestamp >= _pendingDefaultBondToken.eta, 'Timelock not elapsed');
+        if (!_pendingDefaultBondToken.exists) revert NoPendingBondTokenChange();
+        if (block.timestamp < _pendingDefaultBondToken.eta) {
+            revert TimelockNotElapsed(_pendingDefaultBondToken.eta, block.timestamp);
+        }
 
         address oldToken = defaultBondToken;
         address newToken = _pendingDefaultBondToken.token;
@@ -1646,11 +1691,10 @@ contract DecentralizedResolutionModule is
      *      Requires ROLE_TIMELOCK (slow lane) or ROLE_GUARDIAN (emergency)
      */
     function pauseNewAssignments(string memory reason) external {
-        require(
-            hasRole(ROLE_TIMELOCK, msg.sender) || hasRole(DEFAULT_ADMIN_ROLE, msg.sender),
-            'Not authorized'
-        );
-        require(!newAssignmentsPaused, 'Already paused');
+        if (!hasRole(ROLE_TIMELOCK, msg.sender) && !hasRole(ROLE_GUARDIAN, msg.sender)) {
+            revert NotAuthorized(msg.sender);
+        }
+        if (newAssignmentsPaused) revert AlreadyPaused();
 
         newAssignmentsPaused = true;
         emit NewAssignmentsPaused(msg.sender, reason);
@@ -1658,14 +1702,13 @@ contract DecentralizedResolutionModule is
 
     /**
      * @notice Resume new resolver assignments
-     * @dev Requires ROLE_TIMELOCK (slow lane) or ROLE_GUARDIAN (emergency)
+     * @dev Requires ROLE_TIMELOCK (slow lane). Guardian is down-only and cannot resume.
      */
     function resumeNewAssignments() external {
-        require(
-            hasRole(ROLE_TIMELOCK, msg.sender) || hasRole(DEFAULT_ADMIN_ROLE, msg.sender),
-            'Not authorized'
-        );
-        require(newAssignmentsPaused, 'Not paused');
+        if (!hasRole(ROLE_TIMELOCK, msg.sender)) {
+            revert NotAuthorized(msg.sender);
+        }
+        if (!newAssignmentsPaused) revert NotPaused();
 
         newAssignmentsPaused = false;
         emit NewAssignmentsResumed(msg.sender);

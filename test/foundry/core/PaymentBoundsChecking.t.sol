@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import "../../../contracts/types/YieldPresets.sol";
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
@@ -102,8 +103,9 @@ contract PaymentBoundsCheckingTest is Test {
         incentiveModule.activatePaymentCalculationLibrary();
 
         // Should revert because payment exceeds total fees
+        // Malicious library returns (escrowFee + escalationFees) * 2 = 3000 ether, but total fees = 1500 ether
         vm.prank(escrow);
-        vm.expectRevert('Resolver share exceeds total fees');
+        vm.expectRevert(abi.encodeWithSignature("ResolverShareExceedsTotalFees(uint256,uint256)", 3000 ether, 1500 ether));
         incentiveModule.onDisputeResolved(workflowId, address(token));
     }
 
@@ -132,8 +134,12 @@ contract PaymentBoundsCheckingTest is Test {
         incentiveModule.activatePaymentCalculationLibrary();
 
         // Should revert because sum doesn't match total
+        // With 2 resolvers, resolverShare = (1000 * 5000) / 10000 = 500 ether
+        // Each gets 250 ether, sum = 500 ether, but totalResolverShare = resolverShare + 1 from library
+        // Library returns: totalResolverShare = resolverShare + 1 = 500 ether + 1 wei = 500000000000000000001 wei
+        // Actual error: calculatedTotal = 500 ether, expectedTotal = 500 ether + 1 wei
         vm.prank(escrow);
-        vm.expectRevert('Payment sum mismatch');
+        vm.expectRevert(abi.encodeWithSignature("PaymentSumMismatch(uint256,uint256)", 500 ether, 500 ether + 1));
         incentiveModule.onDisputeResolved(workflowId, address(token));
     }
 
@@ -157,7 +163,7 @@ contract PaymentBoundsCheckingTest is Test {
         token.mint(address(incentiveModule), 1000 ether);
 
         vm.prank(escrow);
-        vm.expectRevert('Zero resolver address');
+        vm.expectRevert(abi.encodeWithSignature("ZeroResolverAddress(uint256)", 0));
         incentiveModule.onDisputeResolved(workflowId, address(token));
     }
 
@@ -183,8 +189,10 @@ contract PaymentBoundsCheckingTest is Test {
         vm.prank(timelock);
         incentiveModule.activatePaymentCalculationLibrary();
 
+        // With 2 resolvers, resolverShare = (1000 * 5000) / 10000 = 500 ether
+        // First resolver gets 95% = 475 ether, max is 90% = 450 ether
         vm.prank(escrow);
-        vm.expectRevert('Payment exceeds maximum allowed');
+        vm.expectRevert(abi.encodeWithSignature("PaymentExceedsMaximumAllowed(uint256,uint256)", 475 ether, 450 ether));
         incentiveModule.onDisputeResolved(workflowId, address(token));
     }
 
@@ -205,8 +213,9 @@ contract PaymentBoundsCheckingTest is Test {
         vm.prank(timelock);
         incentiveModule.activatePaymentCalculationLibrary();
 
+        // ArrayMismatchLibrary returns resolvers.length=1, payments.length=2
         vm.prank(escrow);
-        vm.expectRevert('Array length mismatch');
+        vm.expectRevert(abi.encodeWithSignature("ArrayLengthMismatch(uint256,uint256)", 1, 2));
         incentiveModule.onDisputeResolved(workflowId, address(token));
     }
 

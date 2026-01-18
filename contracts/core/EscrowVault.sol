@@ -5,63 +5,82 @@ import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import './BaseEscrow.sol';
 import '../governance/SlowLaneQueueActivate.sol';
-import '../libraries/RecoveryLibrary.sol';
+// PRIORITY: Removed RecoveryLibrary import - recoverERC20 simplified to use safeTransfer directly
+// PRIORITY 5: Removed EscrowAccountingLibrary import (moved to external AccountingOps contract if needed)
 import '../types/EscrowTypes.sol';
 import '../interfaces/IReleaseStrategy.sol';
 import '../shared/interfaces/IResolutionModule.sol';
 import '../interfaces/IYieldGenerationModule.sol';
 import '../interfaces/IYieldDistributionModule.sol';
+import '../interfaces/IModuleRegistry.sol';
+import './ModuleManagementContract.sol';
 
+/**
+ * @title EscrowVault
+ * @notice Main escrow contract implementation supporting ERC20 tokens
+ * @dev Concrete implementation of BaseEscrow that handles ERC20 token escrows.
+ *      Supports multiple tokens, yield generation, dispute resolution, and module snapshots.
+ *      Uses a pull model for token transfers and implements fee tracking per token.
+ */
 contract EscrowVault is BaseEscrow {
     using SafeERC20 for IERC20;
+    // PRIORITY 5: Removed EscrowAccountingLibrary usage (moved to external AccountingOps contract if needed)
+
+    /// @notice Default yield protocol fee (30%)
+    uint256 public constant DEFAULT_YIELD_PROTOCOL_FEE_BPS = 3000; // 30% default
 
     mapping(address => uint256) public totalFeesPerToken;
     // Tracks total amount held in escrow per token (immutable amounts - no partial releases)
     mapping(address => uint256) public totalHeldInEscrowPerToken;
 
-    IReleaseStrategy public defaultReleaseStrategy;
-    IYieldGenerationModule public defaultYieldGenerationModule;
-    IYieldDistributionModule public defaultYieldDistributionModule;
+    // Module management contract (stores module state externally to reduce contract size)
+    ModuleManagementContract public moduleManagement;
+    
+    // Module registry for validation (optional - if not set, validation skipped)
+    IModuleRegistry public moduleRegistry;
 
-    PendingAddress private _pRel;
-    PendingAddress private _pYG;
-    PendingAddress private _pYD;
-
-    event EscrowTransferCreated(
-        uint256 indexed escrowId,
-        address indexed token,
-        address indexed from,
-        address to,
-        uint256 amount
-    );
-    event EscrowTransferReleased(
-        uint256 indexed escrowId,
-        address indexed token,
-        address indexed to,
-        uint256 amount
-    );
-    event EscrowTransferCancelled(
-        uint256 indexed escrowId,
-        address indexed token,
-        address indexed from,
-        uint256 amount
-    );
+    // PRIORITY: Removed EscrowTransferCreated/Released/Cancelled events
+    // EscrowCreated and EscrowStateChanged already provide this information
     event FeesWithdrawn(address indexed token, uint256 amount);
+    // PRIORITY 5: Removed AccountingReconciled event (moved to external AccountingOps contract if needed)
 
-    constructor(uint256 f, address fa, address y, address d) SlowLaneQueueActivate() {
-        if (fa == address(0)) revert InvalidAddress('Fee address cannot be zero', fa);
-        if (y == address(0)) revert InvalidAddress('YieldOps address cannot be zero', y);
-        if (d == address(0)) revert InvalidAddress('DisputeOps address cannot be zero', d);
+    constructor(
+        uint256 escrowFeeBps,
+        address feeAddress,
+        address yieldOpsAddress,
+        address disputeOpsAddress,
+        address moduleManagementAddress
+    ) {
+        // Validate escrow fee is within allowed range (0 to 2%)
+        if (escrowFeeBps > MAX_ESCROW_FEE_BPS) {
+            revert InvalidEscrowFee(escrowFeeBps, MAX_ESCROW_FEE_BPS);
+        }
+        if (feeAddress == address(0)) revert InvalidAddress('Fee address cannot be zero', feeAddress);
+        if (yieldOpsAddress == address(0)) revert InvalidAddress('YieldOps address cannot be zero', yieldOpsAddress);
+        if (disputeOpsAddress == address(0)) revert InvalidAddress('DisputeOps address cannot be zero', disputeOpsAddress);
+        if (moduleManagementAddress == address(0)) revert InvalidAddress('ModuleManagement address cannot be zero', moduleManagementAddress);
 
-        escrowFee = f;
-        escrowFeeAddress = fa;
-        yieldOps = YieldOps(y);
-        disputeOps = DisputeOps(d);
-        _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
+        escrowFee = escrowFeeBps;
+        moduleManagement = ModuleManagementContract(moduleManagementAddress);
+        escrowFeeAddress = feeAddress;
+        yieldOps = YieldOps(yieldOpsAddress);
+        disputeOps = DisputeOps(disputeOpsAddress);
+        
+        // PRIORITY: Role granting moved to deployment script for security (timelock-only from day 1)
 
-        // Initialize protocol fees
-        yieldProtocolFeeBps = 3000; // 30% default
-        appealBondProtocolFeeBps = 0; // 0% default
+        // Initialize protocol fees with validation
+        uint256 initialYieldFee = DEFAULT_YIELD_PROTOCOL_FEE_BPS;
+        uint256 initialAppealFee = 0; // 0% default
+        
+        if (initialYieldFee > MAX_PROTOCOL_FEE_BPS) {
+            revert FeeExceedsMaximum(initialYieldFee, MAX_PROTOCOL_FEE_BPS);
+        }
+        if (initialAppealFee > MAX_PROTOCOL_FEE_BPS) {
+            revert FeeExceedsMaximum(initialAppealFee, MAX_PROTOCOL_FEE_BPS);
+        }
+        
+        yieldProtocolFeeBps = initialYieldFee;
+        appealBondProtocolFeeBps = initialAppealFee;
 
         // Initialize timeout config
         timeoutConfig = TimeoutConfig({
@@ -72,304 +91,218 @@ contract EscrowVault is BaseEscrow {
         });
     }
 
-    function createEscrow(
-        address token,
-        address seller,
-        uint256 amount,
-        uint256 autoReleaseTime,
-        uint256 autoCancelTime
-    ) public whenNotPaused returns (uint256) {
-        EscrowSettings memory settings = getDefaultSettings();
-        settings.autoReleaseTime = autoReleaseTime;
-        settings.autoCancelTime = autoCancelTime;
-        return createEscrow(token, seller, amount, settings);
-    }
 
-    function createEscrow(
-        address token,
-        address seller,
-        uint256 amount
-    ) public whenNotPaused returns (uint256) {
-        return createEscrow(token, seller, amount, getDefaultSettings());
-    }
-
-    function releaseEscrowTransfer(uint256 id) public nonReentrant whenNotPaused returns (bool) {
-        _requirePending(id);
-        if (escrowTransfers[id].from != _msgSender())
-            revert NotSender(id, _msgSender(), escrowTransfers[id].from);
-        _releaseEscrowTransfer(id);
+    /**
+     * @notice Release escrow funds to recipient (sender-initiated)
+     * @param workflowId The escrow ID
+     * @return success Whether the release succeeded
+     * @dev Only the sender (from address) can release. Transfers funds to recipient.
+     */
+    function releaseEscrowTransfer(uint256 workflowId) public nonReentrant whenNotPaused returns (bool) {
+        _requirePending(workflowId);
+        if (escrowTransfers[workflowId].from != _msgSender())
+            revert NotSender(workflowId, _msgSender(), escrowTransfers[workflowId].from);
+        _releaseEscrowTransfer(workflowId);
         return true;
     }
 
-    function _pullTokens(address t, address f, uint256 a) internal override {
-        IERC20(t).safeTransferFrom(f, address(this), a);
+    function _pullTokens(address token, address from, uint256 amount) internal override {
+        IERC20(token).safeTransferFrom(from, address(this), amount);
     }
-    function _recordFee(address t, uint256 a) internal override {
-        totalFeesPerToken[t] += a;
+    function _recordFee(address token, uint256 amount) internal override {
+        // MED-4: Prevent overflow when accumulating fees
+        // currentFees is the current total accumulated fees for this token before adding the new fee
+        uint256 currentFees = totalFeesPerToken[token];
+        if (amount > type(uint256).max - currentFees) {
+            revert InvalidAmount('Fee accumulation would overflow');
+        }
+        totalFeesPerToken[token] = currentFees + amount;
     }
     function _depositForYield(
-        IYieldGenerationModule g,
-        uint256 w,
-        address t,
-        uint256 a
+        IYieldGenerationModule generationModule,
+        uint256 workflowId,
+        address token,
+        uint256 amount
     ) internal override {
-        g.depositForYield(w, t, a);
+        generationModule.depositForYield(workflowId, token, amount);
     }
     function _emitEscrowTransferCreated(
-        uint256 w,
-        address t,
-        address f,
+        uint256 workflowId,
+        address token,
+        address from,
         address to,
-        uint256 a
+        uint256 amount
     ) internal override {
-        emit EscrowTransferCreated(w, t, f, to, a);
+        // PRIORITY: Event removed - EscrowCreated already provides this information
     }
-    function _transferTokens(address t, address to, uint256 a) internal override {
-        IERC20(t).safeTransfer(to, a);
+    function _transferTokens(address token, address to, uint256 amount) internal override {
+        IERC20(token).safeTransfer(to, amount);
     }
-    function _updateEscrowBalance(address t, uint256 a, bool add) internal override {
-        if (add) totalHeldInEscrowPerToken[t] += a;
-        else totalHeldInEscrowPerToken[t] -= a;
+    function _updateEscrowBalance(address token, uint256 amount, bool add) internal override {
+        // MED-3: Input validation
+        if (token == address(0)) revert InvalidAddress('Token address cannot be zero', token);
+        
+        if (add) {
+            totalHeldInEscrowPerToken[token] += amount;
+        } else {
+            // CRIT-1: Prevent underflow that could break accounting
+            if (totalHeldInEscrowPerToken[token] < amount) {
+                revert BalanceUnderflow(token, totalHeldInEscrowPerToken[token], amount);
+            }
+            totalHeldInEscrowPerToken[token] -= amount;
+        }
     }
     function _emitEscrowTransferCancelled(
-        uint256 w,
-        address t,
-        address f,
-        uint256 a
+        uint256 workflowId,
+        address token,
+        address from,
+        uint256 amount
     ) internal override {
-        emit EscrowTransferCancelled(w, t, f, a);
+        // PRIORITY: Event removed - EscrowStateChanged already provides this information
     }
     function _emitEscrowTransferReleased(
-        uint256 w,
-        address t,
+        uint256 workflowId,
+        address token,
         address to,
-        uint256 a
+        uint256 amount
     ) internal override {
-        emit EscrowTransferReleased(w, t, to, a);
+        // PRIORITY: Event removed - EscrowStateChanged already provides this information
     }
 
-    /**
-     * @notice Helper function to get module from snapshot or return default (for IReleaseStrategy)
-     * @param snapshotAddress Address from snapshot mapping (may be zero)
-     * @param defaultModule Default module to return if snapshot is zero
-     * @return Module instance (from snapshot if non-zero, otherwise default)
-     */
-    function _getReleaseStrategyOrDefault(
-        address snapshotAddress,
-        IReleaseStrategy defaultModule
-    ) internal pure returns (IReleaseStrategy) {
-        return snapshotAddress != address(0) ? IReleaseStrategy(snapshotAddress) : defaultModule;
-    }
-
-    /**
-     * @notice Helper function to get module from snapshot or return default (for IYieldGenerationModule)
-     * @param snapshotAddress Address from snapshot mapping (may be zero)
-     * @param defaultModule Default module to return if snapshot is zero
-     * @return Module instance (from snapshot if non-zero, otherwise default)
-     */
-    function _getYieldGenerationModuleOrDefault(
-        address snapshotAddress,
-        IYieldGenerationModule defaultModule
-    ) internal pure returns (IYieldGenerationModule) {
-        return
-            snapshotAddress != address(0) ? IYieldGenerationModule(snapshotAddress) : defaultModule;
-    }
-
-    /**
-     * @notice Helper function to get module from snapshot or return default (for IYieldDistributionModule)
-     * @param snapshotAddress Address from snapshot mapping (may be zero)
-     * @param defaultModule Default module to return if snapshot is zero
-     * @return Module instance (from snapshot if non-zero, otherwise default)
-     */
-    function _getYieldDistributionModuleOrDefault(
-        address snapshotAddress,
-        IYieldDistributionModule defaultModule
-    ) internal pure returns (IYieldDistributionModule) {
-        return
-            snapshotAddress != address(0)
-                ? IYieldDistributionModule(snapshotAddress)
-                : defaultModule;
-    }
-
-    function _getReleaseStrategy(uint256 id) internal view override returns (IReleaseStrategy) {
-        return _getReleaseStrategyOrDefault(snapshotReleaseStrategies[id], defaultReleaseStrategy);
-    }
-
-    function _getResolutionModule(uint256 id) internal view override returns (IResolutionModule) {
-        address s = snapshotResolutionModules[id];
-        if (s != address(0)) {
-            return IResolutionModule(s);
+    // PRIORITY: Consolidated module getters to reduce bytecode
+    function _getModuleAddress(uint256 workflowId, ModuleType moduleType) internal view returns (address) {
+        address snapshotModule;
+        if (moduleType == ModuleType.RELEASE) {
+            snapshotModule = moduleSnapshots[workflowId].releaseStrategy;
+        } else if (moduleType == ModuleType.RESOLUTION) {
+            snapshotModule = moduleSnapshots[workflowId].resolutionModule;
+        } else if (moduleType == ModuleType.YIELD_GEN) {
+            snapshotModule = moduleSnapshots[workflowId].yieldGenerationModule;
+        } else if (moduleType == ModuleType.YIELD_DIST) {
+            snapshotModule = moduleSnapshots[workflowId].yieldDistributionModule;
         }
-        // Use BaseEscrow's disputeResolutionModule
+        
+        if (snapshotModule != address(0)) {
+            return snapshotModule;
+        }
+        
+        // Query ModuleManagementContract for default module
+        return moduleManagement.getDefaultModule(address(this), moduleType);
+    }
+
+    function _getReleaseStrategy(uint256 workflowId) internal view override returns (IReleaseStrategy) {
+        return IReleaseStrategy(_getModuleAddress(workflowId, ModuleType.RELEASE));
+    }
+
+    function _getResolutionModule(uint256 workflowId) internal view override returns (IResolutionModule) {
+        address moduleAddr = _getModuleAddress(workflowId, ModuleType.RESOLUTION);
+        if (moduleAddr != address(0)) {
+            return IResolutionModule(moduleAddr);
+        }
+        // Fallback to BaseEscrow's disputeResolutionModule
         return IResolutionModule(disputeResolutionModule);
     }
 
     function _getYieldGenerationModule(
-        uint256 id
+        uint256 workflowId
     ) internal view override returns (IYieldGenerationModule) {
-        return
-            _getYieldGenerationModuleOrDefault(
-                snapshotYieldGenerationModules[id],
-                defaultYieldGenerationModule
-            );
+        return IYieldGenerationModule(_getModuleAddress(workflowId, ModuleType.YIELD_GEN));
     }
 
     function _getYieldDistributionModule(
-        uint256 id
+        uint256 workflowId
     ) internal view override returns (IYieldDistributionModule) {
-        return
-            _getYieldDistributionModuleOrDefault(
-                snapshotYieldDistributionModules[id],
-                defaultYieldDistributionModule
-            );
+        return IYieldDistributionModule(_getModuleAddress(workflowId, ModuleType.YIELD_DIST));
+    }
+
+
+    /**
+     * @notice Queue a new default module
+     * @param moduleType Type of module to queue (RELEASE, YIELD_GEN, YIELD_DIST)
+     * @param module Address of the new module to queue
+     * @dev Delegates to ModuleManagementContract. Requires ROLE_TIMELOCK.
+     */
+    function queueDefaultModule(ModuleType moduleType, address module) external onlyRole(ROLE_TIMELOCK) {
+        if (moduleType == ModuleType.RESOLUTION) revert InvalidAmount('Use queueResolutionModule');
+        moduleManagement.queueDefaultModule(address(this), moduleType, module);
     }
 
     /**
-     * @notice Get default release strategy
-     * @return Default release strategy
+     * @notice Activate the queued default module
+     * @param moduleType Type of module to activate (RELEASE, YIELD_GEN, YIELD_DIST)
+     * @dev Delegates to ModuleManagementContract. Requires ROLE_TIMELOCK.
      */
-    function getReleaseStrategy(uint256) public view returns (IReleaseStrategy) {
-        return defaultReleaseStrategy;
+    function activateDefaultModule(ModuleType moduleType) external onlyRole(ROLE_TIMELOCK) {
+        if (moduleType == ModuleType.RESOLUTION) revert InvalidAmount('Use activateResolutionModule');
+        moduleManagement.activateDefaultModule(address(this), moduleType);
     }
 
     /**
-     * @notice Get default resolution module
-     * @return Default resolution module
+     * @notice Get pending default module information
+     * @param moduleType Type of module to query
+     * @return Pending module address, activation timestamp, and existence flag
      */
-    function getResolutionModule(uint256) public view returns (IResolutionModule) {
-        return IResolutionModule(disputeResolutionModule);
+    function getPendingDefaultModule(ModuleType moduleType) external view returns (address, uint64, bool) {
+        return moduleManagement.getPendingDefaultModule(address(this), moduleType);
     }
 
-    /**
-     * @notice Get default yield generation module
-     * @return Default yield generation module
-     */
-    function getYieldGenerationModule(uint256) public view returns (IYieldGenerationModule) {
-        return defaultYieldGenerationModule;
-    }
-
-    /**
-     * @notice Get default yield distribution module
-     * @return Default yield distribution module
-     */
-    function getYieldDistributionModule(uint256) public view returns (IYieldDistributionModule) {
-        return defaultYieldDistributionModule;
-    }
-
-    /**
-     * @notice Queue a new default release strategy
-     * @param s Address of the new release strategy to queue
-     * @dev Uses slow lane activation pattern. Requires ROLE_TIMELOCK.
-     */
-    function queueDefaultReleaseStrategy(address s) public onlyRole(ROLE_TIMELOCK) {
-        _queueAddress(_pRel, s);
-    }
-
-    /**
-     * @notice Activate the queued default release strategy
-     * @dev Activates after timelock delay. Requires ROLE_TIMELOCK.
-     */
-    function activateDefaultReleaseStrategy() public onlyRole(ROLE_TIMELOCK) {
-        defaultReleaseStrategy = IReleaseStrategy(_activateAddress(_pRel));
-    }
-
-    /**
-     * @notice Queue a new default yield generation module
-     * @param m Address of the new yield generation module to queue
-     * @dev Uses slow lane activation pattern. Requires ROLE_TIMELOCK.
-     */
-    function queueDefaultYieldGenerationModule(address m) public onlyRole(ROLE_TIMELOCK) {
-        _queueAddress(_pYG, m);
-    }
-
-    /**
-     * @notice Activate the queued default yield generation module
-     * @dev Activates after timelock delay. Requires ROLE_TIMELOCK.
-     */
-    function activateDefaultYieldGenerationModule() public onlyRole(ROLE_TIMELOCK) {
-        defaultYieldGenerationModule = IYieldGenerationModule(_activateAddress(_pYG));
-    }
-
-    /**
-     * @notice Queue a new default yield distribution module
-     * @param m Address of the new yield distribution module to queue
-     * @dev Uses slow lane activation pattern. Requires ROLE_TIMELOCK.
-     */
-    function queueDefaultYieldDistributionModule(address m) public onlyRole(ROLE_TIMELOCK) {
-        _queueAddress(_pYD, m);
-    }
-
-    /**
-     * @notice Activate the queued default yield distribution module
-     * @dev Activates after timelock delay. Requires ROLE_TIMELOCK.
-     */
-    function activateDefaultYieldDistributionModule() public onlyRole(ROLE_TIMELOCK) {
-        defaultYieldDistributionModule = IYieldDistributionModule(_activateAddress(_pYD));
-    }
-
-    /**
-     * @notice Get pending default release strategy information
-     * @return Pending release strategy address, activation timestamp, and existence flag
-     */
-    function getPendingDefaultReleaseStrategy() public view returns (address, uint64, bool) {
-        return getPendingAddress(_pRel);
-    }
-
-    /**
-     * @notice Get pending default yield generation module information
-     * @return Pending yield generation module address, activation timestamp, and existence flag
-     */
-    function getPendingDefaultYieldGenerationModule() public view returns (address, uint64, bool) {
-        return getPendingAddress(_pYG);
-    }
-
-    /**
-     * @notice Get pending default yield distribution module information
-     * @return Pending yield distribution module address, activation timestamp, and existence flag
-     */
-    function getPendingDefaultYieldDistributionModule()
-        public
-        view
-        returns (address, uint64, bool)
-    {
-        return getPendingAddress(_pYD);
-    }
+    bytes32 public constant ROLE_FEE_RECIPIENT = keccak256('ROLE_FEE_RECIPIENT');
 
     /**
      * @notice Withdraw accumulated fees for a specific token
-     * @param t Token address to withdraw fees for
+     * @param token Token address to withdraw fees for
      * @return success Whether withdrawal succeeded
-     * @dev Only fee address can withdraw. Withdraws all accumulated fees for the token.
+     * @dev Only fee recipient role can withdraw. Withdraws all accumulated fees for the token.
      */
-    function withdrawFees(address t) public nonReentrant returns (bool) {
-        if (_msgSender() != escrowFeeAddress) revert NotFeeAddress(_msgSender(), escrowFeeAddress);
-        uint256 f = totalFeesPerToken[t];
-        if (f == 0) revert NoFeesToWithdraw(t, f);
-        totalFeesPerToken[t] = 0;
-        IERC20(t).safeTransfer(escrowFeeAddress, f);
-        emit FeesWithdrawn(t, f);
+    function withdrawFees(address token) external onlyRole(ROLE_FEE_RECIPIENT) nonReentrant returns (bool) {
+        uint256 feeAmount = totalFeesPerToken[token];
+        if (feeAmount == 0) revert NoFeesToWithdraw(token, feeAmount);
+        
+        // Check balance before clearing state (checks-effects-interactions pattern)
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        if (balance < feeAmount) {
+            revert InsufficientContractBalance(token, feeAmount, balance);
+        }
+        
+        // Clear state AFTER successful transfer to prevent fee loss on failure
+        // Note: If transfer fails, revert will restore state (Solidity 0.8+ automatic)
+        IERC20(token).safeTransfer(escrowFeeAddress, feeAmount);
+        totalFeesPerToken[token] = 0;
+        
+        emit FeesWithdrawn(token, feeAmount);
         return true;
     }
 
     /**
      * @notice Recover ERC20 tokens (excluding escrow balances and fees)
-     * @param t Token address to recover
-     * @param r Recipient address
-     * @param a Amount to recover (0 = recover all excess)
+     * @param token Token address to recover
+     * @param recipient Recipient address
+     * @param amount Amount to recover (0 = recover all excess)
      * @return success Whether recovery succeeded
      * @dev Only recovers tokens beyond escrow balances and fees. Requires ROLE_TIMELOCK.
+     *      PRIORITY: Simplified to use safeTransfer directly, removed RecoveryLibrary dependency.
      */
     function recoverERC20(
-        address t,
-        address r,
-        uint256 a
+        address token,
+        address recipient,
+        uint256 amount
     ) external override onlyRole(ROLE_TIMELOCK) nonReentrant returns (bool) {
-        uint256 bal = IERC20(t).balanceOf(address(this));
-        uint256 esc = totalHeldInEscrowPerToken[t];
-        uint256 fee = totalFeesPerToken[t];
-        uint256 rec = a == 0 ? (bal > esc + fee ? bal - esc - fee : 0) : a;
-        rec = RecoveryLibrary.recoverERC20(t, r, rec, bal);
-        emit ERC20Recovered(t, r, rec);
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        uint256 protected = totalHeldInEscrowPerToken[token] + totalFeesPerToken[token];
+        uint256 available = balance > protected ? balance - protected : 0;
+        uint256 recoveryAmount = amount == 0 ? available : amount;
+        
+        if (recoveryAmount == 0 || recoveryAmount > available) {
+            revert AmountExceedsAvailable(token, recoveryAmount, available);
+        }
+        
+        IERC20(token).safeTransfer(recipient, recoveryAmount);
+        emit ERC20Recovered(token, recipient, recoveryAmount);
         return true;
     }
+
+    // PRIORITY 5: Removed getAccountingDelta and reconcileAccounting
+    // These functions have been removed to reduce contract size.
+    // Off-chain monitoring can track accounting deltas via events and public storage.
+    // If reconciliation is needed, it can be done via a separate AccountingOps contract.
 }

@@ -107,12 +107,14 @@ describe('Escalation Fee Handling', function () {
     await escrowableERC20.connect(owner).activateResolutionModule();
 
     // Also set default resolution module (for EscrowableERC20)
+    // EscrowableERC20 uses consolidated module management functions
+    // ModuleType.RESOLUTION = 0
     await escrowableERC20
       .connect(owner)
-      .queueDefaultResolutionModule(await decentralizedModule.getAddress());
-    const [, defaultEta] = await escrowableERC20.getPendingDefaultResolutionModule();
+      .queueDefaultModule(0, await decentralizedModule.getAddress()); // RESOLUTION
+    const [, defaultEta] = await escrowableERC20.getPendingDefaultModule(0); // RESOLUTION
     await time.increaseTo(Number(defaultEta) + 1);
-    await escrowableERC20.connect(owner).activateDefaultResolutionModule();
+    await escrowableERC20.connect(owner).activateDefaultModule(0); // RESOLUTION
   });
 
   describe('Escalation Fee Collection', function () {

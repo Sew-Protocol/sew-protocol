@@ -128,21 +128,23 @@ describe('Core Contracts - Coverage Tests', function () {
     await escrowVault.connect(owner).activateDefaultReleaseStrategy();
     await escrowVault.connect(owner).activateDefaultYieldDistributionModule();
 
+    // EscrowableERC20 uses consolidated module management functions
+    // ModuleType: RESOLUTION=0, RELEASE=1, YIELD_GEN=2, YIELD_DIST=3
     await escrowableERC20
       .connect(owner)
-      .queueDefaultResolutionModule(await resolutionModule.getAddress());
+      .queueDefaultModule(0, await resolutionModule.getAddress()); // RESOLUTION
     await escrowableERC20
       .connect(owner)
-      .queueDefaultReleaseStrategy(await releaseStrategy.getAddress());
+      .queueDefaultModule(1, await releaseStrategy.getAddress()); // RELEASE
     await escrowableERC20
       .connect(owner)
-      .queueDefaultYieldDistributionModule(await yieldDistributionModule.getAddress());
+      .queueDefaultModule(3, await yieldDistributionModule.getAddress()); // YIELD_DIST
 
-    const [, eta2] = await escrowableERC20.getPendingDefaultResolutionModule();
+    const [, eta2] = await escrowableERC20.getPendingDefaultModule(0); // RESOLUTION
     await time.increaseTo(Number(eta2) + 1);
-    await escrowableERC20.connect(owner).activateDefaultResolutionModule();
-    await escrowableERC20.connect(owner).activateDefaultReleaseStrategy();
-    await escrowableERC20.connect(owner).activateDefaultYieldDistributionModule();
+    await escrowableERC20.connect(owner).activateDefaultModule(0); // RESOLUTION
+    await escrowableERC20.connect(owner).activateDefaultModule(1); // RELEASE
+    await escrowableERC20.connect(owner).activateDefaultModule(3); // YIELD_DIST
 
     // Transfer tokens
     await token1.transfer(buyer.address, ethers.parseEther('10000'));
@@ -319,7 +321,6 @@ describe('Core Contracts - Coverage Tests', function () {
         yieldEnabled: false,
         autoReleaseTime: 0,
         autoCancelTime: autoCancelTime,
-        escrowType: 0,
       };
       const tx = await escrowVault
         .connect(buyer)
@@ -348,7 +349,6 @@ describe('Core Contracts - Coverage Tests', function () {
         yieldEnabled: false,
         autoReleaseTime: 0,
         autoCancelTime: autoCancelTime,
-        escrowType: 0,
       };
 
       await escrowVault
@@ -645,8 +645,7 @@ describe('Core Contracts - Coverage Tests', function () {
         customResolver: ethers.ZeroAddress,
         yieldEnabled: false,
         autoReleaseTime: 0,
-        autoCancelTime: 0,
-        escrowType: 0,
+        autoCancelTime: 0
       };
       const tx = await escrowVault
         .connect(buyer)
@@ -660,28 +659,7 @@ describe('Core Contracts - Coverage Tests', function () {
       expect(retrieved.escrowType).to.equal(0); // STANDARD
     });
 
-    it('Should update escrow settings', async function () {
-      await token1.connect(buyer).approve(await escrowVault.getAddress(), INITIAL_AMOUNT);
-      const tx = await escrowVault
-        .connect(buyer)
-        .createEscrow(await token1.getAddress(), seller.address, INITIAL_AMOUNT);
-      await tx.wait();
-      const workflowId = Number(await escrowVault.nextWorkflowId()) - 1;
-
-      const currentTime = await time.latest();
-      const newSettings = {
-        customResolver: ethers.ZeroAddress,
-        yieldEnabled: false,
-        autoReleaseTime: currentTime + 7 * 24 * 60 * 60,
-        autoCancelTime: 0,
-        escrowType: 0,
-      };
-
-      await escrowVault.updateEscrowSettings(workflowId, newSettings);
-
-      const retrieved = await escrowVault.getEscrowSettings(workflowId);
-      expect(retrieved.autoReleaseTime).to.equal(newSettings.autoReleaseTime);
-    });
+    // NOTE: updateEscrowSettings() was removed to enforce strict snapshot immutability.
 
     it('Should get attachments', async function () {
       await token1.connect(buyer).approve(await escrowVault.getAddress(), INITIAL_AMOUNT);
@@ -727,8 +705,7 @@ describe('Core Contracts - Coverage Tests', function () {
         customResolver: ethers.ZeroAddress,
         yieldEnabled: false,
         autoReleaseTime: 0,
-        autoCancelTime: 0,
-        escrowType: 0,
+        autoCancelTime: 0
       };
       const tx = await escrowVault
         .connect(buyer)
@@ -753,7 +730,6 @@ describe('Core Contracts - Coverage Tests', function () {
         yieldEnabled: false,
         autoReleaseTime: autoReleaseTime,
         autoCancelTime: autoCancelTime,
-        escrowType: 0,
       };
       const tx = await escrowVault
         .connect(buyer)
@@ -885,8 +861,7 @@ describe('Core Contracts - Coverage Tests', function () {
         customResolver: ethers.ZeroAddress,
         yieldEnabled: false,
         autoReleaseTime: 0,
-        autoCancelTime: 0,
-        escrowType: 0,
+        autoCancelTime: 0
       };
       const tx = await escrowableERC20
         .connect(buyer)

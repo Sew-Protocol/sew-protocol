@@ -6,11 +6,14 @@ import '../../../contracts/decentralized-resolution-module/ResolverIncentiveModu
 import '../../../contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol';
 import '../../../contracts/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
 import '../../../contracts/core/EscrowVault.sol';
+import '../../../contracts/core/BaseEscrow.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/decentralized-resolution-module/DecentralizedResolverStructs.sol';
 import '../../../contracts/YieldOps.sol';
 import '../../../contracts/DisputeOps.sol';
-
+import '../../../contracts/core/ModuleManagementContract.sol';
+import '../../../contracts/libraries/SettingsValidationLibrary.sol';
+import '../../../contracts/types/EscrowTypes.sol';
 /**
  * @title EscalationDepthHistogram Integration Tests
  * @notice Integration tests for histogram updates during actual dispute escalation flows
@@ -24,6 +27,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
     ERC20Mock public token;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
+    ModuleManagementContract public moduleManagement;
 
     address public deployer;
     address public timelock;
@@ -59,9 +63,10 @@ contract EscalationDepthHistogramIntegrationTest is Test {
         resolutionModule = new DecentralizedResolutionModule(deployer);
 
         // Deploy escrow
-        yieldOps = new YieldOps();
+        yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps();
-        escrow = new EscrowVault(100, makeAddr('feeAddress'), address(yieldOps), address(disputeOps));
+        moduleManagement = new ModuleManagementContract(address(this));
+        escrow = new EscrowVault(100, makeAddr('feeAddress'), address(yieldOps), address(disputeOps), address(moduleManagement));
 
         // Setup roles - deployer has DEFAULT_ADMIN_ROLE from constructors
         bytes32 ROLE_TIMELOCK = resolutionModule.ROLE_TIMELOCK();
@@ -85,9 +90,9 @@ contract EscalationDepthHistogramIntegrationTest is Test {
         
         // Configure resolution module in escrow (required for dispute operations)
         vm.startPrank(deployer);
-        escrow.queueResolutionModule(address(resolutionModule));
+        escrow.queueDefaultModule(BaseEscrow.ModuleType.RESOLUTION, address(resolutionModule));
         vm.warp(block.timestamp + 7 days + 1);
-        escrow.activateResolutionModule();
+        escrow.activateDefaultModule(BaseEscrow.ModuleType.RESOLUTION);
         vm.stopPrank();
 
         // Setup resolvers - first appoint seniorResolver via timelock, then it can appoint others
@@ -141,8 +146,9 @@ contract EscalationDepthHistogramIntegrationTest is Test {
         vm.prank(user1);
         token.approve(address(escrow), ESCROW_AMOUNT);
         
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
         vm.prank(user1);
-        uint256 workflowId = escrow.createEscrow(address(token), user2, ESCROW_AMOUNT);
+        uint256 workflowId = escrow.createEscrow(address(token), user2, ESCROW_AMOUNT, settings);
 
         // Verify initial histogram state
         (uint256 round0, uint256 round1, uint256 round2) = incentiveModule.getEscalationDepthHistogram();
@@ -163,6 +169,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
         vm.prank(address(escrow));
         incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
             workflowId,
+            user1,
             user1,
             BOND_AMOUNT,
             address(0),
@@ -185,14 +192,16 @@ contract EscalationDepthHistogramIntegrationTest is Test {
         vm.prank(user1);
         token.approve(address(escrow), ESCROW_AMOUNT);
         
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
         vm.prank(user1);
-        uint256 workflowId = escrow.createEscrow(address(token), user2, ESCROW_AMOUNT);
+        uint256 workflowId = escrow.createEscrow(address(token), user2, ESCROW_AMOUNT, settings);
 
         // Record bond at round 1
         vm.deal(address(escrow), BOND_AMOUNT * 2); // Enough for both rounds
         vm.prank(address(escrow));
         incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
             workflowId,
+            user1,
             user1,
             BOND_AMOUNT,
             address(0),
@@ -207,6 +216,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
         vm.prank(address(escrow));
         incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
             workflowId,
+            user1,
             user1,
             BOND_AMOUNT,
             address(0),
@@ -232,14 +242,16 @@ contract EscalationDepthHistogramIntegrationTest is Test {
             vm.prank(user1);
             token.approve(address(escrow), ESCROW_AMOUNT);
             
+            EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
             vm.prank(user1);
-            uint256 workflowId = escrow.createEscrow(address(token), user2, ESCROW_AMOUNT);
+            uint256 workflowId = escrow.createEscrow(address(token), user2, ESCROW_AMOUNT, settings);
 
             // Record bond at round 1 for each
             vm.deal(address(escrow), BOND_AMOUNT * (i + 1));
             vm.prank(address(escrow));
             incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
                 workflowId,
+                user1,
                 user1,
                 BOND_AMOUNT,
                 address(0),
@@ -258,6 +270,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
         vm.prank(address(escrow));
         incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
             1, // workflowId 1
+            user1,
             user1,
             BOND_AMOUNT,
             address(0),
@@ -284,6 +297,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
         incentiveModule.recordAppealBond{value: 0}(
             1,
             user1,
+            user1,
             0,
             address(0),
             1
@@ -299,6 +313,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
         vm.expectRevert();
         incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
             1,
+            user1,
             user1,
             BOND_AMOUNT,
             address(0),
@@ -326,6 +341,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
             incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
                 i,
                 user1,
+                user1,
                 BOND_AMOUNT,
                 address(0),
                 1
@@ -338,6 +354,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
             incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
                 i,
                 user1,
+                user1,
                 BOND_AMOUNT,
                 address(0),
                 2
@@ -349,6 +366,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
             workflowIds[i] = i;
             incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
                 i,
+                user1,
                 user1,
                 BOND_AMOUNT,
                 address(0),

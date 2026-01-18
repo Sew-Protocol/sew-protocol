@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+import "../../../contracts/types/YieldPresets.sol";
+pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
 import 'contracts/YieldOps.sol';
 import 'contracts/DisputeOps.sol';
+import 'contracts/core/ModuleManagementContract.sol';
 import 'contracts/token/SewToken.sol';
 import 'contracts/core/EscrowableERC20.sol';
 import 'contracts/core/EscrowVault.sol';
@@ -15,6 +17,7 @@ contract Test_MainnetReleaseSequence_test is Test {
     SewToken public governanceToken;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
+    ModuleManagementContract public moduleManagement;
     EscrowableERC20 public escrowable;
     EscrowVault public vault;
     DefaultReleaseStrategy public relStrat;
@@ -29,7 +32,7 @@ contract Test_MainnetReleaseSequence_test is Test {
     uint256 constant INITIAL_TOKEN_SUPPLY = 10_000_000 ether;
 
     function setUp() public {
-        yieldOps = new YieldOps();
+        yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps();
         // Deploy governance token
         governanceToken = new SewToken('Sew Token', 'SEW', deployer, INITIAL_TOKEN_SUPPLY);
@@ -48,7 +51,8 @@ contract Test_MainnetReleaseSequence_test is Test {
             address(yieldOps),
             address(disputeOps)
         );
-        vault = new EscrowVault(100, feeAddress, address(yieldOps), address(disputeOps));
+        moduleManagement = new ModuleManagementContract(address(this));
+        vault = new EscrowVault(100, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
     }
 
     function test_stage0_and_stage1_deployments_and_role_transfers() public {

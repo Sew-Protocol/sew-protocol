@@ -1,109 +1,139 @@
-# Documentation Index
+# Documentation
 
-Welcome to the protocol documentation. This directory contains comprehensive documentation organized by topic.
+Welcome to the protocol documentation. This directory contains comprehensive documentation for the escrow protocol, including technical specifications, implementation guides, and operational procedures.
 
-## 📚 Core Documentation
+## Core Documents (Start Here)
 
-- **[README.md](./README.md)** - This file (documentation index)
-- **[TECHNICAL_OVERVIEW.md](./TECHNICAL_OVERVIEW.md)** - Technical overview and architecture
-- **[WHITEPAPER.md](./WHITEPAPER.md)** - Protocol whitepaper
-- **[SECURITY_MODEL.md](./SECURITY_MODEL.md)** - Security model and threat analysis
-- **[CONTRIBUTING.md](./CONTRIBUTING.md)** - Contribution guidelines
+- **[README.md](./README.md)** - This file - overview of documentation structure
+- **[WHITEPAPER.md](./WHITEPAPER.md)** - Comprehensive protocol whitepaper
 
-## 📁 Documentation Structure
+## Quick Access to Important Documents
 
-### [test/](./test/) - Testing Documentation
+- **[Document Index](./INDEX.md)** - Complete index of all documents
+- **[Technical Overview](./architecture/TECHNICAL_OVERVIEW.md)** - High-level technical overview
+- **[Security Model](./reviews/SECURITY_MODEL.md)** - Security model and threat analysis
+- **[Contributing Guide](./guides/CONTRIBUTING.md)** - Contributing guidelines
+- **[Coding Standards](./guides/CODING_STANDARDS.md)** - Code style and standards
 
-Comprehensive testing documentation including test plans, guidelines, status reports, and migration notes.
+## Documentation Structure
 
-**Key Documents:**
+### `/architecture/` - System Architecture
+- Architecture overview
+- Escrow creation and settings
+- Protocol fees and yield distribution
 
-- [TESTING.md](./test/TESTING.md) - Main testing guide
-- [Testing Guidelines](./test/Testing_guidelines.md)
-- [Test Plans](./test/)
+### `/dispute-resolution/` - Dispute Resolution System
+- Decentralized resolution module documentation
+- Resolver economics and incentives
+- Dispute resolution workflows
 
-### [coverage/](./coverage/) - Test Coverage
+### `/governance/` - Governance Documentation
+- Governance processes and procedures
+- Governance surface mapping
+- Emergency policies
 
-Documentation related to test coverage strategy, reporting, and goals.
+### `/implementation/` - Implementation Details
+- Implementation summaries and reviews
+- Feature implementation status
+- Implementation plans
 
-### [governance/](./governance/) - Governance
+### `/deployment/` - Deployment & Configuration
+- Chain configuration
+- Deployment checklists
+- Verification procedures
 
-Governance-related documentation including processes, surface maps, and implementation status.
+### `/status/` - Status & Progress
+- Implementation status reports
+- Outstanding issues
+- Progress tracking
 
-### [guides/](./guides/) - Integration Guides
+### `/summaries/` - Summaries
+- Feature summaries
+- Review responses
+- Implementation summaries
 
-Step-by-step guides for integrating with external services and modules.
+### `/reviews/` - Reviews & Audits
+- Security reviews
+- Contract reviews
+- Audit reports
 
-**Available Guides:**
+### `/test/` - Testing Documentation
+- Test plans and strategies
+- Test coverage reports
+- Testing guidelines
 
-- [Kleros Integration Guide](./guides/KLEROS_INTEGRATION_GUIDE.md)
-- [Aave Provider Validation](./guides/AAVE_PROVIDER_VALIDATION.md)
+### `/plans/` - Development Plans
+- Feature implementation plans
+- Roadmap items
+- Planning documents
 
-### [reference/](./reference/) - Reference Documentation
+### `/proposals/` - Proposals
+- Feature proposals
+- Improvement proposals
+- Design proposals
 
-Reference materials including module maps, versioning policies, and standardization docs.
+### `/reference/` - Reference Materials
+- API references
+- Standards and conventions
+- Technical references
 
-### [reviews/](./reviews/) - Code Reviews & Audits
+### `/guides/` - User Guides
+- User-facing guides
+- Developer guides
+- Operational guides
 
-Security reviews, audits, and code review documentation.
+### `/policies/` - Policies
+- Upgrade policies
+- Emergency policies
+- Operational policies
 
-### [plans/](./plans/) - Implementation Plans
+### `/migrations/` - Migration Guides
+- Migration procedures
+- Upgrade guides
+- Migration notes
 
-Development plans, implementation strategies, and technical proposals.
+### `/investigations/` - Investigations
+- Technical investigations
+- Issue analysis
+- Research documents
 
-### [policies/](./policies/) - Policies
+### `/token/` - Token Documentation
+- Tokenomics
+- Token specifications
+- Token-related documentation
 
-Protocol policies including upgrade policies, emergency procedures, and controls.
+### `/audits/` - Audit Documentation
+- Security audits
+- Code audits
+- Audit reports
 
-### [status/](./status/) - Status Reports
+### `/archived/` - Archived Documents
+- Completed or superseded documentation
+- Historical records
 
-Implementation status reports, completion summaries, and progress tracking.
+## Quick Links
 
-### [migrations/](./migrations/) - Migration Guides
+- [Document Index](./INDEX.md) - Complete index of all documents
+- [Contributing Guide](./guides/CONTRIBUTING.md) - How to contribute
+- [Coding Standards](./guides/CODING_STANDARDS.md) - Code style guide
 
-Documentation for migrating between versions or frameworks.
+## Document Organization
 
-### [setup/](./setup/) - Setup & Deployment
+### Current Documentation
+Important, actively maintained documentation is organized in top-level directories:
+- `architecture/` - System architecture and design
+- `dispute-resolution/` - Dispute resolution system
+- `governance/` - Governance processes
+- `policies/` - Protocol policies
+- `deployment/` - Deployment guides
+- `reference/` - Technical references
+- `guides/` - User and developer guides
+- `reviews/` - Security reviews and audits
+- `token/` - Token documentation
 
-Documentation for setup, deployment, CI/CD, and mainnet checklists.
+### Historical Documentation
+Completed, superseded, or historical documentation is organized in:
+- `more/` - Additional historical documents (implementation notes, plans, status reports, test plans, etc.)
+- `archived/` - Archived or superseded documentation
 
-### [architecture/](./architecture/) - Architecture
-
-Architectural documentation, design principles, and analysis documents.
-
-## 🗂️ Other Directories
-
-- **[analysis/](./analysis/)** - Analysis documents
-- **[dispute-resolution/](./dispute-resolution/)** - Dispute resolution module documentation
-- **[investigations/](./investigations/)** - Investigation documents
-- **[summaries/](./summaries/)** - Implementation summaries
-- **[token/](./token/)** - Token-related documentation
-- **[comms/](./comms/)** - Communication and community documents
-- **[priorities/](./priorities/)** - Priority documents
-- **[proposals/](./proposals/)** - Technical proposals
-- **[archived/](./archived/)** - Archived documentation
-
-## 📖 Quick Links
-
-### For Developers
-
-- [Contributing Guide](./CONTRIBUTING.md)
-- [Technical Overview](./TECHNICAL_OVERVIEW.md)
-- [Testing Guide](./test/TESTING.md)
-- [Module Development Guide](./reference/MODULE_DEVELOPMENT_GUIDE.md)
-
-### For Auditors
-
-- [Security Model](./SECURITY_MODEL.md)
-- [Audit Reports](./reviews/AUDIT.md)
-- [Code Reviews](./reviews/)
-
-### For Users
-
-- [Whitepaper](./WHITEPAPER.md)
-- [Governance Process](./governance/GOVERNANCE_PROCESS.md)
-- [Emergency Policy](./policies/EMERGENCY_POLICY.md)
-
----
-
-**Note:** See `_DOCUMENT_INDEX.md` for a detailed index of all documents.
+For a complete list of all documents, see the [Document Index](./INDEX.md).

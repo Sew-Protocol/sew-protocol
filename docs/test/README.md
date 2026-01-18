@@ -1,6 +1,6 @@
 # Testing Documentation
 
-This directory contains all testing-related documentation for the protocol.
+This directory contains essential testing guidelines and documentation for the protocol.
 
 ## Overview
 
@@ -11,41 +11,10 @@ The protocol uses a **hybrid testing approach** with both Hardhat (TypeScript) a
 
 ## Key Documents
 
-### Getting Started
+### Testing Guidelines
 
-- **[TESTING.md](./TESTING.md)** - Comprehensive testing guide and guidelines
-- **[Testing_guidelines.md](./Testing_guidelines.md)** - Testing guidelines and best practices
-- **[TESTING_GUIDELINES_ASSESSMENT.md](./TESTING_GUIDELINES_ASSESSMENT.md)** - Assessment of testing guidelines adherence
-
-### Test Plans & Strategies
-
-- **[TESTING_ADHERENCE_PLAN.md](./TESTING_ADHERENCE_PLAN.md)** - Plan for achieving testing adherence
-- **[TOP_10_TESTING_PRIORITIES.md](./TOP_10_TESTING_PRIORITIES.md)** - Top 10 testing priorities
-- **[FORGE_TEST_EXPANSION_SUMMARY.md](./FORGE_TEST_EXPANSION_SUMMARY.md)** - Summary of Foundry test expansion
-
-### Test Execution & Status
-
-- **[TEST_STATUS_REPORT.md](./TEST_STATUS_REPORT.md)** - Current test status report
-- **[TESTING_ADHERENCE_COMPLETE.md](./TESTING_ADHERENCE_COMPLETE.md)** - Completion status of testing adherence
-- **[TESTING_ADHERENCE_INDEX.md](./TESTING_ADHERENCE_INDEX.md)** - Index of testing adherence coverage
-- **[TEST_UPDATE_SUMMARY_2026-01-09.md](./TEST_UPDATE_SUMMARY_2026-01-09.md)** - Test update summary
-
-### Migration & Maintenance
-
-- **[TEST_MIGRATION_NOTE.md](./TEST_MIGRATION_NOTE.md)** - Notes on test migration
-- **[TEST_UPDATE_PROMPT.md](./TEST_UPDATE_PROMPT.md)** - Prompt for test updates
-- **[DISABLED_TESTS_FIX_GUIDE.md](./DISABLED_TESTS_FIX_GUIDE.md)** - Guide for fixing disabled tests
-
-### Module-Specific Tests
-
-- **[FIX_INCENTIVE_MODULE_TESTS_PROMPT.md](./FIX_INCENTIVE_MODULE_TESTS_PROMPT.md)** - Prompt for fixing incentive module tests
-- **[INCENTIVE_MODULE_TEST_PLAN.md](./INCENTIVE_MODULE_TEST_PLAN.md)** - Test plan for incentive module
-- **[ESCALATION_DEPTH_HISTOGRAM_REVIEW.md](./ESCALATION_DEPTH_HISTOGRAM_REVIEW.md)** - Review and test strategy for escalation depth histogram
-- **[ESCALATION_DEPTH_HISTOGRAM_TEST_IMPLEMENTATION.md](./ESCALATION_DEPTH_HISTOGRAM_TEST_IMPLEMENTATION.md)** - Implementation summary for histogram tests
-
-### Production Testing
-
-- **[MAINNET_RELEASE_SEQUENCE_TESTS.md](./MAINNET_RELEASE_SEQUENCE_TESTS.md)** - Tests for mainnet release sequence
+- **[TESTING.md](./TESTING.md)** - Comprehensive testing guide and framework overview
+- **[Testing_guidelines.md](./Testing_guidelines.md)** - Testing best practices and guidelines
 
 ## Test Structure
 
@@ -57,27 +26,35 @@ test/
 │   └── ...
 └── foundry/          # Solidity unit and invariant tests
     ├── core/         # Core contract comprehensive tests
-    ├── decentralized-resolution-module/  # DRM tests
+    ├── invariants/   # Invariant tests
+    ├── priorities/   # Top 10 priority test suites
     └── ...
 ```
 
-## Running Tests
+## Historical Test Documentation
 
-```bash
-# Run all tests
-pnpm test
+Historical test plans, status reports, and implementation tasks have been moved to `docs/more/test/` for reference.
 
-# Run only Hardhat tests
-pnpm test:hardhat
+## Quick Reference
 
-# Run only Foundry tests
-pnpm test:foundry
+### When to Use Forge vs Hardhat
 
-# Generate coverage report
-pnpm coverage
-```
+**Use Forge when:**
+- Testing pure contract logic (math, state machines, accounting)
+- You want fuzzing / property tests
+- You need fast iteration on tricky corner cases
+- You're testing revert reasons / custom errors precisely
+- You want gas assertions and deterministic EVM-level behavior
+
+**Use Hardhat when:**
+- You need end-to-end flows that mirror how users/ops interact
+- Testing deployment + initialization ordering
+- Testing governance lane changes / timelock flows
+- Testing role assignments and access control
+- Testing integration with external contracts
+- Testing upgrade flows and storage layout
 
 ## See Also
 
-- [Coverage Documentation](../coverage/README.md)
-- [Main Documentation](../README.md)
+- [Contributing Guide](../guides/CONTRIBUTING.md) - General contributing guidelines
+- [Coding Standards](../guides/CODING_STANDARDS.md) - Code style and standards

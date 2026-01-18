@@ -3,6 +3,7 @@ pragma solidity ^0.8.33;
 
 import '../../shared/interfaces/IResolutionModule.sol';
 import '@openzeppelin/contracts/access/AccessControl.sol';
+import '../../types/EscrowTypes.sol';
 
 /**
  * @title DefaultResolutionModule
@@ -18,6 +19,8 @@ contract DefaultResolutionModule is AccessControl, IResolutionModule {
     event ResolverUpdated(address indexed oldResolver, address indexed newResolver);
 
     constructor(address initialOwner, address initialResolver) {
+        if (initialOwner == address(0)) revert InvalidAddress('Initial owner cannot be zero', initialOwner);
+        if (initialResolver == address(0)) revert InvalidAddress('Initial resolver cannot be zero', initialResolver);
         resolver = initialResolver;
         // Grant DEFAULT_ADMIN_ROLE to initialOwner so roles can be granted later
         _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);

@@ -9,7 +9,7 @@ import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/YieldOps.sol';
 import '../../../contracts/DisputeOps.sol';
-
+import '../../../contracts/core/ModuleManagementContract.sol';
 /**
  * @title AppealBondDistributionTest
  * @notice Unit tests for distributeAppealBond functionality
@@ -22,6 +22,7 @@ contract AppealBondDistributionTest is Test {
     ERC20Mock public token;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
+    ModuleManagementContract public moduleManagement;
 
     address public deployer;
     address public depositor;
@@ -46,9 +47,10 @@ contract AppealBondDistributionTest is Test {
         paymentLib = new PaymentCalculationLibraryV1();
         incentiveModule = new ResolverIncentiveModuleV2(deployer, address(paymentLib));
         token = new ERC20Mock('Test Token', 'TEST', address(this), 0);
-        yieldOps = new YieldOps();
+        yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps();
-        escrow = new EscrowVault(100, feeAddress, address(yieldOps), address(disputeOps));
+        moduleManagement = new ModuleManagementContract(address(this));
+        escrow = new EscrowVault(100, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
 
         // Setup tokens
         token.mint(depositor, INITIAL_BALANCE);
@@ -65,11 +67,13 @@ contract AppealBondDistributionTest is Test {
      * @notice Helper to record a bond
      */
     function _recordBond(uint256 workflowId, uint8 round) internal {
+        // Approve incentive module to pull tokens (pull-based pattern)
         vm.prank(depositor);
-        token.transfer(address(incentiveModule), BOND_AMOUNT);
+        token.approve(address(incentiveModule), BOND_AMOUNT);
 
+        // Record bond - incentive module will pull tokens from depositor
         vm.prank(address(escrow));
-        incentiveModule.recordAppealBond(workflowId, depositor, BOND_AMOUNT, address(token), round);
+        incentiveModule.recordAppealBond(workflowId, depositor, depositor, BOND_AMOUNT, address(token), round);
     }
 
     /**

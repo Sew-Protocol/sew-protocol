@@ -2,14 +2,38 @@
 
 Complete mapping of all governance functions to roles, lanes, and delays.
 
+## Deployment defaults (source: `config/governance.config.ts`)
+
+These are **deployment-time defaults** (can be overridden via environment variables in deployment tooling). Exchanges/auditors should verify the deployed on-chain values.
+
+### Governance token (SEW)
+- **Name (default):** `Sew Token`
+- **Symbol (default):** `SEW`
+- **Initial supply (default):** `1,000,000,000 SEW` (18 decimals)
+
+### Timelock / lanes
+- **Timelock minDelay (default):** 48 hours (`TIMELOCK_DELAY=172800`)
+- **Slow lane wall-clock:** ~9 days (48h queue + 7d wait + 48h activate)
+
+### Governor parameters (defaults)
+- **Voting delay:** 1 block
+- **Voting period:** ~1 week (`VOTING_PERIOD=45818` blocks)
+- **Proposal threshold:** 10,000,000 SEW (1% of supply)
+- **Quorum:** 4% (`QUORUM_BPS=400`)
+
+### Guardian / Safe
+- **Guardian multisig:** configured via `GUARDIAN_MULTISIG`
+- **Safe threshold (default):** 3 (3-of-N owners)
+- **Fee recipient (deployment config):** `FEE_RECIPIENT` (feeds into protocol fee recipient configuration)
+
 ## Role Permissions Matrix
 
-| Role                   | Standard Lane       | Slow Lane                | Emergency Lane      | Notes          |
-| ---------------------- | ------------------- | ------------------------ | ------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| **DAO (Governor)**     | Propose & Vote      | Propose & Vote           | Cannot execute      | Cannot execute | Proposals go through Timelock                                                                                                 |
-| **TimelockController** | Execute (48h delay) | Execute (48h + 7d delay) | Cannot execute      | N/A            | Only executor for Standard/Slow. Emergency lane functions are guarded by `onlyRole(ROLE_GUARDIAN)`; Timelock lacks this role. |
-| **Guardian Multisig**  | Cannot execute      | Cannot execute           | Execute (immediate) | Cannot execute | Down-only powers                                                                                                              |
-| **Fee Recipient**      | None                | None                     | None                | None           | Can only withdraw fees                                                                                                        |
+| Role                   | Standard Lane       | Slow Lane                | Emergency Lane      | Notes |
+| ---------------------- | ------------------- | ------------------------ | ------------------- | ----- |
+| **DAO (Governor)**     | Propose & Vote      | Propose & Vote           | Cannot execute      | Proposals execute through Timelock |
+| **TimelockController** | Execute (48h delay) | Execute (48h + 7d delay) | Cannot execute      | Emergency lane functions are guarded by `onlyRole(ROLE_GUARDIAN)`; Timelock lacks this role |
+| **Guardian Multisig**  | Cannot execute      | Cannot execute           | Execute (immediate) | Down-only powers |
+| **Fee Recipient**      | None                | None                     | None                | Can withdraw fees only (no governance powers) |
 
 ## Governance Lanes
 
@@ -50,6 +74,10 @@ Complete mapping of all governance functions to roles, lanes, and delays.
 | `activateEscrowFeeAddress()`                        | `ROLE_TIMELOCK` | Slow      | 7d + 48h  | -                              | Activate queued fee address                                                                                                                                                             |
 | `queueEscrowFee(uint256)`                           | `ROLE_TIMELOCK` | Slow      | 48h queue | 0 <= fee <= 200 bps            | Queue fee change                                                                                                                                                                        |
 | `activateEscrowFee()`                               | `ROLE_TIMELOCK` | Slow      | 7d + 48h  | -                              | Activate queued fee                                                                                                                                                                     |
+| `queueYieldProtocolFeeBps(uint256)`                 | `ROLE_TIMELOCK` | Slow      | 48h queue | 0 <= fee <= 3000 bps           | Queue yield protocol fee (charged on yield only)                                                                                                                                        |
+| `activateYieldProtocolFeeBps()`                     | `ROLE_TIMELOCK` | Slow      | 7d + 48h  | -                              | Activate queued yield protocol fee                                                                                                                                                      |
+| `queueAppealBondProtocolFeeBps(uint256)`            | `ROLE_TIMELOCK` | Slow      | 48h queue | 0 <= fee <= 3000 bps           | Queue appeal bond protocol fee (charged at bond posting time)                                                                                                                           |
+| `activateAppealBondProtocolFeeBps()`                | `ROLE_TIMELOCK` | Slow      | 7d + 48h  | -                              | Activate queued appeal bond protocol fee                                                                                                                                                 |
 | `queueResolutionModule(address)`                    | `ROLE_TIMELOCK` | Slow      | 48h queue | Non-zero address               | Queue resolution module change (BaseEscrow level)                                                                                                                                       |
 | `activateResolutionModule()`                        | `ROLE_TIMELOCK` | Slow      | 7d + 48h  | -                              | Activate queued resolution module                                                                                                                                                       |
 | `getPendingResolutionModule()`                      | N/A             | N/A       | N/A       | -                              | View pending resolution module change                                                                                                                                                   |

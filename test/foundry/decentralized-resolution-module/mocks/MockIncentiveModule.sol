@@ -68,7 +68,11 @@ contract MockIncentiveModule is IIncentiveModule {
         return (0, address(0));
     }
 
-    function recordAppealBond(uint256, address, uint256, address, uint8) external payable override {}
+    function recordAppealBond(uint256, address, address, uint256, address, uint8) external payable override {}
+
+    function supportsFeature(bytes4) external pure override returns (bool) {
+        return false;
+    }
 
     function distributeAppealBond(uint256, uint8, bool) external override {}
 }

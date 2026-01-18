@@ -10,6 +10,7 @@ import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/YieldOps.sol';
 import '../../../contracts/DisputeOps.sol';
 
+import '../../../contracts/core/ModuleManagementContract.sol';
 /**
  * @title AppealBondRecordingTest
  * @notice Unit tests for recordAppealBond functionality
@@ -22,6 +23,7 @@ contract AppealBondRecordingTest is Test {
     ERC20Mock public token;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
+    ModuleManagementContract public moduleManagement;
 
     address public deployer;
     address public depositor;
@@ -41,9 +43,10 @@ contract AppealBondRecordingTest is Test {
         paymentLib = new PaymentCalculationLibraryV1();
         incentiveModule = new ResolverIncentiveModuleV2(deployer, address(paymentLib));
         token = new ERC20Mock('Test Token', 'TEST', address(this), 0);
-        yieldOps = new YieldOps();
+        yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps();
-        escrow = new EscrowVault(100, feeAddress, address(yieldOps), address(disputeOps));
+        moduleManagement = new ModuleManagementContract(address(this));
+        escrow = new EscrowVault(100, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
 
         // Setup tokens
         token.mint(depositor, INITIAL_BALANCE);
@@ -63,17 +66,13 @@ contract AppealBondRecordingTest is Test {
         uint256 amount = 1 ether;
         uint8 round = 1;
 
-        // Prepare tokens
+        // Prepare tokens - approve incentive module (pull-based pattern)
         vm.prank(depositor);
         token.approve(address(incentiveModule), amount);
 
-        // Assume tokens are transferred to incentive module first
-        vm.prank(depositor);
-        token.transfer(address(incentiveModule), amount);
-
-        // Record bond
+        // Record bond - incentive module will pull tokens from depositor
         vm.prank(address(escrow));
-        incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, amount, address(token), round);
+        incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, depositor, amount, address(token), round);
 
         // Verify bond recorded
         ResolverIncentiveModuleV2.AppealBondRecord memory bond = incentiveModule.getAppealBond(
@@ -99,6 +98,7 @@ contract AppealBondRecordingTest is Test {
         incentiveModule.recordAppealBond{value: amount}(
             WORKFLOW_ID,
             depositor,
+            depositor,
             amount,
             address(0),
             round
@@ -120,16 +120,13 @@ contract AppealBondRecordingTest is Test {
         uint256 amount = 1000e18;
         uint8 round = 2;
 
-        // Prepare and transfer tokens
+        // Prepare tokens - approve incentive module (pull-based pattern)
         vm.prank(depositor);
         token.approve(address(incentiveModule), amount);
 
-        vm.prank(depositor);
-        token.transfer(address(incentiveModule), amount);
-
-        // Record bond
+        // Record bond - incentive module will pull tokens from depositor
         vm.prank(address(escrow));
-        incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, amount, address(token), round);
+        incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, depositor, amount, address(token), round);
 
         // Verify bond recorded
         ResolverIncentiveModuleV2.AppealBondRecord memory bond = incentiveModule.getAppealBond(
@@ -147,21 +144,18 @@ contract AppealBondRecordingTest is Test {
         uint256 amount = 1 ether;
         uint8 round = 1;
 
-        // Transfer tokens
+        // Prepare tokens - approve incentive module
         vm.prank(depositor);
-        token.transfer(address(incentiveModule), amount);
+        token.approve(address(incentiveModule), amount * 2);
 
         // Record first bond
         vm.prank(address(escrow));
-        incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, amount, address(token), round);
+        incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, depositor, amount, address(token), round);
 
-        // Try to record duplicate
-        vm.prank(depositor);
-        token.transfer(address(incentiveModule), amount);
-
+        // Try to record duplicate (should revert)
         vm.prank(address(escrow));
         vm.expectRevert();
-        incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, amount, address(token), round);
+        incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, depositor, amount, address(token), round);
     }
 
     /**
@@ -172,11 +166,11 @@ contract AppealBondRecordingTest is Test {
         uint8 round = 0;
 
         vm.prank(depositor);
-        token.transfer(address(incentiveModule), amount);
+        token.approve(address(incentiveModule), amount);
 
         vm.prank(address(escrow));
         vm.expectRevert();
-        incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, amount, address(token), round);
+        incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, depositor, amount, address(token), round);
     }
 
     /**
@@ -187,11 +181,11 @@ contract AppealBondRecordingTest is Test {
         uint8 round = 3;
 
         vm.prank(depositor);
-        token.transfer(address(incentiveModule), amount);
+        token.approve(address(incentiveModule), amount);
 
         vm.prank(address(escrow));
         vm.expectRevert();
-        incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, amount, address(token), round);
+        incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, depositor, amount, address(token), round);
     }
 
     /**
@@ -203,7 +197,7 @@ contract AppealBondRecordingTest is Test {
 
         vm.prank(address(escrow));
         vm.expectRevert();
-        incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, amount, address(token), round);
+        incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, depositor, amount, address(token), round);
     }
 
     /**
@@ -218,7 +212,7 @@ contract AppealBondRecordingTest is Test {
 
         vm.prank(address(escrow));
         vm.expectRevert();
-        incentiveModule.recordAppealBond(WORKFLOW_ID, address(0), amount, address(token), round);
+        incentiveModule.recordAppealBond(WORKFLOW_ID, address(0), address(0), amount, address(token), round);
     }
 
     /**
@@ -229,13 +223,13 @@ contract AppealBondRecordingTest is Test {
         uint8 round = 1;
 
         vm.prank(depositor);
-        token.transfer(address(incentiveModule), amount);
+        token.approve(address(incentiveModule), amount);
 
         // Call from non-escrow address
         address nonEscrow = makeAddr('nonEscrow');
         vm.prank(nonEscrow);
         vm.expectRevert();
-        incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, amount, address(token), round);
+        incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, depositor, amount, address(token), round);
     }
 
     /**
@@ -246,13 +240,13 @@ contract AppealBondRecordingTest is Test {
         uint8 round = 1;
 
         vm.prank(depositor);
-        token.transfer(address(incentiveModule), amount);
+        token.approve(address(incentiveModule), amount);
 
         vm.prank(address(escrow));
         vm.expectEmit(true, true, true, true);
         emit AppealBondRecorded(WORKFLOW_ID, round, depositor, amount, address(token));
 
-        incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, amount, address(token), round);
+        incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, depositor, amount, address(token), round);
     }
 
     // Event declaration for testing (matching ResolverIncentiveModuleV2)

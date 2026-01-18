@@ -40,7 +40,7 @@ PROXY_KIND=uups pnpm deploy --network baseSepolia
 ## Deploy flow (example)
 
 - `deploy/00_impl.ts` deploys impl for bookkeeping
-- `deploy/10_proxy.ts` deploys proxy + runs initializer
+- `deploy/11_proxy.ts` deploys proxy + runs initializer
 - `deploy/90_post.ts` sanity checks / wiring
 
 ## Production safety notes

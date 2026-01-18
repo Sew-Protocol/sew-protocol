@@ -28,7 +28,8 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
     // ============ DR v2 Structures ============
 
     struct AppealBondRecord {
-        address depositor; // Who deposited the bond
+        address depositor; // Who deposited the bond (for ERC20: escrow contract, for ETH: user)
+        address escalatedBy; // Who initiated the escalation (always the user/escalator)
         uint256 amount; // Bond amount
         address token; // Token address (address(0) = ETH)
         uint256 depositedAt; // Timestamp
@@ -49,6 +50,20 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
 
     // Escalation depth histogram: round => count
     mapping(uint8 => uint256) public escalationDepthHistogram;
+
+    // ============ Token Consistency Enforcement ============
+    
+    /// @dev Enforce single payout token per dispute to prevent token-mixing in claimablePayments
+    /// @dev Set on first payment source (fee or bond), subsequent payments must match
+    mapping(uint256 => address) public payoutToken;
+
+    // ============ Feature Support Constants ============
+    
+    /// @dev Feature ID for appeal bonds support
+    bytes4 public constant FEATURE_APPEAL_BONDS = bytes4(keccak256("APPEAL_BONDS_V1"));
+    
+    /// @dev Feature ID for pull-based ERC20 bonds
+    bytes4 public constant FEATURE_PULL_ERC20_BONDS = bytes4(keccak256("PULL_ERC20_BONDS_V1"));
 
     // ============ DR v2 Constructor ============
 
@@ -116,49 +131,64 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
     }
 
     /**
+     * @notice Check if module supports a specific feature
+     * @param featureId Feature identifier (bytes4 keccak256 hash)
+     * @return supported Whether the feature is supported
+     */
+    function supportsFeature(bytes4 featureId) external pure override returns (bool supported) {
+        return featureId == FEATURE_APPEAL_BONDS || featureId == FEATURE_PULL_ERC20_BONDS;
+    }
+
+    /**
      * @notice Record appeal bond payment (V2)
      * @param workflowId Unique identifier for the dispute
-     * @param depositor Address that deposited bond
+     * @param depositor Address that deposited bond (for ERC20: escrow contract, for ETH: user/escalator)
+     * @param escalatedBy Address that initiated the escalation (always the user/escalator)
      * @param amount Bond amount
      * @param token Token address (address(0) = ETH)
      * @param round Round being appealed to
-     * @dev For ETH bonds: function must be called with msg.value == amount
-     *      For ERC20 bonds: tokens must be transferred to this contract before calling
-     *      This function enforces custody - it verifies funds are actually received
+     * @dev For ETH bonds: MUST be payable and require(msg.value == amount)
+     *      For ETH bonds, depositor MUST equal escalatedBy (user-funded)
+     * @dev For ERC20 bonds: Pulls tokens via safeTransferFrom(depositor, address(this), amount)
+     *      and reverts on transfer failure. Depositor is typically the escrow contract (escrow-funded),
+     *      but escalatedBy tracks the actual escalator for metrics/accounting.
      */
     function recordAppealBond(
         uint256 workflowId,
         address depositor,
+        address escalatedBy,
         uint256 amount,
         address token,
         uint8 round
     ) external payable override onlyEscrowContract {
         require(depositor != address(0), 'Invalid depositor');
+        require(escalatedBy != address(0), 'Invalid escalatedBy');
         require(amount > 0, 'Invalid amount');
         require(round > 0 && round <= 2, 'Invalid round');
         require(appealBonds[workflowId][round].amount == 0, 'Bond already exists');
         require(!appealBonds[workflowId][round].distributed, 'Bond already distributed');
 
-        // Enforce custody: verify funds are actually received
+        // Enforce custody: pull funds atomically
         if (token == address(0)) {
             // ETH bond: require exact msg.value match
             require(msg.value == amount, 'ETH amount mismatch');
+            // For ETH bonds, depositor must be the escalator (user-funded)
+            require(depositor == escalatedBy, 'Depositor must be escalator for ETH bonds');
             // Funds are automatically received via payable
         } else {
-            // ERC20 bond: verify contract has sufficient balance
-            // Escrow contract MUST transfer tokens to this contract BEFORE calling this function
-            // We verify the balance is sufficient (handles fee-on-transfer tokens)
-            uint256 currentBalance = IERC20(token).balanceOf(address(this));
-            require(currentBalance >= amount, 'Insufficient token balance');
-
-            // For fee-on-transfer tokens, escrow should account for fees when transferring
-            // We use the specified amount (escrow is responsible for transferring enough)
-            // If escrow transferred less due to fees, this will revert - escrow must handle fees
+            // ERC20 bond: pull tokens from depositor (pull-based pattern)
+            // This ensures atomicity: if this call reverts, no tokens move
+            // Depositor must approve this contract (the incentive module) for ERC20 bonds
+            IERC20(token).safeTransferFrom(depositor, address(this), amount);
         }
+
+        // Enforce single payout token per dispute (CRITICAL: prevents token-mixing in claimablePayments)
+        _requirePayoutToken(workflowId, token);
 
         // Record bond with actual received amount
         appealBonds[workflowId][round] = AppealBondRecord({
             depositor: depositor,
+            escalatedBy: escalatedBy,
             amount: amount,
             token: token,
             depositedAt: block.timestamp,
@@ -199,17 +229,38 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
         require(!bond.distributed, 'Bond already distributed');
 
         bond.distributed = true;
+        // Clear bond amount for gas refunds and "cannot reuse" clarity
+        uint256 bondAmount = bond.amount;
+        bond.amount = 0;
 
         if (outcomeFlipped) {
             // Appeal succeeded - refund to depositor
-            _refundBond(workflowId, bondRound, bond);
+            _refundBond(workflowId, bondRound, bond, bondAmount);
         } else {
             // Appeal failed - pay to resolvers from prior round
-            _payBondToResolvers(workflowId, round, bond);
+            _payBondToResolvers(workflowId, round, bond, bondAmount);
         }
     }
 
     // ============ Internal DR v2 Functions ============
+
+    /**
+     * @notice Enforce single payout token per dispute
+     * @param workflowId Dispute ID
+     * @param token Token address to check/enforce
+     * @dev Sets payout token on first payment source (fee or bond)
+     *      Subsequent payments must match to prevent token-mixing in claimablePayments
+     */
+    function _requirePayoutToken(uint256 workflowId, address token) internal {
+        address p = payoutToken[workflowId];
+        if (p == address(0)) {
+            // First payment source - set the payout token
+            payoutToken[workflowId] = token;
+        } else {
+            // Subsequent payment - must match
+            require(p == token, 'Mixed payout tokens - bond token must match fee token');
+        }
+    }
 
     /**
      * @notice Refund bond to depositor
@@ -217,22 +268,23 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
     function _refundBond(
         uint256 workflowId,
         uint8 bondRound,
-        AppealBondRecord storage bond
+        AppealBondRecord storage bond,
+        uint256 bondAmount
     ) internal {
         bond.refunded = true;
-        totalBondsRefunded += bond.amount;
+        totalBondsRefunded += bondAmount;
 
         // Transfer bond back to depositor
         if (bond.token == address(0)) {
             // ETH
-            (bool success, ) = bond.depositor.call{value: bond.amount}('');
+            (bool success, ) = bond.depositor.call{value: bondAmount}('');
             require(success, 'ETH refund failed');
         } else {
             // ERC20
-            IERC20(bond.token).safeTransfer(bond.depositor, bond.amount);
+            IERC20(bond.token).safeTransfer(bond.depositor, bondAmount);
         }
 
-        emit AppealBondRefunded(workflowId, bondRound, bond.depositor, bond.amount, bond.token);
+        emit AppealBondRefunded(workflowId, bondRound, bond.depositor, bondAmount, bond.token);
     }
 
     /**
@@ -240,13 +292,15 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
      * @param workflowId Dispute ID
      * @param priorRound Round whose resolvers should receive bond
      * @param bond Bond record
+     * @param bondAmount Bond amount (bond.amount is cleared before this call)
      * @dev Only increments totalBondsPaidToResolvers when actually paid to resolvers
      *      If no resolvers found, bond is retained by protocol (not counted as "paid")
      */
     function _payBondToResolvers(
         uint256 workflowId,
         uint8 priorRound,
-        AppealBondRecord storage bond
+        AppealBondRecord storage bond,
+        uint256 bondAmount
     ) internal {
         bond.refunded = false;
 
@@ -261,7 +315,7 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
                 workflowId,
                 priorRound,
                 new address[](0),
-                bond.amount,
+                bondAmount,
                 bond.token
             );
             return;
@@ -285,18 +339,18 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
                 workflowId,
                 priorRound,
                 new address[](0),
-                bond.amount,
+                bondAmount,
                 bond.token
             );
             return;
         }
 
         // Actually pay to resolvers - increment metric only now
-        totalBondsPaidToResolvers += bond.amount;
+        totalBondsPaidToResolvers += bondAmount;
 
         // Distribute bond equally among resolvers from that round
-        uint256 amountPerResolver = bond.amount / count;
-        uint256 remainder = bond.amount % count; // Handle rounding error
+        uint256 amountPerResolver = bondAmount / count;
+        uint256 remainder = bondAmount % count; // Handle rounding error
 
         // Add to claimable payments for each resolver
         //
@@ -332,7 +386,7 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
             workflowId,
             priorRound,
             actualResolvers,
-            bond.amount,
+            bondAmount,
             bond.token
         );
     }
@@ -356,12 +410,14 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
 
         bond.distributed = true;
         bond.refunded = false;
-        totalBondsForfeited += bond.amount;
+        uint256 bondAmount = bond.amount;
+        bond.amount = 0; // Clear for gas refunds and "cannot reuse" clarity
+        totalBondsForfeited += bondAmount;
 
         // Bond remains in contract as protocol revenue
-        // or could be sent to treasury
+        // Can be withdrawn via sweep function
 
-        emit AppealBondForfeited(workflowId, round, bond.amount, bond.token, reason);
+        emit AppealBondForfeited(workflowId, round, bondAmount, bond.token, reason);
     }
 
     // ============ View Functions (DR v2 Metrics) ============
@@ -439,9 +495,49 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
         address token,
         uint256 totalFees
     ) external virtual override onlyEscrowContract {
+        // Enforce single payout token per dispute (CRITICAL: prevents token-mixing in claimablePayments)
+        _requirePayoutToken(workflowId, token);
         // Delegate to onDisputeResolved for backward compatibility
         // Note: totalFees parameter is ignored as fees are already recorded via recordEscrowFee/recordEscalationFee
         onDisputeResolved(workflowId, token);
+    }
+
+    // ============ Treasury/Admin Functions ============
+
+    /**
+     * @notice Sweep retained bonds (protocol revenue) to treasury
+     * @param token Token address to sweep (address(0) = ETH)
+     * @param to Recipient address (typically treasury)
+     * @param amount Amount to sweep (0 = sweep all)
+     * @dev Restricted to timelock/owner for security
+     * @dev Used to withdraw bonds retained by protocol when no resolvers are found
+     */
+    function sweep(
+        address token,
+        address to,
+        uint256 amount
+    ) external onlyRole(ROLE_TIMELOCK) {
+        require(to != address(0), 'Invalid recipient');
+        
+        if (token == address(0)) {
+            // ETH
+            uint256 balance = address(this).balance;
+            uint256 toTransfer = amount == 0 ? balance : amount;
+            require(toTransfer <= balance, 'Insufficient ETH balance');
+            if (toTransfer > 0) {
+                (bool success, ) = payable(to).call{value: toTransfer}('');
+                require(success, 'ETH transfer failed');
+            }
+        } else {
+            // ERC20
+            IERC20 tokenContract = IERC20(token);
+            uint256 balance = tokenContract.balanceOf(address(this));
+            uint256 toTransfer = amount == 0 ? balance : amount;
+            require(toTransfer <= balance, 'Insufficient token balance');
+            if (toTransfer > 0) {
+                tokenContract.safeTransfer(to, toTransfer);
+            }
+        }
     }
 
     // Allow contract to receive ETH for bonds

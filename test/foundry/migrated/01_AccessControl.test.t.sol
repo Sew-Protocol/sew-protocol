@@ -1,16 +1,20 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+import "../../../contracts/types/YieldPresets.sol";
+pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
 import 'contracts/YieldOps.sol';
 import 'contracts/DisputeOps.sol';
+import 'contracts/core/ModuleManagementContract.sol';
 import 'contracts/core/EscrowableERC20.sol';
 import 'contracts/core/EscrowVault.sol';
+import 'contracts/types/EscrowTypes.sol';
 
 contract Test_01_AccessControl_test is Test {
     EscrowableERC20 escrowable;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
+    ModuleManagementContract public moduleManagement;
     EscrowVault escrowVault;
     address timelock = address(0x1);
     address guardian = address(0x2);
@@ -18,7 +22,7 @@ contract Test_01_AccessControl_test is Test {
     address feeAddr = address(0x4);
 
     function setUp() public {
-        yieldOps = new YieldOps();
+        yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps();
         escrowable = new EscrowableERC20(
             'Test Token',
@@ -28,7 +32,8 @@ contract Test_01_AccessControl_test is Test {
             address(yieldOps),
             address(disputeOps)
         );
-        escrowVault = new EscrowVault(100, feeAddr, address(yieldOps), address(disputeOps));
+        moduleManagement = new ModuleManagementContract(address(this));
+        escrowVault = new EscrowVault(100, feeAddr, address(yieldOps), address(disputeOps), address(moduleManagement));
     }
 
     function test_role_constants_and_granting() public {
@@ -51,8 +56,10 @@ contract Test_01_AccessControl_test is Test {
 
         uint256 newTime = block.timestamp + 7 days;
         vm.prank(timelock);
-        escrowable.setDefaultAutoCancelTime(newTime);
-        assertEq(escrowable.defaultAutoCancelTime(), newTime);
+        TimeoutConfig memory config = escrowable.getTimeoutConfig();
+        config.defaultAutoCancelTime = newTime;
+        escrowable.setTimeoutConfig(config);
+        assertEq(escrowable.getTimeoutConfig().defaultAutoCancelTime, newTime);
 
         // EscrowVault should share role constants
         bytes32 ROLE_TIMELOCK_V = escrowVault.ROLE_TIMELOCK();

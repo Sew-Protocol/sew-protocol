@@ -38,7 +38,8 @@ export type GovDeployConfig = {
     votingDelayBlocks: number;
     votingPeriodBlocks: number;
     proposalThreshold: string; // token units as string
-    quorumBps: number; // basis points (e.g., 400 = 4%)
+    absoluteQuorum: string; // absolute quorum amount in token units as string (e.g., "4000000000000000000000000" = 4M tokens)
+    initialNonCirculatingAddresses?: string[]; // addresses to track for transparency/APIs (e.g., vesting contracts)
   };
 
   // Guardian configuration
@@ -148,8 +149,21 @@ export function getGovConfig(hre: HardhatRuntimeEnvironment): GovDeployConfig {
     45818, // ~1 week @ 13s/block
     'VOTING_PERIOD',
   );
-  const proposalThreshold = process.env.PROPOSAL_THRESHOLD || '10000000000000000000000000'; // 10M tokens
-  const quorumBps = parseInteger(process.env.QUORUM_BPS, 400, 'QUORUM_BPS'); // 4%
+  const proposalThreshold = process.env.PROPOSAL_THRESHOLD || '500000000000000000000000'; // 500k tokens (0.05% of supply)
+  const absoluteQuorum = process.env.ABSOLUTE_QUORUM || '4000000000000000000000000'; // 4M tokens (absolute quorum)
+
+  // Initial non-circulating addresses (e.g., vesting contracts, locked tokens)
+  // Format: comma-separated addresses: ADDR1,ADDR2,ADDR3
+  const initialNonCirculatingAddresses: string[] = [];
+  const nonCirculatingEnv = process.env.INITIAL_NON_CIRCULATING_ADDRESSES || '';
+  if (nonCirculatingEnv) {
+    nonCirculatingEnv.split(',').forEach((addr) => {
+      const trimmed = addr.trim();
+      if (trimmed && !isZeroAddress(trimmed)) {
+        initialNonCirculatingAddresses.push(validateAndNormalizeAddress(trimmed, 'INITIAL_NON_CIRCULATING_ADDRESSES'));
+      }
+    });
+  }
 
   // Guardian configuration
   const guardianMultisig = process.env.GUARDIAN_MULTISIG || '';
@@ -199,7 +213,8 @@ export function getGovConfig(hre: HardhatRuntimeEnvironment): GovDeployConfig {
       votingDelayBlocks,
       votingPeriodBlocks,
       proposalThreshold,
-      quorumBps,
+      absoluteQuorum,
+      initialNonCirculatingAddresses: initialNonCirculatingAddresses.length > 0 ? initialNonCirculatingAddresses : undefined,
     },
     guardian: {
       multisig: guardianMultisig,
@@ -283,11 +298,14 @@ export function validateGovConfig(config: GovDeployConfig, hre?: HardhatRuntimeE
   if (config.governor.votingPeriodBlocks <= 0) {
     throw new Error('Voting period must be greater than 0');
   }
-  if (!Number.isInteger(config.governor.quorumBps) || isNaN(config.governor.quorumBps)) {
-    throw new Error(`Quorum must be a valid integer, got: ${config.governor.quorumBps}`);
-  }
-  if (config.governor.quorumBps < 0 || config.governor.quorumBps > 10000) {
-    throw new Error('Quorum must be between 0 and 10000 basis points');
+  // Validate absolute quorum (must be a valid BigInt string)
+  try {
+    const quorumBigInt = BigInt(config.governor.absoluteQuorum);
+    if (quorumBigInt === 0n) {
+      throw new Error(`Absolute quorum must be greater than 0, got: ${config.governor.absoluteQuorum}`);
+    }
+  } catch (error: any) {
+    throw new Error(`Invalid absolute quorum format: ${config.governor.absoluteQuorum}. ${error.message}`);
   }
 
   // Validate addresses (format + checksum)

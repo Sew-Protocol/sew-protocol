@@ -44,19 +44,19 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
     }
 
     event DisputeCreated(
-        uint256 indexed escrowId,
+        uint256 indexed workflowId,
         uint256 indexed klerosDisputeId,
         IArbitrator indexed arbitrator
     );
 
     event EvidenceSubmitted(
-        uint256 indexed escrowId,
+        uint256 indexed workflowId,
         uint256 indexed klerosDisputeId,
         address indexed submitter,
         string evidence
     );
 
-    event RulingExecuted(uint256 indexed escrowId, uint256 indexed klerosDisputeId, uint256 ruling);
+    event RulingExecuted(uint256 indexed workflowId, uint256 indexed klerosDisputeId, uint256 ruling);
 
     constructor(address _arbitrator, address _admin) {
         require(_arbitrator != address(0), 'Invalid arbitrator');

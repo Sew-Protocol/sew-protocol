@@ -334,11 +334,14 @@ contract DRv2FuzzTest is Test {
         resolutionModule.activateEscalationCostConfig();
         vm.stopPrank();
 
-        // Fund and record bond
-        token.mint(address(incentiveModuleV2), amount);
+        // Fund depositor and approve incentive module
+        token.mint(depositor, amount);
+        vm.prank(depositor);
+        token.approve(address(incentiveModuleV2), amount);
 
+        // Record bond - incentive module will pull tokens from depositor
         vm.prank(escrowContract);
-        incentiveModuleV2.recordAppealBond(workflowId, depositor, amount, address(token), round);
+        incentiveModuleV2.recordAppealBond(workflowId, depositor, depositor, amount, address(token), round);
 
         // Verify bond recorded correctly
         ResolverIncentiveModuleV2.AppealBondRecord memory bond = incentiveModuleV2.getAppealBond(
@@ -494,10 +497,14 @@ contract DRv2FuzzTest is Test {
         resolutionModule.activateEscalationCostConfig();
         vm.stopPrank();
 
-        // Record bond
-        token.mint(address(incentiveModuleV2), amount);
+        // Fund depositor and approve incentive module
+        token.mint(depositor, amount);
+        vm.prank(depositor);
+        token.approve(address(incentiveModuleV2), amount);
+
+        // Record bond - incentive module will pull tokens from depositor
         vm.prank(escrowContract);
-        incentiveModuleV2.recordAppealBond(workflowId, depositor, amount, address(token), 1);
+        incentiveModuleV2.recordAppealBond(workflowId, depositor, depositor, amount, address(token), 1);
 
         uint256 depositorBalanceBefore = token.balanceOf(depositor);
 
@@ -550,10 +557,14 @@ contract DRv2FuzzTest is Test {
             uint256 amount = 100e18 + (i * 10e18);
             address depositor = address(uint160(1000 + i));
 
-            // Record bond
-            token.mint(address(incentiveModuleV2), amount);
+            // Fund depositor and approve incentive module
+            token.mint(depositor, amount);
+            vm.prank(depositor);
+            token.approve(address(incentiveModuleV2), amount);
+
+            // Record bond - incentive module will pull tokens from depositor
             vm.prank(escrowContract);
-            incentiveModuleV2.recordAppealBond(workflowId, depositor, amount, address(token), 1);
+            incentiveModuleV2.recordAppealBond(workflowId, depositor, depositor, amount, address(token), 1);
             expectedPosted += amount;
             
             // For payment operations, record a resolver so the bond can be paid

@@ -118,6 +118,20 @@ interface IIncentiveModule {
     // ============ V2+ Functions (optional in V1) ============
 
     /**
+     * @notice Check if module supports a specific feature
+     * @param featureId Feature identifier (bytes4 keccak256 hash)
+     * @return supported Whether the feature is supported
+     * @dev Feature IDs (defined as constants in implementations):
+     *      - FEATURE_APPEAL_BONDS = bytes4(keccak256("APPEAL_BONDS_V1"))
+     *        Indicates module supports appeal bonds for escalation
+     *      - FEATURE_PULL_ERC20_BONDS = bytes4(keccak256("PULL_ERC20_BONDS_V1"))
+     *        Indicates module uses pull-based pattern for ERC20 bonds (safeTransferFrom)
+     * @dev V1 implementations should return false for all features
+     * @dev V2+ implementations should return true for supported features
+     */
+    function supportsFeature(bytes4 featureId) external view returns (bool supported);
+
+    /**
      * @notice Get required appeal bond for escalation (V2+)
      * @param workflowId Unique identifier for the dispute
      * @param fromRound Current round
@@ -135,17 +149,23 @@ interface IIncentiveModule {
     /**
      * @notice Record appeal bond payment (V2+)
      * @param workflowId Unique identifier for the dispute
-     * @param depositor Address that deposited bond
+     * @param depositor Address that deposited bond (for ERC20: escrow contract, for ETH: user/escalator)
+     * @param escalatedBy Address that initiated the escalation (always the user/escalator)
      * @param amount Bond amount
      * @param token Token address (address(0) = ETH)
      * @param round Round being appealed to
      * @dev V1 implementations should revert
-     * @dev For ETH bonds (token == address(0)), function must be payable and msg.value == amount
-     * @dev For ERC20 bonds, tokens must be transferred to contract before calling (or use safeTransferFrom)
+     * @dev SHOULD only be callable by the escrow contract or resolution module (enforced by implementation)
+     * @dev For ETH bonds (token == address(0)): MUST be payable and require(msg.value == amount)
+     *      For ETH bonds, depositor MUST equal escalatedBy (user-funded)
+     * @dev For ERC20 bonds: Implementation MUST pull tokens via safeTransferFrom(depositor, address(this), amount)
+     *      and MUST revert on transfer failure. Depositor is typically the escrow contract (escrow-funded),
+     *      but escalatedBy tracks the actual escalator for metrics/accounting.
      */
     function recordAppealBond(
         uint256 workflowId,
         address depositor,
+        address escalatedBy,
         uint256 amount,
         address token,
         uint8 round

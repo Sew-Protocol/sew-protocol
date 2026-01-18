@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+import "../../../contracts/types/YieldPresets.sol";
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
@@ -10,6 +11,9 @@ import 'contracts/core/modules/DefaultResolutionModule.sol';
 import 'contracts/types/EscrowTypes.sol';
 import 'contracts/YieldOps.sol';
 import 'contracts/DisputeOps.sol';
+import 'contracts/core/ModuleManagementContract.sol';
+import 'contracts/admin/EscrowAdminContract.sol';
+import 'contracts/libraries/SettingsValidationLibrary.sol';
 import '../../mocks/RevertingReceiver.sol';
 
 /**
@@ -25,6 +29,8 @@ contract AutoTransferTest is Test {
     DefaultResolutionModule rm;
     YieldOps yieldOps;
     DisputeOps disputeOps;
+    ModuleManagementContract moduleManagement;
+    EscrowAdminContract adminContract;
 
     address sender = address(0x10);
     address recipient = address(0x20);
@@ -39,9 +45,12 @@ contract AutoTransferTest is Test {
     RevertingReceiver revertingReceiver;
 
     function setUp() public {
-        yieldOps = new YieldOps();
+        yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps();
-        vault = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps));
+        moduleManagement = new ModuleManagementContract(address(this));
+        adminContract = new EscrowAdminContract(address(this));
+        vault = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
+        moduleManagement.registerEscrowContract(address(vault));
         token = new ERC20Mock('Test', 'TST', address(this), 1e24);
         revertingToken = new MockRevertingERC20('Revert', 'REV', address(this), 1e24);
         nonStandardToken = new MockNonStandardERC20('NonStandard', 'NS', address(this), 1e24);
@@ -50,9 +59,9 @@ contract AutoTransferTest is Test {
 
         // Setup roles and modules
         vault.grantRole(vault.ROLE_TIMELOCK(), address(this));
-        vault.queueResolutionModule(address(rm));
+        adminContract.queueResolutionModule(address(vault), address(rm));
         vm.warp(block.timestamp + 7 days + 1);
-        vault.activateResolutionModule();
+        adminContract.activateResolutionModule(address(vault));
 
         // Fund sender
         token.transfer(sender, 1000 ether);
@@ -70,8 +79,9 @@ contract AutoTransferTest is Test {
         vm.prank(sender);
         token.approve(address(vault), AMOUNT);
 
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
         vm.prank(sender);
-        uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT);
+        uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT, settings);
 
         uint256 fee = (AMOUNT * ESCROW_FEE) / 10000;
         uint256 expected = AMOUNT - fee;
@@ -87,7 +97,7 @@ contract AutoTransferTest is Test {
         assertEq(recipientBalanceAfter - recipientBalanceBefore, expected, 'Recipient should receive funds automatically');
 
         // Verify claimable balance is NOT set (transfer succeeded)
-        uint256 claimable = vault.claimable(wid, recipient, address(token));
+        uint256 claimable = vault.claimableBalances(wid, recipient);
         assertEq(claimable, 0, 'Claimable should be 0 when transfer succeeds');
         
         // Event is emitted internally - verified by claimable = 0 (success path)
@@ -100,8 +110,9 @@ contract AutoTransferTest is Test {
         vm.prank(sender);
         revertingToken.approve(address(vault), AMOUNT);
 
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
         vm.prank(sender);
-        uint256 wid = vault.createEscrow(address(revertingToken), recipient, AMOUNT);
+        uint256 wid = vault.createEscrow(address(revertingToken), recipient, AMOUNT, settings);
 
         uint256 fee = (AMOUNT * ESCROW_FEE) / 10000;
         uint256 expected = AMOUNT - fee;
@@ -114,7 +125,7 @@ contract AutoTransferTest is Test {
         vault.releaseEscrowTransfer(wid);
 
         // Verify claimable balance IS set (transfer failed)
-        uint256 claimable = vault.claimable(wid, recipient, address(revertingToken));
+        uint256 claimable = vault.claimableBalances(wid, recipient);
         assertEq(claimable, expected, 'Claimable should be set when transfer fails');
 
         // Verify recipient did NOT receive funds
@@ -130,8 +141,9 @@ contract AutoTransferTest is Test {
         vm.prank(sender);
         revertingToken.approve(address(vault), AMOUNT);
 
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
         vm.prank(sender);
-        uint256 wid = vault.createEscrow(address(revertingToken), recipient, AMOUNT);
+        uint256 wid = vault.createEscrow(address(revertingToken), recipient, AMOUNT, settings);
         
         // Now set token to revert on transfer (for release)
         revertingToken.setShouldRevert(true);
@@ -144,7 +156,7 @@ contract AutoTransferTest is Test {
         vault.releaseEscrowTransfer(wid);
 
         // Verify claimable balance IS set
-        uint256 claimable = vault.claimable(wid, recipient, address(revertingToken));
+        uint256 claimable = vault.claimableBalances(wid, recipient);
         assertEq(claimable, expected, 'Claimable should be set when token reverts');
 
         // Verify recipient can still withdraw (fix token first)
@@ -159,8 +171,9 @@ contract AutoTransferTest is Test {
         vm.prank(sender);
         nonStandardToken.approve(address(vault), AMOUNT);
 
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
         vm.prank(sender);
-        uint256 wid = vault.createEscrow(address(nonStandardToken), recipient, AMOUNT);
+        uint256 wid = vault.createEscrow(address(nonStandardToken), recipient, AMOUNT, settings);
 
         uint256 fee = (AMOUNT * ESCROW_FEE) / 10000;
         uint256 expected = AMOUNT - fee;
@@ -176,7 +189,7 @@ contract AutoTransferTest is Test {
         assertEq(recipientBalanceAfter - recipientBalanceBefore, expected, 'Non-standard token should transfer');
 
         // Verify claimable is 0
-        assertEq(vault.claimable(wid, recipient, address(nonStandardToken)), 0, 'Claimable should be 0');
+        assertEq(vault.claimableBalances(wid, recipient), 0, 'Claimable should be 0');
     }
 
     // ============ Cancel Tests ============
@@ -186,8 +199,9 @@ contract AutoTransferTest is Test {
         vm.prank(sender);
         token.approve(address(vault), AMOUNT);
 
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
         vm.prank(sender);
-        uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT);
+        uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT, settings);
 
         uint256 fee = (AMOUNT * ESCROW_FEE) / 10000;
         uint256 expected = AMOUNT - fee;
@@ -208,7 +222,7 @@ contract AutoTransferTest is Test {
         assertEq(senderBalanceAfter - senderBalanceBefore, expected, 'Sender should receive refund automatically');
 
         // Verify claimable balance is NOT set
-        uint256 claimable = vault.claimable(wid, sender, address(token));
+        uint256 claimable = vault.claimableBalances(wid, sender);
         assertEq(claimable, 0, 'Claimable should be 0 when transfer succeeds');
     }
 
@@ -219,8 +233,9 @@ contract AutoTransferTest is Test {
         vm.prank(sender);
         revertingToken.approve(address(vault), AMOUNT);
 
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
         vm.prank(sender);
-        uint256 wid = vault.createEscrow(address(revertingToken), recipient, AMOUNT);
+        uint256 wid = vault.createEscrow(address(revertingToken), recipient, AMOUNT, settings);
 
         uint256 fee = (AMOUNT * ESCROW_FEE) / 10000;
         uint256 expected = AMOUNT - fee;
@@ -237,7 +252,7 @@ contract AutoTransferTest is Test {
         vault.recipientCancel(wid);
 
         // Verify claimable balance IS set
-        uint256 claimable = vault.claimable(wid, sender, address(revertingToken));
+        uint256 claimable = vault.claimableBalances(wid, sender);
         assertEq(claimable, expected, 'Claimable should be set when transfer fails');
 
         // Verify sender can withdraw (fix token first)
@@ -254,8 +269,9 @@ contract AutoTransferTest is Test {
         vm.prank(sender);
         token.approve(address(vault), AMOUNT);
 
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
         vm.prank(sender);
-        uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT);
+        uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT, settings);
 
         uint256 fee = (AMOUNT * ESCROW_FEE) / 10000;
         uint256 expected = AMOUNT - fee;
@@ -271,7 +287,7 @@ contract AutoTransferTest is Test {
         assertGe(recipientBalanceAfter - recipientBalanceBefore, expected, 'Recipient should receive at least expected amount');
 
         // Verify claimable is 0 (transfer succeeded)
-        assertEq(vault.claimable(wid, recipient, address(token)), 0, 'Claimable should be 0');
+        assertEq(vault.claimableBalances(wid, recipient), 0, 'Claimable should be 0');
     }
 
     function test_autotransfer_resolution_flow() public {
@@ -279,8 +295,9 @@ contract AutoTransferTest is Test {
         vm.prank(sender);
         token.approve(address(vault), AMOUNT);
 
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
         vm.prank(sender);
-        uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT);
+        uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT, settings);
 
         // Raise dispute
         vm.prank(sender);
@@ -304,7 +321,7 @@ contract AutoTransferTest is Test {
         assertGe(recipientBalance, expected, 'Recipient should receive funds after resolution');
 
         // Verify claimable is 0
-        assertEq(vault.claimable(wid, recipient, address(token)), 0, 'Claimable should be 0');
+        assertEq(vault.claimableBalances(wid, recipient), 0, 'Claimable should be 0');
     }
 
     // ============ Edge Cases ============
@@ -327,16 +344,18 @@ contract AutoTransferTest is Test {
         // Create first escrow
         vm.prank(sender);
         token.approve(address(vault), amount1);
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
         vm.prank(sender);
-        uint256 wid1 = vault.createEscrow(address(token), recipient, amount1);
+        uint256 wid1 = vault.createEscrow(address(token), recipient, amount1, settings);
 
         // Create second escrow
         address sender2 = address(0x50);
         token.transfer(sender2, 100 ether);
         vm.prank(sender2);
         token.approve(address(vault), amount2);
+        EscrowSettings memory settings2 = SettingsValidationLibrary.getDefaultSettings();
         vm.prank(sender2);
-        uint256 wid2 = vault.createEscrow(address(token), recipient, amount2);
+        uint256 wid2 = vault.createEscrow(address(token), recipient, amount2, settings2);
 
         uint256 recipientBalanceBefore = token.balanceOf(recipient);
 
@@ -356,8 +375,8 @@ contract AutoTransferTest is Test {
         assertEq(recipientBalanceAfter - recipientBalanceBefore, expectedTotal, 'Recipient should receive both amounts');
 
         // Verify both claimable balances are 0
-        assertEq(vault.claimable(wid1, recipient, address(token)), 0, 'First escrow claimable should be 0');
-        assertEq(vault.claimable(wid2, recipient, address(token)), 0, 'Second escrow claimable should be 0');
+        assertEq(vault.claimableBalances(wid1, recipient), 0, 'First escrow claimable should be 0');
+        assertEq(vault.claimableBalances(wid2, recipient), 0, 'Second escrow claimable should be 0');
     }
 
     function test_autotransfer_fallback_then_withdraw() public {
@@ -367,8 +386,9 @@ contract AutoTransferTest is Test {
         vm.prank(sender);
         revertingToken.approve(address(vault), AMOUNT);
 
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
         vm.prank(sender);
-        uint256 wid = vault.createEscrow(address(revertingToken), recipient, AMOUNT);
+        uint256 wid = vault.createEscrow(address(revertingToken), recipient, AMOUNT, settings);
         
         // Now set token to revert on transfer
         revertingToken.setShouldRevert(true);
@@ -381,7 +401,7 @@ contract AutoTransferTest is Test {
         vault.releaseEscrowTransfer(wid);
 
         // Verify claimable is set
-        assertEq(vault.claimable(wid, recipient, address(revertingToken)), expected, 'Claimable should be set');
+        assertEq(vault.claimableBalances(wid, recipient), expected, 'Claimable should be set');
 
         // Now fix the token and withdraw
         revertingToken.setShouldRevert(false);
@@ -401,8 +421,9 @@ contract AutoTransferTest is Test {
         vm.prank(sender);
         token.approve(address(vault), AMOUNT);
 
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
         vm.prank(sender);
-        uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT);
+        uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT, settings);
 
         uint256 fee = (AMOUNT * ESCROW_FEE) / 10000;
         uint256 expected = AMOUNT - fee;
@@ -413,7 +434,7 @@ contract AutoTransferTest is Test {
         vault.releaseEscrowTransfer(wid);
 
         // Check that claimable is 0 (indicates success event path)
-        assertEq(vault.claimable(wid, recipient, address(token)), 0, 'Claimable 0 indicates success event');
+        assertEq(vault.claimableBalances(wid, recipient), 0, 'Claimable 0 indicates success event');
     }
 
     function test_autotransfer_emits_failure_event() public {
@@ -422,8 +443,9 @@ contract AutoTransferTest is Test {
         vm.prank(sender);
         revertingToken.approve(address(vault), AMOUNT);
 
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
         vm.prank(sender);
-        uint256 wid = vault.createEscrow(address(revertingToken), recipient, AMOUNT);
+        uint256 wid = vault.createEscrow(address(revertingToken), recipient, AMOUNT, settings);
         
         // Now set token to revert on transfer
         revertingToken.setShouldRevert(true);
@@ -437,7 +459,7 @@ contract AutoTransferTest is Test {
         vault.releaseEscrowTransfer(wid);
 
         // Check that claimable is set (indicates failure event path)
-        assertEq(vault.claimable(wid, recipient, address(revertingToken)), expected, 'Claimable set indicates failure event');
+        assertEq(vault.claimableBalances(wid, recipient), expected, 'Claimable set indicates failure event');
     }
 
     // ============ Gas Cost Tests ============
@@ -446,8 +468,9 @@ contract AutoTransferTest is Test {
         vm.prank(sender);
         token.approve(address(vault), AMOUNT);
 
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
         vm.prank(sender);
-        uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT);
+        uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT, settings);
 
         // Measure gas for release with autotransfer
         uint256 gasBefore = gasleft();
@@ -465,8 +488,9 @@ contract AutoTransferTest is Test {
         vm.prank(sender);
         revertingToken.approve(address(vault), AMOUNT);
 
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
         vm.prank(sender);
-        uint256 wid = vault.createEscrow(address(revertingToken), recipient, AMOUNT);
+        uint256 wid = vault.createEscrow(address(revertingToken), recipient, AMOUNT, settings);
         
         // Set to revert for release
         revertingToken.setShouldRevert(true);

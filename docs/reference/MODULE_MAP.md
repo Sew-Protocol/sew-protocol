@@ -168,19 +168,21 @@ Each module type has an interface, and multiple implementations can exist. The p
 
 ## Module Snapshotting
 
-When an escrow is created, the current default modules are **snapshotted** into the escrow's state:
+When an escrow is created, the current default modules are **snapshotted** into the escrow's state using a `ModuleSnapshot` struct:
 
 ```solidity
-struct EscrowTransfer {
-  // ... other fields ...
-  address snapshotResolutionModule;
-  address snapshotReleaseStrategy;
-  address snapshotYieldGenerationModule;
-  address snapshotYieldDistributionModule;
+struct ModuleSnapshot {
+    address resolutionModule;
+    address releaseStrategy;
+    address yieldGenerationModule;
+    address yieldDistributionModule;
 }
+mapping(uint256 => ModuleSnapshot) internal moduleSnapshots;
 ```
 
 **Key Guarantee**: Module changes only affect **new escrows**. Existing escrows continue using their snapshotted modules.
+
+**Implementation Note**: The struct-based approach provides better organization and potential gas savings when accessing multiple modules together (single SLOAD for all modules vs. multiple SLOADs for separate mappings).
 
 ---
 

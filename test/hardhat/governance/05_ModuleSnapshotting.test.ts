@@ -112,39 +112,40 @@ describe('Module Snapshotting', function () {
     await escrowableERC20.grantRole(ROLE_TIMELOCK, deployer.address);
     await escrowVault.grantRole(ROLE_TIMELOCK, deployer.address);
 
-    // EscrowableERC20 uses queue/activate pattern - queue and activate immediately for testing
+    // EscrowableERC20 uses consolidated queue/activate pattern - queue and activate immediately for testing
+    // ModuleType: RESOLUTION=0, RELEASE=1, YIELD_GEN=2, YIELD_DIST=3
     await escrowableERC20
       .connect(deployer)
-      .queueDefaultReleaseStrategy(await releaseStrategyA.getAddress());
+      .queueDefaultModule(1, await releaseStrategyA.getAddress()); // RELEASE
     await escrowableERC20
       .connect(deployer)
-      .queueDefaultResolutionModule(await moduleA.getAddress());
+      .queueDefaultModule(0, await moduleA.getAddress()); // RESOLUTION
     const yieldGenAAddress =
       typeof yieldGenA.getAddress === 'function' ? await yieldGenA.getAddress() : yieldGenA;
     if (yieldGenAAddress !== ethers.ZeroAddress) {
-      await escrowableERC20.connect(deployer).queueDefaultYieldGenerationModule(yieldGenAAddress);
+      await escrowableERC20.connect(deployer).queueDefaultModule(2, yieldGenAAddress); // YIELD_GEN
     }
     await escrowableERC20
       .connect(deployer)
-      .queueDefaultYieldDistributionModule(await yieldDistA.getAddress());
+      .queueDefaultModule(3, await yieldDistA.getAddress()); // YIELD_DIST
 
     // Fast-forward time to allow activation (7 days = 604800 seconds)
-    const [, etaRelease] = await escrowableERC20.getPendingDefaultReleaseStrategy();
-    const [, etaResolution] = await escrowableERC20.getPendingDefaultResolutionModule();
-    const [, etaYieldDist] = await escrowableERC20.getPendingDefaultYieldDistributionModule();
+    const [, etaRelease] = await escrowableERC20.getPendingDefaultModule(1); // RELEASE
+    const [, etaResolution] = await escrowableERC20.getPendingDefaultModule(0); // RESOLUTION
+    const [, etaYieldDist] = await escrowableERC20.getPendingDefaultModule(3); // YIELD_DIST
     const maxEta = Math.max(Number(etaRelease), Number(etaResolution), Number(etaYieldDist));
     await ethers.provider.send('evm_setNextBlockTimestamp', [maxEta + 1]);
     await ethers.provider.send('evm_mine', []);
 
-    await escrowableERC20.connect(deployer).activateDefaultReleaseStrategy();
-    await escrowableERC20.connect(deployer).activateDefaultResolutionModule();
+    await escrowableERC20.connect(deployer).activateDefaultModule(1); // RELEASE
+    await escrowableERC20.connect(deployer).activateDefaultModule(0); // RESOLUTION
     if (yieldGenAAddress !== ethers.ZeroAddress) {
-      const [, etaYieldGen] = await escrowableERC20.getPendingDefaultYieldGenerationModule();
+      const [, etaYieldGen] = await escrowableERC20.getPendingDefaultModule(2); // YIELD_GEN
       await ethers.provider.send('evm_setNextBlockTimestamp', [Number(etaYieldGen) + 1]);
       await ethers.provider.send('evm_mine', []);
-      await escrowableERC20.connect(deployer).activateDefaultYieldGenerationModule();
+      await escrowableERC20.connect(deployer).activateDefaultModule(2); // YIELD_GEN
     }
-    await escrowableERC20.connect(deployer).activateDefaultYieldDistributionModule();
+    await escrowableERC20.connect(deployer).activateDefaultModule(3); // YIELD_DIST
 
     // EscrowVault uses direct setters (Standard lane)
     // Phase 8: EscrowVault now uses Slow lane (queue/activate) for consistency
@@ -212,8 +213,7 @@ describe('Module Snapshotting', function () {
         customResolver: ethers.ZeroAddress,
         yieldEnabled: false,
         autoReleaseTime: 0,
-        autoCancelTime: 0,
-        escrowType: 0,
+        autoCancelTime: 0
       };
       await escrowableERC20
         .connect(sender)
@@ -240,8 +240,7 @@ describe('Module Snapshotting', function () {
             customResolver: ethers.ZeroAddress,
             yieldEnabled: false,
             autoReleaseTime: 0,
-            autoCancelTime: 0,
-            escrowType: 0,
+            autoCancelTime: 0
           }),
       )
         .to.emit(escrowableERC20, 'EscrowModuleSnapshot')
@@ -272,8 +271,7 @@ describe('Module Snapshotting', function () {
         customResolver: ethers.ZeroAddress,
         yieldEnabled: false,
         autoReleaseTime: 0,
-        autoCancelTime: 0,
-        escrowType: 0,
+        autoCancelTime: 0
       };
       await escrowVault
         .connect(sender)
@@ -316,8 +314,7 @@ describe('Module Snapshotting', function () {
         customResolver: ethers.ZeroAddress,
         yieldEnabled: false,
         autoReleaseTime: 0,
-        autoCancelTime: 0,
-        escrowType: 0,
+        autoCancelTime: 0
       };
       await escrowVault
         .connect(sender)
@@ -341,8 +338,7 @@ describe('Module Snapshotting', function () {
         customResolver: ethers.ZeroAddress,
         yieldEnabled: false,
         autoReleaseTime: 0,
-        autoCancelTime: 0,
-        escrowType: 0,
+        autoCancelTime: 0
       };
       const tx = await escrowVault
         .connect(sender)
@@ -364,8 +360,7 @@ describe('Module Snapshotting', function () {
         customResolver: ethers.ZeroAddress,
         yieldEnabled: false,
         autoReleaseTime: 0,
-        autoCancelTime: 0,
-        escrowType: 0,
+        autoCancelTime: 0
       };
       await escrowableERC20
         .connect(sender)
@@ -404,8 +399,7 @@ describe('Module Snapshotting', function () {
         customResolver: ethers.ZeroAddress,
         yieldEnabled: false,
         autoReleaseTime: 0,
-        autoCancelTime: 0,
-        escrowType: 0,
+        autoCancelTime: 0
       };
       await escrowVault
         .connect(sender)
@@ -432,8 +426,7 @@ describe('Module Snapshotting', function () {
         customResolver: ethers.ZeroAddress,
         yieldEnabled: false,
         autoReleaseTime: 0,
-        autoCancelTime: 0,
-        escrowType: 0,
+        autoCancelTime: 0
       };
       await escrowVault
         .connect(sender)
@@ -463,8 +456,7 @@ describe('Module Snapshotting', function () {
         customResolver: ethers.ZeroAddress,
         yieldEnabled: false,
         autoReleaseTime: 0,
-        autoCancelTime: 0,
-        escrowType: 0,
+        autoCancelTime: 0
       };
       await escrowVault
         .connect(sender)
@@ -488,8 +480,7 @@ describe('Module Snapshotting', function () {
         customResolver: ethers.ZeroAddress,
         yieldEnabled: false,
         autoReleaseTime: 0,
-        autoCancelTime: 0,
-        escrowType: 0,
+        autoCancelTime: 0
       };
       const tx = await escrowVault
         .connect(sender)
@@ -511,8 +502,7 @@ describe('Module Snapshotting', function () {
         customResolver: ethers.ZeroAddress,
         yieldEnabled: false,
         autoReleaseTime: 0,
-        autoCancelTime: 0,
-        escrowType: 0,
+        autoCancelTime: 0
       };
       await escrowableERC20
         .connect(sender)

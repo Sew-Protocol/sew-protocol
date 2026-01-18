@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import "../../../contracts/types/YieldPresets.sol";
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
@@ -9,6 +10,8 @@ import '../../../contracts/core/modules/DefaultResolutionModule.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/YieldOps.sol';
 import '../../../contracts/DisputeOps.sol';
+import '../../../contracts/core/ModuleManagementContract.sol';
+import '../../../contracts/admin/EscrowAdminContract.sol';
 
 /**
  * @title ProtocolFeeCalculation
@@ -22,6 +25,8 @@ contract ProtocolFeeCalculationTest is Test {
     DefaultResolutionModule public resolutionModule;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
+    ModuleManagementContract public moduleManagement;
+    EscrowAdminContract public adminContract;
 
     address public owner;
     address public escrowFeeAddress;
@@ -47,20 +52,24 @@ contract ProtocolFeeCalculationTest is Test {
         // Deploy core contracts
         resolutionModule = new DefaultResolutionModule(owner, resolver);
         token = new ERC20Mock('Test Token', 'TEST', owner, 10000000e18);
-        yieldOps = new YieldOps();
+        yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps();
 
         // Deploy vault
-        vault = new EscrowVault(ESCROW_FEE_BPS, escrowFeeAddress, address(yieldOps), address(disputeOps));
+        moduleManagement = new ModuleManagementContract(address(this));
+        adminContract = new EscrowAdminContract(address(this));
+        vault = new EscrowVault(ESCROW_FEE_BPS, escrowFeeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
+        moduleManagement.registerEscrowContract(address(vault));
 
         // Setup vault roles
         vault.grantRole(ROLE_TIMELOCK, owner);
         vault.grantRole(ROLE_GUARDIAN, owner);
+        adminContract.grantRole(adminContract.ROLE_TIMELOCK(), owner);
 
         // Activate resolution module in vault
-        vault.queueResolutionModule(address(resolutionModule));
+        adminContract.queueResolutionModule(address(vault), address(resolutionModule));
         vm.warp(block.timestamp + 7 days + 1);
-        vault.activateResolutionModule();
+        adminContract.activateResolutionModule(address(vault));
 
         // Setup resolver in resolution module
         resolutionModule.grantRole(ROLE_RESOLVER, resolver);
@@ -77,9 +86,9 @@ contract ProtocolFeeCalculationTest is Test {
      */
     function test_YieldProtocolFee_3000Bps_Results_30Percent() public {
         // Setup yield protocol fee to 30%
-        vault.queueYieldProtocolFeeBps(YIELD_PROTOCOL_FEE_BPS);
+        adminContract.queueYieldProtocolFeeBps(address(vault), YIELD_PROTOCOL_FEE_BPS);
         vm.warp(block.timestamp + 7 days + 1);
-        vault.activateYieldProtocolFeeBps();
+        adminContract.activateYieldProtocolFeeBps(address(vault));
 
         // Verify the fee is set
         assertEq(vault.yieldProtocolFeeBps(), YIELD_PROTOCOL_FEE_BPS, 'Yield protocol fee should be 3000 bps');
@@ -114,9 +123,9 @@ contract ProtocolFeeCalculationTest is Test {
      */
     function test_AppealBondProtocolFee_ETH_DeductsCorrectAmount() public {
         // Setup appeal bond protocol fee to 15%
-        vault.queueAppealBondProtocolFeeBps(APPEAL_BOND_PROTOCOL_FEE_BPS);
+        adminContract.queueAppealBondProtocolFeeBps(address(vault), APPEAL_BOND_PROTOCOL_FEE_BPS);
         vm.warp(block.timestamp + 7 days + 1);
-        vault.activateAppealBondProtocolFeeBps();
+        adminContract.activateAppealBondProtocolFeeBps(address(vault));
 
         // Verify the fee is set
         assertEq(

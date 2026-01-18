@@ -10,6 +10,7 @@ import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/YieldOps.sol';
 import '../../../contracts/DisputeOps.sol';
 
+import '../../../contracts/core/ModuleManagementContract.sol';
 /**
  * @title BondRoundingTest
  * @notice Tests for rounding error handling in bond distribution
@@ -22,6 +23,7 @@ contract BondRoundingTest is Test {
     ERC20Mock public token;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
+    ModuleManagementContract public moduleManagement;
 
     address public deployer;
     address public timelock;
@@ -39,9 +41,10 @@ contract BondRoundingTest is Test {
         paymentLib = new PaymentCalculationLibraryV1();
         incentiveModule = new ResolverIncentiveModuleV2(deployer, address(paymentLib));
         token = new ERC20Mock('Test Token', 'TEST', address(this), 0);
-        yieldOps = new YieldOps();
+        yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps();
-        escrow = new EscrowVault(100, feeAddress, address(yieldOps), address(disputeOps));
+        moduleManagement = new ModuleManagementContract(address(this));
+        escrow = new EscrowVault(100, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
 
         // Grant roles
         incentiveModule.grantRole(incentiveModule.ROLE_TIMELOCK(), timelock);
@@ -79,12 +82,15 @@ contract BondRoundingTest is Test {
         uint256 workflowId = 0;
         uint256 bondAmount = 100;
 
-        // Setup bond
-        token.mint(address(incentiveModule), bondAmount);
-
+        // Setup bond - mint to depositor and approve
         address depositor = makeAddr('depositor');
+        token.mint(depositor, bondAmount);
+        
+        vm.prank(depositor);
+        token.approve(address(incentiveModule), bondAmount);
+
         vm.prank(address(escrow));
-        incentiveModule.recordAppealBond(workflowId, depositor, bondAmount, address(token), 1);
+        incentiveModule.recordAppealBond(workflowId, depositor, depositor, bondAmount, address(token), 1);
 
         // Record resolvers at round 0
         _recordResolvers(workflowId, 0, 3);
@@ -119,12 +125,15 @@ contract BondRoundingTest is Test {
         uint256 workflowId = 1;
         uint256 bondAmount = 99;
 
-        // Setup bond
-        token.mint(address(incentiveModule), bondAmount);
-
+        // Setup bond - mint to depositor and approve
         address depositor = makeAddr('depositor');
+        token.mint(depositor, bondAmount);
+        
+        vm.prank(depositor);
+        token.approve(address(incentiveModule), bondAmount);
+
         vm.prank(address(escrow));
-        incentiveModule.recordAppealBond(workflowId, depositor, bondAmount, address(token), 1);
+        incentiveModule.recordAppealBond(workflowId, depositor, depositor, bondAmount, address(token), 1);
 
         // Record resolvers at round 0
         _recordResolvers(workflowId, 0, 5);
@@ -154,12 +163,15 @@ contract BondRoundingTest is Test {
         uint256 workflowId = 2;
         uint256 bondAmount = 100;
 
-        // Setup bond
-        token.mint(address(incentiveModule), bondAmount);
-
+        // Setup bond - mint to depositor and approve
         address depositor = makeAddr('depositor');
+        token.mint(depositor, bondAmount);
+        
+        vm.prank(depositor);
+        token.approve(address(incentiveModule), bondAmount);
+
         vm.prank(address(escrow));
-        incentiveModule.recordAppealBond(workflowId, depositor, bondAmount, address(token), 1);
+        incentiveModule.recordAppealBond(workflowId, depositor, depositor, bondAmount, address(token), 1);
 
         // Record resolvers at round 0
         _recordResolvers(workflowId, 0, 2);
@@ -185,12 +197,15 @@ contract BondRoundingTest is Test {
         uint256 workflowId = 3;
         uint256 bondAmount = 123456;
 
-        // Setup bond
-        token.mint(address(incentiveModule), bondAmount);
-
+        // Setup bond - mint to depositor and approve
         address depositor = makeAddr('depositor');
+        token.mint(depositor, bondAmount);
+        
+        vm.prank(depositor);
+        token.approve(address(incentiveModule), bondAmount);
+
         vm.prank(address(escrow));
-        incentiveModule.recordAppealBond(workflowId, depositor, bondAmount, address(token), 1);
+        incentiveModule.recordAppealBond(workflowId, depositor, depositor, bondAmount, address(token), 1);
 
         // Record resolver at round 0
         _recordResolvers(workflowId, 0, 1);
@@ -219,12 +234,15 @@ contract BondRoundingTest is Test {
 
         uint256 workflowId = uint256(keccak256(abi.encode(bondAmount, resolverCount)));
 
-        // Setup bond
-        token.mint(address(incentiveModule), bondAmount);
-
+        // Setup bond - mint to depositor and approve
         address depositor = makeAddr('depositor');
+        token.mint(depositor, bondAmount);
+        
+        vm.prank(depositor);
+        token.approve(address(incentiveModule), bondAmount);
+
         vm.prank(address(escrow));
-        incentiveModule.recordAppealBond(workflowId, depositor, bondAmount, address(token), 1);
+        incentiveModule.recordAppealBond(workflowId, depositor, depositor, bondAmount, address(token), 1);
 
         // Record resolvers
         for (uint8 i = 0; i < resolverCount; i++) {

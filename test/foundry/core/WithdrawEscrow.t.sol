@@ -1,13 +1,18 @@
 // SPDX-License-Identifier: MIT
+import "../../../contracts/types/YieldPresets.sol";
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
 import 'contracts/core/EscrowVault.sol';
+import 'contracts/core/BaseEscrow.sol';
 import 'contracts/mocks/ERC20Mock.sol';
 import 'contracts/core/modules/DefaultResolutionModule.sol';
 import 'contracts/types/EscrowTypes.sol';
 import 'contracts/YieldOps.sol';
 import 'contracts/DisputeOps.sol';
+import 'contracts/core/ModuleManagementContract.sol';
+import 'contracts/admin/EscrowAdminContract.sol';
+import 'contracts/libraries/SettingsValidationLibrary.sol';
 
 contract WithdrawEscrowTest is Test {
     EscrowVault vault;
@@ -15,6 +20,8 @@ contract WithdrawEscrowTest is Test {
     DefaultResolutionModule rm;
     YieldOps yieldOps;
     DisputeOps disputeOps;
+    ModuleManagementContract moduleManagement;
+    EscrowAdminContract adminContract;
 
     address sender = address(0x10);
     address recipient = address(0x20);
@@ -25,17 +32,21 @@ contract WithdrawEscrowTest is Test {
     uint256 constant AMOUNT = 10 ether;
 
     function setUp() public {
-        yieldOps = new YieldOps();
+        yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps();
-        vault = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps));
+        moduleManagement = new ModuleManagementContract(address(this));
+        adminContract = new EscrowAdminContract(address(this));
+        vault = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
+        moduleManagement.registerEscrowContract(address(vault));
         token = new ERC20Mock('Test', 'TST', address(this), 1e24);
         rm = new DefaultResolutionModule(address(this), resolver);
 
         // Setup roles and modules
         vault.grantRole(vault.ROLE_TIMELOCK(), address(this));
-        vault.queueResolutionModule(address(rm));
+        adminContract.grantRole(adminContract.ROLE_TIMELOCK(), address(this));
+        adminContract.queueResolutionModule(address(vault), address(rm));
         vm.warp(block.timestamp + 7 days + 1);
-        vault.activateResolutionModule();
+        adminContract.activateResolutionModule(address(vault));
 
         // Fund sender
         token.transfer(sender, 1000 ether);
@@ -46,14 +57,15 @@ contract WithdrawEscrowTest is Test {
         vm.prank(sender);
         token.approve(address(vault), AMOUNT);
 
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
         vm.prank(sender);
-        uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT);
+        uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT, settings);
 
         uint256 fee = (AMOUNT * ESCROW_FEE) / 10000;
         uint256 expected = AMOUNT - fee;
 
         // Before release, claimable should be 0
-        uint256 claimableBefore = vault.claimable(wid, recipient, address(token));
+        uint256 claimableBefore = vault.claimableBalances(wid, recipient);
         assertEq(claimableBefore, 0);
 
         // Release - autotransfer should automatically transfer funds
@@ -66,12 +78,12 @@ contract WithdrawEscrowTest is Test {
         assertEq(recipientBalanceAfter - recipientBalanceBefore, expected, 'Autotransfer should have transferred funds');
 
         // Claimable should be 0 (autotransfer succeeded)
-        uint256 claimableAfter = vault.claimable(wid, recipient, address(token));
+        uint256 claimableAfter = vault.claimableBalances(wid, recipient);
         assertEq(claimableAfter, 0, 'Claimable should be 0 when autotransfer succeeds');
 
         // Withdrawal should fail (no claimable balance, already transferred)
         vm.prank(recipient);
-        vm.expectRevert('No claimable balance');
+        vm.expectRevert(abi.encodeWithSignature("NoClaimableBalance(uint256,address,address)", wid, recipient));
         vault.withdrawEscrow(wid);
     }
 
@@ -80,8 +92,9 @@ contract WithdrawEscrowTest is Test {
         vm.prank(sender);
         token.approve(address(vault), AMOUNT);
 
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
         vm.prank(sender);
-        uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT);
+        uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT, settings);
 
         vm.prank(sender);
         vault.releaseEscrowTransfer(wid);
@@ -94,7 +107,7 @@ contract WithdrawEscrowTest is Test {
 
         // Withdrawal should fail (no claimable balance, already transferred)
         vm.prank(recipient);
-        vm.expectRevert('No claimable balance');
+        vm.expectRevert(abi.encodeWithSignature("NoClaimableBalance(uint256,address,address)", wid, recipient));
         vault.withdrawEscrow(wid);
     }
 
@@ -103,12 +116,14 @@ contract WithdrawEscrowTest is Test {
         vm.prank(sender);
         token.approve(address(vault), AMOUNT);
 
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
         vm.prank(sender);
-        uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT);
+        uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT, settings);
 
         // Recipient tries to withdraw while escrow is PENDING
+        // EscrowState.PENDING = 1 (enum starts at 1)
         vm.prank(recipient);
-        vm.expectRevert('Not finalized');
+        vm.expectRevert(abi.encodeWithSignature("TransferNotFinalized(uint256,uint8)", wid, uint8(1))); // 1 = PENDING
         vault.withdrawEscrow(wid);
     }
 
@@ -119,16 +134,18 @@ contract WithdrawEscrowTest is Test {
         // Create first escrow
         vm.prank(sender);
         token.approve(address(vault), amount1);
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
         vm.prank(sender);
-        uint256 wid1 = vault.createEscrow(address(token), recipient, amount1);
+        uint256 wid1 = vault.createEscrow(address(token), recipient, amount1, settings);
 
         // Create second escrow
         address sender2 = address(0x50);
         token.transfer(sender2, 100 ether);
         vm.prank(sender2);
         token.approve(address(vault), amount2);
+        EscrowSettings memory settings2 = SettingsValidationLibrary.getDefaultSettings();
         vm.prank(sender2);
-        uint256 wid2 = vault.createEscrow(address(token), recipient, amount2);
+        uint256 wid2 = vault.createEscrow(address(token), recipient, amount2, settings2);
 
         // Release both - autotransfer should automatically transfer funds
         uint256 recipientBalanceBefore = token.balanceOf(recipient);
@@ -148,11 +165,11 @@ contract WithdrawEscrowTest is Test {
 
         // Withdrawals should fail (no claimable balance, already transferred)
         vm.prank(recipient);
-        vm.expectRevert('No claimable balance');
+        vm.expectRevert(abi.encodeWithSignature("NoClaimableBalance(uint256,address,address)", wid1, recipient));
         vault.withdrawEscrow(wid1);
         
         vm.prank(recipient);
-        vm.expectRevert('No claimable balance');
+        vm.expectRevert(abi.encodeWithSignature("NoClaimableBalance(uint256,address,address)", wid2, recipient));
         vault.withdrawEscrow(wid2);
     }
 
@@ -161,11 +178,12 @@ contract WithdrawEscrowTest is Test {
         vm.prank(sender);
         token.approve(address(vault), AMOUNT);
 
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
         vm.prank(sender);
-        uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT);
+        uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT, settings);
 
         // Before release, claimable should be 0
-        uint256 claimableBefore = vault.claimable(wid, recipient, address(token));
+        uint256 claimableBefore = vault.claimableBalances(wid, recipient);
         assertEq(claimableBefore, 0);
 
         // Release - autotransfer should automatically transfer funds
@@ -181,15 +199,15 @@ contract WithdrawEscrowTest is Test {
         assertEq(recipientBalanceAfter - recipientBalanceBefore, expected, 'Autotransfer should have transferred funds');
 
         // Claimable should be 0 (autotransfer succeeded)
-        uint256 claimableAfter = vault.claimable(wid, recipient, address(token));
+        uint256 claimableAfter = vault.claimableBalances(wid, recipient);
         assertEq(claimableAfter, 0, 'Claimable should be 0 when autotransfer succeeds');
 
         // Withdrawal should fail (no claimable balance, already transferred)
         vm.prank(recipient);
-        vm.expectRevert('No claimable balance');
+        vm.expectRevert(abi.encodeWithSignature("NoClaimableBalance(uint256,address,address)", wid, recipient));
         vault.withdrawEscrow(wid);
 
-        uint256 claimableFinal = vault.claimable(wid, recipient, address(token));
+        uint256 claimableFinal = vault.claimableBalances(wid, recipient);
         assertEq(claimableFinal, 0, 'Claimable should remain 0');
     }
 }

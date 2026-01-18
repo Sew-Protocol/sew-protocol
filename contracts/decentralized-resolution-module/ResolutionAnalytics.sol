@@ -42,7 +42,7 @@ library ResolutionAnalytics {
     );
 
     event ResolutionReversed(
-        uint256 indexed escrowId,
+        uint256 indexed workflowId,
         address indexed resolver,
         DecentralizedResolverStructs.ResolutionOutcome originalOutcome,
         DecentralizedResolverStructs.ResolutionOutcome newOutcome,
@@ -51,7 +51,7 @@ library ResolutionAnalytics {
     );
 
     event ResolverTimeout(
-        uint256 indexed escrowId,
+        uint256 indexed workflowId,
         address indexed resolver,
         uint8 round,
         uint8 timeoutType // 0=accept, 1=resolve

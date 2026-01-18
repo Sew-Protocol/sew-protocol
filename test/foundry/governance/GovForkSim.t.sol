@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.28;
+import "../../../contracts/types/YieldPresets.sol";
+pragma solidity ^0.8.33;
 
 import {Test, console} from 'forge-std/Test.sol';
 import {GovGovernor} from '../../../contracts/governance/GovGovernor.sol';

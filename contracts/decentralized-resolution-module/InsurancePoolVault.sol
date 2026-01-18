@@ -61,7 +61,7 @@ contract InsurancePoolVault is AccessControl, ReentrancyGuard {
     event InsuranceFunded(
         uint256 indexed amount,
         ISlashingModule.SlashReason indexed source,
-        uint256 indexed escrowId,
+        uint256 indexed workflowId,
         uint256 newTotalBalance
     );
 
@@ -69,7 +69,7 @@ contract InsurancePoolVault is AccessControl, ReentrancyGuard {
         uint256 indexed payoutId,
         address indexed to,
         uint256 amount,
-        uint256 indexed escrowId,
+        uint256 indexed workflowId,
         string reason,
         uint64 eta
     );
@@ -78,7 +78,7 @@ contract InsurancePoolVault is AccessControl, ReentrancyGuard {
         uint256 indexed payoutId,
         address indexed to,
         uint256 amount,
-        uint256 indexed escrowId
+        uint256 indexed workflowId
     );
 
     event WithdrawalsEnabled(bool enabled);

@@ -38,8 +38,7 @@ describe('EscrowableERC20', function () {
       customResolver: disputeResolver as any,
       yieldEnabled: false,
       autoReleaseTime: 0,
-      autoCancelTime: 0,
-      escrowType: 0,
+      autoCancelTime: 0
     };
     const tx = await escrowableERC20
       .connect(sender)
@@ -62,8 +61,7 @@ describe('EscrowableERC20', function () {
       customResolver: resolverAddress as any,
       yieldEnabled: false,
       autoReleaseTime: 0,
-      autoCancelTime: 0,
-      escrowType: 0,
+      autoCancelTime: 0
     };
     const tx = await escrowableERC20
       .connect(sender)
@@ -179,8 +177,7 @@ describe('EscrowableERC20', function () {
         customResolver: customResolver.address,
         yieldEnabled: false,
         autoReleaseTime: 0,
-        autoCancelTime: 0,
-        escrowType: 0,
+        autoCancelTime: 0
       };
 
       await expect(
