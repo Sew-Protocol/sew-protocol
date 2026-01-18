@@ -115,7 +115,8 @@ export const GOVERNANCE_CONFIG = {
       'VOTING_PERIOD',
     ),
     proposalThreshold: process.env.PROPOSAL_THRESHOLD || '500000000000000000000000', // 500k tokens (0.05% of supply)
-    quorumBps: parseInteger(process.env.QUORUM_BPS, 400, 'QUORUM_BPS'), // 4%
+    absoluteQuorum:
+      process.env.ABSOLUTE_QUORUM || '4000000000000000000000000', // 4M tokens (in wei)
   },
   guardian: {
     multisig: process.env.GUARDIAN_MULTISIG || '',
@@ -198,14 +199,16 @@ export function validateConfig(): void {
   }
 
   if (
-    !Number.isInteger(GOVERNANCE_CONFIG.governor.quorumBps) ||
-    isNaN(GOVERNANCE_CONFIG.governor.quorumBps)
+    !GOVERNANCE_CONFIG.governor.absoluteQuorum ||
+    GOVERNANCE_CONFIG.governor.absoluteQuorum.trim().length === 0
   ) {
-    errors.push(
-      `QUORUM_BPS must be a valid integer, got: ${GOVERNANCE_CONFIG.governor.quorumBps}`,
-    );
-  } else if (GOVERNANCE_CONFIG.governor.quorumBps < 0 || GOVERNANCE_CONFIG.governor.quorumBps > 10000) {
-    errors.push('QUORUM_BPS must be between 0 and 10000');
+    errors.push('ABSOLUTE_QUORUM is required');
+  } else {
+    try {
+      parseBigInt(GOVERNANCE_CONFIG.governor.absoluteQuorum, 'ABSOLUTE_QUORUM');
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : `Invalid ABSOLUTE_QUORUM: ${String(error)}`);
+    }
   }
 
   // Validate proposalThreshold (should be a valid BigInt string)

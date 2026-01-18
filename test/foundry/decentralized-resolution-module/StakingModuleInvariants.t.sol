@@ -179,7 +179,7 @@ contract StakingModuleInvariantsTest is Test {
         sewAmount = bound(sewAmount, 10000e18, MAX_SEW); // Large SEW
 
         // Check if mix is invalid
-        (bool valid, , ) = BondValuationLibrary.checkBondMix(
+        (bool valid, uint256 stableBps, uint256 sewBps) = BondValuationLibrary.checkBondMix(
             stableAmount,
             sewAmount,
             PRECISION,
@@ -189,9 +189,11 @@ contract StakingModuleInvariantsTest is Test {
         );
 
         if (!valid) {
-            // Should revert
+            // Should revert with the exact mix percentages
             vm.prank(resolver1);
-            vm.expectRevert('Invalid bond mix');
+            vm.expectRevert(
+                abi.encodeWithSelector(ResolverStakingModuleV1.InvalidBondMix.selector, stableBps, sewBps)
+            );
             stakingModule.stakeWithMix(stableAmount, sewAmount);
         }
     }
@@ -346,7 +348,14 @@ contract StakingModuleInvariantsTest is Test {
         // Resolver needs 10K × 3 = 30K coverage
         // Should fail (12.5K < 30K)
         vm.prank(resolver1);
-        vm.expectRevert('Insufficient senior coverage');
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ResolverStakingModuleV1.InsufficientSeniorCoverage.selector,
+                senior1,
+                12500e18,
+                30000e18
+            )
+        );
         stakingModule.delegateStake(senior1, 0);
     }
 
@@ -375,7 +384,14 @@ contract StakingModuleInvariantsTest is Test {
         // Second delegation should succeed (9K + 9K = 18K > 15K)
         // Should fail
         vm.prank(resolver2);
-        vm.expectRevert('Insufficient senior coverage');
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ResolverStakingModuleV1.InsufficientSeniorCoverage.selector,
+                senior1,
+                6000e18,
+                9000e18
+            )
+        );
         stakingModule.delegateStake(senior1, 0);
     }
 
@@ -421,16 +437,32 @@ contract StakingModuleInvariantsTest is Test {
         stakingModule.requestUnstakeWithMix(5000e6, 0);
 
         // Try to complete immediately
+        (, , uint256 availableAt, ) = stakingModule.unbondRequests(resolver1);
         vm.prank(resolver1);
-        vm.expectRevert('Unbond delay not passed');
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ResolverStakingModuleV1.UnbondDelayNotPassed.selector,
+                resolver1,
+                availableAt,
+                block.timestamp
+            )
+        );
         stakingModule.completeUnstake();
 
         // Warp 13 days (< 14 day delay)
         vm.warp(block.timestamp + 13 days);
 
         // Still should fail
+        (, , uint256 availableAt2, ) = stakingModule.unbondRequests(resolver1);
         vm.prank(resolver1);
-        vm.expectRevert('Unbond delay not passed');
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ResolverStakingModuleV1.UnbondDelayNotPassed.selector,
+                resolver1,
+                availableAt2,
+                block.timestamp
+            )
+        );
         stakingModule.completeUnstake();
 
         // Warp to 14 days
@@ -474,8 +506,16 @@ contract StakingModuleInvariantsTest is Test {
         stakingModule.completeUnstake();
 
         // Senior cannot yet
+        (, , uint256 seniorAvailableAt, ) = stakingModule.unbondRequests(senior1);
         vm.prank(senior1);
-        vm.expectRevert('Unbond delay not passed');
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ResolverStakingModuleV1.UnbondDelayNotPassed.selector,
+                senior1,
+                seniorAvailableAt,
+                block.timestamp
+            )
+        );
         stakingModule.completeUnstake();
 
         // Warp to 21 days
@@ -500,8 +540,15 @@ contract StakingModuleInvariantsTest is Test {
         stakingModule.onResolverAssigned(1, resolver1, 0);
 
         // Try to unbond
+        uint256 lockedAmount = stakingModule.totalLockedStake(resolver1);
         vm.prank(resolver1);
-        vm.expectRevert('Stake locked in disputes');
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ResolverStakingModuleV1.StakeLockedInDisputes.selector,
+                resolver1,
+                lockedAmount
+            )
+        );
         stakingModule.requestUnstakeWithMix(5000e6, 0);
 
         // Unlock stake
@@ -530,8 +577,15 @@ contract StakingModuleInvariantsTest is Test {
         stakingModule.delegateStake(senior1, 0);
 
         // Senior tries to unbond
+        uint256 reserved = stakingModule.reservedCoverage(senior1);
         vm.prank(senior1);
-        vm.expectRevert('Coverage reserved');
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ResolverStakingModuleV1.CoverageAlreadyReserved.selector,
+                senior1,
+                reserved
+            )
+        );
         stakingModule.requestUnstakeWithMix(10000e6, 0);
 
         // Junior undelegates
@@ -560,7 +614,9 @@ contract StakingModuleInvariantsTest is Test {
 
         // Junior tries to unbond
         vm.prank(resolver1);
-        vm.expectRevert('Must undelegate first');
+        vm.expectRevert(
+            abi.encodeWithSelector(ResolverStakingModuleV1.MustUndelegateFirst.selector, resolver1)
+        );
         stakingModule.requestUnstakeWithMix(1000e6, 0);
 
         // Junior undelegates
@@ -737,7 +793,15 @@ contract StakingModuleInvariantsTest is Test {
     function test_ResolverMinimumStake() public {
         // Try to stake below minimum ($200 < $250)
         vm.prank(resolver1);
-        vm.expectRevert('Below minimum stake');
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ResolverStakingModuleV1.BelowMinimumStake.selector,
+                resolver1,
+                200e18,
+                250e18,
+                uint8(0)
+            )
+        );
         stakingModule.stakeWithMix(200e6, 0);
 
         // Should succeed with minimum ($250)
@@ -754,7 +818,15 @@ contract StakingModuleInvariantsTest is Test {
     function test_SeniorMinimumStake() public {
         // Try to stake below minimum ($20,000 < $25,000)
         vm.prank(senior1);
-        vm.expectRevert('Below minimum stake');
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ResolverStakingModuleV1.BelowMinimumStake.selector,
+                senior1,
+                20000e18,
+                25000e18,
+                uint8(1)
+            )
+        );
         stakingModule.stakeWithMix(20000e6, 0);
 
         // Should succeed with minimum ($25,000)

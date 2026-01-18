@@ -5,7 +5,6 @@ import '@openzeppelin/contracts/governance/Governor.sol';
 import '@openzeppelin/contracts/governance/extensions/GovernorSettings.sol';
 import '@openzeppelin/contracts/governance/extensions/GovernorCountingSimple.sol';
 import '@openzeppelin/contracts/governance/extensions/GovernorVotes.sol';
-import '@openzeppelin/contracts/governance/extensions/GovernorVotesQuorumFraction.sol';
 import '@openzeppelin/contracts/governance/extensions/GovernorTimelockControl.sol';
 import '@openzeppelin/contracts/governance/TimelockController.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
@@ -16,21 +15,18 @@ import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
  * @dev Combines multiple Governor extensions:
  * - GovernorSettings: voting delay, voting period, proposal threshold
  * - GovernorVotes: token-weighted voting
- * - GovernorVotesQuorumFraction: quorum based on absolute token amount (not percentage)
  * - GovernorTimelockControl: execution via TimelockController
  *
  * Quorum Calculation:
- * - Quorum is an ABSOLUTE amount of tokens (e.g., 4M tokens)
- * - Can be updated via governance proposal (setAbsoluteQuorum)
- * - Simple, safe, and predictable
- * - Non-circulating addresses are tracked for transparency/APIs (CoinGecko, etc.)
- *   but NOT used for quorum calculation
+ * - Launch configuration uses an absolute quorum amount (e.g., 4,000,000 SEW).
+ * - This avoids ambiguity around "circulating supply" definitions for quorum during launch.
+ * - Non-circulating addresses are still tracked for transparency/APIs and future governance upgrades.
  *
  * Non-Circulating Token Tracking:
  * - Tracks addresses that hold non-circulating tokens (vesting, treasury, etc.)
  * - Used for external APIs (CoinGecko, CoinMarketCap) and transparency
  * - getCirculatingSupply() provides accurate circulating supply for reporting
- * - Can be migrated to circulating-based quorum later if desired
+ * - Can be migrated to circulating-based quorum later if desired (without losing tracking data)
  *
  * Configuration:
  * - Voting delay: 1 block (configurable, longer for mainnet)
@@ -44,7 +40,6 @@ contract GovGovernor is
     GovernorSettings,
     GovernorCountingSimple,
     GovernorVotes,
-    GovernorVotesQuorumFraction,
     GovernorTimelockControl
 {
     /// @notice Maximum number of non-circulating addresses (prevents DoS)
@@ -62,10 +57,11 @@ contract GovGovernor is
     /// @notice Event emitted when a non-circulating address is removed
     event NonCirculatingAddressRemoved(address indexed addr);
 
-    /// @notice Absolute quorum amount (in tokens)
+    /// @notice Absolute quorum amount in token units (e.g., 4,000,000e18 for 4M tokens).
+    /// @dev Kept as `absoluteQuorum` for backwards compatibility with earlier naming.
     uint256 public absoluteQuorum;
 
-    /// @notice Event emitted when absolute quorum is updated
+    /// @notice Event emitted when absolute quorum amount is updated
     event AbsoluteQuorumUpdated(uint256 oldQuorum, uint256 newQuorum);
 
     // Custom errors
@@ -84,7 +80,7 @@ contract GovGovernor is
      * @param votingDelayBlocks Voting delay in blocks
      * @param votingPeriodBlocks Voting period in blocks
      * @param proposalThresholdTokens Minimum tokens needed to propose
-     * @param absoluteQuorumTokens Absolute quorum amount in tokens (e.g., 4M tokens)
+     * @param absoluteQuorumTokens Absolute quorum amount in token units (e.g., 4,000,000e18 for 4M tokens)
      * @param initialNonCirculatingAddresses Initial addresses to track for transparency/APIs (e.g., vesting contracts)
      */
     constructor(
@@ -99,7 +95,6 @@ contract GovGovernor is
         Governor('Sew Protocol DAO')
         GovernorSettings(votingDelayBlocks, votingPeriodBlocks, proposalThresholdTokens)
         GovernorVotes(IVotes(token))
-        GovernorVotesQuorumFraction(0) // Not used - we override quorum() to use absoluteQuorum
         GovernorTimelockControl(timelock)
     {
         if (absoluteQuorumTokens == 0) revert QuorumMustBePositive();
@@ -142,15 +137,15 @@ contract GovGovernor is
     }
 
     /**
-     * @notice Calculate quorum as absolute amount (not percentage-based)
-     * @return Quorum amount in tokens (absolute value, e.g., 4M tokens)
-     * @dev Overrides GovernorVotesQuorumFraction to use absolute quorum instead of percentage
-     *      Simple, safe, and predictable. Can be updated via governance (setAbsoluteQuorum)
-     *      blockNumber parameter is unused but required by interface
+     * @notice Return the absolute quorum amount.
+     * @return Quorum amount in token units
+     * @dev For launch, quorum is an absolute amount (e.g., 4M tokens).
+     *      Non-circulating tracking is preserved for reporting and future upgrades.
      */
     function quorum(
-        uint256 /* blockNumber */
-    ) public view override(Governor, GovernorVotesQuorumFraction) returns (uint256) {
+        uint256 blockNumber
+    ) public view override(Governor) returns (uint256) {
+        blockNumber; // silence unused warning; absolute quorum is block-independent
         return absoluteQuorum;
     }
 
@@ -159,13 +154,20 @@ contract GovGovernor is
      * @param blockNumber Block number to calculate circulating supply for
      * @return Circulating supply = total supply - sum of tokens in non-circulating addresses
      * @dev Used for external APIs (CoinGecko, CoinMarketCap) and transparency
-     *      NOT used for quorum calculation (quorum uses absoluteQuorum)
+     *      NOT used for quorum calculation (quorum uses `absoluteQuorum`)
      *      For current block: uses balanceOf() (more accurate, works even if not delegated)
      *      For historical blocks: uses getPastVotes() (limitation of ERC20Votes)
      */
     function getCirculatingSupply(uint256 blockNumber) public view returns (uint256) {
         IVotes token = token();
-        uint256 totalSupply = token.getPastTotalSupply(blockNumber);
+        uint256 totalSupply;
+        if (blockNumber >= block.number) {
+            // Current (or future) block: use live ERC20 totalSupply to avoid ERC5805FutureLookup
+            totalSupply = IERC20(address(token)).totalSupply();
+            blockNumber = block.number;
+        } else {
+            totalSupply = token.getPastTotalSupply(blockNumber);
+        }
         uint256 nonCirculating = 0;
 
         uint256 length = nonCirculatingAddressesList.length;

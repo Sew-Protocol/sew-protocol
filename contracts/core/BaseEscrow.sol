@@ -750,13 +750,17 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
                     if (address(bondCollector) == address(0)) {
                         revert ZeroBondCollector();
                     }
-                    // Pull tokens first for ERC20 bonds (BondCollector expects tokens already in escrow)
+                    // Pull tokens first for ERC20 bonds
                     if (bondToken != address(0)) {
                         _pullTokens(bondToken, _msgSender(), bondAmount);
+                        // Move custody to BondCollector (it will approve + record in incentive module)
+                        IERC20(bondToken).safeTransfer(address(bondCollector), bondAmount);
                     }
                     // Collect bond via BondCollector
                     uint256 snapshottedBondFee = moduleSnapshots[workflowId].appealBondProtocolFeeBps;
-                    address depositor = bondToken == address(0) ? _msgSender() : address(this);
+                    // For ETH bonds: depositor is user (must equal escalatedBy)
+                    // For ERC20 bonds: BondCollector is the depositor (it holds custody after transfer above)
+                    address depositor = bondToken == address(0) ? _msgSender() : address(bondCollector);
                     bondCollector.collectBond{value: bondToken == address(0) ? bondAmount : 0}(
                         workflowId,
                         incentiveMod,

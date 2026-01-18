@@ -23,6 +23,7 @@ import './types/EscrowTypes.sol';
 contract SettlementOps is AccessControl {
     // ============ Role Constants ============
     bytes32 public constant ROLE_ESCROW_CONTRACT = keccak256('ROLE_ESCROW_CONTRACT');
+    bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');
 
     // ============ Custom Errors ============
     error ZeroOwner();
@@ -46,19 +47,21 @@ contract SettlementOps is AccessControl {
 
     /**
      * @notice Constructor for SettlementOps
-     * @param initialOwner Address that will receive DEFAULT_ADMIN_ROLE
+     * @param initialOwner Address that will receive DEFAULT_ADMIN_ROLE (for initial setup only)
      */
     constructor(address initialOwner) {
         if (initialOwner == address(0)) revert ZeroOwner();
         _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
+        // ROLE_TIMELOCK gates registerEscrowContract(), so initialOwner must have it for initial setup.
+        _grantRole(ROLE_TIMELOCK, initialOwner);
     }
 
     /**
      * @notice Register an escrow contract (grants it ROLE_ESCROW_CONTRACT)
      * @param escrowContract Address of the escrow contract
-     * @dev Only DEFAULT_ADMIN_ROLE can register escrow contracts
+     * @dev Only ROLE_TIMELOCK can register escrow contracts (governance-controlled)
      */
-    function registerEscrowContract(address escrowContract) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function registerEscrowContract(address escrowContract) external onlyRole(ROLE_TIMELOCK) {
         if (escrowContract == address(0)) revert InvalidAddress('Escrow contract cannot be zero', escrowContract);
         _grantRole(ROLE_ESCROW_CONTRACT, escrowContract);
     }

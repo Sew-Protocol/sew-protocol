@@ -279,6 +279,8 @@ These fields change naturally as part of the escrow lifecycle, not through gover
 
 - The _only_ executor of Standard and Slow changes.
 - Global timelock delay: **48 hours**.
+- Controls all operational functions in ops contracts (CreateOps, SettlementOps, DisputeOps, YieldOps, BondCollector, ModuleManagementContract, EscrowAdminContract).
+- All `registerEscrowContract()` functions require `ROLE_TIMELOCK` (governance-controlled).
 
 ### Guardian Multisig
 
@@ -287,14 +289,17 @@ Emergency-only role with **risk-reduction** powers:
 - can pause protocol operations
 - can disable external yield deposits (e.g., Aave)
 - can lower exposure caps (down-only)
+- can pause yield deposits (via CreateOps)
 
 Guardian **cannot**:
 
 - unpause the protocol
+- resume yield deposits (down-only control)
 - swap modules
 - raise caps
 - change fees or fee recipient
 - cancel governance actions in the timelock
+- register escrow contracts with ops contracts
 
 ### Fee Recipient
 

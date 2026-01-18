@@ -385,7 +385,7 @@ TIMELOCK_DELAY=172800  # 48 hours in seconds
 VOTING_DELAY=1  # blocks (for testing)
 VOTING_PERIOD=45818  # blocks (~1 week @ 13s/block)
 PROPOSAL_THRESHOLD=10000000000000000000000000  # 10M tokens (1% of supply)
-QUORUM_BPS=400  # 4%
+ABSOLUTE_QUORUM=4000000000000000000000000  # 4M tokens (in wei)
 
 # Guardian
 GUARDIAN_MULTISIG=0x...  # 3-of-5 Safe address

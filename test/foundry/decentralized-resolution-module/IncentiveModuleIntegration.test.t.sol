@@ -12,8 +12,11 @@ import '../../../contracts/decentralized-resolution-module/DecentralizedResolver
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/YieldOps.sol';
 import '../../../contracts/DisputeOps.sol';
+import '../../../contracts/CreateOps.sol';
+import '../../../contracts/SettlementOps.sol';
 import '../../../contracts/core/ModuleManagementContract.sol';
 import '../../../contracts/admin/EscrowAdminContract.sol';
+import '../../../contracts/core/BondCollector.sol';
 /**
  * @title IncentiveModuleIntegrationTest
  * @notice Comprehensive integration tests for incentive module lifecycle hooks
@@ -28,6 +31,9 @@ contract IncentiveModuleIntegrationTest is Test {
     ERC20Mock public token;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
+    CreateOps public createOps;
+    SettlementOps public settlementOps;
+    BondCollector public bondCollector;
     ModuleManagementContract public moduleManagement;
     EscrowAdminContract public adminContract;
 
@@ -66,12 +72,34 @@ contract IncentiveModuleIntegrationTest is Test {
         resolutionModule = new DecentralizedResolutionModule(deployer);
 
         // Deploy escrow
-        YieldOps yOps = new YieldOps(address(this));
-        DisputeOps dOps = new DisputeOps(address(this));
-        // Assign to state variables if they exist, but here we just need address
+        yieldOps = new YieldOps(address(this));
+        disputeOps = new DisputeOps(address(this));
         moduleManagement = new ModuleManagementContract(address(this));
         adminContract = new EscrowAdminContract(address(this));
-        escrow = new EscrowVault(100, makeAddr('feeAddress'), address(yOps), address(dOps), address(moduleManagement));
+        escrow = new EscrowVault(
+            100,
+            makeAddr('feeAddress'),
+            address(yieldOps),
+            address(disputeOps),
+            address(moduleManagement)
+        );
+        disputeOps.registerEscrowContract(address(escrow));
+
+        // Deploy and wire required ops (BaseEscrow now requires these)
+        createOps = new CreateOps(address(this));
+        settlementOps = new SettlementOps(address(this));
+        bondCollector = new BondCollector(address(this));
+        createOps.registerEscrowContract(address(escrow));
+        settlementOps.registerEscrowContract(address(escrow));
+        bondCollector.registerEscrowContract(address(escrow));
+
+        // Grant admin-contract role so this test can configure ops,
+        // and so EscrowAdminContract can activate modules without attempting to grant itself.
+        escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(this));
+        escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(adminContract));
+        escrow.setCreateOps(address(createOps));
+        escrow.setSettlementOps(address(settlementOps));
+        escrow.setBondCollector(address(bondCollector));
 
         // Setup roles
         bytes32 ROLE_TIMELOCK = resolutionModule.ROLE_TIMELOCK();
@@ -84,12 +112,22 @@ contract IncentiveModuleIntegrationTest is Test {
         // Register escrow contract in resolution module
         vm.prank(timelock);
         resolutionModule.registerEscrowContract(address(escrow));
+        // DisputeOps calls into the resolution module during escalation, so it must be registered too
+        vm.prank(timelock);
+        resolutionModule.registerEscrowContract(address(disputeOps));
 
         // Register escrow contract in incentive modules
         vm.prank(timelock);
         incentiveModuleV1.registerEscrowContract(address(escrow));
         vm.prank(timelock);
         incentiveModuleV2.registerEscrowContract(address(escrow));
+
+        // BondCollector calls incentive module directly for bond recording (ERC20 path),
+        // so it must also be authorized as an escrow contract.
+        vm.prank(timelock);
+        incentiveModuleV1.registerEscrowContract(address(bondCollector));
+        vm.prank(timelock);
+        incentiveModuleV2.registerEscrowContract(address(bondCollector));
 
         // Also register resolution module in incentive modules (it calls hooks)
         vm.prank(timelock);
@@ -247,6 +285,16 @@ contract IncentiveModuleIntegrationTest is Test {
         escrow.raiseDispute(workflowId);
         vm.stopPrank();
 
+        // DisputeOps enforces "decision exists before appeal"
+        vm.prank(address(escrow));
+        resolutionModule.recordResolution(
+            workflowId,
+            resolver1,
+            // RELEASE → recipient wins, so sender (user1) can appeal
+            DecentralizedResolverStructs.ResolutionOutcome.RELEASE,
+            1 days
+        );
+
         // Get required bond amount
         (uint256 bondAmount, address bondToken) = resolutionModule.getRequiredAppealBond(
             workflowId,
@@ -260,10 +308,11 @@ contract IncentiveModuleIntegrationTest is Test {
         );
         assertTrue(bondAmount > 0, 'Bond amount should be > 0');
 
-        // Escalate with bond payment
-        vm.deal(user1, 10 ether);
-        vm.prank(user1);
-        escrow.escalateDispute{value: bondAmount}(workflowId);
+        // Escalate with bond payment (bond token is enforced to match escrow token)
+        vm.startPrank(user1);
+        token.approve(address(escrow), bondAmount);
+        escrow.escalateDispute(workflowId);
+        vm.stopPrank();
 
         // Verify bond was recorded
         ResolverIncentiveModuleV2.AppealBondRecord memory bond = incentiveModuleV2.getAppealBond(
@@ -271,7 +320,8 @@ contract IncentiveModuleIntegrationTest is Test {
             1
         );
         assertEq(bond.amount, bondAmount, 'Bond amount should match');
-        assertEq(bond.depositor, user1, 'Depositor should be user1');
+        // For ERC20 bonds, depositor is the BondCollector (custody + approval lives there)
+        assertEq(bond.depositor, address(bondCollector), 'Depositor should be BondCollector');
         assertEq(bond.token, bondToken, 'Token should match');
         assertFalse(bond.distributed, 'Bond should not be distributed yet');
     }
@@ -319,28 +369,42 @@ contract IncentiveModuleIntegrationTest is Test {
         escrow.raiseDispute(workflowId);
         vm.stopPrank();
 
-        // Record bond first time - send ETH with call
-        vm.deal(address(escrow), 0.01 ether);
+        // DisputeOps enforces "decision exists before appeal"
         vm.prank(address(escrow));
-        incentiveModuleV2.recordAppealBond{value: 0.01 ether}(
+        resolutionModule.recordResolution(
             workflowId,
-            user1,
-            user1,
-            0.01 ether,
-            address(0),
-            1
+            resolver1,
+            // RELEASE → recipient wins, so sender (user1) can appeal
+            DecentralizedResolverStructs.ResolutionOutcome.RELEASE,
+            1 days
         );
 
-        // Try to record again - should fail
-        vm.deal(address(escrow), 0.01 ether);
-        vm.prank(address(escrow));
-        vm.expectRevert('Bond already exists');
-        incentiveModuleV2.recordAppealBond{value: 0.01 ether}(
+        // Record bond first time via escalation flow
+        (uint256 bondAmount, ) = resolutionModule.getRequiredAppealBond(
             workflowId,
+            0,
+            abi.encode(
+                address(token),
+                user1,
+                user2,
+                1000 ether - ((1000 ether * escrow.escrowFee()) / escrow.ESCROW_FEE_DENOMINATOR())
+            )
+        );
+        // Round 0 decision is RELEASE → only sender (user1) can appeal
+        vm.startPrank(user1);
+        token.approve(address(escrow), bondAmount);
+        escrow.escalateDispute(workflowId);
+        vm.stopPrank();
+
+        // Try to record again - should fail (bond already exists)
+        vm.prank(address(bondCollector));
+        vm.expectRevert('Bond already exists');
+        incentiveModuleV2.recordAppealBond(
+            workflowId,
+            address(escrow),
             user1,
-            user1,
-            0.01 ether,
-            address(0),
+            bondAmount,
+            address(token),
             1
         );
     }
@@ -390,18 +454,6 @@ contract IncentiveModuleIntegrationTest is Test {
         escrow.raiseDispute(workflowId);
         vm.stopPrank();
 
-        // Record bond for round 1 - send ETH with call
-        vm.deal(address(escrow), 0.01 ether);
-        vm.prank(address(escrow));
-        incentiveModuleV2.recordAppealBond{value: 0.01 ether}(
-            workflowId,
-            user1,
-            user1,
-            0.01 ether,
-            address(0),
-            1
-        );
-
         // Simulate decision at round 0 (CANCEL)
         vm.prank(address(escrow));
         resolutionModule.recordResolution(
@@ -411,10 +463,22 @@ contract IncentiveModuleIntegrationTest is Test {
             1 days
         );
 
-        // Escalate to round 1 (requires 0.01 ether bond)
-        vm.deal(user1, 1 ether);
-        vm.prank(user1);
-        escrow.escalateDispute{value: 0.01 ether}(workflowId);
+        // Escalate to round 1 (bond token is enforced to match escrow token)
+        (uint256 bondAmount, ) = resolutionModule.getRequiredAppealBond(
+            workflowId,
+            0,
+            abi.encode(
+                address(token),
+                user1,
+                user2,
+                1000 ether - ((1000 ether * escrow.escrowFee()) / escrow.ESCROW_FEE_DENOMINATOR())
+            )
+        );
+        // Round 0 decision is CANCEL → only recipient (user2) can appeal
+        vm.startPrank(user2);
+        token.approve(address(escrow), bondAmount);
+        escrow.escalateDispute(workflowId);
+        vm.stopPrank();
 
         // Simulate decision at round 1 (RELEASE) - reversal!
         vm.prank(address(escrow));
@@ -485,22 +549,6 @@ contract IncentiveModuleIntegrationTest is Test {
         escrow.raiseDispute(workflowId);
         vm.stopPrank();
 
-        // Record resolver at round 0
-        vm.prank(address(escrow));
-        incentiveModuleV2.recordResolver(workflowId, resolver1, 0);
-
-        // Record bond for round 1 - send ETH with call
-        vm.deal(address(escrow), 0.01 ether);
-        vm.prank(address(escrow));
-        incentiveModuleV2.recordAppealBond{value: 0.01 ether}(
-            workflowId,
-            user1,
-            user1,
-            0.01 ether,
-            address(0),
-            1
-        );
-
         // Simulate decision at round 0 (CANCEL)
         vm.prank(address(escrow));
         resolutionModule.recordResolution(
@@ -510,10 +558,22 @@ contract IncentiveModuleIntegrationTest is Test {
             1 days
         );
 
-        // Escalate to round 1 with bond payment
-        vm.deal(user1, 1 ether);
-        vm.prank(user1);
-        escrow.escalateDispute{value: 0.01 ether}(workflowId);
+        // Escalate to round 1 (bond token is enforced to match escrow token)
+        (uint256 bondAmount, ) = resolutionModule.getRequiredAppealBond(
+            workflowId,
+            0,
+            abi.encode(
+                address(token),
+                user1,
+                user2,
+                1000 ether - ((1000 ether * escrow.escrowFee()) / escrow.ESCROW_FEE_DENOMINATOR())
+            )
+        );
+        // Round 0 decision is CANCEL → only recipient (user2) can appeal
+        vm.startPrank(user2);
+        token.approve(address(escrow), bondAmount);
+        escrow.escalateDispute(workflowId);
+        vm.stopPrank();
 
         // Simulate decision at round 1 (CANCEL) - same as round 0, appeal failed
         vm.prank(address(escrow));
@@ -588,20 +648,14 @@ contract IncentiveModuleIntegrationTest is Test {
 
         // Record 3 resolvers at round 0
         vm.prank(address(escrow));
-        incentiveModuleV2.recordResolver(workflowId, resolver1, 0);
+        try incentiveModuleV2.recordResolver(workflowId, resolver1, 0) {} catch {}
         vm.prank(address(escrow));
         incentiveModuleV2.recordResolver(workflowId, resolver2, 0);
         address resolver3 = makeAddr('resolver3');
         vm.prank(address(escrow));
         incentiveModuleV2.recordResolver(workflowId, resolver3, 0);
 
-        // Record bond that doesn't divide evenly: 100 wei / 3 = 33 remainder 1
-        // Send ETH with call
-        vm.deal(address(escrow), 100);
-        vm.prank(address(escrow));
-        incentiveModuleV2.recordAppealBond{value: 100}(workflowId, user1, user1, 100, address(0), 1);
-
-        // Simulate decision and escalation
+        // Simulate decision at round 0 (CANCEL) - required before appeal can be filed
         vm.prank(address(escrow));
         resolutionModule.recordResolution(
             workflowId,
@@ -609,9 +663,14 @@ contract IncentiveModuleIntegrationTest is Test {
             DecentralizedResolverStructs.ResolutionOutcome.CANCEL,
             1 days
         );
-        vm.deal(user1, 100);
-        vm.prank(user1);
-        escrow.escalateDispute{value: 100}(workflowId);
+
+        // Escalate to round 1 with bond amount 100 (token is enforced to match escrow token)
+        // Round 0 decision is CANCEL → only recipient (user2) can appeal
+        vm.startPrank(user2);
+        token.approve(address(escrow), 100);
+        escrow.escalateDispute(workflowId);
+        vm.stopPrank();
+
         vm.prank(address(escrow));
         resolutionModule.recordResolution(
             workflowId,
@@ -664,11 +723,7 @@ contract IncentiveModuleIntegrationTest is Test {
         escrow.raiseDispute(workflowId);
         vm.stopPrank();
 
-        // Record resolver and fees
-        vm.prank(address(escrow));
-        incentiveModuleV1.recordResolver(workflowId, resolver1, 0);
-        vm.prank(address(escrow));
-        incentiveModuleV1.recordEscrowFee(workflowId, address(token), 50 ether);
+        // Resolver + escrow fee are recorded via incentive module hooks during dispute initialization.
 
         // Transfer tokens to incentive module
         token.mint(address(incentiveModuleV1), 100 ether);

@@ -11,7 +11,10 @@ import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/decentralized-resolution-module/DecentralizedResolverStructs.sol';
 import '../../../contracts/YieldOps.sol';
 import '../../../contracts/DisputeOps.sol';
+import '../../../contracts/CreateOps.sol';
+import '../../../contracts/SettlementOps.sol';
 import '../../../contracts/core/ModuleManagementContract.sol';
+import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 /**
@@ -27,6 +30,9 @@ contract EscalationDepthHistogramIntegrationTest is Test {
     ERC20Mock public token;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
+    CreateOps public createOps;
+    SettlementOps public settlementOps;
+    BondCollector public bondCollector;
     ModuleManagementContract public moduleManagement;
 
     address public deployer;
@@ -68,6 +74,20 @@ contract EscalationDepthHistogramIntegrationTest is Test {
         moduleManagement = new ModuleManagementContract(address(this));
         escrow = new EscrowVault(100, makeAddr('feeAddress'), address(yieldOps), address(disputeOps), address(moduleManagement));
 
+        // Deploy and wire required ops (BaseEscrow now requires these)
+        createOps = new CreateOps(address(this));
+        settlementOps = new SettlementOps(address(this));
+        bondCollector = new BondCollector(address(this));
+        createOps.registerEscrowContract(address(escrow));
+        settlementOps.registerEscrowContract(address(escrow));
+        bondCollector.registerEscrowContract(address(escrow));
+
+        // Grant admin-contract role so this test can configure ops
+        escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(this));
+        escrow.setCreateOps(address(createOps));
+        escrow.setSettlementOps(address(settlementOps));
+        escrow.setBondCollector(address(bondCollector));
+
         // Setup roles - deployer has DEFAULT_ADMIN_ROLE from constructors
         bytes32 ROLE_TIMELOCK = resolutionModule.ROLE_TIMELOCK();
         bytes32 INCENTIVE_ROLE_TIMELOCK = incentiveModule.ROLE_TIMELOCK();
@@ -94,13 +114,16 @@ contract EscalationDepthHistogramIntegrationTest is Test {
         moduleManagement.grantRole(ROLE_ESCROW_CONTRACT, address(escrow));
         
         // Configure resolution module in escrow (required for dispute operations)
-        vm.startPrank(deployer);
+        // Note: avoid vm.startPrank(deployer) then vm.prank(...) overwrite without an applied call
         vm.prank(address(escrow));
-        moduleManagement.queueDefaultModule(address(escrow), BaseEscrow.ModuleType.RESOLUTION, address(resolutionModule));
+        moduleManagement.queueDefaultModule(
+            address(escrow),
+            BaseEscrow.ModuleType.RESOLUTION,
+            address(resolutionModule)
+        );
         vm.warp(block.timestamp + 7 days + 1);
         vm.prank(address(escrow));
         moduleManagement.activateDefaultModule(address(escrow), BaseEscrow.ModuleType.RESOLUTION);
-        vm.stopPrank();
 
         // Setup resolvers - first appoint seniorResolver via timelock, then it can appoint others
         vm.prank(timelock);

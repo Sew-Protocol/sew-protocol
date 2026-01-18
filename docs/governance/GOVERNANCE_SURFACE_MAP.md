@@ -19,7 +19,7 @@ These are **deployment-time defaults** (can be overridden via environment variab
 - **Voting delay:** 1 block
 - **Voting period:** ~1 week (`VOTING_PERIOD=45818` blocks)
 - **Proposal threshold:** 10,000,000 SEW (1% of supply)
-- **Quorum:** 4% (`QUORUM_BPS=400`)
+- **Quorum:** 4,000,000 SEW (`ABSOLUTE_QUORUM=4000000000000000000000000`)
 
 ### Guardian / Safe
 - **Guardian multisig:** configured via `GUARDIAN_MULTISIG`
@@ -156,6 +156,64 @@ These are **deployment-time defaults** (can be overridden via environment variab
 
 **Note:** `DecentralizedResolutionModule` is in a separate package (`contracts/decentralized-resolution-module/`) and is **not included in the initial mainnet release**. When ready, it will be deployed and swapped in via the same Slow lane governance process as other modules (queue + activate, ~9 days).
 
+### CreateOps.sol (`contracts/CreateOps.sol`)
+
+| Function                                    | Role            | Lane     | Delay | Bounds           | Notes                                                      |
+| ------------------------------------------- | --------------- | -------- | ----- | ---------------- | ---------------------------------------------------------- |
+| `registerEscrowContract(address)`           | `ROLE_TIMELOCK` | Standard | 48h   | Non-zero address | Register escrow contract (EscrowVault or EscrowableERC20) |
+| `pauseYieldDeposits(string reason)`         | `ROLE_GUARDIAN` OR `ROLE_TIMELOCK` | Emergency OR Standard | 0h OR 48h | - | Pause yield deposits (Guardian can pause for emergencies, Timelock can pause via governance) |
+| `resumeYieldDeposits()`                     | `ROLE_TIMELOCK` | Standard | 48h   | -                | Resume yield deposits (Guardian cannot resume, down-only)  |
+
+**Note**: `CreateOps` is an external helper contract that handles escrow creation validation and computation. It uses consistent governance roles: `ROLE_TIMELOCK` for operational functions, `ROLE_GUARDIAN` for emergency pause.
+
+### SettlementOps.sol (`contracts/SettlementOps.sol`)
+
+| Function                      | Role            | Lane     | Delay | Bounds           | Notes                                    |
+| ----------------------------- | --------------- | -------- | ----- | ---------------- | ---------------------------------------- |
+| `registerEscrowContract(address)` | `ROLE_TIMELOCK` | Standard | 48h   | Non-zero address | Register escrow contract                 |
+
+**Note**: `SettlementOps` is an external helper contract that handles settlement execution operations. It uses `ROLE_TIMELOCK` for all operational functions.
+
+### DisputeOps.sol (`contracts/DisputeOps.sol`)
+
+| Function                      | Role            | Lane     | Delay | Bounds           | Notes                                    |
+| ----------------------------- | --------------- | -------- | ----- | ---------------- | ---------------------------------------- |
+| `registerEscrowContract(address)` | `ROLE_TIMELOCK` | Standard | 48h   | Non-zero address | Register escrow contract                 |
+
+**Note**: `DisputeOps` is an external helper contract that handles dispute escalation orchestration. It uses `ROLE_TIMELOCK` for all operational functions.
+
+### YieldOps.sol (`contracts/YieldOps.sol`)
+
+| Function                      | Role            | Lane     | Delay | Bounds           | Notes                                    |
+| ----------------------------- | --------------- | -------- | ----- | ---------------- | ---------------------------------------- |
+| `registerEscrowContract(address)` | `ROLE_TIMELOCK` | Standard | 48h   | Non-zero address | Register escrow contract                 |
+
+**Note**: `YieldOps` is an external helper contract that handles yield withdrawal and distribution operations. It uses `ROLE_TIMELOCK` for all operational functions.
+
+### BondCollector.sol (`contracts/core/BondCollector.sol`)
+
+| Function                      | Role            | Lane     | Delay | Bounds           | Notes                                    |
+| ----------------------------- | --------------- | -------- | ----- | ---------------- | ---------------------------------------- |
+| `registerEscrowContract(address)` | `ROLE_TIMELOCK` | Standard | 48h   | Non-zero address | Register escrow contract                 |
+
+**Note**: `BondCollector` is an external helper contract that handles escalation bond collection. It uses `ROLE_TIMELOCK` for all operational functions.
+
+### ModuleManagementContract.sol (`contracts/core/ModuleManagementContract.sol`)
+
+| Function                      | Role            | Lane     | Delay | Bounds           | Notes                                    |
+| ----------------------------- | --------------- | -------- | ----- | ---------------- | ---------------------------------------- |
+| `registerEscrowContract(address)` | `ROLE_TIMELOCK` | Standard | 48h   | Non-zero address | Register escrow contract for module management |
+
+**Note**: `ModuleManagementContract` is a centralized module management contract that handles queue/activate pattern for default modules. It uses `ROLE_TIMELOCK` for all operational functions.
+
+### EscrowAdminContract.sol (`contracts/admin/EscrowAdminContract.sol`)
+
+| Function                      | Role            | Lane     | Delay | Bounds           | Notes                                    |
+| ----------------------------- | --------------- | -------- | ----- | ---------------- | ---------------------------------------- |
+| `registerEscrowContract(address)` | `ROLE_TIMELOCK` | Standard | 48h   | Non-zero address | Register escrow contract                 |
+
+**Note**: `EscrowAdminContract` is an admin contract that handles time-delayed parameter updates for escrow contracts. It uses `ROLE_TIMELOCK` for all operational functions.
+
 ### ResolverIncentiveModule.sol (`contracts/decentralized-resolution-module/ResolverIncentiveModule.sol`)
 
 **Note:** `ResolverIncentiveModule` is in a separate package (`contracts/decentralized-resolution-module/`) and is **not included in the initial mainnet release**. When ready, it will be deployed and swapped in via the same Slow lane governance process as other modules (queue + activate, ~9 days).
@@ -208,12 +266,44 @@ The following functions were **removed from the ABI** in Phase 5 to eliminate pe
 
 ---
 
+## Ops Contracts Governance Pattern
+
+All ops contracts (CreateOps, SettlementOps, DisputeOps, YieldOps, BondCollector) and auxiliary contracts (ModuleManagementContract, EscrowAdminContract) follow a **consistent governance pattern**:
+
+### Consistent Role Usage
+
+- **DEFAULT_ADMIN_ROLE**: Only granted in constructor to `initialOwner` for initial setup. Transferred to TimelockController after deployment.
+- **ROLE_TIMELOCK**: Required for all operational functions (e.g., `registerEscrowContract()`).
+- **ROLE_GUARDIAN**: Used for emergency pause functions (where applicable, e.g., `pauseYieldDeposits()` in CreateOps).
+
+### Registration Pattern
+
+All ops contracts require escrow contracts (EscrowVault, EscrowableERC20) to be registered before use:
+
+1. **Registration**: `registerEscrowContract(address escrow)` - Requires `ROLE_TIMELOCK` (governance-controlled)
+2. **Access**: Registered escrow contracts receive `ROLE_ESCROW_CONTRACT` role
+3. **Usage**: Only registered escrow contracts can call ops contract functions
+
+### Emergency Controls (Where Applicable)
+
+Some ops contracts have emergency pause capabilities:
+
+- **CreateOps**: `pauseYieldDeposits()` can be called by `ROLE_GUARDIAN` (emergency) OR `ROLE_TIMELOCK` (governance)
+- **CreateOps**: `resumeYieldDeposits()` can only be called by `ROLE_TIMELOCK` (Guardian cannot resume, down-only control)
+
+This pattern ensures:
+- ✅ No admin role for operational functions
+- ✅ Consistent governance across all auxiliary contracts
+- ✅ Emergency controls where needed (Guardian can pause, Timelock can pause/resume)
+- ✅ All changes are time-delayed and transparent
+
 ## Key Guarantees
 
 1. **New Escrows Only**: Module changes apply only to new escrows. Existing escrows use snapshotted modules.
 2. **No Per-Escrow Overrides**: No governance actor can modify rules for a specific escrow after creation.
 3. **Time-Delayed Execution**: All non-emergency changes execute through TimelockController.
 4. **Down-Only Emergency**: Guardian can only reduce risk, never increase it.
+5. **Consistent Governance**: All ops contracts use the same governance pattern (ROLE_TIMELOCK for operations, ROLE_GUARDIAN for emergency pause where applicable).
 
 ---
 
@@ -222,3 +312,20 @@ The following functions were **removed from the ABI** in Phase 5 to eliminate pe
 - `governance.md` - Governance model overview
 - `GOVERNANCE_IMPLEMENTATION_STATUS.md` - Implementation status
 - `GOVERNANCE_IMPLEMENTATION_PLAN.md` - Implementation plan
+- `../reviews/GOVERNANCE_ROLES_CONSISTENCY.md` - Governance roles consistency review
+
+## Change Log
+
+### 2026-01-27
+
+- Added ops contracts to governance surface map:
+  - CreateOps (with yield deposits pause/resume)
+  - SettlementOps
+  - DisputeOps
+  - YieldOps
+  - BondCollector
+  - ModuleManagementContract
+  - EscrowAdminContract
+- Documented consistent governance pattern across all ops contracts
+- Updated role usage: All `registerEscrowContract()` functions now require `ROLE_TIMELOCK` (governance-controlled)
+- Added emergency controls documentation for CreateOps yield deposits pause/resume

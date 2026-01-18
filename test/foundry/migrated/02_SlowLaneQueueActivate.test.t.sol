@@ -26,6 +26,7 @@ contract Test_02_SlowLaneQueueActivate_test is Test {
         vault = new EscrowVault(100, address(this), address(yieldOps), address(disputeOps), address(moduleManagement));
         // grant timelock role to timelock address
         vault.grantRole(vault.ROLE_TIMELOCK(), timelock);
+        vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(adminContract));
         adminContract.grantRole(adminContract.ROLE_TIMELOCK(), timelock);
     }
 

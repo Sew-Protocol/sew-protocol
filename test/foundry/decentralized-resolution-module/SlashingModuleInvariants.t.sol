@@ -427,7 +427,14 @@ contract SlashingModuleInvariantsTest is Test {
 
         // Try to reset immediately
         vm.prank(admin);
-        vm.expectRevert('Cooldown not passed');
+        uint256 availableAt = slashingModule.lastCircuitBreakerTrigger() + 1 hours;
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ResolverSlashingModuleV1.CooldownNotPassed.selector,
+                availableAt,
+                block.timestamp
+            )
+        );
         slashingModule.resetCircuitBreaker();
 
         // Warp past cooldown (1 hour)

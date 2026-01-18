@@ -61,32 +61,60 @@ export NETWORK=baseSepolia
 pnpm hardhat console --network baseSepolia
 ```
 
-### Step 2: Deploy Core Contracts
+### Step 2: Deploy Ops Contracts
 
 ```bash
-# Deploy core escrow contracts
-pnpm hardhat deploy --network baseSepolia --tags core
+# Deploy ops contracts (required before core escrow contracts)
+pnpm hardhat deploy --network baseSepolia --tags yield-ops,dispute-ops,settlement-ops,create-ops,bond-collector
 
 # Verify deployments
 pnpm hardhat export --network baseSepolia
 ```
 
 **Expected Output:**
-- `BaseEscrow` (implementation)
-- `EscrowVault` (implementation)
-- `EscrowableERC20` (implementation)
+- `YieldOps` (Yield withdrawal and distribution)
+- `DisputeOps` (Dispute escalation orchestration)
+- `SettlementOps` (Settlement execution operations)
+- `CreateOps` (Escrow creation validation and computation)
+- `BondCollector` (Escalation bond collection)
 
-### Step 3: Deploy Governance Infrastructure
+**Note**: These contracts are deployed with the deployer as `initialOwner`. Admin roles will be transferred to TimelockController in Step 5.
+
+### Step 3: Deploy Module Management
 
 ```bash
-# Deploy governance token
+# Deploy module management contract
+pnpm hardhat deploy --network baseSepolia --tags module-management
+```
+
+**Expected Output:**
+- `ModuleManagementContract` (Centralized module management)
+
+### Step 4: Deploy Core Escrow Contracts
+
+```bash
+# Deploy core escrow contracts
+pnpm hardhat deploy --network baseSepolia --tags escrow
+
+# Verify deployments
+pnpm hardhat export --network baseSepolia
+```
+
+**Expected Output:**
+- `EscrowVault` (Main escrow contract for ERC20 tokens)
+- `EscrowableERC20` (Optional - ERC20 token with built-in escrow, set `DEPLOY_ESCROWABLE_ERC20=true`)
+
+**Actions performed automatically**:
+- Registers EscrowVault with all 5 ops contracts (CreateOps, SettlementOps, DisputeOps, YieldOps, BondCollector)
+- Sets ops contracts in EscrowVault using `setCreateOps()`, `setSettlementOps()`, `setBondCollector()` (if deployer has ROLE_ADMIN_CONTRACT)
+- Registers EscrowableERC20 with all ops contracts (if deployed)
+- Sets ops contracts in EscrowableERC20 (if deployed)
+
+### Step 5: Deploy Governance Infrastructure
+
+```bash
+# Deploy all governance contracts
 pnpm hardhat deploy --network baseSepolia --tags governance
-
-# Deploy timelock
-pnpm hardhat deploy --network baseSepolia --tags timelock
-
-# Deploy governor
-pnpm hardhat deploy --network baseSepolia --tags governor
 ```
 
 **Expected Output:**
@@ -94,7 +122,17 @@ pnpm hardhat deploy --network baseSepolia --tags governor
 - `TimelockController` (OpenZeppelin)
 - `GovGovernor` (OpenZeppelin Governor)
 
-### Step 4: Deploy IEO Modules
+**Actions performed automatically**:
+- Grants roles to TimelockController and Guardian multisig
+- Transfers DEFAULT_ADMIN_ROLE from deployer to TimelockController for all contracts:
+  - EscrowVault
+  - EscrowableERC20
+  - All ops contracts (CreateOps, SettlementOps, DisputeOps, YieldOps, BondCollector)
+  - ModuleManagementContract
+  - AaveYieldGenerationModule (if deployed)
+  - DefaultResolutionModule (if deployed)
+
+### Step 6: Deploy IEO Modules
 
 ```bash
 # Deploy default resolution module
@@ -113,10 +151,10 @@ pnpm hardhat deploy --network baseSepolia --tags yield-modules
 - `AaveYieldGenerationModule` (if yield enabled)
 - `DefaultYieldDistributionModule`
 
-### Step 5: Wire Contracts
+### Step 7: Wire Contracts (Optional)
 
 ```bash
-# Wire governance and modules
+# Wire governance and modules (if needed)
 pnpm hardhat deploy --network baseSepolia --tags wiring
 
 # Post-deployment checks
@@ -124,13 +162,17 @@ pnpm hardhat deploy --network baseSepolia --tags post
 ```
 
 **Actions:**
-- Set default resolution module in BaseEscrow
-- Set default release strategy
+- Set default resolution module in EscrowVault (via EscrowAdminContract)
+- Set default release strategy (via ModuleManagementContract)
 - Set default yield modules (if enabled)
-- Transfer admin roles to Timelock
-- Transfer governance token to Governor
+- Transfer governance token to Governor (if needed)
 
-### Step 6: Verify Contracts
+**Note**: Most wiring is now handled automatically:
+- ✅ Ops contracts are registered with escrow contracts (Step 4)
+- ✅ Ops contracts are set in escrow contracts (Step 4)
+- ✅ Admin roles are transferred to TimelockController (Step 5)
+
+### Step 8: Verify Contracts
 
 ```bash
 # Verify all contracts on block explorer
@@ -144,7 +186,39 @@ pnpm hardhat verify --network baseSepolia <CONTRACT_ADDRESS> <CONSTRUCTOR_ARGS>
 
 ## Post-Deployment Configuration
 
-### 1. Set Initial Resolver
+### 1. Verify Ops Contract Registration
+
+```bash
+# Verify EscrowVault is registered with all ops contracts
+# This should have been done automatically in Step 4
+# Check via:
+pnpm hardhat run scripts/verify-ops-registration.ts --network baseSepolia
+```
+
+**Verification Checklist**:
+- [ ] EscrowVault registered with CreateOps
+- [ ] EscrowVault registered with SettlementOps
+- [ ] EscrowVault registered with DisputeOps
+- [ ] EscrowVault registered with YieldOps
+- [ ] EscrowVault registered with BondCollector
+- [ ] CreateOps set in EscrowVault
+- [ ] SettlementOps set in EscrowVault
+- [ ] BondCollector set in EscrowVault
+
+### 2. Verify Role Transfers
+
+```bash
+# Verify TimelockController has DEFAULT_ADMIN_ROLE on all contracts
+pnpm hardhat run scripts/verify-roles.ts --network baseSepolia
+```
+
+**Verification Checklist**:
+- [ ] TimelockController has DEFAULT_ADMIN_ROLE on EscrowVault
+- [ ] TimelockController has DEFAULT_ADMIN_ROLE on all ops contracts
+- [ ] TimelockController has DEFAULT_ADMIN_ROLE on ModuleManagementContract
+- [ ] Deployer does NOT have DEFAULT_ADMIN_ROLE (revoked)
+
+### 3. Set Initial Resolver
 
 ```bash
 # Via governance proposal
@@ -152,7 +226,7 @@ pnpm gov:build governance/payloads/set_initial_resolver.ts
 pnpm gov:stage governance/proposals/set_initial_resolver.json --stage=propose --network baseSepolia
 ```
 
-### 2. Configure Protocol Fees (if needed)
+### 4. Configure Protocol Fees (if needed)
 
 ```bash
 # Set escrow fee address
@@ -160,7 +234,7 @@ pnpm gov:build governance/payloads/0002_queue_fee_address.ts
 pnpm gov:stage governance/proposals/0002_queue_fee_address.json --stage=propose --network baseSepolia
 ```
 
-### 3. Register Tokens for Yield (if yield enabled)
+### 5. Register Tokens for Yield (if yield enabled)
 
 ```bash
 # Register USDC for Aave yield
@@ -183,10 +257,19 @@ const IEO_DEPLOYMENT = {
   deployedAt: '2026-01-XX',
   deployer: '0x...',
   
+  ops: {
+    yieldOps: '0x...',
+    disputeOps: '0x...',
+    settlementOps: '0x...',
+    createOps: '0x...',
+    bondCollector: '0x...',
+  },
+  moduleManagement: {
+    moduleManagementContract: '0x...',
+  },
   core: {
-    baseEscrow: '0x...',
     escrowVault: '0x...',
-    escrowableERC20: '0x...',
+    escrowableERC20: '0x...', // Optional
   },
   
   governance: {
@@ -225,7 +308,18 @@ Record all deployment transaction hashes for audit trail.
 pnpm hardhat verify --network baseSepolia --list
 ```
 
-### 2. Governance Test
+### 2. Ops Contract Registration Test
+
+```typescript
+// Verify EscrowVault can call CreateOps
+const createOps = await ethers.getContractAt('CreateOps', CREATE_OPS_ADDRESS);
+const escrowVault = await ethers.getContractAt('EscrowVault', ESCROW_VAULT_ADDRESS);
+
+// This should succeed (EscrowVault has ROLE_ESCROW_CONTRACT)
+const result = await createOps.computeEscrowCreation(/* ... */);
+```
+
+### 3. Governance Test
 
 ```bash
 # Create and execute a test proposal
@@ -233,7 +327,7 @@ pnpm gov:build governance/payloads/0001_set_token_cap.ts
 pnpm gov:sim governance/proposals/0001_set_token_cap.json --fork-url=$BASE_SEPOLIA_RPC
 ```
 
-### 3. Escrow Creation Test
+### 4. Escrow Creation Test
 
 ```typescript
 // Create a test escrow
@@ -241,7 +335,7 @@ const escrowVault = await ethers.getContractAt('EscrowVault', DEPLOYED_ADDRESS);
 await escrowVault.createEscrow(/* ... */);
 ```
 
-### 4. Dispute Resolution Test
+### 5. Dispute Resolution Test
 
 ```typescript
 // Raise a test dispute
@@ -313,4 +407,5 @@ For issues during deployment:
 
 ---
 
-_Last Updated: 2026-01-16_
+_Last Updated: 2026-01-27_  
+**Changes**: Added ops contracts deployment, registration steps, and role transfer verification

@@ -11,6 +11,9 @@ import 'contracts/core/modules/DefaultResolutionModule.sol';
 import 'contracts/types/YieldPresets.sol';
 import 'contracts/admin/EscrowAdminContract.sol';
 import 'contracts/types/EscrowTypes.sol';
+import 'contracts/CreateOps.sol';
+import 'contracts/SettlementOps.sol';
+import 'contracts/core/BondCollector.sol';
 
 contract Test_05_ModuleSnapshotting_test is Test {
     EscrowVault vault;
@@ -18,6 +21,9 @@ contract Test_05_ModuleSnapshotting_test is Test {
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
     ModuleManagementContract public moduleManagement;
+    CreateOps public createOps;
+    SettlementOps public settlementOps;
+    BondCollector public bondCollector;
     address deployer = address(this);
     address timelock = address(0x1);
 
@@ -28,7 +34,26 @@ contract Test_05_ModuleSnapshotting_test is Test {
         vault = new EscrowVault(100, address(this), address(yieldOps), address(disputeOps), address(moduleManagement));
         adminContract = new EscrowAdminContract(address(this));
         vault.grantRole(vault.ROLE_TIMELOCK(), timelock);
+        vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(adminContract));
         adminContract.grantRole(adminContract.ROLE_TIMELOCK(), timelock);
+
+        // Wire required ops for createEscrow
+        createOps = new CreateOps(address(this));
+        // CreateOps requires ROLE_TIMELOCK for registerEscrowContract (granted by DEFAULT_ADMIN_ROLE)
+        createOps.grantRole(createOps.ROLE_TIMELOCK(), address(this));
+        createOps.registerEscrowContract(address(vault));
+
+        settlementOps = new SettlementOps(address(this));
+        settlementOps.registerEscrowContract(address(vault));
+
+        bondCollector = new BondCollector(address(this));
+        bondCollector.registerEscrowContract(address(vault));
+
+        // Grant this test admin-contract role to set ops addresses
+        vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
+        vault.setCreateOps(address(createOps));
+        vault.setSettlementOps(address(settlementOps));
+        vault.setBondCollector(address(bondCollector));
 
         // deploy and activate a default resolution module so createEscrow can succeed
         DefaultResolutionModule rm = new DefaultResolutionModule(address(this), address(0x2));

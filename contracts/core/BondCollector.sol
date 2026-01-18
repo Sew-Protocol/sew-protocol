@@ -15,7 +15,7 @@ import '../types/EscrowTypes.sol';
  *      Handles:
  *      - ETH bond collection with protocol fee deduction
  *      - ERC20 bond collection with protocol fee deduction
- *      - Pull-based pattern for ERC20 (user approves escrow, escrow pulls)
+ *      - Custody lives in this contract for ERC20 bonds (escrow transfers in, this contract approves incentive module)
  *      - Protocol fee transfer to fee address
  *      - Bond recording via incentive module
  */
@@ -24,7 +24,8 @@ contract BondCollector is AccessControl {
 
     // ============ Role Constants ============
     bytes32 public constant ROLE_ESCROW_CONTRACT = keccak256('ROLE_ESCROW_CONTRACT');
-
+    bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');
+    
     // ============ Custom Errors ============
     error ZeroOwner();
 
@@ -40,19 +41,21 @@ contract BondCollector is AccessControl {
 
     /**
      * @notice Constructor for BondCollector
-     * @param initialOwner Address that will receive DEFAULT_ADMIN_ROLE
+     * @param initialOwner Address that will receive DEFAULT_ADMIN_ROLE (for initial setup only)
      */
     constructor(address initialOwner) {
         if (initialOwner == address(0)) revert ZeroOwner();
         _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
+        // ROLE_TIMELOCK gates registerEscrowContract(), so initialOwner must have it for initial setup.
+        _grantRole(ROLE_TIMELOCK, initialOwner);
     }
 
     /**
      * @notice Register an escrow contract (grants it ROLE_ESCROW_CONTRACT)
      * @param escrowContract Address of the escrow contract
-     * @dev Only DEFAULT_ADMIN_ROLE can register escrow contracts
+     * @dev Only ROLE_TIMELOCK can register escrow contracts (governance-controlled)
      */
-    function registerEscrowContract(address escrowContract) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function registerEscrowContract(address escrowContract) external onlyRole(ROLE_TIMELOCK) {
         if (escrowContract == address(0)) revert InvalidAddress('Escrow contract cannot be zero', escrowContract);
         _grantRole(ROLE_ESCROW_CONTRACT, escrowContract);
     }
@@ -66,7 +69,7 @@ contract BondCollector is AccessControl {
      * @param newLevel New escalation level
      * @param snapshottedBondFee Protocol fee in basis points (from module snapshot)
      * @param escrowFeeAddress Address to receive protocol fees
-     * @param depositor Address that deposited the bond (user for ETH, escrow contract for ERC20)
+     * @param depositor Address that deposited the bond (user for ETH, this contract for ERC20)
      * @param escalatedBy Address that initiated the escalation (always the user)
      * @return collected Whether bond was successfully collected
      * @dev Only authorized escrow contracts can call this function
@@ -122,9 +125,9 @@ contract BondCollector is AccessControl {
                 return s;
             }
         } else {
-            // ERC20 bond - pull-based pattern
-            // Step 1: Pull tokens from user to escrow contract (already done by BaseEscrow before calling this)
-            // Step 2: Calculate and transfer protocol fee
+            // ERC20 bond - custody is held by this contract
+            // BaseEscrow transfers tokens to this contract before calling collectBond
+            // Step 1: Calculate and transfer protocol fee
             uint256 protocolFeeAmount = 0;
             uint256 bondToRecord = bondAmount;
             
@@ -137,10 +140,10 @@ contract BondCollector is AccessControl {
                 }
             }
             
-            // Step 3: Approve incentive module to pull remaining tokens
+            // Step 2: Approve incentive module to pull remaining tokens
             if (bondToRecord > 0) {
                 // Pull-based pattern: approve incentive module to pull tokens
-                // If recordAppealBond fails, tokens remain with escrow contract (no loss)
+                // If recordAppealBond fails, tokens remain with this contract (no loss)
                 IERC20(bondToken).safeIncreaseAllowance(address(incentiveMod), bondToRecord);
                 try incentiveMod.recordAppealBond(workflowId, depositor, escalatedBy, bondToRecord, bondToken, newLevel) {
                     // Reset approval to zero after successful call

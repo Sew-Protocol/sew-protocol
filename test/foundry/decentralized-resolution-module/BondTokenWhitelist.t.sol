@@ -116,7 +116,12 @@ contract BondTokenWhitelistTest is Test {
     function test_CannotAddDuplicateToken() public {
         // Try to add ETH (already in whitelist)
         vm.prank(timelock);
-        vm.expectRevert('Token already in whitelist');
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                DecentralizedResolutionModule.TokenAlreadyInWhitelist.selector,
+                address(0)
+            )
+        );
         resolutionModule.queueAddAcceptedBondToken(address(0));
     }
 
@@ -126,7 +131,12 @@ contract BondTokenWhitelistTest is Test {
     function test_CannotRemoveDefaultToken() public {
         // Try to remove ETH (which is default)
         vm.prank(timelock);
-        vm.expectRevert('Cannot remove default bond token');
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                DecentralizedResolutionModule.CannotRemoveDefaultToken.selector,
+                address(0)
+            )
+        );
         resolutionModule.queueRemoveAcceptedBondToken(address(0));
     }
 
@@ -169,7 +179,12 @@ contract BondTokenWhitelistTest is Test {
      */
     function test_CannotSetNonWhitelistedTokenAsDefault() public {
         vm.prank(timelock);
-        vm.expectRevert('Token not in whitelist');
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                DecentralizedResolutionModule.TokenNotInWhitelist.selector,
+                address(usdcToken)
+            )
+        );
         resolutionModule.queueSetDefaultBondToken(address(usdcToken));
     }
 
@@ -177,8 +192,10 @@ contract BondTokenWhitelistTest is Test {
      * @notice Test getRequiredAppealBond returns whitelisted token
      */
     function test_GetRequiredAppealBond_ReturnsWhitelistedToken() public {
-        // Should return ETH (in whitelist by default)
-        (uint256 amount, address token) = resolutionModule.getRequiredAppealBond(0, 0, '');
+        // SECURITY: bond token is enforced to match escrow token.
+        // Provide escrowData encoded as (token, from, to, amount).
+        bytes memory escrowData = abi.encode(address(0), owner, owner, uint256(1));
+        (uint256 amount, address token) = resolutionModule.getRequiredAppealBond(0, 0, escrowData);
 
         assertGt(amount, 0, 'Bond amount should be > 0');
         assertEq(token, address(0), 'Token should be ETH');
@@ -204,11 +221,12 @@ contract BondTokenWhitelistTest is Test {
         vm.prank(timelock);
         resolutionModule.activateDefaultBondToken();
 
-        // Get required bond
-        (uint256 amount, address token) = resolutionModule.getRequiredAppealBond(0, 0, '');
+        // Get required bond: token is enforced to match escrow token (not default token)
+        bytes memory escrowData = abi.encode(address(usdcToken), owner, owner, uint256(1));
+        (uint256 amount, address token) = resolutionModule.getRequiredAppealBond(0, 0, escrowData);
 
         assertGt(amount, 0, 'Bond amount should be > 0');
-        assertEq(token, address(usdcToken), 'Token should be USDC (default)');
+        assertEq(token, address(usdcToken), 'Token should match escrow token');
     }
 
     /**
@@ -347,8 +365,9 @@ contract BondTokenWhitelistTest is Test {
         vm.prank(timelock);
         resolutionModule.activateDefaultBondToken();
 
-        // Now getRequiredAppealBond should return USDC (default)
-        (, address token) = resolutionModule.getRequiredAppealBond(0, 0, '');
-        assertEq(token, address(usdcToken), 'Should return USDC as default token');
+        // SECURITY: getRequiredAppealBond enforces bond token matches escrow token.
+        bytes memory escrowData = abi.encode(address(usdcToken), owner, owner, uint256(1));
+        (, address token) = resolutionModule.getRequiredAppealBond(0, 0, escrowData);
+        assertEq(token, address(usdcToken), 'Token should match escrow token');
     }
 }

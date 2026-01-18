@@ -7,6 +7,7 @@ import 'contracts/YieldOps.sol';
 import 'contracts/DisputeOps.sol';
 import 'contracts/core/ModuleManagementContract.sol';
 import 'contracts/core/EscrowVault.sol';
+import 'contracts/admin/EscrowAdminContract.sol';
 import 'contracts/types/EscrowTypes.sol';
 
 contract Test_03_BoundsEnforcement_test is Test {
@@ -14,6 +15,7 @@ contract Test_03_BoundsEnforcement_test is Test {
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
     ModuleManagementContract public moduleManagement;
+    EscrowAdminContract public adminContract;
     address timelock = address(0x1);
 
     function setUp() public {
@@ -22,11 +24,13 @@ contract Test_03_BoundsEnforcement_test is Test {
         moduleManagement = new ModuleManagementContract(address(this));
         vault = new EscrowVault(100, address(this), address(yieldOps), address(disputeOps), address(moduleManagement));
         vault.grantRole(vault.ROLE_TIMELOCK(), timelock);
+        adminContract = new EscrowAdminContract(address(this));
+        adminContract.grantRole(adminContract.ROLE_TIMELOCK(), timelock);
+        vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(adminContract));
     }
 
     function test_auto_cancel_time_bounds_accept_and_reject() public {
         // accept 0
-        vm.prank(timelock);
         (uint256 dar, uint256 dac, uint256 mdd, uint256 awd) = vault.timeoutConfig();
         TimeoutConfig memory config = TimeoutConfig({
             defaultAutoReleaseTime: dar,
@@ -35,13 +39,13 @@ contract Test_03_BoundsEnforcement_test is Test {
             appealWindowDuration: awd
         });
         config.defaultAutoCancelTime = 0;
-        vault.setTimeoutConfig(config);
+        vm.prank(timelock);
+        adminContract.setTimeoutConfig(address(vault), config);
         (, uint256 newDefaultAutoCancelTime, , ) = vault.timeoutConfig();
         assertEq(newDefaultAutoCancelTime, 0);
 
         // accept max (30 days)
         uint256 maxTime = block.timestamp + 30 days;
-        vm.prank(timelock);
         (dar, dac, mdd, awd) = vault.timeoutConfig();
         config = TimeoutConfig({
             defaultAutoReleaseTime: dar,
@@ -50,13 +54,12 @@ contract Test_03_BoundsEnforcement_test is Test {
             appealWindowDuration: awd
         });
         config.defaultAutoCancelTime = maxTime;
-        vault.setTimeoutConfig(config);
+        vm.prank(timelock);
+        adminContract.setTimeoutConfig(address(vault), config);
         (, newDefaultAutoCancelTime, , ) = vault.timeoutConfig();
         assertEq(newDefaultAutoCancelTime, maxTime);
 
         // exceed max -> revert
-        vm.prank(timelock);
-        vm.expectRevert();
         (dar, dac, mdd, awd) = vault.timeoutConfig();
         config = TimeoutConfig({
             defaultAutoReleaseTime: dar,
@@ -65,11 +68,12 @@ contract Test_03_BoundsEnforcement_test is Test {
             appealWindowDuration: awd
         });
         config.defaultAutoCancelTime = block.timestamp + 30 days + 1;
-        vault.setTimeoutConfig(config);
+        vm.expectRevert();
+        vm.prank(timelock);
+        adminContract.setTimeoutConfig(address(vault), config);
     }
 
     function test_auto_release_time_bounds() public {
-        vm.prank(timelock);
         (uint256 dar, uint256 dac, uint256 mdd, uint256 awd) = vault.timeoutConfig();
         TimeoutConfig memory config = TimeoutConfig({
             defaultAutoReleaseTime: dar,
@@ -78,12 +82,12 @@ contract Test_03_BoundsEnforcement_test is Test {
             appealWindowDuration: awd
         });
         config.defaultAutoReleaseTime = 0;
-        vault.setTimeoutConfig(config);
+        vm.prank(timelock);
+        adminContract.setTimeoutConfig(address(vault), config);
         (uint256 newDefaultAutoReleaseTime, , , ) = vault.timeoutConfig();
         assertEq(newDefaultAutoReleaseTime, 0);
 
         uint256 maxTime = block.timestamp + 30 days;
-        vm.prank(timelock);
         (dar, dac, mdd, awd) = vault.timeoutConfig();
         config = TimeoutConfig({
             defaultAutoReleaseTime: dar,
@@ -92,12 +96,11 @@ contract Test_03_BoundsEnforcement_test is Test {
             appealWindowDuration: awd
         });
         config.defaultAutoReleaseTime = maxTime;
-        vault.setTimeoutConfig(config);
+        vm.prank(timelock);
+        adminContract.setTimeoutConfig(address(vault), config);
         (newDefaultAutoReleaseTime, , , ) = vault.timeoutConfig();
         assertEq(newDefaultAutoReleaseTime, maxTime);
 
-        vm.prank(timelock);
-        vm.expectRevert();
         (dar, dac, mdd, awd) = vault.timeoutConfig();
         config = TimeoutConfig({
             defaultAutoReleaseTime: dar,
@@ -106,6 +109,8 @@ contract Test_03_BoundsEnforcement_test is Test {
             appealWindowDuration: awd
         });
         config.defaultAutoReleaseTime = block.timestamp + 30 days + 1;
-        vault.setTimeoutConfig(config);
+        vm.expectRevert();
+        vm.prank(timelock);
+        adminContract.setTimeoutConfig(address(vault), config);
     }
 }

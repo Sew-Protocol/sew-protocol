@@ -10,7 +10,7 @@ import { registerDeployment } from '../config/deployments.registry';
  * - GovernorSettings: voting delay, period, threshold
  * - GovernorCountingSimple: simple vote counting
  * - GovernorVotes: token-weighted voting
- * - GovernorVotesQuorumFraction: quorum based on token supply
+ * - Custom quorum override: quorum is an absolute token amount (launch configuration)
  * - GovernorTimelockControl: execution via TimelockController
  */
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {

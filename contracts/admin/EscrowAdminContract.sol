@@ -58,9 +58,9 @@ contract EscrowAdminContract is AccessControl, SlowLaneQueueActivate {
     /**
      * @notice Register an escrow contract (grants it ROLE_ESCROW_CONTRACT)
      * @param escrowContract Address of the escrow contract
-     * @dev Only DEFAULT_ADMIN_ROLE can register escrow contracts
+     * @dev Only ROLE_TIMELOCK can register escrow contracts (governance-controlled)
      */
-    function registerEscrowContract(address escrowContract) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function registerEscrowContract(address escrowContract) external onlyRole(ROLE_TIMELOCK) {
         if (escrowContract == address(0)) revert InvalidValue();
         _grantRole(ROLE_ESCROW_CONTRACT, escrowContract);
     }

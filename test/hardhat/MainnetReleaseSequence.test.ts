@@ -609,13 +609,15 @@ describe('Mainnet Release Sequence', function () {
 
     it('Should deploy OpenZeppelin Governor with Timelock', async function () {
       // Deploy GovGovernor contract (production Governor implementation)
-      // GovGovernor constructor: (token, timelock, votingDelayBlocks, votingPeriodBlocks, proposalThresholdTokens, quorumBps)
+      // GovGovernor constructor:
+      // (token, timelock, votingDelayBlocks, votingPeriodBlocks, proposalThresholdTokens, absoluteQuorumTokens, initialNonCirculatingAddresses)
 
       try {
         const GovernorFactory = await ethers.getContractFactory('GovGovernor');
 
-        // Quorum: 4% (numerator is 4, denominator is 100 by default in GovernorVotesQuorumFraction)
-        const QUORUM_NUMERATOR = 4n; // 4%
+        // Quorum: absolute 4M tokens (launch configuration)
+        const ABSOLUTE_QUORUM = ethers.parseEther('4000000');
+        const initialNonCirculatingAddresses: string[] = [];
 
         governor = (await GovernorFactory.deploy(
           await governanceToken.getAddress(),
@@ -623,7 +625,8 @@ describe('Mainnet Release Sequence', function () {
           VOTING_DELAY,
           VOTING_PERIOD,
           PROPOSAL_THRESHOLD,
-          QUORUM_NUMERATOR,
+          ABSOLUTE_QUORUM,
+          initialNonCirculatingAddresses,
         )) as GovGovernor;
         await governor.waitForDeployment();
 
@@ -988,15 +991,17 @@ describe('Mainnet Release Sequence', function () {
       let daoGovernor: GovGovernor | any;
       try {
         const GovernorFactory = await ethers.getContractFactory('GovGovernor');
-        // Quorum: 4% (numerator is 4, denominator is 100 by default in GovernorVotesQuorumFraction)
-        const QUORUM_NUMERATOR = 4n; // 4%
+        // Quorum: absolute 4M tokens (launch configuration)
+        const ABSOLUTE_QUORUM = ethers.parseEther('4000000');
+        const initialNonCirculatingAddresses: string[] = [];
         daoGovernor = (await GovernorFactory.deploy(
           await govToken.getAddress(),
           await timelockController.getAddress(),
           VOTING_DELAY,
           VOTING_PERIOD,
           PROPOSAL_THRESHOLD,
-          QUORUM_NUMERATOR,
+          ABSOLUTE_QUORUM,
+          initialNonCirculatingAddresses,
         )) as GovGovernor;
         await daoGovernor.waitForDeployment();
       } catch (error: any) {

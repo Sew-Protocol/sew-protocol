@@ -274,14 +274,19 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
         bond.refunded = true;
         totalBondsRefunded += bondAmount;
 
-        // Transfer bond back to depositor
+        // Refund bond back to the escalator.
+        // For ETH bonds: depositor == escalatedBy (user-funded)
+        // For ERC20 bonds: depositor may be an intermediary custodian (e.g., BondCollector),
+        // but escalatedBy is always the user who should receive the refund.
+        address refundTo = bond.escalatedBy;
+
         if (bond.token == address(0)) {
             // ETH
-            (bool success, ) = bond.depositor.call{value: bondAmount}('');
+            (bool success, ) = refundTo.call{value: bondAmount}('');
             require(success, 'ETH refund failed');
         } else {
             // ERC20
-            IERC20(bond.token).safeTransfer(bond.depositor, bondAmount);
+            IERC20(bond.token).safeTransfer(refundTo, bondAmount);
         }
 
         emit AppealBondRefunded(workflowId, bondRound, bond.depositor, bondAmount, bond.token);

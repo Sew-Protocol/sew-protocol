@@ -8,6 +8,7 @@ import 'contracts/DisputeOps.sol';
 import 'contracts/core/ModuleManagementContract.sol';
 import 'contracts/core/EscrowableERC20.sol';
 import 'contracts/core/EscrowVault.sol';
+import 'contracts/admin/EscrowAdminContract.sol';
 import 'contracts/types/EscrowTypes.sol';
 
 contract Test_01_AccessControl_test is Test {
@@ -16,6 +17,7 @@ contract Test_01_AccessControl_test is Test {
     DisputeOps public disputeOps;
     ModuleManagementContract public moduleManagement;
     EscrowVault escrowVault;
+    EscrowAdminContract public adminContract;
     address timelock = address(0x1);
     address guardian = address(0x2);
     address unauthorized = address(0x3);
@@ -34,6 +36,9 @@ contract Test_01_AccessControl_test is Test {
         );
         moduleManagement = new ModuleManagementContract(address(this));
         escrowVault = new EscrowVault(100, feeAddr, address(yieldOps), address(disputeOps), address(moduleManagement));
+        adminContract = new EscrowAdminContract(address(this));
+        adminContract.grantRole(adminContract.ROLE_TIMELOCK(), timelock);
+        escrowable.grantRole(escrowable.ROLE_ADMIN_CONTRACT(), address(adminContract));
     }
 
     function test_role_constants_and_granting() public {
@@ -55,7 +60,6 @@ contract Test_01_AccessControl_test is Test {
         escrowable.grantRole(ROLE_TIMELOCK, timelock);
 
         uint256 newTime = block.timestamp + 7 days;
-        vm.prank(timelock);
         (uint256 dar, uint256 dac, uint256 mdd, uint256 awd) = escrowable.timeoutConfig();
         TimeoutConfig memory config = TimeoutConfig({
             defaultAutoReleaseTime: dar,
@@ -64,7 +68,8 @@ contract Test_01_AccessControl_test is Test {
             appealWindowDuration: awd
         });
         config.defaultAutoCancelTime = newTime;
-        escrowable.setTimeoutConfig(config);
+        vm.prank(timelock);
+        adminContract.setTimeoutConfig(address(escrowable), config);
         (, uint256 newDefaultAutoCancelTime, , ) = escrowable.timeoutConfig();
         assertEq(newDefaultAutoCancelTime, newTime);
 

@@ -80,14 +80,16 @@ contract ModuleManagementContract is AccessControl, SlowLaneQueueActivate {
     constructor(address initialAdmin) {
         if (initialAdmin == address(0)) revert InvalidValue();
         _grantRole(DEFAULT_ADMIN_ROLE, initialAdmin);
+        // ROLE_TIMELOCK gates registerEscrowContract(), so initialAdmin must have it for initial setup.
+        _grantRole(ROLE_TIMELOCK, initialAdmin);
     }
 
     /**
      * @notice Register an escrow contract for module management
      * @param escrowContract Address of the escrow contract
-     * @dev Only DEFAULT_ADMIN_ROLE can register escrow contracts
+     * @dev Only ROLE_TIMELOCK can register escrow contracts (governance-controlled)
      */
-    function registerEscrowContract(address escrowContract) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function registerEscrowContract(address escrowContract) external onlyRole(ROLE_TIMELOCK) {
         if (escrowContract == address(0)) revert InvalidValue();
         _grantRole(ROLE_ESCROW_CONTRACT, escrowContract);
     }

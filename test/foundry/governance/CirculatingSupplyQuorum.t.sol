@@ -10,10 +10,10 @@ import 'contracts/token/SewToken.sol';
 
 /**
  * @title CirculatingSupplyQuorumTest
- * @notice Comprehensive tests for circulating supply-based quorum calculation
+ * @notice Tests for circulating supply reporting + absolute quorum behavior
  * @dev Tests:
  *      - Circulating supply calculation (total - non-circulating)
- *      - Quorum calculation based on circulating supply
+ *      - Absolute quorum (launch configuration)
  *      - Adding/removing non-circulating addresses
  *      - Edge cases (empty list, max addresses, zero supply)
  *      - Integration with proposals
@@ -33,9 +33,7 @@ contract CirculatingSupplyQuorumTest is Test {
 
     uint256 constant TOTAL_SUPPLY = 1_000_000_000 ether; // 1B tokens
     uint256 constant INITIAL_CIRCULATING = 100_000_000 ether; // 100M tokens (10%)
-    uint256 constant QUORUM_BPS = 400; // 4%
-    uint256 constant QUORUM_NUMERATOR = 4; // 4% (denominator is 100)
-    uint256 constant EXPECTED_QUORUM = 4_000_000 ether; // 4% of 100M = 4M tokens
+    uint256 constant ABSOLUTE_QUORUM = 4_000_000 ether; // 4M tokens (launch quorum)
 
     function setUp() public {
         vm.startPrank(deployer);
@@ -88,7 +86,7 @@ contract CirculatingSupplyQuorumTest is Test {
             1, // votingDelay
             45818, // votingPeriod (~1 week)
             500_000 ether, // proposalThreshold
-            QUORUM_NUMERATOR, // quorumNumerator (4%)
+            ABSOLUTE_QUORUM, // absolute quorum (4M tokens)
             initialNonCirculating
         );
 
@@ -127,7 +125,7 @@ contract CirculatingSupplyQuorumTest is Test {
             1,
             45818,
             500_000 ether,
-            QUORUM_NUMERATOR,
+            ABSOLUTE_QUORUM,
             empty
         );
 
@@ -138,7 +136,11 @@ contract CirculatingSupplyQuorumTest is Test {
     function test_GetCirculatingSupply_AfterAddingNonCirculating() public {
         // Add a new non-circulating address via timelock
         address newVesting = address(0x8);
-        token.transfer(newVesting, 50_000_000 ether);
+        // Move tokens from circulating holders into a new non-circulating address
+        vm.prank(voter1);
+        token.transfer(newVesting, 30_000_000 ether);
+        vm.prank(voter2);
+        token.transfer(newVesting, 20_000_000 ether);
         vm.prank(newVesting);
         token.delegate(newVesting);
 
@@ -161,24 +163,17 @@ contract CirculatingSupplyQuorumTest is Test {
 
     // ============ Unit Tests: Quorum Calculation ============
 
-    function test_Quorum_BasedOnCirculatingSupply() public {
+    function test_Quorum_IsAbsolute() public {
         uint256 quorum = governor.quorum(block.number);
-        assertEq(quorum, EXPECTED_QUORUM, 'Quorum should be 4% of circulating supply');
+        assertEq(quorum, ABSOLUTE_QUORUM, 'Quorum should be the configured absolute amount');
     }
 
-    function test_Quorum_Formula() public {
-        uint256 circulating = governor.getCurrentCirculatingSupply();
-        uint256 expectedQuorum = (circulating * QUORUM_NUMERATOR) / 100;
-        uint256 actualQuorum = governor.quorum(block.number);
-
-        assertEq(actualQuorum, expectedQuorum, 'Quorum formula should match');
-    }
-
-    function test_Quorum_ChangesWithCirculatingSupply() public {
+    function test_Quorum_DoesNotChangeWithCirculatingSupply() public {
         uint256 quorumBefore = governor.quorum(block.number);
 
         // Add more non-circulating
         address newVesting = address(0x9);
+        vm.prank(voter3);
         token.transfer(newVesting, 10_000_000 ether);
         vm.prank(newVesting);
         token.delegate(newVesting);
@@ -187,15 +182,15 @@ contract CirculatingSupplyQuorumTest is Test {
         governor.addNonCirculatingAddress(newVesting);
 
         uint256 quorumAfter = governor.quorum(block.number);
-        assertLt(quorumAfter, quorumBefore, 'Quorum should decrease when circulating decreases');
+        assertEq(quorumAfter, quorumBefore, 'Absolute quorum should not change with circulating supply');
     }
 
     function test_Quorum_NotBasedOnTotalSupply() public {
         uint256 quorum = governor.quorum(block.number);
-        uint256 quorumIfTotalSupply = (TOTAL_SUPPLY * QUORUM_NUMERATOR) / 100;
+        uint256 quorumIfTotalSupply4Percent = (TOTAL_SUPPLY * 4) / 100;
 
-        assertLt(quorum, quorumIfTotalSupply, 'Quorum should be less than if based on total supply');
-        assertEq(quorum, EXPECTED_QUORUM, 'Quorum should be 4M tokens (4% of 100M)');
+        assertLt(quorum, quorumIfTotalSupply4Percent, 'Quorum should not be 4% of total supply');
+        assertEq(quorum, ABSOLUTE_QUORUM, 'Quorum should be 4M tokens (launch absolute quorum)');
     }
 
     // ============ Unit Tests: Non-Circulating Address Management ============
@@ -212,19 +207,21 @@ contract CirculatingSupplyQuorumTest is Test {
     }
 
     function test_AddNonCirculatingAddress_RevertsIfNotTimelock() public {
-        vm.expectRevert('Only timelock');
+        vm.expectRevert(
+            abi.encodeWithSelector(GovGovernor.OnlyTimelock.selector, address(this), address(timelock))
+        );
         governor.addNonCirculatingAddress(address(0xB));
     }
 
     function test_AddNonCirculatingAddress_RevertsIfZero() public {
         vm.prank(address(timelock));
-        vm.expectRevert('Zero address');
+        vm.expectRevert(abi.encodeWithSelector(GovGovernor.ZeroAddress.selector));
         governor.addNonCirculatingAddress(address(0));
     }
 
     function test_AddNonCirculatingAddress_RevertsIfAlreadyAdded() public {
         vm.prank(address(timelock));
-        vm.expectRevert('Already added');
+        vm.expectRevert(abi.encodeWithSelector(GovGovernor.DuplicateAddress.selector, vestingContract));
         governor.addNonCirculatingAddress(vestingContract);
     }
 
@@ -238,7 +235,7 @@ contract CirculatingSupplyQuorumTest is Test {
 
         // Next addition should fail
         vm.prank(address(timelock));
-        vm.expectRevert('Max addresses reached');
+        vm.expectRevert(abi.encodeWithSelector(GovGovernor.MaxAddressesReached.selector));
         governor.addNonCirculatingAddress(address(0xFF));
     }
 
@@ -253,13 +250,17 @@ contract CirculatingSupplyQuorumTest is Test {
     }
 
     function test_RemoveNonCirculatingAddress_RevertsIfNotTimelock() public {
-        vm.expectRevert('Only timelock');
+        vm.expectRevert(
+            abi.encodeWithSelector(GovGovernor.OnlyTimelock.selector, address(this), address(timelock))
+        );
         governor.removeNonCirculatingAddress(vestingContract);
     }
 
     function test_RemoveNonCirculatingAddress_RevertsIfNotInList() public {
         vm.prank(address(timelock));
-        vm.expectRevert('Not in list');
+        vm.expectRevert(
+            abi.encodeWithSelector(GovGovernor.AddressNotInList.selector, address(0xDEAD))
+        );
         governor.removeNonCirculatingAddress(address(0xDEAD));
     }
 
@@ -279,7 +280,7 @@ contract CirculatingSupplyQuorumTest is Test {
             1,
             45818,
             500_000 ether,
-            QUORUM_NUMERATOR,
+            ABSOLUTE_QUORUM,
             empty
         );
 
@@ -291,6 +292,7 @@ contract CirculatingSupplyQuorumTest is Test {
                 if (balance > 0 || i < 5) {
                     // Give some addresses tokens for testing
                     if (balance == 0) {
+                        vm.prank(vestingContract);
                         token.transfer(addr, 1 ether);
                         vm.prank(addr);
                         token.delegate(addr);
@@ -302,13 +304,13 @@ contract CirculatingSupplyQuorumTest is Test {
         }
 
         uint256 circulating = newGovernor.getCurrentCirculatingSupply();
-        uint256 total = token.getPastTotalSupply(block.number);
+        uint256 total = token.totalSupply();
 
         assertLe(circulating, total, 'Circulating should never exceed total');
     }
 
-    function testFuzz_Quorum_AlwaysPositive(uint256 quorumNumerator) public {
-        quorumNumerator = bound(quorumNumerator, 0, 100); // 0-100%
+    function testFuzz_Quorum_AlwaysPositive(uint256 absoluteQuorum) public {
+        absoluteQuorum = bound(absoluteQuorum, 1, TOTAL_SUPPLY); // keep within supply for readability
 
         address[] memory empty = new address[](0);
         GovGovernor newGovernor = new GovGovernor(
@@ -317,26 +319,28 @@ contract CirculatingSupplyQuorumTest is Test {
             1,
             45818,
             500_000 ether,
-            quorumNumerator,
+            absoluteQuorum,
             empty
         );
 
         uint256 quorum = newGovernor.quorum(block.number);
-        assertGe(quorum, 0, 'Quorum should always be non-negative');
+        assertEq(quorum, absoluteQuorum, 'Quorum should equal configured absolute amount');
     }
 
-    function testFuzz_Quorum_ProportionalToCirculating(
+    function testFuzz_Quorum_IndependentOfCirculating(
         address nonCirculatingAddr,
         uint256 nonCirculatingAmount
     ) public {
         // Bound inputs
-        nonCirculatingAmount = bound(nonCirculatingAmount, 0, INITIAL_CIRCULATING);
+        // Use a circulating source with enough balance (voter3 has 40M)
+        nonCirculatingAmount = bound(nonCirculatingAmount, 0, token.balanceOf(voter3));
         nonCirculatingAddr = address(uint160(uint256(keccak256(abi.encodePacked(nonCirculatingAddr)))));
         vm.assume(nonCirculatingAddr != address(0));
         vm.assume(nonCirculatingAddr != address(token));
         vm.assume(nonCirculatingAddr != address(governor));
 
         // Give tokens to address
+        vm.prank(voter3);
         token.transfer(nonCirculatingAddr, nonCirculatingAmount);
         vm.prank(nonCirculatingAddr);
         token.delegate(nonCirculatingAddr);
@@ -350,8 +354,7 @@ contract CirculatingSupplyQuorumTest is Test {
         assertEq(circulating, expectedCirculating, 'Circulating should decrease by amount');
 
         uint256 quorum = governor.quorum(block.number);
-        uint256 expectedQuorum = (expectedCirculating * QUORUM_NUMERATOR) / 100;
-        assertEq(quorum, expectedQuorum, 'Quorum should be proportional to circulating');
+        assertEq(quorum, ABSOLUTE_QUORUM, 'Quorum should remain the absolute launch quorum');
     }
 
     // ============ Invariant Tests ============
@@ -368,7 +371,7 @@ contract CirculatingSupplyQuorumTest is Test {
 
     function test_Invariant_CirculatingSupply_LessThanOrEqualTotal() public {
         uint256 circulating = governor.getCurrentCirculatingSupply();
-        uint256 total = token.getPastTotalSupply(block.number);
+        uint256 total = token.totalSupply();
         assertLe(circulating, total, 'Circulating should never exceed total');
     }
 
@@ -388,7 +391,7 @@ contract CirculatingSupplyQuorumTest is Test {
             1,
             45818,
             500_000 ether,
-            QUORUM_NUMERATOR,
+            ABSOLUTE_QUORUM,
             empty
         );
 
@@ -399,7 +402,16 @@ contract CirculatingSupplyQuorumTest is Test {
     function test_EdgeCase_AllTokensNonCirculating() public {
         // Transfer all circulating tokens to a non-circulating address
         address allTokens = address(0xAA);
-        token.transfer(allTokens, INITIAL_CIRCULATING);
+        // Deployer distributed its entire balance in setUp(), so gather circulating tokens from voters.
+        uint256 b1 = token.balanceOf(voter1);
+        uint256 b2 = token.balanceOf(voter2);
+        uint256 b3 = token.balanceOf(voter3);
+        vm.prank(voter1);
+        token.transfer(allTokens, b1);
+        vm.prank(voter2);
+        token.transfer(allTokens, b2);
+        vm.prank(voter3);
+        token.transfer(allTokens, b3);
         vm.prank(allTokens);
         token.delegate(allTokens);
 
@@ -410,20 +422,18 @@ contract CirculatingSupplyQuorumTest is Test {
         assertEq(circulating, 0, 'Circulating should be zero when all tokens are non-circulating');
     }
 
-    function test_EdgeCase_ZeroQuorumNumerator() public {
+    function test_EdgeCase_ZeroAbsoluteQuorum() public {
         address[] memory empty = new address[](0);
-        GovGovernor newGovernor = new GovGovernor(
+        vm.expectRevert(abi.encodeWithSelector(GovGovernor.QuorumMustBePositive.selector));
+        new GovGovernor(
             address(token),
             timelock,
             1,
             45818,
             500_000 ether,
-            0, // 0% quorum
+            0, // 0 tokens quorum
             empty
         );
-
-        uint256 quorum = newGovernor.quorum(block.number);
-        assertEq(quorum, 0, 'Quorum should be zero when numerator is zero');
     }
 
     // ============ Helper Functions ============

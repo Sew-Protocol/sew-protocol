@@ -117,13 +117,24 @@ contract DRv1WorkloadRoutingTest is Test {
 
     function test_SetResolverAssignmentWeight_RevertWhen_WeightExceedsMax() public {
         vm.prank(timelock);
-        vm.expectRevert('Weight exceeds max');
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                DecentralizedResolutionModule.WeightExceedsMaximum.selector,
+                BASIS_POINTS_DENOMINATOR + 1,
+                BASIS_POINTS_DENOMINATOR
+            )
+        );
         module.setResolverAssignmentWeight(resolver1, BASIS_POINTS_DENOMINATOR + 1);
     }
 
     function test_SetResolverAssignmentWeight_RevertWhen_ZeroAddress() public {
         vm.prank(timelock);
-        vm.expectRevert('Zero address');
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                DecentralizedResolutionModule.ZeroAddress.selector,
+                'resolver'
+            )
+        );
         module.setResolverAssignmentWeight(address(0), 5000);
     }
 

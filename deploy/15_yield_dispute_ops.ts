@@ -171,6 +171,58 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   } else {
     console.log(`   ✅ BondCollector already deployed at: ${bondCollectorDeployment.address}`);
   }
+
+  // Transfer admin roles to TimelockController (if deployed)
+  console.log(`\n   Transferring admin roles to TimelockController...`);
+  try {
+    const timelockDeployment = await get('TimelockController');
+    const timelockAddress = timelockDeployment.address;
+    const DEFAULT_ADMIN_ROLE = ethers.ZeroAddress; // AccessControl uses 0x00
+
+    const opsContracts = [
+      { name: 'YieldOps', deployment: yieldOpsDeployment },
+      { name: 'DisputeOps', deployment: disputeOpsDeployment },
+      { name: 'SettlementOps', deployment: settlementOpsDeployment },
+      { name: 'CreateOps', deployment: createOpsDeployment },
+      { name: 'BondCollector', deployment: bondCollectorDeployment },
+    ];
+
+    for (const { name, deployment } of opsContracts) {
+      try {
+        const contract = await ethers.getContractAt(name, deployment.address);
+        const deployerHasAdmin = await contract.hasRole(DEFAULT_ADMIN_ROLE, deployer);
+        
+        if (deployerHasAdmin) {
+          // Grant DEFAULT_ADMIN_ROLE to TimelockController first
+          const timelockHasAdmin = await contract.hasRole(DEFAULT_ADMIN_ROLE, timelockAddress);
+          if (!timelockHasAdmin) {
+            console.log(`      Granting DEFAULT_ADMIN_ROLE to TimelockController for ${name}...`);
+            const tx1 = await contract.grantRole(DEFAULT_ADMIN_ROLE, timelockAddress);
+            await tx1.wait();
+            console.log(`      ✅ DEFAULT_ADMIN_ROLE granted to TimelockController`);
+          }
+
+          // Revoke deployer's DEFAULT_ADMIN_ROLE
+          console.log(`      Revoking DEFAULT_ADMIN_ROLE from deployer for ${name}...`);
+          const tx2 = await contract.revokeRole(DEFAULT_ADMIN_ROLE, deployer);
+          await tx2.wait();
+          console.log(`      ✅ Deployer's DEFAULT_ADMIN_ROLE revoked for ${name}`);
+        } else {
+          console.log(`      ✅ ${name}: Deployer does not have DEFAULT_ADMIN_ROLE`);
+        }
+      } catch (error: any) {
+        console.log(`      ⚠️  ${name}: Error transferring roles: ${error.message}`);
+        console.log(`      ℹ️  Roles will be transferred via deploy/60_protocol_governance.ts`);
+      }
+    }
+  } catch (error: any) {
+    if (error.message?.includes('TimelockController not found')) {
+      console.log(`   ℹ️  TimelockController not deployed yet. Roles will be transferred via deploy/60_protocol_governance.ts`);
+    } else {
+      console.log(`   ⚠️  Error transferring roles: ${error.message}`);
+      console.log(`   ℹ️  Roles will be transferred via deploy/60_protocol_governance.ts`);
+    }
+  }
 };
 
 export default func;

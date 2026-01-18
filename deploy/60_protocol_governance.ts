@@ -44,6 +44,13 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     'EscrowVault',
     'AaveYieldGenerationModule',
     'DefaultResolutionModule',
+    // Ops contracts
+    'CreateOps', // Has ROLE_TIMELOCK and ROLE_GUARDIAN for yield deposits control
+    'SettlementOps',
+    'DisputeOps',
+    'YieldOps', // Has ROLE_TIMELOCK and ROLE_GUARDIAN
+    'BondCollector',
+    'ModuleManagementContract',
     // DecentralizedResolutionModule is in separate package
     // Add other AccessControl contracts as they are deployed
   ];
@@ -65,28 +72,50 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
       // Check if contract has AccessControl roles
       try {
-        // Grant ROLE_TIMELOCK to TimelockController
-        const hasTimelockRole = await contract.hasRole(ROLE_TIMELOCK, timelockDeployment.address);
-        if (!hasTimelockRole) {
-          console.log(`      Granting ROLE_TIMELOCK to TimelockController...`);
-          const tx1 = await contract.grantRole(ROLE_TIMELOCK, timelockDeployment.address);
-          await tx1.wait();
-          console.log(`      ✅ ROLE_TIMELOCK granted`);
-          rolesGranted++;
-        } else {
-          console.log(`      ✅ TimelockController already has ROLE_TIMELOCK`);
+        // Check if contract supports ROLE_TIMELOCK (not all contracts have it)
+        let hasTimelockSupport = false;
+        try {
+          await contract.ROLE_TIMELOCK();
+          hasTimelockSupport = true;
+        } catch {
+          // Contract doesn't have ROLE_TIMELOCK, skip
         }
 
-        // Grant ROLE_GUARDIAN to Guardian multisig
-        const hasGuardianRole = await contract.hasRole(ROLE_GUARDIAN, guardianMultisig);
-        if (!hasGuardianRole) {
-          console.log(`      Granting ROLE_GUARDIAN to Guardian (${guardianMultisig})...`);
-          const tx2 = await contract.grantRole(ROLE_GUARDIAN, guardianMultisig);
-          await tx2.wait();
-          console.log(`      ✅ ROLE_GUARDIAN granted`);
-          rolesGranted++;
-        } else {
-          console.log(`      ✅ Guardian already has ROLE_GUARDIAN`);
+        // Grant ROLE_TIMELOCK to TimelockController (if contract supports it)
+        if (hasTimelockSupport) {
+          const hasTimelockRole = await contract.hasRole(ROLE_TIMELOCK, timelockDeployment.address);
+          if (!hasTimelockRole) {
+            console.log(`      Granting ROLE_TIMELOCK to TimelockController...`);
+            const tx1 = await contract.grantRole(ROLE_TIMELOCK, timelockDeployment.address);
+            await tx1.wait();
+            console.log(`      ✅ ROLE_TIMELOCK granted`);
+            rolesGranted++;
+          } else {
+            console.log(`      ✅ TimelockController already has ROLE_TIMELOCK`);
+          }
+        }
+
+        // Check if contract supports ROLE_GUARDIAN (not all contracts have it)
+        let hasGuardianSupport = false;
+        try {
+          await contract.ROLE_GUARDIAN();
+          hasGuardianSupport = true;
+        } catch {
+          // Contract doesn't have ROLE_GUARDIAN, skip
+        }
+
+        // Grant ROLE_GUARDIAN to Guardian multisig (if contract supports it)
+        if (hasGuardianSupport) {
+          const hasGuardianRole = await contract.hasRole(ROLE_GUARDIAN, guardianMultisig);
+          if (!hasGuardianRole) {
+            console.log(`      Granting ROLE_GUARDIAN to Guardian (${guardianMultisig})...`);
+            const tx2 = await contract.grantRole(ROLE_GUARDIAN, guardianMultisig);
+            await tx2.wait();
+            console.log(`      ✅ ROLE_GUARDIAN granted`);
+            rolesGranted++;
+          } else {
+            console.log(`      ✅ Guardian already has ROLE_GUARDIAN`);
+          }
         }
 
         // Revoke DEFAULT_ADMIN_ROLE from deployer (if deployer has it)

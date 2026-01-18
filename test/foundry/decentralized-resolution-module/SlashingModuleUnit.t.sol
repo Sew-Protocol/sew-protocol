@@ -195,7 +195,7 @@ contract SlashingModuleUnitTest is Test {
         bytes memory evidence = 'Evidence';
 
         vm.prank(timelock);
-        vm.expectRevert('Fraud slashing not enabled');
+        vm.expectRevert(ResolverSlashingModuleV1.FraudSlashingNotEnabled.selector);
         slashingModule.slashForFraud(workflowId, resolver1, evidence);
     }
 

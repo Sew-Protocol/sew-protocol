@@ -32,28 +32,74 @@ contract CreateOps is AccessControl {
     
     // ============ Role Constants ============
     bytes32 public constant ROLE_ESCROW_CONTRACT = keccak256('ROLE_ESCROW_CONTRACT');
+    bytes32 public constant ROLE_GUARDIAN = keccak256('ROLE_GUARDIAN');
+    bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');
+    
+    // ============ State Variables ============
+    /// @notice Pause flag for yield deposits (emergency control)
+    bool public yieldDepositsPaused;
     
     // ============ Custom Errors ============
     error ZeroOwner();
-    error UnauthorizedEscrowContract(address caller);
+    error AlreadyPaused();
+    error NotPaused();
+    error NotAuthorized(address caller);
+    
+    // ============ Events ============
+    /// @notice Emitted when yield deposits are paused
+    event YieldDepositsPaused(address indexed caller, string reason);
+    /// @notice Emitted when yield deposits are resumed
+    event YieldDepositsResumed(address indexed caller);
+    
+    // Note: Monitoring events are emitted by BaseEscrow (EscrowCreated, EscrowStateChanged)
+    // This contract is compute-only (view functions) and emits minimal events
     
     /**
      * @notice Constructor for CreateOps
-     * @param initialOwner Address that will receive DEFAULT_ADMIN_ROLE
+     * @param initialOwner Address that will receive DEFAULT_ADMIN_ROLE (for initial setup only)
      */
     constructor(address initialOwner) {
         if (initialOwner == address(0)) revert ZeroOwner();
         _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
+        // ROLE_TIMELOCK gates registerEscrowContract(), so initialOwner must have it for initial setup.
+        _grantRole(ROLE_TIMELOCK, initialOwner);
     }
     
     /**
      * @notice Register an escrow contract that can call computeEscrowCreation
      * @param escrow Address of the escrow contract (EscrowVault or EscrowableERC20)
-     * @dev Only callable by admin. Escrow contracts must be registered before use.
+     * @dev Only callable by ROLE_TIMELOCK (governance-controlled). Escrow contracts must be registered before use.
      */
-    function registerEscrowContract(address escrow) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function registerEscrowContract(address escrow) external onlyRole(ROLE_TIMELOCK) {
         if (escrow == address(0)) revert InvalidAddress('Escrow contract cannot be zero', escrow);
         _grantRole(ROLE_ESCROW_CONTRACT, escrow);
+    }
+    
+    /**
+     * @notice Pause yield deposits (emergency control)
+     * @param reason Reason for pausing
+     * @dev Can be called by ROLE_GUARDIAN (emergency) or ROLE_TIMELOCK (governance)
+     *      When paused, all yield deposits are disabled regardless of user settings
+     */
+    function pauseYieldDeposits(string memory reason) external {
+        if (!hasRole(ROLE_TIMELOCK, msg.sender) && !hasRole(ROLE_GUARDIAN, msg.sender)) {
+            revert NotAuthorized(msg.sender);
+        }
+        if (yieldDepositsPaused) revert AlreadyPaused();
+        
+        yieldDepositsPaused = true;
+        emit YieldDepositsPaused(msg.sender, reason);
+    }
+    
+    /**
+     * @notice Resume yield deposits
+     * @dev Only callable by ROLE_TIMELOCK (slow lane). Guardian is down-only and cannot resume.
+     */
+    function resumeYieldDeposits() external onlyRole(ROLE_TIMELOCK) {
+        if (!yieldDepositsPaused) revert NotPaused();
+        
+        yieldDepositsPaused = false;
+        emit YieldDepositsResumed(msg.sender);
     }
     
     /**
@@ -92,11 +138,15 @@ contract CreateOps is AccessControl {
         uint256 workflowId,
         address resolutionModule
     ) external view onlyRole(ROLE_ESCROW_CONTRACT) returns (CreateResult memory result) {
-        // Validate amount
+        // Validate inputs
+        if (token == address(0)) revert InvalidAddress('Token cannot be zero', token);
         if (amount == 0) revert AmountZero();
         SettingsValidationLibrary.validateEscrowAmount(amount);
         SettingsValidationLibrary.validateRecipient(to, from);
-        SettingsValidationLibrary.validateEscrowSettings(settings, block.timestamp);
+        
+        // Use explicit validation time (always block.timestamp in production)
+        uint256 validationTime = block.timestamp;
+        SettingsValidationLibrary.validateEscrowSettings(settings, validationTime);
 
         // Fee calculation: fee = (amount * escrowFee) / ESCROW_FEE_DENOMINATOR
         result.fee = (amount * escrowFee) / ESCROW_FEE_DENOMINATOR;
@@ -114,7 +164,7 @@ contract CreateOps is AccessControl {
 
         // Yield configuration
         result.yieldEnabled = YieldPresetLibrary.isYieldEnabled(settings.yieldPreset);
-        if (result.yieldEnabled) {
+        if (result.yieldEnabled && !yieldDepositsPaused) {
             // Validate preset parameters (sender and recipient addresses)
             YieldPresetLibrary.validatePresetParams(settings.yieldPreset, from, to);
             // Validate yield opt-in amount (graceful degradation)
@@ -139,6 +189,11 @@ contract CreateOps is AccessControl {
         uint256 amount
     ) internal view returns (address resolver) {
         if (resolutionModule == address(0)) {
+            return address(0);
+        }
+        
+        // Check if resolutionModule is a contract (has code)
+        if (resolutionModule.code.length == 0) {
             return address(0);
         }
 

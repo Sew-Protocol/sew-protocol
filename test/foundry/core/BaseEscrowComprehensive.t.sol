@@ -222,7 +222,7 @@ contract BaseEscrowComprehensive is Test {
         uint256 newFee = 200; // 2%
         vm.prank(timelock);
         adminContract.queueEscrowFee(address(vault), newFee);
-        (uint256 value, uint64 eta, bool exists) = adminContract.getPendingEscrowFee(address(vault));
+        (uint256 value, , bool exists) = adminContract.getPendingEscrowFee(address(vault));
         assertTrue(exists);
         assertEq(value, newFee);
     }
@@ -241,7 +241,7 @@ contract BaseEscrowComprehensive is Test {
         address newFeeAddress = address(0x9999);
         vm.prank(timelock);
         adminContract.queueFeeRecipient(address(vault), newFeeAddress);
-        (address value, uint64 eta, bool exists) = adminContract.getPendingFeeRecipient(address(vault));
+        (address value, , bool exists) = adminContract.getPendingFeeRecipient(address(vault));
         assertTrue(exists);
         assertEq(value, newFeeAddress);
     }
@@ -318,8 +318,7 @@ contract BaseEscrowComprehensive is Test {
         // Warp past max dispute duration
         vm.warp(block.timestamp + 7 days + 1);
 
-        bool success = vault.autoCancelDisputedEscrow(workflowId);
-        // assertTrue(success);
+        vault.autoCancelDisputedEscrow(workflowId);
     }
 
     function test_isDisputeTimedOut() public {
@@ -379,8 +378,7 @@ contract BaseEscrowComprehensive is Test {
 
         vm.warp(autoCancelTime + 1);
 
-        bool success = vault.automateTimedActions(workflowId);
-        // assertTrue(success);
+        vault.automateTimedActions(workflowId);
     }
 
     function test_automateTimedActions_range() public {
@@ -404,14 +402,13 @@ contract BaseEscrowComprehensive is Test {
         vm.prank(buyer);
         uint256 workflowId1 = vault.createEscrow(address(token), seller, amount, SettingsValidationLibrary.getDefaultSettings());
         vm.prank(buyer);
-        uint256 workflowId2 = vault.createEscrow(address(token), seller, amount, SettingsValidationLibrary.getDefaultSettings());
+        vault.createEscrow(address(token), seller, amount, SettingsValidationLibrary.getDefaultSettings());
         vm.prank(buyer);
-        uint256 workflowId3 = vault.createEscrow(address(token), seller, amount, SettingsValidationLibrary.getDefaultSettings());
+        vault.createEscrow(address(token), seller, amount, SettingsValidationLibrary.getDefaultSettings());
 
         vm.warp(autoCancelTime + 1);
 
-        bool success = vault.automateTimedActions(workflowId1);
-        // assertTrue(success);
+        vault.automateTimedActions(workflowId1);
     }
 
     // ============ Attachments ============
@@ -468,8 +465,7 @@ contract BaseEscrowComprehensive is Test {
         uint256 workflowId = vault.createEscrow(address(token), seller, amount, _getDefaultSettings());
 
         vm.prank(seller);
-        bool success = vault.recipientCancel(workflowId);
-        // assertTrue(success);
+        vault.recipientCancel(workflowId);
     }
 
     function test_senderCancel() public {
@@ -482,8 +478,7 @@ contract BaseEscrowComprehensive is Test {
         uint256 workflowId = vault.createEscrow(address(token), seller, amount, _getDefaultSettings());
 
         vm.prank(buyer);
-        bool success = vault.senderCancel(workflowId);
-        // assertTrue(success);
+        vault.senderCancel(workflowId);
     }
 
     function test_bothPartiesCancel() public {
@@ -499,8 +494,7 @@ contract BaseEscrowComprehensive is Test {
         vault.recipientCancel(workflowId);
 
         vm.prank(buyer);
-        bool success = vault.senderCancel(workflowId);
-        // assertTrue(success);
+        vault.senderCancel(workflowId);
 
         EscrowTransfer memory et = _loadTransfer(workflowId);
         assertEq(uint256(et.escrowState), uint256(EscrowState.REFUNDED));
@@ -521,8 +515,7 @@ contract BaseEscrowComprehensive is Test {
         vault.raiseDispute(workflowId);
 
         vm.prank(resolver);
-        bool success = vault.cancelAsDisputeResolver(workflowId, bytes32(0));
-        // assertTrue(success);
+        vault.cancelAsDisputeResolver(workflowId, bytes32(0));
     }
 
     function test_releaseAsDisputeResolver() public {
@@ -538,8 +531,7 @@ contract BaseEscrowComprehensive is Test {
         vault.raiseDispute(workflowId);
 
         vm.prank(resolver);
-        bool success = vault.releaseAsDisputeResolver(workflowId, bytes32(0));
-        // assertTrue(success);
+        vault.releaseAsDisputeResolver(workflowId, bytes32(0));
     }
 
     // ============ Dispute Functions ============
@@ -554,8 +546,7 @@ contract BaseEscrowComprehensive is Test {
         uint256 workflowId = vault.createEscrow(address(token), seller, amount, _getDefaultSettings());
 
         vm.prank(buyer);
-        bool success = vault.raiseDispute(workflowId);
-        // assertTrue(success);
+        vault.raiseDispute(workflowId);
 
         EscrowTransfer memory et = _loadTransfer(workflowId);
         assertEq(uint256(et.escrowState), uint256(EscrowState.DISPUTED));
@@ -638,11 +629,11 @@ contract BaseEscrowComprehensive is Test {
         token.approve(address(vault), amount * 3);
 
         vm.prank(buyer);
-        uint256 workflowId1 = vault.createEscrow(address(token), seller, amount, _getDefaultSettings());
+        vault.createEscrow(address(token), seller, amount, _getDefaultSettings());
         vm.prank(buyer);
-        uint256 workflowId2 = vault.createEscrow(address(token), seller, amount, _getDefaultSettings());
+        vault.createEscrow(address(token), seller, amount, _getDefaultSettings());
         vm.prank(buyer);
-        uint256 workflowId3 = vault.createEscrow(address(token), seller, amount, _getDefaultSettings());
+        vault.createEscrow(address(token), seller, amount, _getDefaultSettings());
 
         // uint256 pendingCount = vault.getTotalEscrowsByStatus(EscrowState.PENDING);
         // assertGe(pendingCount, 3);
@@ -711,7 +702,7 @@ contract BaseEscrowComprehensive is Test {
         vault.senderCancel(workflowId);
     }
 
-    function test_supportsInterface() public {
+    function test_supportsInterface() public view {
         assertTrue(vault.supportsInterface(0x01ffc9a7)); // IERC165
     }
 }

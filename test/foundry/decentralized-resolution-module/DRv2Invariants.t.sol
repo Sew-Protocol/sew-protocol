@@ -229,10 +229,13 @@ contract DRv2InvariantsTest is StdInvariant, Test {
      * @dev For any enabled cost curve, cost(k+1) >= cost(k)
      */
     function invariant_CostCurveMonotonic() public view {
+        // SECURITY: getRequiredAppealBond now requires escrowData for (token, from, to, amount)
+        bytes memory escrowData = abi.encode(address(token), address(this), address(this), uint256(1));
+
         // Test costs for rounds 0, 1, 2
-        (uint256 cost0, ) = resolutionModule.getRequiredAppealBond(0, 0, '');
-        (uint256 cost1, ) = resolutionModule.getRequiredAppealBond(0, 1, '');
-        (uint256 cost2, ) = resolutionModule.getRequiredAppealBond(0, 2, '');
+        (uint256 cost0, ) = resolutionModule.getRequiredAppealBond(0, 0, escrowData);
+        (uint256 cost1, ) = resolutionModule.getRequiredAppealBond(0, 1, escrowData);
+        (uint256 cost2, ) = resolutionModule.getRequiredAppealBond(0, 2, escrowData);
 
         if (cost0 > 0) {
             // Only test if cost curve is enabled
@@ -390,7 +393,8 @@ contract DRv2FuzzTest is Test {
         uint256 kSquared = uint256(escalationCount) * uint256(escalationCount);
         uint256 expectedCost = baseCost + (stepSize * kSquared);
 
-        (uint256 actualCost, ) = resolutionModule.getRequiredAppealBond(0, escalationCount, '');
+        bytes memory escrowData = abi.encode(address(token), address(this), address(this), uint256(1));
+        (uint256 actualCost, ) = resolutionModule.getRequiredAppealBond(0, escalationCount, escrowData);
 
         assertEq(actualCost, expectedCost, 'Quadratic cost calculation mismatch');
 
@@ -399,7 +403,7 @@ contract DRv2FuzzTest is Test {
             (uint256 nextCost, ) = resolutionModule.getRequiredAppealBond(
                 0,
                 escalationCount + 1,
-                ''
+                escrowData
             );
             assertTrue(nextCost >= actualCost, 'Cost curve must be monotonic');
         }
@@ -432,7 +436,8 @@ contract DRv2FuzzTest is Test {
         // Calculate expected cost: baseCost + stepSize * k
         uint256 expectedCost = baseCost + (stepSize * uint256(escalationCount));
 
-        (uint256 actualCost, ) = resolutionModule.getRequiredAppealBond(0, escalationCount, '');
+        bytes memory escrowData = abi.encode(address(token), address(this), address(this), uint256(1));
+        (uint256 actualCost, ) = resolutionModule.getRequiredAppealBond(0, escalationCount, escrowData);
 
         assertEq(actualCost, expectedCost, 'Linear cost calculation mismatch');
     }
@@ -461,7 +466,8 @@ contract DRv2FuzzTest is Test {
         resolutionModule.activateEscalationCostConfig();
         vm.stopPrank();
 
-        (uint256 actualCost, ) = resolutionModule.getRequiredAppealBond(0, escalationCount, '');
+        bytes memory escrowData = abi.encode(address(token), address(this), address(this), uint256(1));
+        (uint256 actualCost, ) = resolutionModule.getRequiredAppealBond(0, escalationCount, escrowData);
 
         // For geometric, we can't easily calculate expected value due to division,
         // but we can verify it's in a reasonable range

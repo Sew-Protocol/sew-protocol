@@ -28,10 +28,9 @@
    - Token-weighted voting using `ERC20Votes`
    - Uses `getPastVotes()` for historical voting power
 
-5. **`GovernorVotesQuorumFraction`** (Extension) ⚠️ **PERCENTAGE-BASED**
-   - Quorum as **percentage of total supply**
-   - Formula: `quorum = (totalSupply * quorumNumerator) / 100`
-   - Uses `token.getPastTotalSupply(blockNumber)` - **total supply, not circulating**
+5. **Quorum** (Custom override)
+   - Quorum is implemented via an override of `quorum(uint256)` to return an **absolute token amount**
+   - This avoids ambiguity around circulating vs total supply at launch
 
 6. **`GovernorTimelockControl`** (Extension)
    - Execution via `TimelockController`
@@ -57,7 +56,6 @@ contract GovGovernor is
     GovernorSettings,
     GovernorCountingSimple,
     GovernorVotes,
-    GovernorVotesQuorumFraction,  // ⚠️ Percentage-based
     GovernorTimelockControl
 
 // Lines 45-60: Constructor - all standard OZ
@@ -65,12 +63,11 @@ constructor(...) {
     Governor('Sew Protocol DAO')
     GovernorSettings(...)
     GovernorVotes(...)
-    GovernorVotesQuorumFraction(quorumBps)  // ⚠️ Percentage of total supply
     GovernorTimelockControl(...)
 }
 
-// Lines 65-176: Required overrides - all just call super
-// NO CUSTOM LOGIC
+// Custom override:
+// - quorum(uint256) returns absoluteQuorum (fixed token amount)
 ```
 
 ---
@@ -79,7 +76,7 @@ constructor(...) {
 
 ### OpenZeppelin's Options
 
-**Option 1: `GovernorVotesQuorumFraction`** (Current - Percentage-Based)
+**Option 1: `GovernorVotesQuorumFraction`** (Percentage-Based)
 - ✅ Percentage of **total supply**
 - ❌ Does NOT support absolute quorum
 - ❌ Does NOT support circulating supply
@@ -103,7 +100,6 @@ constructor(...) {
 
 **Current Implementation:**
 - Overrides `quorum()` to return `absoluteQuorum` (absolute amount)
-- Uses `GovernorVotesQuorumFraction` with `quorumNumerator = 0` (not used)
 - Quorum = `absoluteQuorum` (e.g., 4M tokens)
 - Can be updated via governance: `setAbsoluteQuorum(uint256)`
 

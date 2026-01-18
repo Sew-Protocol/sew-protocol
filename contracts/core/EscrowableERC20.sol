@@ -373,14 +373,14 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
     /**
      * @notice Disabled legacy entrypoint (use ModuleManagementContract)
      */
-    function queueDefaultModule(ModuleType, address) external onlyRole(ROLE_TIMELOCK) {
+    function queueDefaultModule(ModuleType, address) external view onlyRole(ROLE_TIMELOCK) {
         revert UseModuleManagementContract();
     }
 
     /**
      * @notice Disabled legacy entrypoint (use ModuleManagementContract)
      */
-    function activateDefaultModule(ModuleType) external onlyRole(ROLE_TIMELOCK) {
+    function activateDefaultModule(ModuleType) external view onlyRole(ROLE_TIMELOCK) {
         revert UseModuleManagementContract();
     }
 

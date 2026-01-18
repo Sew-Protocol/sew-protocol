@@ -37,7 +37,9 @@ contract Test_06_TimelockIntegration_test is Test {
         adminContract = new EscrowAdminContract(address(this));
         vault = new EscrowVault(100, address(this), address(yieldOps), address(disputeOps), address(moduleManagement));
         token.grantRole(token.ROLE_TIMELOCK(), timelock);
+        token.grantRole(token.ROLE_ADMIN_CONTRACT(), address(adminContract));
         vault.grantRole(vault.ROLE_TIMELOCK(), timelock);
+        vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(adminContract));
         adminContract.grantRole(adminContract.ROLE_TIMELOCK(), timelock);
     }
 
@@ -47,7 +49,6 @@ contract Test_06_TimelockIntegration_test is Test {
 
         // impersonate timelock to set default auto cancel time
         uint256 newTime = block.timestamp + 7 days;
-        vm.prank(timelock);
         (uint256 dar, uint256 dac, uint256 mdd, uint256 awd) = token.timeoutConfig();
         TimeoutConfig memory config = TimeoutConfig({
             defaultAutoReleaseTime: dar,
@@ -56,7 +57,8 @@ contract Test_06_TimelockIntegration_test is Test {
             appealWindowDuration: awd
         });
         config.defaultAutoCancelTime = newTime;
-        token.setTimeoutConfig(config);
+        vm.prank(timelock);
+        adminContract.setTimeoutConfig(address(token), config);
         (, uint256 newDefaultAutoCancelTime, , ) = token.timeoutConfig();
         assertEq(newDefaultAutoCancelTime, newTime);
     }

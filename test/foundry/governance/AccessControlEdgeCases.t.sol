@@ -56,6 +56,9 @@ contract AccessControlEdgeCasesTest is Test {
         escrow.grantRole(ROLE_TIMELOCK, timelock);
         escrow.grantRole(ROLE_GUARDIAN, guardian);
         adminContract.grantRole(adminContract.ROLE_TIMELOCK(), address(this));
+        adminContract.grantRole(adminContract.ROLE_TIMELOCK(), timelock);
+        // Admin contract must be authorized to apply changes on the escrow
+        escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(adminContract));
     }
 
     // ============ Role Revocation Tests ============
@@ -127,6 +130,7 @@ contract AccessControlEdgeCasesTest is Test {
         // Grant both roles to newAdmin
         escrow.grantRole(ROLE_TIMELOCK, newAdmin);
         escrow.grantRole(ROLE_GUARDIAN, newAdmin);
+        adminContract.grantRole(adminContract.ROLE_TIMELOCK(), newAdmin);
 
         // newAdmin can perform timelock operations
         vm.prank(newAdmin);
@@ -191,6 +195,7 @@ contract AccessControlEdgeCasesTest is Test {
         escrow.revokeRole(DEFAULT_ADMIN_ROLE, deployer);
 
         // System should still work - newAdmin can manage
+        adminContract.grantRole(adminContract.ROLE_TIMELOCK(), newAdmin);
         vm.startPrank(newAdmin);
         escrow.grantRole(ROLE_TIMELOCK, newAdmin); // newAdmin needs ROLE_TIMELOCK to call queueResolutionModule
         adminContract.queueResolutionModule(address(escrow), address(resolutionModule));

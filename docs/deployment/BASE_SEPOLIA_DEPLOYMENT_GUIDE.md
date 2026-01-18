@@ -40,7 +40,7 @@ GOVERNANCE_TOKEN_NAME=Sew Token
 GOVERNANCE_TOKEN_SYMBOL=SEW
 GOVERNANCE_TOKEN_SUPPLY=1000000000000000000000000000  # 1B tokens in wei
 PROPOSAL_THRESHOLD=10000000000000000000000000  # 10M tokens in wei
-QUORUM_BPS=400  # 4% quorum
+ABSOLUTE_QUORUM=4000000000000000000000000  # 4M tokens in wei (absolute quorum)
 TIMELOCK_DELAY=172800  # 48 hours in seconds
 VOTING_DELAY=1  # 1 block
 VOTING_PERIOD=45818  # ~1 week @ 13s/block
@@ -81,7 +81,33 @@ pnpm hardhat console --network baseSepolia
 # console.log('Current block:', blockNumber);
 ```
 
-### Step 2: Deploy Governance Infrastructure
+### Step 2: Deploy Ops Contracts
+
+```bash
+# Deploy ops contracts (required before core escrow contracts)
+pnpm hardhat deploy --network baseSepolia --tags yield-ops,dispute-ops,settlement-ops,create-ops,bond-collector
+```
+
+This deploys:
+- **YieldOps** (Yield withdrawal and distribution)
+- **DisputeOps** (Dispute escalation orchestration)
+- **SettlementOps** (Settlement execution operations)
+- **CreateOps** (Escrow creation validation and computation)
+- **BondCollector** (Escalation bond collection)
+
+**Note**: These contracts are deployed with the deployer as `initialOwner`. Roles will be transferred to TimelockController in Step 4.
+
+### Step 3: Deploy Module Management
+
+```bash
+# Deploy module management contract
+pnpm hardhat deploy --network baseSepolia --tags module-management
+```
+
+This deploys:
+- **ModuleManagementContract** (Centralized module management for escrow contracts)
+
+### Step 4: Deploy Governance Infrastructure
 
 ```bash
 # Deploy all governance contracts
@@ -94,9 +120,26 @@ This deploys:
 - **TimelockController** (48h delay)
 - **GovGovernor** (OpenZeppelin Governor)
 - **Timelock Wiring** (Connects Governor to Timelock)
-- **Protocol Governance** (Grants roles)
+- **Protocol Governance** (Grants roles and transfers admin roles to TimelockController)
 
-### Step 3: Verify Deployment
+### Step 5: Deploy Core Escrow Contracts
+
+```bash
+# Deploy core escrow contracts
+pnpm hardhat deploy --network baseSepolia --tags escrow
+```
+
+This deploys:
+- **EscrowVault** (Main escrow contract for ERC20 tokens)
+- **EscrowableERC20** (Optional - ERC20 token with built-in escrow)
+
+**Actions performed automatically**:
+- Registers EscrowVault with all ops contracts (CreateOps, SettlementOps, DisputeOps, YieldOps, BondCollector)
+- Sets ops contracts in EscrowVault (if deployer has ROLE_ADMIN_CONTRACT)
+- Registers EscrowableERC20 with all ops contracts (if deployed)
+- Sets ops contracts in EscrowableERC20 (if deployed)
+
+### Step 6: Verify Deployment
 
 ```bash
 # Export deployment artifacts
@@ -106,7 +149,7 @@ pnpm export --network baseSepolia
 pnpm ts-node scripts/query-deployments.ts chain 84532
 ```
 
-### Step 4: Verify Contracts on Basescan (Optional)
+### Step 7: Verify Contracts on Basescan (Optional)
 
 ```bash
 # Verify all contracts
@@ -149,12 +192,23 @@ After deployment, you may need to:
    - Update deployment ledger with Safe address
 
 2. **Transfer Admin Roles** (handled by deployment scripts):
-   - Roles should be automatically transferred to Timelock
-   - Verify roles were transferred correctly
+   - Ops contracts: Admin roles transferred to TimelockController in `deploy/15_yield_dispute_ops.ts`
+   - Core contracts: Admin roles transferred to TimelockController in `deploy/60_protocol_governance.ts`
+   - Verify roles were transferred correctly:
+     ```bash
+     # Check that TimelockController has DEFAULT_ADMIN_ROLE on all contracts
+     pnpm hardhat run scripts/verify-roles.ts --network baseSepolia
+     ```
 
-3. **Verify Governance Setup**:
+3. **Verify Ops Contract Registration**:
+   - Verify EscrowVault is registered with all ops contracts
+   - Verify ops contracts are set in EscrowVault
+   - Check that EscrowVault can call ops contract functions
+
+4. **Verify Governance Setup**:
    - Check Governor is connected to Timelock
    - Verify Guardian role is set correctly
+   - Verify TimelockController has DEFAULT_ADMIN_ROLE on all contracts
    - Test a governance proposal (optional)
 
 ---
@@ -196,4 +250,5 @@ After successful deployment:
 
 ---
 
-_Last Updated: 2026-01-16_
+_Last Updated: 2026-01-27_  
+**Changes**: Added ops contracts deployment, module management, and role transfer steps
