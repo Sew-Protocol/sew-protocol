@@ -67,7 +67,7 @@ contract IncentiveModuleIntegrationTest is Test {
 
         // Deploy escrow
         YieldOps yOps = new YieldOps(address(this));
-        DisputeOps dOps = new DisputeOps();
+        DisputeOps dOps = new DisputeOps(address(this));
         // Assign to state variables if they exist, but here we just need address
         moduleManagement = new ModuleManagementContract(address(this));
         adminContract = new EscrowAdminContract(address(this));

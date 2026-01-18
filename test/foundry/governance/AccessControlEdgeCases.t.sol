@@ -46,7 +46,7 @@ contract AccessControlEdgeCasesTest is Test {
         attacker = makeAddr('attacker');
 
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps();
+        disputeOps = new DisputeOps(address(this));
         moduleManagement = new ModuleManagementContract(address(this));
         adminContract = new EscrowAdminContract(address(this));
         escrow = new EscrowVault(100, makeAddr('feeAddress'), address(yieldOps), address(disputeOps), address(moduleManagement));

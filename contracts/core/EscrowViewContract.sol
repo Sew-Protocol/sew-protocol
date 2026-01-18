@@ -3,6 +3,9 @@ pragma solidity ^0.8.33;
 
 import './BaseEscrow.sol';
 import '../types/EscrowTypes.sol';
+import '../types/YieldPresets.sol';
+import '../libraries/SettingsValidationLibrary.sol';
+import '../libraries/DisputeManagementLibrary.sol';
 
 /**
  * @title EscrowViewContract
@@ -44,16 +47,27 @@ contract EscrowViewContract {
      * @return summary Compact escrow summary
      */
     function getEscrowSummary(uint256 workflowId) external view returns (EscrowSummary memory summary) {
-        EscrowTransfer memory et = escrowContract.getEscrowTransfer(workflowId);
+        // Public array getter returns tuple - unpack into struct
+        (
+            address token,
+            address to,
+            address from,
+            address disputeResolver,
+            uint256 amountAfterFee,
+            uint256 autoReleaseTime,
+            uint256 autoCancelTime,
+            EscrowState escrowState,
+            ,
+        ) = escrowContract.escrowTransfers(workflowId);
         summary = EscrowSummary({
-            state: et.escrowState,
-            token: et.token,
-            from: et.from,
-            to: et.to,
-            amountAfterFee: et.amountAfterFee,
-            resolver: et.disputeResolver,
-            autoReleaseTime: et.autoReleaseTime,
-            autoCancelTime: et.autoCancelTime
+            state: escrowState,
+            token: token,
+            from: from,
+            to: to,
+            amountAfterFee: amountAfterFee,
+            resolver: disputeResolver,
+            autoReleaseTime: autoReleaseTime,
+            autoCancelTime: autoCancelTime
         });
     }
 
@@ -62,8 +76,21 @@ contract EscrowViewContract {
      * @param workflowId The escrow ID
      * @return settings Escrow settings
      */
-    function getEscrowSettings(uint256 workflowId) external view returns (EscrowSettings memory) {
-        return escrowContract.getEscrowSettings(workflowId);
+    function getEscrowSettings(uint256 workflowId) external view returns (EscrowSettings memory settings) {
+        // Public mapping getter returns tuple - unpack into struct
+        // Note: yieldPreset is stored as YieldPreset enum in storage, but public getter returns as uint8
+        (
+            address customResolver,
+            YieldPreset yieldPreset,
+            uint256 autoReleaseTime,
+            uint256 autoCancelTime
+        ) = escrowContract.escrowSettings(workflowId);
+        settings = EscrowSettings({
+            customResolver: customResolver,
+            yieldPreset: yieldPreset,
+            autoReleaseTime: autoReleaseTime,
+            autoCancelTime: autoCancelTime
+        });
     }
 
     /**
@@ -76,8 +103,13 @@ contract EscrowViewContract {
     function getEscrowStatusInfo(
         uint256 workflowId
     ) external view returns (EscrowState status, bool isActive, bool isPending) {
-        EscrowTransfer memory et = escrowContract.getEscrowTransfer(workflowId);
-        status = et.escrowState;
+        // Public array getter returns tuple - extract only escrowState
+        (
+            , , , , , , ,
+            EscrowState escrowState,
+            ,
+        ) = escrowContract.escrowTransfers(workflowId);
+        status = escrowState;
         isActive = (status == EscrowState.PENDING || status == EscrowState.DISPUTED);
         isPending = (status == EscrowState.PENDING);
     }
@@ -91,18 +123,20 @@ contract EscrowViewContract {
     function getEscrowParticipants(
         uint256 workflowId
     ) external view returns (address from, address to) {
-        EscrowTransfer memory et = escrowContract.getEscrowTransfer(workflowId);
-        return (et.from, et.to);
+        // Public array getter returns tuple - extract only from and to
+        (
+            , address toAddr, address fromAddr, , , , , , ,
+        ) = escrowContract.escrowTransfers(workflowId);
+        return (fromAddr, toAddr);
     }
 
     /**
      * @notice Get module snapshot for an escrow
-     * @param workflowId The escrow ID
      * @return snapshot Module snapshot containing all module addresses and fees at time of escrow creation
      * @dev Note: moduleSnapshots is internal in BaseEscrow, so this function cannot access it directly.
      *      Consider exposing moduleSnapshots as public mapping or adding a minimal getter in BaseEscrow.
      */
-    function getModuleSnapshot(uint256 workflowId) external view returns (BaseEscrow.ModuleSnapshot memory) {
+    function getModuleSnapshot(uint256) external pure returns (BaseEscrow.ModuleSnapshot memory) {
         // moduleSnapshots is internal in BaseEscrow, so we cannot access it directly
         // This requires BaseEscrow to expose moduleSnapshots as public or add a minimal getter
         revert('ModuleSnapshot accessor removed - use events emitted at escrow creation');
@@ -114,15 +148,18 @@ contract EscrowViewContract {
      * @return Total amount deposited after fee deduction
      */
     function getTotalDeposited(uint256 workflowId) external view returns (uint256) {
-        EscrowTransfer memory et = escrowContract.getEscrowTransfer(workflowId);
-        return et.amountAfterFee;
+        // Public array getter returns tuple - extract only amountAfterFee
+        (
+            , , , , uint256 amountAfterFee, , , , ,
+        ) = escrowContract.escrowTransfers(workflowId);
+        return amountAfterFee;
     }
 
     /**
      * @notice Get total number of escrows created
      * @return Total count of escrows
      */
-    function getEscrowCount() external view returns (uint256) {
+    function getEscrowCount() external pure returns (uint256) {
         // escrowTransfers is a public array in BaseEscrow
         // Access via public getter: escrowTransfers.length
         // Note: Solidity generates a public getter for public arrays, but .length is not directly accessible
@@ -148,19 +185,39 @@ contract EscrowViewContract {
      */
     function getPendingSettlement(
         uint256 workflowId
-    ) external view returns (bool exists, bool isRelease, uint256 appealDeadline, bytes32 resolutionHash) {
-        // pendingSettlements is a public mapping in BaseEscrow
-        // Access via public getter: pendingSettlements(workflowId)
-        // Note: Solidity generates a public getter for public mappings
-        (exists, isRelease, appealDeadline, resolutionHash) = escrowContract.pendingSettlements(workflowId);
+    ) external view returns (bool exists, bool isRelease, uint256 appealDeadline, bytes32 resolutionHash, bool canExecute) {
+        // Public mapping getter returns tuple - unpack into struct
+        (
+            bool exists_,
+            bool isRelease_,
+            uint256 appealDeadline_,
+            bytes32 resolutionHash_
+        ) = escrowContract.pendingSettlements(workflowId);
+        exists = exists_;
+        isRelease = isRelease_;
+        appealDeadline = appealDeadline_;
+        resolutionHash = resolutionHash_;
+        canExecute = exists && block.timestamp >= appealDeadline;
     }
 
     /**
      * @notice Get timeout configuration
      * @return config Timeout configuration
      */
-    function getTimeoutConfig() external view returns (TimeoutConfig memory) {
-        return escrowContract.getTimeoutConfig();
+    function getTimeoutConfig() external view returns (TimeoutConfig memory config) {
+        // Public struct getter returns tuple - unpack into struct
+        (
+            uint256 defaultAutoReleaseTime,
+            uint256 defaultAutoCancelTime,
+            uint256 maxDisputeDuration,
+            uint256 appealWindowDuration
+        ) = escrowContract.timeoutConfig();
+        config = TimeoutConfig({
+            defaultAutoReleaseTime: defaultAutoReleaseTime,
+            defaultAutoCancelTime: defaultAutoCancelTime,
+            maxDisputeDuration: maxDisputeDuration,
+            appealWindowDuration: appealWindowDuration
+        });
     }
 
     /**
@@ -172,13 +229,23 @@ contract EscrowViewContract {
     function isDisputeTimedOut(
         uint256 workflowId
     ) external view returns (bool isTimedOut, uint256 timeRemaining) {
-        EscrowTransfer memory et = escrowContract.getEscrowTransfer(workflowId);
-        TimeoutConfig memory config = escrowContract.getTimeoutConfig();
+        // Public array getter returns tuple - extract escrowState
+        (
+            , , , , , , ,
+            EscrowState escrowState,
+            ,
+        ) = escrowContract.escrowTransfers(workflowId);
+        
+        // Public struct getter returns tuple - extract maxDisputeDuration
+        (
+            , , uint256 maxDisputeDuration,
+        ) = escrowContract.timeoutConfig();
+        
         (bool timedOut, uint256 remaining) = DisputeManagementLibrary.isTimedOut(
             workflowId,
-            et.escrowState,
+            escrowState,
             escrowContract.disputeRaisedTimestamp(workflowId),
-            config.maxDisputeDuration
+            maxDisputeDuration
         );
         return (timedOut, remaining);
     }

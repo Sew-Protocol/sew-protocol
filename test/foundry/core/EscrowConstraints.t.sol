@@ -11,6 +11,9 @@ import '../../../contracts/types/YieldPresets.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
 import '../../../contracts/YieldOps.sol';
 import '../../../contracts/DisputeOps.sol';
+import '../../../contracts/SettlementOps.sol';
+import '../../../contracts/CreateOps.sol';
+import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/core/ModuleManagementContract.sol';
 import '../../../contracts/admin/EscrowAdminContract.sol';
 
@@ -26,6 +29,9 @@ contract EscrowConstraints is Test {
     DefaultReleaseStrategy public releaseStrategy;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
+    SettlementOps public settlementOps;
+    CreateOps public createOps;
+    BondCollector public bondCollector;
     ModuleManagementContract public moduleManagement;
     EscrowAdminContract public adminContract;
 
@@ -54,23 +60,45 @@ contract EscrowConstraints is Test {
 
         token = new ERC20Mock('Test Token', 'TEST', owner, 10000000e18);
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps();
+        disputeOps = new DisputeOps(address(this));
+        settlementOps = new SettlementOps(address(this));
+        createOps = new CreateOps(address(this));
+        bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleManagementContract(address(this));
         adminContract = new EscrowAdminContract(address(this));
         vault = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
         moduleManagement.registerEscrowContract(address(vault));
 
+        // Register escrow contract callers on ops contracts
+        yieldOps.registerEscrowContract(address(vault));
+        disputeOps.registerEscrowContract(address(vault));
+        settlementOps.registerEscrowContract(address(vault));
+        createOps.registerEscrowContract(address(vault));
+        bondCollector.registerEscrowContract(address(vault));
+
         bytes32 ROLE_TIMELOCK = vault.ROLE_TIMELOCK();
         vault.grantRole(ROLE_TIMELOCK, owner);
         vault.grantRole(ROLE_TIMELOCK, timelock);
+
+        // Allow this test contract to wire ops on the vault
+        vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), owner);
+        vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(adminContract));
+        vault.setCreateOps(address(createOps));
+        vault.setSettlementOps(address(settlementOps));
+        vault.setBondCollector(address(bondCollector));
         adminContract.grantRole(adminContract.ROLE_TIMELOCK(), owner);
         adminContract.grantRole(adminContract.ROLE_TIMELOCK(), timelock);
 
         adminContract.queueResolutionModule(address(vault), address(resolutionModule));
-        vault.queueDefaultModule(BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
+        // Grant ROLE_ESCROW_CONTRACT to vault so it can call moduleManagement
+        bytes32 ROLE_ESCROW_CONTRACT = moduleManagement.ROLE_ESCROW_CONTRACT();
+        moduleManagement.grantRole(ROLE_ESCROW_CONTRACT, address(vault));
+        vm.prank(address(vault));
+        moduleManagement.queueDefaultModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
         vm.warp(block.timestamp + 14 days + 1);
         adminContract.activateResolutionModule(address(vault));
-        vault.activateDefaultModule(BaseEscrow.ModuleType.RELEASE);
+        vm.prank(address(vault));
+        moduleManagement.activateDefaultModule(address(vault), BaseEscrow.ModuleType.RELEASE);
     }
 
     function getDefaultSettings() internal view returns (EscrowSettings memory) {
@@ -297,11 +325,29 @@ contract EscrowConstraints is Test {
         bytes32 ROLE_TIMELOCK = maxFeeVault.ROLE_TIMELOCK();
         maxFeeVault.grantRole(ROLE_TIMELOCK, owner);
         maxFeeVault.grantRole(ROLE_TIMELOCK, timelock);
+        maxFeeVault.grantRole(maxFeeVault.ROLE_ADMIN_CONTRACT(), owner);
+        maxFeeVault.grantRole(maxFeeVault.ROLE_ADMIN_CONTRACT(), address(adminContract));
+        moduleManagement.registerEscrowContract(address(maxFeeVault));
+        bytes32 ROLE_ESCROW_CONTRACT = moduleManagement.ROLE_ESCROW_CONTRACT();
+        moduleManagement.grantRole(ROLE_ESCROW_CONTRACT, address(maxFeeVault));
+
+        // Wire ops contracts on maxFeeVault
+        yieldOps.registerEscrowContract(address(maxFeeVault));
+        disputeOps.registerEscrowContract(address(maxFeeVault));
+        settlementOps.registerEscrowContract(address(maxFeeVault));
+        createOps.registerEscrowContract(address(maxFeeVault));
+        bondCollector.registerEscrowContract(address(maxFeeVault));
+        maxFeeVault.setCreateOps(address(createOps));
+        maxFeeVault.setSettlementOps(address(settlementOps));
+        maxFeeVault.setBondCollector(address(bondCollector));
+
         adminContract.queueResolutionModule(address(maxFeeVault), address(resolutionModule));
-        maxFeeVault.queueDefaultModule(BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
+        vm.prank(address(maxFeeVault));
+        moduleManagement.queueDefaultModule(address(maxFeeVault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
         vm.warp(block.timestamp + 14 days + 1);
         adminContract.activateResolutionModule(address(maxFeeVault));
-        maxFeeVault.activateDefaultModule(BaseEscrow.ModuleType.RELEASE);
+        vm.prank(address(maxFeeVault));
+        moduleManagement.activateDefaultModule(address(maxFeeVault), BaseEscrow.ModuleType.RELEASE);
 
         // Test with a large amount that could cause overflow
         // Use a reasonable large amount that doesn't exceed practical limits

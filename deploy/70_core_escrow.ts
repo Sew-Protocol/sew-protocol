@@ -30,6 +30,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   // Get dependencies
   const yieldOpsDeployment = await get('YieldOps');
   const disputeOpsDeployment = await get('DisputeOps');
+  const settlementOpsDeployment = await get('SettlementOps');
+  const createOpsDeployment = await get('CreateOps');
+  const bondCollectorDeployment = await get('BondCollector');
+  const moduleManagementDeployment = await get('ModuleManagementContract');
 
   // Get fee configuration from environment or use defaults
   const escrowFeeBps = parseInt(process.env.ESCROW_FEE_BPS || '0', 10); // 0% default (0-10000 bps)
@@ -45,6 +49,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   console.log(`      Fee Recipient: ${feeRecipient}`);
   console.log(`      YieldOps: ${yieldOpsDeployment.address}`);
   console.log(`      DisputeOps: ${disputeOpsDeployment.address}`);
+  console.log(`      SettlementOps: ${settlementOpsDeployment.address}`);
+  console.log(`      CreateOps: ${createOpsDeployment.address}`);
+  console.log(`      BondCollector: ${bondCollectorDeployment.address}`);
+  console.log(`      ModuleManagement: ${moduleManagementDeployment.address}`);
 
   // Deploy EscrowVault
   console.log(`\n   Deploying EscrowVault...`);
@@ -56,6 +64,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       feeRecipient, // feeAddress
       yieldOpsDeployment.address, // yieldOps
       disputeOpsDeployment.address, // disputeOps
+      moduleManagementDeployment.address, // moduleManagement
     ],
     log: true,
   });
@@ -77,12 +86,122 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
           feeRecipient,
           yieldOpsDeployment.address,
           disputeOpsDeployment.address,
+          moduleManagementDeployment.address,
         ],
         tags: ['core', 'escrow'],
       });
     }
   } else {
     console.log(`   ✅ EscrowVault already deployed at: ${escrowVaultDeployment.address}`);
+  }
+
+  // Register EscrowVault with all ops contracts
+  console.log(`\n   Registering EscrowVault with ops contracts...`);
+  const escrowVaultContract = await ethers.getContractAt('EscrowVault', escrowVaultDeployment.address);
+  
+  // Get ops contracts
+  const createOpsContract = await ethers.getContractAt('CreateOps', createOpsDeployment.address);
+  const settlementOpsContract = await ethers.getContractAt('SettlementOps', settlementOpsDeployment.address);
+  const disputeOpsContract = await ethers.getContractAt('DisputeOps', disputeOpsDeployment.address);
+  const yieldOpsContract = await ethers.getContractAt('YieldOps', yieldOpsDeployment.address);
+  const bondCollectorContract = await ethers.getContractAt('BondCollector', bondCollectorDeployment.address);
+
+  // Register with CreateOps
+  try {
+    const createOpsTx = await createOpsContract.registerEscrowContract(escrowVaultDeployment.address);
+    await createOpsTx.wait();
+    console.log(`   ✅ Registered EscrowVault with CreateOps`);
+  } catch (error: any) {
+    if (error.message?.includes('AccessControlUnauthorizedAccount') || error.message?.includes('already has role')) {
+      console.log(`   ℹ️  EscrowVault already registered with CreateOps`);
+    } else {
+      throw error;
+    }
+  }
+
+  // Register with SettlementOps
+  try {
+    const settlementOpsTx = await settlementOpsContract.registerEscrowContract(escrowVaultDeployment.address);
+    await settlementOpsTx.wait();
+    console.log(`   ✅ Registered EscrowVault with SettlementOps`);
+  } catch (error: any) {
+    if (error.message?.includes('AccessControlUnauthorizedAccount') || error.message?.includes('already has role')) {
+      console.log(`   ℹ️  EscrowVault already registered with SettlementOps`);
+    } else {
+      throw error;
+    }
+  }
+
+  // Register with DisputeOps
+  try {
+    const disputeOpsTx = await disputeOpsContract.registerEscrowContract(escrowVaultDeployment.address);
+    await disputeOpsTx.wait();
+    console.log(`   ✅ Registered EscrowVault with DisputeOps`);
+  } catch (error: any) {
+    if (error.message?.includes('AccessControlUnauthorizedAccount') || error.message?.includes('already has role')) {
+      console.log(`   ℹ️  EscrowVault already registered with DisputeOps`);
+    } else {
+      throw error;
+    }
+  }
+
+  // Register with YieldOps
+  try {
+    const yieldOpsTx = await yieldOpsContract.registerEscrowContract(escrowVaultDeployment.address);
+    await yieldOpsTx.wait();
+    console.log(`   ✅ Registered EscrowVault with YieldOps`);
+  } catch (error: any) {
+    if (error.message?.includes('AccessControlUnauthorizedAccount') || error.message?.includes('already has role')) {
+      console.log(`   ℹ️  EscrowVault already registered with YieldOps`);
+    } else {
+      throw error;
+    }
+  }
+
+  // Register with BondCollector
+  try {
+    const bondCollectorTx = await bondCollectorContract.registerEscrowContract(escrowVaultDeployment.address);
+    await bondCollectorTx.wait();
+    console.log(`   ✅ Registered EscrowVault with BondCollector`);
+  } catch (error: any) {
+    if (error.message?.includes('AccessControlUnauthorizedAccount') || error.message?.includes('already has role')) {
+      console.log(`   ℹ️  EscrowVault already registered with BondCollector`);
+    } else {
+      throw error;
+    }
+  }
+
+  // Set ops contracts in EscrowVault (via admin contract or directly if deployer has role)
+  console.log(`\n   Setting ops contracts in EscrowVault...`);
+  try {
+    // Check if deployer has ROLE_ADMIN_CONTRACT
+    const ADMIN_CONTRACT_ROLE = await escrowVaultContract.ROLE_ADMIN_CONTRACT();
+    const hasAdminRole = await escrowVaultContract.hasRole(ADMIN_CONTRACT_ROLE, deployer);
+    
+    if (hasAdminRole) {
+      // Set CreateOps
+      const setCreateOpsTx = await escrowVaultContract.setCreateOps(createOpsDeployment.address);
+      await setCreateOpsTx.wait();
+      console.log(`   ✅ Set CreateOps in EscrowVault`);
+
+      // Set SettlementOps
+      const setSettlementOpsTx = await escrowVaultContract.setSettlementOps(settlementOpsDeployment.address);
+      await setSettlementOpsTx.wait();
+      console.log(`   ✅ Set SettlementOps in EscrowVault`);
+
+      // Set BondCollector
+      const setBondCollectorTx = await escrowVaultContract.setBondCollector(bondCollectorDeployment.address);
+      await setBondCollectorTx.wait();
+      console.log(`   ✅ Set BondCollector in EscrowVault`);
+    } else {
+      console.log(`   ℹ️  Deployer does not have ROLE_ADMIN_CONTRACT. Ops contracts must be set via EscrowAdminContract.`);
+    }
+  } catch (error: any) {
+    if (error.message?.includes('AccessControlUnauthorizedAccount')) {
+      console.log(`   ℹ️  Deployer does not have permission to set ops contracts. Must be set via EscrowAdminContract.`);
+    } else {
+      throw error;
+    }
   }
 
   // Deploy EscrowableERC20 (optional - only if needed)
@@ -105,6 +224,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
         feeRecipient, // feeAddress
         yieldOpsDeployment.address, // yieldOps
         disputeOpsDeployment.address, // disputeOps
+        moduleManagementDeployment.address, // moduleManagement
       ],
       log: true,
     });
@@ -128,12 +248,115 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
             feeRecipient,
             yieldOpsDeployment.address,
             disputeOpsDeployment.address,
+            moduleManagementDeployment.address,
           ],
           tags: ['core', 'escrow', 'token'],
         });
       }
     } else {
       console.log(`   ✅ EscrowableERC20 already deployed at: ${escrowableERC20Deployment.address}`);
+    }
+
+    // Register EscrowableERC20 with all ops contracts
+    console.log(`\n   Registering EscrowableERC20 with ops contracts...`);
+    const escrowableERC20Contract = await ethers.getContractAt('EscrowableERC20', escrowableERC20Deployment.address);
+
+    // Register with CreateOps
+    try {
+      const createOpsTx = await createOpsContract.registerEscrowContract(escrowableERC20Deployment.address);
+      await createOpsTx.wait();
+      console.log(`   ✅ Registered EscrowableERC20 with CreateOps`);
+    } catch (error: any) {
+      if (error.message?.includes('AccessControlUnauthorizedAccount') || error.message?.includes('already has role')) {
+        console.log(`   ℹ️  EscrowableERC20 already registered with CreateOps`);
+      } else {
+        throw error;
+      }
+    }
+
+    // Register with SettlementOps
+    try {
+      const settlementOpsTx = await settlementOpsContract.registerEscrowContract(escrowableERC20Deployment.address);
+      await settlementOpsTx.wait();
+      console.log(`   ✅ Registered EscrowableERC20 with SettlementOps`);
+    } catch (error: any) {
+      if (error.message?.includes('AccessControlUnauthorizedAccount') || error.message?.includes('already has role')) {
+        console.log(`   ℹ️  EscrowableERC20 already registered with SettlementOps`);
+      } else {
+        throw error;
+      }
+    }
+
+    // Register with DisputeOps
+    try {
+      const disputeOpsTx = await disputeOpsContract.registerEscrowContract(escrowableERC20Deployment.address);
+      await disputeOpsTx.wait();
+      console.log(`   ✅ Registered EscrowableERC20 with DisputeOps`);
+    } catch (error: any) {
+      if (error.message?.includes('AccessControlUnauthorizedAccount') || error.message?.includes('already has role')) {
+        console.log(`   ℹ️  EscrowableERC20 already registered with DisputeOps`);
+      } else {
+        throw error;
+      }
+    }
+
+    // Register with YieldOps
+    try {
+      const yieldOpsTx = await yieldOpsContract.registerEscrowContract(escrowableERC20Deployment.address);
+      await yieldOpsTx.wait();
+      console.log(`   ✅ Registered EscrowableERC20 with YieldOps`);
+    } catch (error: any) {
+      if (error.message?.includes('AccessControlUnauthorizedAccount') || error.message?.includes('already has role')) {
+        console.log(`   ℹ️  EscrowableERC20 already registered with YieldOps`);
+      } else {
+        throw error;
+      }
+    }
+
+    // Register with BondCollector
+    try {
+      const bondCollectorTx = await bondCollectorContract.registerEscrowContract(escrowableERC20Deployment.address);
+      await bondCollectorTx.wait();
+      console.log(`   ✅ Registered EscrowableERC20 with BondCollector`);
+    } catch (error: any) {
+      if (error.message?.includes('AccessControlUnauthorizedAccount') || error.message?.includes('already has role')) {
+        console.log(`   ℹ️  EscrowableERC20 already registered with BondCollector`);
+      } else {
+        throw error;
+      }
+    }
+
+    // Set ops contracts in EscrowableERC20 (via admin contract or directly if deployer has role)
+    console.log(`\n   Setting ops contracts in EscrowableERC20...`);
+    try {
+      // Check if deployer has ROLE_ADMIN_CONTRACT
+      const ADMIN_CONTRACT_ROLE = await escrowableERC20Contract.ROLE_ADMIN_CONTRACT();
+      const hasAdminRole = await escrowableERC20Contract.hasRole(ADMIN_CONTRACT_ROLE, deployer);
+      
+      if (hasAdminRole) {
+        // Set CreateOps
+        const setCreateOpsTx = await escrowableERC20Contract.setCreateOps(createOpsDeployment.address);
+        await setCreateOpsTx.wait();
+        console.log(`   ✅ Set CreateOps in EscrowableERC20`);
+
+        // Set SettlementOps
+        const setSettlementOpsTx = await escrowableERC20Contract.setSettlementOps(settlementOpsDeployment.address);
+        await setSettlementOpsTx.wait();
+        console.log(`   ✅ Set SettlementOps in EscrowableERC20`);
+
+        // Set BondCollector
+        const setBondCollectorTx = await escrowableERC20Contract.setBondCollector(bondCollectorDeployment.address);
+        await setBondCollectorTx.wait();
+        console.log(`   ✅ Set BondCollector in EscrowableERC20`);
+      } else {
+        console.log(`   ℹ️  Deployer does not have ROLE_ADMIN_CONTRACT. Ops contracts must be set via EscrowAdminContract.`);
+      }
+    } catch (error: any) {
+      if (error.message?.includes('AccessControlUnauthorizedAccount')) {
+        console.log(`   ℹ️  Deployer does not have permission to set ops contracts. Must be set via EscrowAdminContract.`);
+      } else {
+        throw error;
+      }
     }
   } else {
     console.log(`\n   ℹ️  EscrowableERC20 deployment skipped (set DEPLOY_ESCROWABLE_ERC20=true to deploy)`);
@@ -142,4 +365,11 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
 export default func;
 func.tags = ['core', 'escrow'];
-func.dependencies = ['yield-ops', 'dispute-ops'];
+func.dependencies = [
+  'yield-ops',
+  'dispute-ops',
+  'settlement-ops',
+  'create-ops',
+  'bond-collector',
+  'module-management',
+];

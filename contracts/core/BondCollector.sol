@@ -3,7 +3,9 @@ pragma solidity ^0.8.33;
 
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
+import '@openzeppelin/contracts/access/AccessControl.sol';
 import '../decentralized-resolution-module/IIncentiveModule.sol';
+import '../types/EscrowTypes.sol';
 
 /**
  * @title BondCollector
@@ -17,8 +19,14 @@ import '../decentralized-resolution-module/IIncentiveModule.sol';
  *      - Protocol fee transfer to fee address
  *      - Bond recording via incentive module
  */
-contract BondCollector {
+contract BondCollector is AccessControl {
     using SafeERC20 for IERC20;
+
+    // ============ Role Constants ============
+    bytes32 public constant ROLE_ESCROW_CONTRACT = keccak256('ROLE_ESCROW_CONTRACT');
+
+    // ============ Custom Errors ============
+    error ZeroOwner();
 
     // Events
     event ProtocolFeeCollected(
@@ -29,6 +37,25 @@ contract BondCollector {
         uint256 feeBps,
         uint256 feeAmount
     );
+
+    /**
+     * @notice Constructor for BondCollector
+     * @param initialOwner Address that will receive DEFAULT_ADMIN_ROLE
+     */
+    constructor(address initialOwner) {
+        if (initialOwner == address(0)) revert ZeroOwner();
+        _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
+    }
+
+    /**
+     * @notice Register an escrow contract (grants it ROLE_ESCROW_CONTRACT)
+     * @param escrowContract Address of the escrow contract
+     * @dev Only DEFAULT_ADMIN_ROLE can register escrow contracts
+     */
+    function registerEscrowContract(address escrowContract) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (escrowContract == address(0)) revert InvalidAddress('Escrow contract cannot be zero', escrowContract);
+        _grantRole(ROLE_ESCROW_CONTRACT, escrowContract);
+    }
 
     /**
      * @notice Collect escalation bond (ETH or ERC20) and deduct protocol fee
@@ -42,6 +69,7 @@ contract BondCollector {
      * @param depositor Address that deposited the bond (user for ETH, escrow contract for ERC20)
      * @param escalatedBy Address that initiated the escalation (always the user)
      * @return collected Whether bond was successfully collected
+     * @dev Only authorized escrow contracts can call this function
      */
     function collectBond(
         uint256 workflowId,
@@ -53,7 +81,7 @@ contract BondCollector {
         address escrowFeeAddress,
         address depositor,
         address escalatedBy
-    ) external payable returns (bool collected) {
+    ) external payable onlyRole(ROLE_ESCROW_CONTRACT) returns (bool collected) {
         if (address(incentiveMod) == address(0)) return false;
         
         if (bondToken == address(0)) {

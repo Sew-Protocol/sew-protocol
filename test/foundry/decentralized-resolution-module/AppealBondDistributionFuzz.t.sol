@@ -39,7 +39,7 @@ contract AppealBondDistributionFuzzTest is Test {
         incentiveModule = new ResolverIncentiveModuleV2(deployer, address(paymentLib));
         token = new ERC20Mock('Test Token', 'TEST', deployer, 0);
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps();
+        disputeOps = new DisputeOps(address(this));
 
         // Register escrow contract (requires ROLE_TIMELOCK)
         bytes32 ROLE_TIMELOCK = incentiveModule.ROLE_TIMELOCK();

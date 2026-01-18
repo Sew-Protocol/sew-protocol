@@ -11,6 +11,9 @@ import 'contracts/core/modules/DefaultResolutionModule.sol';
 import 'contracts/types/EscrowTypes.sol';
 import 'contracts/YieldOps.sol';
 import 'contracts/DisputeOps.sol';
+import 'contracts/SettlementOps.sol';
+import 'contracts/CreateOps.sol';
+import 'contracts/core/BondCollector.sol';
 import 'contracts/core/ModuleManagementContract.sol';
 import 'contracts/admin/EscrowAdminContract.sol';
 import 'contracts/libraries/SettingsValidationLibrary.sol';
@@ -29,6 +32,9 @@ contract AutoTransferTest is Test {
     DefaultResolutionModule rm;
     YieldOps yieldOps;
     DisputeOps disputeOps;
+    SettlementOps settlementOps;
+    CreateOps createOps;
+    BondCollector bondCollector;
     ModuleManagementContract moduleManagement;
     EscrowAdminContract adminContract;
 
@@ -46,11 +52,21 @@ contract AutoTransferTest is Test {
 
     function setUp() public {
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps();
+        disputeOps = new DisputeOps(address(this));
+        settlementOps = new SettlementOps(address(this));
+        createOps = new CreateOps(address(this));
+        bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleManagementContract(address(this));
         adminContract = new EscrowAdminContract(address(this));
         vault = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
         moduleManagement.registerEscrowContract(address(vault));
+
+        // Register escrow contract callers on ops contracts
+        yieldOps.registerEscrowContract(address(vault));
+        disputeOps.registerEscrowContract(address(vault));
+        settlementOps.registerEscrowContract(address(vault));
+        createOps.registerEscrowContract(address(vault));
+        bondCollector.registerEscrowContract(address(vault));
         token = new ERC20Mock('Test', 'TST', address(this), 1e24);
         revertingToken = new MockRevertingERC20('Revert', 'REV', address(this), 1e24);
         nonStandardToken = new MockNonStandardERC20('NonStandard', 'NS', address(this), 1e24);
@@ -59,6 +75,13 @@ contract AutoTransferTest is Test {
 
         // Setup roles and modules
         vault.grantRole(vault.ROLE_TIMELOCK(), address(this));
+        // Allow EscrowAdminContract to apply queued changes on the vault
+        vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(adminContract));
+        // Wire required ops contracts on the vault (createEscrow/dispute flow)
+        vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
+        vault.setCreateOps(address(createOps));
+        vault.setSettlementOps(address(settlementOps));
+        vault.setBondCollector(address(bondCollector));
         adminContract.queueResolutionModule(address(vault), address(rm));
         vm.warp(block.timestamp + 7 days + 1);
         adminContract.activateResolutionModule(address(vault));

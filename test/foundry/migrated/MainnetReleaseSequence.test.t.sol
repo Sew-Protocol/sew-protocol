@@ -33,7 +33,7 @@ contract Test_MainnetReleaseSequence_test is Test {
 
     function setUp() public {
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps();
+        disputeOps = new DisputeOps(address(this));
         // Deploy governance token
         governanceToken = new SewToken('Sew Token', 'SEW', deployer, INITIAL_TOKEN_SUPPLY);
 

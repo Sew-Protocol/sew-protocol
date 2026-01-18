@@ -64,7 +64,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
 
         // Deploy escrow
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps();
+        disputeOps = new DisputeOps(address(this));
         moduleManagement = new ModuleManagementContract(address(this));
         escrow = new EscrowVault(100, makeAddr('feeAddress'), address(yieldOps), address(disputeOps), address(moduleManagement));
 
@@ -88,11 +88,18 @@ contract EscalationDepthHistogramIntegrationTest is Test {
         resolutionModule.setIncentiveModule(address(incentiveModule));
         vm.stopPrank();
         
+        // Register escrow with moduleManagement and grant role
+        moduleManagement.registerEscrowContract(address(escrow));
+        bytes32 ROLE_ESCROW_CONTRACT = moduleManagement.ROLE_ESCROW_CONTRACT();
+        moduleManagement.grantRole(ROLE_ESCROW_CONTRACT, address(escrow));
+        
         // Configure resolution module in escrow (required for dispute operations)
         vm.startPrank(deployer);
-        escrow.queueDefaultModule(BaseEscrow.ModuleType.RESOLUTION, address(resolutionModule));
+        vm.prank(address(escrow));
+        moduleManagement.queueDefaultModule(address(escrow), BaseEscrow.ModuleType.RESOLUTION, address(resolutionModule));
         vm.warp(block.timestamp + 7 days + 1);
-        escrow.activateDefaultModule(BaseEscrow.ModuleType.RESOLUTION);
+        vm.prank(address(escrow));
+        moduleManagement.activateDefaultModule(address(escrow), BaseEscrow.ModuleType.RESOLUTION);
         vm.stopPrank();
 
         // Setup resolvers - first appoint seniorResolver via timelock, then it can appoint others

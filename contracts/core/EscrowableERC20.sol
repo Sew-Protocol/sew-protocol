@@ -54,6 +54,9 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
     event DefaultYieldDistributionModuleQueued(address indexed oldModule, address indexed newModule, uint64 eta);
     event DefaultYieldDistributionModuleActivated(address indexed oldModule, address indexed newModule);
 
+    /// @dev Legacy slow-lane functions are disabled; use ModuleManagementContract.
+    error UseModuleManagementContract();
+
     constructor(
         string memory name,
         string memory symbol,
@@ -368,70 +371,24 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
     // ============ Module Management (Slow Lane Queue/Activate) ============
 
     /**
-     * @notice Queue a new default module
-     * @param moduleType Type of module to queue (RELEASE, RESOLUTION, YIELD_GEN, YIELD_DIST)
-     * @param module Address of the new module to queue
-     * @dev Uses slow lane activation pattern. Requires ROLE_TIMELOCK.
-     *      Validates against module registry for YIELD_GEN and YIELD_DIST if registry is set.
+     * @notice Disabled legacy entrypoint (use ModuleManagementContract)
      */
-    function queueDefaultModule(ModuleType moduleType, address module) external onlyRole(ROLE_TIMELOCK) {
-        // Validate against registry if set (for yield modules)
-        if (address(moduleRegistry) != address(0)) {
-            if (moduleType == ModuleType.YIELD_GEN) {
-                require(
-                    moduleRegistry.isApproved(IModuleRegistry.ModuleType.YIELD_GENERATION, module),
-                    'Module not approved in registry'
-                );
-            } else if (moduleType == ModuleType.YIELD_DIST) {
-                require(
-                    moduleRegistry.isApproved(IModuleRegistry.ModuleType.YIELD_DISTRIBUTION, module),
-                    'Module not approved in registry'
-                );
-            }
-        }
-        
-        // TEMPORARILY DISABLED: Use ModuleManagementContract instead
-        revert('Use ModuleManagementContract instead');
+    function queueDefaultModule(ModuleType, address) external onlyRole(ROLE_TIMELOCK) {
+        revert UseModuleManagementContract();
     }
 
     /**
-     * @notice Activate the queued default module
-     * @param moduleType Type of module to activate (RELEASE, RESOLUTION, YIELD_GEN, YIELD_DIST)
-     * @dev Activates after timelock delay. Requires ROLE_TIMELOCK.
+     * @notice Disabled legacy entrypoint (use ModuleManagementContract)
      */
-    function activateDefaultModule(ModuleType moduleType) external onlyRole(ROLE_TIMELOCK) {
-        // TEMPORARILY DISABLED: Use ModuleManagementContract instead
-        revert('Use ModuleManagementContract instead');
-        /* address newModule = _activateAddress(_pendingModules[moduleType]);
-        address oldModule;
-        
-        if (moduleType == ModuleType.RELEASE) {
-            oldModule = address(defaultReleaseStrategy);
-            defaultReleaseStrategy = IReleaseStrategy(newModule);
-            emit DefaultReleaseStrategyActivated(oldModule, newModule);
-        } else if (moduleType == ModuleType.RESOLUTION) {
-            oldModule = address(defaultDisputeResolutionModule);
-            defaultDisputeResolutionModule = IResolutionModule(newModule);
-            emit DefaultResolutionModuleActivated(oldModule, newModule);
-        } else if (moduleType == ModuleType.YIELD_GEN) {
-            oldModule = address(defaultYieldGenerationModule);
-            defaultYieldGenerationModule = IYieldGenerationModule(newModule);
-            emit DefaultYieldGenerationModuleActivated(oldModule, newModule);
-        } else if (moduleType == ModuleType.YIELD_DIST) {
-            oldModule = address(defaultYieldDistributionModule);
-            defaultYieldDistributionModule = IYieldDistributionModule(newModule);
-            emit DefaultYieldDistributionModuleActivated(oldModule, newModule);
-        } */
+    function activateDefaultModule(ModuleType) external onlyRole(ROLE_TIMELOCK) {
+        revert UseModuleManagementContract();
     }
 
     /**
-     * @notice Get pending default module information
-     * @param moduleType Type of module to query
-     * @return Pending module address, activation timestamp, and existence flag
-     * @dev TEMPORARILY DISABLED: Use ModuleManagementContract instead
+     * @notice Disabled legacy entrypoint (use ModuleManagementContract)
      */
-    function getPendingDefaultModule(ModuleType moduleType) external view returns (address, uint64, bool) {
-        revert('Use ModuleManagementContract instead');
+    function getPendingDefaultModule(ModuleType) external pure returns (address, uint64, bool) {
+        revert UseModuleManagementContract();
     }
 
     // ============ Fee Management ============

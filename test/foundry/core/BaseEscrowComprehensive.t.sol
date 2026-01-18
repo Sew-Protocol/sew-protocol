@@ -14,6 +14,9 @@ import '../../../contracts/types/YieldPresets.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
 import '../../../contracts/YieldOps.sol';
 import '../../../contracts/DisputeOps.sol';
+import '../../../contracts/SettlementOps.sol';
+import '../../../contracts/CreateOps.sol';
+import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/core/EscrowViewContract.sol';
 
 /**
@@ -31,6 +34,9 @@ contract BaseEscrowComprehensive is Test {
     DefaultReleaseStrategy public releaseStrategy;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
+    SettlementOps public settlementOps;
+    CreateOps public createOps;
+    BondCollector public bondCollector;
 
     address public owner;
     address public timelock;
@@ -44,6 +50,45 @@ contract BaseEscrowComprehensive is Test {
 
     function _getDefaultSettings() internal pure returns (EscrowSettings memory) {
         return SettingsValidationLibrary.getDefaultSettings();
+    }
+
+    function _loadTransfer(uint256 workflowId) internal view returns (EscrowTransfer memory et) {
+        (
+            address token_,
+            address to_,
+            address from_,
+            address disputeResolver_,
+            uint256 amountAfterFee_,
+            uint256 autoReleaseTime_,
+            uint256 autoCancelTime_,
+            EscrowState escrowState_,
+            SenderStatus senderStatus_,
+            RecipientStatus recipientStatus_
+        ) = vault.escrowTransfers(workflowId);
+
+        et = EscrowTransfer({
+            token: token_,
+            to: to_,
+            from: from_,
+            disputeResolver: disputeResolver_,
+            amountAfterFee: amountAfterFee_,
+            autoReleaseTime: autoReleaseTime_,
+            autoCancelTime: autoCancelTime_,
+            escrowState: escrowState_,
+            senderStatus: senderStatus_,
+            recipientStatus: recipientStatus_
+        });
+    }
+
+    function _loadSettings(uint256 workflowId) internal view returns (EscrowSettings memory settings) {
+        (address customResolver, YieldPreset yieldPreset, uint256 autoReleaseTime, uint256 autoCancelTime) = vault
+            .escrowSettings(workflowId);
+        settings = EscrowSettings({
+            customResolver: customResolver,
+            yieldPreset: yieldPreset,
+            autoReleaseTime: autoReleaseTime,
+            autoCancelTime: autoCancelTime
+        });
     }
 
     function setUp() public {
@@ -60,10 +105,16 @@ contract BaseEscrowComprehensive is Test {
 
         token = new ERC20Mock('Test Token', 'TEST', owner, 10000000e18);
         yieldOps = new YieldOps(owner);
-        disputeOps = new DisputeOps();
-        adminContract = new EscrowAdminContract(timelock);
-        moduleManagement = new ModuleManagementContract(timelock);
+        disputeOps = new DisputeOps(owner);
+        settlementOps = new SettlementOps(owner);
+        createOps = new CreateOps(owner);
+        bondCollector = new BondCollector(owner);
+        adminContract = new EscrowAdminContract(owner);
+        moduleManagement = new ModuleManagementContract(owner);
         vault = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
+
+        // Allow the dedicated timelock address to operate the admin contract in tests
+        adminContract.grantRole(adminContract.ROLE_TIMELOCK(), timelock);
 
         bytes32 ROLE_TIMELOCK = vault.ROLE_TIMELOCK();
         bytes32 ROLE_GUARDIAN = vault.ROLE_GUARDIAN();
@@ -71,10 +122,26 @@ contract BaseEscrowComprehensive is Test {
         vault.grantRole(ROLE_TIMELOCK, timelock);
         vault.grantRole(ROLE_GUARDIAN, guardian);
 
+        // Wire ops contracts on the vault
+        yieldOps.registerEscrowContract(address(vault));
+        disputeOps.registerEscrowContract(address(vault));
+        settlementOps.registerEscrowContract(address(vault));
+        createOps.registerEscrowContract(address(vault));
+        bondCollector.registerEscrowContract(address(vault));
+        vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), owner);
+        vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(adminContract));
+        vault.setCreateOps(address(createOps));
+        vault.setSettlementOps(address(settlementOps));
+        vault.setBondCollector(address(bondCollector));
+
+        moduleManagement.registerEscrowContract(address(vault));
+
         adminContract.queueResolutionModule(address(vault), address(resolutionModule));
+        vm.prank(address(vault));
         moduleManagement.queueDefaultModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
         vm.warp(block.timestamp + 14 days + 1);
         adminContract.activateResolutionModule(address(vault));
+        vm.prank(address(vault));
         moduleManagement.activateDefaultModule(address(vault), BaseEscrow.ModuleType.RELEASE);
         
         escrowView = new EscrowViewContract(address(vault));
@@ -307,7 +374,7 @@ contract BaseEscrowComprehensive is Test {
         uint256 workflowId = vault.createEscrow(address(token), seller, amount, SettingsValidationLibrary.getDefaultSettings());
 
         // Get the escrow to verify auto cancel time
-        EscrowTransfer memory et = vault.getEscrowTransfer(workflowId);
+        EscrowTransfer memory et = _loadTransfer(workflowId);
         assertEq(et.autoCancelTime, autoCancelTime);
 
         vm.warp(autoCancelTime + 1);
@@ -435,7 +502,7 @@ contract BaseEscrowComprehensive is Test {
         bool success = vault.senderCancel(workflowId);
         // assertTrue(success);
 
-        EscrowTransfer memory et = vault.getEscrowTransfer(workflowId);
+        EscrowTransfer memory et = _loadTransfer(workflowId);
         assertEq(uint256(et.escrowState), uint256(EscrowState.REFUNDED));
     }
 
@@ -490,7 +557,7 @@ contract BaseEscrowComprehensive is Test {
         bool success = vault.raiseDispute(workflowId);
         // assertTrue(success);
 
-        EscrowTransfer memory et = vault.getEscrowTransfer(workflowId);
+        EscrowTransfer memory et = _loadTransfer(workflowId);
         assertEq(uint256(et.escrowState), uint256(EscrowState.DISPUTED));
     }
 
@@ -527,7 +594,7 @@ contract BaseEscrowComprehensive is Test {
         vm.prank(buyer);
         uint256 workflowId = vault.createEscrow(address(token), seller, amount, _getDefaultSettings());
 
-        EscrowTransfer memory et = vault.getEscrowTransfer(workflowId);
+        EscrowTransfer memory et = _loadTransfer(workflowId);
         assertEq(et.from, buyer);
         assertEq(et.to, seller);
         // amountAfterFee is stored after fee deduction - it's the actual escrow amount
@@ -545,7 +612,7 @@ contract BaseEscrowComprehensive is Test {
         uint256 workflowId = vault.createEscrow(address(token), seller, amount, _getDefaultSettings());
 
         // Get the escrow to verify the amount after fee
-        EscrowTransfer memory et = vault.getEscrowTransfer(workflowId);
+        EscrowTransfer memory et = _loadTransfer(workflowId);
         uint256 expectedTotal = amount - ((amount * ESCROW_FEE) / 10000);
         assertEq(et.amountAfterFee, expectedTotal);
     }
@@ -559,7 +626,7 @@ contract BaseEscrowComprehensive is Test {
         vm.prank(buyer);
         uint256 workflowId = vault.createEscrow(address(token), seller, amount, _getDefaultSettings());
 
-        EscrowTransfer memory et = vault.getEscrowTransfer(workflowId);
+        EscrowTransfer memory et = _loadTransfer(workflowId);
         assertEq(et.from, buyer);
         assertEq(et.to, seller);
     }
@@ -597,7 +664,7 @@ contract BaseEscrowComprehensive is Test {
         vm.prank(buyer);
         uint256 workflowId = vault.createEscrow(address(token), seller, amount, settings);
 
-        EscrowSettings memory retrieved = vault.getEscrowSettings(workflowId);
+        EscrowSettings memory retrieved = _loadSettings(workflowId);
         assertEq(uint256(retrieved.yieldPreset), uint256(YieldPreset.OFF));
     }
 
@@ -617,7 +684,7 @@ contract BaseEscrowComprehensive is Test {
         vm.prank(buyer);
         uint256 workflowId = vault.createEscrow(address(token), seller, amount, newSettings);
 
-        EscrowSettings memory retrieved = vault.getEscrowSettings(workflowId);
+        EscrowSettings memory retrieved = _loadSettings(workflowId);
         assertEq(retrieved.autoReleaseTime, newSettings.autoReleaseTime);
     }
 
@@ -625,7 +692,7 @@ contract BaseEscrowComprehensive is Test {
 
     function test_validateWorkflowId_reverts() public {
         vm.expectRevert();
-        vault.getEscrowTransfer(999);
+        vault.escrowTransfers(999);
     }
 
     function test_requirePending_reverts() public {

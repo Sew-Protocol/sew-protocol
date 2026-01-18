@@ -9,6 +9,9 @@ import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/types/YieldPresets.sol';
 import '../../../contracts/YieldOps.sol';
 import '../../../contracts/DisputeOps.sol';
+import '../../../contracts/SettlementOps.sol';
+import '../../../contracts/CreateOps.sol';
+import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/core/ModuleManagementContract.sol';
 import '../../../contracts/admin/EscrowAdminContract.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
@@ -25,6 +28,9 @@ contract EscrowVaultUniqueCoverageTest is Test {
     DefaultResolutionModule public resolutionModule;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
+    SettlementOps public settlementOps;
+    CreateOps public createOps;
+    BondCollector public bondCollector;
     ModuleManagementContract public moduleManagement;
     EscrowAdminContract public adminContract;
 
@@ -49,17 +55,34 @@ contract EscrowVaultUniqueCoverageTest is Test {
         token1 = new ERC20Mock('Token 1', 'TKN1', owner, 10000000e18);
         token2 = new ERC20Mock('Token 2', 'TKN2', owner, 10000000e18);
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps();
+        disputeOps = new DisputeOps(address(this));
+        settlementOps = new SettlementOps(address(this));
+        createOps = new CreateOps(address(this));
+        bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleManagementContract(address(this));
         adminContract = new EscrowAdminContract(address(this));
         vault = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
         moduleManagement.registerEscrowContract(address(vault));
+
+        // Register escrow contract with all ops contracts
+        yieldOps.registerEscrowContract(address(vault));
+        disputeOps.registerEscrowContract(address(vault));
+        settlementOps.registerEscrowContract(address(vault));
+        createOps.registerEscrowContract(address(vault));
+        bondCollector.registerEscrowContract(address(vault));
 
         // Setup vault
         vault.grantRole(vault.ROLE_TIMELOCK(), owner);
         vault.grantRole(vault.ROLE_TIMELOCK(), timelock);
         adminContract.grantRole(adminContract.ROLE_TIMELOCK(), owner);
         adminContract.grantRole(adminContract.ROLE_TIMELOCK(), timelock);
+
+        // Wire ops contracts on the vault
+        vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), owner);
+        vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(adminContract));
+        vault.setCreateOps(address(createOps));
+        vault.setSettlementOps(address(settlementOps));
+        vault.setBondCollector(address(bondCollector));
 
         // Queue and activate resolution module
         adminContract.queueResolutionModule(address(vault), address(resolutionModule));

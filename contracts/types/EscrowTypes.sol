@@ -14,8 +14,10 @@ error ArrayLengthMismatch(uint256 expectedLength, uint256 actualLength);
 // Specific errors without string parameters (saves bytecode)
 error ZeroDisputeOps();
 error ZeroSettlementOps();
+error ZeroCreateOps();
 error InvalidResolutionModule(address module);
 error ModuleNotContract(address module);
+error NotAContract(uint8 which, address addr); // which: 1=resolutionModule, 2=yieldOps, etc.
 error AmountZero();
 error FeeOverflow();
 error NoTokensToRecover();

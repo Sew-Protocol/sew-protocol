@@ -10,6 +10,9 @@ import 'contracts/core/modules/DefaultResolutionModule.sol';
 import 'contracts/types/EscrowTypes.sol';
 import 'contracts/YieldOps.sol';
 import 'contracts/DisputeOps.sol';
+import 'contracts/SettlementOps.sol';
+import 'contracts/CreateOps.sol';
+import 'contracts/core/BondCollector.sol';
 import 'contracts/core/ModuleManagementContract.sol';
 import 'contracts/admin/EscrowAdminContract.sol';
 import 'contracts/libraries/SettingsValidationLibrary.sol';
@@ -20,6 +23,9 @@ contract WithdrawEscrowTest is Test {
     DefaultResolutionModule rm;
     YieldOps yieldOps;
     DisputeOps disputeOps;
+    SettlementOps settlementOps;
+    CreateOps createOps;
+    BondCollector bondCollector;
     ModuleManagementContract moduleManagement;
     EscrowAdminContract adminContract;
 
@@ -33,11 +39,30 @@ contract WithdrawEscrowTest is Test {
 
     function setUp() public {
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps();
+        disputeOps = new DisputeOps(address(this));
+        settlementOps = new SettlementOps(address(this));
+        createOps = new CreateOps(address(this));
+        bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleManagementContract(address(this));
         adminContract = new EscrowAdminContract(address(this));
         vault = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
         moduleManagement.registerEscrowContract(address(vault));
+
+        // Register escrow contract with all ops contracts
+        yieldOps.registerEscrowContract(address(vault));
+        disputeOps.registerEscrowContract(address(vault));
+        settlementOps.registerEscrowContract(address(vault));
+        createOps.registerEscrowContract(address(vault));
+        bondCollector.registerEscrowContract(address(vault));
+
+        // Wire ops contracts on the vault
+        vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
+        // Allow EscrowAdminContract to apply queued changes on the vault
+        vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(adminContract));
+        vault.setCreateOps(address(createOps));
+        vault.setSettlementOps(address(settlementOps));
+        vault.setBondCollector(address(bondCollector));
+
         token = new ERC20Mock('Test', 'TST', address(this), 1e24);
         rm = new DefaultResolutionModule(address(this), resolver);
 
@@ -83,7 +108,7 @@ contract WithdrawEscrowTest is Test {
 
         // Withdrawal should fail (no claimable balance, already transferred)
         vm.prank(recipient);
-        vm.expectRevert(abi.encodeWithSignature("NoClaimableBalance(uint256,address,address)", wid, recipient));
+        vm.expectRevert(abi.encodeWithSignature("NoClaimableBalance(uint256,address,address)", wid, recipient, address(token)));
         vault.withdrawEscrow(wid);
     }
 
@@ -107,7 +132,7 @@ contract WithdrawEscrowTest is Test {
 
         // Withdrawal should fail (no claimable balance, already transferred)
         vm.prank(recipient);
-        vm.expectRevert(abi.encodeWithSignature("NoClaimableBalance(uint256,address,address)", wid, recipient));
+        vm.expectRevert(abi.encodeWithSignature("NoClaimableBalance(uint256,address,address)", wid, recipient, address(token)));
         vault.withdrawEscrow(wid);
     }
 
@@ -165,11 +190,11 @@ contract WithdrawEscrowTest is Test {
 
         // Withdrawals should fail (no claimable balance, already transferred)
         vm.prank(recipient);
-        vm.expectRevert(abi.encodeWithSignature("NoClaimableBalance(uint256,address,address)", wid1, recipient));
+        vm.expectRevert(abi.encodeWithSignature("NoClaimableBalance(uint256,address,address)", wid1, recipient, address(token)));
         vault.withdrawEscrow(wid1);
         
         vm.prank(recipient);
-        vm.expectRevert(abi.encodeWithSignature("NoClaimableBalance(uint256,address,address)", wid2, recipient));
+        vm.expectRevert(abi.encodeWithSignature("NoClaimableBalance(uint256,address,address)", wid2, recipient, address(token)));
         vault.withdrawEscrow(wid2);
     }
 
@@ -204,7 +229,7 @@ contract WithdrawEscrowTest is Test {
 
         // Withdrawal should fail (no claimable balance, already transferred)
         vm.prank(recipient);
-        vm.expectRevert(abi.encodeWithSignature("NoClaimableBalance(uint256,address,address)", wid, recipient));
+        vm.expectRevert(abi.encodeWithSignature("NoClaimableBalance(uint256,address,address)", wid, recipient, address(token)));
         vault.withdrawEscrow(wid);
 
         uint256 claimableFinal = vault.claimableBalances(wid, recipient);

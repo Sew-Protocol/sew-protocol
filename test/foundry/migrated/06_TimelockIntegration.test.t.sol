@@ -24,7 +24,7 @@ contract Test_06_TimelockIntegration_test is Test {
 
     function setUp() public {
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps();
+        disputeOps = new DisputeOps(address(this));
         token = new EscrowableERC20(
             'Test',
             'TST',
@@ -48,10 +48,17 @@ contract Test_06_TimelockIntegration_test is Test {
         // impersonate timelock to set default auto cancel time
         uint256 newTime = block.timestamp + 7 days;
         vm.prank(timelock);
-        TimeoutConfig memory config = token.getTimeoutConfig();
+        (uint256 dar, uint256 dac, uint256 mdd, uint256 awd) = token.timeoutConfig();
+        TimeoutConfig memory config = TimeoutConfig({
+            defaultAutoReleaseTime: dar,
+            defaultAutoCancelTime: dac,
+            maxDisputeDuration: mdd,
+            appealWindowDuration: awd
+        });
         config.defaultAutoCancelTime = newTime;
         token.setTimeoutConfig(config);
-        assertEq(token.getTimeoutConfig().defaultAutoCancelTime, newTime);
+        (, uint256 newDefaultAutoCancelTime, , ) = token.timeoutConfig();
+        assertEq(newDefaultAutoCancelTime, newTime);
     }
 
     function test_timelock_can_queue_and_activate_slow_lane() public {

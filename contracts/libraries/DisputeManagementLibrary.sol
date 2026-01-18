@@ -23,6 +23,9 @@ library DisputeManagementLibrary {
         uint256 raisedTimestamp,
         uint256 maxDuration
     ) internal view returns (bool timedOut, uint256 timeRemaining) {
+        // Intentionally unused (kept for consistent call signatures / debugging)
+        workflowId;
+
         if (escrowState != EscrowState.DISPUTED || raisedTimestamp == 0) {
             return (false, 0);
         }

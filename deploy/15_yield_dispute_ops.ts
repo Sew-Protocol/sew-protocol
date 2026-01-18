@@ -1,9 +1,12 @@
 /**
- * Deploy YieldOps and DisputeOps
+ * Deploy Ops Contracts
  *
  * These are utility contracts required by the core escrow contracts.
  * - YieldOps: Handles yield withdrawal and distribution
  * - DisputeOps: Handles dispute escalation orchestration
+ * - SettlementOps: Handles settlement execution operations
+ * - CreateOps: Handles escrow creation validation and computation
+ * - BondCollector: Handles escalation bond collection
  */
 
 import { HardhatRuntimeEnvironment } from 'hardhat/types';
@@ -20,7 +23,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployer } = await getNamedAccounts();
   const chainConfig = getChainConfig(hre);
 
-  console.log(`\n📦 Deploying YieldOps and DisputeOps...`);
+  console.log(`\n📦 Deploying Ops Contracts...`);
 
   // Deploy YieldOps
   console.log(`\n   Deploying YieldOps...`);
@@ -53,12 +56,12 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     console.log(`   ✅ YieldOps already deployed at: ${yieldOpsDeployment.address}`);
   }
 
-  // Deploy DisputeOps (no constructor)
+  // Deploy DisputeOps
   console.log(`\n   Deploying DisputeOps...`);
   const disputeOpsDeployment = await deploy('DisputeOps', {
     contract: 'DisputeOps',
     from: deployer,
-    args: [],
+    args: [deployer], // initialOwner
     log: true,
   });
 
@@ -74,15 +77,102 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
         address: disputeOpsDeployment.address,
         txHash: disputeOpsDeployment.receipt.hash,
         blockNumber: disputeOpsDeployment.receipt.blockNumber,
-        constructorArgs: [],
+        constructorArgs: [deployer],
         tags: ['core', 'dispute'],
       });
     }
   } else {
     console.log(`   ✅ DisputeOps already deployed at: ${disputeOpsDeployment.address}`);
   }
+
+  // Deploy SettlementOps
+  console.log(`\n   Deploying SettlementOps...`);
+  const settlementOpsDeployment = await deploy('SettlementOps', {
+    contract: 'SettlementOps',
+    from: deployer,
+    args: [deployer], // initialOwner
+    log: true,
+  });
+
+  if (settlementOpsDeployment.newlyDeployed) {
+    const explorerUrl = getBlockExplorerUrl(hre, settlementOpsDeployment.address);
+    console.log(`   ✅ SettlementOps deployed at: ${settlementOpsDeployment.address}`);
+    if (explorerUrl) {
+      console.log(`      📊 View on ${chainConfig.blockExplorer.name}: ${explorerUrl}`);
+    }
+
+    if (settlementOpsDeployment.receipt) {
+      await registerDeployment(hre, 'SettlementOps', {
+        address: settlementOpsDeployment.address,
+        txHash: settlementOpsDeployment.receipt.hash,
+        blockNumber: settlementOpsDeployment.receipt.blockNumber,
+        constructorArgs: [deployer],
+        tags: ['core', 'settlement'],
+      });
+    }
+  } else {
+    console.log(`   ✅ SettlementOps already deployed at: ${settlementOpsDeployment.address}`);
+  }
+
+  // Deploy CreateOps
+  console.log(`\n   Deploying CreateOps...`);
+  const createOpsDeployment = await deploy('CreateOps', {
+    contract: 'CreateOps',
+    from: deployer,
+    args: [deployer], // initialOwner
+    log: true,
+  });
+
+  if (createOpsDeployment.newlyDeployed) {
+    const explorerUrl = getBlockExplorerUrl(hre, createOpsDeployment.address);
+    console.log(`   ✅ CreateOps deployed at: ${createOpsDeployment.address}`);
+    if (explorerUrl) {
+      console.log(`      📊 View on ${chainConfig.blockExplorer.name}: ${explorerUrl}`);
+    }
+
+    if (createOpsDeployment.receipt) {
+      await registerDeployment(hre, 'CreateOps', {
+        address: createOpsDeployment.address,
+        txHash: createOpsDeployment.receipt.hash,
+        blockNumber: createOpsDeployment.receipt.blockNumber,
+        constructorArgs: [deployer],
+        tags: ['core', 'create'],
+      });
+    }
+  } else {
+    console.log(`   ✅ CreateOps already deployed at: ${createOpsDeployment.address}`);
+  }
+
+  // Deploy BondCollector
+  console.log(`\n   Deploying BondCollector...`);
+  const bondCollectorDeployment = await deploy('BondCollector', {
+    contract: 'BondCollector',
+    from: deployer,
+    args: [deployer], // initialOwner
+    log: true,
+  });
+
+  if (bondCollectorDeployment.newlyDeployed) {
+    const explorerUrl = getBlockExplorerUrl(hre, bondCollectorDeployment.address);
+    console.log(`   ✅ BondCollector deployed at: ${bondCollectorDeployment.address}`);
+    if (explorerUrl) {
+      console.log(`      📊 View on ${chainConfig.blockExplorer.name}: ${explorerUrl}`);
+    }
+
+    if (bondCollectorDeployment.receipt) {
+      await registerDeployment(hre, 'BondCollector', {
+        address: bondCollectorDeployment.address,
+        txHash: bondCollectorDeployment.receipt.hash,
+        blockNumber: bondCollectorDeployment.receipt.blockNumber,
+        constructorArgs: [deployer],
+        tags: ['core', 'bond'],
+      });
+    }
+  } else {
+    console.log(`   ✅ BondCollector already deployed at: ${bondCollectorDeployment.address}`);
+  }
 };
 
 export default func;
-func.tags = ['core', 'yield-ops', 'dispute-ops'];
+func.tags = ['core', 'yield-ops', 'dispute-ops', 'settlement-ops', 'create-ops', 'bond-collector'];
 func.dependencies = [];

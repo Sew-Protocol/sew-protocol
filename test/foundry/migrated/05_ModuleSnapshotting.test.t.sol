@@ -23,7 +23,7 @@ contract Test_05_ModuleSnapshotting_test is Test {
 
     function setUp() public {
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps();
+        disputeOps = new DisputeOps(address(this));
         moduleManagement = new ModuleManagementContract(address(this));
         vault = new EscrowVault(100, address(this), address(yieldOps), address(disputeOps), address(moduleManagement));
         adminContract = new EscrowAdminContract(address(this));

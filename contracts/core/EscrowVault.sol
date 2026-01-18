@@ -4,15 +4,12 @@ pragma solidity ^0.8.33;
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import './BaseEscrow.sol';
-import '../governance/SlowLaneQueueActivate.sol';
-// PRIORITY: Removed RecoveryLibrary import - recoverERC20 simplified to use safeTransfer directly
-// PRIORITY 5: Removed EscrowAccountingLibrary import (moved to external AccountingOps contract if needed)
 import '../types/EscrowTypes.sol';
 import '../interfaces/IReleaseStrategy.sol';
 import '../shared/interfaces/IResolutionModule.sol';
 import '../interfaces/IYieldGenerationModule.sol';
 import '../interfaces/IYieldDistributionModule.sol';
-import '../interfaces/IModuleRegistry.sol';
+// PRIORITY: Removed unused IModuleRegistry import (only used in EscrowableERC20)
 import './ModuleManagementContract.sol';
 
 /**
@@ -24,7 +21,6 @@ import './ModuleManagementContract.sol';
  */
 contract EscrowVault is BaseEscrow {
     using SafeERC20 for IERC20;
-    // PRIORITY 5: Removed EscrowAccountingLibrary usage (moved to external AccountingOps contract if needed)
 
     /// @notice Default yield protocol fee (30%)
     uint256 public constant DEFAULT_YIELD_PROTOCOL_FEE_BPS = 3000; // 30% default
@@ -35,14 +31,12 @@ contract EscrowVault is BaseEscrow {
 
     // Module management contract (stores module state externally to reduce contract size)
     ModuleManagementContract public moduleManagement;
-    
-    // Module registry for validation (optional - if not set, validation skipped)
-    IModuleRegistry public moduleRegistry;
 
-    // PRIORITY: Removed EscrowTransferCreated/Released/Cancelled events
     // EscrowCreated and EscrowStateChanged already provide this information
     event FeesWithdrawn(address indexed token, uint256 amount);
-    // PRIORITY 5: Removed AccountingReconciled event (moved to external AccountingOps contract if needed)
+
+    /// @notice Compact error for zero address validation (saves bytecode vs string-based errors)
+    error ZeroAddress(uint8 which); // 1=fee, 2=yieldOps, 3=disputeOps, 4=moduleMgmt
 
     constructor(
         uint256 escrowFeeBps,
@@ -51,44 +45,32 @@ contract EscrowVault is BaseEscrow {
         address disputeOpsAddress,
         address moduleManagementAddress
     ) {
-        // Validate escrow fee is within allowed range (0 to 2%)
-        if (escrowFeeBps > MAX_ESCROW_FEE_BPS) {
-            revert InvalidEscrowFee(escrowFeeBps, MAX_ESCROW_FEE_BPS);
-        }
-        if (feeAddress == address(0)) revert InvalidAddress('Fee address cannot be zero', feeAddress);
-        if (yieldOpsAddress == address(0)) revert InvalidAddress('YieldOps address cannot be zero', yieldOpsAddress);
-        if (disputeOpsAddress == address(0)) revert InvalidAddress('DisputeOps address cannot be zero', disputeOpsAddress);
-        if (moduleManagementAddress == address(0)) revert InvalidAddress('ModuleManagement address cannot be zero', moduleManagementAddress);
+        // AccessControl initialization (required so tests/admin can grant roles)
+        address deployer = _msgSender();
+        _grantRole(DEFAULT_ADMIN_ROLE, deployer);
+        _grantRole(ROLE_TIMELOCK, deployer);
 
+        // Validate inputs (compact custom errors save bytecode)
+        if (escrowFeeBps > MAX_ESCROW_FEE_BPS) revert InvalidEscrowFee(escrowFeeBps, MAX_ESCROW_FEE_BPS);
+        if (feeAddress == address(0)) revert ZeroAddress(1);
+        if (yieldOpsAddress == address(0)) revert ZeroAddress(2);
+        if (disputeOpsAddress == address(0)) revert ZeroAddress(3);
+        if (moduleManagementAddress == address(0)) revert ZeroAddress(4);
+
+        // Set state variables
         escrowFee = escrowFeeBps;
-        moduleManagement = ModuleManagementContract(moduleManagementAddress);
         escrowFeeAddress = feeAddress;
+        moduleManagement = ModuleManagementContract(moduleManagementAddress);
         yieldOps = YieldOps(yieldOpsAddress);
         disputeOps = DisputeOps(disputeOpsAddress);
         
-        // PRIORITY: Role granting moved to deployment script for security (timelock-only from day 1)
-
-        // Initialize protocol fees with validation
-        uint256 initialYieldFee = DEFAULT_YIELD_PROTOCOL_FEE_BPS;
-        uint256 initialAppealFee = 0; // 0% default
+        // Only set non-zero / non-default values (skip zero assignments to save bytecode)
+        yieldProtocolFeeBps = DEFAULT_YIELD_PROTOCOL_FEE_BPS;
         
-        if (initialYieldFee > MAX_PROTOCOL_FEE_BPS) {
-            revert FeeExceedsMaximum(initialYieldFee, MAX_PROTOCOL_FEE_BPS);
-        }
-        if (initialAppealFee > MAX_PROTOCOL_FEE_BPS) {
-            revert FeeExceedsMaximum(initialAppealFee, MAX_PROTOCOL_FEE_BPS);
-        }
-        
-        yieldProtocolFeeBps = initialYieldFee;
-        appealBondProtocolFeeBps = initialAppealFee;
-
-        // Initialize timeout config
-        timeoutConfig = TimeoutConfig({
-            defaultAutoReleaseTime: 0,
-            defaultAutoCancelTime: 0,
-            maxDisputeDuration: 90 days,
-            appealWindowDuration: 2 days
-        });
+        // Set timeout config fields directly (avoid struct literal to save bytecode)
+        timeoutConfig.maxDisputeDuration = 90 days;
+        timeoutConfig.appealWindowDuration = 2 days;
+        // Note: defaultAutoReleaseTime and defaultAutoCancelTime are zero by default, no need to set
     }
 
 
@@ -114,7 +96,7 @@ contract EscrowVault is BaseEscrow {
         // currentFees is the current total accumulated fees for this token before adding the new fee
         uint256 currentFees = totalFeesPerToken[token];
         if (amount > type(uint256).max - currentFees) {
-            revert InvalidAmount('Fee accumulation would overflow');
+            revert FeeOverflow();
         }
         totalFeesPerToken[token] = currentFees + amount;
     }
@@ -139,8 +121,8 @@ contract EscrowVault is BaseEscrow {
         IERC20(token).safeTransfer(to, amount);
     }
     function _updateEscrowBalance(address token, uint256 amount, bool add) internal override {
-        // MED-3: Input validation
-        if (token == address(0)) revert InvalidAddress('Token address cannot be zero', token);
+        // MED-3: Input validation (use compact error)
+        if (token == address(0)) revert ZeroAddress(0);
         
         if (add) {
             totalHeldInEscrowPerToken[token] += amount;
@@ -215,36 +197,8 @@ contract EscrowVault is BaseEscrow {
         return IYieldDistributionModule(_getModuleAddress(workflowId, ModuleType.YIELD_DIST));
     }
 
-
-    /**
-     * @notice Queue a new default module
-     * @param moduleType Type of module to queue (RELEASE, YIELD_GEN, YIELD_DIST)
-     * @param module Address of the new module to queue
-     * @dev Delegates to ModuleManagementContract. Requires ROLE_TIMELOCK.
-     */
-    function queueDefaultModule(ModuleType moduleType, address module) external onlyRole(ROLE_TIMELOCK) {
-        if (moduleType == ModuleType.RESOLUTION) revert InvalidAmount('Use queueResolutionModule');
-        moduleManagement.queueDefaultModule(address(this), moduleType, module);
-    }
-
-    /**
-     * @notice Activate the queued default module
-     * @param moduleType Type of module to activate (RELEASE, YIELD_GEN, YIELD_DIST)
-     * @dev Delegates to ModuleManagementContract. Requires ROLE_TIMELOCK.
-     */
-    function activateDefaultModule(ModuleType moduleType) external onlyRole(ROLE_TIMELOCK) {
-        if (moduleType == ModuleType.RESOLUTION) revert InvalidAmount('Use activateResolutionModule');
-        moduleManagement.activateDefaultModule(address(this), moduleType);
-    }
-
-    /**
-     * @notice Get pending default module information
-     * @param moduleType Type of module to query
-     * @return Pending module address, activation timestamp, and existence flag
-     */
-    function getPendingDefaultModule(ModuleType moduleType) external view returns (address, uint64, bool) {
-        return moduleManagement.getPendingDefaultModule(address(this), moduleType);
-    }
+    // PRIORITY: Removed thin wrapper functions (queueDefaultModule, activateDefaultModule, getPendingDefaultModule)
+    // Users should call ModuleManagementContract directly to reduce EscrowVault bytecode size
 
     bytes32 public constant ROLE_FEE_RECIPIENT = keccak256('ROLE_FEE_RECIPIENT');
 
@@ -300,9 +254,4 @@ contract EscrowVault is BaseEscrow {
         emit ERC20Recovered(token, recipient, recoveryAmount);
         return true;
     }
-
-    // PRIORITY 5: Removed getAccountingDelta and reconcileAccounting
-    // These functions have been removed to reduce contract size.
-    // Off-chain monitoring can track accounting deltas via events and public storage.
-    // If reconciliation is needed, it can be done via a separate AccountingOps contract.
 }

@@ -15,7 +15,7 @@ contract Test_BaseEscrow_test is Test {
     function setUp() public {
         // Deploy EscrowableERC20 with this contract as owner
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps();
+        disputeOps = new DisputeOps(address(this));
         token = new EscrowableERC20(
             'Test Token',
             'TEST',

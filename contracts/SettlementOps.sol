@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
+import '@openzeppelin/contracts/access/AccessControl.sol';
 import './shared/interfaces/IResolutionModule.sol';
 import './types/EscrowTypes.sol';
 
@@ -19,7 +20,12 @@ import './types/EscrowTypes.sol';
  *      SettlementOps returns: (shouldExecute, isRelease, appealDeadline, isFinalRound)
  *      BaseEscrow applies: Updates state and executes transfer
  */
-contract SettlementOps {
+contract SettlementOps is AccessControl {
+    // ============ Role Constants ============
+    bytes32 public constant ROLE_ESCROW_CONTRACT = keccak256('ROLE_ESCROW_CONTRACT');
+
+    // ============ Custom Errors ============
+    error ZeroOwner();
     // PendingSettlement struct (matches BaseEscrow.PendingSettlement)
     // Note: This must match BaseEscrow.PendingSettlement exactly
     struct SettlementPendingSettlement {
@@ -36,6 +42,25 @@ contract SettlementOps {
         bool isRelease; // True to release, false to cancel
         uint256 appealDeadline; // Appeal deadline timestamp (0 if immediate)
         bool isFinalRound; // Whether this is the final round (no appeal window)
+    }
+
+    /**
+     * @notice Constructor for SettlementOps
+     * @param initialOwner Address that will receive DEFAULT_ADMIN_ROLE
+     */
+    constructor(address initialOwner) {
+        if (initialOwner == address(0)) revert ZeroOwner();
+        _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
+    }
+
+    /**
+     * @notice Register an escrow contract (grants it ROLE_ESCROW_CONTRACT)
+     * @param escrowContract Address of the escrow contract
+     * @dev Only DEFAULT_ADMIN_ROLE can register escrow contracts
+     */
+    function registerEscrowContract(address escrowContract) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (escrowContract == address(0)) revert InvalidAddress('Escrow contract cannot be zero', escrowContract);
+        _grantRole(ROLE_ESCROW_CONTRACT, escrowContract);
     }
 
     /**
@@ -59,13 +84,14 @@ contract SettlementOps {
      * @return result Resolution execution result
      * @dev This function is "compute-only" - it does NOT modify BaseEscrow state.
      *      BaseEscrow will apply the result after receiving it.
+     *      Only authorized escrow contracts can call this function
      */
     function computeResolutionExecution(
         address resolutionModule,
         uint256 workflowId,
         bool isRelease,
         TimeoutConfig memory timeoutConfig
-    ) external view returns (ResolutionResult memory result) {
+    ) external view onlyRole(ROLE_ESCROW_CONTRACT) returns (ResolutionResult memory result) {
         result.isRelease = isRelease;
         result.shouldExecute = false;
         result.appealDeadline = 0;
@@ -117,12 +143,16 @@ contract SettlementOps {
      * @return canExecute Whether settlement can be executed
      * @return isRelease True if pending release, false if pending cancel
      * @dev This function is "compute-only" - it does NOT modify BaseEscrow state.
+     *      Only authorized escrow contracts can call this function
      */
     function computePendingSettlementExecution(
         uint256 workflowId,
         SettlementPendingSettlement memory pending,
         EscrowState escrowState
-    ) external view returns (bool canExecute, bool isRelease) {
+    ) external view onlyRole(ROLE_ESCROW_CONTRACT) returns (bool canExecute, bool isRelease) {
+        // Intentionally unused (kept for interface/telemetry parity with other ops functions)
+        workflowId;
+
         // Verify pending settlement exists
         if (!pending.exists) {
             return (false, false);
@@ -148,13 +178,14 @@ contract SettlementOps {
      * @return actionType 0 = none, 1 = auto-release, 2 = auto-cancel, 3 = pending settlement
      * @return isRelease True if release action, false if cancel
      * @dev This function is "compute-only" - it does NOT modify BaseEscrow state.
+     *      Only authorized escrow contracts can call this function
      */
     function computeTimedActions(
         uint256 /* workflowId */,
         EscrowTransfer memory et,
         SettlementPendingSettlement memory pending,
         TimeoutConfig memory /* timeoutConfig */
-    ) external view returns (uint8 actionType, bool isRelease) {
+    ) external view onlyRole(ROLE_ESCROW_CONTRACT) returns (uint8 actionType, bool isRelease) {
         // Check for pending settlement execution (appeal window enforcement)
         if (
             pending.exists &&

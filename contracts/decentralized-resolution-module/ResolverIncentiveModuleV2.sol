@@ -495,6 +495,9 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
         address token,
         uint256 totalFees
     ) external virtual override onlyEscrowContract {
+        // Intentionally unused; fees are tracked via recordEscrowFee/recordEscalationFee.
+        totalFees;
+
         // Enforce single payout token per dispute (CRITICAL: prevents token-mixing in claimablePayments)
         _requirePayoutToken(workflowId, token);
         // Delegate to onDisputeResolved for backward compatibility

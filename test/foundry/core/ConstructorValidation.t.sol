@@ -27,7 +27,7 @@ contract ConstructorValidation is Test {
     function setUp() public {
         feeAddress = address(0xFEE);
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps();
+        disputeOps = new DisputeOps(address(this));
         moduleManagement = new ModuleManagementContract(address(this));
     }
 
@@ -74,9 +74,7 @@ contract ConstructorValidation is Test {
     }
 
     function test_EscrowVault_constructor_reverts_zeroFeeAddress() public {
-        vm.expectRevert(
-            abi.encodeWithSignature('InvalidAddress(string,address)', 'Fee address cannot be zero', address(0))
-        );
+        vm.expectRevert(abi.encodeWithSignature('ZeroAddress(uint8)', 1));
         
         new EscrowVault(
             100,
@@ -88,9 +86,7 @@ contract ConstructorValidation is Test {
     }
 
     function test_EscrowVault_constructor_reverts_zeroYieldOpsAddress() public {
-        vm.expectRevert(
-            abi.encodeWithSignature('InvalidAddress(string,address)', 'YieldOps address cannot be zero', address(0))
-        );
+        vm.expectRevert(abi.encodeWithSignature('ZeroAddress(uint8)', 2));
         
         new EscrowVault(
             100,
@@ -102,9 +98,7 @@ contract ConstructorValidation is Test {
     }
 
     function test_EscrowVault_constructor_reverts_zeroDisputeOpsAddress() public {
-        vm.expectRevert(
-            abi.encodeWithSignature('InvalidAddress(string,address)', 'DisputeOps address cannot be zero', address(0))
-        );
+        vm.expectRevert(abi.encodeWithSignature('ZeroAddress(uint8)', 3));
         
         new EscrowVault(
             100,
@@ -195,7 +189,7 @@ contract ConstructorValidation is Test {
 
     function test_EscrowableERC20_constructor_reverts_zeroFeeAddress() public {
         vm.expectRevert(
-            abi.encodeWithSignature('InvalidAddress(string,address),', 'Fee address cannot be zero', address(0))
+            abi.encodeWithSignature('InvalidAddress(string,address)', 'Fee address cannot be zero', address(0))
         );
         
         new EscrowableERC20(

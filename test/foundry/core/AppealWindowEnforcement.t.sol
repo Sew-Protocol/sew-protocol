@@ -3,6 +3,7 @@ pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
 import '../../../contracts/core/EscrowVault.sol';
+import '../../../contracts/core/BaseEscrow.sol';
 import '../../../contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol';
 import '../../../contracts/decentralized-resolution-module/ResolverIncentiveModuleV2.sol';
 import '../../../contracts/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
@@ -11,6 +12,8 @@ import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/YieldOps.sol';
 import '../../../contracts/DisputeOps.sol';
 import '../../../contracts/SettlementOps.sol';
+import '../../../contracts/CreateOps.sol';
+import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/core/ModuleManagementContract.sol';
 import '../../../contracts/admin/EscrowAdminContract.sol';
 
@@ -28,6 +31,8 @@ contract AppealWindowEnforcementTest is Test {
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
     SettlementOps public settlementOps;
+    CreateOps public createOps;
+    BondCollector public bondCollector;
     ModuleManagementContract public moduleManagement;
     EscrowAdminContract public adminContract;
 
@@ -69,42 +74,27 @@ contract AppealWindowEnforcementTest is Test {
 
         // Deploy escrow
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps();
-        settlementOps = new SettlementOps();
+        disputeOps = new DisputeOps(address(this));
+        settlementOps = new SettlementOps(address(this));
+        createOps = new CreateOps(address(this));
+        bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleManagementContract(deployer);
         adminContract = new EscrowAdminContract(deployer);
         escrow = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
         moduleManagement.registerEscrowContract(address(escrow));
-        
-        // Set SettlementOps in escrow (no setter function, so use storage slot)
-        // settlementOps is declared after yieldOps and disputeOps in BaseEscrow
-        // Find yieldOps slot by checking multiple slots
-        uint256 yieldOpsSlot = type(uint256).max; // Use max as "not found" marker
-        for (uint256 i = 0; i < 50; i++) {
-            bytes32 value = vm.load(address(escrow), bytes32(i));
-            if (address(uint160(uint256(value))) == address(yieldOps)) {
-                yieldOpsSlot = i;
-                break;
-            }
-        }
-        require(yieldOpsSlot != type(uint256).max, "Could not find yieldOps storage slot");
-        
-        // settlementOps should be at yieldOpsSlot + 2 (yieldOps, disputeOps, settlementOps)
-        uint256 settlementOpsSlotNum = yieldOpsSlot + 2;
-        
-        // Set settlementOps
-        vm.store(
-            address(escrow),
-            bytes32(settlementOpsSlotNum),
-            bytes32(uint256(uint160(address(settlementOps))))
-        );
-        
-        // Verify it was set correctly
-        bytes32 settlementOpsValue = vm.load(address(escrow), bytes32(settlementOpsSlotNum));
-        require(
-            address(uint160(uint256(settlementOpsValue))) == address(settlementOps),
-            "settlementOps not set correctly"
-        );
+
+        // Wire ops contracts (CreateOps / SettlementOps) and register escrow contract callers
+        disputeOps.registerEscrowContract(address(escrow));
+        settlementOps.registerEscrowContract(address(escrow));
+        createOps.registerEscrowContract(address(escrow));
+        bondCollector.registerEscrowContract(address(escrow));
+
+        // Allow this test contract to wire ops on the vault
+        escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(this));
+        escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(adminContract));
+        escrow.setCreateOps(address(createOps));
+        escrow.setSettlementOps(address(settlementOps));
+        escrow.setBondCollector(address(bondCollector));
 
         // Setup roles
         bytes32 ROLE_TIMELOCK = resolutionModule.ROLE_TIMELOCK();
@@ -210,9 +200,9 @@ contract AppealWindowEnforcementTest is Test {
         vm.prank(resolver);
         escrow.releaseAsDisputeResolver(workflowId, bytes32(0));
 
-        // Check pending settlement exists
-        (bool exists, bool isRelease, uint256 appealDeadline, bool canExecute) = escrow
-            .getPendingSettlement(workflowId);
+        // Check pending settlement exists (public mapping getter returns tuple)
+        (bool exists, bool isRelease, uint256 appealDeadline, ) = escrow.pendingSettlements(workflowId);
+        bool canExecute = exists && block.timestamp >= appealDeadline;
 
         assertTrue(exists, 'Pending settlement should exist');
         assertTrue(isRelease, 'Should be pending release');
@@ -220,8 +210,13 @@ contract AppealWindowEnforcementTest is Test {
         assertFalse(canExecute, 'Should not be executable yet');
 
         // Check state is still DISPUTED (not RELEASED)
-        EscrowTransfer memory et = escrow.getEscrowTransfer(workflowId);
-        assertEq(uint8(et.escrowState), uint8(EscrowState.DISPUTED), 'State should be DISPUTED');
+        // Public array getter returns tuple - extract escrowState
+        (
+            , , , , , , ,
+            EscrowState escrowState,
+            ,
+        ) = escrow.escrowTransfers(workflowId);
+        assertEq(uint8(escrowState), uint8(EscrowState.DISPUTED), 'State should be DISPUTED');
 
         // Check tokens not transferred yet
         uint256 sellerClaimable = escrow.claimableBalances(workflowId, seller);
@@ -234,17 +229,34 @@ contract AppealWindowEnforcementTest is Test {
         uint256 workflowId = createEscrow();
         raiseDispute(workflowId);
 
+        bytes memory escrowData = abi.encode(address(token), buyer, seller, ESCROW_AMOUNT);
+
+        // Round 0 resolver must first issue a decision before escalation is allowed
+        (address round0Resolver, ) = resolutionModule.getDisputeResolver(workflowId, escrowData);
+        vm.prank(round0Resolver);
+        escrow.releaseAsDisputeResolver(workflowId, bytes32(0));
+
         // Fund buyer with ETH for escalation bonds
         vm.deal(buyer, 1 ether);
 
-        // Escalate to round 1
-        bytes memory escrowData = abi.encode(address(token), buyer, seller, ESCROW_AMOUNT);
+        // Escalate to round 1 (appeal)
+        (uint256 bond0, ) = resolutionModule.getRequiredAppealBond(workflowId, 0, escrowData);
         vm.prank(buyer);
-        escrow.escalateDispute{value: 0.01 ether}(workflowId);
+        token.approve(address(escrow), bond0);
+        vm.prank(buyer);
+        escrow.escalateDispute(workflowId);
+
+        // Round 1 resolver must issue a decision before further escalation is allowed
+        (address round1Resolver, ) = resolutionModule.getDisputeResolver(workflowId, escrowData);
+        vm.prank(round1Resolver);
+        escrow.releaseAsDisputeResolver(workflowId, bytes32(0));
 
         // Escalate to round 2 (final round) - cost is 0.02 ether (baseCost + stepSize * escalationCount)
+        (uint256 bond1, ) = resolutionModule.getRequiredAppealBond(workflowId, 1, escrowData);
         vm.prank(buyer);
-        escrow.escalateDispute{value: 0.02 ether}(workflowId);
+        token.approve(address(escrow), bond1);
+        vm.prank(buyer);
+        escrow.escalateDispute(workflowId);
 
         // Get senior resolver for round 2 (after escalation, resolver is updated)
         (address seniorRes, ) = resolutionModule.getDisputeResolver(workflowId, escrowData);
@@ -254,12 +266,17 @@ contract AppealWindowEnforcementTest is Test {
         escrow.releaseAsDisputeResolver(workflowId, bytes32(0));
 
         // Check no pending settlement (executed immediately)
-        (bool exists, , , ) = escrow.getPendingSettlement(workflowId);
+        (bool exists, , , ) = escrow.pendingSettlements(workflowId);
         assertFalse(exists, 'No pending settlement for final round');
 
         // Check state is RELEASED
-        EscrowTransfer memory et = escrow.getEscrowTransfer(workflowId);
-        assertEq(uint8(et.escrowState), uint8(EscrowState.RELEASED), 'State should be RELEASED');
+        // Public array getter returns tuple - extract escrowState
+        (
+            , , , , , , ,
+            EscrowState escrowState,
+            ,
+        ) = escrow.escrowTransfers(workflowId);
+        assertEq(uint8(escrowState), uint8(EscrowState.RELEASED), 'State should be RELEASED');
 
         // Check tokens transferred via autotransfer
         uint256 sellerClaimable = escrow.claimableBalances(workflowId, seller);
@@ -282,8 +299,8 @@ contract AppealWindowEnforcementTest is Test {
         vm.prank(resolver);
         escrow.releaseAsDisputeResolver(workflowId, bytes32(0));
 
-        // Get appeal deadline
-        (bool exists, , uint256 appealDeadline, ) = escrow.getPendingSettlement(workflowId);
+        // Get appeal deadline (public mapping getter returns struct tuple)
+        (bool exists, , uint256 appealDeadline, ) = escrow.pendingSettlements(workflowId);
         assertTrue(exists);
 
         // Warp past appeal deadline
@@ -293,8 +310,13 @@ contract AppealWindowEnforcementTest is Test {
         escrow.executePendingSettlement(workflowId);
 
         // Check state is RELEASED
-        EscrowTransfer memory et = escrow.getEscrowTransfer(workflowId);
-        assertEq(uint8(et.escrowState), uint8(EscrowState.RELEASED), 'State should be RELEASED');
+        // Public array getter returns tuple - extract escrowState
+        (
+            , , , , , , ,
+            EscrowState escrowState,
+            ,
+        ) = escrow.escrowTransfers(workflowId);
+        assertEq(uint8(escrowState), uint8(EscrowState.RELEASED), 'State should be RELEASED');
 
         // Check tokens transferred via autotransfer
         uint256 sellerClaimable = escrow.claimableBalances(workflowId, seller);
@@ -303,7 +325,8 @@ contract AppealWindowEnforcementTest is Test {
         assertTrue(sellerClaimable > 0 || sellerBalance > 0, 'Seller should have either claimable balance or received funds via autotransfer');
 
         // Check pending settlement cleared
-        (exists, , , ) = escrow.getPendingSettlement(workflowId);
+        (bool exists_, , , ) = escrow.pendingSettlements(workflowId);
+        exists = exists_;
         assertFalse(exists, 'Pending settlement should be cleared');
     }
 
@@ -321,8 +344,8 @@ contract AppealWindowEnforcementTest is Test {
         vm.prank(resolver);
         escrow.releaseAsDisputeResolver(workflowId, bytes32(0));
 
-        // Get appeal deadline
-        (, , uint256 appealDeadline, ) = escrow.getPendingSettlement(workflowId);
+        // Get appeal deadline (public mapping getter returns struct tuple)
+        (, , uint256 appealDeadline, ) = escrow.pendingSettlements(workflowId);
 
         // Warp to just before appeal deadline
         vm.warp(appealDeadline - 1);
@@ -332,9 +355,14 @@ contract AppealWindowEnforcementTest is Test {
         escrow.executePendingSettlement(workflowId);
 
         // Check state is still DISPUTED
-        EscrowTransfer memory et = escrow.getEscrowTransfer(workflowId);
+        // Public array getter returns tuple - extract escrowState
+        (
+            , , , , , , ,
+            EscrowState escrowState,
+            ,
+        ) = escrow.escrowTransfers(workflowId);
         assertEq(
-            uint8(et.escrowState),
+            uint8(escrowState),
             uint8(EscrowState.DISPUTED),
             'State should still be DISPUTED'
         );
@@ -354,25 +382,33 @@ contract AppealWindowEnforcementTest is Test {
         vm.prank(resolver);
         escrow.releaseAsDisputeResolver(workflowId, bytes32(0));
 
-        // Check pending settlement exists
-        (bool exists, , , ) = escrow.getPendingSettlement(workflowId);
+        // Check pending settlement exists (public mapping getter returns struct tuple)
+        (bool exists, , , ) = escrow.pendingSettlements(workflowId);
         assertTrue(exists, 'Pending settlement should exist');
 
         // Fund buyer with ETH for escalation bond
         vm.deal(buyer, 1 ether);
 
         // Escalate during appeal window
+        (uint256 bond0, ) = resolutionModule.getRequiredAppealBond(workflowId, 0, escrowData);
         vm.prank(buyer);
-        escrow.escalateDispute{value: 0.01 ether}(workflowId);
+        token.approve(address(escrow), bond0);
+        vm.prank(buyer);
+        escrow.escalateDispute(workflowId);
 
         // Check pending settlement cancelled
-        (exists, , , ) = escrow.getPendingSettlement(workflowId);
+        (exists, , , ) = escrow.pendingSettlements(workflowId);
         assertFalse(exists, 'Pending settlement should be cancelled');
 
         // Check state is still DISPUTED (escalation doesn't change state)
-        EscrowTransfer memory et = escrow.getEscrowTransfer(workflowId);
+        // Public array getter returns tuple - extract escrowState
+        (
+            , , , , , , ,
+            EscrowState escrowState,
+            ,
+        ) = escrow.escrowTransfers(workflowId);
         assertEq(
-            uint8(et.escrowState),
+            uint8(escrowState),
             uint8(EscrowState.DISPUTED),
             'State should still be DISPUTED'
         );
@@ -392,8 +428,8 @@ contract AppealWindowEnforcementTest is Test {
         vm.prank(resolver);
         escrow.releaseAsDisputeResolver(workflowId, bytes32(0));
 
-        // Get appeal deadline
-        (, , uint256 appealDeadline, ) = escrow.getPendingSettlement(workflowId);
+        // Get appeal deadline (public mapping getter returns struct tuple)
+        (, , uint256 appealDeadline, ) = escrow.pendingSettlements(workflowId);
 
         // Warp past appeal deadline
         vm.warp(appealDeadline + 1);
@@ -403,8 +439,13 @@ contract AppealWindowEnforcementTest is Test {
         assertTrue(success, 'automateTimedActions should succeed');
 
         // Check state is RELEASED
-        EscrowTransfer memory et = escrow.getEscrowTransfer(workflowId);
-        assertEq(uint8(et.escrowState), uint8(EscrowState.RELEASED), 'State should be RELEASED');
+        // Public array getter returns tuple - extract escrowState
+        (
+            , , , , , , ,
+            EscrowState escrowState,
+            ,
+        ) = escrow.escrowTransfers(workflowId);
+        assertEq(uint8(escrowState), uint8(EscrowState.RELEASED), 'State should be RELEASED');
 
         // Check tokens transferred via autotransfer
         uint256 sellerClaimable = escrow.claimableBalances(workflowId, seller);
@@ -427,8 +468,8 @@ contract AppealWindowEnforcementTest is Test {
         vm.prank(resolver);
         escrow.releaseAsDisputeResolver(workflowId, bytes32(0));
 
-        // Get appeal deadline
-        (, , uint256 appealDeadline, ) = escrow.getPendingSettlement(workflowId);
+        // Get appeal deadline (public mapping getter returns struct tuple)
+        (, , uint256 appealDeadline, ) = escrow.pendingSettlements(workflowId);
 
         // Warp past appeal deadline
         vm.warp(appealDeadline + 1);
@@ -455,8 +496,8 @@ contract AppealWindowEnforcementTest is Test {
         vm.prank(resolver);
         escrow.releaseAsDisputeResolver(workflowId, bytes32(0));
 
-        // Get appeal deadline
-        (, , uint256 appealDeadline, ) = escrow.getPendingSettlement(workflowId);
+        // Get appeal deadline (public mapping getter returns struct tuple)
+        (, , uint256 appealDeadline, ) = escrow.pendingSettlements(workflowId);
 
         // Warp past appeal deadline
         vm.warp(appealDeadline + 1);
@@ -469,9 +510,13 @@ contract AppealWindowEnforcementTest is Test {
         vm.expectRevert(abi.encodeWithSignature("NoPendingSettlement(uint256)", workflowId));
         escrow.executePendingSettlement(workflowId);
 
-        // Verify state is RELEASED
-        EscrowTransfer memory et = escrow.getEscrowTransfer(workflowId);
-        assertEq(uint8(et.escrowState), uint8(EscrowState.RELEASED), 'State should be RELEASED');
+        // Verify state is RELEASED (public array getter returns tuple)
+        (
+            , , , , , , ,
+            EscrowState escrowState,
+            ,
+        ) = escrow.escrowTransfers(workflowId);
+        assertEq(uint8(escrowState), uint8(EscrowState.RELEASED), 'State should be RELEASED');
     }
 
     // ============ Test: Cancel Resolution Also Stores Pending Settlement ============
@@ -488,9 +533,9 @@ contract AppealWindowEnforcementTest is Test {
         vm.prank(resolver);
         escrow.cancelAsDisputeResolver(workflowId, bytes32(0));
 
-        // Check pending settlement exists
-        (bool exists, bool isRelease, uint256 appealDeadline, bool canExecute) = escrow
-            .getPendingSettlement(workflowId);
+        // Check pending settlement exists (public mapping getter returns tuple)
+        (bool exists, bool isRelease, uint256 appealDeadline, ) = escrow.pendingSettlements(workflowId);
+        bool canExecute = exists && block.timestamp >= appealDeadline;
 
         assertTrue(exists, 'Pending settlement should exist');
         assertFalse(isRelease, 'Should be pending cancel');
@@ -504,8 +549,13 @@ contract AppealWindowEnforcementTest is Test {
         escrow.executePendingSettlement(workflowId);
 
         // Check state is REFUNDED
-        EscrowTransfer memory et = escrow.getEscrowTransfer(workflowId);
-        assertEq(uint8(et.escrowState), uint8(EscrowState.REFUNDED), 'State should be REFUNDED');
+        // Public array getter returns tuple - extract escrowState
+        (
+            , , , , , , ,
+            EscrowState escrowState,
+            ,
+        ) = escrow.escrowTransfers(workflowId);
+        assertEq(uint8(escrowState), uint8(EscrowState.REFUNDED), 'State should be REFUNDED');
 
         // Check tokens refunded to buyer via autotransfer
         uint256 buyerClaimable = escrow.claimableBalances(workflowId, buyer);
@@ -528,9 +578,14 @@ contract AppealWindowEnforcementTest is Test {
         vm.prank(resolver);
         escrow.releaseAsDisputeResolver(workflowId, bytes32(0));
 
-        // Query pending settlement
-        (bool exists, bool isRelease, uint256 appealDeadline, bool canExecute) = escrow
-            .getPendingSettlement(workflowId);
+        // Query pending settlement (public mapping getter returns struct tuple)
+        (
+            bool exists,
+            bool isRelease,
+            uint256 appealDeadline,
+            bytes32 resolutionHash
+        ) = escrow.pendingSettlements(workflowId);
+        bool canExecute = block.timestamp >= appealDeadline;
 
         assertTrue(exists);
         assertTrue(isRelease);
@@ -541,7 +596,8 @@ contract AppealWindowEnforcementTest is Test {
         vm.warp(appealDeadline + 1);
 
         // Query again
-        (, , , canExecute) = escrow.getPendingSettlement(workflowId);
+        (exists, , appealDeadline, ) = escrow.pendingSettlements(workflowId);
+        canExecute = exists && block.timestamp >= appealDeadline;
         assertTrue(canExecute, 'Should be executable now');
     }
 

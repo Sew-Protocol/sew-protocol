@@ -35,6 +35,7 @@ contract YieldOps is AccessControl {
     // ============ Role Constants ============
     bytes32 public constant ROLE_GUARDIAN = keccak256('ROLE_GUARDIAN');
     bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');
+    bytes32 public constant ROLE_ESCROW_CONTRACT = keccak256('ROLE_ESCROW_CONTRACT');
 
     // ============ Constants ============
     /// @notice Maximum protocol fee (30%)
@@ -73,6 +74,16 @@ contract YieldOps is AccessControl {
     }
 
     /**
+     * @notice Register an escrow contract (grants it ROLE_ESCROW_CONTRACT)
+     * @param escrowContract Address of the escrow contract
+     * @dev Only DEFAULT_ADMIN_ROLE can register escrow contracts
+     */
+    function registerEscrowContract(address escrowContract) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (escrowContract == address(0)) revert InvalidRecipient(address(0));
+        _grantRole(ROLE_ESCROW_CONTRACT, escrowContract);
+    }
+
+    /**
      * @dev Result of yield handling operation
      */
     struct YieldResult {
@@ -96,6 +107,7 @@ contract YieldOps is AccessControl {
      * @dev Non-blocking: Returns success=false if distribution fails, doesn't revert
      *      Caller (BaseEscrow) should handle failure case (e.g., route to fee address)
      *      Protocol fee is deducted from yield before distribution to recipients
+     *      Only authorized escrow contracts can call this function
      */
     function handleYield(
         IYieldGenerationModule genModule,
@@ -106,7 +118,7 @@ contract YieldOps is AccessControl {
         uint256 protocolFeeBps,
         address feeRecipient,
         bytes memory distributionData
-    ) external returns (YieldResult memory result) {
+    ) external onlyRole(ROLE_ESCROW_CONTRACT) returns (YieldResult memory result) {
         result.actualAmount = amount;
         result.yield = 0;
         result.yieldDistributed = 0;

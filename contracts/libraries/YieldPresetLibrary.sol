@@ -29,6 +29,9 @@ library YieldPresetLibrary {
         address sender,
         address recipient
     ) internal pure returns (bytes memory distributionData) {
+        // Intentionally unused for current presets (kept for forward-compatible preset expansion)
+        recipient;
+
         if (preset == YieldPreset.OFF) {
             return ''; // Empty = no distribution
         }
@@ -71,6 +74,9 @@ library YieldPresetLibrary {
         address sender,
         address recipient
     ) internal pure {
+        // Intentionally unused for current presets (kept for forward-compatible preset expansion)
+        recipient;
+
         if (preset == YieldPreset.TO_SENDER) {
             if (sender == address(0)) revert InvalidAddress('Sender cannot be zero', sender);
         }

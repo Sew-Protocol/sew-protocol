@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
+import '@openzeppelin/contracts/access/AccessControl.sol';
 import './types/EscrowTypes.sol';
 import './types/YieldPresets.sol';
 import './libraries/SettingsValidationLibrary.sol';
@@ -19,14 +20,41 @@ import './interfaces/IYieldGenerationModule.sol';
  *      - No state writes: Does not modify BaseEscrow state
  *      - Validation only: Validates inputs and computes values
  *      - View-ish: Could be view functions but may query modules
+ *      - Access Control: Restricted to authorized escrow contracts only
  *
  *      Pattern:
  *      BaseEscrow calls: computeEscrowCreation(...)
  *      CreateOps returns: (fee, amountAfterFee, resolver, yieldEnabled, shouldDepositYield)
  *      BaseEscrow applies: Stores struct, updates balances, emits events
  */
-contract CreateOps {
+contract CreateOps is AccessControl {
     uint256 private constant ESCROW_FEE_DENOMINATOR = 10000;
+    
+    // ============ Role Constants ============
+    bytes32 public constant ROLE_ESCROW_CONTRACT = keccak256('ROLE_ESCROW_CONTRACT');
+    
+    // ============ Custom Errors ============
+    error ZeroOwner();
+    error UnauthorizedEscrowContract(address caller);
+    
+    /**
+     * @notice Constructor for CreateOps
+     * @param initialOwner Address that will receive DEFAULT_ADMIN_ROLE
+     */
+    constructor(address initialOwner) {
+        if (initialOwner == address(0)) revert ZeroOwner();
+        _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
+    }
+    
+    /**
+     * @notice Register an escrow contract that can call computeEscrowCreation
+     * @param escrow Address of the escrow contract (EscrowVault or EscrowableERC20)
+     * @dev Only callable by admin. Escrow contracts must be registered before use.
+     */
+    function registerEscrowContract(address escrow) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (escrow == address(0)) revert InvalidAddress('Escrow contract cannot be zero', escrow);
+        _grantRole(ROLE_ESCROW_CONTRACT, escrow);
+    }
     
     /**
      * @dev Result of escrow creation computation
@@ -52,6 +80,7 @@ contract CreateOps {
      * @return result Creation computation result
      * @dev This function is "compute-only" - it does NOT modify BaseEscrow state.
      *      BaseEscrow will apply the result after receiving it.
+     *      Restricted to authorized escrow contracts only (EscrowVault, EscrowableERC20).
      */
     function computeEscrowCreation(
         address token,
@@ -62,7 +91,7 @@ contract CreateOps {
         uint256 escrowFee,
         uint256 workflowId,
         address resolutionModule
-    ) external view returns (CreateResult memory result) {
+    ) external view onlyRole(ROLE_ESCROW_CONTRACT) returns (CreateResult memory result) {
         // Validate amount
         if (amount == 0) revert AmountZero();
         SettingsValidationLibrary.validateEscrowAmount(amount);

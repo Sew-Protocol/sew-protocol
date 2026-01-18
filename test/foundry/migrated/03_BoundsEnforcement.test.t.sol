@@ -18,7 +18,7 @@ contract Test_03_BoundsEnforcement_test is Test {
 
     function setUp() public {
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps();
+        disputeOps = new DisputeOps(address(this));
         moduleManagement = new ModuleManagementContract(address(this));
         vault = new EscrowVault(100, address(this), address(yieldOps), address(disputeOps), address(moduleManagement));
         vault.grantRole(vault.ROLE_TIMELOCK(), timelock);
@@ -27,44 +27,84 @@ contract Test_03_BoundsEnforcement_test is Test {
     function test_auto_cancel_time_bounds_accept_and_reject() public {
         // accept 0
         vm.prank(timelock);
-        TimeoutConfig memory config = vault.getTimeoutConfig();
+        (uint256 dar, uint256 dac, uint256 mdd, uint256 awd) = vault.timeoutConfig();
+        TimeoutConfig memory config = TimeoutConfig({
+            defaultAutoReleaseTime: dar,
+            defaultAutoCancelTime: dac,
+            maxDisputeDuration: mdd,
+            appealWindowDuration: awd
+        });
         config.defaultAutoCancelTime = 0;
         vault.setTimeoutConfig(config);
-        assertEq(vault.getTimeoutConfig().defaultAutoCancelTime, 0);
+        (, uint256 newDefaultAutoCancelTime, , ) = vault.timeoutConfig();
+        assertEq(newDefaultAutoCancelTime, 0);
 
         // accept max (30 days)
         uint256 maxTime = block.timestamp + 30 days;
         vm.prank(timelock);
-        config = vault.getTimeoutConfig();
+        (dar, dac, mdd, awd) = vault.timeoutConfig();
+        config = TimeoutConfig({
+            defaultAutoReleaseTime: dar,
+            defaultAutoCancelTime: dac,
+            maxDisputeDuration: mdd,
+            appealWindowDuration: awd
+        });
         config.defaultAutoCancelTime = maxTime;
         vault.setTimeoutConfig(config);
-        assertEq(vault.getTimeoutConfig().defaultAutoCancelTime, maxTime);
+        (, newDefaultAutoCancelTime, , ) = vault.timeoutConfig();
+        assertEq(newDefaultAutoCancelTime, maxTime);
 
         // exceed max -> revert
         vm.prank(timelock);
         vm.expectRevert();
-        config = vault.getTimeoutConfig();
+        (dar, dac, mdd, awd) = vault.timeoutConfig();
+        config = TimeoutConfig({
+            defaultAutoReleaseTime: dar,
+            defaultAutoCancelTime: dac,
+            maxDisputeDuration: mdd,
+            appealWindowDuration: awd
+        });
         config.defaultAutoCancelTime = block.timestamp + 30 days + 1;
         vault.setTimeoutConfig(config);
     }
 
     function test_auto_release_time_bounds() public {
         vm.prank(timelock);
-        TimeoutConfig memory config = vault.getTimeoutConfig();
+        (uint256 dar, uint256 dac, uint256 mdd, uint256 awd) = vault.timeoutConfig();
+        TimeoutConfig memory config = TimeoutConfig({
+            defaultAutoReleaseTime: dar,
+            defaultAutoCancelTime: dac,
+            maxDisputeDuration: mdd,
+            appealWindowDuration: awd
+        });
         config.defaultAutoReleaseTime = 0;
         vault.setTimeoutConfig(config);
-        assertEq(vault.getTimeoutConfig().defaultAutoReleaseTime, 0);
+        (uint256 newDefaultAutoReleaseTime, , , ) = vault.timeoutConfig();
+        assertEq(newDefaultAutoReleaseTime, 0);
 
         uint256 maxTime = block.timestamp + 30 days;
         vm.prank(timelock);
-        config = vault.getTimeoutConfig();
+        (dar, dac, mdd, awd) = vault.timeoutConfig();
+        config = TimeoutConfig({
+            defaultAutoReleaseTime: dar,
+            defaultAutoCancelTime: dac,
+            maxDisputeDuration: mdd,
+            appealWindowDuration: awd
+        });
         config.defaultAutoReleaseTime = maxTime;
         vault.setTimeoutConfig(config);
-        assertEq(vault.getTimeoutConfig().defaultAutoReleaseTime, maxTime);
+        (newDefaultAutoReleaseTime, , , ) = vault.timeoutConfig();
+        assertEq(newDefaultAutoReleaseTime, maxTime);
 
         vm.prank(timelock);
         vm.expectRevert();
-        config = vault.getTimeoutConfig();
+        (dar, dac, mdd, awd) = vault.timeoutConfig();
+        config = TimeoutConfig({
+            defaultAutoReleaseTime: dar,
+            defaultAutoCancelTime: dac,
+            maxDisputeDuration: mdd,
+            appealWindowDuration: awd
+        });
         config.defaultAutoReleaseTime = block.timestamp + 30 days + 1;
         vault.setTimeoutConfig(config);
     }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
+import '@openzeppelin/contracts/access/AccessControl.sol';
 import './shared/interfaces/IResolutionModule.sol';
 import './types/EscrowTypes.sol';
 
@@ -20,7 +21,31 @@ import './types/EscrowTypes.sol';
  *      DisputeOps returns: (newResolver, newLevel, escalationFee)
  *      BaseEscrow applies: Updates state and collects fees
  */
-contract DisputeOps {
+contract DisputeOps is AccessControl {
+    // ============ Role Constants ============
+    bytes32 public constant ROLE_ESCROW_CONTRACT = keccak256('ROLE_ESCROW_CONTRACT');
+
+    // ============ Custom Errors ============
+    error ZeroOwner();
+    /**
+     * @notice Constructor for DisputeOps
+     * @param initialOwner Address that will receive DEFAULT_ADMIN_ROLE
+     */
+    constructor(address initialOwner) {
+        if (initialOwner == address(0)) revert ZeroOwner();
+        _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
+    }
+
+    /**
+     * @notice Register an escrow contract (grants it ROLE_ESCROW_CONTRACT)
+     * @param escrowContract Address of the escrow contract
+     * @dev Only DEFAULT_ADMIN_ROLE can register escrow contracts
+     */
+    function registerEscrowContract(address escrowContract) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (escrowContract == address(0)) revert InvalidAddress('Escrow contract cannot be zero', escrowContract);
+        _grantRole(ROLE_ESCROW_CONTRACT, escrowContract);
+    }
+
     /**
      * @dev Result of escalation computation
      */
@@ -47,6 +72,7 @@ contract DisputeOps {
      * @dev This function is "compute-only" - it does NOT modify BaseEscrow state.
      *      It may call the resolution module which might update its own counters.
      *      BaseEscrow will apply the result after receiving it.
+     *      Only authorized escrow contracts can call this function
      */
     function computeEscalation(
         address resolutionModule,
@@ -57,7 +83,7 @@ contract DisputeOps {
         address token,
         uint256 amountAfterFee,
         EscrowState escrowState
-    ) external returns (EscalationResult memory result) {
+    ) external onlyRole(ROLE_ESCROW_CONTRACT) returns (EscalationResult memory result) {
         result.success = false;
 
         // Validate caller is participant (BaseEscrow should have checked this, but double-check)

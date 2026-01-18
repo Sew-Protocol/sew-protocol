@@ -9,6 +9,9 @@ import '../../../contracts/decentralized-resolution-module/PaymentCalculationLib
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/YieldOps.sol';
 import '../../../contracts/DisputeOps.sol';
+import '../../../contracts/SettlementOps.sol';
+import '../../../contracts/CreateOps.sol';
+import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/core/ModuleManagementContract.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/types/YieldPresets.sol';
@@ -31,6 +34,9 @@ contract ReentrancyProtectionTest is Test {
     ERC20Mock public token;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
+    SettlementOps public settlementOps;
+    CreateOps public createOps;
+    BondCollector public bondCollector;
     ModuleManagementContract public moduleManagement;
     EscrowAdminContract public adminContract;
 
@@ -53,11 +59,28 @@ contract ReentrancyProtectionTest is Test {
 
         // Deploy infrastructure
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps();
+        disputeOps = new DisputeOps(address(this));
+        settlementOps = new SettlementOps(address(this));
+        createOps = new CreateOps(address(this));
+        bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleManagementContract(address(this));
         adminContract = new EscrowAdminContract(address(this));
         escrow = new EscrowVault(100, makeAddr('feeAddress'), address(yieldOps), address(disputeOps), address(moduleManagement));
         moduleManagement.registerEscrowContract(address(escrow));
+
+        // Register escrow contract callers on ops contracts
+        yieldOps.registerEscrowContract(address(escrow));
+        disputeOps.registerEscrowContract(address(escrow));
+        settlementOps.registerEscrowContract(address(escrow));
+        createOps.registerEscrowContract(address(escrow));
+        bondCollector.registerEscrowContract(address(escrow));
+
+        // Wire ops contracts on escrow
+        escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(this));
+        escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(adminContract));
+        escrow.setCreateOps(address(createOps));
+        escrow.setSettlementOps(address(settlementOps));
+        escrow.setBondCollector(address(bondCollector));
 
         // Deploy modules
         paymentLib = new PaymentCalculationLibraryV1();
@@ -125,8 +148,8 @@ contract ReentrancyProtectionTest is Test {
         vm.stopPrank();
 
         // Sanity: escrow was created
-        EscrowTransfer memory et = escrow.getEscrowTransfer(workflowId);
-        assertEq(et.from, user1);
+        (, , address from, , , , , , , ) = escrow.escrowTransfers(workflowId);
+        assertEq(from, user1);
     }
 
 }

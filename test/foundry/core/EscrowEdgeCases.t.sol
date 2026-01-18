@@ -10,6 +10,9 @@ import '../../../contracts/core/modules/DefaultResolutionModule.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/YieldOps.sol';
 import '../../../contracts/DisputeOps.sol';
+import '../../../contracts/SettlementOps.sol';
+import '../../../contracts/CreateOps.sol';
+import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/core/ModuleManagementContract.sol';
 import '../../../contracts/admin/EscrowAdminContract.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
@@ -25,6 +28,9 @@ contract EscrowEdgeCasesTest is Test {
     DefaultResolutionModule public resolutionModule;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
+    SettlementOps public settlementOps;
+    CreateOps public createOps;
+    BondCollector public bondCollector;
     ModuleManagementContract public moduleManagement;
     EscrowAdminContract public adminContract;
 
@@ -51,15 +57,32 @@ contract EscrowEdgeCasesTest is Test {
         feeToken = new MockFeeOnTransfer('FeeToken', 'FEE', owner, 10000000e18, 100, address(0xdead));
         
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps();
+        disputeOps = new DisputeOps(address(this));
+        settlementOps = new SettlementOps(address(this));
+        createOps = new CreateOps(address(this));
+        bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleManagementContract(address(this));
         adminContract = new EscrowAdminContract(address(this));
         vault = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
         moduleManagement.registerEscrowContract(address(vault));
 
+        // Register escrow contract callers on ops contracts
+        yieldOps.registerEscrowContract(address(vault));
+        disputeOps.registerEscrowContract(address(vault));
+        settlementOps.registerEscrowContract(address(vault));
+        createOps.registerEscrowContract(address(vault));
+        bondCollector.registerEscrowContract(address(vault));
+
         // Setup vault
         vault.grantRole(vault.ROLE_TIMELOCK(), owner);
         vault.grantRole(vault.ROLE_TIMELOCK(), timelock);
+
+        // Allow this test contract to wire ops on the vault
+        vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), owner);
+        vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(adminContract));
+        vault.setCreateOps(address(createOps));
+        vault.setSettlementOps(address(settlementOps));
+        vault.setBondCollector(address(bondCollector));
         adminContract.grantRole(adminContract.ROLE_TIMELOCK(), owner);
         adminContract.grantRole(adminContract.ROLE_TIMELOCK(), timelock);
 
@@ -186,8 +209,8 @@ contract EscrowEdgeCasesTest is Test {
         uint256 fee = (maxSafeAmount * 100) / 10000;
         uint256 expectedAmountAfterFee = maxSafeAmount - fee;
         
-        EscrowTransfer memory escrow = vault.getEscrowTransfer(escrowId);
-        assertEq(escrow.amountAfterFee, expectedAmountAfterFee);
+        (, , , , uint256 amountAfterFee, , , , , ) = vault.escrowTransfers(escrowId);
+        assertEq(amountAfterFee, expectedAmountAfterFee);
         vm.stopPrank();
     }
 }

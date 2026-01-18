@@ -23,7 +23,7 @@ contract Test_01_AccessControl_test is Test {
 
     function setUp() public {
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps();
+        disputeOps = new DisputeOps(address(this));
         escrowable = new EscrowableERC20(
             'Test Token',
             'TEST',
@@ -56,10 +56,17 @@ contract Test_01_AccessControl_test is Test {
 
         uint256 newTime = block.timestamp + 7 days;
         vm.prank(timelock);
-        TimeoutConfig memory config = escrowable.getTimeoutConfig();
+        (uint256 dar, uint256 dac, uint256 mdd, uint256 awd) = escrowable.timeoutConfig();
+        TimeoutConfig memory config = TimeoutConfig({
+            defaultAutoReleaseTime: dar,
+            defaultAutoCancelTime: dac,
+            maxDisputeDuration: mdd,
+            appealWindowDuration: awd
+        });
         config.defaultAutoCancelTime = newTime;
         escrowable.setTimeoutConfig(config);
-        assertEq(escrowable.getTimeoutConfig().defaultAutoCancelTime, newTime);
+        (, uint256 newDefaultAutoCancelTime, , ) = escrowable.timeoutConfig();
+        assertEq(newDefaultAutoCancelTime, newTime);
 
         // EscrowVault should share role constants
         bytes32 ROLE_TIMELOCK_V = escrowVault.ROLE_TIMELOCK();
