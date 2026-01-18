@@ -260,7 +260,7 @@ contract EvidenceModuleV1 is IEvidenceModule, AccessControlUpgradeable, Reentran
         // Check if submitter is participant (requires escrow data)
         if (escrowData.length > 0) {
             // Decode escrow data: (token, from, to, amount, totalDeposited)
-            (address token, address from, address to, , ) = abi.decode(
+            (, address from, address to, , ) = abi.decode(
                 escrowData,
                 (address, address, address, uint256, uint256)
             );

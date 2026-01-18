@@ -7,6 +7,7 @@ import '../interfaces/IModuleRegistry.sol';
 import '../interfaces/IYieldGenerationModule.sol';
 import '../interfaces/IYieldDistributionModule.sol';
 import '../shared/interfaces/IResolutionModule.sol';
+import '../types/EscrowTypes.sol';
 
 /**
  * @title ModuleRegistry
@@ -24,7 +25,7 @@ contract ModuleRegistry is AccessControl, IModuleRegistry {
     mapping(ModuleType => address[]) private _moduleList;
 
     // Errors
-    error NotAContract(address module);
+    error RegistryNotAContract(address module);
     error ModuleAlreadyExists(ModuleType moduleType, address module);
     error InvalidInterface(ModuleType moduleType, address module);
     error ModuleNotFound(ModuleType moduleType, address module);
@@ -35,7 +36,7 @@ contract ModuleRegistry is AccessControl, IModuleRegistry {
      * @param initialAdmin Initial admin address (typically timelock)
      */
     constructor(address initialAdmin) {
-        if (initialAdmin == address(0)) revert InvalidAddress('Initial admin cannot be zero', initialAdmin);
+        if (initialAdmin == address(0)) revert InvalidAddress(ADDR_INITIAL_ADMIN, initialAdmin);
         _grantRole(DEFAULT_ADMIN_ROLE, initialAdmin);
         _grantRole(ROLE_TIMELOCK, initialAdmin);
     }
@@ -87,7 +88,7 @@ contract ModuleRegistry is AccessControl, IModuleRegistry {
         address module,
         ModuleMetadata calldata metadata
     ) external onlyRole(ROLE_TIMELOCK) {
-        if (module.code.length == 0) revert NotAContract(module);
+        if (module.code.length == 0) revert RegistryNotAContract(module);
 
         // Check if module already exists (must be deprecated to re-add)
         ModuleMetadata memory existing = _modules[moduleType][module];
@@ -150,6 +151,4 @@ contract ModuleRegistry is AccessControl, IModuleRegistry {
         emit ModuleDeprecated(moduleType, module);
     }
 
-    // Reuse InvalidAddress error from types
-    error InvalidAddress(string reason, address addr);
 }

@@ -97,14 +97,14 @@ contract AppealWindowEnforcementTest is Test {
         escrow.setBondCollector(address(bondCollector));
 
         // Setup roles
-        bytes32 ROLE_TIMELOCK = resolutionModule.ROLE_TIMELOCK();
-        resolutionModule.grantRole(ROLE_TIMELOCK, timelock);
+        bytes32 roleTimelock = resolutionModule.ROLE_TIMELOCK();
+        resolutionModule.grantRole(roleTimelock, timelock);
 
-        bytes32 INCENTIVE_ROLE_TIMELOCK = incentiveModule.ROLE_TIMELOCK();
-        incentiveModule.grantRole(INCENTIVE_ROLE_TIMELOCK, timelock);
+        bytes32 incentiveRoleTimelock = incentiveModule.ROLE_TIMELOCK();
+        incentiveModule.grantRole(incentiveRoleTimelock, timelock);
 
-        bytes32 ESCROW_ROLE_TIMELOCK = escrow.ROLE_TIMELOCK();
-        escrow.grantRole(ESCROW_ROLE_TIMELOCK, address(this));
+        bytes32 escrowRoleTimelock = escrow.ROLE_TIMELOCK();
+        escrow.grantRole(escrowRoleTimelock, address(this));
 
         // Register escrow contract in resolution module
         vm.prank(timelock);

@@ -71,7 +71,7 @@ abstract contract SlowLaneQueueActivate {
             revert InvalidValue();
         }
         pending.value = newValue;
-        pending.eta = uint64(block.timestamp + SLOW_DELAY);
+        pending.eta = uint64(block.timestamp + SLOW_DELAY); // forge-lint: disable-line(unsafe-typecast)
         pending.exists = true;
     }
 
@@ -104,7 +104,7 @@ abstract contract SlowLaneQueueActivate {
      */
     function _queueUint(PendingUint storage pending, uint256 newValue) internal {
         pending.value = newValue;
-        pending.eta = uint64(block.timestamp + SLOW_DELAY);
+        pending.eta = uint64(block.timestamp + SLOW_DELAY); // forge-lint: disable-line(unsafe-typecast)
         pending.exists = true;
     }
 

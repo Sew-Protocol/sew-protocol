@@ -56,7 +56,7 @@ contract BondCollector is AccessControl {
      * @dev Only ROLE_TIMELOCK can register escrow contracts (governance-controlled)
      */
     function registerEscrowContract(address escrowContract) external onlyRole(ROLE_TIMELOCK) {
-        if (escrowContract == address(0)) revert InvalidAddress('Escrow contract cannot be zero', escrowContract);
+        if (escrowContract == address(0)) revert InvalidAddress(ADDR_ESCROW_CONTRACT, escrowContract);
         _grantRole(ROLE_ESCROW_CONTRACT, escrowContract);
     }
 

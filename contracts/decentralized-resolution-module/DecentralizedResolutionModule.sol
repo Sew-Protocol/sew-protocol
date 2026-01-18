@@ -683,7 +683,7 @@ contract DecentralizedResolutionModule is
         _pendingEscalationConfig[level] = PendingEscalationConfig({
             level: level,
             config: config,
-            eta: uint64(block.timestamp + SLOW_DELAY),
+            eta: uint64(block.timestamp + SLOW_DELAY), // forge-lint: disable-line(unsafe-typecast)
             exists: true
         });
         emit EscalationConfigQueued(level, config, _pendingEscalationConfig[level].eta);
@@ -1382,7 +1382,7 @@ contract DecentralizedResolutionModule is
 
         _pendingEscalationCostConfig = PendingEscalationCostConfig({
             config: config,
-            eta: uint64(block.timestamp + SLOW_DELAY),
+            eta: uint64(block.timestamp + SLOW_DELAY), // forge-lint: disable-line(unsafe-typecast)
             exists: true
         });
 
@@ -1593,7 +1593,7 @@ contract DecentralizedResolutionModule is
     function queueStakingModule(address module) external onlyRole(ROLE_TIMELOCK) {
         _pendingStakingModule = PendingModuleConfig({
             module: module,
-            eta: uint64(block.timestamp + SLOW_DELAY),
+            eta: uint64(block.timestamp + SLOW_DELAY), // forge-lint: disable-line(unsafe-typecast)
             exists: true
         });
 
@@ -1621,7 +1621,7 @@ contract DecentralizedResolutionModule is
     function queueSlashingModule(address module) external onlyRole(ROLE_TIMELOCK) {
         _pendingSlashingModule = PendingModuleConfig({
             module: module,
-            eta: uint64(block.timestamp + SLOW_DELAY),
+            eta: uint64(block.timestamp + SLOW_DELAY), // forge-lint: disable-line(unsafe-typecast)
             exists: true
         });
 

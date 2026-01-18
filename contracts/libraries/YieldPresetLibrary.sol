@@ -2,6 +2,7 @@
 pragma solidity ^0.8.33;
 
 import '../types/YieldPresets.sol';
+import '../types/EscrowTypes.sol';
 
 /**
  * @title YieldPresetLibrary
@@ -12,9 +13,6 @@ import '../types/YieldPresets.sol';
 library YieldPresetLibrary {
     /// @notice Error thrown when an invalid preset is used
     error InvalidYieldPreset();
-
-    /// @notice Error thrown when preset parameters are invalid
-    error InvalidAddress(string reason, address addr);
 
     /**
      * @notice Derive distribution data from preset
@@ -38,7 +36,7 @@ library YieldPresetLibrary {
 
         if (preset == YieldPreset.TO_SENDER) {
             // Validate sender
-            if (sender == address(0)) revert InvalidAddress('Sender cannot be zero', sender);
+            if (sender == address(0)) revert InvalidAddress(ADDR_GENERIC, sender);
 
             // Deterministic: 100% to sender
             address[] memory recipients = new address[](1);
@@ -78,7 +76,7 @@ library YieldPresetLibrary {
         recipient;
 
         if (preset == YieldPreset.TO_SENDER) {
-            if (sender == address(0)) revert InvalidAddress('Sender cannot be zero', sender);
+            if (sender == address(0)) revert InvalidAddress(ADDR_GENERIC, sender);
         }
         // OFF preset requires no addresses
         // Future presets (e.g., YIELD_BOTH) can add their validation here

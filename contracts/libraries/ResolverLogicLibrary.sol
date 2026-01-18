@@ -90,22 +90,22 @@ library ResolverLogicLibrary {
         uint256 availableBalance
     ) internal pure returns (uint256 totalPayout) {
         if (payouts.length == 0) {
-            revert InvalidAmount('At least one payout required');
+            revert InvalidAmount(AMOUNT_EMPTY);
         }
 
         totalPayout = 0;
         for (uint256 i = 0; i < payouts.length; i++) {
             if (payouts[i].recipient == address(0)) {
-                revert InvalidAddress('Payout recipient cannot be zero', address(0));
+                revert InvalidAddress(ADDR_RECIPIENT, address(0));
             }
             if (payouts[i].amount == 0) {
-                revert InvalidAmount('Payout amount must be greater than zero');
+                revert InvalidAmount(AMOUNT_EMPTY);
             }
             totalPayout += payouts[i].amount;
         }
 
         if (totalPayout > availableBalance) {
-            revert InvalidAmount('Total payout exceeds available balance');
+            revert InvalidAmount(AMOUNT_GENERIC);
         }
     }
 

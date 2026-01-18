@@ -77,6 +77,12 @@ contract ModuleManagementContract is AccessControl, SlowLaneQueueActivate {
         address indexed newModule
     );
 
+    /**
+     * @notice Deploy the ModuleManagementContract.
+     * @param initialAdmin Initial admin for bootstrap (expected to be replaced/managed by governance wiring).
+     * @dev Grants `DEFAULT_ADMIN_ROLE` and `ROLE_TIMELOCK` to `initialAdmin` for initial setup.
+     *      In production, `ROLE_TIMELOCK` should be held by the TimelockController.
+     */
     constructor(address initialAdmin) {
         if (initialAdmin == address(0)) revert InvalidValue();
         _grantRole(DEFAULT_ADMIN_ROLE, initialAdmin);
@@ -100,6 +106,7 @@ contract ModuleManagementContract is AccessControl, SlowLaneQueueActivate {
      * @param moduleType Type of module to queue
      * @param module Address of the new module to queue
      * @dev Only the escrow contract itself can queue modules (via ROLE_ESCROW_CONTRACT)
+     *      This ensures pending state is namespaced to the calling escrow contract.
      */
     function queueDefaultModule(
         address escrowContract,
@@ -149,6 +156,7 @@ contract ModuleManagementContract is AccessControl, SlowLaneQueueActivate {
      * @param escrowContract Address of the escrow contract
      * @param moduleType Type of module to activate
      * @dev Only the escrow contract itself can activate modules (via ROLE_ESCROW_CONTRACT)
+     *      Reverts if no module is queued for the given type, or if the ETA has not passed yet.
      */
     function activateDefaultModule(
         address escrowContract,

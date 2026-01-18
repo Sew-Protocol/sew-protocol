@@ -206,7 +206,7 @@ contract InsurancePoolVault is AccessControl, ReentrancyGuard {
             amount: amount,
             workflowId: workflowId,
             reason: reason,
-            eta: uint64(block.timestamp + SLOW_DELAY),
+            eta: uint64(block.timestamp + SLOW_DELAY), // forge-lint: disable-line(unsafe-typecast)
             exists: true
         });
 

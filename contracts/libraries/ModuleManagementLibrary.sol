@@ -31,27 +31,18 @@ library ModuleManagementLibrary {
     function validateModule(address newModule, ModuleConfig memory config) internal view {
         // Check zero address
         if (!config.allowZero && newModule == address(0)) {
-            revert InvalidAddress(
-                string(abi.encodePacked('Default ', config.moduleName, ' cannot be zero')),
-                newModule
-            );
+            revert InvalidAddress(ADDR_GENERIC, newModule);
         }
 
         // Check contract requirement
         if (config.requireContract && newModule.code.length == 0) {
-            revert InvalidAddress(
-                string(abi.encodePacked('Default ', config.moduleName, ' must be a contract')),
-                newModule
-            );
+            revert NotAContract(ADDR_GENERIC, newModule);
         }
 
         // Validate ERC-165 interface if specified
         if (config.interfaceId != bytes4(0) && newModule != address(0)) {
             if (!IERC165(newModule).supportsInterface(config.interfaceId)) {
-                revert InvalidAddress(
-                    string(abi.encodePacked('Module does not implement required interface')),
-                    newModule
-                );
+                revert InvalidAddress(ADDR_GENERIC, newModule);
             }
         }
     }

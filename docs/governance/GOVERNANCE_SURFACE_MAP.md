@@ -316,9 +316,7 @@ This pattern ensures:
 
 ## Change Log
 
-### 2026-01-27
-
-- Added ops contracts to governance surface map:
+### 2026-01-27- Added ops contracts to governance surface map:
   - CreateOps (with yield deposits pause/resume)
   - SettlementOps
   - DisputeOps

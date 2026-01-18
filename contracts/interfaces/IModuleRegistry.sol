@@ -14,6 +14,7 @@ interface IModuleRegistry {
     }
 
     enum ModuleStatus {
+        NONE,
         ACTIVE,
         DEPRECATED
     }

@@ -59,8 +59,8 @@ contract BaseEscrowComprehensive is Test {
             address from_,
             address disputeResolver_,
             uint256 amountAfterFee_,
-            uint256 autoReleaseTime_,
-            uint256 autoCancelTime_,
+            uint64 autoReleaseTime_,
+            uint64 autoCancelTime_,
             EscrowState escrowState_,
             SenderStatus senderStatus_,
             RecipientStatus recipientStatus_
@@ -72,8 +72,8 @@ contract BaseEscrowComprehensive is Test {
             from: from_,
             disputeResolver: disputeResolver_,
             amountAfterFee: amountAfterFee_,
-            autoReleaseTime: autoReleaseTime_,
-            autoCancelTime: autoCancelTime_,
+            autoReleaseTime: uint64(autoReleaseTime_),
+            autoCancelTime: uint64(autoCancelTime_),
             escrowState: escrowState_,
             senderStatus: senderStatus_,
             recipientStatus: recipientStatus_

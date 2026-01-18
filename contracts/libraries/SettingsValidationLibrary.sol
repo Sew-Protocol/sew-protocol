@@ -39,13 +39,11 @@ library SettingsValidationLibrary {
      * @dev Validate a single auto time value
      * @param autoTime The auto time to validate (0 means no auto time, which is valid)
      * @param currentTime Current block timestamp
-     * @param timeType Description of the time type for error messages
      * @dev Reverts if autoTime is in the past or exceeds MAX_AUTO_TIME_DURATION from current block timestamp
      */
     function validateAutoTime(
         uint256 autoTime,
-        uint256 currentTime,
-        string memory timeType
+        uint256 currentTime
     ) internal pure {
         if (autoTime == 0) {
             return; // 0 means no auto time, which is valid
@@ -53,11 +51,7 @@ library SettingsValidationLibrary {
 
         // Validate time is in the future
         if (autoTime <= currentTime) {
-            revert InvalidAutoTime(
-                string.concat(timeType, ' must be in the future'),
-                autoTime,
-                currentTime
-            );
+            revert InvalidAutoTime(AUTO_TIME_IN_PAST, autoTime, currentTime);
         }
 
         // Validate time doesn't exceed maximum duration
@@ -83,8 +77,8 @@ library SettingsValidationLibrary {
         }
 
         // Validate auto times using helper function
-        validateAutoTime(settings.autoReleaseTime, currentTime, 'Auto release time');
-        validateAutoTime(settings.autoCancelTime, currentTime, 'Auto cancel time');
+        validateAutoTime(settings.autoReleaseTime, currentTime);
+        validateAutoTime(settings.autoCancelTime, currentTime);
         
         // Validate maximum escrow duration (for auto times)
         if (settings.autoReleaseTime > 0) {

@@ -54,8 +54,8 @@ contract EscrowViewContract {
             address from,
             address disputeResolver,
             uint256 amountAfterFee,
-            uint256 autoReleaseTime,
-            uint256 autoCancelTime,
+            uint64 autoReleaseTime,
+            uint64 autoCancelTime,
             EscrowState escrowState,
             ,
         ) = escrowContract.escrowTransfers(workflowId);
@@ -66,8 +66,8 @@ contract EscrowViewContract {
             to: to,
             amountAfterFee: amountAfterFee,
             resolver: disputeResolver,
-            autoReleaseTime: autoReleaseTime,
-            autoCancelTime: autoCancelTime
+            autoReleaseTime: uint256(autoReleaseTime),
+            autoCancelTime: uint256(autoCancelTime)
         });
     }
 

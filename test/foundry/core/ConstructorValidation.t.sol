@@ -189,7 +189,7 @@ contract ConstructorValidation is Test {
 
     function test_EscrowableERC20_constructor_reverts_zeroFeeAddress() public {
         vm.expectRevert(
-            abi.encodeWithSignature('InvalidAddress(string,address)', 'Fee address cannot be zero', address(0))
+            abi.encodeWithSignature('InvalidAddress(uint8,address)', 5, address(0))
         );
         
         new EscrowableERC20(
@@ -204,7 +204,7 @@ contract ConstructorValidation is Test {
 
     function test_EscrowableERC20_constructor_reverts_zeroYieldOpsAddress() public {
         vm.expectRevert(
-            abi.encodeWithSignature('InvalidAddress(string,address)', 'YieldOps address cannot be zero', address(0))
+            abi.encodeWithSignature('InvalidAddress(uint8,address)', 6, address(0))
         );
         
         new EscrowableERC20(
@@ -219,7 +219,7 @@ contract ConstructorValidation is Test {
 
     function test_EscrowableERC20_constructor_reverts_zeroDisputeOpsAddress() public {
         vm.expectRevert(
-            abi.encodeWithSignature('InvalidAddress(string,address)', 'DisputeOps address cannot be zero', address(0))
+            abi.encodeWithSignature('InvalidAddress(uint8,address)', 7, address(0))
         );
         
         new EscrowableERC20(

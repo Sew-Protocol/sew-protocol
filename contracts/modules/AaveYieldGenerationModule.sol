@@ -223,7 +223,6 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
             return (true, originalAmount, 0); // No aToken balance tracked
         }
 
-        uint256 originalATokenBalance = aTokenBalance;
         uint256 originalDeposit = escrowOriginalDeposit[escrowContract][workflowId];
 
         // Fix checks-effects-interactions pattern
@@ -392,7 +391,7 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
      */
     function queueAavePoolProvider(address provider) public onlyRole(ROLE_TIMELOCK) {
         if (provider == address(0)) {
-            revert InvalidAddress('Provider address cannot be zero', provider);
+            revert InvalidAddress(ADDR_PROVIDER, provider);
         }
         _queueAddress(_pendingPoolProvider, provider);
         emit AavePoolProviderQueued(
@@ -497,10 +496,10 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
      */
     function registerTokenForAave(address token, address aToken) public onlyRole(ROLE_TIMELOCK) {
         if (token == address(0)) {
-            revert InvalidAddress('Token address cannot be zero', token);
+            revert InvalidAddress(ADDR_TOKEN, token);
         }
         if (aToken == address(0)) {
-            revert InvalidAddress('aToken address cannot be zero', aToken);
+            revert InvalidAddress(ADDR_ATOKEN, aToken);
         }
 
         // Verify aToken is valid by checking underlying asset (external call)

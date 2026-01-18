@@ -33,16 +33,28 @@ import '../decentralized-resolution-module/IIncentiveModule.sol';
 import './BondCollector.sol';
 
 // Failure reason codes for events (replaces string reasons to save bytecode)
+// IMPORTANT: Do not reorder. Only append new values.
 enum FailureReason {
-    UNKNOWN,                // 0
-    CALL_FAILED,            // 1
-    TIMEOUT,                // 2
-    INSUFFICIENT_BALANCE,   // 3
-    INVALID_MODULE,          // 4
-    TRANSFER_FAILED,        // 5
-    DEPOSIT_FAILED,          // 6
-    WITHDRAWAL_FAILED,       // 7
-    LESS_THAN_PRINCIPAL      // 8
+    UNKNOWN, // 0
+
+    // Generic call / module wiring
+    CALL_FAILED, // 1
+    MALFORMED_RETURN_DATA, // 2
+    MODULE_NOT_SET, // 3
+    MODULE_NOT_CONTRACT, // 4
+
+    // Transfers / accounting
+    CONTRACT_INSUFFICIENT_BALANCE, // 5
+    TRANSFER_FAILED, // 6
+    PUSH_FAILED_FALLBACK_TO_PULL, // 7
+
+    // Yield lifecycle
+    DEPOSIT_FAILED, // 8
+    WITHDRAWAL_FAILED, // 9
+    LESS_THAN_PRINCIPAL, // 10
+
+    // (reserve future: dispute/bond reasons appended later)
+    TIMEOUT // 11
 }
 
 // Function selectors (replaces abi.encodeWithSignature strings to save bytecode)
@@ -307,18 +319,19 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         emit TimeoutConfigUpdated(config);
     }
 
-    // ============ Ops Contract Wiring (Only callable by EscrowAdminContract / timelock) ============
-    function setCreateOps(address ops) external onlyRole(ROLE_ADMIN_CONTRACT) {
+    // ============ Ops Contract Wiring (Governance-controlled) ============
+    // These are operational wiring changes and should be callable directly by governance (Timelock).
+    function setCreateOps(address ops) external onlyRole(ROLE_TIMELOCK) {
         if (ops == address(0)) revert ZeroCreateOps();
         createOps = CreateOps(ops);
     }
 
-    function setSettlementOps(address ops) external onlyRole(ROLE_ADMIN_CONTRACT) {
+    function setSettlementOps(address ops) external onlyRole(ROLE_TIMELOCK) {
         if (ops == address(0)) revert ZeroSettlementOps();
         settlementOps = SettlementOps(ops);
     }
 
-    function setBondCollector(address collector) external onlyRole(ROLE_ADMIN_CONTRACT) {
+    function setBondCollector(address collector) external onlyRole(ROLE_TIMELOCK) {
         if (collector == address(0)) revert ZeroBondCollector();
         bondCollector = BondCollector(collector);
     }
@@ -1047,12 +1060,22 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         EscrowTransfer storage et = escrowTransfers[workflowId];
         if (settings.customResolver != address(0)) et.disputeResolver = settings.customResolver;
         bool def = (settings.autoReleaseTime == 0 && settings.autoCancelTime == 0);
-        et.autoReleaseTime = settings.autoReleaseTime > 0
-            ? uint64(settings.autoReleaseTime)
-            : (def ? uint64(timeoutConfig.defaultAutoReleaseTime) : 0);
-        et.autoCancelTime = settings.autoCancelTime > 0
-            ? uint64(settings.autoCancelTime)
-            : (def ? uint64(timeoutConfig.defaultAutoCancelTime) : 0);
+
+        uint256 autoReleaseTime = settings.autoReleaseTime > 0
+            ? settings.autoReleaseTime
+            : (def ? timeoutConfig.defaultAutoReleaseTime : 0);
+        if (autoReleaseTime > type(uint64).max) {
+            revert InvalidAutoTime(AUTO_TIME_TOO_LARGE, autoReleaseTime, block.timestamp);
+        }
+        et.autoReleaseTime = uint64(autoReleaseTime);
+
+        uint256 autoCancelTime = settings.autoCancelTime > 0
+            ? settings.autoCancelTime
+            : (def ? timeoutConfig.defaultAutoCancelTime : 0);
+        if (autoCancelTime > type(uint64).max) {
+            revert InvalidAutoTime(AUTO_TIME_TOO_LARGE, autoCancelTime, block.timestamp);
+        }
+        et.autoCancelTime = uint64(autoCancelTime);
         escrowSettings[workflowId] = settings;
         
         emit EscrowSettingsUpdated(workflowId, settings);

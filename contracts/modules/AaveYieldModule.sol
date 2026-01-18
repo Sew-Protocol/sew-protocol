@@ -7,6 +7,7 @@ import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/access/Ownable2Step.sol';
 import '@openzeppelin/contracts/utils/introspection/ERC165.sol';
 import '@openzeppelin/contracts/utils/introspection/IERC165.sol';
+import '../types/EscrowTypes.sol';
 
 // Aave V3 interfaces
 interface IPoolAddressesProvider {
@@ -32,8 +33,6 @@ interface IAToken {
 error AavePoolNotConfigured();
 error TokenNotSupportedByAave(address token);
 error InvalidATokenAddress(address token, address aToken);
-error InvalidAddress(string reason, address addr);
-error ArrayLengthMismatch(uint256 expectedLength, uint256 actualLength);
 error AaveWithdrawalFailed(uint256 workflowId, address token);
 
 /**
@@ -310,7 +309,7 @@ contract AaveYieldModule is IYieldModule, Ownable2Step, ERC165 {
      */
     function setAavePoolAddressesProvider(address provider) public onlyOwner {
         if (provider == address(0)) {
-            revert InvalidAddress('Provider address cannot be zero', provider);
+            revert InvalidAddress(ADDR_PROVIDER, provider);
         }
         aavePoolAddressesProvider = IPoolAddressesProvider(provider);
         // Get pool address first (external call)
@@ -340,10 +339,10 @@ contract AaveYieldModule is IYieldModule, Ownable2Step, ERC165 {
      */
     function registerTokenForAave(address token, address aToken) public onlyOwner {
         if (token == address(0)) {
-            revert InvalidAddress('Token address cannot be zero', token);
+            revert InvalidAddress(ADDR_TOKEN, token);
         }
         if (aToken == address(0)) {
-            revert InvalidAddress('aToken address cannot be zero', aToken);
+            revert InvalidAddress(ADDR_ATOKEN, aToken);
         }
 
         // Verify aToken is valid by checking underlying asset (external call)

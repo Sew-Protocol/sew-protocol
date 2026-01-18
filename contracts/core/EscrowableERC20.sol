@@ -69,9 +69,9 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         if (escrowFeeBps > MAX_ESCROW_FEE_BPS) {
             revert InvalidEscrowFee(escrowFeeBps, MAX_ESCROW_FEE_BPS);
         }
-        if (feeAddress == address(0)) revert InvalidAddress('Fee address cannot be zero', feeAddress);
-        if (yieldOpsAddress == address(0)) revert InvalidAddress('YieldOps address cannot be zero', yieldOpsAddress);
-        if (disputeOpsAddress == address(0)) revert InvalidAddress('DisputeOps address cannot be zero', disputeOpsAddress);
+        if (feeAddress == address(0)) revert InvalidAddress(ADDR_FEE_RECIPIENT, feeAddress);
+        if (yieldOpsAddress == address(0)) revert InvalidAddress(ADDR_YIELD_OPS, yieldOpsAddress);
+        if (disputeOpsAddress == address(0)) revert InvalidAddress(ADDR_DISPUTE_OPS, disputeOpsAddress);
 
         escrowFee = escrowFeeBps;
         escrowFeeAddress = feeAddress;
@@ -151,7 +151,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
      * @dev Overrides BaseEscrow._pullTokens. For EscrowableERC20, token must always be address(this).
      */
     function _pullTokens(address token, address from, uint256 amount) internal override {
-        if (token != address(this)) revert InvalidAddress('Token must be address(this)', token);
+        if (token != address(this)) revert InvalidAddress(ADDR_TOKEN, token);
         // Transfer from sender to contract using ERC20's internal _transfer
         _transfer(from, address(this), amount);
     }
@@ -163,12 +163,12 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
      * @dev Overrides BaseEscrow._recordFee. Tracks fees in single totalFees variable.
      */
     function _recordFee(address token, uint256 amount) internal override {
-        if (token != address(this)) revert InvalidAddress('Token must be address(this)', token);
+        if (token != address(this)) revert InvalidAddress(ADDR_TOKEN, token);
         // MED-4: Prevent overflow when accumulating fees
         // currentFees is the current total accumulated fees before adding the new fee
         uint256 currentFees = totalFees;
         if (amount > type(uint256).max - currentFees) {
-            revert InvalidAmount('Fee accumulation would overflow');
+            revert FeeOverflow();
         }
         totalFees = currentFees + amount;
     }
@@ -181,7 +181,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
      * @dev Overrides BaseEscrow._transferTokens. For EscrowableERC20, token must always be address(this).
      */
     function _transferTokens(address token, address to, uint256 amount) internal override {
-        if (token != address(this)) revert InvalidAddress('Token must be address(this)', token);
+        if (token != address(this)) revert InvalidAddress(ADDR_TOKEN, token);
         _transfer(address(this), to, amount);
     }
 
@@ -194,7 +194,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
      */
     function _updateEscrowBalance(address token, uint256 amount, bool add) internal override {
         // MED-3: Input validation
-        if (token != address(this)) revert InvalidAddress('Token must be address(this)', token);
+        if (token != address(this)) revert InvalidAddress(ADDR_TOKEN, token);
         
         if (add) {
             totalHeldInEscrow += amount;
@@ -223,7 +223,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         address to,
         uint256 amount
     ) internal override {
-        if (token != address(this)) revert InvalidAddress('Token must be address(this)', token);
+        if (token != address(this)) revert InvalidAddress(ADDR_TOKEN, token);
         emit EscrowTransferCreated(workflowId, from, to, amount);
     }
 
@@ -241,7 +241,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         address from,
         uint256 amount
     ) internal override {
-        if (token != address(this)) revert InvalidAddress('Token must be address(this)', token);
+        if (token != address(this)) revert InvalidAddress(ADDR_TOKEN, token);
         emit EscrowTransferCancelled(workflowId, from, amount);
     }
 
@@ -259,7 +259,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         address to,
         uint256 amount
     ) internal override {
-        if (token != address(this)) revert InvalidAddress('Token must be address(this)', token);
+        if (token != address(this)) revert InvalidAddress(ADDR_TOKEN, token);
         emit EscrowTransferReleased(workflowId, to, amount);
     }
 
@@ -277,7 +277,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         address token,
         uint256 amount
     ) internal override {
-        if (token != address(this)) revert InvalidAddress('Token must be address(this)', token);
+        if (token != address(this)) revert InvalidAddress(ADDR_TOKEN, token);
         generationModule.depositForYield(workflowId, token, amount);
     }
 
@@ -373,21 +373,21 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
     /**
      * @notice Disabled legacy entrypoint (use ModuleManagementContract)
      */
-    function queueDefaultModule(ModuleType, address) external view onlyRole(ROLE_TIMELOCK) {
+    function queueDefaultModule(ModuleType /* moduleType */, address /* newModule */) external view onlyRole(ROLE_TIMELOCK) {
         revert UseModuleManagementContract();
     }
 
     /**
      * @notice Disabled legacy entrypoint (use ModuleManagementContract)
      */
-    function activateDefaultModule(ModuleType) external view onlyRole(ROLE_TIMELOCK) {
+    function activateDefaultModule(ModuleType /* moduleType */) external view onlyRole(ROLE_TIMELOCK) {
         revert UseModuleManagementContract();
     }
 
     /**
      * @notice Disabled legacy entrypoint (use ModuleManagementContract)
      */
-    function getPendingDefaultModule(ModuleType) external pure returns (address, uint64, bool) {
+    function getPendingDefaultModule(ModuleType /* moduleType */) external pure returns (address, uint64, bool) {
         revert UseModuleManagementContract();
     }
 
@@ -436,7 +436,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         address recipient,
         uint256 amount
     ) external override onlyRole(ROLE_TIMELOCK) nonReentrant returns (bool) {
-        if (token != address(this)) revert InvalidAddress('Token must be address(this)', token);
+        if (token != address(this)) revert InvalidAddress(ADDR_TOKEN, token);
         
         uint256 balance = balanceOf(address(this));
         uint256 escrowBalance = totalHeldInEscrow;
@@ -453,7 +453,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
             revert AmountExceedsAvailable(token, recoveryAmount, available);
         }
         if (recoveryAmount == 0) {
-            revert InvalidAmount('No tokens to recover');
+            revert NoTokensToRecover();
         }
         
         recoveryAmount = RecoveryLibrary.recoverERC20(token, recipient, recoveryAmount, balance);

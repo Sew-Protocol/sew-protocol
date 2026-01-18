@@ -25,9 +25,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   // Safe deployment is optional (skipped if @safe-global/safe-contracts not installed)
   let safeDeployment;
   try {
-    safeDeployment = await get('Safe');
+    safeDeployment = await get('GuardianSafe');
   } catch (error: any) {
-    console.log('   ℹ️  Safe deployment not found (this is OK if Safe was not deployed)');
+    console.log('   ℹ️  GuardianSafe deployment not found (this is OK if Safe was not deployed)');
     safeDeployment = null;
   }
   
@@ -42,6 +42,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const contractsToGovern = [
     'EscrowableERC20',
     'EscrowVault',
+    'EscrowAdminContract',
     'AaveYieldGenerationModule',
     'DefaultResolutionModule',
     // Ops contracts
@@ -161,4 +162,4 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
 export default func;
 func.tags = ['governance', 'ownership'];
-func.dependencies = ['timelock', 'governor', 'safe'];
+func.dependencies = ['timelock', 'governor', 'safe', 'escrow-admin'];

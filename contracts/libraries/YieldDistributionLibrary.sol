@@ -28,7 +28,7 @@ library YieldDistributionLibrary {
         uint256[] memory percentages
     ) internal pure {
         if (recipients.length == 0) {
-            revert InvalidAmount('Yield distribution must have at least one recipient');
+            revert InvalidAmount(AMOUNT_EMPTY);
         }
         if (recipients.length != percentages.length) {
             revert ArrayLengthMismatch(recipients.length, percentages.length);
@@ -37,16 +37,16 @@ library YieldDistributionLibrary {
         uint256 totalPercentage = 0;
         for (uint256 i = 0; i < percentages.length; i++) {
             if (recipients[i] == address(0)) {
-                revert InvalidAddress('Recipient address cannot be zero', recipients[i]);
+                revert InvalidAddress(ADDR_RECIPIENT, recipients[i]);
             }
             if (percentages[i] == 0) {
-                revert InvalidAmount('Percentage must be greater than zero');
+                revert InvalidAmount(AMOUNT_GENERIC);
             }
             totalPercentage += percentages[i];
         }
 
         if (totalPercentage != ESCROW_FEE_DENOMINATOR) {
-            revert InvalidAmount('Yield distribution percentages must sum to 10000 (100%)');
+            revert InvalidAmount(AMOUNT_GENERIC);
         }
     }
 

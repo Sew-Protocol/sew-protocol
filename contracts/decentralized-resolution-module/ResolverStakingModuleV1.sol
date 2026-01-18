@@ -591,13 +591,13 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
      * @notice Lock stake when resolver is assigned to dispute
      * @param workflowId Dispute ID
      * @param resolver Resolver address
-     * @param stakeRequired Amount of stake to lock (ignored, locks minimum)
      */
     function onResolverAssigned(
         uint256 workflowId,
         address resolver,
         uint256 stakeRequired
     ) external onlyRole(ROLE_RESOLUTION_MODULE) {
+        stakeRequired;
         // Lock minimum stake for tier
         uint8 tier = resolverTier[resolver];
         uint256 lockAmount = minimumStakes[tier];
@@ -618,13 +618,13 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
      * @notice Unlock stake when resolution is finalized
      * @param workflowId Dispute ID
      * @param resolver Resolver address
-     * @param outcome Resolution outcome (true = correct, false = incorrect)
      */
     function onResolutionFinalized(
         uint256 workflowId,
         address resolver,
         bool outcome
     ) external onlyRole(ROLE_RESOLUTION_MODULE) {
+        outcome;
         uint256 lockedAmount = lockedStakes[workflowId][resolver];
 
         if (lockedAmount > 0) {
@@ -665,6 +665,7 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
         uint256 amount,
         uint256 duration
     ) external onlyRole(ROLE_RESOLUTION_MODULE) {
+        duration;
         BondComposition storage bond = resolverBonds[resolver];
         uint256 availableStake = bond.effectiveBondUSD - totalLockedStake[resolver];
         if (availableStake < amount) revert InsufficientAvailableStake(resolver, availableStake, amount);

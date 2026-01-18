@@ -4,11 +4,33 @@ pragma solidity ^0.8.33;
 import './YieldPresets.sol';
 
 // Custom errors for better user experience
-error InvalidAutoTime(string reason, uint256 providedTime, uint256 currentTime);
+// Error code constants (uint8)
+// InvalidAutoTime codes
+uint8 constant AUTO_TIME_IN_PAST = 1;
+uint8 constant AUTO_TIME_TOO_LARGE = 2;
+// InvalidAmount codes
+uint8 constant AMOUNT_GENERIC = 1;
+uint8 constant AMOUNT_OVERFLOW = 2;
+uint8 constant AMOUNT_EMPTY = 3;
+// InvalidAddress "which" codes
+uint8 constant ADDR_GENERIC = 1;
+uint8 constant ADDR_ESCROW_CONTRACT = 2;
+uint8 constant ADDR_TOKEN = 3;
+uint8 constant ADDR_RECIPIENT = 4;
+uint8 constant ADDR_FEE_RECIPIENT = 5;
+uint8 constant ADDR_YIELD_OPS = 6;
+uint8 constant ADDR_DISPUTE_OPS = 7;
+uint8 constant ADDR_INITIAL_ADMIN = 8;
+uint8 constant ADDR_INITIAL_OWNER = 9;
+uint8 constant ADDR_INITIAL_RESOLVER = 10;
+uint8 constant ADDR_PROVIDER = 11;
+uint8 constant ADDR_ATOKEN = 12;
+
+error InvalidAutoTime(uint8 code, uint256 providedTime, uint256 currentTime);
 error CannotSetBothAutoTimes(uint256 autoReleaseTime, uint256 autoCancelTime);
 error AutoTimeExceedsMaxLimit(uint256 providedTime, uint256 maxTime);
-error InvalidAddress(string reason, address addr);
-error InvalidAmount(string reason);
+error InvalidAddress(uint8 which, address addr);
+error InvalidAmount(uint8 code);
 error ArrayLengthMismatch(uint256 expectedLength, uint256 actualLength);
 
 // Specific errors without string parameters (saves bytecode)
@@ -21,7 +43,6 @@ error NotAContract(uint8 which, address addr); // which: 1=resolutionModule, 2=y
 error AmountZero();
 error FeeOverflow();
 error NoTokensToRecover();
-error NoETHToRecover();
 error AmountExceedsBalance(uint256 requested, uint256 available);
 
 struct EscrowSettings {
@@ -62,16 +83,15 @@ enum RecipientStatus {
 
 // EscrowTransfer struct (shared across contracts)
 // Note: workflowId is redundant - use array index (escrowTransfers[index]) instead
-// Optimized packing: 4 addresses (80 bytes = 3 slots), 3 uint256 (96 bytes = 3 slots), 3 enums (3 bytes = 1 slot)
 struct EscrowTransfer {
     address token; // ERC20 token address (for EscrowVault) or address(this) for EscrowableERC20
     address to;
     address from;
-    address disputeResolver; // Pack 4 addresses together (80 bytes = 3 slots)
+    address disputeResolver;
     uint256 amountAfterFee; // amount after fee deduction (what's actually held in escrow)
-    uint256 autoReleaseTime;
-    uint256 autoCancelTime;
-    EscrowState escrowState; // Pack 3 enums together (3 bytes + 29 padding = 1 slot)
+    uint64 autoReleaseTime;
+    uint64 autoCancelTime;
+    EscrowState escrowState;
     SenderStatus senderStatus;
     RecipientStatus recipientStatus;
 }

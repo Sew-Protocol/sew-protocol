@@ -34,6 +34,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const createOpsDeployment = await get('CreateOps');
   const bondCollectorDeployment = await get('BondCollector');
   const moduleManagementDeployment = await get('ModuleManagementContract');
+  const escrowAdminDeployment = await get('EscrowAdminContract');
 
   // Get fee configuration from environment or use defaults
   const escrowFeeBps = parseInt(process.env.ESCROW_FEE_BPS || '0', 10); // 0% default (0-10000 bps)
@@ -53,6 +54,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   console.log(`      CreateOps: ${createOpsDeployment.address}`);
   console.log(`      BondCollector: ${bondCollectorDeployment.address}`);
   console.log(`      ModuleManagement: ${moduleManagementDeployment.address}`);
+  console.log(`      EscrowAdminContract: ${escrowAdminDeployment.address}`);
 
   // Deploy EscrowVault
   console.log(`\n   Deploying EscrowVault...`);
@@ -171,34 +173,42 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     }
   }
 
-  // Set ops contracts in EscrowVault (via admin contract or directly if deployer has role)
-  console.log(`\n   Setting ops contracts in EscrowVault...`);
+  // Grant EscrowAdminContract the minimal admin role on EscrowVault (for slow-lane apply).
+  console.log(`\n   Granting ROLE_ADMIN_CONTRACT to EscrowAdminContract...`);
   try {
-    // Check if deployer has ROLE_ADMIN_CONTRACT
     const ADMIN_CONTRACT_ROLE = await escrowVaultContract.ROLE_ADMIN_CONTRACT();
-    const hasAdminRole = await escrowVaultContract.hasRole(ADMIN_CONTRACT_ROLE, deployer);
-    
-    if (hasAdminRole) {
-      // Set CreateOps
-      const setCreateOpsTx = await escrowVaultContract.setCreateOps(createOpsDeployment.address);
-      await setCreateOpsTx.wait();
-      console.log(`   ✅ Set CreateOps in EscrowVault`);
-
-      // Set SettlementOps
-      const setSettlementOpsTx = await escrowVaultContract.setSettlementOps(settlementOpsDeployment.address);
-      await setSettlementOpsTx.wait();
-      console.log(`   ✅ Set SettlementOps in EscrowVault`);
-
-      // Set BondCollector
-      const setBondCollectorTx = await escrowVaultContract.setBondCollector(bondCollectorDeployment.address);
-      await setBondCollectorTx.wait();
-      console.log(`   ✅ Set BondCollector in EscrowVault`);
+    const hasRole = await escrowVaultContract.hasRole(ADMIN_CONTRACT_ROLE, escrowAdminDeployment.address);
+    if (!hasRole) {
+      const grantTx = await escrowVaultContract.grantRole(ADMIN_CONTRACT_ROLE, escrowAdminDeployment.address);
+      await grantTx.wait();
+      console.log(`   ✅ ROLE_ADMIN_CONTRACT granted to EscrowAdminContract`);
     } else {
-      console.log(`   ℹ️  Deployer does not have ROLE_ADMIN_CONTRACT. Ops contracts must be set via EscrowAdminContract.`);
+      console.log(`   ✅ EscrowAdminContract already has ROLE_ADMIN_CONTRACT`);
     }
   } catch (error: any) {
+    console.log(`   ⚠️  Could not grant ROLE_ADMIN_CONTRACT (non-fatal): ${error.message}`);
+  }
+
+  // Set ops contracts in EscrowVault (governance-controlled wiring).
+  console.log(`\n   Setting ops contracts in EscrowVault...`);
+  try {
+    // Set CreateOps
+    const setCreateOpsTx = await escrowVaultContract.setCreateOps(createOpsDeployment.address);
+    await setCreateOpsTx.wait();
+    console.log(`   ✅ Set CreateOps in EscrowVault`);
+
+    // Set SettlementOps
+    const setSettlementOpsTx = await escrowVaultContract.setSettlementOps(settlementOpsDeployment.address);
+    await setSettlementOpsTx.wait();
+    console.log(`   ✅ Set SettlementOps in EscrowVault`);
+
+    // Set BondCollector
+    const setBondCollectorTx = await escrowVaultContract.setBondCollector(bondCollectorDeployment.address);
+    await setBondCollectorTx.wait();
+    console.log(`   ✅ Set BondCollector in EscrowVault`);
+  } catch (error: any) {
     if (error.message?.includes('AccessControlUnauthorizedAccount')) {
-      console.log(`   ℹ️  Deployer does not have permission to set ops contracts. Must be set via EscrowAdminContract.`);
+      console.log(`   ℹ️  Deployer does not have permission to set ops contracts.`);
     } else {
       throw error;
     }

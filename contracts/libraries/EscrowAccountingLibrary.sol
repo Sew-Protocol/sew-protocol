@@ -11,7 +11,8 @@ library EscrowAccountingLibrary {
     ) internal view returns (int256 delta) {
         uint256 actual = IERC20(token).balanceOf(address(this));
         uint256 expected = totalHeld[token] + totalFees[token];
-        return int256(actual) - int256(expected);
+        // In this system, token balances are expected to remain far below int256.max.
+        return int256(actual) - int256(expected); // forge-lint: disable-line(unsafe-typecast)
     }
 
     function reconcile(

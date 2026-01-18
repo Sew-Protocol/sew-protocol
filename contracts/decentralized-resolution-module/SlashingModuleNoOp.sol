@@ -55,7 +55,7 @@ contract SlashingModuleNoOp is ISlashingModule, AccessControl {
         uint256 workflowId,
         address resolver,
         SlashReason reason,
-        bytes calldata evidence
+        bytes calldata /* evidence */
     ) external override returns (uint256 slashId) {
         slashId = _nextSlashId++;
 
@@ -88,7 +88,7 @@ contract SlashingModuleNoOp is ISlashingModule, AccessControl {
     function appealSlash(
         uint256 slashId,
         string calldata reason,
-        bytes calldata evidence
+        bytes calldata /* evidence */
     ) external override {
         emit SlashAppealed(slashId, msg.sender, _dummyConfig.appealBond, reason);
     }
@@ -129,7 +129,7 @@ contract SlashingModuleNoOp is ISlashingModule, AccessControl {
     function slashForReversal(
         uint256 workflowId,
         address resolver,
-        uint8 priorRound
+        uint8 /* priorRound */
     ) external override onlyRole(ROLE_RESOLUTION_MODULE) returns (uint256 slashId) {
         slashId = _nextSlashId++;
 
@@ -148,7 +148,7 @@ contract SlashingModuleNoOp is ISlashingModule, AccessControl {
     function slashForFraud(
         uint256 workflowId,
         address resolver,
-        bytes calldata evidence
+        bytes calldata /* evidence */
     ) external override returns (uint256 slashId) {
         slashId = _nextSlashId++;
 
@@ -166,7 +166,7 @@ contract SlashingModuleNoOp is ISlashingModule, AccessControl {
 
     // ============ Query Functions (No-Op - return dummy data) ============
 
-    function getSlashEvent(uint256 slashId) external view override returns (SlashEvent memory) {
+    function getSlashEvent(uint256 slashId) external pure override returns (SlashEvent memory) {
         return
             SlashEvent({
                 slashId: slashId,
@@ -183,7 +183,7 @@ contract SlashingModuleNoOp is ISlashingModule, AccessControl {
             });
     }
 
-    function getSlashAppeal(uint256 slashId) external view override returns (SlashAppeal memory) {
+    function getSlashAppeal(uint256 slashId) external pure override returns (SlashAppeal memory) {
         return
             SlashAppeal({
                 slashId: slashId,
@@ -198,21 +198,21 @@ contract SlashingModuleNoOp is ISlashingModule, AccessControl {
     }
 
     function calculateSlashAmount(
-        address resolver,
-        SlashReason reason
-    ) external view override returns (uint256 amount) {
+        address /* resolver */,
+        SlashReason /* reason */
+    ) external pure override returns (uint256 amount) {
         // Return 0 in no-op mode
         return 0;
     }
 
     function getSlashableStake(
-        address resolver
-    ) external view override returns (uint256 slashable) {
+        address /* resolver */
+    ) external pure override returns (uint256 slashable) {
         // Return 0 in no-op mode
         return 0;
     }
 
-    function getSlashedInPeriod(address resolver) external view override returns (uint256 slashed) {
+    function getSlashedInPeriod(address /* resolver */) external pure override returns (uint256 slashed) {
         return 0;
     }
 
@@ -220,11 +220,11 @@ contract SlashingModuleNoOp is ISlashingModule, AccessControl {
         return _dummyConfig;
     }
 
-    function canAppeal(uint256 slashId) external view override returns (bool) {
+    function canAppeal(uint256 /* slashId */) external pure override returns (bool) {
         return true; // Always allow appeals in no-op mode
     }
 
-    function canExecute(uint256 slashId) external view override returns (bool) {
+    function canExecute(uint256 /* slashId */) external pure override returns (bool) {
         return true; // Always allow execution in no-op mode
     }
 
@@ -236,7 +236,7 @@ contract SlashingModuleNoOp is ISlashingModule, AccessControl {
 
     function calculateDistribution(
         uint256 amount,
-        SlashReason reason
+        SlashReason /* reason */
     ) external pure override returns (SlashDistribution memory distribution) {
         // Return dummy distribution
         return

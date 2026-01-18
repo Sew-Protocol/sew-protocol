@@ -87,7 +87,7 @@ contract StakingModuleNoOp is IStakingModule, AccessControl {
     function onResolutionFinalized(
         uint256 workflowId,
         address resolver,
-        bool outcome
+        bool /* outcome */
     ) external override onlyRole(ROLE_RESOLUTION_MODULE) {
         // No-op: In real implementation, would unlock stake
         emit StakeUnlocked(resolver, 0, workflowId);
@@ -105,7 +105,7 @@ contract StakingModuleNoOp is IStakingModule, AccessControl {
         uint256 workflowId,
         address resolver,
         uint256 amount,
-        uint256 duration
+        uint256 /* duration */
     ) external override onlyRole(ROLE_RESOLUTION_MODULE) {
         emit StakeLocked(resolver, amount, workflowId, 'Manual lock');
     }
@@ -119,7 +119,7 @@ contract StakingModuleNoOp is IStakingModule, AccessControl {
 
     // ============ Query Functions (No-Op - return dummy data) ============
 
-    function getStakeInfo(address resolver) external view override returns (StakeInfo memory info) {
+    function getStakeInfo(address /* resolver */) external pure override returns (StakeInfo memory info) {
         // Return dummy data indicating "sufficient" stake
         return
             StakeInfo({
@@ -136,29 +136,29 @@ contract StakingModuleNoOp is IStakingModule, AccessControl {
     }
 
     function isStakeSufficient(
-        address resolver,
-        uint256 required
-    ) external view override returns (bool sufficient) {
+        address /* resolver */,
+        uint256 /* required */
+    ) external pure override returns (bool sufficient) {
         // Always return true in no-op mode
         return true;
     }
 
     function getAvailableStake(
-        address resolver
-    ) external view override returns (uint256 available) {
+        address /* resolver */
+    ) external pure override returns (uint256 available) {
         return 10000 ether; // Dummy value
     }
 
     function getEffectiveStake(
-        address resolver
-    ) external view override returns (uint256 effective) {
+        address /* resolver */
+    ) external pure override returns (uint256 effective) {
         return 10000 ether; // Dummy value
     }
 
     function getDelegationInfo(
         address delegator,
         address delegatee
-    ) external view override returns (DelegationInfo memory info) {
+    ) external pure override returns (DelegationInfo memory info) {
         return
             DelegationInfo({
                 delegator: delegator,

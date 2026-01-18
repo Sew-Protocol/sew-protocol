@@ -202,7 +202,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         uint256 workflowId,
         address resolver,
         SlashReason reason,
-        bytes calldata evidence
+        bytes calldata /* evidence */
     ) external onlyRole(ROLE_TIMELOCK) returns (uint256 slashId) {
         if (workflowSlashed[workflowId][resolver]) revert AlreadySlashedForWorkflow(workflowId, resolver);
 
@@ -291,7 +291,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
     function appealSlash(
         uint256 slashId,
         string calldata reason,
-        bytes calldata evidence
+        bytes calldata /* evidence */
     ) external nonReentrant {
         SlashEvent storage slashEvent = slashEvents[slashId];
 
@@ -440,10 +440,10 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
      * @notice Slash for reversal (disabled initially)
      */
     function slashForReversal(
-        uint256 workflowId,
-        address resolver,
-        uint8 priorRound
-    ) external onlyRole(ROLE_RESOLUTION_MODULE) returns (uint256 slashId) {
+        uint256 /* workflowId */,
+        address /* resolver */,
+        uint8 /* priorRound */
+    ) external view onlyRole(ROLE_RESOLUTION_MODULE) returns (uint256 slashId) {
         // Reversal slashing disabled initially (too harsh for early rollout)
         return 0;
     }
@@ -628,7 +628,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         } else if (reason == SlashReason.TIMEOUT_RESOLVE) {
             // Check if this is a repeat offense in the same epoch
             EpochSlashTracker storage epochTracker = epochSlashTrackers[resolver];
-            uint256 currentEpochStart = (block.timestamp / EPOCH_LENGTH) * EPOCH_LENGTH;
+            uint256 currentEpochStart = (block.timestamp / EPOCH_LENGTH) * EPOCH_LENGTH; // forge-lint: disable-line(divide-before-multiply)
             
             // If resolver already slashed in this epoch, use repeat penalty
             if (epochTracker.epochStart == currentEpochStart && epochTracker.slashCount > 0) {
@@ -674,7 +674,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         }
 
         // Check if new epoch (v3 epoch-based caps)
-        uint256 currentEpochStart = (block.timestamp / EPOCH_LENGTH) * EPOCH_LENGTH;
+        uint256 currentEpochStart = (block.timestamp / EPOCH_LENGTH) * EPOCH_LENGTH; // forge-lint: disable-line(divide-before-multiply)
         if (epochTracker.epochStart != currentEpochStart) {
             // Reset epoch
             epochTracker.epochStart = currentEpochStart;
@@ -865,7 +865,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
      */
     function _freezeResolver(address resolver) internal {
         EpochSlashTracker storage epochTracker = epochSlashTrackers[resolver];
-        uint256 currentEpochStart = (block.timestamp / EPOCH_LENGTH) * EPOCH_LENGTH;
+        uint256 currentEpochStart = (block.timestamp / EPOCH_LENGTH) * EPOCH_LENGTH; // forge-lint: disable-line(divide-before-multiply)
         
         // Determine freeze duration based on context
         uint256 freezeDuration;
@@ -898,7 +898,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
     /**
      * @notice Update unavailability stats (for circuit breaker)
      */
-    function _updateUnavailabilityStats(address resolver, bool unavailable) internal {
+    function _updateUnavailabilityStats(address /* resolver */, bool unavailable) internal {
         UnavailabilityStats storage stats = unavailabilityStats;
 
         // Update timestamp
@@ -996,7 +996,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
 
     function calculateDistribution(
         uint256 amount,
-        SlashReason reason
+        SlashReason /* reason */
     ) external pure returns (SlashDistribution memory distribution) {
         distribution.toInsurancePool = (amount * 5000) / BASIS_POINTS;
         distribution.toProtocol = (amount * 3000) / BASIS_POINTS;
@@ -1005,10 +1005,10 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
     }
 
     function claimInsurancePayout(
-        uint256 workflowId,
-        address to,
-        uint256 amount
-    ) external onlyRole(ROLE_TIMELOCK) {
+        uint256 /* workflowId */,
+        address /* to */,
+        uint256 /* amount */
+    ) external view onlyRole(ROLE_TIMELOCK) {
         // This function is deprecated - use InsurancePoolVault.proposePayout() instead
         // Kept for backward compatibility, but should route through vault
         revert('Use InsurancePoolVault.proposePayout() instead');

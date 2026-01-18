@@ -71,7 +71,7 @@ contract CreateOps is AccessControl {
      * @dev Only callable by ROLE_TIMELOCK (governance-controlled). Escrow contracts must be registered before use.
      */
     function registerEscrowContract(address escrow) external onlyRole(ROLE_TIMELOCK) {
-        if (escrow == address(0)) revert InvalidAddress('Escrow contract cannot be zero', escrow);
+        if (escrow == address(0)) revert InvalidAddress(ADDR_ESCROW_CONTRACT, escrow);
         _grantRole(ROLE_ESCROW_CONTRACT, escrow);
     }
     
@@ -80,6 +80,7 @@ contract CreateOps is AccessControl {
      * @param reason Reason for pausing
      * @dev Can be called by ROLE_GUARDIAN (emergency) or ROLE_TIMELOCK (governance)
      *      When paused, all yield deposits are disabled regardless of user settings
+     * @dev Reverts if already paused, or if caller is not authorized.
      */
     function pauseYieldDeposits(string memory reason) external {
         if (!hasRole(ROLE_TIMELOCK, msg.sender) && !hasRole(ROLE_GUARDIAN, msg.sender)) {
@@ -93,7 +94,8 @@ contract CreateOps is AccessControl {
     
     /**
      * @notice Resume yield deposits
-     * @dev Only callable by ROLE_TIMELOCK (slow lane). Guardian is down-only and cannot resume.
+     * @dev Only callable by ROLE_TIMELOCK. Guardian is down-only and cannot resume.
+     * @dev Reverts if deposits are not paused.
      */
     function resumeYieldDeposits() external onlyRole(ROLE_TIMELOCK) {
         if (!yieldDepositsPaused) revert NotPaused();
@@ -139,7 +141,7 @@ contract CreateOps is AccessControl {
         address resolutionModule
     ) external view onlyRole(ROLE_ESCROW_CONTRACT) returns (CreateResult memory result) {
         // Validate inputs
-        if (token == address(0)) revert InvalidAddress('Token cannot be zero', token);
+        if (token == address(0)) revert InvalidAddress(ADDR_TOKEN, token);
         if (amount == 0) revert AmountZero();
         SettingsValidationLibrary.validateEscrowAmount(amount);
         SettingsValidationLibrary.validateRecipient(to, from);
@@ -178,7 +180,16 @@ contract CreateOps is AccessControl {
 
     /**
      * @notice Get dispute resolver for new escrow
-     * @dev Queries resolution module for default resolver
+     * @param resolutionModule Resolution module address to query
+     * @param workflowId Escrow workflow ID being created
+     * @param token Escrowed token address
+     * @param from Escrow sender address
+     * @param to Escrow recipient address
+     * @param amount Amount after escrow fee deduction
+     * @return resolver Dispute resolver address to snapshot into the new escrow (or address(0) on failure)
+     * @dev Queries the resolution module for a resolver using a low-level staticcall.
+     *      This function is best-effort: if the module is unset, not a contract, or reverts/returns malformed data,
+     *      it returns `address(0)` and the caller can decide fallback behavior.
      */
     function _getDisputeResolverForNewEscrow(
         address resolutionModule,
