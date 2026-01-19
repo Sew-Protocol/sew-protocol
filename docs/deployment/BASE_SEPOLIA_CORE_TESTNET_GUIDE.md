@@ -81,10 +81,12 @@ export SOLC_RUNS=200  # keep bytecode under 24KB (EIP-170)
 pnpm hardhat deploy --network baseSepolia --tags escrow
 ```
 
-4) **Deploy default resolution + (optional) yield modules**
+4) **Deploy default resolution + release strategy + (optional) yield modules**
 
 ```bash
 pnpm hardhat deploy --network baseSepolia --tags default-resolution
+# Deploy default release strategy module (`contracts/modules/DefaultReleaseStrategy.sol`)
+pnpm hardhat deploy --network baseSepolia --tags release-strategy
 # Optional yield modules if you want to test yield flows
 pnpm hardhat deploy --network baseSepolia --tags yield-modules
 ```
@@ -157,6 +159,12 @@ and capture gas deltas across commits.
 | `ModuleManagementContract` | Slow-lane module default management | `0xaa0Fa9C11af77E7f2BF14f86C17C8436370F0a86` | `https://sepolia.basescan.org/address/0xaa0Fa9C11af77E7f2BF14f86C17C8436370F0a86` |
 | `EscrowAdminContract` | Slow-lane admin helper (holds minimal admin role) | `0x34fF47Ee2f95C35ec1e012DdD2D7394D7C644931` | `https://sepolia.basescan.org/address/0x34fF47Ee2f95C35ec1e012DdD2D7394D7C644931` |
 | `EscrowVault` | Core escrow contract | `0xBcDefBdEEA5C00f128bE83534646427b7248c5F9` | `https://sepolia.basescan.org/address/0xBcDefBdEEA5C00f128bE83534646427b7248c5F9` |
+
+### Optional modules (deploy if needed)
+
+| Contract | Description | Deploy tag | Address |
+|---|---|---|---|
+| `DefaultReleaseStrategy` | Default release strategy module (`contracts/modules/DefaultReleaseStrategy.sol`) | `release-strategy` | `0x9738584Db6D171e6BE9d0F104aAbF4C1cAd0fb3b` |
 
 ### What to tell the exchange partner (prepared message template)
 Subject: Base Sepolia escrow integration — testnet contract addresses + scope

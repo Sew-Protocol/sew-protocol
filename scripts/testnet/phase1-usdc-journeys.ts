@@ -177,6 +177,7 @@ async function main() {
     workflowId: bigint;
     amountAfterFee: bigint;
     feeAmount: bigint;
+    blockNumber: number;
   }> {
     const tx = await escrow.connect(buyer).createEscrow(tokenAddr, to, amount, settings);
     console.log(`  create tx: ${tx.hash}`);
@@ -188,6 +189,7 @@ async function main() {
       workflowId: created.args.workflowId as bigint,
       amountAfterFee: created.args.amountAfterFee as bigint,
       feeAmount: created.args.fee as bigint,
+      blockNumber: Number(rcpt.blockNumber || 0),
     };
     return result;
   }
@@ -366,11 +368,19 @@ async function main() {
       autoCancelTime: 0n,
     };
 
-    const { workflowId, amountAfterFee, feeAmount } = await createEscrow(sellerAddr, settings);
+    const { workflowId, amountAfterFee, feeAmount, blockNumber: createBlock } = await createEscrow(sellerAddr, settings);
     console.log(`  workflowId: ${workflowId.toString()}`);
     console.log(`  amountAfterFee: ${amountAfterFee.toString()}`);
     console.log(`  feeAmount: ${feeAmount.toString()}`);
 
+    if (createBlock > 0) {
+      await waitForEscrowMatch(
+        workflowId,
+        { escrowState: ESCROW_STATE.PENDING, senderStatus: SENDER_STATUS.NONE, recipientStatus: RECIPIENT_STATUS.NONE },
+        createBlock,
+        'after create (wait)'
+      );
+    }
     await expectEscrow(
       workflowId,
       { escrowState: ESCROW_STATE.PENDING, senderStatus: SENDER_STATUS.NONE, recipientStatus: RECIPIENT_STATUS.NONE },
@@ -551,8 +561,16 @@ async function main() {
   // ======================
   console.log(`\n### 2) createEscrow -> buyer raises dispute -> resolverCancel -> buyer refund (amountAfterFee)`);
   {
-    const { workflowId, amountAfterFee } = await createEscrow(sellerAddr, disputeSettings);
+    const { workflowId, amountAfterFee, blockNumber: createBlock } = await createEscrow(sellerAddr, disputeSettings);
     console.log(`  workflowId: ${workflowId.toString()}`);
+    if (createBlock > 0) {
+      await waitForEscrowMatch(
+        workflowId,
+        { escrowState: ESCROW_STATE.PENDING, senderStatus: SENDER_STATUS.NONE, recipientStatus: RECIPIENT_STATUS.NONE },
+        createBlock,
+        'after create (wait)'
+      );
+    }
     await expectEscrow(
       workflowId,
       { escrowState: ESCROW_STATE.PENDING, senderStatus: SENDER_STATUS.NONE, recipientStatus: RECIPIENT_STATUS.NONE },
@@ -564,6 +582,12 @@ async function main() {
     const raiseRcpt = await raiseTx.wait();
     assert(raiseRcpt, 'Missing receipt for raiseDispute');
     assert(await parseEscrowEvent(raiseRcpt, 'DisputeOpened'), 'DisputeOpened not emitted');
+    await waitForEscrowMatch(
+      workflowId,
+      { escrowState: ESCROW_STATE.DISPUTED, senderStatus: SENDER_STATUS.RAISE_DISPUTE, recipientStatus: RECIPIENT_STATUS.NONE },
+      Number(raiseRcpt.blockNumber || 0),
+      'after raiseDispute (buyer) (wait)'
+    );
     await expectEscrow(
       workflowId,
       { escrowState: ESCROW_STATE.DISPUTED, senderStatus: SENDER_STATUS.RAISE_DISPUTE, recipientStatus: RECIPIENT_STATUS.NONE },
@@ -604,8 +628,16 @@ async function main() {
   // ======================
   console.log(`\n### 3) createEscrow -> seller raises dispute -> resolverRelease -> seller receives amountAfterFee`);
   {
-    const { workflowId, amountAfterFee } = await createEscrow(sellerAddr, disputeSettings);
+    const { workflowId, amountAfterFee, blockNumber: createBlock } = await createEscrow(sellerAddr, disputeSettings);
     console.log(`  workflowId: ${workflowId.toString()}`);
+    if (createBlock > 0) {
+      await waitForEscrowMatch(
+        workflowId,
+        { escrowState: ESCROW_STATE.PENDING, senderStatus: SENDER_STATUS.NONE, recipientStatus: RECIPIENT_STATUS.NONE },
+        createBlock,
+        'after create (wait)'
+      );
+    }
     await expectEscrow(
       workflowId,
       { escrowState: ESCROW_STATE.PENDING, senderStatus: SENDER_STATUS.NONE, recipientStatus: RECIPIENT_STATUS.NONE },
@@ -617,6 +649,12 @@ async function main() {
     const raiseRcpt = await raiseTx.wait();
     assert(raiseRcpt, 'Missing receipt for raiseDispute');
     assert(await parseEscrowEvent(raiseRcpt, 'DisputeOpened'), 'DisputeOpened not emitted');
+    await waitForEscrowMatch(
+      workflowId,
+      { escrowState: ESCROW_STATE.DISPUTED, senderStatus: SENDER_STATUS.NONE, recipientStatus: RECIPIENT_STATUS.RAISE_DISPUTE },
+      Number(raiseRcpt.blockNumber || 0),
+      'after raiseDispute (seller) (wait)'
+    );
     await expectEscrow(
       workflowId,
       { escrowState: ESCROW_STATE.DISPUTED, senderStatus: SENDER_STATUS.NONE, recipientStatus: RECIPIENT_STATUS.RAISE_DISPUTE },

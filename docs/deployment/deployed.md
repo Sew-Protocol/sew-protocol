@@ -40,3 +40,15 @@
 |---|---|---|
 | `EscrowAdminContract` | Slow-lane admin helper (holds minimal admin role) | [`0x34fF47Ee2f95C35ec1e012DdD2D7394D7C644931`](https://sepolia.basescan.org/address/0x34fF47Ee2f95C35ec1e012DdD2D7394D7C644931) |
 | `ModuleManagementContract` | Slow-lane module default management | [`0xaa0Fa9C11af77E7f2BF14f86C17C8436370F0a86`](https://sepolia.basescan.org/address/0xaa0Fa9C11af77E7f2BF14f86C17C8436370F0a86) |
+
+### Optional modules (deploy if needed)
+
+| Contract | Description | Address |
+|---|---|---|
+| `DefaultReleaseStrategy` | Default release strategy module (`contracts/modules/DefaultReleaseStrategy.sol`) | [`0x9738584Db6D171e6BE9d0F104aAbF4C1cAd0fb3b`](https://sepolia.basescan.org/address/0x9738584Db6D171e6BE9d0F104aAbF4C1cAd0fb3b) |
+
+`DefaultReleaseStrategy` can be deployed with:
+
+```bash
+pnpm hardhat deploy --network baseSepolia --tags release-strategy
+```

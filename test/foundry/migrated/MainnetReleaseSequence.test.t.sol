@@ -34,6 +34,7 @@ contract Test_MainnetReleaseSequence_test is Test {
     function setUp() public {
         yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps(address(this));
+        moduleManagement = new ModuleManagementContract(address(this));
         // Deploy governance token
         governanceToken = new SewToken('Sew Token', 'SEW', deployer, INITIAL_TOKEN_SUPPLY);
 
@@ -49,9 +50,9 @@ contract Test_MainnetReleaseSequence_test is Test {
             100,
             feeAddress,
             address(yieldOps),
-            address(disputeOps)
+            address(disputeOps),
+            address(moduleManagement)
         );
-        moduleManagement = new ModuleManagementContract(address(this));
         vault = new EscrowVault(100, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
     }
 

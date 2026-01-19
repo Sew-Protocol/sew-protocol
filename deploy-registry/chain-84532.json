@@ -250,6 +250,24 @@
       "compilerVersion": "0.8.33",
       "optimizationRuns": 1000,
       "proxyType": "none"
+    },
+    {
+      "chainId": 84532,
+      "networkName": "baseSepolia",
+      "contractName": "DefaultReleaseStrategy",
+      "address": "0x9738584Db6D171e6BE9d0F104aAbF4C1cAd0fb3b",
+      "blockNumber": 36547248,
+      "deployer": "0xE8d7Fbd5Db3ad910370Be315f21D4596ed45122f",
+      "timestamp": "2026-01-19T22:46:24.429Z",
+      "verified": false,
+      "blockExplorerUrl": "https://sepolia.basescan.org/address/0x9738584Db6D171e6BE9d0F104aAbF4C1cAd0fb3b",
+      "constructorArgs": [],
+      "tags": [
+        "release-strategy"
+      ],
+      "compilerVersion": "0.8.33",
+      "optimizationRuns": 1000,
+      "proxyType": "none"
     }
   ],
   "deployedAt": "2026-01-17T00:39:23.435Z",

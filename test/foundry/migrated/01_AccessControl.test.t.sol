@@ -26,15 +26,16 @@ contract Test_01_AccessControl_test is Test {
     function setUp() public {
         yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps(address(this));
+        moduleManagement = new ModuleManagementContract(address(this));
         escrowable = new EscrowableERC20(
             'Test Token',
             'TEST',
             100,
             feeAddr,
             address(yieldOps),
-            address(disputeOps)
+            address(disputeOps),
+            address(moduleManagement)
         );
-        moduleManagement = new ModuleManagementContract(address(this));
         escrowVault = new EscrowVault(100, feeAddr, address(yieldOps), address(disputeOps), address(moduleManagement));
         adminContract = new EscrowAdminContract(address(this));
         adminContract.grantRole(adminContract.ROLE_TIMELOCK(), timelock);

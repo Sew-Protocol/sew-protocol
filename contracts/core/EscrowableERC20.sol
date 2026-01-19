@@ -8,8 +8,7 @@ import '../interfaces/IReleaseStrategy.sol';
 import '../shared/interfaces/IResolutionModule.sol';
 import '../interfaces/IYieldGenerationModule.sol';
 import '../interfaces/IYieldDistributionModule.sol';
-import '../interfaces/IModuleRegistry.sol';
-import '../libraries/RecoveryLibrary.sol';
+import './ModuleManagementContract.sol';
 
 /**
  * @title EscrowableERC20
@@ -29,33 +28,13 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
     uint256 public totalHeldInEscrow = 0;
     uint256 public totalFees = 0;
     
-    // Default module instances
-    IReleaseStrategy public defaultReleaseStrategy;
-    IResolutionModule public defaultDisputeResolutionModule;
-    IYieldGenerationModule public defaultYieldGenerationModule;
-    IYieldDistributionModule public defaultYieldDistributionModule;
-    
-    // Module registry for validation (optional - if not set, validation skipped)
-    IModuleRegistry public moduleRegistry;
+    // Module management contract (stores module state externally to reduce contract size)
+    ModuleManagementContract public moduleManagement;
 
-    // Events specific to EscrowableERC20 (without token parameter since token is always address(this))
-    event EscrowTransferCreated(uint256 indexed workflowId, address indexed from, address indexed to, uint256 amount);
-    event EscrowTransferReleased(uint256 indexed workflowId, address indexed to, uint256 amount);
-    event EscrowTransferCancelled(uint256 indexed workflowId, address indexed from, uint256 amount);
     event FeesWithdrawn(uint256 amount);
-    
-    // Module events
-    event DefaultReleaseStrategyQueued(address indexed oldStrategy, address indexed newStrategy, uint64 eta);
-    event DefaultReleaseStrategyActivated(address indexed oldStrategy, address indexed newStrategy);
-    event DefaultResolutionModuleQueued(address indexed oldModule, address indexed newModule, uint64 eta);
-    event DefaultResolutionModuleActivated(address indexed oldModule, address indexed newModule);
-    event DefaultYieldGenerationModuleQueued(address indexed oldModule, address indexed newModule, uint64 eta);
-    event DefaultYieldGenerationModuleActivated(address indexed oldModule, address indexed newModule);
-    event DefaultYieldDistributionModuleQueued(address indexed oldModule, address indexed newModule, uint64 eta);
-    event DefaultYieldDistributionModuleActivated(address indexed oldModule, address indexed newModule);
 
-    /// @dev Legacy slow-lane functions are disabled; use ModuleManagementContract.
-    error UseModuleManagementContract();
+    /// @notice Compact error for zero address validation (saves bytecode vs string-based errors)
+    error ZeroAddress(uint8 which); // 1=fee, 2=yieldOps, 3=disputeOps, 4=moduleMgmt
 
     constructor(
         string memory name,
@@ -63,45 +42,33 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         uint256 escrowFeeBps,
         address feeAddress,
         address yieldOpsAddress,
-        address disputeOpsAddress
+        address disputeOpsAddress,
+        address moduleManagementAddress
     ) ERC20(name, symbol) {
         // Validate escrow fee is within allowed range (0 to 2%)
-        if (escrowFeeBps > MAX_ESCROW_FEE_BPS) {
-            revert InvalidEscrowFee(escrowFeeBps, MAX_ESCROW_FEE_BPS);
-        }
-        if (feeAddress == address(0)) revert InvalidAddress(ADDR_FEE_RECIPIENT, feeAddress);
-        if (yieldOpsAddress == address(0)) revert InvalidAddress(ADDR_YIELD_OPS, yieldOpsAddress);
-        if (disputeOpsAddress == address(0)) revert InvalidAddress(ADDR_DISPUTE_OPS, disputeOpsAddress);
+        if (escrowFeeBps > MAX_ESCROW_FEE_BPS) revert InvalidEscrowFee(escrowFeeBps, MAX_ESCROW_FEE_BPS);
+        if (feeAddress == address(0)) revert ZeroAddress(1);
+        if (yieldOpsAddress == address(0)) revert ZeroAddress(2);
+        if (disputeOpsAddress == address(0)) revert ZeroAddress(3);
+        if (moduleManagementAddress == address(0)) revert ZeroAddress(4);
 
         escrowFee = escrowFeeBps;
         escrowFeeAddress = feeAddress;
         yieldOps = YieldOps(yieldOpsAddress);
         disputeOps = DisputeOps(disputeOpsAddress);
+        moduleManagement = ModuleManagementContract(moduleManagementAddress);
         
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _grantRole(ROLE_TIMELOCK, _msgSender());
 
-        // Initialize protocol fees with validation
-        uint256 initialYieldFee = DEFAULT_YIELD_PROTOCOL_FEE_BPS;
-        uint256 initialAppealFee = 0; // 0% default
-        
-        if (initialYieldFee > MAX_PROTOCOL_FEE_BPS) {
-            revert FeeExceedsMaximum(initialYieldFee, MAX_PROTOCOL_FEE_BPS);
-        }
-        if (initialAppealFee > MAX_PROTOCOL_FEE_BPS) {
-            revert FeeExceedsMaximum(initialAppealFee, MAX_PROTOCOL_FEE_BPS);
-        }
-        
-        yieldProtocolFeeBps = initialYieldFee;
-        appealBondProtocolFeeBps = initialAppealFee;
+        // Initialize protocol fees (constants are already within bounds)
+        yieldProtocolFeeBps = DEFAULT_YIELD_PROTOCOL_FEE_BPS;
+        appealBondProtocolFeeBps = 0; // 0% default
 
-        // Initialize timeout config
-        timeoutConfig = TimeoutConfig({
-            defaultAutoReleaseTime: 0,
-            defaultAutoCancelTime: 0,
-            maxDisputeDuration: 90 days,
-            appealWindowDuration: 2 days
-        });
+        // Set timeout config fields directly (avoid struct literal to save bytecode)
+        timeoutConfig.maxDisputeDuration = 90 days;
+        timeoutConfig.appealWindowDuration = 2 days;
+        // Note: defaultAutoReleaseTime and defaultAutoCancelTime are zero by default
         
         // Mint initial supply to deployer
         _mint(_msgSender(), INITIAL_SUPPLY);
@@ -223,8 +190,12 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         address to,
         uint256 amount
     ) internal override {
-        if (token != address(this)) revert InvalidAddress(ADDR_TOKEN, token);
-        emit EscrowTransferCreated(workflowId, from, to, amount);
+        // EscrowCreated already provides this information (token is always address(this))
+        workflowId;
+        token;
+        from;
+        to;
+        amount;
     }
 
     /**
@@ -241,8 +212,11 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         address from,
         uint256 amount
     ) internal override {
-        if (token != address(this)) revert InvalidAddress(ADDR_TOKEN, token);
-        emit EscrowTransferCancelled(workflowId, from, amount);
+        // EscrowStateChanged already provides this information
+        workflowId;
+        token;
+        from;
+        amount;
     }
 
     /**
@@ -259,8 +233,11 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         address to,
         uint256 amount
     ) internal override {
-        if (token != address(this)) revert InvalidAddress(ADDR_TOKEN, token);
-        emit EscrowTransferReleased(workflowId, to, amount);
+        // EscrowStateChanged already provides this information
+        workflowId;
+        token;
+        to;
+        amount;
     }
 
     /**
@@ -283,14 +260,34 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
 
     // ============ Module Getters ============
 
+    // Consolidated module getters to reduce bytecode (mirrors EscrowVault)
+    function _getModuleAddress(uint256 workflowId, ModuleType moduleType) internal view returns (address) {
+        address snapshotModule;
+        if (moduleType == ModuleType.RELEASE) {
+            snapshotModule = moduleSnapshots[workflowId].releaseStrategy;
+        } else if (moduleType == ModuleType.RESOLUTION) {
+            snapshotModule = moduleSnapshots[workflowId].resolutionModule;
+        } else if (moduleType == ModuleType.YIELD_GEN) {
+            snapshotModule = moduleSnapshots[workflowId].yieldGenerationModule;
+        } else if (moduleType == ModuleType.YIELD_DIST) {
+            snapshotModule = moduleSnapshots[workflowId].yieldDistributionModule;
+        }
+
+        if (snapshotModule != address(0)) {
+            return snapshotModule;
+        }
+
+        // Query ModuleManagementContract for default module
+        return moduleManagement.getDefaultModule(address(this), moduleType);
+    }
+
     /**
      * @dev Get the release strategy for an escrow
      * @param workflowId The escrow transfer ID
      * @return The release strategy module (from snapshot or default)
      */
     function _getReleaseStrategy(uint256 workflowId) internal view override returns (IReleaseStrategy) {
-        address snapshot = moduleSnapshots[workflowId].releaseStrategy;
-        return snapshot != address(0) ? IReleaseStrategy(snapshot) : defaultReleaseStrategy;
+        return IReleaseStrategy(_getModuleAddress(workflowId, ModuleType.RELEASE));
     }
 
     /**
@@ -299,15 +296,12 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
      * @return The resolution module (from snapshot or default or BaseEscrow's disputeResolutionModule)
      */
     function _getResolutionModule(uint256 workflowId) internal view override returns (IResolutionModule) {
-        address snapshot = moduleSnapshots[workflowId].resolutionModule;
-        if (snapshot != address(0)) {
-            return IResolutionModule(snapshot);
+        address moduleAddr = _getModuleAddress(workflowId, ModuleType.RESOLUTION);
+        if (moduleAddr != address(0)) {
+            return IResolutionModule(moduleAddr);
         }
-        // Fall back to defaultDisputeResolutionModule if set, otherwise BaseEscrow's disputeResolutionModule
-        if (address(defaultDisputeResolutionModule) != address(0)) {
-            return defaultDisputeResolutionModule;
-        }
-        return super._getResolutionModule(workflowId);
+        // Fallback to BaseEscrow's disputeResolutionModule
+        return IResolutionModule(disputeResolutionModule);
     }
 
     /**
@@ -316,8 +310,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
      * @return The yield generation module (from snapshot or default)
      */
     function _getYieldGenerationModule(uint256 workflowId) internal view override returns (IYieldGenerationModule) {
-        address snapshot = moduleSnapshots[workflowId].yieldGenerationModule;
-        return snapshot != address(0) ? IYieldGenerationModule(snapshot) : defaultYieldGenerationModule;
+        return IYieldGenerationModule(_getModuleAddress(workflowId, ModuleType.YIELD_GEN));
     }
 
     /**
@@ -326,69 +319,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
      * @return The yield distribution module (from snapshot or default)
      */
     function _getYieldDistributionModule(uint256 workflowId) internal view override returns (IYieldDistributionModule) {
-        address snapshot = moduleSnapshots[workflowId].yieldDistributionModule;
-        return snapshot != address(0) ? IYieldDistributionModule(snapshot) : defaultYieldDistributionModule;
-    }
-
-    // ============ Public Module Getters ============
-
-    /**
-     * @notice Get the release strategy for an escrow
-     * @param workflowId The escrow transfer ID
-     * @return The release strategy module
-     */
-    function getReleaseStrategy(uint256 workflowId) public view returns (IReleaseStrategy) {
-        return _getReleaseStrategy(workflowId);
-    }
-
-    /**
-     * @notice Get the resolution module for an escrow
-     * @param workflowId The escrow transfer ID
-     * @return The resolution module
-     */
-    function getResolutionModule(uint256 workflowId) public view returns (IResolutionModule) {
-        return _getResolutionModule(workflowId);
-    }
-
-    /**
-     * @notice Get the yield generation module for an escrow
-     * @param workflowId The escrow transfer ID
-     * @return The yield generation module
-     */
-    function getYieldGenerationModule(uint256 workflowId) public view returns (IYieldGenerationModule) {
-        return _getYieldGenerationModule(workflowId);
-    }
-
-    /**
-     * @notice Get the yield distribution module for an escrow
-     * @param workflowId The escrow transfer ID
-     * @return The yield distribution module
-     */
-    function getYieldDistributionModule(uint256 workflowId) public view returns (IYieldDistributionModule) {
-        return _getYieldDistributionModule(workflowId);
-    }
-
-    // ============ Module Management (Slow Lane Queue/Activate) ============
-
-    /**
-     * @notice Disabled legacy entrypoint (use ModuleManagementContract)
-     */
-    function queueDefaultModule(ModuleType /* moduleType */, address /* newModule */) external view onlyRole(ROLE_TIMELOCK) {
-        revert UseModuleManagementContract();
-    }
-
-    /**
-     * @notice Disabled legacy entrypoint (use ModuleManagementContract)
-     */
-    function activateDefaultModule(ModuleType /* moduleType */) external view onlyRole(ROLE_TIMELOCK) {
-        revert UseModuleManagementContract();
-    }
-
-    /**
-     * @notice Disabled legacy entrypoint (use ModuleManagementContract)
-     */
-    function getPendingDefaultModule(ModuleType /* moduleType */) external pure returns (address, uint64, bool) {
-        revert UseModuleManagementContract();
+        return IYieldDistributionModule(_getModuleAddress(workflowId, ModuleType.YIELD_DIST));
     }
 
     // ============ Fee Management ============
@@ -437,6 +368,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         uint256 amount
     ) external override onlyRole(ROLE_TIMELOCK) nonReentrant returns (bool) {
         if (token != address(this)) revert InvalidAddress(ADDR_TOKEN, token);
+        if (recipient == address(0)) revert InvalidAddress(ADDR_RECIPIENT, recipient);
         
         uint256 balance = balanceOf(address(this));
         uint256 escrowBalance = totalHeldInEscrow;
@@ -455,8 +387,9 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         if (recoveryAmount == 0) {
             revert NoTokensToRecover();
         }
-        
-        recoveryAmount = RecoveryLibrary.recoverERC20(token, recipient, recoveryAmount, balance);
+
+        // Token is address(this): use ERC20 internal transfer directly (saves bytecode vs RecoveryLibrary)
+        _transfer(address(this), recipient, recoveryAmount);
         emit ERC20Recovered(token, recipient, recoveryAmount);
         return true;
     }
@@ -484,8 +417,20 @@ contract EscrowableERC20Factory {
         uint256 escrowFee,
         address escrowFeeAddress,
         address yieldOps,
-        address disputeOps
+        address disputeOps,
+        address moduleManagement
     ) public returns (address) {
-        return address(new EscrowableERC20(name, symbol, escrowFee, escrowFeeAddress, yieldOps, disputeOps));
+        return
+            address(
+                new EscrowableERC20(
+                    name,
+                    symbol,
+                    escrowFee,
+                    escrowFeeAddress,
+                    yieldOps,
+                    disputeOps,
+                    moduleManagement
+                )
+            );
     }
 }

@@ -25,15 +25,16 @@ contract Test_06_TimelockIntegration_test is Test {
     function setUp() public {
         yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps(address(this));
+        moduleManagement = new ModuleManagementContract(address(this));
         token = new EscrowableERC20(
             'Test',
             'TST',
             100,
             address(this),
             address(yieldOps),
-            address(disputeOps)
+            address(disputeOps),
+            address(moduleManagement)
         );
-        moduleManagement = new ModuleManagementContract(address(this));
         adminContract = new EscrowAdminContract(address(this));
         vault = new EscrowVault(100, address(this), address(yieldOps), address(disputeOps), address(moduleManagement));
         token.grantRole(token.ROLE_TIMELOCK(), timelock);

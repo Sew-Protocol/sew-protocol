@@ -157,7 +157,8 @@ contract ConstructorValidation is Test {
             invalidFee,
             feeAddress,
             address(yieldOps),
-            address(disputeOps)
+            address(disputeOps),
+            address(moduleManagement)
         );
     }
 
@@ -168,7 +169,8 @@ contract ConstructorValidation is Test {
             0,
             feeAddress,
             address(yieldOps),
-            address(disputeOps)
+            address(disputeOps),
+            address(moduleManagement)
         );
         
         assertEq(token.escrowFee(), 0);
@@ -181,16 +183,15 @@ contract ConstructorValidation is Test {
             MAX_ESCROW_FEE_BPS,
             feeAddress,
             address(yieldOps),
-            address(disputeOps)
+            address(disputeOps),
+            address(moduleManagement)
         );
         
         assertEq(token.escrowFee(), MAX_ESCROW_FEE_BPS);
     }
 
     function test_EscrowableERC20_constructor_reverts_zeroFeeAddress() public {
-        vm.expectRevert(
-            abi.encodeWithSignature('InvalidAddress(uint8,address)', 5, address(0))
-        );
+        vm.expectRevert(abi.encodeWithSignature('ZeroAddress(uint8)', 1));
         
         new EscrowableERC20(
             'Test Token',
@@ -198,14 +199,13 @@ contract ConstructorValidation is Test {
             100,
             address(0),
             address(yieldOps),
-            address(disputeOps)
+            address(disputeOps),
+            address(moduleManagement)
         );
     }
 
     function test_EscrowableERC20_constructor_reverts_zeroYieldOpsAddress() public {
-        vm.expectRevert(
-            abi.encodeWithSignature('InvalidAddress(uint8,address)', 6, address(0))
-        );
+        vm.expectRevert(abi.encodeWithSignature('ZeroAddress(uint8)', 2));
         
         new EscrowableERC20(
             'Test Token',
@@ -213,14 +213,13 @@ contract ConstructorValidation is Test {
             100,
             feeAddress,
             address(0),
-            address(disputeOps)
+            address(disputeOps),
+            address(moduleManagement)
         );
     }
 
     function test_EscrowableERC20_constructor_reverts_zeroDisputeOpsAddress() public {
-        vm.expectRevert(
-            abi.encodeWithSignature('InvalidAddress(uint8,address)', 7, address(0))
-        );
+        vm.expectRevert(abi.encodeWithSignature('ZeroAddress(uint8)', 3));
         
         new EscrowableERC20(
             'Test Token',
@@ -228,7 +227,8 @@ contract ConstructorValidation is Test {
             100,
             feeAddress,
             address(yieldOps),
-            address(0)
+            address(0),
+            address(moduleManagement)
         );
     }
 
@@ -239,7 +239,8 @@ contract ConstructorValidation is Test {
             100, // 1%
             feeAddress,
             address(yieldOps),
-            address(disputeOps)
+            address(disputeOps),
+            address(moduleManagement)
         );
         
         assertEq(token.escrowFee(), 100);
@@ -292,7 +293,8 @@ contract ConstructorValidation is Test {
             feeBps,
             feeAddress,
             address(yieldOps),
-            address(disputeOps)
+            address(disputeOps),
+            address(moduleManagement)
         );
         
         assertEq(token.escrowFee(), feeBps);
