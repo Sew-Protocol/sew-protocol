@@ -9,7 +9,7 @@
 
 | Release | Status | Networks | Activation Date | Notes |
 |---------|--------|----------|----------------|-------|
-| **IEO** | ✅ Ready | None (Base Sepolia planned) | TBD | Initial Exchange Offering - minimal surface area |
+| **IEO** | ✅ Deployed (testnet) | Base Sepolia | 2026-01 | Core escrow + ops + governance infra deployed for integration testing |
 | **DR v1** | ✅ Implemented | None | TBD | Decentralize Decisions - ready for activation |
 | **DR v2** | ✅ Implemented | None | TBD | Decentralize Incentives - ready for activation |
 | **DR v3** | 🚧 Phase 1-3 Complete | None | TBD | Decentralize Capital - interfaces + staking + slashing complete |
@@ -169,15 +169,15 @@
 
 | Release | Status | Contracts | Deployment Date | Notes |
 |---------|--------|-----------|----------------|-------|
-| **IEO** | 🚧 Planned | Core + DefaultResolutionModule | TBD | Initial deployment target |
+| **IEO** | ✅ Deployed | Core + Ops + Governance infra | 2026-01 | Integration test deployment (may redeploy) |
 | **DR v1** | ⏸️ Not Deployed | - | - | Implemented, awaiting IEO stability |
 | **DR v2** | ⏸️ Not Deployed | - | - | Implemented, awaiting DR v1 activation |
 | **DR v3** | ⏸️ Not Deployed | - | - | Phase 1-3 complete, awaiting DR v2 activation |
 
 **Deployment Status:**
-- ⏸️ No deployments yet
-- 🚧 IEO deployment planned for Base Sepolia
-- 📋 See [IEO Release Guide](./ieo/IEO_RELEASE_GUIDE.md) for deployment steps
+- ✅ Core IEO testnet deployment completed.
+- 📋 Canonical address list: **[Base Sepolia Core (IEO) Testnet Deployment Guide](./BASE_SEPOLIA_CORE_TESTNET_GUIDE.md)** (see “Deployed contracts index”).
+- ✅ Suggested post-deploy validation: run `scripts/testnet/smoke-escrow.sh` / `scripts/testnet/smoke-escrow.ts` against `EscrowVault`.
 
 ---
 

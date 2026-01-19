@@ -65,11 +65,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   if (governorDeployment.newlyDeployed) {
     console.log(`✅ GovGovernor deployed at: ${governorDeployment.address}`);
 
-    // Wait for transaction confirmation before verifying
-    if (governorDeployment.receipt) {
-      await governorDeployment.receipt.wait();
-    }
-
     // Verify deployment (with retry for timing issues)
     const governor = await ethers.getContractAt('GovGovernor', governorDeployment.address);
     let votingDelay, votingPeriod, proposalThreshold, timelockAddress, absoluteQuorum;

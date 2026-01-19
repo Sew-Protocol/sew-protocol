@@ -34,12 +34,13 @@ uint256 id = escrow.createEscrow(seller, 100e18, settings);
 // Happy path: Seller delivers, buyer releases
 escrow.releaseEscrow(id);
 
-// Dispute path: Buyer raises dispute, resolver splits funds
+// Dispute path: Buyer raises dispute, resolver decides outcome
 escrow.raiseDispute(id);
-escrow.resolveDispute(id, [
-    Payout(seller, 70e2),
-    Payout(buyer, 30e2)
-]);
+bytes32 resolutionHash = keccak256("example-resolution-metadata");
+// Resolver releases full amount to seller:
+escrow.releaseAsDisputeResolver(id, resolutionHash);
+// ...or cancels and refunds full amount to buyer:
+// escrow.cancelAsDisputeResolver(id, resolutionHash);
 ```
 
 ## Open Questions

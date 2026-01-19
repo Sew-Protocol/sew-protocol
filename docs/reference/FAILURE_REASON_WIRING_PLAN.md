@@ -41,6 +41,12 @@ This is consistent with adding a `PUSH_FAILED_FALLBACK_TO_PULL` reason code, and
 Create-time deposit and settlement-time withdrawal are executed via low-level calls and/or module interfaces.
 Failures currently emit `YieldHandlingFailed(...)` but do not revert the escrow.
 
+**Correctness requirement:** the yield path must be *non-reverting end-to-end*.  
+That means:
+- no `abi.decode(...)` that can revert on malformed return data
+- no assumptions that `ret.length > 0` implies a decodable struct
+- yield module upgrades / ABI drift must not brick release/refund/cancel flows
+
 This matches the intended meaning of:
 - `DEPOSIT_FAILED`
 - `WITHDRAWAL_FAILED`
@@ -98,10 +104,11 @@ Core user-facing actions generally revert with custom errors:
 Right now some places collapse multiple root causes into a single code.
 
 **Examples of improvements:**
-- Yield withdrawal currently treats `(call failed) OR (ret.length == 0)` as `WITHDRAWAL_FAILED`.
-  - Better:
-    - `!ok` → `WITHDRAWAL_FAILED` + `CALL_FAILED` subcode (or use `CALL_FAILED` directly if you want a single channel)
-    - `ok && bad ret` → `MALFORMED_RETURN_DATA`
+- Yield withdrawal needs to distinguish:
+  - `!ok` → `CALL_FAILED`
+  - `ok && ret malformed/too short/wrong ABI` → `MALFORMED_RETURN_DATA`
+  - `ok && decodeable but value < principal` → `LESS_THAN_PRINCIPAL`
+  - **And critically:** it must never revert if `ret` is malformed (yield is optional).
 
 - Auto push failure fallback currently emits `TRANSFER_FAILED` even though it *did* recover by switching to pull.
   - Better:
@@ -119,7 +126,7 @@ Right now some places collapse multiple root causes into a single code.
 
 ### P0 (Urgent: before public testnet addresses circulate)
 
-Goal: ensure **stable numeric mapping** + no misleading codes.
+Goal: ensure **stable numeric mapping** + no misleading codes + no “optional path can revert” hazards.
 
 - **Freeze enum order**
   - Confirm “append-only” policy is followed.
@@ -128,14 +135,33 @@ Goal: ensure **stable numeric mapping** + no misleading codes.
 - **Fix misleading fallback code**
   - When push fails but claimable is credited, emit `PUSH_FAILED_FALLBACK_TO_PULL` (not `TRANSFER_FAILED`).
 
-- **Split call-failed vs malformed-return**
+- **Make yield “non-critical” truly non-reverting**
+  - Replace any “decode can revert” pattern with decode-safe handling:
+    - `!ok` → emit `CALL_FAILED`, return principal
+    - `ok` but `ret` too short / malformed → emit `MALFORMED_RETURN_DATA`, return principal
+    - only decode fixed-width primitives or guard struct decode with strict length checks
+  - Prefer “primitive return” from `YieldOps.handleYield` (`uint256 actualAmount` + optional `uint256 feeAmount`) so callers can decode safely.
+
+- **Split call-failed vs malformed-return everywhere it matters**
   - Any place doing `if (!ok || ret.length == 0)` should emit:
     - `CALL_FAILED` when `!ok`
     - `MALFORMED_RETURN_DATA` when `ok && ret invalid`
 
+- **Bond / ETH invariants (audit-grade clarity)**
+  - If bond token is ERC20: require `msg.value == 0` (no silent ETH left behind).
+  - If bond token is ETH: require `msg.value >= bondAmount` and explicitly refund excess.
+
+- **Avoid “unbonded escalation” edge cases**
+  - If escalation requires a bond, do not treat “bond query failed” as “bond not required”.
+  - Pick and document one of:
+    - **strict**: bond query failure reverts (safer default)
+    - **best-effort**: emit a dedicated failure event (at minimum) and continue only if bond is truly optional
+
 Acceptance:
 - Events emitted match “what happened” (transfer failed but pull succeeded ≠ transfer failed).
 - Off-chain dashboards don’t over-alert on normal recoveries.
+- Yield handling cannot brick escrow execution due to decode/ABI drift.
+- Escalation bond payment rules are unambiguous for integrators.
 
 ### P1 (High priority: next iteration)
 
@@ -175,6 +201,11 @@ Add/extend tests for:
 
 - **Yield withdraw malformed return**
   - Mock module returns success with empty/short bytes → expect `MALFORMED_RETURN_DATA`
+
+- **Bond msg.value invariants**
+  - ERC20 bond + nonzero `msg.value` should revert
+  - ETH bond + insufficient `msg.value` should revert with an explicit error
+  - ETH bond + excess `msg.value` should refund excess
 
 - **Timeout**
   - Ensure timeout events emit the correct `TIMEOUT` code (and that enum is append-only).

@@ -5,6 +5,7 @@ import 'forge-std/Test.sol';
 import '../../../contracts/libraries/YieldHandlingLibrary.sol';
 import '../../../contracts/libraries/YieldPresetLibrary.sol';
 import '../../../contracts/libraries/YieldDistributionLibrary.sol';
+import '../../../contracts/libraries/SettingsValidationLibrary.sol';
 import '../../../contracts/types/YieldPresets.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
@@ -82,6 +83,51 @@ contract LibraryHarness {
     ) external returns (uint256 totalDistributed) {
         return YieldDistributionLibrary.distributeYieldFallback(token, yieldAmount, recipients, percentages, feeAddress);
     }
+
+    // SettingsValidationLibrary wrappers
+    function validateAutoTime(uint256 autoTime, uint256 currentTime) external pure {
+        SettingsValidationLibrary.validateAutoTime(autoTime, currentTime);
+    }
+
+    function validateEscrowSettings(EscrowSettings memory settings, uint256 currentTime) external view {
+        SettingsValidationLibrary.validateEscrowSettings(settings, currentTime);
+    }
+
+    function validateEscrowAmount(uint256 amount) external pure {
+        SettingsValidationLibrary.validateEscrowAmount(amount);
+    }
+
+    function validateRecipient(address recipient, address sender) external pure {
+        SettingsValidationLibrary.validateRecipient(recipient, sender);
+    }
+
+    function validateYieldOptIn(uint256 amount, bool yieldEnabled) external pure returns (bool) {
+        return SettingsValidationLibrary.validateYieldOptIn(amount, yieldEnabled);
+    }
+
+    function validateAutoCancel(uint256 t) external view {
+        SettingsValidationLibrary.validateAutoCancel(t);
+    }
+
+    function validateAutoRelease(uint256 t) external view {
+        SettingsValidationLibrary.validateAutoRelease(t);
+    }
+
+    function validateMaxAttachments(uint256 n) external pure {
+        SettingsValidationLibrary.validateMaxAttachments(n);
+    }
+
+    function validateFeeBps(uint256 bps) external pure {
+        SettingsValidationLibrary.validateFeeBps(bps);
+    }
+
+    function validateResolutionDelay(uint256 d) external pure {
+        SettingsValidationLibrary.validateResolutionDelay(d);
+    }
+
+    function validateSettingsYieldDistribution(address[] memory recipients, uint256[] memory bps) external pure {
+        SettingsValidationLibrary.validateYieldDistribution(recipients, bps);
+    }
 }
 
 contract LibraryCoverageTest is Test {
@@ -95,6 +141,135 @@ contract LibraryCoverageTest is Test {
         genModule = new MockGenModule();
         distModule = new MockDistModule();
         harness = new LibraryHarness();
+    }
+
+    // ============ SettingsValidationLibrary Tests ============
+
+    function test_SettingsValidation_validateAutoTime() public {
+        uint256 now_ = 1000;
+        // 0 is valid
+        harness.validateAutoTime(0, now_);
+        // Future is valid
+        harness.validateAutoTime(now_ + 1, now_);
+        // Past is invalid
+        vm.expectRevert();
+        harness.validateAutoTime(now_ - 1, now_);
+        // Too far future is invalid
+        vm.expectRevert();
+        harness.validateAutoTime(now_ + SettingsValidationLibrary.MAX_AUTO_TIME_DURATION + 1, now_);
+    }
+
+    function test_SettingsValidation_validateEscrowSettings() public {
+        uint256 now_ = 1000;
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
+        
+        // Default is valid
+        harness.validateEscrowSettings(settings, now_);
+
+        // Both times set is invalid
+        settings.autoReleaseTime = now_ + 1;
+        settings.autoCancelTime = now_ + 1;
+        vm.expectRevert();
+        harness.validateEscrowSettings(settings, now_);
+
+        // Exceed max duration
+        settings = SettingsValidationLibrary.getDefaultSettings();
+        settings.autoReleaseTime = now_ + SettingsValidationLibrary.MAX_ESCROW_DURATION + 1;
+        vm.expectRevert();
+        harness.validateEscrowSettings(settings, now_);
+
+        // Custom resolver must be a contract
+        settings = SettingsValidationLibrary.getDefaultSettings();
+        settings.customResolver = address(0x123); // EOA
+        vm.expectRevert();
+        harness.validateEscrowSettings(settings, now_);
+    }
+
+    function test_SettingsValidation_validateEscrowAmount() public {
+        harness.validateEscrowAmount(SettingsValidationLibrary.MIN_ESCROW_AMOUNT);
+        vm.expectRevert();
+        harness.validateEscrowAmount(SettingsValidationLibrary.MIN_ESCROW_AMOUNT - 1);
+    }
+
+    function test_SettingsValidation_validateRecipient() public {
+        address sender = address(0x1);
+        address recipient = address(0x2);
+        harness.validateRecipient(recipient, sender);
+        
+        vm.expectRevert();
+        harness.validateRecipient(address(0), sender);
+        
+        vm.expectRevert();
+        harness.validateRecipient(sender, sender);
+    }
+
+    function test_SettingsValidation_validateYieldOptIn() public {
+        assertTrue(harness.validateYieldOptIn(SettingsValidationLibrary.MIN_YIELD_DEPOSIT, true));
+        assertFalse(harness.validateYieldOptIn(SettingsValidationLibrary.MIN_YIELD_DEPOSIT - 1, true));
+        assertFalse(harness.validateYieldOptIn(SettingsValidationLibrary.MIN_YIELD_DEPOSIT, false));
+    }
+
+    function test_SettingsValidation_validateAutoCancel() public {
+        harness.validateAutoCancel(0);
+        harness.validateAutoCancel(block.timestamp + 1);
+        
+        vm.expectRevert();
+        harness.validateAutoCancel(block.timestamp);
+        
+        vm.expectRevert();
+        harness.validateAutoCancel(block.timestamp + SettingsValidationLibrary.MAX_AUTO_TIME_DAYS + 1);
+    }
+
+    function test_SettingsValidation_validateMaxAttachments() public {
+        harness.validateMaxAttachments(SettingsValidationLibrary.MAX_ATTACHMENTS);
+        vm.expectRevert();
+        harness.validateMaxAttachments(SettingsValidationLibrary.MAX_ATTACHMENTS + 1);
+    }
+
+    function test_SettingsValidation_validateFeeBps() public {
+        harness.validateFeeBps(SettingsValidationLibrary.MAX_FEE_BPS);
+        vm.expectRevert();
+        harness.validateFeeBps(SettingsValidationLibrary.MAX_FEE_BPS + 1);
+    }
+
+    function test_SettingsValidation_validateResolutionDelay() public {
+        harness.validateResolutionDelay(SettingsValidationLibrary.MIN_RESOLUTION_DELAY);
+        harness.validateResolutionDelay(SettingsValidationLibrary.MAX_RESOLUTION_DELAY);
+        
+        vm.expectRevert();
+        harness.validateResolutionDelay(SettingsValidationLibrary.MIN_RESOLUTION_DELAY - 1);
+        
+        vm.expectRevert();
+        harness.validateResolutionDelay(SettingsValidationLibrary.MAX_RESOLUTION_DELAY + 1);
+    }
+
+    function test_SettingsValidation_validateYieldDistribution() public {
+        address[] memory recipients = new address[](1);
+        recipients[0] = address(0x1);
+        uint256[] memory bps = new uint256[](1);
+        bps[0] = 10000;
+        
+        harness.validateSettingsYieldDistribution(recipients, bps);
+
+        // Mismatch length
+        uint256[] memory bps2 = new uint256[](0);
+        vm.expectRevert();
+        harness.validateSettingsYieldDistribution(recipients, bps2);
+
+        // Bad sum
+        bps[0] = 9999;
+        vm.expectRevert();
+        harness.validateSettingsYieldDistribution(recipients, bps);
+
+        // Duplicate
+        address[] memory recipients2 = new address[](2);
+        recipients2[0] = address(0x1);
+        recipients2[1] = address(0x1);
+        uint256[] memory bps3 = new uint256[](2);
+        bps3[0] = 5000;
+        bps3[1] = 5000;
+        vm.expectRevert();
+        harness.validateSettingsYieldDistribution(recipients2, bps3);
     }
 
     // ============ YieldHandlingLibrary Tests ============

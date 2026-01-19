@@ -72,10 +72,17 @@ interface IEscrowPayment {
   /// @param workflowId Identifier of the escrow in dispute
   function raiseDispute(uint256 workflowId) external;
 
-  /// @notice Resolves a dispute with specified payout distribution
+  /// @notice Resolves a dispute (full outcome)
   /// @param workflowId Identifier of the escrow to resolve
-  /// @param payouts Array of payout recipients and amounts
-  function resolveDispute(uint256 workflowId, Payout[] calldata payouts) external;
+  /// @param resolutionHash Hash of resolution metadata/details (for offchain verification)
+  /// @dev Dispute resolution is a full outcome (no partial splits).
+  function releaseAsDisputeResolver(uint256 workflowId, bytes32 resolutionHash) external;
+
+  /// @notice Resolves a dispute by refunding sender (full cancel)
+  /// @param workflowId Identifier of the escrow to cancel
+  /// @param resolutionHash Hash of resolution metadata/details (for offchain verification)
+  /// @dev Dispute resolution is a full outcome (no partial splits).
+  function cancelAsDisputeResolver(uint256 workflowId, bytes32 resolutionHash) external;
 
   /// @notice Gets the current state of an escrow
   /// @param workflowId Identifier of the escrow
@@ -132,12 +139,6 @@ struct EscrowTransfer {
   bytes metadata; // Additional metadata
 }
 
-/// @notice Payout specification for dispute resolution
-struct Payout {
-  address recipient; // Address to receive payout
-  uint256 amount; // Amount to pay (in escrowed token)
-}
-
 /// @notice Events
 event EscrowCreated(
   uint256 indexed workflowId,
@@ -153,7 +154,7 @@ event EscrowCancelled(uint256 indexed workflowId, address indexed sender, uint25
 
 event DisputeRaised(uint256 indexed workflowId, address indexed raisedBy, address indexed resolver);
 
-event DisputeResolved(uint256 indexed workflowId, address indexed resolver, Payout[] payouts);
+event DisputeResolved(uint256 indexed workflowId, address indexed resolver, bool isRelease, bytes32 resolutionHash);
 ```
 
 ### State Machine
@@ -161,7 +162,7 @@ event DisputeResolved(uint256 indexed workflowId, address indexed resolver, Payo
 ```
 NONE → PENDING → RELEASED (via releaseEscrow)
               → REFUNDED (via cancelEscrow)
-              → DISPUTED (via raiseDispute) → RESOLVED (via resolveDispute)
+              → DISPUTED (via raiseDispute) → RESOLVED (via resolver outcome)
               → RELEASED (via autoReleaseTime)
               → REFUNDED (via autoCancelTime)
 ```
@@ -170,7 +171,7 @@ NONE → PENDING → RELEASED (via releaseEscrow)
 
 - **Sender**: Can release, cancel (with recipient agreement), or raise dispute
 - **Recipient**: Can cancel (with sender agreement) or raise dispute
-- **Resolver**: Can resolve disputes with arbitrary payout distribution
+- **Resolver**: Can resolve disputes with a full outcome (release OR refund)
 - **Anyone**: Can view escrow state (read-only)
 
 ### Dispute Resolution
@@ -180,7 +181,6 @@ NONE → PENDING → RELEASED (via releaseEscrow)
 3. A resolver (specified at creation or via resolution module) can:
    - Release full amount to recipient
    - Refund full amount to sender
-   - Split funds between parties (partial resolution)
 4. Resolution is final and cannot be reversed
 
 ### Auto-Release and Auto-Cancel

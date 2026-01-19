@@ -36,7 +36,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   // Role constants (must match contracts)
   const ROLE_TIMELOCK = ethers.keccak256(ethers.toUtf8Bytes('ROLE_TIMELOCK'));
   const ROLE_GUARDIAN = ethers.keccak256(ethers.toUtf8Bytes('ROLE_GUARDIAN'));
-  const DEFAULT_ADMIN_ROLE = ethers.ZeroAddress; // AccessControl uses 0x00 for DEFAULT_ADMIN_ROLE
+  const DEFAULT_ADMIN_ROLE = ethers.ZeroHash; // AccessControl uses bytes32(0) for DEFAULT_ADMIN_ROLE
 
   const allDeployments = await all();
   const contractsToGovern = [

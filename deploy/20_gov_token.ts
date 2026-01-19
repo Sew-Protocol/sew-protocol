@@ -84,11 +84,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       }
     }
 
-    // Wait for transaction confirmation before verifying
-    if (tokenDeployment.receipt) {
-      await tokenDeployment.receipt.wait();
-    }
-
     // Verify token balance (with retry for timing issues)
     const token = await ethers.getContractAt('SewToken', tokenDeployment.address);
     let deployerBalance;

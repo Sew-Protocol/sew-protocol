@@ -7,6 +7,14 @@
 
 ---
 
+## Current status (recommended path)
+
+For the current Base Sepolia integration-test rollout (separate `SEPOLIA_DEPLOY_KEY`, `SOLC_RUNS=200`, fee override knobs, deployed address table, etc.), use:
+
+- `docs/deployment/BASE_SEPOLIA_CORE_TESTNET_GUIDE.md`
+
+This document remains as a higher-level IEO release checklist and “fresh deployment” reference.
+
 ## Overview
 
 The IEO release is the initial deployment of the Sew Protocol escrow system. It includes:
@@ -25,7 +33,7 @@ This release provides a **minimal, secure foundation** for the protocol with cen
 ### Prerequisites
 
 - [ ] Environment variables configured (`.env` file)
-- [ ] Base Sepolia RPC URL set (`BASE_SEPOLIA_RPC_URL`)
+- [ ] Base Sepolia RPC URL set (`RPC_BASE_SEPOLIA`)
 - [ ] Deployer account funded with ETH for gas
 - [ ] Aave Pool Addresses Provider address (Base Sepolia)
 - [ ] Safe multisig address (for initial admin)
@@ -54,9 +62,6 @@ This release provides a **minimal, secure foundation** for the protocol with cen
 ### Step 1: Environment Setup
 
 ```bash
-# Set network
-export NETWORK=baseSepolia
-
 # Verify RPC connectivity
 pnpm hardhat console --network baseSepolia
 ```
@@ -93,6 +98,9 @@ pnpm hardhat deploy --network baseSepolia --tags module-management
 ### Step 4: Deploy Core Escrow Contracts
 
 ```bash
+# Keep bytecode under 24KB (EIP-170) for Base Sepolia deployments
+export SOLC_RUNS=200
+
 # Deploy core escrow contracts
 pnpm hardhat deploy --network baseSepolia --tags escrow
 
@@ -106,7 +114,7 @@ pnpm hardhat export --network baseSepolia
 
 **Actions performed automatically**:
 - Registers EscrowVault with all 5 ops contracts (CreateOps, SettlementOps, DisputeOps, YieldOps, BondCollector)
-- Sets ops contracts in EscrowVault using `setCreateOps()`, `setSettlementOps()`, `setBondCollector()` (if deployer has ROLE_ADMIN_CONTRACT)
+- Sets ops contracts in EscrowVault using `setCreateOps()`, `setSettlementOps()`, `setBondCollector()` (these setters are Timelock-gated; scripts are written to be safe on reruns)
 - Registers EscrowableERC20 with all ops contracts (if deployed)
 - Sets ops contracts in EscrowableERC20 (if deployed)
 
@@ -334,6 +342,21 @@ pnpm gov:sim governance/proposals/0001_set_token_cap.json --fork-url=$BASE_SEPOL
 const escrowVault = await ethers.getContractAt('EscrowVault', DEPLOYED_ADDRESS);
 await escrowVault.createEscrow(/* ... */);
 ```
+
+### 4b. Smoke test script (recommended)
+
+Run the Base Sepolia smoke tests (create escrow → release; create escrow → both parties cancel → refund):
+
+```bash
+chmod +x scripts/testnet/smoke-escrow.sh
+./scripts/testnet/smoke-escrow.sh
+```
+
+Optional env vars:
+- `SELLER_PRIVATE_KEY=0x...` (recommended, second funded EOA to test true 2-party cancel)
+- `BUYER_PRIVATE_KEY=0x...`
+- `ESCROW_TOKEN=0x...` (defaults to deployed `SewToken`)
+- `ESCROW_AMOUNT=1`
 
 ### 5. Dispute Resolution Test
 

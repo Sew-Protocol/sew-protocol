@@ -19,6 +19,8 @@ Welcome to the protocol documentation. This directory contains comprehensive doc
 
 ### `/architecture/` - System Architecture
 - Architecture overview
+- Technical overview (canonical)
+- Contracts summary (canonical)
 - Escrow creation and settings
 - Protocol fees and yield distribution
 
@@ -30,47 +32,28 @@ Welcome to the protocol documentation. This directory contains comprehensive doc
 ### `/governance/` - Governance Documentation
 - Governance processes and procedures
 - Governance surface mapping
-- Emergency policies
-
-### `/implementation/` - Implementation Details
-- Implementation summaries and reviews
-- Feature implementation status
-- Implementation plans
+- Governance structure & quorum analyses
 
 ### `/deployment/` - Deployment & Configuration
 - Chain configuration
 - Deployment checklists
 - Verification procedures
 
-### `/status/` - Status & Progress
-- Implementation status reports
-- Outstanding issues
-- Progress tracking
-
-### `/summaries/` - Summaries
-- Feature summaries
-- Review responses
-- Implementation summaries
-
 ### `/reviews/` - Reviews & Audits
 - Security reviews
 - Contract reviews
 - Audit reports
 
+### `/security/` - Security Notes & Reviews
+- Security reviews and tracking docs (in addition to `/reviews/`)
+
+### `/optimization/` - Contract size + gas optimization notes
+- Bytecode size investigations and mitigation plans
+
 ### `/test/` - Testing Documentation
 - Test plans and strategies
 - Test coverage reports
 - Testing guidelines
-
-### `/plans/` - Development Plans
-- Feature implementation plans
-- Roadmap items
-- Planning documents
-
-### `/proposals/` - Proposals
-- Feature proposals
-- Improvement proposals
-- Design proposals
 
 ### `/reference/` - Reference Materials
 - API references
@@ -87,29 +70,10 @@ Welcome to the protocol documentation. This directory contains comprehensive doc
 - Emergency policies
 - Operational policies
 
-### `/migrations/` - Migration Guides
-- Migration procedures
-- Upgrade guides
-- Migration notes
-
-### `/investigations/` - Investigations
-- Technical investigations
-- Issue analysis
-- Research documents
-
 ### `/token/` - Token Documentation
 - Tokenomics
 - Token specifications
 - Token-related documentation
-
-### `/audits/` - Audit Documentation
-- Security audits
-- Code audits
-- Audit reports
-
-### `/archived/` - Archived Documents
-- Completed or superseded documentation
-- Historical records
 
 ## Quick Links
 

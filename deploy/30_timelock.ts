@@ -45,11 +45,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   if (timelockDeployment.newlyDeployed) {
     console.log(`✅ TimelockController deployed at: ${timelockDeployment.address}`);
 
-    // Wait for transaction confirmation before verifying
-    if (timelockDeployment.receipt) {
-      await timelockDeployment.receipt.wait();
-    }
-
     // Verify deployment (with retry for timing issues)
     const timelock = await ethers.getContractAt('TimelockController', timelockDeployment.address);
     let minDelay;

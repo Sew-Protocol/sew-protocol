@@ -214,7 +214,58 @@ contract OpsCoverageTest is Test {
         assertEq(result.resolver, address(0));
     }
 
+    function test_CreateOps_computeEscrowCreation_EOAResolver() public {
+        vm.prank(timelock);
+        createOps.registerEscrowContract(escrowContract);
+
+        EscrowSettings memory settings = EscrowSettings({
+            customResolver: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        });
+
+        vm.prank(escrowContract);
+        CreateOps.CreateResult memory result = createOps.computeEscrowCreation(
+            address(token),
+            address(0x1),
+            address(0x2),
+            1000,
+            settings,
+            100,
+            1,
+            address(0xDEAD) // EOA
+        );
+
+        assertEq(result.resolver, address(0));
+    }
+
     // ============ YieldOps Tests ============
+
+    function test_YieldOps_handleYield_WithdrawalFailed() public {
+        mockGen = new MockYieldGenerationModule();
+        vm.prank(timelock);
+        yieldOps.registerEscrowContract(escrowContract);
+
+        // Success = false from module
+        mockGen.setWithdrawResult(false, 0, 0);
+
+        vm.prank(escrowContract);
+        YieldOps.YieldResult memory result = yieldOps.handleYield(
+            IYieldGenerationModule(address(mockGen)),
+            IYieldDistributionModule(address(0)),
+            1,
+            address(token),
+            1000,
+            0,
+            feeRecipient,
+            ""
+        );
+
+        assertTrue(result.success);
+        assertEq(result.actualAmount, 1000); // Falls back to original amount
+        assertEq(result.yield, 0);
+    }
 
     function test_YieldOps_recoverTokens_Guardian() public {
         // Send tokens to YieldOps

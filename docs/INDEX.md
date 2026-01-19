@@ -12,6 +12,7 @@ Complete index of all documentation in this repository.
 - **[WHITEPAPER.md](./WHITEPAPER.md)** - Complete protocol whitepaper
 - **[README.md](./README.md)** - Documentation overview and structure
 - **[Technical Overview](./architecture/TECHNICAL_OVERVIEW.md)** - High-level technical architecture
+- **[Base Sepolia Core Testnet Guide](./deployment/BASE_SEPOLIA_CORE_TESTNET_GUIDE.md)** - Core escrow deployment + test checklist (IEO/integration)
 
 ### Security & Audits
 - **[Security Model](./reviews/SECURITY_MODEL.md)** - Security model and threat analysis
@@ -207,6 +208,9 @@ Historical, superseded, or completed documentation moved to `more/` or `archived
 
 **Deployment:**
 - [Mainnet Deployment Plan](./deployment/MAINNET_DEPLOYMENT_PLAN.md)
+- [Base Sepolia Core Testnet Guide](./deployment/BASE_SEPOLIA_CORE_TESTNET_GUIDE.md)
+- [Base Sepolia Deployment Guide](./deployment/BASE_SEPOLIA_DEPLOYMENT_GUIDE.md)
+- [IEO Release Guide](./deployment/ieo/IEO_RELEASE_GUIDE.md)
 - [Verification Guide](./deployment/VERIFICATION.md)
 
 ---

@@ -112,11 +112,12 @@ uint256 workflowId = escrow.createEscrow(
 
 // If dispute arises
 escrow.raiseDispute(workflowId);
-// Resolver can split: 70% to freelancer, 30% refund to client
-escrow.resolveDispute(workflowId, [
-    Payout({recipient: freelancer, amount: 350e18}),
-    Payout({recipient: client, amount: 150e18})
-]);
+// Resolver decides a full outcome (no partial splits):
+bytes32 resolutionHash = keccak256("example-resolution-metadata");
+// - Release full amount to freelancer:
+escrow.releaseAsDisputeResolver(workflowId, resolutionHash);
+// - Or cancel and refund full amount to client:
+// escrow.cancelAsDisputeResolver(workflowId, resolutionHash);
 ```
 
 ---

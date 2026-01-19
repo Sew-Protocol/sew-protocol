@@ -26,15 +26,23 @@ extendEnvironment(async (hre) => {
 });
 
 const PRIVATE_KEY = process.env.PRIVATE_KEY || '';
+const SEPOLIA_DEPLOY_KEY = process.env.SEPOLIA_DEPLOY_KEY || '';
 const DEPLOY_CONFIRM = (process.env.DEPLOY_CONFIRM || 'NO').toUpperCase();
+// Keep runs low to minimize deployed bytecode size (EIP-170).
+// Higher runs often increase runtime bytecode size (optimize for gas instead).
+const SOLC_RUNS = parseInt(process.env.SOLC_RUNS || '200', 10);
 
 function rpc(envKey: string) {
   return process.env[envKey] || '';
 }
 
-function accountsOrThrow(networkName: string) {
-  if (!PRIVATE_KEY) throw new Error(`Missing PRIVATE_KEY for network: ${networkName}`);
-  return [PRIVATE_KEY];
+function accountsOrThrow(networkName: string, privateKeyOverride?: string) {
+  const key = privateKeyOverride || PRIVATE_KEY;
+  if (!key) {
+    const suffix = privateKeyOverride ? ' (override provided but empty)' : '';
+    throw new Error(`Missing PRIVATE_KEY for network: ${networkName}${suffix}`);
+  }
+  return [key];
 }
 
 const config: HardhatUserConfig = {
@@ -44,7 +52,7 @@ const config: HardhatUserConfig = {
       optimizer: {
         enabled: true,
         // https://docs.soliditylang.org/en/latest/using-the-compiler.html#optimizer-options
-        runs: 1000, // Higher runs = smaller code size (but higher gas cost)
+        runs: Number.isFinite(SOLC_RUNS) && SOLC_RUNS > 0 ? SOLC_RUNS : 200,
       },
       viaIR: true, // Enable IR-based code generation to reduce contract size (required to avoid stack too deep)
       evmVersion: 'cancun', // Use Cancun EVM version to support mcopy instruction
@@ -66,7 +74,9 @@ const config: HardhatUserConfig = {
     },
     baseSepolia: {
       url: rpc('RPC_BASE_SEPOLIA'),
-      accounts: accountsOrThrow('baseSepolia'),
+      // Allow a dedicated deploy key for Base Sepolia testnet deployments.
+      // This is useful if you want governance infra deployed from one EOA and core escrow from another.
+      accounts: accountsOrThrow('baseSepolia', SEPOLIA_DEPLOY_KEY || undefined),
       chainId: 84532,
     },
     base: { url: rpc('RPC_BASE_MAINNET'), accounts: accountsOrThrow('base'), chainId: 8453 },

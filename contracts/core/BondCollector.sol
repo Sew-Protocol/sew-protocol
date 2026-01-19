@@ -158,4 +158,25 @@ contract BondCollector is AccessControl {
         }
         return false;
     }
+
+    /**
+     * @notice Approve a spender to pull ERC20 bond tokens
+     * @dev Intended for escrow contract flows where the escrow contract calls the incentive module,
+     *      but custody lives in this contract (BondCollector).
+     */
+    function approveBondSpender(
+        address token,
+        address spender,
+        uint256 amount
+    ) external onlyRole(ROLE_ESCROW_CONTRACT) {
+        IERC20(token).safeIncreaseAllowance(spender, amount);
+    }
+
+    /**
+     * @notice Reset an ERC20 approval back to zero
+     * @dev Best practice to avoid leaving allowances lingering on third-party contracts.
+     */
+    function resetBondSpender(address token, address spender) external onlyRole(ROLE_ESCROW_CONTRACT) {
+        IERC20(token).approve(spender, 0);
+    }
 }

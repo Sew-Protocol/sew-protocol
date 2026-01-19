@@ -15,13 +15,44 @@ import { validateNetworkForDeployment } from '../scripts/_lib/network-validation
 import { getChainConfig, getBlockExplorerUrl } from '../config/chains.config';
 import { registerDeployment } from '../config/deployments.registry';
 
+function getTxOverrides(ethers: any): {
+  maxFeePerGas?: string;
+  maxPriorityFeePerGas?: string;
+  gasPrice?: string;
+} {
+  // Optional overrides to handle “replacement transaction underpriced” / stuck nonces on testnets.
+  // Prefer EIP-1559 fields if provided; fall back to legacy gasPrice if set.
+  const maxFeeGwei = process.env.TX_MAX_FEE_GWEI;
+  const maxPriorityFeeGwei = process.env.TX_PRIORITY_FEE_GWEI;
+  const gasPriceGwei = process.env.TX_GAS_PRICE_GWEI;
+
+  const overrides: {
+    maxFeePerGas?: string;
+    maxPriorityFeePerGas?: string;
+    gasPrice?: string;
+  } = {};
+
+  if (maxFeeGwei) {
+    overrides.maxFeePerGas = ethers.parseUnits(maxFeeGwei, 'gwei').toString();
+  }
+  if (maxPriorityFeeGwei) {
+    overrides.maxPriorityFeePerGas = ethers.parseUnits(maxPriorityFeeGwei, 'gwei').toString();
+  }
+  if (gasPriceGwei) {
+    overrides.gasPrice = ethers.parseUnits(gasPriceGwei, 'gwei').toString();
+  }
+
+  return overrides;
+}
+
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   await validateNetworkForDeployment(hre);
 
   const { deployments, getNamedAccounts, ethers } = hre;
-  const { deploy } = deployments;
+  const { deploy, get } = deployments;
   const { deployer } = await getNamedAccounts();
   const chainConfig = getChainConfig(hre);
+  const txOverrides = getTxOverrides(ethers);
 
   console.log(`\n📦 Deploying Ops Contracts...`);
 
@@ -31,6 +62,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     contract: 'YieldOps',
     from: deployer,
     args: [deployer], // initialOwner
+    ...txOverrides,
     log: true,
   });
 
@@ -41,9 +73,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       console.log(`      📊 View on ${chainConfig.blockExplorer.name}: ${explorerUrl}`);
     }
 
-    // Wait for transaction confirmation before next deployment
     if (yieldOpsDeployment.receipt) {
-      await yieldOpsDeployment.receipt.wait();
       await registerDeployment(hre, 'YieldOps', {
         address: yieldOpsDeployment.address,
         txHash: yieldOpsDeployment.receipt.hash,
@@ -62,6 +92,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     contract: 'DisputeOps',
     from: deployer,
     args: [deployer], // initialOwner
+    ...txOverrides,
     log: true,
   });
 
@@ -91,6 +122,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     contract: 'SettlementOps',
     from: deployer,
     args: [deployer], // initialOwner
+    ...txOverrides,
     log: true,
   });
 
@@ -120,6 +152,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     contract: 'CreateOps',
     from: deployer,
     args: [deployer], // initialOwner
+    ...txOverrides,
     log: true,
   });
 
@@ -149,6 +182,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     contract: 'BondCollector',
     from: deployer,
     args: [deployer], // initialOwner
+    ...txOverrides,
     log: true,
   });
 
@@ -177,7 +211,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   try {
     const timelockDeployment = await get('TimelockController');
     const timelockAddress = timelockDeployment.address;
-    const DEFAULT_ADMIN_ROLE = ethers.ZeroAddress; // AccessControl uses 0x00
+    const DEFAULT_ADMIN_ROLE = ethers.ZeroHash; // AccessControl uses bytes32(0)
 
     const opsContracts = [
       { name: 'YieldOps', deployment: yieldOpsDeployment },

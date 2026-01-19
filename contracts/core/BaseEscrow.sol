@@ -57,6 +57,14 @@ enum FailureReason {
     TIMEOUT // 11
 }
 
+// EscrowTransferAutoResult reasonCode meanings:
+// - If success == true: reasonCode is an action code (NOT a FailureReason).
+//   - 0 = push transfer succeeded
+//   - 1 = auto-release executed
+//   - 2 = auto-cancel executed
+//   - 3 = pending settlement executed
+// - If success == false: reasonCode is a FailureReason value.
+
 // Function selectors (replaces abi.encodeWithSignature strings to save bytecode)
 bytes4 constant SEL_INCENTIVE_MODULE = bytes4(keccak256("incentiveModule()"));
 bytes4 constant SEL_FINALIZE_DISPUTE = bytes4(keccak256("finalizeDispute(uint256)"));
@@ -89,6 +97,10 @@ error TransferFailed(uint8 kind, address token, address to, uint256 amount);
 error ResolutionModuleError(uint8 code);
 error ZeroBondCollector();
 error EscalationNotAllowed();
+error AppealBondQueryFailed(uint256 workflowId);
+error InvalidBondMsgValue(uint256 workflowId, uint256 required, uint256 provided);
+error UnexpectedETH(uint256 workflowId, uint256 provided);
+error BondCollectionFailed(uint256 workflowId);
 
 // Errors used by child contracts (EscrowVault, EscrowableERC20)
 error BalanceUnderflow(address token, uint256 currentBalance, uint256 requestedAmount);
@@ -278,6 +290,20 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         uint8 reasonCode
     );
 
+    // P2: consolidated telemetry surface for operational failures (best-effort paths only).
+    // op codes (append-only):
+    // 1 = yield deposit
+    // 2 = yield withdraw/distribute
+    // 3 = incentive module hook
+    // 4 = auto-transfer push (fallback to pull)
+    event OperationFailure(
+        uint8 indexed op,
+        uint256 indexed workflowId,
+        address indexed target,
+        bytes4 selector,
+        uint8 reasonCode
+    );
+
     // ============ Pause/Unpause ============
     function pause() external onlyRole(ROLE_GUARDIAN) {
         _pause();
@@ -405,6 +431,13 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
                 );
                 if (!success) {
                     emit YieldHandlingFailed(workflowId, token, result.amountAfterFee, uint8(FailureReason.DEPOSIT_FAILED));
+                    emit OperationFailure(
+                        1,
+                        workflowId,
+                        address(genModule),
+                        IYieldGenerationModule.depositForYield.selector,
+                        uint8(FailureReason.DEPOSIT_FAILED)
+                    );
                 }
             }
         }
@@ -519,16 +552,24 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
             }
 
             emit PendingSettlementExecuted(workflowId, isRelease);
+            emit EscrowTransferAutoResult(
+                workflowId,
+                isRelease ? et.to : et.from,
+                et.token,
+                et.amountAfterFee,
+                true,
+                3
+            );
             return true;
         } else if (actionType == 1) {
             // Auto-release
             _releaseEscrowTransfer(workflowId);
-            emit EscrowTransferAutoResult(workflowId, et.to, et.token, et.amountAfterFee, true, 0);
+            emit EscrowTransferAutoResult(workflowId, et.to, et.token, et.amountAfterFee, true, 1);
             return true;
         } else if (actionType == 2) {
             // Auto-cancel
             _cancelAndRefund(workflowId);
-            emit EscrowTransferAutoResult(workflowId, et.from, et.token, et.amountAfterFee, true, 0);
+            emit EscrowTransferAutoResult(workflowId, et.from, et.token, et.amountAfterFee, true, 2);
             return true;
         }
 
@@ -669,6 +710,13 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
             if (!success) {
                 // MED-3: Emit event for monitoring
                 emit IncentiveModuleCallFailed(workflowId, IIncentiveModule.onDisputeOpened.selector, uint8(FailureReason.CALL_FAILED));
+                emit OperationFailure(
+                    3,
+                    workflowId,
+                    incentiveModAddr,
+                    IIncentiveModule.onDisputeOpened.selector,
+                    uint8(FailureReason.CALL_FAILED)
+                );
             }
         }
 
@@ -752,39 +800,88 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
             )
         );
         
-        if (bondCheckSuccess && bondData.length >= 64) {
-            (uint256 bondAmount, address bondToken) = abi.decode(bondData, (uint256, address));
-            if (bondAmount > 0) {
-                // PRIORITY 3: Use snapshotted incentive module (no dynamic discovery)
-                address incentiveModAddr = moduleSnapshots[workflowId].incentiveModule;
-                if (incentiveModAddr != address(0)) {
-                    IIncentiveModule incentiveMod = IIncentiveModule(incentiveModAddr);
-                    // Use BondCollector for bond collection
-                    if (address(bondCollector) == address(0)) {
-                        revert ZeroBondCollector();
+        if (!bondCheckSuccess || bondData.length < 64) {
+            revert AppealBondQueryFailed(workflowId);
+        }
+
+        (uint256 bondAmount, address bondToken) = abi.decode(bondData, (uint256, address));
+
+        // Enforce msg.value invariants (audit-grade clarity)
+        if (bondToken == address(0)) {
+            if (msg.value < bondAmount) {
+                revert InvalidBondMsgValue(workflowId, bondAmount, msg.value);
+            }
+        } else {
+            if (msg.value != 0) {
+                revert UnexpectedETH(workflowId, msg.value);
+            }
+        }
+
+        if (bondAmount > 0) {
+            // Use snapshotted incentive module (no dynamic discovery)
+            address incentiveModAddr = moduleSnapshots[workflowId].incentiveModule;
+            if (incentiveModAddr != address(0)) {
+                IIncentiveModule incentiveMod = IIncentiveModule(incentiveModAddr);
+                uint256 snapshottedBondFee = moduleSnapshots[workflowId].appealBondProtocolFeeBps;
+
+                // Collect protocol fee (if enabled) and record net bond amount.
+                uint256 protocolFeeAmount = 0;
+                uint256 bondToRecord = bondAmount;
+
+                if (snapshottedBondFee > 0 && escrowFeeAddress != address(0)) {
+                    protocolFeeAmount = (bondAmount * snapshottedBondFee) / 10000;
+                    if (protocolFeeAmount > 0) {
+                        bondToRecord = bondAmount - protocolFeeAmount;
+                        emit ProtocolFeeCollected(
+                            1,
+                            workflowId,
+                            bondToken,
+                            bondAmount,
+                            snapshottedBondFee,
+                            protocolFeeAmount
+                        );
                     }
-                    // Pull tokens first for ERC20 bonds
-                    if (bondToken != address(0)) {
-                        _pullTokens(bondToken, _msgSender(), bondAmount);
-                        // Move custody to BondCollector (it will approve + record in incentive module)
-                        IERC20(bondToken).safeTransfer(address(bondCollector), bondAmount);
+                }
+
+                if (bondToken == address(0)) {
+                    // ETH bond: pay protocol fee, then record bond (must match msg.value rules in incentive module).
+                    if (protocolFeeAmount > 0) {
+                        (bool feeSuccess, ) = payable(escrowFeeAddress).call{value: protocolFeeAmount}('');
+                        if (!feeSuccess) revert TransferFailed(1, bondToken, escrowFeeAddress, protocolFeeAmount);
                     }
-                    // Collect bond via BondCollector
-                    uint256 snapshottedBondFee = moduleSnapshots[workflowId].appealBondProtocolFeeBps;
-                    // For ETH bonds: depositor is user (must equal escalatedBy)
-                    // For ERC20 bonds: BondCollector is the depositor (it holds custody after transfer above)
-                    address depositor = bondToken == address(0) ? _msgSender() : address(bondCollector);
-                    bondCollector.collectBond{value: bondToken == address(0) ? bondAmount : 0}(
+
+                    // For ETH bonds, depositor MUST equal escalatedBy.
+                    incentiveMod.recordAppealBond{value: bondToRecord}(
                         workflowId,
-                        incentiveMod,
-                        bondAmount,
+                        _msgSender(), // depositor
+                        _msgSender(), // escalatedBy
+                        bondToRecord,
                         bondToken,
-                        result.newLevel,
-                        snapshottedBondFee,
-                        escrowFeeAddress,
-                        depositor,
-                        _msgSender() // escalatedBy is always the user
+                        result.newLevel
                     );
+                } else {
+                    // ERC20 bond: custody lives in BondCollector, but recordAppealBond must be called
+                    // by the escrow contract (onlyEscrowContract in incentive module).
+                    if (address(bondCollector) == address(0)) revert ZeroBondCollector();
+
+                    // Pull full bond amount into escrow contract, then fan out fee + custody transfer.
+                    _pullTokens(bondToken, _msgSender(), bondAmount);
+                    if (protocolFeeAmount > 0) {
+                        IERC20(bondToken).safeTransfer(escrowFeeAddress, protocolFeeAmount);
+                    }
+                    IERC20(bondToken).safeTransfer(address(bondCollector), bondToRecord);
+
+                    // Let incentive module pull tokens from BondCollector.
+                    bondCollector.approveBondSpender(bondToken, address(incentiveMod), bondToRecord);
+                    incentiveMod.recordAppealBond(
+                        workflowId,
+                        address(bondCollector), // depositor (custodian)
+                        _msgSender(), // escalatedBy
+                        bondToRecord,
+                        bondToken,
+                        result.newLevel
+                    );
+                    bondCollector.resetBondSpender(bondToken, address(incentiveMod));
                 }
             }
         }
@@ -798,14 +895,11 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         et.disputeResolver = newResolver;
         
         // Refund excess ETH if bond was ETH and msg.value exceeded bond amount
-        if (bondCheckSuccess && bondData.length >= 64) {
-            (uint256 bondAmount, address bondToken) = abi.decode(bondData, (uint256, address));
-            if (bondToken == address(0) && msg.value > bondAmount) {
-                uint256 excess = msg.value - bondAmount;
-                if (excess > 0) {
-                    (bool s, ) = payable(_msgSender()).call{value: excess}('');
-                    if (!s) revert ExcessRefundTransferFailed(workflowId, _msgSender(), excess);
-                }
+        if (bondToken == address(0) && msg.value > bondAmount) {
+            uint256 excess = msg.value - bondAmount;
+            if (excess > 0) {
+                (bool s, ) = payable(_msgSender()).call{value: excess}('');
+                if (!s) revert ExcessRefundTransferFailed(workflowId, _msgSender(), excess);
             }
         }
         emit DisputeEscalated(
@@ -1199,7 +1293,21 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
             // Transfer failed - fallback to pull model
             claimableBalances[workflowId][recipient] += amount;
             emit ClaimableBalanceSet(workflowId, recipient, token, amount);
-            emit EscrowTransferAutoResult(workflowId, recipient, token, amount, false, uint8(FailureReason.TRANSFER_FAILED));
+            emit EscrowTransferAutoResult(
+                workflowId,
+                recipient,
+                token,
+                amount,
+                false,
+                uint8(FailureReason.PUSH_FAILED_FALLBACK_TO_PULL)
+            );
+            emit OperationFailure(
+                4,
+                workflowId,
+                token,
+                IERC20.transfer.selector,
+                uint8(FailureReason.PUSH_FAILED_FALLBACK_TO_PULL)
+            );
             return false;
         }
     }
@@ -1247,7 +1355,33 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     ) internal returns (uint256 actualAmount) {
         actualAmount = amount;
         
+        // P1: module wiring observability (only emit if yield is enabled for this escrow).
+        EscrowSettings memory settings = escrowSettings[workflowId];
+        bool yieldEnabled = settings.yieldPreset != YieldPreset.OFF;
         if (address(yieldOps) == address(0)) {
+            if (yieldEnabled) {
+                emit YieldHandlingFailed(workflowId, token, amount, uint8(FailureReason.MODULE_NOT_SET));
+                emit OperationFailure(
+                    2,
+                    workflowId,
+                    address(0),
+                    YieldOps.handleYield.selector,
+                    uint8(FailureReason.MODULE_NOT_SET)
+                );
+            }
+            return actualAmount;
+        }
+        if (address(yieldOps).code.length == 0) {
+            if (yieldEnabled) {
+                emit YieldHandlingFailed(workflowId, token, amount, uint8(FailureReason.MODULE_NOT_CONTRACT));
+                emit OperationFailure(
+                    2,
+                    workflowId,
+                    address(yieldOps),
+                    YieldOps.handleYield.selector,
+                    uint8(FailureReason.MODULE_NOT_CONTRACT)
+                );
+            }
             return actualAmount;
         }
         
@@ -1258,7 +1392,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         uint256 snapshottedYieldFee = moduleSnapshots[workflowId].yieldProtocolFeeBps;
         
         // Derive distribution data from preset
-        EscrowSettings memory settings = escrowSettings[workflowId];
         EscrowTransfer memory et = escrowTransfers[workflowId];
         bytes memory distributionData = YieldPresetLibrary.deriveDistributionData(
             settings.yieldPreset,
@@ -1281,8 +1414,30 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
             )
         );
 
-        if (!ok || ret.length == 0) {
+        if (!ok) {
+            // For yield withdrawal paths, expose a stable "withdrawal failed" signal.
             emit YieldHandlingFailed(workflowId, token, amount, uint8(FailureReason.WITHDRAWAL_FAILED));
+            emit OperationFailure(
+                2,
+                workflowId,
+                address(yieldOps),
+                YieldOps.handleYield.selector,
+                uint8(FailureReason.CALL_FAILED)
+            );
+            return actualAmount;
+        }
+        // YieldOps currently returns YieldOps.YieldResult (4 * 32-byte words).
+        // Guard decode so yield remains strictly non-blocking even if ABI drifts.
+        if (ret.length < 128) {
+            // For yield withdrawal paths, expose a stable "withdrawal failed" signal.
+            emit YieldHandlingFailed(workflowId, token, amount, uint8(FailureReason.WITHDRAWAL_FAILED));
+            emit OperationFailure(
+                2,
+                workflowId,
+                address(yieldOps),
+                YieldOps.handleYield.selector,
+                uint8(FailureReason.MALFORMED_RETURN_DATA)
+            );
             return actualAmount;
         }
 
@@ -1295,6 +1450,13 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
             // Basic sanity check: actual amount should be >= principal (no loss)
             if (result.actualAmount < amount) {
                 emit YieldHandlingFailed(workflowId, token, amount, uint8(FailureReason.LESS_THAN_PRINCIPAL));
+                emit OperationFailure(
+                    2,
+                    workflowId,
+                    address(yieldOps),
+                    YieldOps.handleYield.selector,
+                    uint8(FailureReason.LESS_THAN_PRINCIPAL)
+                );
                 actualAmount = amount; // Use principal amount
             } else {
                 actualAmount = result.actualAmount; // Use actual amount (may include yield)

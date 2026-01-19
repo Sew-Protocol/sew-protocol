@@ -235,4 +235,40 @@ contract WithdrawEscrowTest is Test {
         uint256 claimableFinal = vault.claimableBalances(wid, recipient);
         assertEq(claimableFinal, 0, 'Claimable should remain 0');
     }
+
+    function test_withdrawEscrow_succeeds_after_autotransfer_fallback_and_refill() public {
+        // Create escrow
+        vm.prank(sender);
+        token.approve(address(vault), AMOUNT);
+
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
+        vm.prank(sender);
+        uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT, settings);
+
+        uint256 fee = (AMOUNT * ESCROW_FEE) / 10000;
+        uint256 expected = AMOUNT - fee; // amountAfterFee
+
+        // Simulate an unexpected vault balance deficit right before release:
+        // drain the vault's escrowed amount so the push transfer fails and we fall back to pull.
+        vm.prank(address(vault));
+        token.transfer(address(0xdead), expected);
+
+        // Release: autotransfer should fail and credit claimable balance.
+        vm.prank(sender);
+        vault.releaseEscrowTransfer(wid);
+
+        uint256 claimable = vault.claimableBalances(wid, recipient);
+        assertEq(claimable, expected, 'Claimable should be credited on push failure');
+
+        // Refill vault so withdrawal can succeed.
+        token.transfer(address(vault), expected);
+
+        uint256 balBefore = token.balanceOf(recipient);
+        vm.prank(recipient);
+        vault.withdrawEscrow(wid);
+        uint256 balAfter = token.balanceOf(recipient);
+
+        assertEq(balAfter - balBefore, expected, 'Withdraw should transfer claimable amount');
+        assertEq(vault.claimableBalances(wid, recipient), 0, 'Claimable should be cleared after withdraw');
+    }
 }

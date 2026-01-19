@@ -192,20 +192,33 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   // Set ops contracts in EscrowVault (governance-controlled wiring).
   console.log(`\n   Setting ops contracts in EscrowVault...`);
   try {
-    // Set CreateOps
-    const setCreateOpsTx = await escrowVaultContract.setCreateOps(createOpsDeployment.address);
-    await setCreateOpsTx.wait();
-    console.log(`   ✅ Set CreateOps in EscrowVault`);
+    // NOTE: Make wiring idempotent. Only send txs if the value differs.
+    const currentCreateOps = await escrowVaultContract.createOps();
+    if (currentCreateOps.toLowerCase() !== createOpsDeployment.address.toLowerCase()) {
+      const setCreateOpsTx = await escrowVaultContract.setCreateOps(createOpsDeployment.address);
+      await setCreateOpsTx.wait();
+      console.log(`   ✅ Set CreateOps in EscrowVault`);
+    } else {
+      console.log(`   ✅ CreateOps already set in EscrowVault`);
+    }
 
-    // Set SettlementOps
-    const setSettlementOpsTx = await escrowVaultContract.setSettlementOps(settlementOpsDeployment.address);
-    await setSettlementOpsTx.wait();
-    console.log(`   ✅ Set SettlementOps in EscrowVault`);
+    const currentSettlementOps = await escrowVaultContract.settlementOps();
+    if (currentSettlementOps.toLowerCase() !== settlementOpsDeployment.address.toLowerCase()) {
+      const setSettlementOpsTx = await escrowVaultContract.setSettlementOps(settlementOpsDeployment.address);
+      await setSettlementOpsTx.wait();
+      console.log(`   ✅ Set SettlementOps in EscrowVault`);
+    } else {
+      console.log(`   ✅ SettlementOps already set in EscrowVault`);
+    }
 
-    // Set BondCollector
-    const setBondCollectorTx = await escrowVaultContract.setBondCollector(bondCollectorDeployment.address);
-    await setBondCollectorTx.wait();
-    console.log(`   ✅ Set BondCollector in EscrowVault`);
+    const currentBondCollector = await escrowVaultContract.bondCollector();
+    if (currentBondCollector.toLowerCase() !== bondCollectorDeployment.address.toLowerCase()) {
+      const setBondCollectorTx = await escrowVaultContract.setBondCollector(bondCollectorDeployment.address);
+      await setBondCollectorTx.wait();
+      console.log(`   ✅ Set BondCollector in EscrowVault`);
+    } else {
+      console.log(`   ✅ BondCollector already set in EscrowVault`);
+    }
   } catch (error: any) {
     if (error.message?.includes('AccessControlUnauthorizedAccount')) {
       console.log(`   ℹ️  Deployer does not have permission to set ops contracts.`);
