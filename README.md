@@ -1,62 +1,68 @@
-# hardhat-deploy-hybrid (classic hardhat-deploy + Foundry)
+# Escrow Protocol (Hardhat Deploy + Foundry)
 
-This scaffold uses **classic** `hardhat-deploy` (not Ignition) and supports:
+This repository contains the smart contracts, deployment scripts, governance tooling, and documentation for the escrow protocol.
 
-- **Complex multi-step deployments** (script ordering + tags)
-- **Upgradeable deployments**: **Transparent** or **UUPS** (select via `PROXY_KIND`)
-- **Hardhat tests** (TypeScript)
-- **Foundry tests** (forge)
-- A timestamped deployment ledger in `deploy-ledger/<network>/<stamp>/`
+It uses:
+- **Hardhat + hardhat-deploy** for deployments, verification, and TypeScript tooling
+- **Foundry** for fast Solidity unit tests, fuzzing, and invariants
 
-## Quick start
+## Documentation
+
+- **Start here**: `docs/INDEX.md`
+- **Deployment**: `docs/deployment/`
+  - Base Sepolia core testnet guide: `docs/deployment/BASE_SEPOLIA_CORE_TESTNET_GUIDE.md`
+  - Release tracking: `docs/deployment/RELEASES.md`
+- **Governance**: `docs/governance/` and `governance/runbooks/`
+- **Security**:
+  - Responsible disclosure: `SECURITY.md`
+  - Security model: `docs/reviews/SECURITY_MODEL.md`
+
+## Quick start (local)
 
 ```bash
 pnpm i
 cp .env.example .env
+pnpm compile
 pnpm test
 ```
 
-## Deploy locally
+## Tests
+
+```bash
+pnpm test                 # hardhat + foundry
+pnpm test:hardhat
+pnpm test:foundry
+pnpm lint
+pnpm typecheck
+```
+
+## Deploy
+
+Local:
 
 ```bash
 pnpm deploy:local
-pnpm export --network hardhat
 ```
 
-## Deploy with proxies
-
-Transparent (default):
+Base Sepolia (example):
 
 ```bash
 pnpm deploy --network baseSepolia
 ```
 
-UUPS:
+Verification and release workflow docs:
+- `docs/deployment/BASE_SEPOLIA_CORE_TESTNET_GUIDE.md`
+- `docs/deployment/RELEASES.md`
 
-```bash
-PROXY_KIND=uups pnpm deploy --network baseSepolia
-```
-
-## Deploy flow (example)
-
-- `deploy/00_impl.ts` deploys impl for bookkeeping
-- `deploy/11_proxy.ts` deploys proxy + runs initializer
-- `deploy/90_post.ts` sanity checks / wiring
-
-## Production safety notes
+## Production safety notes (high level)
 
 - Gate upgrades behind **Safe + Timelock**.
 - Require **storage layout checks** on every upgrade.
 - Never leave upgrade authority on an EOA.
 
-## Security
-
-- [Security Policy](SECURITY.md) - Security contact and responsible disclosure policy
-- [Security Model](docs/SECURITY_MODEL.md) - Comprehensive security model and threat analysis
-
 ## Governance
 
-The protocol uses onchain governance with TimelockController and OpenZeppelin Governor. See governance documentation:
+The protocol uses onchain governance with `TimelockController` and OpenZeppelin Governor.
 
 - [Governance Model](docs/governance/governance.md) - Overview of governance structure
 - [Governance Surface Map](docs/governance/GOVERNANCE_SURFACE_MAP.md) - Complete function → role → lane mapping

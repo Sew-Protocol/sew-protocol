@@ -38,12 +38,13 @@ async function rowForDeployment(
 function printGroup(title: string, rows: Row[]) {
   if (rows.length === 0) return;
   console.log(`\n### ${title}\n`);
-  console.log(`| Contract | Description | Address | Explorer |`);
-  console.log(`|---|---|---|---|`);
+  console.log(`| Contract | Description | Address |`);
+  console.log(`|---|---|---|`);
   for (const r of rows) {
     const displayName = r.kind === 'eoa' ? `${r.name} (EOA)` : r.name;
+    const linkedAddress = `[\`${r.address}\`](${r.link})`;
     console.log(
-      `| \`${displayName}\` | ${r.description} | \`${r.address}\` | \`${r.link}\` |`,
+      `| \`${displayName}\` | ${r.description} | ${linkedAddress} |`,
     );
   }
 }

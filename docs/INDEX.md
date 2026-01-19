@@ -137,6 +137,7 @@ Historical, superseded, or completed documentation moved to `more/` or `archived
 - Test coverage reports
 - Test implementation tasks
 - Testing assessments and status reports
+- **[Initial Simulation Testing Plan (Base Sepolia)](./more/test/INITIAL_SIMULATION_TESTING_PLAN.md)** - Phased simulation plan (Phase 0–3, DR1→DR3) and pass criteria
 
 ### Proposals (`more/proposals/`)
 - Completed proposals

@@ -35,8 +35,8 @@ async function main() {
   const escrowVaultAddr = (await deployments.get('EscrowVault')).address;
   const sewTokenAddr = (await deployments.get('SewToken')).address;
 
-  const buyerPk = process.env.BUYER_PRIVATE_KEY; // optional
-  const sellerPk = process.env.SELLER_PRIVATE_KEY; // optional (recommended for true 2-party cancel)
+  const buyerPk = process.env.TEST_SELLER_PRIVATE_KEY; // optional
+  const sellerPk = process.env.TEST_SELLER_PRIVATE_KEY; // optional (recommended for true 2-party cancel)
 
   const buyer = await getWalletOrDefaultSigner(provider, buyerPk);
   const buyerAddr = await buyer.getAddress();
@@ -58,8 +58,8 @@ async function main() {
 
   if (sellerAddr.toLowerCase() === buyerAddr.toLowerCase()) {
     console.log(
-      `\nℹ️  SELLER_PRIVATE_KEY not set; cancel test will use buyer as both parties. ` +
-        `Set SELLER_PRIVATE_KEY (funded with some Base Sepolia ETH) to test true 2-party cancel.`
+      `\nℹ️  TEST_SELLER_PRIVATE_KEY not set; cancel test will use buyer as both parties. ` +
+        `Set TEST_SELLER_PRIVATE_KEY (funded with some Base Sepolia ETH) to test true 2-party cancel.`
     );
   }
 

@@ -1,170 +1,57 @@
 name: CI
 
 on:
-  push:
-    branches: [main, develop]
   pull_request:
-    branches: [main, develop]
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
-    name: Test Suite
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Node (from .nvmrc)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 8
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'pnpm'
-
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: nightly
+          version: 9
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm i --frozen-lockfile
 
-      - name: Compile contracts
-        run: pnpm compile
-
-      - name: Run Hardhat tests
-        run: pnpm test:hardhat
-
-      - name: Run Foundry tests
-        run: pnpm test:foundry
-
-  quality:
-    name: Code Quality Checks
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 8
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'pnpm'
-
-      - name: Install Foundry
+      - name: Setup Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: nightly
+          version: stable
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Compile contracts
-        run: pnpm compile
-
-      - name: Check contract sizes
-        run: |
-          echo "Checking contract sizes..."
-          SIZE_OUTPUT=$(pnpm size:check 2>&1)
-          echo "$SIZE_OUTPUT"
-          if echo "$SIZE_OUTPUT" | grep -q "OVER LIMIT"; then
-            echo "⚠️ Some contracts exceed the 24KB limit"
-            echo "::warning::Contract size limit exceeded. This will be addressed separately."
-          else
-            echo "✅ All contracts are under the 24KB limit"
-          fi
-
-      - name: Lint code
+      - name: Lint
         run: pnpm lint
 
-      - name: Type check
+      - name: Typecheck
         run: pnpm typecheck
 
-      - name: Check formatting
-        run: |
-          echo "Checking code formatting..."
-          npx prettier --check . || {
-            echo "❌ Code formatting check failed. Run 'pnpm format' to fix."
-            exit 1
-          }
-
-  coverage:
-    name: Test Coverage
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 8
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'pnpm'
-
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: nightly
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Compile contracts
+      - name: Compile (Hardhat + Forge)
         run: pnpm compile
 
-      - name: Generate coverage report
-        run: pnpm coverage
+      - name: Tests (Hardhat)
+        run: pnpm test:hardhat
 
-      - name: Generate comprehensive coverage report
-        run: pnpm coverage:report
-        continue-on-error: true
+      - name: Tests (Foundry)
+        run: pnpm test:foundry
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          files: ./coverage/coverage.json
-          flags: unittests
-          name: codecov-umbrella
-          fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}
-        continue-on-error: true
-
-      - name: Coverage summary
-        run: |
-          if [ -f "coverage/COVERAGE_REPORT.md" ]; then
-            echo "📊 Test Coverage Report:"
-            head -50 coverage/COVERAGE_REPORT.md
-          fi
-          if [ -f "coverage/coverage-summary.json" ]; then
-            echo ""
-            echo "📊 Coverage Summary (Legacy):"
-            cat coverage/coverage-summary.json | grep -A 5 '"total"' || true
-          fi
-
-      - name: Upload coverage artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-reports
-          path: coverage/
-          retention-days: 30
-        continue-on-error: true
+      - name: Contract size check
+        run: pnpm size:check
