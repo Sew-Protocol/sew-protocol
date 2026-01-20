@@ -13,6 +13,7 @@ Complete index of all documentation in this repository.
 - **[README.md](./README.md)** - Documentation overview and structure
 - **[Technical Overview](./architecture/TECHNICAL_OVERVIEW.md)** - High-level technical architecture
 - **[Base Sepolia Core Testnet Guide](./deployment/BASE_SEPOLIA_CORE_TESTNET_GUIDE.md)** - Core escrow deployment + test checklist (IEO/integration)
+- **[Base Sepolia Testnet Release Summary](./deployment/BASE_SEPOLIA_TESTNET_RELEASE_SUMMARY.md)** - What’s deployed, what’s broken, and paths forward (canonical for testnet status)
 
 ### Security & Audits
 - **[Security Model](./reviews/SECURITY_MODEL.md)** - Security model and threat analysis

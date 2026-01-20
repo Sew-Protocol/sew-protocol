@@ -176,6 +176,7 @@
 
 **Deployment Status:**
 - ✅ Core IEO testnet deployment completed.
+- 📌 Canonical status + issues: **[Base Sepolia testnet release summary](./BASE_SEPOLIA_TESTNET_RELEASE_SUMMARY.md)**.
 - 📋 Canonical address list: **[Base Sepolia Core (IEO) Testnet Deployment Guide](./BASE_SEPOLIA_CORE_TESTNET_GUIDE.md)** (see “Deployed contracts index”).
 - ✅ Suggested post-deploy validation: run `scripts/testnet/smoke-escrow.sh` / `scripts/testnet/smoke-escrow.ts` against `EscrowVault`.
 
