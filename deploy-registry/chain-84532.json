@@ -1,0 +1,283 @@
+{
+  "chainId": 84532,
+  "networkName": "baseSepolia",
+  "deployments": [
+    {
+      "chainId": 84532,
+      "networkName": "baseSepolia",
+      "contractName": "SewToken",
+      "address": "0x7428c13e158ab6eB3E9e7780f05d58181172Ab5A",
+      "blockNumber": 36506934,
+      "deployer": "0xE8d7Fbd5Db3ad910370Be315f21D4596ed45122f",
+      "timestamp": "2026-01-19T00:22:35.263Z",
+      "verified": false,
+      "blockExplorerUrl": "https://sepolia.basescan.org/address/0x7428c13e158ab6eB3E9e7780f05d58181172Ab5A",
+      "constructorArgs": [
+        "Sew Token",
+        "SEW",
+        "0xE8d7Fbd5Db3ad910370Be315f21D4596ed45122f",
+        "1000000000000000000000000000"
+      ],
+      "tags": [
+        "token",
+        "governance"
+      ],
+      "compilerVersion": "0.8.33",
+      "optimizationRuns": 1000,
+      "proxyType": "none"
+    },
+    {
+      "chainId": 84532,
+      "networkName": "baseSepolia",
+      "contractName": "YieldOps",
+      "address": "0xFf1AaC122A1Ab02aA76E43Cf8641A4a33277C653",
+      "blockNumber": 36507223,
+      "deployer": "0xE8d7Fbd5Db3ad910370Be315f21D4596ed45122f",
+      "timestamp": "2026-01-19T00:32:14.337Z",
+      "verified": false,
+      "blockExplorerUrl": "https://sepolia.basescan.org/address/0xFf1AaC122A1Ab02aA76E43Cf8641A4a33277C653",
+      "constructorArgs": [
+        "0xE8d7Fbd5Db3ad910370Be315f21D4596ed45122f"
+      ],
+      "tags": [
+        "core",
+        "yield"
+      ],
+      "compilerVersion": "0.8.33",
+      "optimizationRuns": 1000,
+      "proxyType": "none"
+    },
+    {
+      "chainId": 84532,
+      "networkName": "baseSepolia",
+      "contractName": "DisputeOps",
+      "address": "0x5456edb1f266D6F3FaeAfFa4be33a7891eC9b3D2",
+      "blockNumber": 36507224,
+      "deployer": "0xE8d7Fbd5Db3ad910370Be315f21D4596ed45122f",
+      "timestamp": "2026-01-19T00:32:16.329Z",
+      "verified": false,
+      "blockExplorerUrl": "https://sepolia.basescan.org/address/0x5456edb1f266D6F3FaeAfFa4be33a7891eC9b3D2",
+      "constructorArgs": [
+        "0xE8d7Fbd5Db3ad910370Be315f21D4596ed45122f"
+      ],
+      "tags": [
+        "core",
+        "dispute"
+      ],
+      "compilerVersion": "0.8.33",
+      "optimizationRuns": 1000,
+      "proxyType": "none"
+    },
+    {
+      "chainId": 84532,
+      "networkName": "baseSepolia",
+      "contractName": "ModuleManagementContract",
+      "address": "0xaa0Fa9C11af77E7f2BF14f86C17C8436370F0a86",
+      "blockNumber": 36507403,
+      "deployer": "0xE8d7Fbd5Db3ad910370Be315f21D4596ed45122f",
+      "timestamp": "2026-01-19T00:38:13.760Z",
+      "verified": false,
+      "blockExplorerUrl": "https://sepolia.basescan.org/address/0xaa0Fa9C11af77E7f2BF14f86C17C8436370F0a86",
+      "constructorArgs": [
+        "0xE8d7Fbd5Db3ad910370Be315f21D4596ed45122f"
+      ],
+      "tags": [
+        "core",
+        "module-management"
+      ],
+      "compilerVersion": "0.8.33",
+      "optimizationRuns": 1000,
+      "proxyType": "none"
+    },
+    {
+      "chainId": 84532,
+      "networkName": "baseSepolia",
+      "contractName": "SettlementOps",
+      "address": "0x1d0BE2d3b91A26537b5A8d75Ae721dE5Ea1a4054",
+      "blockNumber": 36507225,
+      "deployer": "0xE8d7Fbd5Db3ad910370Be315f21D4596ed45122f",
+      "timestamp": "2026-01-19T00:32:18.536Z",
+      "verified": false,
+      "blockExplorerUrl": "https://sepolia.basescan.org/address/0x1d0BE2d3b91A26537b5A8d75Ae721dE5Ea1a4054",
+      "constructorArgs": [
+        "0xE8d7Fbd5Db3ad910370Be315f21D4596ed45122f"
+      ],
+      "tags": [
+        "core",
+        "settlement"
+      ],
+      "compilerVersion": "0.8.33",
+      "optimizationRuns": 1000,
+      "proxyType": "none"
+    },
+    {
+      "chainId": 84532,
+      "networkName": "baseSepolia",
+      "contractName": "CreateOps",
+      "address": "0x7816EB2022B7AFB3A53a41eaa5ED5a2c3924De3b",
+      "blockNumber": 36507227,
+      "deployer": "0xE8d7Fbd5Db3ad910370Be315f21D4596ed45122f",
+      "timestamp": "2026-01-19T00:32:20.995Z",
+      "verified": false,
+      "blockExplorerUrl": "https://sepolia.basescan.org/address/0x7816EB2022B7AFB3A53a41eaa5ED5a2c3924De3b",
+      "constructorArgs": [
+        "0xE8d7Fbd5Db3ad910370Be315f21D4596ed45122f"
+      ],
+      "tags": [
+        "core",
+        "create"
+      ],
+      "compilerVersion": "0.8.33",
+      "optimizationRuns": 1000,
+      "proxyType": "none"
+    },
+    {
+      "chainId": 84532,
+      "networkName": "baseSepolia",
+      "contractName": "BondCollector",
+      "address": "0x0f0526297983260fa92e71149322f13d74B4Cdca",
+      "blockNumber": 36507228,
+      "deployer": "0xE8d7Fbd5Db3ad910370Be315f21D4596ed45122f",
+      "timestamp": "2026-01-19T00:32:23.174Z",
+      "verified": false,
+      "blockExplorerUrl": "https://sepolia.basescan.org/address/0x0f0526297983260fa92e71149322f13d74B4Cdca",
+      "constructorArgs": [
+        "0xE8d7Fbd5Db3ad910370Be315f21D4596ed45122f"
+      ],
+      "tags": [
+        "core",
+        "bond"
+      ],
+      "compilerVersion": "0.8.33",
+      "optimizationRuns": 1000,
+      "proxyType": "none"
+    },
+    {
+      "chainId": 84532,
+      "networkName": "baseSepolia",
+      "contractName": "TimelockController",
+      "address": "0xF0f2134CB24296781ABCa41A536c7C17600a7E47",
+      "blockNumber": 36506931,
+      "deployer": "0xE8d7Fbd5Db3ad910370Be315f21D4596ed45122f",
+      "timestamp": "2026-01-19T00:22:32.341Z",
+      "verified": false,
+      "blockExplorerUrl": "https://sepolia.basescan.org/address/0xF0f2134CB24296781ABCa41A536c7C17600a7E47",
+      "constructorArgs": [
+        172800,
+        [],
+        [
+          "0x0000000000000000000000000000000000000000"
+        ],
+        "0xE8d7Fbd5Db3ad910370Be315f21D4596ed45122f"
+      ],
+      "tags": [
+        "timelock",
+        "governance"
+      ],
+      "compilerVersion": "0.8.33",
+      "optimizationRuns": 1000,
+      "proxyType": "none"
+    },
+    {
+      "chainId": 84532,
+      "networkName": "baseSepolia",
+      "contractName": "GovGovernor",
+      "address": "0xaFf6b4b8cF3bBDa62d4A40839c6c8244aacAC166",
+      "blockNumber": 36506936,
+      "deployer": "0xE8d7Fbd5Db3ad910370Be315f21D4596ed45122f",
+      "timestamp": "2026-01-19T00:22:40.806Z",
+      "verified": false,
+      "blockExplorerUrl": "https://sepolia.basescan.org/address/0xaFf6b4b8cF3bBDa62d4A40839c6c8244aacAC166",
+      "constructorArgs": [
+        "0x7428c13e158ab6eB3E9e7780f05d58181172Ab5A",
+        "0xF0f2134CB24296781ABCa41A536c7C17600a7E47",
+        1,
+        45818,
+        "10000000000000000000000000",
+        "4000000000000000000000000",
+        []
+      ],
+      "tags": [
+        "governor",
+        "governance"
+      ],
+      "compilerVersion": "0.8.33",
+      "optimizationRuns": 1000,
+      "proxyType": "none"
+    },
+    {
+      "chainId": 84532,
+      "networkName": "baseSepolia",
+      "contractName": "EscrowAdminContract",
+      "address": "0x34fF47Ee2f95C35ec1e012DdD2D7394D7C644931",
+      "blockNumber": 36506938,
+      "deployer": "0xE8d7Fbd5Db3ad910370Be315f21D4596ed45122f",
+      "timestamp": "2026-01-19T00:22:42.680Z",
+      "verified": false,
+      "blockExplorerUrl": "https://sepolia.basescan.org/address/0x34fF47Ee2f95C35ec1e012DdD2D7394D7C644931",
+      "constructorArgs": [
+        "0xE8d7Fbd5Db3ad910370Be315f21D4596ed45122f"
+      ],
+      "tags": [
+        "escrow-admin",
+        "governance"
+      ],
+      "compilerVersion": "0.8.33",
+      "optimizationRuns": 1000,
+      "proxyType": "none"
+    },
+    {
+      "chainId": 84532,
+      "networkName": "baseSepolia",
+      "contractName": "EscrowVault",
+      "address": "0xBcDefBdEEA5C00f128bE83534646427b7248c5F9",
+      "blockNumber": 36507408,
+      "deployer": "0xE8d7Fbd5Db3ad910370Be315f21D4596ed45122f",
+      "timestamp": "2026-01-19T00:38:23.194Z",
+      "verified": false,
+      "blockExplorerUrl": "https://sepolia.basescan.org/address/0xBcDefBdEEA5C00f128bE83534646427b7248c5F9",
+      "constructorArgs": [
+        0,
+        "0x5F13B5089a0B23c74AD9A22a2db59F5F48ab09bC",
+        "0xFf1AaC122A1Ab02aA76E43Cf8641A4a33277C653",
+        "0x5456edb1f266D6F3FaeAfFa4be33a7891eC9b3D2",
+        "0xaa0Fa9C11af77E7f2BF14f86C17C8436370F0a86"
+      ],
+      "tags": [
+        "core",
+        "escrow"
+      ],
+      "compilerVersion": "0.8.33",
+      "optimizationRuns": 1000,
+      "proxyType": "none"
+    },
+    {
+      "chainId": 84532,
+      "networkName": "baseSepolia",
+      "contractName": "DefaultReleaseStrategy",
+      "address": "0x9738584Db6D171e6BE9d0F104aAbF4C1cAd0fb3b",
+      "blockNumber": 36547248,
+      "deployer": "0xE8d7Fbd5Db3ad910370Be315f21D4596ed45122f",
+      "timestamp": "2026-01-19T22:46:24.429Z",
+      "verified": false,
+      "blockExplorerUrl": "https://sepolia.basescan.org/address/0x9738584Db6D171e6BE9d0F104aAbF4C1cAd0fb3b",
+      "constructorArgs": [],
+      "tags": [
+        "release-strategy"
+      ],
+      "compilerVersion": "0.8.33",
+      "optimizationRuns": 1000,
+      "proxyType": "none"
+    }
+  ],
+  "deployedAt": "2026-01-17T00:39:23.435Z",
+  "deployer": "0x5F13B5089a0B23c74AD9A22a2db59F5F48ab09bC",
+  "chainConfig": {
+    "name": "baseSepolia",
+    "displayName": "Base Sepolia",
+    "networkType": "testnet"
+  },
+  "deploymentEnvironment": {
+    "nodeVersion": "v22.15.0"
+  }
+}

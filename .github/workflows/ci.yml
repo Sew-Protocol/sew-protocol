@@ -1,36 +1,57 @@
-name: ci
+name: CI
 
 on:
-  push:
   pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+    timeout-minutes: 30
 
-      - name: Setup Node
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node (from .nvmrc)
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'pnpm'
+          node-version: "20"
+          cache: "pnpm"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 9
 
-      - name: Install deps
-        run: pnpm i --frozen-lockfile || pnpm i
+      - name: Install dependencies
+        run: pnpm i --frozen-lockfile
 
-      - name: Install Foundry
+      - name: Setup Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: nightly
+          version: stable
 
-      - name: Hardhat tests
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Compile (Hardhat + Forge)
+        run: pnpm compile
+
+      - name: Tests (Hardhat)
         run: pnpm test:hardhat
 
-      - name: Foundry tests
+      - name: Tests (Foundry)
         run: pnpm test:foundry
+
+      - name: Contract size check
+        run: pnpm size:check

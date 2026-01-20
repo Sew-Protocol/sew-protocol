@@ -4,4 +4,5 @@ cache
 .github
 node_modules
 out
+coverage
 

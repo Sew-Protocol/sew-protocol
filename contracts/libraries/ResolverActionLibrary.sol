@@ -1,16 +1,16 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.28;
+// SPDX-License-Identifier: Apache-2.0
+pragma solidity ^0.8.33;
 
-import "../types/EscrowTypes.sol";
-import "../interfaces/IYieldGenerationModule.sol";
-import "../interfaces/IYieldDistributionModule.sol";
-import "./YieldHandlingLibrary.sol";
+import '../types/EscrowTypes.sol';
+import '../interfaces/IYieldGenerationModule.sol';
+import '../interfaces/IYieldDistributionModule.sol';
+import './YieldHandlingLibrary.sol';
 
 /**
  * @title ResolverActionLibrary
- * @notice Library for resolver action execution (partial/full release/cancel)
+ * @notice Library for resolver action execution (full release/cancel only)
  * @dev Extracted from BaseEscrow to reduce contract size
- *      Consolidates common logic between partialReleaseAsDisputeResolver and partialCancelAsDisputeResolver
+ *      Note: Partial operations removed - escrow amounts are now immutable
  */
 library ResolverActionLibrary {
     /**
@@ -19,12 +19,9 @@ library ResolverActionLibrary {
     struct ActionParams {
         uint256 workflowId;
         uint256 amount;
-        bool isRelease;      // true = release to recipient, false = cancel/refund to sender
-        bool isPartial;      // true = partial, false = full
-        address recipient;   // to (if release) or from (if cancel)
+        bool isRelease; // true = release to recipient, false = cancel/refund to sender
+        address recipient; // to (if release) or from (if cancel)
         address token;
-        uint256 remainingBalance;
-        uint256 totalDeposited;
     }
 
     /**
@@ -37,7 +34,7 @@ library ResolverActionLibrary {
     }
 
     /**
-     * @dev Execute resolver action (release or cancel, partial or full)
+     * @dev Execute resolver action (release or cancel, full only)
      * @param params Action parameters
      * @param genModule Yield generation module
      * @return result Action result
@@ -46,36 +43,20 @@ library ResolverActionLibrary {
         ActionParams memory params,
         IYieldGenerationModule genModule
     ) internal returns (ActionResult memory result) {
-        result.isComplete = false;
+        result.isComplete = true; // Always complete for full resolution
         result.actualAmount = params.amount;
         result.yieldToDistribute = 0;
 
-        // Calculate yield and withdraw if partial
-        if (params.isPartial) {
-            YieldHandlingLibrary.YieldWithdrawalResult memory yieldResult = 
-                YieldHandlingLibrary.withdrawAndCalculateYield(
-                    genModule,
-                    params.workflowId,
-                    params.token,
-                    params.amount,
-                    params.remainingBalance,
-                    params.totalDeposited
-                );
-            result.actualAmount = yieldResult.actualAmount;
-            result.yieldToDistribute = yieldResult.yieldToDistribute;
-        } else {
-            // Full action - withdraw with yield
-            (uint256 actualAmount, uint256 yield) = YieldHandlingLibrary.withdrawFullWithYield(
-                genModule,
-                params.workflowId,
-                params.token,
-                params.amount
-            );
-            result.actualAmount = actualAmount;
-            result.yieldToDistribute = yield;
-        }
+        // Full action - withdraw with yield
+        (uint256 actualAmount, uint256 yield) = YieldHandlingLibrary.withdrawFullWithYield(
+            genModule,
+            params.workflowId,
+            params.token,
+            params.amount
+        );
+        result.actualAmount = actualAmount;
+        result.yieldToDistribute = yield;
 
         return result;
     }
 }
-

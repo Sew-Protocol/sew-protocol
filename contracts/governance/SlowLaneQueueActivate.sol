@@ -1,31 +1,31 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.28;
+// SPDX-License-Identifier: Apache-2.0
+pragma solidity ^0.8.33;
 
 /**
  * @title SlowLaneQueueActivate
  * @notice Abstract contract providing two-step queue/activate pattern for Slow lane governance
  * @dev Enforces 7-day delay for high-risk changes (module swaps, fee recipient, etc.)
- * 
+ *
  * Usage:
  * 1. Inherit this contract
  * 2. Add storage for pending values (PendingAddress or PendingUint)
  * 3. Implement queueX() function calling _queueAddress() or _queueUint()
  * 4. Implement activateX() function calling _activateAddress() or _activateUint()
- * 
+ *
  * Pattern:
  * - queueX() stores pending value and ETA (now + 7 days)
  * - activateX() checks ETA has passed, then applies the change
  * - This enforces 7-day delay on top of Timelock's 48h delay
- * 
+ *
  * Example:
  * ```solidity
  * PendingAddress private _pendingFeeRecipient;
- * 
+ *
  * function queueFeeRecipient(address newAddr) external onlyRole(ROLE_TIMELOCK) {
  *     _queueAddress(_pendingFeeRecipient, newAddr);
  *     emit FeeRecipientQueued(feeRecipient, newAddr, _pendingFeeRecipient.eta);
  * }
- * 
+ *
  * function activateFeeRecipient() external onlyRole(ROLE_TIMELOCK) {
  *     address old = feeRecipient;
  *     feeRecipient = _activateAddress(_pendingFeeRecipient);
@@ -53,10 +53,10 @@ abstract contract SlowLaneQueueActivate {
 
     /// @notice Error thrown when trying to activate before ETA
     error NotReady(uint64 eta);
-    
+
     /// @notice Error thrown when no pending change exists
     error NoPending();
-    
+
     /// @notice Error thrown when value is invalid (e.g., zero address)
     error InvalidValue();
 
@@ -71,7 +71,7 @@ abstract contract SlowLaneQueueActivate {
             revert InvalidValue();
         }
         pending.value = newValue;
-        pending.eta = uint64(block.timestamp + SLOW_DELAY);
+        pending.eta = uint64(block.timestamp + SLOW_DELAY); // forge-lint: disable-line(unsafe-typecast)
         pending.exists = true;
     }
 
@@ -104,7 +104,7 @@ abstract contract SlowLaneQueueActivate {
      */
     function _queueUint(PendingUint storage pending, uint256 newValue) internal {
         pending.value = newValue;
-        pending.eta = uint64(block.timestamp + SLOW_DELAY);
+        pending.eta = uint64(block.timestamp + SLOW_DELAY); // forge-lint: disable-line(unsafe-typecast)
         pending.exists = true;
     }
 
@@ -136,11 +136,9 @@ abstract contract SlowLaneQueueActivate {
      * @return eta Timestamp when activation is allowed
      * @return exists Whether a pending change exists
      */
-    function getPendingAddress(PendingAddress storage pending)
-        internal
-        view
-        returns (address value, uint64 eta, bool exists)
-    {
+    function getPendingAddress(
+        PendingAddress storage pending
+    ) internal view returns (address value, uint64 eta, bool exists) {
         return (pending.value, pending.eta, pending.exists);
     }
 
@@ -151,12 +149,9 @@ abstract contract SlowLaneQueueActivate {
      * @return eta Timestamp when activation is allowed
      * @return exists Whether a pending change exists
      */
-    function getPendingUint(PendingUint storage pending)
-        internal
-        view
-        returns (uint256 value, uint64 eta, bool exists)
-    {
+    function getPendingUint(
+        PendingUint storage pending
+    ) internal view returns (uint256 value, uint64 eta, bool exists) {
         return (pending.value, pending.eta, pending.exists);
     }
 }
-

@@ -1,11 +1,11 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.28;
+// SPDX-License-Identifier: Apache-2.0
+pragma solidity ^0.8.33;
 
-import "../interfaces/IYieldGenerationModule.sol";
-import "../interfaces/IYieldDistributionModule.sol";
-import "./ResolverLogicLibrary.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import '../interfaces/IYieldGenerationModule.sol';
+import '../interfaces/IYieldDistributionModule.sol';
+import './ResolverLogicLibrary.sol';
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 
 /**
  * @title YieldHandlingLibrary
@@ -19,62 +19,9 @@ library YieldHandlingLibrary {
      * @dev Result of yield withdrawal operation
      */
     struct YieldWithdrawalResult {
-        uint256 actualAmount;      // Actual amount withdrawn (may include yield)
-        uint256 yield;             // Yield amount (actualAmount - originalAmount)
+        uint256 actualAmount; // Actual amount withdrawn (may include yield)
+        uint256 yield; // Yield amount (actualAmount - originalAmount)
         uint256 yieldToDistribute; // Proportional yield to distribute
-    }
-
-    /**
-     * @dev Withdraw from yield module and calculate yield for partial operations
-     * @param genModule Yield generation module (can be address(0))
-     * @param workflowId Escrow workflow ID
-     * @param token Token address
-     * @param amount Amount to withdraw
-     * @param remainingBalance Remaining escrow balance (for proportional calculation)
-     * @param originalDeposit Original deposit amount (for proportional withdrawal)
-     * @return result Yield withdrawal result
-     */
-    function withdrawAndCalculateYield(
-        IYieldGenerationModule genModule,
-        uint256 workflowId,
-        address token,
-        uint256 amount,
-        uint256 remainingBalance,
-        uint256 originalDeposit
-    ) internal returns (YieldWithdrawalResult memory result) {
-        result.actualAmount = amount;
-        result.yield = 0;
-        result.yieldToDistribute = 0;
-
-        if (address(genModule) == address(0)) {
-            return result; // No yield module
-        }
-
-        // Calculate total yield
-        uint256 totalYield = genModule.calculateYield(workflowId, token);
-        
-        // Calculate proportional yield to distribute
-        result.yieldToDistribute = ResolverLogicLibrary.calculateProportionalYield(
-            totalYield,
-            amount,
-            remainingBalance
-        );
-
-        // Withdraw proportional amount (includes yield)
-        (bool success, uint256 amt) = genModule.withdrawProportional(
-            workflowId,
-            token,
-            amount,
-            originalDeposit
-        );
-        
-        if (success) {
-            result.actualAmount = amt;
-            // Yield is already included in actualAmount, but we track it separately for distribution
-            // Note: actualAmount may be > amount due to yield, but we use yieldToDistribute for distribution
-        }
-
-        return result;
     }
 
     /**
@@ -100,7 +47,7 @@ library YieldHandlingLibrary {
         }
 
         (bool success, uint256 amt, ) = genModule.withdrawWithYield(workflowId, token, amount);
-        
+
         if (success) {
             actualAmount = amt;
             if (amt > amount) {
@@ -127,7 +74,7 @@ library YieldHandlingLibrary {
         uint256 yieldAmount
     ) internal {
         if (yieldAmount == 0) return;
-        require(address(distModule) != address(0), "No yield distribution module");
+        require(address(distModule) != address(0), 'No yield distribution module');
 
         // Transfer yield to module first (module expects tokens to be in its balance)
         // This matches the pattern used by DefaultYieldDistributionModule which uses safeTransfer
@@ -135,11 +82,16 @@ library YieldHandlingLibrary {
 
         // Empty distributionData means no distribution configured - yield stays in contract
         // This allows tests to work without full distribution setup
-        bytes memory distributionData = "";
-        (bool success, ) = distModule.distributeYield(workflowId, token, yieldAmount, distributionData);
+        bytes memory distributionData = '';
+        (bool success, ) = distModule.distributeYield(
+            workflowId,
+            token,
+            yieldAmount,
+            distributionData
+        );
         // Revert if distribution fails - yield should be properly distributed
         // This ensures yield is not lost if distribution module has issues
-        require(success, "Yield distribution failed");
+        require(success, 'Yield distribution failed');
     }
 
     /**
@@ -157,7 +109,7 @@ library YieldHandlingLibrary {
         if (address(genModule) == address(0)) {
             return address(0);
         }
-        
+
         // Try to get approval target from module (new interface method)
         try genModule.getApprovalTarget(token) returns (address target) {
             return target;
@@ -167,4 +119,3 @@ library YieldHandlingLibrary {
         }
     }
 }
-

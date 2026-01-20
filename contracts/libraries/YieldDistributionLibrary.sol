@@ -1,9 +1,9 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.28;
+// SPDX-License-Identifier: Apache-2.0
+pragma solidity ^0.8.33;
 
-import "../types/EscrowTypes.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import '../types/EscrowTypes.sol';
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 
 /**
  * @title YieldDistributionLibrary
@@ -28,37 +28,40 @@ library YieldDistributionLibrary {
         uint256[] memory percentages
     ) internal pure {
         if (recipients.length == 0) {
-            revert InvalidAmount("Yield distribution must have at least one recipient");
+            revert InvalidAmount(AMOUNT_EMPTY);
         }
         if (recipients.length != percentages.length) {
             revert ArrayLengthMismatch(recipients.length, percentages.length);
         }
-        
+
         uint256 totalPercentage = 0;
         for (uint256 i = 0; i < percentages.length; i++) {
             if (recipients[i] == address(0)) {
-                revert InvalidAddress("Recipient address cannot be zero", recipients[i]);
+                revert InvalidAddress(ADDR_RECIPIENT, recipients[i]);
             }
             if (percentages[i] == 0) {
-                revert InvalidAmount("Percentage must be greater than zero");
+                revert InvalidAmount(AMOUNT_GENERIC);
             }
             totalPercentage += percentages[i];
         }
-        
+
         if (totalPercentage != ESCROW_FEE_DENOMINATOR) {
-            revert InvalidAmount("Yield distribution percentages must sum to 10000 (100%)");
+            revert InvalidAmount(AMOUNT_GENERIC);
         }
     }
 
     /**
-     * @dev Encode yield distribution data
-     * @param distribution YieldDistribution struct to encode
+     * @dev DEPRECATED: Encode yield distribution data
+     * @dev This function is deprecated - distribution now derived from preset
+     * @param recipients Array of recipient addresses
+     * @param percentages Array of percentages in basis points
      * @return Encoded distribution data as bytes
      */
     function encodeYieldDistribution(
-        YieldDistribution memory distribution
+        address[] memory recipients,
+        uint256[] memory percentages
     ) internal pure returns (bytes memory) {
-        return abi.encode(distribution.recipients, distribution.percentages);
+        return abi.encode(recipients, percentages);
     }
 
     /**
@@ -74,10 +77,12 @@ library YieldDistributionLibrary {
     }
 
     /**
-     * @dev Distribute yield using fallback distribution settings
+     * @dev DEPRECATED: Distribute yield using fallback distribution settings
+     * @dev This function is deprecated - distribution now derived from preset
      * @param token Token address
      * @param yieldAmount Amount of yield to distribute
-     * @param distribution YieldDistribution struct with recipients and percentages
+     * @param recipients Array of recipient addresses
+     * @param percentages Array of percentages in basis points
      * @param feeAddress Address to receive remainder if distribution is incomplete
      * @return totalDistributed Total amount distributed
      * @dev Distributes yield according to distribution settings. Sends remainder to feeAddress.
@@ -85,22 +90,23 @@ library YieldDistributionLibrary {
     function distributeYieldFallback(
         address token,
         uint256 yieldAmount,
-        YieldDistribution memory distribution,
+        address[] memory recipients,
+        uint256[] memory percentages,
         address feeAddress
     ) internal returns (uint256 totalDistributed) {
         if (yieldAmount == 0) {
             return 0;
         }
 
-        if (distribution.isSet && distribution.recipients.length > 0) {
+        if (recipients.length > 0) {
             totalDistributed = 0;
-            for (uint256 i = 0; i < distribution.recipients.length; i++) {
-                if (distribution.recipients[i] == address(0)) {
+            for (uint256 i = 0; i < recipients.length; i++) {
+                if (recipients[i] == address(0)) {
                     continue;
                 }
-                uint256 share = (yieldAmount * distribution.percentages[i]) / ESCROW_FEE_DENOMINATOR;
+                uint256 share = (yieldAmount * percentages[i]) / ESCROW_FEE_DENOMINATOR;
                 if (share > 0) {
-                    IERC20(token).safeTransfer(distribution.recipients[i], share);
+                    IERC20(token).safeTransfer(recipients[i], share);
                     totalDistributed += share;
                 }
             }
@@ -114,4 +120,3 @@ library YieldDistributionLibrary {
         }
     }
 }
-

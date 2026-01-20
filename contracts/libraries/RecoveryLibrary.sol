@@ -1,9 +1,9 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.28;
+// SPDX-License-Identifier: Apache-2.0
+pragma solidity ^0.8.33;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "../types/EscrowTypes.sol";
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
+import '../types/EscrowTypes.sol';
 
 /**
  * @title RecoveryLibrary
@@ -12,6 +12,8 @@ import "../types/EscrowTypes.sol";
  */
 library RecoveryLibrary {
     using SafeERC20 for IERC20;
+
+    error ETHTransferFailed();
 
     /**
      * @notice Recover native ETH
@@ -27,20 +29,22 @@ library RecoveryLibrary {
         uint256 contractBalance
     ) internal returns (uint256 recoverAmount) {
         if (recipient == address(0)) {
-            revert InvalidAddress("Recipient cannot be zero address", recipient);
+            revert InvalidAddress(ADDR_RECIPIENT, recipient);
         }
-        
+
         recoverAmount = amount == 0 ? contractBalance : amount;
-        
+
         if (recoverAmount == 0) {
-            revert InvalidAmount("No ETH to recover");
+            revert InvalidAmount(AMOUNT_EMPTY);
         }
-        
+
         if (recoverAmount > contractBalance) {
-            revert InvalidAmount("Amount exceeds contract balance");
+            revert InvalidAmount(AMOUNT_GENERIC);
         }
-        
-        payable(recipient).transfer(recoverAmount);
+
+        // Use call instead of transfer to avoid 2300 gas limit
+        (bool success, ) = payable(recipient).call{value: recoverAmount}('');
+        if (!success) revert ETHTransferFailed();
     }
 
     /**
@@ -59,24 +63,22 @@ library RecoveryLibrary {
         uint256 contractBalance
     ) internal returns (uint256 recoverAmount) {
         if (token == address(0)) {
-            revert InvalidAddress("Token address cannot be zero", token);
+            revert InvalidAddress(ADDR_TOKEN, token);
         }
         if (recipient == address(0)) {
-            revert InvalidAddress("Recipient cannot be zero address", recipient);
+            revert InvalidAddress(ADDR_RECIPIENT, recipient);
         }
-        
+
         recoverAmount = amount == 0 ? contractBalance : amount;
-        
+
         if (recoverAmount == 0) {
-            revert InvalidAmount("No tokens to recover");
+            revert InvalidAmount(AMOUNT_EMPTY);
         }
-        
+
         if (recoverAmount > contractBalance) {
-            revert InvalidAmount("Amount exceeds contract balance");
+            revert InvalidAmount(AMOUNT_GENERIC);
         }
-        
+
         IERC20(token).safeTransfer(recipient, recoverAmount);
     }
 }
-
-

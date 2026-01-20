@@ -1,0 +1,98 @@
+flowchart TB
+  %% =========================
+  %% SEW Protocol = Cryptographic Court
+  %% Threat-model-driven architecture
+  %% =========================
+
+  %% ---- Actors / Clients ----
+  subgraph Actors[Actors (Untrusted)]
+    B[Buyer]
+    S[Seller]
+    UI[Wallet / Marketplace UI<br/>(untrusted client)]
+    O[Operators / Frontends<br/>(untrusted)]
+  end
+
+  %% ---- Court Core ----
+  subgraph Court[SEW "Cryptographic Court" (On-chain, Enforced)]
+    ESC[Escrow Contract (Immutable)<br/>Per-workflow state machine]
+    RULES[Outcome Rules (Immutable)<br/>release/refund/resolve]
+    DISPUTE[Dispute Lifecycle<br/>open → assign → decide → finalize]
+    EVID[Evidence Commitments<br/>(hashes / attestations)]
+  end
+
+  %% ---- Resolver Network ----
+  subgraph RN[Resolver Network (Bonded, Adversarial)]
+    RPOOL[Resolver Pool]
+    R1[Resolver A]
+    R2[Resolver B]
+    R3[Resolver C]
+    STAKE[Staking Ledger<br/>bonded capital]
+    SLASH[Slashing + Freeze<br/>deadline / misbehavior]
+    REP[Reputation / Eligibility<br/>re-eligible after top-up]
+  end
+
+  %% ---- Governance ----
+  subgraph GOV[Governance (Slow Lane, Non-retroactive)]
+    DAO[Governance Authority<br/>(slow lane)]
+    REG[Registry of Approved Modules<br/>for NEW escrows only]
+    SWAP[Module Swap / Versioning<br/>affects future escrows]
+  end
+
+  %% ---- External Protocols ----
+  subgraph EXT[External Protocols (Optional)]
+    YIELD[Yield Venue (e.g., Aave)<br/>(optional; bounded risk)]
+  end
+
+  %% ---- Threat boundaries ----
+  TB1((Trust Boundary:<br/>UI / Off-chain))
+  TB2((Trust Boundary:<br/>Resolver Decisions))
+  TB3((Trust Boundary:<br/>Governance Changes))
+  TB4((Trust Boundary:<br/>External Yield))
+
+  %% ---- Main flows ----
+  B --> UI --> ESC
+  S --> UI --> ESC
+
+  ESC --> RULES
+  ESC --> DISPUTE
+  ESC --> EVID
+
+  %% dispute initiation & assignment
+  DISPUTE -->|assign| RPOOL
+  RPOOL --> R1
+  RPOOL --> R2
+  RPOOL --> R3
+
+  %% staking/slashing enforcement
+  R1 -->|must be bonded| STAKE
+  R2 -->|must be bonded| STAKE
+  R3 -->|must be bonded| STAKE
+  DISPUTE -->|deadline + liveness| SLASH
+  SLASH --> REP
+  REP --> RPOOL
+
+  %% finalization
+  RPOOL -->|decision (signed/committed)| DISPUTE
+  DISPUTE -->|finalize outcome| RULES
+  RULES -->|enforced transfer| ESC
+
+  %% optional yield
+  ESC -->|escrowed funds optional| YIELD
+  YIELD -->|yield accounting only| ESC
+
+  %% governance and immutability model
+  DAO --> REG
+  REG --> SWAP
+  SWAP -->|new escrow templates only| ESC
+
+  %% ---- Threat annotations (high level) ----
+  TB1 --- UI
+  TB1 --- O
+
+  TB2 --- RPOOL
+  TB2 --- SLASH
+
+  TB3 --- DAO
+  TB3 --- SWAP
+
+  TB4 --- YIELD

@@ -1,10 +1,10 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.28;
+// SPDX-License-Identifier: Apache-2.0
+pragma solidity ^0.8.33;
 
-import "../interfaces/IYieldDistributionModule.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
+import '../interfaces/IYieldDistributionModule.sol';
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
+import '@openzeppelin/contracts/utils/introspection/ERC165.sol';
 
 /**
  * @title DefaultYieldDistributionModule
@@ -14,7 +14,7 @@ import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
  */
 contract DefaultYieldDistributionModule is IYieldDistributionModule, ERC165 {
     using SafeERC20 for IERC20;
-    
+
     // Events
     event YieldDistributed(uint256 indexed workflowId, address indexed recipient, uint256 amount);
 
@@ -38,26 +38,28 @@ contract DefaultYieldDistributionModule is IYieldDistributionModule, ERC165 {
         if (yieldAmount == 0) {
             return (true, 0);
         }
-        
+
         // If distributionData is empty, return success with 0 distributed (yield stays in contract)
         // This allows graceful handling when distribution is not configured
         if (distributionData.length == 0) {
             return (true, 0);
         }
-        
+
         // Decode distribution data
-        (address[] memory recipients, uint256[] memory percentages) = 
-            abi.decode(distributionData, (address[], uint256[]));
-        
+        (address[] memory recipients, uint256[] memory percentages) = abi.decode(
+            distributionData,
+            (address[], uint256[])
+        );
+
         // Validate distribution exists
         if (recipients.length == 0 || recipients.length != percentages.length) {
             return (false, 0);
         }
-        
+
         if (recipients.length == 0 || recipients.length != percentages.length) {
             return (false, 0);
         }
-        
+
         // Validate percentages sum to 100% (10000 basis points)
         uint256 ESCROW_FEE_DENOMINATOR = 10000;
         uint256 totalPercentage = 0;
@@ -67,7 +69,7 @@ contract DefaultYieldDistributionModule is IYieldDistributionModule, ERC165 {
         if (totalPercentage != ESCROW_FEE_DENOMINATOR) {
             return (false, 0); // Invalid distribution
         }
-        
+
         // Distribute yield
         uint256 totalDistributed = 0;
         for (uint256 i = 0; i < recipients.length; i++) {
@@ -75,7 +77,7 @@ contract DefaultYieldDistributionModule is IYieldDistributionModule, ERC165 {
             if (recipient == address(0)) {
                 continue; // Skip zero address
             }
-            
+
             uint256 share = (yieldAmount * percentages[i]) / ESCROW_FEE_DENOMINATOR;
             if (share > 0) {
                 IERC20(token).safeTransfer(recipient, share);
@@ -83,7 +85,7 @@ contract DefaultYieldDistributionModule is IYieldDistributionModule, ERC165 {
                 emit YieldDistributed(workflowId, recipient, share);
             }
         }
-        
+
         return (true, totalDistributed);
     }
 
@@ -92,7 +94,7 @@ contract DefaultYieldDistributionModule is IYieldDistributionModule, ERC165 {
      * @return name The module name
      */
     function moduleName() external pure override returns (string memory name) {
-        return "DefaultYieldDistribution";
+        return 'DefaultYieldDistribution';
     }
 
     /**
@@ -100,17 +102,17 @@ contract DefaultYieldDistributionModule is IYieldDistributionModule, ERC165 {
      * @return version The module version (semantic versioning)
      */
     function moduleVersion() external pure override returns (string memory version) {
-        return "1.0.0";
+        return '1.0.0';
     }
 
     /**
      * @notice ERC-165 interface support
      */
-    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165, IERC165) returns (bool) {
+    function supportsInterface(
+        bytes4 interfaceId
+    ) public view virtual override(ERC165, IERC165) returns (bool) {
         return
             interfaceId == type(IYieldDistributionModule).interfaceId ||
             super.supportsInterface(interfaceId);
     }
 }
-
-

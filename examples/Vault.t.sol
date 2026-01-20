@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "forge-std/Test.sol";
-import "../../contracts/Vault.sol";
+import 'forge-std/Test.sol';
+import '../../contracts/Vault.sol';
 
 contract VaultTest is Test {
     Vault vault;
@@ -26,7 +26,7 @@ contract VaultTest is Test {
 
     function testWithdrawRevertsIfInsufficient() public {
         vault.deposit(1 ether);
-        vm.expectRevert("insufficient");
+        vm.expectRevert('insufficient');
         vault.withdraw(2 ether);
     }
 
@@ -35,10 +35,10 @@ contract VaultTest is Test {
         vm.assume(dep > 0);
         vault.deposit(uint256(dep));
         if (wd > dep) {
-            vm.expectRevert("insufficient");
+            vm.expectRevert('insufficient');
             vault.withdraw(uint256(wd));
         } else if (wd == 0) {
-            vm.expectRevert("amount=0");
+            vm.expectRevert('amount=0');
             vault.withdraw(0);
         } else {
             vault.withdraw(uint256(wd));

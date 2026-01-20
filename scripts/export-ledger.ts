@@ -1,12 +1,20 @@
 import path from 'node:path';
-import { deployments } from 'hardhat';
-import { addressesBundle, metaBundle, ledgerRoot, ensureDir, writeJson, snapshotAbi } from './_lib/ledger';
+import { deployments, HardhatRuntimeEnvironment } from 'hardhat';
+import hre from 'hardhat';
+import {
+  addressesBundle,
+  metaBundle,
+  ledgerRoot,
+  ensureDir,
+  writeJson,
+  snapshotAbi,
+} from './_lib/ledger';
 
 async function main() {
   const dir = ledgerRoot();
   ensureDir(dir);
 
-  const meta = await metaBundle();
+  const meta = await metaBundle(hre as HardhatRuntimeEnvironment);
   writeJson(path.join(dir, 'meta.json'), meta);
 
   const addresses = await addressesBundle();

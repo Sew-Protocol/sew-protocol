@@ -17,7 +17,7 @@ extendEnvironment(async (hre) => {
   // Add getSignerFrom method to provider if it doesn't exist
   if (hre.network.provider && !(hre.network.provider as any).getSignerFrom) {
     const provider = hre.network.provider;
-    (provider as any).getSignerFrom = function(address: string) {
+    (provider as any).getSignerFrom = function (address: string) {
       // Use ethers provider to get signer - hardhat-deploy expects this method to exist
       // The actual implementation will use provider.getSigner anyway, so this is just a stub
       return (hre.ethers.provider as any).getSigner(address);
@@ -26,28 +26,36 @@ extendEnvironment(async (hre) => {
 });
 
 const PRIVATE_KEY = process.env.PRIVATE_KEY || '';
+const SEPOLIA_DEPLOY_KEY = process.env.SEPOLIA_DEPLOY_KEY || '';
 const DEPLOY_CONFIRM = (process.env.DEPLOY_CONFIRM || 'NO').toUpperCase();
+// Keep runs low to minimize deployed bytecode size (EIP-170).
+// Higher runs often increase runtime bytecode size (optimize for gas instead).
+const SOLC_RUNS = parseInt(process.env.SOLC_RUNS || '200', 10);
 
 function rpc(envKey: string) {
   return process.env[envKey] || '';
 }
 
-function accountsOrThrow(networkName: string) {
-  if (!PRIVATE_KEY) throw new Error(`Missing PRIVATE_KEY for network: ${networkName}`);
-  return [PRIVATE_KEY];
+function accountsOrThrow(networkName: string, privateKeyOverride?: string) {
+  const key = privateKeyOverride || PRIVATE_KEY;
+  if (!key) {
+    const suffix = privateKeyOverride ? ' (override provided but empty)' : '';
+    throw new Error(`Missing PRIVATE_KEY for network: ${networkName}${suffix}`);
+  }
+  return [key];
 }
 
 const config: HardhatUserConfig = {
   solidity: {
-    version: "0.8.28",
+    version: '0.8.33',
     settings: {
       optimizer: {
         enabled: true,
         // https://docs.soliditylang.org/en/latest/using-the-compiler.html#optimizer-options
-        runs: 50000, // Higher runs = smaller code size (but higher gas cost)
+        runs: Number.isFinite(SOLC_RUNS) && SOLC_RUNS > 0 ? SOLC_RUNS : 200,
       },
-      viaIR: true, // Enable IR-based code generation to reduce contract size
-      evmVersion: "cancun", // Use Cancun EVM version to support mcopy instruction
+      viaIR: true, // Enable IR-based code generation to reduce contract size (required to avoid stack too deep)
+      evmVersion: 'cancun', // Use Cancun EVM version to support mcopy instruction
     },
   },
   paths: {
@@ -60,20 +68,41 @@ const config: HardhatUserConfig = {
     deployer: { default: 0 },
   },
   networks: {
-    hardhat: { 
+    hardhat: {
       allowUnlimitedContractSize: true, // Allow large contracts in test environment only
-      chainId: 31337
+      chainId: 31337,
     },
-    baseSepolia: { url: rpc('RPC_BASE_SEPOLIA'), accounts: accountsOrThrow('baseSepolia'), chainId: 84532 },
+    baseSepolia: {
+      url: rpc('RPC_BASE_SEPOLIA'),
+      // Allow a dedicated deploy key for Base Sepolia testnet deployments.
+      // This is useful if you want governance infra deployed from one EOA and core escrow from another.
+      accounts: accountsOrThrow('baseSepolia', SEPOLIA_DEPLOY_KEY || undefined),
+      chainId: 84532,
+    },
     base: { url: rpc('RPC_BASE_MAINNET'), accounts: accountsOrThrow('base'), chainId: 8453 },
     ethereum: { url: rpc('RPC_ETHEREUM'), accounts: accountsOrThrow('ethereum'), chainId: 1 },
   },
   etherscan: {
-    apiKey: {
-      baseSepolia: process.env.BASESCAN_API_KEY || process.env.ETHERSCAN_API_KEY || '',
-      base: process.env.BASESCAN_API_KEY || process.env.ETHERSCAN_API_KEY || '',
-      mainnet: process.env.ETHERSCAN_API_KEY || '',
-    },
+    // Use a single API key for V2 API (Basescan uses same API key format)
+    apiKey: process.env.BASESCAN_API_KEY || process.env.ETHERSCAN_API_KEY || '',
+    customChains: [
+      {
+        network: 'baseSepolia',
+        chainId: 84532,
+        urls: {
+          apiURL: 'https://api-sepolia.basescan.org/api',
+          browserURL: 'https://sepolia.basescan.org',
+        },
+      },
+      {
+        network: 'base',
+        chainId: 8453,
+        urls: {
+          apiURL: 'https://api.basescan.org/api',
+          browserURL: 'https://basescan.org',
+        },
+      },
+    ],
   },
 };
 

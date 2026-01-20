@@ -1,0 +1,47 @@
+// SPDX-License-Identifier: MIT
+import "../../../contracts/types/YieldPresets.sol";
+pragma solidity ^0.8.33;
+
+import 'forge-std/Test.sol';
+import 'contracts/core/EscrowableERC20.sol';
+import 'contracts/YieldOps.sol';
+import 'contracts/DisputeOps.sol';
+import 'contracts/core/ModuleManagementContract.sol';
+
+contract Test_BaseEscrow_test is Test {
+    EscrowableERC20 token;
+    YieldOps yieldOps;
+    DisputeOps disputeOps;
+    ModuleManagementContract moduleManagement;
+
+    function setUp() public {
+        // Deploy EscrowableERC20 with this contract as owner
+        yieldOps = new YieldOps(address(this));
+        disputeOps = new DisputeOps(address(this));
+        moduleManagement = new ModuleManagementContract(address(this));
+        token = new EscrowableERC20(
+            'Test Token',
+            'TEST',
+            100,
+            address(this),
+            address(yieldOps),
+            address(disputeOps),
+            address(moduleManagement)
+        );
+    }
+
+    function test_supports_IERC165_interface() public {
+        // IERC165 id = 0x01ffc9a7
+        bytes4 IERC165_ID = 0x01ffc9a7;
+        assertTrue(token.supportsInterface(IERC165_ID));
+    }
+
+    // NOTE: getEscrowCount() was removed from BaseEscrow to reduce contract size.
+    // Escrow count should be tracked via events (EscrowCreated) emitted at escrow creation.
+    // function test_get_escrow_count_initially_zero() public {
+    //     assertEq(token.getEscrowCount(), 0);
+    // }
+
+    // Note: many BaseEscrow behaviors require a resolution module and governance slow-lane activation.
+    // Full behavioral ports (createEscrow, resolve, dispute flows) require additional setup and are deferred.
+}

@@ -1,34 +1,63 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.28;
+// SPDX-License-Identifier: Apache-2.0
+pragma solidity ^0.8.33;
+
+import './YieldPresets.sol';
 
 // Custom errors for better user experience
-error InvalidAutoTime(string reason, uint256 providedTime, uint256 currentTime);
+// Error code constants (uint8)
+// InvalidAutoTime codes
+uint8 constant AUTO_TIME_IN_PAST = 1;
+uint8 constant AUTO_TIME_TOO_LARGE = 2;
+// InvalidAmount codes
+uint8 constant AMOUNT_GENERIC = 1;
+uint8 constant AMOUNT_OVERFLOW = 2;
+uint8 constant AMOUNT_EMPTY = 3;
+// InvalidAddress "which" codes
+uint8 constant ADDR_GENERIC = 1;
+uint8 constant ADDR_ESCROW_CONTRACT = 2;
+uint8 constant ADDR_TOKEN = 3;
+uint8 constant ADDR_RECIPIENT = 4;
+uint8 constant ADDR_FEE_RECIPIENT = 5;
+uint8 constant ADDR_YIELD_OPS = 6;
+uint8 constant ADDR_DISPUTE_OPS = 7;
+uint8 constant ADDR_INITIAL_ADMIN = 8;
+uint8 constant ADDR_INITIAL_OWNER = 9;
+uint8 constant ADDR_INITIAL_RESOLVER = 10;
+uint8 constant ADDR_PROVIDER = 11;
+uint8 constant ADDR_ATOKEN = 12;
+
+error InvalidAutoTime(uint8 code, uint256 providedTime, uint256 currentTime);
 error CannotSetBothAutoTimes(uint256 autoReleaseTime, uint256 autoCancelTime);
 error AutoTimeExceedsMaxLimit(uint256 providedTime, uint256 maxTime);
-error InvalidAddress(string reason, address addr);
-error InvalidAmount(string reason);
+error InvalidAddress(uint8 which, address addr);
+error InvalidAmount(uint8 code);
 error ArrayLengthMismatch(uint256 expectedLength, uint256 actualLength);
 
-enum EscrowType {
-    STANDARD,      // Default escrow
-    MILESTONE,     // Future: milestone-based releases
-    RECURRING,     // Future: recurring payments
-    CUSTOM         // Future: custom logic
-}
+// Specific errors without string parameters (saves bytecode)
+error ZeroDisputeOps();
+error ZeroSettlementOps();
+error ZeroCreateOps();
+error InvalidResolutionModule(address module);
+error ModuleNotContract(address module);
+error NotAContract(uint8 which, address addr); // which: 1=resolutionModule, 2=yieldOps, etc.
+error AmountZero();
+error FeeOverflow();
+error NoTokensToRecover();
+error AmountExceedsBalance(uint256 requested, uint256 available);
 
 struct EscrowSettings {
-    address customResolver;     // Override default resolver (address(0) = use default)
-    bool yieldEnabled;          // Opt-in for yield generation (future: Aave integration)
-    uint256 autoReleaseTime;    // Custom release time (0 = use default)
-    uint256 autoCancelTime;     // Custom cancel time (0 = use default)
-    EscrowType escrowType;      // For future extensibility
+    address customResolver; // Override default resolver (address(0) = use default)
+    YieldPreset yieldPreset; // Yield configuration preset (OFF, TO_SENDER, etc.)
+    uint256 autoReleaseTime; // Custom release time (0 = use default)
+    uint256 autoCancelTime; // Custom cancel time (0 = use default)
 }
 
-struct YieldDistribution {
-    address[] recipients;      // Addresses to receive yield
-    uint256[] percentages;     // Percentage per recipient (basis points, sum to 10000)
-    bool isSet;               // Whether distribution is configured
-}
+// DEPRECATED: YieldDistribution struct removed - distribution now derived from preset
+// struct YieldDistribution {
+//     address[] recipients; // Addresses to receive yield
+//     uint256[] percentages; // Percentage per recipient (basis points, sum to 10000)
+//     bool isSet; // Whether distribution is configured
+// }
 
 // Escrow state and status enums (shared across contracts)
 enum EscrowState {
@@ -53,27 +82,25 @@ enum RecipientStatus {
 }
 
 // EscrowTransfer struct (shared across contracts)
+// Note: workflowId is redundant - use array index (escrowTransfers[index]) instead
 struct EscrowTransfer {
-    uint256 workflowId;
     address token; // ERC20 token address (for EscrowVault) or address(this) for EscrowableERC20
     address to;
     address from;
-    uint256 remainingBalance; // remaining balance held in escrow (may be less than totalDeposited if partially released/cancelled)
-    uint256 totalDeposited; // total amount originally deposited (before any releases/cancellations)
+    address disputeResolver;
+    uint256 amountAfterFee; // amount after fee deduction (what's actually held in escrow)
+    uint64 autoReleaseTime;
+    uint64 autoCancelTime;
     EscrowState escrowState;
     SenderStatus senderStatus;
     RecipientStatus recipientStatus;
-    address disputeResolver;
-    uint256 autoReleaseTime;
-    uint256 autoCancelTime;
-    string[] attachmentURIs;
-    bytes32[] attachmentHashes;
-    bytes metadata; // optional metadata (IPFS hash, JSON, custom data)
-    // Phase 7: Module snapshots (ensures module changes only affect new escrows)
-    address snapshotResolutionModule;    // Resolution module at creation time
-    address snapshotReleaseStrategy;     // Release strategy at creation time
-    address snapshotYieldGenerationModule;  // Yield generation module at creation time
-    address snapshotYieldDistributionModule; // Yield distribution module at creation time
 }
 
-
+struct TimeoutConfig {
+    // Auto-execution defaults (0 = disabled, absolute timestamps)
+    uint256 defaultAutoReleaseTime; // Default auto-release timestamp (0 = disabled)
+    uint256 defaultAutoCancelTime; // Default auto-cancel timestamp (0 = disabled)
+    // Safety timeouts (durations in seconds)
+    uint256 maxDisputeDuration; // Max time for disputes (7-365 days)
+    uint256 appealWindowDuration; // Time to appeal resolution (1-7 days)
+}

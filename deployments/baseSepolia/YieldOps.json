@@ -1,0 +1,944 @@
+{
+  "address": "0xFf1AaC122A1Ab02aA76E43Cf8641A4a33277C653",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "initialOwner",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [],
+      "name": "AccessControlBadConfirmation",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "neededRole",
+          "type": "bytes32"
+        }
+      ],
+      "name": "AccessControlUnauthorizedAccount",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "workflowId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "DistributionFailed",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "FeeRecipientCannotBeZero",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "caller",
+          "type": "address"
+        }
+      ],
+      "name": "InternalOnly",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "recipient",
+          "type": "address"
+        }
+      ],
+      "name": "InvalidRecipient",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "feeBps",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "maxFeeBps",
+          "type": "uint256"
+        }
+      ],
+      "name": "ProtocolFeeExceedsMaximum",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        }
+      ],
+      "name": "SafeERC20FailedOperation",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "recipient",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "TransferFailed",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ZeroOwner",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "previousAdminRole",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "newAdminRole",
+          "type": "bytes32"
+        }
+      ],
+      "name": "RoleAdminChanged",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "sender",
+          "type": "address"
+        }
+      ],
+      "name": "RoleGranted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "sender",
+          "type": "address"
+        }
+      ],
+      "name": "RoleRevoked",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "TokensRecovered",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "workflowId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "yieldAmount",
+          "type": "uint256"
+        }
+      ],
+      "name": "YieldDistributed",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "workflowId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "yieldAmount",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "reason",
+          "type": "string"
+        }
+      ],
+      "name": "YieldDistributionFailed",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "workflowId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "yieldAmount",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "protocolFeeAmount",
+          "type": "uint256"
+        }
+      ],
+      "name": "YieldProtocolFeeCollected",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "workflowId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "yieldAmount",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "feeRecipient",
+          "type": "address"
+        }
+      ],
+      "name": "YieldRecoveredToFeeAddress",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "workflowId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "yieldAmount",
+          "type": "uint256"
+        }
+      ],
+      "name": "YieldWithdrawn",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "DEFAULT_ADMIN_ROLE",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "MAX_PROTOCOL_FEE_BPS",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "ROLE_ESCROW_CONTRACT",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "ROLE_GUARDIAN",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "ROLE_TIMELOCK",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "contract IYieldDistributionModule",
+          "name": "distModule",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "workflowId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "yieldAmount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes",
+          "name": "distributionData",
+          "type": "bytes"
+        }
+      ],
+      "name": "_distributeYieldInternal",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        }
+      ],
+      "name": "getRoleAdmin",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "grantRole",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "contract IYieldGenerationModule",
+          "name": "genModule",
+          "type": "address"
+        },
+        {
+          "internalType": "contract IYieldDistributionModule",
+          "name": "distModule",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "workflowId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "protocolFeeBps",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "feeRecipient",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes",
+          "name": "distributionData",
+          "type": "bytes"
+        }
+      ],
+      "name": "handleYield",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "actualAmount",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "yield",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "yieldDistributed",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bool",
+              "name": "success",
+              "type": "bool"
+            }
+          ],
+          "internalType": "struct YieldOps.YieldResult",
+          "name": "result",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "hasRole",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "recoverTokens",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "escrowContract",
+          "type": "address"
+        }
+      ],
+      "name": "registerEscrowContract",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "address",
+          "name": "callerConfirmation",
+          "type": "address"
+        }
+      ],
+      "name": "renounceRole",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "revokeRole",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes4",
+          "name": "interfaceId",
+          "type": "bytes4"
+        }
+      ],
+      "name": "supportsInterface",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "transactionHash": "0x2ff1b199a0f69a71d4bf92c8ea66d7e44eebc0f0f702db7cadfed580cb2d9b68",
+  "receipt": {
+    "to": null,
+    "from": "0xE8d7Fbd5Db3ad910370Be315f21D4596ed45122f",
+    "contractAddress": "0xFf1AaC122A1Ab02aA76E43Cf8641A4a33277C653",
+    "transactionIndex": 16,
+    "gasUsed": "1105759",
+    "logsBloom": "0x00000004000000000000000000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004000000000000000000000020020000002040000000000800000000000000000000004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000400000000000000000000000000000000000000100000000000020000000000000000000000000000000000000000100000000000000020000000000",
+    "blockHash": "0x7fbbc41a99ce7afad8c4a81b3bac04d8d2983757f83b1085e7c65e9d95a5e261",
+    "transactionHash": "0x2ff1b199a0f69a71d4bf92c8ea66d7e44eebc0f0f702db7cadfed580cb2d9b68",
+    "logs": [
+      {
+        "transactionIndex": 16,
+        "blockNumber": 36507223,
+        "transactionHash": "0x2ff1b199a0f69a71d4bf92c8ea66d7e44eebc0f0f702db7cadfed580cb2d9b68",
+        "address": "0xFf1AaC122A1Ab02aA76E43Cf8641A4a33277C653",
+        "topics": [
+          "0x2f8788117e7eff1d82e926ec794901d17c78024a50270940304540a733656f0d",
+          "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "0x000000000000000000000000e8d7fbd5db3ad910370be315f21d4596ed45122f",
+          "0x000000000000000000000000e8d7fbd5db3ad910370be315f21d4596ed45122f"
+        ],
+        "data": "0x",
+        "logIndex": 23,
+        "blockHash": "0x7fbbc41a99ce7afad8c4a81b3bac04d8d2983757f83b1085e7c65e9d95a5e261"
+      },
+      {
+        "transactionIndex": 16,
+        "blockNumber": 36507223,
+        "transactionHash": "0x2ff1b199a0f69a71d4bf92c8ea66d7e44eebc0f0f702db7cadfed580cb2d9b68",
+        "address": "0xFf1AaC122A1Ab02aA76E43Cf8641A4a33277C653",
+        "topics": [
+          "0x2f8788117e7eff1d82e926ec794901d17c78024a50270940304540a733656f0d",
+          "0xa7237cfbf9fe2450157172fd47796702525944fb480132d0010170990238cb28",
+          "0x000000000000000000000000e8d7fbd5db3ad910370be315f21d4596ed45122f",
+          "0x000000000000000000000000e8d7fbd5db3ad910370be315f21d4596ed45122f"
+        ],
+        "data": "0x",
+        "logIndex": 24,
+        "blockHash": "0x7fbbc41a99ce7afad8c4a81b3bac04d8d2983757f83b1085e7c65e9d95a5e261"
+      }
+    ],
+    "blockNumber": 36507223,
+    "cumulativeGasUsed": "3668895",
+    "status": 1,
+    "byzantium": true
+  },
+  "args": [
+    "0xE8d7Fbd5Db3ad910370Be315f21D4596ed45122f"
+  ],
+  "numDeployments": 3,
+  "solcInputHash": "203892abf14362b6eadbf761f02af82a",
+  "metadata": "{\"compiler\":{\"version\":\"0.8.33+commit.64118f21\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"initialOwner\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[],\"name\":\"AccessControlBadConfirmation\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"neededRole\",\"type\":\"bytes32\"}],\"name\":\"AccessControlUnauthorizedAccount\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"workflowId\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"DistributionFailed\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"FeeRecipientCannotBeZero\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"caller\",\"type\":\"address\"}],\"name\":\"InternalOnly\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"recipient\",\"type\":\"address\"}],\"name\":\"InvalidRecipient\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"feeBps\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"maxFeeBps\",\"type\":\"uint256\"}],\"name\":\"ProtocolFeeExceedsMaximum\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"}],\"name\":\"SafeERC20FailedOperation\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"recipient\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"TransferFailed\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"ZeroOwner\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"previousAdminRole\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"newAdminRole\",\"type\":\"bytes32\"}],\"name\":\"RoleAdminChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"}],\"name\":\"RoleGranted\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"}],\"name\":\"RoleRevoked\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"TokensRecovered\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"workflowId\",\"type\":\"uint256\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"yieldAmount\",\"type\":\"uint256\"}],\"name\":\"YieldDistributed\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"workflowId\",\"type\":\"uint256\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"yieldAmount\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"reason\",\"type\":\"string\"}],\"name\":\"YieldDistributionFailed\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"workflowId\",\"type\":\"uint256\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"yieldAmount\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"protocolFeeAmount\",\"type\":\"uint256\"}],\"name\":\"YieldProtocolFeeCollected\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"workflowId\",\"type\":\"uint256\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"yieldAmount\",\"type\":\"uint256\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"feeRecipient\",\"type\":\"address\"}],\"name\":\"YieldRecoveredToFeeAddress\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"workflowId\",\"type\":\"uint256\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"yieldAmount\",\"type\":\"uint256\"}],\"name\":\"YieldWithdrawn\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"DEFAULT_ADMIN_ROLE\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"MAX_PROTOCOL_FEE_BPS\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"ROLE_ESCROW_CONTRACT\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"ROLE_GUARDIAN\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"ROLE_TIMELOCK\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"contract IYieldDistributionModule\",\"name\":\"distModule\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"workflowId\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"yieldAmount\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"distributionData\",\"type\":\"bytes\"}],\"name\":\"_distributeYieldInternal\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"}],\"name\":\"getRoleAdmin\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"grantRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"contract IYieldGenerationModule\",\"name\":\"genModule\",\"type\":\"address\"},{\"internalType\":\"contract IYieldDistributionModule\",\"name\":\"distModule\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"workflowId\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"protocolFeeBps\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"feeRecipient\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"distributionData\",\"type\":\"bytes\"}],\"name\":\"handleYield\",\"outputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"actualAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"yield\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"yieldDistributed\",\"type\":\"uint256\"},{\"internalType\":\"bool\",\"name\":\"success\",\"type\":\"bool\"}],\"internalType\":\"struct YieldOps.YieldResult\",\"name\":\"result\",\"type\":\"tuple\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"hasRole\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"recoverTokens\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"escrowContract\",\"type\":\"address\"}],\"name\":\"registerEscrowContract\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"callerConfirmation\",\"type\":\"address\"}],\"name\":\"renounceRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"revokeRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"interfaceId\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"}],\"devdoc\":{\"details\":\"Extracted from BaseEscrow to reduce contract size (Phase 1 size optimization)      Key design principles (from updated plan):      - Non-blocking: Uses try/catch to prevent yield failures from blocking escrow lifecycle      - Non-reentrant: No callbacks to BaseEscrow, operates in \\\"compute and return\\\" pattern      - Pull-based: BaseEscrow transfers tokens to this contract before calling      This contract is stateless and purely operational - no escrow state stored here.\",\"errors\":{\"AccessControlBadConfirmation()\":[{\"details\":\"The caller of a function is not the expected one. NOTE: Don't confuse with {AccessControlUnauthorizedAccount}.\"}],\"AccessControlUnauthorizedAccount(address,bytes32)\":[{\"details\":\"The `account` is missing a role.\"}],\"SafeERC20FailedOperation(address)\":[{\"details\":\"An operation with an ERC-20 token failed.\"}]},\"events\":{\"RoleAdminChanged(bytes32,bytes32,bytes32)\":{\"details\":\"Emitted when `newAdminRole` is set as ``role``'s admin role, replacing `previousAdminRole` `DEFAULT_ADMIN_ROLE` is the starting admin for all roles, despite {RoleAdminChanged} not being emitted to signal this.\"},\"RoleGranted(bytes32,address,address)\":{\"details\":\"Emitted when `account` is granted `role`. `sender` is the account that originated the contract call. This account bears the admin role (for the granted role). Expected in cases where the role was granted using the internal {AccessControl-_grantRole}.\"},\"RoleRevoked(bytes32,address,address)\":{\"details\":\"Emitted when `account` is revoked `role`. `sender` is the account that originated the contract call:   - if using `revokeRole`, it is the admin role bearer   - if using `renounceRole`, it is the role bearer (i.e. `account`)\"}},\"kind\":\"dev\",\"methods\":{\"_distributeYieldInternal(address,uint256,address,uint256,bytes)\":{\"details\":\"Internal yield distribution (public for try/catch pattern)This function is public to allow try/catch from within the contract      but should only be called by handleYield\",\"params\":{\"distModule\":\"Yield distribution module\",\"distributionData\":\"Encoded per-escrow yield distribution (recipients, percentages) or empty for module default\",\"token\":\"Token address\",\"workflowId\":\"Escrow workflow ID\",\"yieldAmount\":\"Yield amount to distribute\"}},\"constructor\":{\"params\":{\"initialOwner\":\"Address that will receive DEFAULT_ADMIN_ROLE (for initial setup only)\"}},\"getRoleAdmin(bytes32)\":{\"details\":\"Returns the admin role that controls `role`. See {grantRole} and {revokeRole}. To change a role's admin, use {_setRoleAdmin}.\"},\"grantRole(bytes32,address)\":{\"details\":\"Grants `role` to `account`. If `account` had not been already granted `role`, emits a {RoleGranted} event. Requirements: - the caller must have ``role``'s admin role. May emit a {RoleGranted} event.\"},\"handleYield(address,address,uint256,address,uint256,uint256,address,bytes)\":{\"details\":\"Non-blocking: Returns success=false if distribution fails, doesn't revert      Caller (BaseEscrow) should handle failure case (e.g., route to fee address)      Protocol fee is deducted from yield before distribution to recipients      Only authorized escrow contracts can call this function\",\"params\":{\"amount\":\"Original escrow amount\",\"distModule\":\"Yield distribution module\",\"distributionData\":\"Encoded per-escrow yield distribution (recipients, percentages) or empty for module default\",\"feeRecipient\":\"Address to receive protocol fee\",\"genModule\":\"Yield generation module\",\"protocolFeeBps\":\"Protocol fee in basis points (0-3000 = 0-30%)\",\"token\":\"Token address\",\"workflowId\":\"Escrow workflow ID\"},\"returns\":{\"result\":\"Yield operation result\"}},\"hasRole(bytes32,address)\":{\"details\":\"Returns `true` if `account` has been granted `role`.\"},\"recoverTokens(address,address,uint256)\":{\"details\":\"CRIT-1: Emergency function - requires ROLE_GUARDIAN access control      This contract should not hold funds, but access control prevents unauthorized draining\",\"params\":{\"amount\":\"Amount to recover\",\"to\":\"Recipient address\",\"token\":\"Token address (or address(0) for native ETH)\"}},\"registerEscrowContract(address)\":{\"details\":\"Only ROLE_TIMELOCK can register escrow contracts (governance-controlled)\",\"params\":{\"escrowContract\":\"Address of the escrow contract\"}},\"renounceRole(bytes32,address)\":{\"details\":\"Revokes `role` from the calling account. Roles are often managed via {grantRole} and {revokeRole}: this function's purpose is to provide a mechanism for accounts to lose their privileges if they are compromised (such as when a trusted device is misplaced). If the calling account had been revoked `role`, emits a {RoleRevoked} event. Requirements: - the caller must be `callerConfirmation`. May emit a {RoleRevoked} event.\"},\"revokeRole(bytes32,address)\":{\"details\":\"Revokes `role` from `account`. If `account` had been granted `role`, emits a {RoleRevoked} event. Requirements: - the caller must have ``role``'s admin role. May emit a {RoleRevoked} event.\"},\"supportsInterface(bytes4)\":{\"details\":\"Returns true if this contract implements the interface defined by `interfaceId`. See the corresponding https://eips.ethereum.org/EIPS/eip-165#how-interfaces-are-identified[ERC section] to learn more about how these ids are created. This function call must use less than 30 000 gas.\"}},\"title\":\"YieldOps\",\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{\"MAX_PROTOCOL_FEE_BPS()\":{\"notice\":\"Maximum protocol fee (30%)\"},\"constructor\":{\"notice\":\"Constructor for YieldOps\"},\"handleYield(address,address,uint256,address,uint256,uint256,address,bytes)\":{\"notice\":\"Handle yield withdrawal and distribution\"},\"recoverTokens(address,address,uint256)\":{\"notice\":\"Recover tokens accidentally sent to this contract\"},\"registerEscrowContract(address)\":{\"notice\":\"Register an escrow contract (grants it ROLE_ESCROW_CONTRACT)\"}},\"notice\":\"External contract for yield withdrawal and distribution operations\",\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/YieldOps.sol\":\"YieldOps\"},\"evmVersion\":\"cancun\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\",\"useLiteralContent\":true},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[],\"viaIR\":true},\"sources\":{\"@openzeppelin/contracts/access/AccessControl.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.4.0) (access/AccessControl.sol)\\n\\npragma solidity ^0.8.20;\\n\\nimport {IAccessControl} from \\\"./IAccessControl.sol\\\";\\nimport {Context} from \\\"../utils/Context.sol\\\";\\nimport {IERC165, ERC165} from \\\"../utils/introspection/ERC165.sol\\\";\\n\\n/**\\n * @dev Contract module that allows children to implement role-based access\\n * control mechanisms. This is a lightweight version that doesn't allow enumerating role\\n * members except through off-chain means by accessing the contract event logs. Some\\n * applications may benefit from on-chain enumerability, for those cases see\\n * {AccessControlEnumerable}.\\n *\\n * Roles are referred to by their `bytes32` identifier. These should be exposed\\n * in the external API and be unique. The best way to achieve this is by\\n * using `public constant` hash digests:\\n *\\n * ```solidity\\n * bytes32 public constant MY_ROLE = keccak256(\\\"MY_ROLE\\\");\\n * ```\\n *\\n * Roles can be used to represent a set of permissions. To restrict access to a\\n * function call, use {hasRole}:\\n *\\n * ```solidity\\n * function foo() public {\\n *     require(hasRole(MY_ROLE, msg.sender));\\n *     ...\\n * }\\n * ```\\n *\\n * Roles can be granted and revoked dynamically via the {grantRole} and\\n * {revokeRole} functions. Each role has an associated admin role, and only\\n * accounts that have a role's admin role can call {grantRole} and {revokeRole}.\\n *\\n * By default, the admin role for all roles is `DEFAULT_ADMIN_ROLE`, which means\\n * that only accounts with this role will be able to grant or revoke other\\n * roles. More complex role relationships can be created by using\\n * {_setRoleAdmin}.\\n *\\n * WARNING: The `DEFAULT_ADMIN_ROLE` is also its own admin: it has permission to\\n * grant and revoke this role. Extra precautions should be taken to secure\\n * accounts that have been granted it. We recommend using {AccessControlDefaultAdminRules}\\n * to enforce additional security measures for this role.\\n */\\nabstract contract AccessControl is Context, IAccessControl, ERC165 {\\n    struct RoleData {\\n        mapping(address account => bool) hasRole;\\n        bytes32 adminRole;\\n    }\\n\\n    mapping(bytes32 role => RoleData) private _roles;\\n\\n    bytes32 public constant DEFAULT_ADMIN_ROLE = 0x00;\\n\\n    /**\\n     * @dev Modifier that checks that an account has a specific role. Reverts\\n     * with an {AccessControlUnauthorizedAccount} error including the required role.\\n     */\\n    modifier onlyRole(bytes32 role) {\\n        _checkRole(role);\\n        _;\\n    }\\n\\n    /// @inheritdoc IERC165\\n    function supportsInterface(bytes4 interfaceId) public view virtual override returns (bool) {\\n        return interfaceId == type(IAccessControl).interfaceId || super.supportsInterface(interfaceId);\\n    }\\n\\n    /**\\n     * @dev Returns `true` if `account` has been granted `role`.\\n     */\\n    function hasRole(bytes32 role, address account) public view virtual returns (bool) {\\n        return _roles[role].hasRole[account];\\n    }\\n\\n    /**\\n     * @dev Reverts with an {AccessControlUnauthorizedAccount} error if `_msgSender()`\\n     * is missing `role`. Overriding this function changes the behavior of the {onlyRole} modifier.\\n     */\\n    function _checkRole(bytes32 role) internal view virtual {\\n        _checkRole(role, _msgSender());\\n    }\\n\\n    /**\\n     * @dev Reverts with an {AccessControlUnauthorizedAccount} error if `account`\\n     * is missing `role`.\\n     */\\n    function _checkRole(bytes32 role, address account) internal view virtual {\\n        if (!hasRole(role, account)) {\\n            revert AccessControlUnauthorizedAccount(account, role);\\n        }\\n    }\\n\\n    /**\\n     * @dev Returns the admin role that controls `role`. See {grantRole} and\\n     * {revokeRole}.\\n     *\\n     * To change a role's admin, use {_setRoleAdmin}.\\n     */\\n    function getRoleAdmin(bytes32 role) public view virtual returns (bytes32) {\\n        return _roles[role].adminRole;\\n    }\\n\\n    /**\\n     * @dev Grants `role` to `account`.\\n     *\\n     * If `account` had not been already granted `role`, emits a {RoleGranted}\\n     * event.\\n     *\\n     * Requirements:\\n     *\\n     * - the caller must have ``role``'s admin role.\\n     *\\n     * May emit a {RoleGranted} event.\\n     */\\n    function grantRole(bytes32 role, address account) public virtual onlyRole(getRoleAdmin(role)) {\\n        _grantRole(role, account);\\n    }\\n\\n    /**\\n     * @dev Revokes `role` from `account`.\\n     *\\n     * If `account` had been granted `role`, emits a {RoleRevoked} event.\\n     *\\n     * Requirements:\\n     *\\n     * - the caller must have ``role``'s admin role.\\n     *\\n     * May emit a {RoleRevoked} event.\\n     */\\n    function revokeRole(bytes32 role, address account) public virtual onlyRole(getRoleAdmin(role)) {\\n        _revokeRole(role, account);\\n    }\\n\\n    /**\\n     * @dev Revokes `role` from the calling account.\\n     *\\n     * Roles are often managed via {grantRole} and {revokeRole}: this function's\\n     * purpose is to provide a mechanism for accounts to lose their privileges\\n     * if they are compromised (such as when a trusted device is misplaced).\\n     *\\n     * If the calling account had been revoked `role`, emits a {RoleRevoked}\\n     * event.\\n     *\\n     * Requirements:\\n     *\\n     * - the caller must be `callerConfirmation`.\\n     *\\n     * May emit a {RoleRevoked} event.\\n     */\\n    function renounceRole(bytes32 role, address callerConfirmation) public virtual {\\n        if (callerConfirmation != _msgSender()) {\\n            revert AccessControlBadConfirmation();\\n        }\\n\\n        _revokeRole(role, callerConfirmation);\\n    }\\n\\n    /**\\n     * @dev Sets `adminRole` as ``role``'s admin role.\\n     *\\n     * Emits a {RoleAdminChanged} event.\\n     */\\n    function _setRoleAdmin(bytes32 role, bytes32 adminRole) internal virtual {\\n        bytes32 previousAdminRole = getRoleAdmin(role);\\n        _roles[role].adminRole = adminRole;\\n        emit RoleAdminChanged(role, previousAdminRole, adminRole);\\n    }\\n\\n    /**\\n     * @dev Attempts to grant `role` to `account` and returns a boolean indicating if `role` was granted.\\n     *\\n     * Internal function without access restriction.\\n     *\\n     * May emit a {RoleGranted} event.\\n     */\\n    function _grantRole(bytes32 role, address account) internal virtual returns (bool) {\\n        if (!hasRole(role, account)) {\\n            _roles[role].hasRole[account] = true;\\n            emit RoleGranted(role, account, _msgSender());\\n            return true;\\n        } else {\\n            return false;\\n        }\\n    }\\n\\n    /**\\n     * @dev Attempts to revoke `role` from `account` and returns a boolean indicating if `role` was revoked.\\n     *\\n     * Internal function without access restriction.\\n     *\\n     * May emit a {RoleRevoked} event.\\n     */\\n    function _revokeRole(bytes32 role, address account) internal virtual returns (bool) {\\n        if (hasRole(role, account)) {\\n            _roles[role].hasRole[account] = false;\\n            emit RoleRevoked(role, account, _msgSender());\\n            return true;\\n        } else {\\n            return false;\\n        }\\n    }\\n}\\n\",\"keccak256\":\"0x1a6b4f6b7798ab80929d491b89d5427a9b3338c0fd1acd0ba325f69c6f1646af\",\"license\":\"MIT\"},\"@openzeppelin/contracts/access/IAccessControl.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.4.0) (access/IAccessControl.sol)\\n\\npragma solidity >=0.8.4;\\n\\n/**\\n * @dev External interface of AccessControl declared to support ERC-165 detection.\\n */\\ninterface IAccessControl {\\n    /**\\n     * @dev The `account` is missing a role.\\n     */\\n    error AccessControlUnauthorizedAccount(address account, bytes32 neededRole);\\n\\n    /**\\n     * @dev The caller of a function is not the expected one.\\n     *\\n     * NOTE: Don't confuse with {AccessControlUnauthorizedAccount}.\\n     */\\n    error AccessControlBadConfirmation();\\n\\n    /**\\n     * @dev Emitted when `newAdminRole` is set as ``role``'s admin role, replacing `previousAdminRole`\\n     *\\n     * `DEFAULT_ADMIN_ROLE` is the starting admin for all roles, despite\\n     * {RoleAdminChanged} not being emitted to signal this.\\n     */\\n    event RoleAdminChanged(bytes32 indexed role, bytes32 indexed previousAdminRole, bytes32 indexed newAdminRole);\\n\\n    /**\\n     * @dev Emitted when `account` is granted `role`.\\n     *\\n     * `sender` is the account that originated the contract call. This account bears the admin role (for the granted role).\\n     * Expected in cases where the role was granted using the internal {AccessControl-_grantRole}.\\n     */\\n    event RoleGranted(bytes32 indexed role, address indexed account, address indexed sender);\\n\\n    /**\\n     * @dev Emitted when `account` is revoked `role`.\\n     *\\n     * `sender` is the account that originated the contract call:\\n     *   - if using `revokeRole`, it is the admin role bearer\\n     *   - if using `renounceRole`, it is the role bearer (i.e. `account`)\\n     */\\n    event RoleRevoked(bytes32 indexed role, address indexed account, address indexed sender);\\n\\n    /**\\n     * @dev Returns `true` if `account` has been granted `role`.\\n     */\\n    function hasRole(bytes32 role, address account) external view returns (bool);\\n\\n    /**\\n     * @dev Returns the admin role that controls `role`. See {grantRole} and\\n     * {revokeRole}.\\n     *\\n     * To change a role's admin, use {AccessControl-_setRoleAdmin}.\\n     */\\n    function getRoleAdmin(bytes32 role) external view returns (bytes32);\\n\\n    /**\\n     * @dev Grants `role` to `account`.\\n     *\\n     * If `account` had not been already granted `role`, emits a {RoleGranted}\\n     * event.\\n     *\\n     * Requirements:\\n     *\\n     * - the caller must have ``role``'s admin role.\\n     */\\n    function grantRole(bytes32 role, address account) external;\\n\\n    /**\\n     * @dev Revokes `role` from `account`.\\n     *\\n     * If `account` had been granted `role`, emits a {RoleRevoked} event.\\n     *\\n     * Requirements:\\n     *\\n     * - the caller must have ``role``'s admin role.\\n     */\\n    function revokeRole(bytes32 role, address account) external;\\n\\n    /**\\n     * @dev Revokes `role` from the calling account.\\n     *\\n     * Roles are often managed via {grantRole} and {revokeRole}: this function's\\n     * purpose is to provide a mechanism for accounts to lose their privileges\\n     * if they are compromised (such as when a trusted device is misplaced).\\n     *\\n     * If the calling account had been granted `role`, emits a {RoleRevoked}\\n     * event.\\n     *\\n     * Requirements:\\n     *\\n     * - the caller must be `callerConfirmation`.\\n     */\\n    function renounceRole(bytes32 role, address callerConfirmation) external;\\n}\\n\",\"keccak256\":\"0xbff9f59c84e5337689161ce7641c0ef8e872d6a7536fbc1f5133f128887aba3c\",\"license\":\"MIT\"},\"@openzeppelin/contracts/interfaces/IERC1363.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.4.0) (interfaces/IERC1363.sol)\\n\\npragma solidity >=0.6.2;\\n\\nimport {IERC20} from \\\"./IERC20.sol\\\";\\nimport {IERC165} from \\\"./IERC165.sol\\\";\\n\\n/**\\n * @title IERC1363\\n * @dev Interface of the ERC-1363 standard as defined in the https://eips.ethereum.org/EIPS/eip-1363[ERC-1363].\\n *\\n * Defines an extension interface for ERC-20 tokens that supports executing code on a recipient contract\\n * after `transfer` or `transferFrom`, or code on a spender contract after `approve`, in a single transaction.\\n */\\ninterface IERC1363 is IERC20, IERC165 {\\n    /*\\n     * Note: the ERC-165 identifier for this interface is 0xb0202a11.\\n     * 0xb0202a11 ===\\n     *   bytes4(keccak256('transferAndCall(address,uint256)')) ^\\n     *   bytes4(keccak256('transferAndCall(address,uint256,bytes)')) ^\\n     *   bytes4(keccak256('transferFromAndCall(address,address,uint256)')) ^\\n     *   bytes4(keccak256('transferFromAndCall(address,address,uint256,bytes)')) ^\\n     *   bytes4(keccak256('approveAndCall(address,uint256)')) ^\\n     *   bytes4(keccak256('approveAndCall(address,uint256,bytes)'))\\n     */\\n\\n    /**\\n     * @dev Moves a `value` amount of tokens from the caller's account to `to`\\n     * and then calls {IERC1363Receiver-onTransferReceived} on `to`.\\n     * @param to The address which you want to transfer to.\\n     * @param value The amount of tokens to be transferred.\\n     * @return A boolean value indicating whether the operation succeeded unless throwing.\\n     */\\n    function transferAndCall(address to, uint256 value) external returns (bool);\\n\\n    /**\\n     * @dev Moves a `value` amount of tokens from the caller's account to `to`\\n     * and then calls {IERC1363Receiver-onTransferReceived} on `to`.\\n     * @param to The address which you want to transfer to.\\n     * @param value The amount of tokens to be transferred.\\n     * @param data Additional data with no specified format, sent in call to `to`.\\n     * @return A boolean value indicating whether the operation succeeded unless throwing.\\n     */\\n    function transferAndCall(address to, uint256 value, bytes calldata data) external returns (bool);\\n\\n    /**\\n     * @dev Moves a `value` amount of tokens from `from` to `to` using the allowance mechanism\\n     * and then calls {IERC1363Receiver-onTransferReceived} on `to`.\\n     * @param from The address which you want to send tokens from.\\n     * @param to The address which you want to transfer to.\\n     * @param value The amount of tokens to be transferred.\\n     * @return A boolean value indicating whether the operation succeeded unless throwing.\\n     */\\n    function transferFromAndCall(address from, address to, uint256 value) external returns (bool);\\n\\n    /**\\n     * @dev Moves a `value` amount of tokens from `from` to `to` using the allowance mechanism\\n     * and then calls {IERC1363Receiver-onTransferReceived} on `to`.\\n     * @param from The address which you want to send tokens from.\\n     * @param to The address which you want to transfer to.\\n     * @param value The amount of tokens to be transferred.\\n     * @param data Additional data with no specified format, sent in call to `to`.\\n     * @return A boolean value indicating whether the operation succeeded unless throwing.\\n     */\\n    function transferFromAndCall(address from, address to, uint256 value, bytes calldata data) external returns (bool);\\n\\n    /**\\n     * @dev Sets a `value` amount of tokens as the allowance of `spender` over the\\n     * caller's tokens and then calls {IERC1363Spender-onApprovalReceived} on `spender`.\\n     * @param spender The address which will spend the funds.\\n     * @param value The amount of tokens to be spent.\\n     * @return A boolean value indicating whether the operation succeeded unless throwing.\\n     */\\n    function approveAndCall(address spender, uint256 value) external returns (bool);\\n\\n    /**\\n     * @dev Sets a `value` amount of tokens as the allowance of `spender` over the\\n     * caller's tokens and then calls {IERC1363Spender-onApprovalReceived} on `spender`.\\n     * @param spender The address which will spend the funds.\\n     * @param value The amount of tokens to be spent.\\n     * @param data Additional data with no specified format, sent in call to `spender`.\\n     * @return A boolean value indicating whether the operation succeeded unless throwing.\\n     */\\n    function approveAndCall(address spender, uint256 value, bytes calldata data) external returns (bool);\\n}\\n\",\"keccak256\":\"0xd5ea07362ab630a6a3dee4285a74cf2377044ca2e4be472755ad64d7c5d4b69d\",\"license\":\"MIT\"},\"@openzeppelin/contracts/interfaces/IERC165.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.4.0) (interfaces/IERC165.sol)\\n\\npragma solidity >=0.4.16;\\n\\nimport {IERC165} from \\\"../utils/introspection/IERC165.sol\\\";\\n\",\"keccak256\":\"0x0afcb7e740d1537b252cb2676f600465ce6938398569f09ba1b9ca240dde2dfc\",\"license\":\"MIT\"},\"@openzeppelin/contracts/interfaces/IERC20.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.4.0) (interfaces/IERC20.sol)\\n\\npragma solidity >=0.4.16;\\n\\nimport {IERC20} from \\\"../token/ERC20/IERC20.sol\\\";\\n\",\"keccak256\":\"0x1a6221315ce0307746c2c4827c125d821ee796c74a676787762f4778671d4f44\",\"license\":\"MIT\"},\"@openzeppelin/contracts/token/ERC20/IERC20.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.4.0) (token/ERC20/IERC20.sol)\\n\\npragma solidity >=0.4.16;\\n\\n/**\\n * @dev Interface of the ERC-20 standard as defined in the ERC.\\n */\\ninterface IERC20 {\\n    /**\\n     * @dev Emitted when `value` tokens are moved from one account (`from`) to\\n     * another (`to`).\\n     *\\n     * Note that `value` may be zero.\\n     */\\n    event Transfer(address indexed from, address indexed to, uint256 value);\\n\\n    /**\\n     * @dev Emitted when the allowance of a `spender` for an `owner` is set by\\n     * a call to {approve}. `value` is the new allowance.\\n     */\\n    event Approval(address indexed owner, address indexed spender, uint256 value);\\n\\n    /**\\n     * @dev Returns the value of tokens in existence.\\n     */\\n    function totalSupply() external view returns (uint256);\\n\\n    /**\\n     * @dev Returns the value of tokens owned by `account`.\\n     */\\n    function balanceOf(address account) external view returns (uint256);\\n\\n    /**\\n     * @dev Moves a `value` amount of tokens from the caller's account to `to`.\\n     *\\n     * Returns a boolean value indicating whether the operation succeeded.\\n     *\\n     * Emits a {Transfer} event.\\n     */\\n    function transfer(address to, uint256 value) external returns (bool);\\n\\n    /**\\n     * @dev Returns the remaining number of tokens that `spender` will be\\n     * allowed to spend on behalf of `owner` through {transferFrom}. This is\\n     * zero by default.\\n     *\\n     * This value changes when {approve} or {transferFrom} are called.\\n     */\\n    function allowance(address owner, address spender) external view returns (uint256);\\n\\n    /**\\n     * @dev Sets a `value` amount of tokens as the allowance of `spender` over the\\n     * caller's tokens.\\n     *\\n     * Returns a boolean value indicating whether the operation succeeded.\\n     *\\n     * IMPORTANT: Beware that changing an allowance with this method brings the risk\\n     * that someone may use both the old and the new allowance by unfortunate\\n     * transaction ordering. One possible solution to mitigate this race\\n     * condition is to first reduce the spender's allowance to 0 and set the\\n     * desired value afterwards:\\n     * https://github.com/ethereum/EIPs/issues/20#issuecomment-263524729\\n     *\\n     * Emits an {Approval} event.\\n     */\\n    function approve(address spender, uint256 value) external returns (bool);\\n\\n    /**\\n     * @dev Moves a `value` amount of tokens from `from` to `to` using the\\n     * allowance mechanism. `value` is then deducted from the caller's\\n     * allowance.\\n     *\\n     * Returns a boolean value indicating whether the operation succeeded.\\n     *\\n     * Emits a {Transfer} event.\\n     */\\n    function transferFrom(address from, address to, uint256 value) external returns (bool);\\n}\\n\",\"keccak256\":\"0x74ed01eb66b923d0d0cfe3be84604ac04b76482a55f9dd655e1ef4d367f95bc2\",\"license\":\"MIT\"},\"@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.3.0) (token/ERC20/utils/SafeERC20.sol)\\n\\npragma solidity ^0.8.20;\\n\\nimport {IERC20} from \\\"../IERC20.sol\\\";\\nimport {IERC1363} from \\\"../../../interfaces/IERC1363.sol\\\";\\n\\n/**\\n * @title SafeERC20\\n * @dev Wrappers around ERC-20 operations that throw on failure (when the token\\n * contract returns false). Tokens that return no value (and instead revert or\\n * throw on failure) are also supported, non-reverting calls are assumed to be\\n * successful.\\n * To use this library you can add a `using SafeERC20 for IERC20;` statement to your contract,\\n * which allows you to call the safe operations as `token.safeTransfer(...)`, etc.\\n */\\nlibrary SafeERC20 {\\n    /**\\n     * @dev An operation with an ERC-20 token failed.\\n     */\\n    error SafeERC20FailedOperation(address token);\\n\\n    /**\\n     * @dev Indicates a failed `decreaseAllowance` request.\\n     */\\n    error SafeERC20FailedDecreaseAllowance(address spender, uint256 currentAllowance, uint256 requestedDecrease);\\n\\n    /**\\n     * @dev Transfer `value` amount of `token` from the calling contract to `to`. If `token` returns no value,\\n     * non-reverting calls are assumed to be successful.\\n     */\\n    function safeTransfer(IERC20 token, address to, uint256 value) internal {\\n        _callOptionalReturn(token, abi.encodeCall(token.transfer, (to, value)));\\n    }\\n\\n    /**\\n     * @dev Transfer `value` amount of `token` from `from` to `to`, spending the approval given by `from` to the\\n     * calling contract. If `token` returns no value, non-reverting calls are assumed to be successful.\\n     */\\n    function safeTransferFrom(IERC20 token, address from, address to, uint256 value) internal {\\n        _callOptionalReturn(token, abi.encodeCall(token.transferFrom, (from, to, value)));\\n    }\\n\\n    /**\\n     * @dev Variant of {safeTransfer} that returns a bool instead of reverting if the operation is not successful.\\n     */\\n    function trySafeTransfer(IERC20 token, address to, uint256 value) internal returns (bool) {\\n        return _callOptionalReturnBool(token, abi.encodeCall(token.transfer, (to, value)));\\n    }\\n\\n    /**\\n     * @dev Variant of {safeTransferFrom} that returns a bool instead of reverting if the operation is not successful.\\n     */\\n    function trySafeTransferFrom(IERC20 token, address from, address to, uint256 value) internal returns (bool) {\\n        return _callOptionalReturnBool(token, abi.encodeCall(token.transferFrom, (from, to, value)));\\n    }\\n\\n    /**\\n     * @dev Increase the calling contract's allowance toward `spender` by `value`. If `token` returns no value,\\n     * non-reverting calls are assumed to be successful.\\n     *\\n     * IMPORTANT: If the token implements ERC-7674 (ERC-20 with temporary allowance), and if the \\\"client\\\"\\n     * smart contract uses ERC-7674 to set temporary allowances, then the \\\"client\\\" smart contract should avoid using\\n     * this function. Performing a {safeIncreaseAllowance} or {safeDecreaseAllowance} operation on a token contract\\n     * that has a non-zero temporary allowance (for that particular owner-spender) will result in unexpected behavior.\\n     */\\n    function safeIncreaseAllowance(IERC20 token, address spender, uint256 value) internal {\\n        uint256 oldAllowance = token.allowance(address(this), spender);\\n        forceApprove(token, spender, oldAllowance + value);\\n    }\\n\\n    /**\\n     * @dev Decrease the calling contract's allowance toward `spender` by `requestedDecrease`. If `token` returns no\\n     * value, non-reverting calls are assumed to be successful.\\n     *\\n     * IMPORTANT: If the token implements ERC-7674 (ERC-20 with temporary allowance), and if the \\\"client\\\"\\n     * smart contract uses ERC-7674 to set temporary allowances, then the \\\"client\\\" smart contract should avoid using\\n     * this function. Performing a {safeIncreaseAllowance} or {safeDecreaseAllowance} operation on a token contract\\n     * that has a non-zero temporary allowance (for that particular owner-spender) will result in unexpected behavior.\\n     */\\n    function safeDecreaseAllowance(IERC20 token, address spender, uint256 requestedDecrease) internal {\\n        unchecked {\\n            uint256 currentAllowance = token.allowance(address(this), spender);\\n            if (currentAllowance < requestedDecrease) {\\n                revert SafeERC20FailedDecreaseAllowance(spender, currentAllowance, requestedDecrease);\\n            }\\n            forceApprove(token, spender, currentAllowance - requestedDecrease);\\n        }\\n    }\\n\\n    /**\\n     * @dev Set the calling contract's allowance toward `spender` to `value`. If `token` returns no value,\\n     * non-reverting calls are assumed to be successful. Meant to be used with tokens that require the approval\\n     * to be set to zero before setting it to a non-zero value, such as USDT.\\n     *\\n     * NOTE: If the token implements ERC-7674, this function will not modify any temporary allowance. This function\\n     * only sets the \\\"standard\\\" allowance. Any temporary allowance will remain active, in addition to the value being\\n     * set here.\\n     */\\n    function forceApprove(IERC20 token, address spender, uint256 value) internal {\\n        bytes memory approvalCall = abi.encodeCall(token.approve, (spender, value));\\n\\n        if (!_callOptionalReturnBool(token, approvalCall)) {\\n            _callOptionalReturn(token, abi.encodeCall(token.approve, (spender, 0)));\\n            _callOptionalReturn(token, approvalCall);\\n        }\\n    }\\n\\n    /**\\n     * @dev Performs an {ERC1363} transferAndCall, with a fallback to the simple {ERC20} transfer if the target has no\\n     * code. This can be used to implement an {ERC721}-like safe transfer that rely on {ERC1363} checks when\\n     * targeting contracts.\\n     *\\n     * Reverts if the returned value is other than `true`.\\n     */\\n    function transferAndCallRelaxed(IERC1363 token, address to, uint256 value, bytes memory data) internal {\\n        if (to.code.length == 0) {\\n            safeTransfer(token, to, value);\\n        } else if (!token.transferAndCall(to, value, data)) {\\n            revert SafeERC20FailedOperation(address(token));\\n        }\\n    }\\n\\n    /**\\n     * @dev Performs an {ERC1363} transferFromAndCall, with a fallback to the simple {ERC20} transferFrom if the target\\n     * has no code. This can be used to implement an {ERC721}-like safe transfer that rely on {ERC1363} checks when\\n     * targeting contracts.\\n     *\\n     * Reverts if the returned value is other than `true`.\\n     */\\n    function transferFromAndCallRelaxed(\\n        IERC1363 token,\\n        address from,\\n        address to,\\n        uint256 value,\\n        bytes memory data\\n    ) internal {\\n        if (to.code.length == 0) {\\n            safeTransferFrom(token, from, to, value);\\n        } else if (!token.transferFromAndCall(from, to, value, data)) {\\n            revert SafeERC20FailedOperation(address(token));\\n        }\\n    }\\n\\n    /**\\n     * @dev Performs an {ERC1363} approveAndCall, with a fallback to the simple {ERC20} approve if the target has no\\n     * code. This can be used to implement an {ERC721}-like safe transfer that rely on {ERC1363} checks when\\n     * targeting contracts.\\n     *\\n     * NOTE: When the recipient address (`to`) has no code (i.e. is an EOA), this function behaves as {forceApprove}.\\n     * Opposedly, when the recipient address (`to`) has code, this function only attempts to call {ERC1363-approveAndCall}\\n     * once without retrying, and relies on the returned value to be true.\\n     *\\n     * Reverts if the returned value is other than `true`.\\n     */\\n    function approveAndCallRelaxed(IERC1363 token, address to, uint256 value, bytes memory data) internal {\\n        if (to.code.length == 0) {\\n            forceApprove(token, to, value);\\n        } else if (!token.approveAndCall(to, value, data)) {\\n            revert SafeERC20FailedOperation(address(token));\\n        }\\n    }\\n\\n    /**\\n     * @dev Imitates a Solidity high-level call (i.e. a regular function call to a contract), relaxing the requirement\\n     * on the return value: the return value is optional (but if data is returned, it must not be false).\\n     * @param token The token targeted by the call.\\n     * @param data The call data (encoded using abi.encode or one of its variants).\\n     *\\n     * This is a variant of {_callOptionalReturnBool} that reverts if call fails to meet the requirements.\\n     */\\n    function _callOptionalReturn(IERC20 token, bytes memory data) private {\\n        uint256 returnSize;\\n        uint256 returnValue;\\n        assembly (\\\"memory-safe\\\") {\\n            let success := call(gas(), token, 0, add(data, 0x20), mload(data), 0, 0x20)\\n            // bubble errors\\n            if iszero(success) {\\n                let ptr := mload(0x40)\\n                returndatacopy(ptr, 0, returndatasize())\\n                revert(ptr, returndatasize())\\n            }\\n            returnSize := returndatasize()\\n            returnValue := mload(0)\\n        }\\n\\n        if (returnSize == 0 ? address(token).code.length == 0 : returnValue != 1) {\\n            revert SafeERC20FailedOperation(address(token));\\n        }\\n    }\\n\\n    /**\\n     * @dev Imitates a Solidity high-level call (i.e. a regular function call to a contract), relaxing the requirement\\n     * on the return value: the return value is optional (but if data is returned, it must not be false).\\n     * @param token The token targeted by the call.\\n     * @param data The call data (encoded using abi.encode or one of its variants).\\n     *\\n     * This is a variant of {_callOptionalReturn} that silently catches all reverts and returns a bool instead.\\n     */\\n    function _callOptionalReturnBool(IERC20 token, bytes memory data) private returns (bool) {\\n        bool success;\\n        uint256 returnSize;\\n        uint256 returnValue;\\n        assembly (\\\"memory-safe\\\") {\\n            success := call(gas(), token, 0, add(data, 0x20), mload(data), 0, 0x20)\\n            returnSize := returndatasize()\\n            returnValue := mload(0)\\n        }\\n        return success && (returnSize == 0 ? address(token).code.length > 0 : returnValue == 1);\\n    }\\n}\\n\",\"keccak256\":\"0x982c5cb790ab941d1e04f807120a71709d4c313ba0bfc16006447ffbd27fbbd5\",\"license\":\"MIT\"},\"@openzeppelin/contracts/utils/Context.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.0.1) (utils/Context.sol)\\n\\npragma solidity ^0.8.20;\\n\\n/**\\n * @dev Provides information about the current execution context, including the\\n * sender of the transaction and its data. While these are generally available\\n * via msg.sender and msg.data, they should not be accessed in such a direct\\n * manner, since when dealing with meta-transactions the account sending and\\n * paying for execution may not be the actual sender (as far as an application\\n * is concerned).\\n *\\n * This contract is only required for intermediate, library-like contracts.\\n */\\nabstract contract Context {\\n    function _msgSender() internal view virtual returns (address) {\\n        return msg.sender;\\n    }\\n\\n    function _msgData() internal view virtual returns (bytes calldata) {\\n        return msg.data;\\n    }\\n\\n    function _contextSuffixLength() internal view virtual returns (uint256) {\\n        return 0;\\n    }\\n}\\n\",\"keccak256\":\"0x493033a8d1b176a037b2cc6a04dad01a5c157722049bbecf632ca876224dd4b2\",\"license\":\"MIT\"},\"@openzeppelin/contracts/utils/introspection/ERC165.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.4.0) (utils/introspection/ERC165.sol)\\n\\npragma solidity ^0.8.20;\\n\\nimport {IERC165} from \\\"./IERC165.sol\\\";\\n\\n/**\\n * @dev Implementation of the {IERC165} interface.\\n *\\n * Contracts that want to implement ERC-165 should inherit from this contract and override {supportsInterface} to check\\n * for the additional interface id that will be supported. For example:\\n *\\n * ```solidity\\n * function supportsInterface(bytes4 interfaceId) public view virtual override returns (bool) {\\n *     return interfaceId == type(MyInterface).interfaceId || super.supportsInterface(interfaceId);\\n * }\\n * ```\\n */\\nabstract contract ERC165 is IERC165 {\\n    /// @inheritdoc IERC165\\n    function supportsInterface(bytes4 interfaceId) public view virtual returns (bool) {\\n        return interfaceId == type(IERC165).interfaceId;\\n    }\\n}\\n\",\"keccak256\":\"0x2d9dc2fe26180f74c11c13663647d38e259e45f95eb88f57b61d2160b0109d3e\",\"license\":\"MIT\"},\"@openzeppelin/contracts/utils/introspection/IERC165.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.4.0) (utils/introspection/IERC165.sol)\\n\\npragma solidity >=0.4.16;\\n\\n/**\\n * @dev Interface of the ERC-165 standard, as defined in the\\n * https://eips.ethereum.org/EIPS/eip-165[ERC].\\n *\\n * Implementers can declare support of contract interfaces, which can then be\\n * queried by others ({ERC165Checker}).\\n *\\n * For an implementation, see {ERC165}.\\n */\\ninterface IERC165 {\\n    /**\\n     * @dev Returns true if this contract implements the interface defined by\\n     * `interfaceId`. See the corresponding\\n     * https://eips.ethereum.org/EIPS/eip-165#how-interfaces-are-identified[ERC section]\\n     * to learn more about how these ids are created.\\n     *\\n     * This function call must use less than 30 000 gas.\\n     */\\n    function supportsInterface(bytes4 interfaceId) external view returns (bool);\\n}\\n\",\"keccak256\":\"0x8891738ffe910f0cf2da09566928589bf5d63f4524dd734fd9cedbac3274dd5c\",\"license\":\"MIT\"},\"contracts/YieldOps.sol\":{\"content\":\"// SPDX-License-Identifier: Apache-2.0\\npragma solidity ^0.8.33;\\n\\nimport '@openzeppelin/contracts/token/ERC20/IERC20.sol';\\nimport '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';\\nimport '@openzeppelin/contracts/access/AccessControl.sol';\\nimport './interfaces/IYieldGenerationModule.sol';\\nimport './interfaces/IYieldDistributionModule.sol';\\nimport './libraries/ResolverLogicLibrary.sol';\\n\\n/**\\n * @title YieldOps\\n * @notice External contract for yield withdrawal and distribution operations\\n * @dev Extracted from BaseEscrow to reduce contract size (Phase 1 size optimization)\\n *\\n *      Key design principles (from updated plan):\\n *      - Non-blocking: Uses try/catch to prevent yield failures from blocking escrow lifecycle\\n *      - Non-reentrant: No callbacks to BaseEscrow, operates in \\\"compute and return\\\" pattern\\n *      - Pull-based: BaseEscrow transfers tokens to this contract before calling\\n *\\n *      This contract is stateless and purely operational - no escrow state stored here.\\n */\\ncontract YieldOps is AccessControl {\\n    using SafeERC20 for IERC20;\\n\\n    // ============ Custom Errors ============\\n    error ZeroOwner();\\n    error FeeRecipientCannotBeZero();\\n    error ProtocolFeeExceedsMaximum(uint256 feeBps, uint256 maxFeeBps);\\n    error InternalOnly(address caller);\\n    error DistributionFailed(uint256 workflowId, address token, uint256 amount);\\n    error InvalidRecipient(address recipient);\\n    error TransferFailed(address recipient, uint256 amount);\\n\\n    // ============ Role Constants ============\\n    bytes32 public constant ROLE_GUARDIAN = keccak256('ROLE_GUARDIAN');\\n    bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');\\n    bytes32 public constant ROLE_ESCROW_CONTRACT = keccak256('ROLE_ESCROW_CONTRACT');\\n\\n    // ============ Constants ============\\n    /// @notice Maximum protocol fee (30%)\\n    uint256 public constant MAX_PROTOCOL_FEE_BPS = 3000; // 30% maximum protocol fee\\n\\n    // Events for yield operations\\n    event YieldWithdrawn(uint256 indexed workflowId, address indexed token, uint256 yieldAmount);\\n    event YieldDistributed(uint256 indexed workflowId, address indexed token, uint256 yieldAmount);\\n    event YieldDistributionFailed(\\n        uint256 indexed workflowId,\\n        address indexed token,\\n        uint256 yieldAmount,\\n        string reason\\n    );\\n    event YieldProtocolFeeCollected(\\n        uint256 indexed workflowId,\\n        address indexed token,\\n        uint256 yieldAmount,\\n        uint256 protocolFeeAmount\\n    );\\n    event YieldRecoveredToFeeAddress(\\n        uint256 indexed workflowId,\\n        address indexed token,\\n        uint256 yieldAmount,\\n        address indexed feeRecipient\\n    );\\n    event TokensRecovered(address indexed token, address indexed to, uint256 amount);\\n\\n    /**\\n     * @notice Constructor for YieldOps\\n     * @param initialOwner Address that will receive DEFAULT_ADMIN_ROLE (for initial setup only)\\n     */\\n    constructor(address initialOwner) {\\n        if (initialOwner == address(0)) revert ZeroOwner();\\n        _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);\\n        // ROLE_TIMELOCK gates registerEscrowContract(), so initialOwner must have it for initial setup.\\n        _grantRole(ROLE_TIMELOCK, initialOwner);\\n    }\\n\\n    /**\\n     * @notice Register an escrow contract (grants it ROLE_ESCROW_CONTRACT)\\n     * @param escrowContract Address of the escrow contract\\n     * @dev Only ROLE_TIMELOCK can register escrow contracts (governance-controlled)\\n     */\\n    function registerEscrowContract(address escrowContract) external onlyRole(ROLE_TIMELOCK) {\\n        if (escrowContract == address(0)) revert InvalidRecipient(address(0));\\n        _grantRole(ROLE_ESCROW_CONTRACT, escrowContract);\\n    }\\n\\n    /**\\n     * @dev Result of yield handling operation\\n     */\\n    struct YieldResult {\\n        uint256 actualAmount; // Actual amount withdrawn (may include yield)\\n        uint256 yield; // Total yield amount\\n        uint256 yieldDistributed; // Amount successfully distributed\\n        bool success; // Whether distribution succeeded\\n    }\\n\\n    /**\\n     * @notice Handle yield withdrawal and distribution\\n     * @param genModule Yield generation module\\n     * @param distModule Yield distribution module\\n     * @param workflowId Escrow workflow ID\\n     * @param token Token address\\n     * @param amount Original escrow amount\\n     * @param protocolFeeBps Protocol fee in basis points (0-3000 = 0-30%)\\n     * @param feeRecipient Address to receive protocol fee\\n     * @param distributionData Encoded per-escrow yield distribution (recipients, percentages) or empty for module default\\n     * @return result Yield operation result\\n     * @dev Non-blocking: Returns success=false if distribution fails, doesn't revert\\n     *      Caller (BaseEscrow) should handle failure case (e.g., route to fee address)\\n     *      Protocol fee is deducted from yield before distribution to recipients\\n     *      Only authorized escrow contracts can call this function\\n     */\\n    function handleYield(\\n        IYieldGenerationModule genModule,\\n        IYieldDistributionModule distModule,\\n        uint256 workflowId,\\n        address token,\\n        uint256 amount,\\n        uint256 protocolFeeBps,\\n        address feeRecipient,\\n        bytes memory distributionData\\n    ) external onlyRole(ROLE_ESCROW_CONTRACT) returns (YieldResult memory result) {\\n        result.actualAmount = amount;\\n        result.yield = 0;\\n        result.yieldDistributed = 0;\\n        result.success = true;\\n\\n        // No yield module - early return\\n        if (address(genModule) == address(0)) {\\n            return result;\\n        }\\n\\n        // Withdraw with yield (try/catch to prevent blocking)\\n        try genModule.withdrawWithYield(workflowId, token, amount) returns (\\n            bool withdrawSuccess,\\n            uint256 actualAmount,\\n            uint256 /* yieldGenerated */\\n        ) {\\n            if (withdrawSuccess) {\\n                result.actualAmount = actualAmount;\\n                if (actualAmount > amount) {\\n                    result.yield = actualAmount - amount;\\n                    emit YieldWithdrawn(workflowId, token, result.yield);\\n                }\\n            }\\n        } catch {\\n            // Withdrawal failed - continue with original amount\\n            emit YieldDistributionFailed(workflowId, token, 0, 'Yield withdrawal failed');\\n        }\\n\\n        // Deduct protocol fee and distribute remaining yield if any\\n        if (result.yield > 0) {\\n            uint256 protocolFeeAmount = 0;\\n            uint256 yieldToDistribute = result.yield;\\n\\n            // Calculate and collect protocol fee if enabled\\n            // MED-3: Validate fee recipient is not zero address\\n            if (protocolFeeBps > 0) {\\n                if (feeRecipient == address(0)) revert FeeRecipientCannotBeZero();\\n                if (protocolFeeBps > MAX_PROTOCOL_FEE_BPS) revert ProtocolFeeExceedsMaximum(protocolFeeBps, MAX_PROTOCOL_FEE_BPS);\\n                protocolFeeAmount = (result.yield * protocolFeeBps) / 10000;\\n                if (protocolFeeAmount > 0) {\\n                    yieldToDistribute = result.yield - protocolFeeAmount;\\n                    // Transfer protocol fee to fee recipient\\n                    IERC20(token).safeTransfer(feeRecipient, protocolFeeAmount);\\n                    emit YieldProtocolFeeCollected(workflowId, token, result.yield, protocolFeeAmount);\\n                }\\n            }\\n\\n            // Distribute remaining yield to recipients if distribution module is set\\n            if (yieldToDistribute > 0 && address(distModule) != address(0)) {\\n                try this._distributeYieldInternal(distModule, workflowId, token, yieldToDistribute, distributionData) {\\n                    result.yieldDistributed = yieldToDistribute;\\n                    result.success = true;\\n                } catch Error(string memory reason) {\\n                    emit YieldDistributionFailed(workflowId, token, yieldToDistribute, reason);\\n                    result.success = false;\\n                    \\n                    // CRIT-2: Fallback to fee recipient on distribution failure\\n                    if (feeRecipient != address(0)) {\\n                        IERC20(token).safeTransfer(feeRecipient, yieldToDistribute);\\n                        result.yieldDistributed = yieldToDistribute;\\n                        emit YieldRecoveredToFeeAddress(workflowId, token, yieldToDistribute, feeRecipient);\\n                    }\\n                } catch {\\n                    emit YieldDistributionFailed(workflowId, token, yieldToDistribute, 'Unknown error');\\n                    result.success = false;\\n                    \\n                    // CRIT-2: Fallback to fee recipient on distribution failure\\n                    if (feeRecipient != address(0)) {\\n                        IERC20(token).safeTransfer(feeRecipient, yieldToDistribute);\\n                        result.yieldDistributed = yieldToDistribute;\\n                        emit YieldRecoveredToFeeAddress(workflowId, token, yieldToDistribute, feeRecipient);\\n                    }\\n                }\\n            } else if (yieldToDistribute > 0) {\\n                // CRIT-2: No distribution module - route to fee recipient as fallback\\n                if (feeRecipient != address(0)) {\\n                    IERC20(token).safeTransfer(feeRecipient, yieldToDistribute);\\n                    result.yieldDistributed = yieldToDistribute;\\n                    emit YieldRecoveredToFeeAddress(workflowId, token, yieldToDistribute, feeRecipient);\\n                } else {\\n                    // No distribution module and no fee recipient - yield stays in contract\\n                    result.yieldDistributed = 0;\\n                }\\n                result.success = true;\\n            }\\n        }\\n\\n        return result;\\n    }\\n\\n    /**\\n     * @dev Internal yield distribution (public for try/catch pattern)\\n     * @param distModule Yield distribution module\\n     * @param workflowId Escrow workflow ID\\n     * @param token Token address\\n     * @param yieldAmount Yield amount to distribute\\n     * @param distributionData Encoded per-escrow yield distribution (recipients, percentages) or empty for module default\\n     * @dev This function is public to allow try/catch from within the contract\\n     *      but should only be called by handleYield\\n     */\\n    function _distributeYieldInternal(\\n        IYieldDistributionModule distModule,\\n        uint256 workflowId,\\n        address token,\\n        uint256 yieldAmount,\\n        bytes memory distributionData\\n    ) public {\\n        if (msg.sender != address(this)) revert InternalOnly(msg.sender);\\n\\n        if (yieldAmount == 0) return;\\n\\n        // Transfer yield to module\\n        IERC20(token).safeTransfer(address(distModule), yieldAmount);\\n\\n        // Distribute using per-escrow distribution data or module default (empty = module default)\\n        (bool success, ) = distModule.distributeYield(\\n            workflowId,\\n            token,\\n            yieldAmount,\\n            distributionData\\n        );\\n        if (!success) revert DistributionFailed(workflowId, token, yieldAmount);\\n\\n        emit YieldDistributed(workflowId, token, yieldAmount);\\n    }\\n\\n    /**\\n     * @notice Recover tokens accidentally sent to this contract\\n     * @param token Token address (or address(0) for native ETH)\\n     * @param to Recipient address\\n     * @param amount Amount to recover\\n     * @dev CRIT-1: Emergency function - requires ROLE_GUARDIAN access control\\n     *      This contract should not hold funds, but access control prevents unauthorized draining\\n     */\\n    function recoverTokens(address token, address to, uint256 amount) \\n        external \\n        onlyRole(ROLE_GUARDIAN) \\n    {\\n        if (to == address(0)) revert InvalidRecipient(to);\\n\\n        if (token == address(0)) {\\n            (bool success, ) = payable(to).call{value: amount}('');\\n            if (!success) revert TransferFailed(to, amount);\\n        } else {\\n            IERC20(token).safeTransfer(to, amount);\\n        }\\n        \\n        emit TokensRecovered(token, to, amount);\\n    }\\n}\\n\",\"keccak256\":\"0xe8f6837a0e52ef993589012bc6ac8c73b5f41b0e7ffecaf9eb490b8b758a1edc\",\"license\":\"Apache-2.0\"},\"contracts/interfaces/IResolver.sol\":{\"content\":\"// SPDX-License-Identifier: Apache-2.0\\npragma solidity ^0.8.33;\\n\\n/**\\n * @title IResolver\\n * @notice Standard interface for dispute resolution (ERC-ESCR-DISPUTE)\\n * @dev Enables pluggable dispute resolution systems\\n */\\ninterface IResolver {\\n    /**\\n     * @notice Called when a dispute is opened for an escrow\\n     * @param workflowId The workflow ID\\n     * @param disputeMetadata Additional dispute metadata (optional)\\n     * @dev Optional callback - resolver can choose to implement or ignore\\n     */\\n    function onDisputeOpened(uint256 workflowId, bytes calldata disputeMetadata) external;\\n\\n    /**\\n     * @notice Resolve a disputed escrow with flexible payouts\\n     * @param workflowId The workflow ID\\n     * @param payouts Array of payouts (recipient, amount)\\n     * @param resolutionMetadata Additional resolution metadata (optional)\\n     * @dev Must be called by the escrow contract's resolve function\\n     * @dev Payouts must sum to available escrow balance\\n     */\\n    function resolve(\\n        uint256 workflowId,\\n        Payout[] calldata payouts,\\n        bytes calldata resolutionMetadata\\n    ) external;\\n\\n    /**\\n     * @notice Get resolver metadata\\n     * @return name Resolver name/identifier\\n     * @return version Resolver version\\n     */\\n    function resolverMetadata() external view returns (string memory name, string memory version);\\n}\\n\\n/**\\n * @title Payout\\n * @notice Structure for escrow resolution payouts\\n */\\nstruct Payout {\\n    address recipient; // Address to receive payout\\n    uint256 amount; // Amount to payout\\n}\\n\",\"keccak256\":\"0xd47afa87445c41eb5e10eafb10ed9704c2163f1dff768c97ccf8c22198b6ba57\",\"license\":\"Apache-2.0\"},\"contracts/interfaces/IYieldDistributionModule.sol\":{\"content\":\"// SPDX-License-Identifier: Apache-2.0\\npragma solidity ^0.8.33;\\n\\nimport '@openzeppelin/contracts/utils/introspection/IERC165.sol';\\n\\n/**\\n * @title IYieldDistributionModule\\n * @notice Interface for yield distribution modules\\n * @dev Handles distribution of yield to recipients. Generation is handled separately.\\n */\\ninterface IYieldDistributionModule is IERC165 {\\n    /**\\n     * @notice Distribute yield to recipients\\n     * @param workflowId The escrow transfer ID\\n     * @param token Token address\\n     * @param yieldAmount Amount of yield to distribute\\n     * @param distributionData Encoded distribution configuration (e.g., recipients and percentages)\\n     * @return success True if distribution was successful\\n     * @return distributedAmount Total amount distributed\\n     */\\n    function distributeYield(\\n        uint256 workflowId,\\n        address token,\\n        uint256 yieldAmount,\\n        bytes calldata distributionData\\n    ) external returns (bool success, uint256 distributedAmount);\\n\\n    /**\\n     * @notice Get the module name/identifier\\n     * @return name The module name\\n     */\\n    function moduleName() external pure returns (string memory name);\\n\\n    /**\\n     * @notice Get the module version\\n     * @return version The module version (semantic versioning, e.g., \\\"1.0.0\\\")\\n     */\\n    function moduleVersion() external pure returns (string memory version);\\n}\\n\",\"keccak256\":\"0x303115b011a85190a7bda13e59cecb9f4bd8ee997013ea51de2bc524dfb3a1ff\",\"license\":\"Apache-2.0\"},\"contracts/interfaces/IYieldGenerationModule.sol\":{\"content\":\"// SPDX-License-Identifier: Apache-2.0\\npragma solidity ^0.8.33;\\n\\nimport '@openzeppelin/contracts/utils/introspection/IERC165.sol';\\n\\n/**\\n * @title IYieldGenerationModule\\n * @notice Interface for yield generation modules (e.g., Aave, Compound, Yearn)\\n * @dev Handles yield generation during escrow lifespan. Distribution is handled separately.\\n */\\ninterface IYieldGenerationModule is IERC165 {\\n    /**\\n     * @notice Deposit funds to generate yield\\n     * @param workflowId The escrow transfer ID\\n     * @param token Token address (or address(this) for native token)\\n     * @param amount Amount to deposit\\n     * @return success True if deposit was successful\\n     * @return yieldTokenBalance Balance of yield token received\\n     */\\n    function depositForYield(\\n        uint256 workflowId,\\n        address token,\\n        uint256 amount\\n    ) external returns (bool success, uint256 yieldTokenBalance);\\n\\n    /**\\n     * @notice Withdraw funds and calculate yield\\n     * @param workflowId The escrow transfer ID\\n     * @param token Token address\\n     * @param originalAmount Original deposit amount\\n     * @return success True if withdrawal was successful\\n     * @return actualAmount Actual amount withdrawn (including yield)\\n     * @return yieldAmount Amount of yield generated\\n     */\\n    function withdrawWithYield(\\n        uint256 workflowId,\\n        address token,\\n        uint256 originalAmount\\n    ) external returns (bool success, uint256 actualAmount, uint256 yieldAmount);\\n\\n    /**\\n     * @notice Calculate current yield for an escrow\\n     * @param workflowId The escrow transfer ID\\n     * @param token Token address\\n     * @return yieldAmount Current yield amount\\n     */\\n    function calculateYield(\\n        uint256 workflowId,\\n        address token\\n    ) external view returns (uint256 yieldAmount);\\n\\n    /**\\n     * @notice Check if token is supported for yield generation\\n     * @param token Token address\\n     * @return supported True if supported\\n     */\\n    function isTokenSupported(address token) external view returns (bool supported);\\n\\n    /**\\n     * @notice Get the approval target address for a token (if escrow contract needs to approve before deposit)\\n     * @param token Token address\\n     * @return approvalTarget Address that needs approval (address(0) if no approval needed or handled by module)\\n     * @dev For EscrowableERC20: returns the pool/contract that needs approval to spend tokens\\n     *      For EscrowVault: typically returns address(0) as module handles approvals\\n     *      Returns address(0) if approval is not needed or is handled internally by the module\\n     */\\n    function getApprovalTarget(address token) external view returns (address approvalTarget);\\n\\n    /**\\n     * @notice Get the module name/identifier\\n     * @return name The module name\\n     */\\n    function moduleName() external pure returns (string memory name);\\n\\n    /**\\n     * @notice Get the module version\\n     * @return version The module version (semantic versioning, e.g., \\\"1.0.0\\\")\\n     */\\n    function moduleVersion() external pure returns (string memory version);\\n}\\n\",\"keccak256\":\"0xad7ecffba2dd2ade95ecdbbedcc6988e09aee5d30487a70835e73cc63236ac37\",\"license\":\"Apache-2.0\"},\"contracts/libraries/ResolverLogicLibrary.sol\":{\"content\":\"// SPDX-License-Identifier: Apache-2.0\\npragma solidity ^0.8.33;\\n\\nimport '../interfaces/IResolver.sol';\\nimport '../interfaces/IYieldGenerationModule.sol';\\nimport '../types/EscrowTypes.sol';\\n\\n// Payout struct is defined in IResolver.sol at file level\\n\\n/**\\n * @title ResolverLogicLibrary\\n * @notice Library for resolver payout calculations and yield handling\\n * @dev Extracted from BaseEscrow to reduce contract size\\n */\\nlibrary ResolverLogicLibrary {\\n    /**\\n     * @dev Calculate proportional yield for payouts\\n     * @param totalYield Total yield amount\\n     * @param payoutAmount Individual payout amount\\n     * @param totalAmount Total escrow amount\\n     * @return Proportional yield for this payout\\n     */\\n    function calculateProportionalYield(\\n        uint256 totalYield,\\n        uint256 payoutAmount,\\n        uint256 totalAmount\\n    ) internal pure returns (uint256) {\\n        if (totalAmount == 0) return 0;\\n        return (totalYield * payoutAmount) / totalAmount;\\n    }\\n\\n    /**\\n     * @dev Calculate total yield to distribute across all payouts\\n     * @param totalYield Total yield amount\\n     * @param payoutAmounts Array of payout amounts\\n     * @param totalAmount Total escrow amount\\n     * @return Total yield to distribute\\n     */\\n    function calculateTotalYieldToDistribute(\\n        uint256 totalYield,\\n        uint256[] memory payoutAmounts,\\n        uint256 totalAmount\\n    ) internal pure returns (uint256) {\\n        if (totalAmount == 0) return 0;\\n        uint256 yieldToDistribute = 0;\\n        for (uint256 i = 0; i < payoutAmounts.length; i++) {\\n            uint256 proportionalYield = calculateProportionalYield(\\n                totalYield,\\n                payoutAmounts[i],\\n                totalAmount\\n            );\\n            if (proportionalYield > 0) {\\n                yieldToDistribute += proportionalYield;\\n            }\\n        }\\n        return yieldToDistribute;\\n    }\\n\\n    /**\\n     * @dev Adjust payout amounts proportionally based on actual withdrawal amount\\n     * @param payoutAmounts Array of payout amounts to adjust\\n     * @param actualTotalPayout Actual total amount withdrawn\\n     * @param requestedTotalPayout Requested total payout amount\\n     * @return Adjusted payout amounts\\n     * @dev Multiplies before dividing to maintain precision\\n     */\\n    function adjustPayoutAmounts(\\n        uint256[] memory payoutAmounts,\\n        uint256 actualTotalPayout,\\n        uint256 requestedTotalPayout\\n    ) internal pure returns (uint256[] memory) {\\n        if (actualTotalPayout == requestedTotalPayout || requestedTotalPayout == 0) {\\n            return payoutAmounts;\\n        }\\n        for (uint256 i = 0; i < payoutAmounts.length; i++) {\\n            payoutAmounts[i] = (payoutAmounts[i] * actualTotalPayout) / requestedTotalPayout;\\n        }\\n        return payoutAmounts;\\n    }\\n\\n    /**\\n     * @dev Validate payout array and calculate total\\n     * @param payouts Array of payout structs\\n     * @param availableBalance Available escrow balance\\n     * @return totalPayout Sum of all payout amounts\\n     * @dev Reverts if validation fails\\n     */\\n    function validatePayouts(\\n        Payout[] memory payouts,\\n        uint256 availableBalance\\n    ) internal pure returns (uint256 totalPayout) {\\n        if (payouts.length == 0) {\\n            revert InvalidAmount(AMOUNT_EMPTY);\\n        }\\n\\n        totalPayout = 0;\\n        for (uint256 i = 0; i < payouts.length; i++) {\\n            if (payouts[i].recipient == address(0)) {\\n                revert InvalidAddress(ADDR_RECIPIENT, address(0));\\n            }\\n            if (payouts[i].amount == 0) {\\n                revert InvalidAmount(AMOUNT_EMPTY);\\n            }\\n            totalPayout += payouts[i].amount;\\n        }\\n\\n        if (totalPayout > availableBalance) {\\n            revert InvalidAmount(AMOUNT_GENERIC);\\n        }\\n    }\\n\\n    /**\\n     * @dev Copy payout amounts to memory array\\n     * @param payouts Array of payout structs\\n     * @return Array of payout amounts\\n     */\\n    function copyPayoutAmounts(Payout[] memory payouts) internal pure returns (uint256[] memory) {\\n        uint256[] memory amounts = new uint256[](payouts.length);\\n        for (uint256 i = 0; i < payouts.length; i++) {\\n            amounts[i] = payouts[i].amount;\\n        }\\n        return amounts;\\n    }\\n}\\n\",\"keccak256\":\"0x062b278f0f2e7fe09d39a8858a5ac1beac36b7f5e45da49a779b2d2909dc8c1f\",\"license\":\"Apache-2.0\"},\"contracts/types/EscrowTypes.sol\":{\"content\":\"// SPDX-License-Identifier: Apache-2.0\\npragma solidity ^0.8.33;\\n\\nimport './YieldPresets.sol';\\n\\n// Custom errors for better user experience\\n// Error code constants (uint8)\\n// InvalidAutoTime codes\\nuint8 constant AUTO_TIME_IN_PAST = 1;\\nuint8 constant AUTO_TIME_TOO_LARGE = 2;\\n// InvalidAmount codes\\nuint8 constant AMOUNT_GENERIC = 1;\\nuint8 constant AMOUNT_OVERFLOW = 2;\\nuint8 constant AMOUNT_EMPTY = 3;\\n// InvalidAddress \\\"which\\\" codes\\nuint8 constant ADDR_GENERIC = 1;\\nuint8 constant ADDR_ESCROW_CONTRACT = 2;\\nuint8 constant ADDR_TOKEN = 3;\\nuint8 constant ADDR_RECIPIENT = 4;\\nuint8 constant ADDR_FEE_RECIPIENT = 5;\\nuint8 constant ADDR_YIELD_OPS = 6;\\nuint8 constant ADDR_DISPUTE_OPS = 7;\\nuint8 constant ADDR_INITIAL_ADMIN = 8;\\nuint8 constant ADDR_INITIAL_OWNER = 9;\\nuint8 constant ADDR_INITIAL_RESOLVER = 10;\\nuint8 constant ADDR_PROVIDER = 11;\\nuint8 constant ADDR_ATOKEN = 12;\\n\\nerror InvalidAutoTime(uint8 code, uint256 providedTime, uint256 currentTime);\\nerror CannotSetBothAutoTimes(uint256 autoReleaseTime, uint256 autoCancelTime);\\nerror AutoTimeExceedsMaxLimit(uint256 providedTime, uint256 maxTime);\\nerror InvalidAddress(uint8 which, address addr);\\nerror InvalidAmount(uint8 code);\\nerror ArrayLengthMismatch(uint256 expectedLength, uint256 actualLength);\\n\\n// Specific errors without string parameters (saves bytecode)\\nerror ZeroDisputeOps();\\nerror ZeroSettlementOps();\\nerror ZeroCreateOps();\\nerror InvalidResolutionModule(address module);\\nerror ModuleNotContract(address module);\\nerror NotAContract(uint8 which, address addr); // which: 1=resolutionModule, 2=yieldOps, etc.\\nerror AmountZero();\\nerror FeeOverflow();\\nerror NoTokensToRecover();\\nerror AmountExceedsBalance(uint256 requested, uint256 available);\\n\\nstruct EscrowSettings {\\n    address customResolver; // Override default resolver (address(0) = use default)\\n    YieldPreset yieldPreset; // Yield configuration preset (OFF, TO_SENDER, etc.)\\n    uint256 autoReleaseTime; // Custom release time (0 = use default)\\n    uint256 autoCancelTime; // Custom cancel time (0 = use default)\\n}\\n\\n// DEPRECATED: YieldDistribution struct removed - distribution now derived from preset\\n// struct YieldDistribution {\\n//     address[] recipients; // Addresses to receive yield\\n//     uint256[] percentages; // Percentage per recipient (basis points, sum to 10000)\\n//     bool isSet; // Whether distribution is configured\\n// }\\n\\n// Escrow state and status enums (shared across contracts)\\nenum EscrowState {\\n    NONE,\\n    PENDING,\\n    RELEASED,\\n    REFUNDED,\\n    DISPUTED,\\n    RESOLVED\\n}\\n\\nenum SenderStatus {\\n    NONE,\\n    AGREE_TO_CANCEL,\\n    RAISE_DISPUTE\\n}\\n\\nenum RecipientStatus {\\n    NONE,\\n    AGREE_TO_CANCEL,\\n    RAISE_DISPUTE\\n}\\n\\n// EscrowTransfer struct (shared across contracts)\\n// Note: workflowId is redundant - use array index (escrowTransfers[index]) instead\\nstruct EscrowTransfer {\\n    address token; // ERC20 token address (for EscrowVault) or address(this) for EscrowableERC20\\n    address to;\\n    address from;\\n    address disputeResolver;\\n    uint256 amountAfterFee; // amount after fee deduction (what's actually held in escrow)\\n    uint64 autoReleaseTime;\\n    uint64 autoCancelTime;\\n    EscrowState escrowState;\\n    SenderStatus senderStatus;\\n    RecipientStatus recipientStatus;\\n}\\n\\nstruct TimeoutConfig {\\n    // Auto-execution defaults (0 = disabled, absolute timestamps)\\n    uint256 defaultAutoReleaseTime; // Default auto-release timestamp (0 = disabled)\\n    uint256 defaultAutoCancelTime; // Default auto-cancel timestamp (0 = disabled)\\n    // Safety timeouts (durations in seconds)\\n    uint256 maxDisputeDuration; // Max time for disputes (7-365 days)\\n    uint256 appealWindowDuration; // Time to appeal resolution (1-7 days)\\n}\\n\",\"keccak256\":\"0xdd5946eb89e70dcc4309d34b383cccdc5dbd0d5e6364750fdd83e274cbd1b82a\",\"license\":\"Apache-2.0\"},\"contracts/types/YieldPresets.sol\":{\"content\":\"// SPDX-License-Identifier: Apache-2.0\\npragma solidity ^0.8.33;\\n\\n/**\\n * @title YieldPresets\\n * @notice Yield configuration presets for escrows\\n * @dev Simple enum for yield configuration. Distribution is derived deterministically.\\n */\\nenum YieldPreset {\\n    OFF,           // No yield (default)\\n    TO_SENDER      // Yield goes to sender (buyer) - 100%\\n}\\n\",\"keccak256\":\"0xeb4453c6843e7c64560d17d29a1fa71e071a7f4975c5fd8ededb3564c91ea522\",\"license\":\"Apache-2.0\"}},\"version\":1}",
+  "bytecode": "0x60803461008757601f61140338819003918201601f19168301916001600160401b0383118484101761008b5780849260209460405283398101031261008757516001600160a01b038116808203610087571561007857806100626100689261009f565b50610115565b506040516111fa90816101a98239f35b639905827b60e01b5f5260045ffd5b5f80fd5b634e487b7160e01b5f52604160045260245ffd5b6001600160a01b0381165f9081525f5160206113e35f395f51905f52602052604090205460ff16610110576001600160a01b03165f8181525f5160206113e35f395f51905f5260205260408120805460ff191660011790553391905f5160206113a35f395f51905f528180a4600190565b505f90565b6001600160a01b0381165f9081525f5160206113c35f395f51905f52602052604090205460ff16610110576001600160a01b03165f8181525f5160206113c35f395f51905f5260205260408120805460ff191660011790553391907fa7237cfbf9fe2450157172fd47796702525944fb480132d0010170990238cb28905f5160206113a35f395f51905f529080a460019056fe6080806040526004361015610012575f80fd5b5f3560e01c90816301ffc9a7146106da57508063248a9ca3146106a85780632f2ff15d1461066b57806336568abe1461062757806344afb7c8146104bc5780635f3e849f146103445780636d947e4b1461032857806377e223b0146102ee57806391d14854146102a6578063a217fddf1461028c578063a7fecab0146101db578063b92d04ee146101a1578063d1c3c4a714610167578063d547741f146101255763e859f9a3146100c1575f80fd5b346101215760a0366003190112610121576100da610743565b6044356001600160a01b0381168103610121576084359167ffffffffffffffff83116101215761011161011f933690600401610797565b916064359160243590610dfc565b005b5f80fd5b346101215760403660031901126101215761011f60043561014461072d565b9061016261015d825f525f602052600160405f20015490565b610f25565b6110b6565b34610121575f3660031901126101215760206040517fa7237cfbf9fe2450157172fd47796702525944fb480132d0010170990238cb288152f35b34610121575f3660031901126101215760206040517fae28d422fade920f8416eec4df2d6e8c972ee866d9da985a79f2bb60b62dd8ba8152f35b34610121576020366003190112610121576101f4610743565b335f9081527fb78b4e3a69a464ad18a7efe334870473ce1cbce43199ef3daded65a5770c63ab602052604090205460ff1615610255576001600160a01b038116156102425761011f90610f5d565b630bc2c5df60e11b5f525f60045260245ffd5b63e2517d3f60e01b5f52336004527fa7237cfbf9fe2450157172fd47796702525944fb480132d0010170990238cb2860245260445ffd5b34610121575f3660031901126101215760206040515f8152f35b34610121576040366003190112610121576102bf61072d565b6004355f525f60205260405f209060018060a01b03165f52602052602060ff60405f2054166040519015158152f35b34610121575f3660031901126101215760206040517f780a3ff0ad9fdec512b42db99bab4e6e0228ba9ddcf45e7acb1f4f9276a4f26b8152f35b34610121575f366003190112610121576020604051610bb88152f35b346101215760603660031901126101215761035d610743565b61036561072d565b335f9081527fc1d3706dfd3eabe31ea8075cb991d5f4c8a7a2a0644b05f3f5ce965dfd258b6260205260409020546044359060ff1615610485576001600160a01b038216928315610472576001600160a01b0316918261043e57505f80808084875af13d15610439573d6103d88161077b565b906103e66040519283610759565b81525f60203d92013e5b156104235760207f401f439d865a766757ec78675925bd67198d5e78805aa41691b34b5d6a6cbbe6915b604051908152a3005b82630e21dcbb60e11b5f5260045260245260445ffd5b6103f0565b8161046d7f401f439d865a766757ec78675925bd67198d5e78805aa41691b34b5d6a6cbbe69360209386611136565b61041a565b83630bc2c5df60e11b5f5260045260245ffd5b63e2517d3f60e01b5f52336004527f780a3ff0ad9fdec512b42db99bab4e6e0228ba9ddcf45e7acb1f4f9276a4f26b60245260445ffd5b3461012157610100366003190112610121576004356001600160a01b0381168103610121576104e961072d565b60643591906001600160a01b03831683036101215760c4356001600160a01b03811681036101215760e43567ffffffffffffffff811161012157610531903690600401610797565b91604051936080850185811067ffffffffffffffff8211176106135760409081525f8087526020808801829052878301829052606088018290523382527f707f8236909d1a477adb595d9647bde7f92d2c34cfd02463a7e023d653b407a19052205460ff16156105dc576080956105b39560a4359360843593604435926108a6565b606060405191805183526020810151602084015260408101516040840152015115156060820152f35b63e2517d3f60e01b5f52336004527fae28d422fade920f8416eec4df2d6e8c972ee866d9da985a79f2bb60b62dd8ba60245260445ffd5b634e487b7160e01b5f52604160045260245ffd5b346101215760403660031901126101215761064061072d565b336001600160a01b0382160361065c5761011f906004356110b6565b63334bd91960e11b5f5260045ffd5b346101215760403660031901126101215761011f60043561068a61072d565b906106a361015d825f525f602052600160405f20015490565b61102e565b346101215760203660031901126101215760206106d26004355f525f602052600160405f20015490565b604051908152f35b34610121576020366003190112610121576004359063ffffffff60e01b821680920361012157602091637965db0b60e01b811490811561071c575b5015158152f35b6301ffc9a760e01b14905083610715565b602435906001600160a01b038216820361012157565b600435906001600160a01b038216820361012157565b90601f8019910116810190811067ffffffffffffffff82111761061357604052565b67ffffffffffffffff811161061357601f01601f191660200190565b81601f82011215610121578035906107ae8261077b565b926107bc6040519485610759565b8284526020838301011161012157815f926020809301838601378301015290565b5190811515820361012157565b919082039182116107f757565b634e487b7160e01b5f52601160045260245ffd5b805180835260209291819084018484015e5f828201840152601f01601f1916010190565b5f60443d10610895576040513d600319016004823e8051913d602484011167ffffffffffffffff8411176108a0578282019283519167ffffffffffffffff8311610898573d84016003190185840160200111610898575061089592910160200190610759565b90565b949350505050565b92915050565b8581525f6020820181905260408201819052600160608301529598909796939593949092916001600160a01b031690888215610dee57508860645f999a9b60608a94604051938480926313eb031960e11b825288600483015260018060a01b03169e8f998a60248401528660448401525af191825f915f94610da2575b50610d4257505050507f7fed93271b7d6ff984a31a88e8a05336347cb372df35deabd56924b5076bed8360806040515f815260406020820152601760408201527f5969656c64207769746864726177616c206661696c65640000000000000000006060820152a35b60208801938451806109a4575b50505050505050505090565b9481610c81575b50508315158080610c6f575b15610bef5750303b156101215760405163e859f9a360e01b81526001600160a01b03909116600482015260248101859052604481018690526064810184905260a06084820152905f9082908190610a129060a483019061080b565b038183305af19081610bda575b50610bc55760018160033d11610bb5575b6308c379a014610b00575b610a54575b50505050505b5f8080808080808080610998565b83837f7fed93271b7d6ff984a31a88e8a05336347cb372df35deabd56924b5076bed83608060405186815260406020820152600d60408201526c2ab735b737bbb71032b93937b960991b6060820152a360608601526001600160a01b038416938415610a405781610ae97f6bf945a684ee0b868a015a2fb91a2e2bc2918630df8b480c549bff9e736e909d9360209387611136565b806040880152604051908152a45f80808080610a40565b610b0861082f565b80610b14575b50610a3b565b905084847f7fed93271b7d6ff984a31a88e8a05336347cb372df35deabd56924b5076bed83610b58859460405191829189835260406020840152604083019061080b565b0390a3606087018290526001600160a01b0386168015610b0e57610b7d848888611136565b83604089015285857f6bf945a684ee0b868a015a2fb91a2e2bc2918630df8b480c549bff9e736e909d6020604051888152a45f610b0e565b50600482803e815160e01c610a30565b50604085015250506001606083015250610a46565b610be79192505f90610759565b5f905f610a1f565b92505050610c01575b50505050610a46565b6001600160a01b038416938415610c5f5781610c417f6bf945a684ee0b868a015a2fb91a2e2bc2918630df8b480c549bff9e736e909d9360209387611136565b806040880152604051908152a45b600160608201525f808080610bf8565b50505050505f6040820152610c4f565b506001600160a01b03821615156109b7565b6001600160a01b03891615610d3357610bb88211610d1a5780518281029281840414901517156107f7578688916127108b94049081610cc3575b5050506109ab565b7fddff2bd7f136e8bb615a61af958d9b8b643c4b10904eed6e28d643f237ca350992939498509081610d0382610cfc81604096516107ea565b9b88611136565b519082519182526020820152a38686865f80610cbb565b5063fc01915160e01b5f52600452610bb860245260445ffd5b634fdcfc5560e11b5f5260045ffd5b610d51575b505050505061098b565b81835280821115610d47577f94a8a4ee0a0fd32dcadd2dc661028f579bf7d07a4970cd618cfb9d0c1b2d5a7b92610d8c6020939284936107ea565b9182910152604051908152a38585895f80610d47565b94509550509250506060813d606011610de6575b81610dc360609383610759565b810103126101215788928892826020610ddc8f956107dd565b910151925f610923565b3d9150610db6565b995050505050505050505090565b9392919092303303610f12578215610f0b576001600160a01b03918216945f92604092610e679290911690610e3286838a611136565b8351948580948193636eeca2e160e11b83528a60048401528b602484015289604484015260806064840152608483019061080b565b03925af1908115610f00575f91610ec6575b5015610eac5760207f4c44bdc7c4678ac452a89c8b93511eb6592ff47a3660c4d6bb1847e957308acf91604051908152a3565b925063adcde5e760e01b5f5260045260245260445260645ffd5b90506040813d604011610ef8575b81610ee160409383610759565b8101031261012157610ef2906107dd565b5f610e79565b3d9150610ed4565b6040513d5f823e3d90fd5b5050505050565b63053ca80360e21b5f523360045260245ffd5b5f8181526020818152604080832033845290915290205460ff1615610f475750565b63e2517d3f60e01b5f523360045260245260445ffd5b6001600160a01b0381165f9081527f707f8236909d1a477adb595d9647bde7f92d2c34cfd02463a7e023d653b407a1602052604090205460ff16611029576001600160a01b03165f8181527f707f8236909d1a477adb595d9647bde7f92d2c34cfd02463a7e023d653b407a160205260408120805460ff191660011790553391907fae28d422fade920f8416eec4df2d6e8c972ee866d9da985a79f2bb60b62dd8ba907f2f8788117e7eff1d82e926ec794901d17c78024a50270940304540a733656f0d9080a4600190565b505f90565b5f818152602081815260408083206001600160a01b038616845290915290205460ff166110b0575f818152602081815260408083206001600160a01b0395909516808452949091528120805460ff19166001179055339291907f2f8788117e7eff1d82e926ec794901d17c78024a50270940304540a733656f0d9080a4600190565b50505f90565b5f818152602081815260408083206001600160a01b038616845290915290205460ff16156110b0575f818152602081815260408083206001600160a01b0395909516808452949091528120805460ff19169055339291907ff6391f5c32d9c69d2a47ea670b442974b53935d1edc7fd64eb21e047a839171b9080a4600190565b60405163a9059cbb60e01b60208281019182526001600160a01b03909416602483015260448083019590955293815290925f91611174606482610759565b519082855af115610f00575f513d6111bb57506001600160a01b0381163b155b61119b5750565b635274afe760e01b5f9081526001600160a01b0391909116600452602490fd5b6001141561119456fea264697066735822122063447c2a077629a347508e05844d61f43f43777a74358f951f26337d681979b564736f6c634300082100332f8788117e7eff1d82e926ec794901d17c78024a50270940304540a733656f0db78b4e3a69a464ad18a7efe334870473ce1cbce43199ef3daded65a5770c63abad3228b676f7d3cd4284a5443f17f1962b36e491b30a40b2405849e597ba5fb5",
+  "deployedBytecode": "0x6080806040526004361015610012575f80fd5b5f3560e01c90816301ffc9a7146106da57508063248a9ca3146106a85780632f2ff15d1461066b57806336568abe1461062757806344afb7c8146104bc5780635f3e849f146103445780636d947e4b1461032857806377e223b0146102ee57806391d14854146102a6578063a217fddf1461028c578063a7fecab0146101db578063b92d04ee146101a1578063d1c3c4a714610167578063d547741f146101255763e859f9a3146100c1575f80fd5b346101215760a0366003190112610121576100da610743565b6044356001600160a01b0381168103610121576084359167ffffffffffffffff83116101215761011161011f933690600401610797565b916064359160243590610dfc565b005b5f80fd5b346101215760403660031901126101215761011f60043561014461072d565b9061016261015d825f525f602052600160405f20015490565b610f25565b6110b6565b34610121575f3660031901126101215760206040517fa7237cfbf9fe2450157172fd47796702525944fb480132d0010170990238cb288152f35b34610121575f3660031901126101215760206040517fae28d422fade920f8416eec4df2d6e8c972ee866d9da985a79f2bb60b62dd8ba8152f35b34610121576020366003190112610121576101f4610743565b335f9081527fb78b4e3a69a464ad18a7efe334870473ce1cbce43199ef3daded65a5770c63ab602052604090205460ff1615610255576001600160a01b038116156102425761011f90610f5d565b630bc2c5df60e11b5f525f60045260245ffd5b63e2517d3f60e01b5f52336004527fa7237cfbf9fe2450157172fd47796702525944fb480132d0010170990238cb2860245260445ffd5b34610121575f3660031901126101215760206040515f8152f35b34610121576040366003190112610121576102bf61072d565b6004355f525f60205260405f209060018060a01b03165f52602052602060ff60405f2054166040519015158152f35b34610121575f3660031901126101215760206040517f780a3ff0ad9fdec512b42db99bab4e6e0228ba9ddcf45e7acb1f4f9276a4f26b8152f35b34610121575f366003190112610121576020604051610bb88152f35b346101215760603660031901126101215761035d610743565b61036561072d565b335f9081527fc1d3706dfd3eabe31ea8075cb991d5f4c8a7a2a0644b05f3f5ce965dfd258b6260205260409020546044359060ff1615610485576001600160a01b038216928315610472576001600160a01b0316918261043e57505f80808084875af13d15610439573d6103d88161077b565b906103e66040519283610759565b81525f60203d92013e5b156104235760207f401f439d865a766757ec78675925bd67198d5e78805aa41691b34b5d6a6cbbe6915b604051908152a3005b82630e21dcbb60e11b5f5260045260245260445ffd5b6103f0565b8161046d7f401f439d865a766757ec78675925bd67198d5e78805aa41691b34b5d6a6cbbe69360209386611136565b61041a565b83630bc2c5df60e11b5f5260045260245ffd5b63e2517d3f60e01b5f52336004527f780a3ff0ad9fdec512b42db99bab4e6e0228ba9ddcf45e7acb1f4f9276a4f26b60245260445ffd5b3461012157610100366003190112610121576004356001600160a01b0381168103610121576104e961072d565b60643591906001600160a01b03831683036101215760c4356001600160a01b03811681036101215760e43567ffffffffffffffff811161012157610531903690600401610797565b91604051936080850185811067ffffffffffffffff8211176106135760409081525f8087526020808801829052878301829052606088018290523382527f707f8236909d1a477adb595d9647bde7f92d2c34cfd02463a7e023d653b407a19052205460ff16156105dc576080956105b39560a4359360843593604435926108a6565b606060405191805183526020810151602084015260408101516040840152015115156060820152f35b63e2517d3f60e01b5f52336004527fae28d422fade920f8416eec4df2d6e8c972ee866d9da985a79f2bb60b62dd8ba60245260445ffd5b634e487b7160e01b5f52604160045260245ffd5b346101215760403660031901126101215761064061072d565b336001600160a01b0382160361065c5761011f906004356110b6565b63334bd91960e11b5f5260045ffd5b346101215760403660031901126101215761011f60043561068a61072d565b906106a361015d825f525f602052600160405f20015490565b61102e565b346101215760203660031901126101215760206106d26004355f525f602052600160405f20015490565b604051908152f35b34610121576020366003190112610121576004359063ffffffff60e01b821680920361012157602091637965db0b60e01b811490811561071c575b5015158152f35b6301ffc9a760e01b14905083610715565b602435906001600160a01b038216820361012157565b600435906001600160a01b038216820361012157565b90601f8019910116810190811067ffffffffffffffff82111761061357604052565b67ffffffffffffffff811161061357601f01601f191660200190565b81601f82011215610121578035906107ae8261077b565b926107bc6040519485610759565b8284526020838301011161012157815f926020809301838601378301015290565b5190811515820361012157565b919082039182116107f757565b634e487b7160e01b5f52601160045260245ffd5b805180835260209291819084018484015e5f828201840152601f01601f1916010190565b5f60443d10610895576040513d600319016004823e8051913d602484011167ffffffffffffffff8411176108a0578282019283519167ffffffffffffffff8311610898573d84016003190185840160200111610898575061089592910160200190610759565b90565b949350505050565b92915050565b8581525f6020820181905260408201819052600160608301529598909796939593949092916001600160a01b031690888215610dee57508860645f999a9b60608a94604051938480926313eb031960e11b825288600483015260018060a01b03169e8f998a60248401528660448401525af191825f915f94610da2575b50610d4257505050507f7fed93271b7d6ff984a31a88e8a05336347cb372df35deabd56924b5076bed8360806040515f815260406020820152601760408201527f5969656c64207769746864726177616c206661696c65640000000000000000006060820152a35b60208801938451806109a4575b50505050505050505090565b9481610c81575b50508315158080610c6f575b15610bef5750303b156101215760405163e859f9a360e01b81526001600160a01b03909116600482015260248101859052604481018690526064810184905260a06084820152905f9082908190610a129060a483019061080b565b038183305af19081610bda575b50610bc55760018160033d11610bb5575b6308c379a014610b00575b610a54575b50505050505b5f8080808080808080610998565b83837f7fed93271b7d6ff984a31a88e8a05336347cb372df35deabd56924b5076bed83608060405186815260406020820152600d60408201526c2ab735b737bbb71032b93937b960991b6060820152a360608601526001600160a01b038416938415610a405781610ae97f6bf945a684ee0b868a015a2fb91a2e2bc2918630df8b480c549bff9e736e909d9360209387611136565b806040880152604051908152a45f80808080610a40565b610b0861082f565b80610b14575b50610a3b565b905084847f7fed93271b7d6ff984a31a88e8a05336347cb372df35deabd56924b5076bed83610b58859460405191829189835260406020840152604083019061080b565b0390a3606087018290526001600160a01b0386168015610b0e57610b7d848888611136565b83604089015285857f6bf945a684ee0b868a015a2fb91a2e2bc2918630df8b480c549bff9e736e909d6020604051888152a45f610b0e565b50600482803e815160e01c610a30565b50604085015250506001606083015250610a46565b610be79192505f90610759565b5f905f610a1f565b92505050610c01575b50505050610a46565b6001600160a01b038416938415610c5f5781610c417f6bf945a684ee0b868a015a2fb91a2e2bc2918630df8b480c549bff9e736e909d9360209387611136565b806040880152604051908152a45b600160608201525f808080610bf8565b50505050505f6040820152610c4f565b506001600160a01b03821615156109b7565b6001600160a01b03891615610d3357610bb88211610d1a5780518281029281840414901517156107f7578688916127108b94049081610cc3575b5050506109ab565b7fddff2bd7f136e8bb615a61af958d9b8b643c4b10904eed6e28d643f237ca350992939498509081610d0382610cfc81604096516107ea565b9b88611136565b519082519182526020820152a38686865f80610cbb565b5063fc01915160e01b5f52600452610bb860245260445ffd5b634fdcfc5560e11b5f5260045ffd5b610d51575b505050505061098b565b81835280821115610d47577f94a8a4ee0a0fd32dcadd2dc661028f579bf7d07a4970cd618cfb9d0c1b2d5a7b92610d8c6020939284936107ea565b9182910152604051908152a38585895f80610d47565b94509550509250506060813d606011610de6575b81610dc360609383610759565b810103126101215788928892826020610ddc8f956107dd565b910151925f610923565b3d9150610db6565b995050505050505050505090565b9392919092303303610f12578215610f0b576001600160a01b03918216945f92604092610e679290911690610e3286838a611136565b8351948580948193636eeca2e160e11b83528a60048401528b602484015289604484015260806064840152608483019061080b565b03925af1908115610f00575f91610ec6575b5015610eac5760207f4c44bdc7c4678ac452a89c8b93511eb6592ff47a3660c4d6bb1847e957308acf91604051908152a3565b925063adcde5e760e01b5f5260045260245260445260645ffd5b90506040813d604011610ef8575b81610ee160409383610759565b8101031261012157610ef2906107dd565b5f610e79565b3d9150610ed4565b6040513d5f823e3d90fd5b5050505050565b63053ca80360e21b5f523360045260245ffd5b5f8181526020818152604080832033845290915290205460ff1615610f475750565b63e2517d3f60e01b5f523360045260245260445ffd5b6001600160a01b0381165f9081527f707f8236909d1a477adb595d9647bde7f92d2c34cfd02463a7e023d653b407a1602052604090205460ff16611029576001600160a01b03165f8181527f707f8236909d1a477adb595d9647bde7f92d2c34cfd02463a7e023d653b407a160205260408120805460ff191660011790553391907fae28d422fade920f8416eec4df2d6e8c972ee866d9da985a79f2bb60b62dd8ba907f2f8788117e7eff1d82e926ec794901d17c78024a50270940304540a733656f0d9080a4600190565b505f90565b5f818152602081815260408083206001600160a01b038616845290915290205460ff166110b0575f818152602081815260408083206001600160a01b0395909516808452949091528120805460ff19166001179055339291907f2f8788117e7eff1d82e926ec794901d17c78024a50270940304540a733656f0d9080a4600190565b50505f90565b5f818152602081815260408083206001600160a01b038616845290915290205460ff16156110b0575f818152602081815260408083206001600160a01b0395909516808452949091528120805460ff19169055339291907ff6391f5c32d9c69d2a47ea670b442974b53935d1edc7fd64eb21e047a839171b9080a4600190565b60405163a9059cbb60e01b60208281019182526001600160a01b03909416602483015260448083019590955293815290925f91611174606482610759565b519082855af115610f00575f513d6111bb57506001600160a01b0381163b155b61119b5750565b635274afe760e01b5f9081526001600160a01b0391909116600452602490fd5b6001141561119456fea264697066735822122063447c2a077629a347508e05844d61f43f43777a74358f951f26337d681979b564736f6c63430008210033",
+  "devdoc": {
+    "details": "Extracted from BaseEscrow to reduce contract size (Phase 1 size optimization)      Key design principles (from updated plan):      - Non-blocking: Uses try/catch to prevent yield failures from blocking escrow lifecycle      - Non-reentrant: No callbacks to BaseEscrow, operates in \"compute and return\" pattern      - Pull-based: BaseEscrow transfers tokens to this contract before calling      This contract is stateless and purely operational - no escrow state stored here.",
+    "errors": {
+      "AccessControlBadConfirmation()": [
+        {
+          "details": "The caller of a function is not the expected one. NOTE: Don't confuse with {AccessControlUnauthorizedAccount}."
+        }
+      ],
+      "AccessControlUnauthorizedAccount(address,bytes32)": [
+        {
+          "details": "The `account` is missing a role."
+        }
+      ],
+      "SafeERC20FailedOperation(address)": [
+        {
+          "details": "An operation with an ERC-20 token failed."
+        }
+      ]
+    },
+    "events": {
+      "RoleAdminChanged(bytes32,bytes32,bytes32)": {
+        "details": "Emitted when `newAdminRole` is set as ``role``'s admin role, replacing `previousAdminRole` `DEFAULT_ADMIN_ROLE` is the starting admin for all roles, despite {RoleAdminChanged} not being emitted to signal this."
+      },
+      "RoleGranted(bytes32,address,address)": {
+        "details": "Emitted when `account` is granted `role`. `sender` is the account that originated the contract call. This account bears the admin role (for the granted role). Expected in cases where the role was granted using the internal {AccessControl-_grantRole}."
+      },
+      "RoleRevoked(bytes32,address,address)": {
+        "details": "Emitted when `account` is revoked `role`. `sender` is the account that originated the contract call:   - if using `revokeRole`, it is the admin role bearer   - if using `renounceRole`, it is the role bearer (i.e. `account`)"
+      }
+    },
+    "kind": "dev",
+    "methods": {
+      "_distributeYieldInternal(address,uint256,address,uint256,bytes)": {
+        "details": "Internal yield distribution (public for try/catch pattern)This function is public to allow try/catch from within the contract      but should only be called by handleYield",
+        "params": {
+          "distModule": "Yield distribution module",
+          "distributionData": "Encoded per-escrow yield distribution (recipients, percentages) or empty for module default",
+          "token": "Token address",
+          "workflowId": "Escrow workflow ID",
+          "yieldAmount": "Yield amount to distribute"
+        }
+      },
+      "constructor": {
+        "params": {
+          "initialOwner": "Address that will receive DEFAULT_ADMIN_ROLE (for initial setup only)"
+        }
+      },
+      "getRoleAdmin(bytes32)": {
+        "details": "Returns the admin role that controls `role`. See {grantRole} and {revokeRole}. To change a role's admin, use {_setRoleAdmin}."
+      },
+      "grantRole(bytes32,address)": {
+        "details": "Grants `role` to `account`. If `account` had not been already granted `role`, emits a {RoleGranted} event. Requirements: - the caller must have ``role``'s admin role. May emit a {RoleGranted} event."
+      },
+      "handleYield(address,address,uint256,address,uint256,uint256,address,bytes)": {
+        "details": "Non-blocking: Returns success=false if distribution fails, doesn't revert      Caller (BaseEscrow) should handle failure case (e.g., route to fee address)      Protocol fee is deducted from yield before distribution to recipients      Only authorized escrow contracts can call this function",
+        "params": {
+          "amount": "Original escrow amount",
+          "distModule": "Yield distribution module",
+          "distributionData": "Encoded per-escrow yield distribution (recipients, percentages) or empty for module default",
+          "feeRecipient": "Address to receive protocol fee",
+          "genModule": "Yield generation module",
+          "protocolFeeBps": "Protocol fee in basis points (0-3000 = 0-30%)",
+          "token": "Token address",
+          "workflowId": "Escrow workflow ID"
+        },
+        "returns": {
+          "result": "Yield operation result"
+        }
+      },
+      "hasRole(bytes32,address)": {
+        "details": "Returns `true` if `account` has been granted `role`."
+      },
+      "recoverTokens(address,address,uint256)": {
+        "details": "CRIT-1: Emergency function - requires ROLE_GUARDIAN access control      This contract should not hold funds, but access control prevents unauthorized draining",
+        "params": {
+          "amount": "Amount to recover",
+          "to": "Recipient address",
+          "token": "Token address (or address(0) for native ETH)"
+        }
+      },
+      "registerEscrowContract(address)": {
+        "details": "Only ROLE_TIMELOCK can register escrow contracts (governance-controlled)",
+        "params": {
+          "escrowContract": "Address of the escrow contract"
+        }
+      },
+      "renounceRole(bytes32,address)": {
+        "details": "Revokes `role` from the calling account. Roles are often managed via {grantRole} and {revokeRole}: this function's purpose is to provide a mechanism for accounts to lose their privileges if they are compromised (such as when a trusted device is misplaced). If the calling account had been revoked `role`, emits a {RoleRevoked} event. Requirements: - the caller must be `callerConfirmation`. May emit a {RoleRevoked} event."
+      },
+      "revokeRole(bytes32,address)": {
+        "details": "Revokes `role` from `account`. If `account` had been granted `role`, emits a {RoleRevoked} event. Requirements: - the caller must have ``role``'s admin role. May emit a {RoleRevoked} event."
+      },
+      "supportsInterface(bytes4)": {
+        "details": "Returns true if this contract implements the interface defined by `interfaceId`. See the corresponding https://eips.ethereum.org/EIPS/eip-165#how-interfaces-are-identified[ERC section] to learn more about how these ids are created. This function call must use less than 30 000 gas."
+      }
+    },
+    "title": "YieldOps",
+    "version": 1
+  },
+  "userdoc": {
+    "kind": "user",
+    "methods": {
+      "MAX_PROTOCOL_FEE_BPS()": {
+        "notice": "Maximum protocol fee (30%)"
+      },
+      "constructor": {
+        "notice": "Constructor for YieldOps"
+      },
+      "handleYield(address,address,uint256,address,uint256,uint256,address,bytes)": {
+        "notice": "Handle yield withdrawal and distribution"
+      },
+      "recoverTokens(address,address,uint256)": {
+        "notice": "Recover tokens accidentally sent to this contract"
+      },
+      "registerEscrowContract(address)": {
+        "notice": "Register an escrow contract (grants it ROLE_ESCROW_CONTRACT)"
+      }
+    },
+    "notice": "External contract for yield withdrawal and distribution operations",
+    "version": 1
+  },
+  "storageLayout": {
+    "storage": [
+      {
+        "astId": 875,
+        "contract": "contracts/YieldOps.sol:YieldOps",
+        "label": "_roles",
+        "offset": 0,
+        "slot": "0",
+        "type": "t_mapping(t_bytes32,t_struct(RoleData)870_storage)"
+      }
+    ],
+    "types": {
+      "t_address": {
+        "encoding": "inplace",
+        "label": "address",
+        "numberOfBytes": "20"
+      },
+      "t_bool": {
+        "encoding": "inplace",
+        "label": "bool",
+        "numberOfBytes": "1"
+      },
+      "t_bytes32": {
+        "encoding": "inplace",
+        "label": "bytes32",
+        "numberOfBytes": "32"
+      },
+      "t_mapping(t_address,t_bool)": {
+        "encoding": "mapping",
+        "key": "t_address",
+        "label": "mapping(address => bool)",
+        "numberOfBytes": "32",
+        "value": "t_bool"
+      },
+      "t_mapping(t_bytes32,t_struct(RoleData)870_storage)": {
+        "encoding": "mapping",
+        "key": "t_bytes32",
+        "label": "mapping(bytes32 => struct AccessControl.RoleData)",
+        "numberOfBytes": "32",
+        "value": "t_struct(RoleData)870_storage"
+      },
+      "t_struct(RoleData)870_storage": {
+        "encoding": "inplace",
+        "label": "struct AccessControl.RoleData",
+        "members": [
+          {
+            "astId": 867,
+            "contract": "contracts/YieldOps.sol:YieldOps",
+            "label": "hasRole",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_mapping(t_address,t_bool)"
+          },
+          {
+            "astId": 869,
+            "contract": "contracts/YieldOps.sol:YieldOps",
+            "label": "adminRole",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_bytes32"
+          }
+        ],
+        "numberOfBytes": "64"
+      }
+    }
+  }
+}

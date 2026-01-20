@@ -3,7 +3,7 @@ import { DeployFunction } from 'hardhat-deploy/types';
 
 /**
  * Wire TimelockController Roles
- * 
+ *
  * This script configures the TimelockController roles:
  * - Grant PROPOSER_ROLE to Governor (so Governor can queue proposals)
  * - Grant CANCELLER_ROLE to Governor (so Governor can cancel proposals)
@@ -87,13 +87,20 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   // Verify final state
   console.log(`\n✅ Timelock role wiring complete!`);
   console.log(`\n📊 Final Role Status:`);
-  console.log(`   Governor has PROPOSER_ROLE: ${await timelock.hasRole(PROPOSER_ROLE, governorDeployment.address)}`);
-  console.log(`   Governor has CANCELLER_ROLE: ${await timelock.hasRole(CANCELLER_ROLE, governorDeployment.address)}`);
-  console.log(`   Timelock has TIMELOCK_ADMIN_ROLE: ${await timelock.hasRole(TIMELOCK_ADMIN_ROLE, timelockDeployment.address)}`);
-  console.log(`   Deployer has TIMELOCK_ADMIN_ROLE: ${await timelock.hasRole(TIMELOCK_ADMIN_ROLE, deployer)}`);
+  console.log(
+    `   Governor has PROPOSER_ROLE: ${await timelock.hasRole(PROPOSER_ROLE, governorDeployment.address)}`,
+  );
+  console.log(
+    `   Governor has CANCELLER_ROLE: ${await timelock.hasRole(CANCELLER_ROLE, governorDeployment.address)}`,
+  );
+  console.log(
+    `   Timelock has TIMELOCK_ADMIN_ROLE: ${await timelock.hasRole(TIMELOCK_ADMIN_ROLE, timelockDeployment.address)}`,
+  );
+  console.log(
+    `   Deployer has TIMELOCK_ADMIN_ROLE: ${await timelock.hasRole(TIMELOCK_ADMIN_ROLE, deployer)}`,
+  );
 };
 
 export default func;
 func.tags = ['timelock-wiring', 'governance'];
 func.dependencies = ['governor'];
-

@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.28;
+// SPDX-License-Identifier: Apache-2.0
+pragma solidity ^0.8.33;
 
 /**
  * @title EscrowEncodingLibrary
@@ -12,18 +12,16 @@ library EscrowEncodingLibrary {
      * @param token Token address
      * @param from Sender address (buyer)
      * @param to Recipient address (seller)
-     * @param amount Remaining balance (current amount in escrow)
-     * @param originalAmount Total deposited (original amount)
+     * @param amountAfterFee Amount after fee deduction (what's actually held in escrow)
      * @return Encoded data as bytes
      */
     function encodeEscrowTransferData(
         address token,
         address from,
         address to,
-        uint256 amount,
-        uint256 originalAmount
+        uint256 amountAfterFee
     ) internal pure returns (bytes memory) {
-        return abi.encode(token, from, to, amount, originalAmount);
+        return abi.encode(token, from, to, amountAfterFee);
     }
 
     /**
@@ -32,19 +30,11 @@ library EscrowEncodingLibrary {
      * @return token Token address
      * @return from Sender address (buyer)
      * @return to Recipient address (seller)
-     * @return amount Remaining balance (current amount in escrow)
-     * @return originalAmount Total deposited (original amount)
+     * @return amountAfterFee Amount after fee deduction
      */
     function decodeEscrowTransferData(
         bytes memory data
-    ) internal pure returns (
-        address token,
-        address from,
-        address to,
-        uint256 amount,
-        uint256 originalAmount
-    ) {
-        return abi.decode(data, (address, address, address, uint256, uint256));
+    ) internal pure returns (address token, address from, address to, uint256 amountAfterFee) {
+        return abi.decode(data, (address, address, address, uint256));
     }
 }
-

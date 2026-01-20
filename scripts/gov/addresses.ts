@@ -1,11 +1,11 @@
 /**
  * Address Loading Utilities
- * 
+ *
  * Loads deployed contract addresses from hardhat-deploy artifacts.
  */
 
-import { HardhatRuntimeEnvironment } from "hardhat/types";
-import { DeploymentsExtension } from "hardhat-deploy/types";
+import { HardhatRuntimeEnvironment } from 'hardhat/types';
+import { DeploymentsExtension } from 'hardhat-deploy/types';
 
 /**
  * Get deployed contract address by name
@@ -14,7 +14,7 @@ import { DeploymentsExtension } from "hardhat-deploy/types";
 export async function getDeployedAddress(
   hre: HardhatRuntimeEnvironment,
   contractName: string,
-  allowPlaceholder: boolean = false
+  allowPlaceholder: boolean = false,
 ): Promise<string> {
   try {
     const deployment = await hre.deployments.get(contractName);
@@ -37,7 +37,7 @@ export async function getDeployedAddress(
  */
 export async function getDeployedAddresses(
   hre: HardhatRuntimeEnvironment,
-  contractNames: string[]
+  contractNames: string[],
 ): Promise<Record<string, string>> {
   const addresses: Record<string, string> = {};
   for (const name of contractNames) {
@@ -50,17 +50,17 @@ export async function getDeployedAddresses(
  * Get all deployed contracts for a network
  */
 export async function getAllDeployedAddresses(
-  hre: HardhatRuntimeEnvironment
+  hre: HardhatRuntimeEnvironment,
 ): Promise<Record<string, string>> {
   const allDeployments = await hre.deployments.all();
   const addresses: Record<string, string> = {};
-  
+
   for (const [name, deployment] of Object.entries(allDeployments)) {
     if (deployment.address) {
       addresses[name] = deployment.address;
     }
   }
-  
+
   return addresses;
 }
 
@@ -69,10 +69,10 @@ export async function getAllDeployedAddresses(
  */
 export async function validateDeployments(
   hre: HardhatRuntimeEnvironment,
-  required: string[]
+  required: string[],
 ): Promise<void> {
   const missing: string[] = [];
-  
+
   for (const name of required) {
     try {
       await hre.deployments.get(name);
@@ -80,12 +80,11 @@ export async function validateDeployments(
       missing.push(name);
     }
   }
-  
+
   if (missing.length > 0) {
     throw new Error(
-      `Missing required deployments: ${missing.join(", ")}\n` +
-      `Run 'hardhat deploy' first to deploy contracts.`
+      `Missing required deployments: ${missing.join(', ')}\n` +
+        `Run 'hardhat deploy' first to deploy contracts.`,
     );
   }
 }
-

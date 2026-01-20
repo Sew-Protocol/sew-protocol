@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "forge-std/Test.sol";
-import "forge-std/StdInvariant.sol";
-import "../../../contracts/Vault.sol";
+import 'forge-std/Test.sol';
+import 'forge-std/StdInvariant.sol';
+import '../../../contracts/Vault.sol';
 
 contract VaultHandler is Test {
     Vault public vault;

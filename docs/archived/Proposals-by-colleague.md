@@ -453,7 +453,7 @@ Possible interface:
 - `canAct(escrowId, action, actor, role, proofData) view returns (bool)`
 
 This is where:
-- multisig approvals// SPDX-License-Identifier: UNLICENSED
+- multisig approvals// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.28;
 
 // Uncomment this line to use console.log

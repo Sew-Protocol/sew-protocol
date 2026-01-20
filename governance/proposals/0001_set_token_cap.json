@@ -8,10 +8,7 @@
       "target": "0xPLACEHOLDER_AAVEYIELDGENERATIONMODULE",
       "contractName": "AaveYieldGenerationModule",
       "functionName": "setTokenCap",
-      "args": [
-        "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-        "10000000000000"
-      ],
+      "args": ["0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", "10000000000000"],
       "description": "Set USDC cap to 10000000 (10000000000000 wei)"
     }
   ],

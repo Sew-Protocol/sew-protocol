@@ -1,11 +1,12 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.28;
+// SPDX-License-Identifier: Apache-2.0
+import "../../../contracts/types/YieldPresets.sol";
+pragma solidity ^0.8.33;
 
-import {Test, console} from "forge-std/Test.sol";
-import {GovGovernor} from "../../../contracts/governance/GovGovernor.sol";
-import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
-import {SewToken} from "../../../contracts/token/SewToken.sol";
-import {EscrowableERC20} from "../../../contracts/EscrowableERC20.sol";
+import {Test, console} from 'forge-std/Test.sol';
+import {GovGovernor} from '../../../contracts/governance/GovGovernor.sol';
+import {TimelockController} from '@openzeppelin/contracts/governance/TimelockController.sol';
+import {SewToken} from '../../../contracts/token/SewToken.sol';
+import {EscrowableERC20} from '../../../contracts/core/EscrowableERC20.sol';
 
 /**
  * @title GovForkSim
@@ -30,8 +31,8 @@ contract GovForkSim is Test {
 
     function setUp() public {
         // Load configuration from environment
-        RPC_URL = vm.envOr("BASE_RPC_URL", string("https://mainnet.base.org"));
-        FORK_BLOCK = vm.envOr("FORK_BLOCK", uint256(0)); // 0 = latest
+        RPC_URL = vm.envOr('BASE_RPC_URL', string('https://mainnet.base.org'));
+        FORK_BLOCK = vm.envOr('FORK_BLOCK', uint256(0)); // 0 = latest
 
         // Fork the network
         if (FORK_BLOCK > 0) {
@@ -42,10 +43,10 @@ contract GovForkSim is Test {
 
         // Load deployed contracts from environment or use placeholders
         // In a real scenario, these would be loaded from deployment artifacts
-        address governorAddr = vm.envOr("GOVERNOR_ADDRESS", address(0));
-        address timelockAddr = vm.envOr("TIMELOCK_ADDRESS", address(0));
-        address tokenAddr = vm.envOr("TOKEN_ADDRESS", address(0));
-        address escrowAddr = vm.envOr("ESCROWABLE_ERC20_ADDRESS", address(0));
+        address governorAddr = vm.envOr('GOVERNOR_ADDRESS', address(0));
+        address timelockAddr = vm.envOr('TIMELOCK_ADDRESS', address(0));
+        address tokenAddr = vm.envOr('TOKEN_ADDRESS', address(0));
+        address escrowAddr = vm.envOr('ESCROWABLE_ERC20_ADDRESS', address(0));
 
         if (governorAddr != address(0)) {
             governor = GovGovernor(payable(governorAddr));
@@ -83,13 +84,10 @@ contract GovForkSim is Test {
             values[0] = 0;
             // Note: EscrowableERC20 inherits from BaseEscrow which has setDefaultAutoCancelTime
             // We'll use a direct call instead of selector lookup
-            calldatas[0] = abi.encodeWithSignature(
-                "setDefaultAutoCancelTime(uint256)",
-                7 days
-            );
+            calldatas[0] = abi.encodeWithSignature('setDefaultAutoCancelTime(uint256)', 7 days);
 
             // Impersonate a proposer with enough tokens
-            address proposer = vm.envOr("PROPOSER_ADDRESS", address(0));
+            address proposer = vm.envOr('PROPOSER_ADDRESS', address(0));
             if (proposer == address(0)) {
                 return; // Skip test if no proposer configured
             }
@@ -97,10 +95,10 @@ contract GovForkSim is Test {
             vm.startPrank(proposer);
 
             // Create proposal
-            string memory description = "Set default auto cancel time to 7 days";
+            string memory description = 'Set default auto cancel time to 7 days';
             proposalId = governor.propose(targets, values, calldatas, description);
 
-            console.log("Proposal ID:", proposalId);
+            console.log('Proposal ID:', proposalId);
 
             // Check proposal state
             uint8 state = uint8(governor.state(proposalId));
@@ -123,7 +121,7 @@ contract GovForkSim is Test {
 
         // Assume proposal already created and voted on
         // In practice, load from proposal artifact
-        uint256 existingProposalId = vm.envOr("PROPOSAL_ID", uint256(0));
+        uint256 existingProposalId = vm.envOr('PROPOSAL_ID', uint256(0));
         if (existingProposalId == 0) {
             return; // Skip test if no proposal ID provided
         }
@@ -132,7 +130,8 @@ contract GovForkSim is Test {
 
         // Check proposal state (should be Succeeded)
         uint8 state = uint8(governor.state(proposalId));
-        if (state != 4) { // Succeeded
+        if (state != 4) {
+            // Succeeded
             return; // Skip test if proposal not in Succeeded state
         }
 
@@ -143,11 +142,11 @@ contract GovForkSim is Test {
         calldatas = new bytes[](1);
 
         // Queue proposal
-        string memory description = "Example proposal";
+        string memory description = 'Example proposal';
         bytes32 descriptionHash = keccak256(bytes(description));
 
         // Impersonate Governor (or anyone can queue after vote succeeds)
-        address executor = vm.envOr("EXECUTOR_ADDRESS", address(this));
+        address executor = vm.envOr('EXECUTOR_ADDRESS', address(this));
         vm.startPrank(executor);
 
         governor.queue(targets, values, calldatas, descriptionHash);
@@ -169,7 +168,7 @@ contract GovForkSim is Test {
         }
 
         // Assume proposal already queued
-        uint256 existingProposalId = vm.envOr("PROPOSAL_ID", uint256(0));
+        uint256 existingProposalId = vm.envOr('PROPOSAL_ID', uint256(0));
         if (existingProposalId == 0) {
             return; // Skip test if no proposal ID provided
         }
@@ -178,7 +177,8 @@ contract GovForkSim is Test {
 
         // Check proposal state (should be Queued)
         uint8 state = uint8(governor.state(proposalId));
-        if (state != 5) { // Queued
+        if (state != 5) {
+            // Queued
             return; // Skip test if proposal not in Queued state
         }
 
@@ -193,11 +193,11 @@ contract GovForkSim is Test {
         values = new uint256[](1);
         calldatas = new bytes[](1);
 
-        string memory description = "Example proposal";
+        string memory description = 'Example proposal';
         bytes32 descriptionHash = keccak256(bytes(description));
 
         // Execute proposal (anyone can execute after delay)
-        address executor = vm.envOr("EXECUTOR_ADDRESS", address(this));
+        address executor = vm.envOr('EXECUTOR_ADDRESS', address(this));
         vm.startPrank(executor);
 
         governor.execute(targets, values, calldatas, descriptionHash);
@@ -244,4 +244,3 @@ contract GovForkSim is Test {
         return; // Skip test - JSON parsing not supported in Foundry
     }
 }
-

@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.28;
+// SPDX-License-Identifier: Apache-2.0
+pragma solidity ^0.8.33;
 
 /**
  * @title IResolver
@@ -9,22 +9,22 @@ pragma solidity ^0.8.28;
 interface IResolver {
     /**
      * @notice Called when a dispute is opened for an escrow
-     * @param escrowId The escrow ID
+     * @param workflowId The workflow ID
      * @param disputeMetadata Additional dispute metadata (optional)
      * @dev Optional callback - resolver can choose to implement or ignore
      */
-    function onDisputeOpened(uint256 escrowId, bytes calldata disputeMetadata) external;
+    function onDisputeOpened(uint256 workflowId, bytes calldata disputeMetadata) external;
 
     /**
      * @notice Resolve a disputed escrow with flexible payouts
-     * @param escrowId The escrow ID
+     * @param workflowId The workflow ID
      * @param payouts Array of payouts (recipient, amount)
      * @param resolutionMetadata Additional resolution metadata (optional)
      * @dev Must be called by the escrow contract's resolve function
      * @dev Payouts must sum to available escrow balance
      */
     function resolve(
-        uint256 escrowId,
+        uint256 workflowId,
         Payout[] calldata payouts,
         bytes calldata resolutionMetadata
     ) external;
@@ -42,9 +42,6 @@ interface IResolver {
  * @notice Structure for escrow resolution payouts
  */
 struct Payout {
-    address recipient;  // Address to receive payout
-    uint256 amount;     // Amount to payout
+    address recipient; // Address to receive payout
+    uint256 amount; // Amount to payout
 }
-
-
-

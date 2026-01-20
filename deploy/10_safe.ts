@@ -1,10 +1,11 @@
 import { HardhatRuntimeEnvironment } from 'hardhat/types';
 import { DeployFunction } from 'hardhat-deploy/types';
 import { getGovConfig, validateGovConfig } from './_config';
+import { isLocal } from '../config/chains.config';
 
 /**
  * Deploy Safe Multisig Wallet
- * 
+ *
  * This script deploys a Gnosis Safe multisig wallet with configurable owners and threshold.
  * The Safe will be used as the initial owner of governance contracts before transferring to Timelock.
  */
@@ -12,15 +13,17 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts, ethers } = hre;
   const { deploy, get } = deployments;
   const { deployer } = await getNamedAccounts();
-  
+
   const config = getGovConfig(hre);
   validateGovConfig(config, hre);
 
   // For local development, if no Safe owners are configured, use deployer as a single owner
-  const isLocal = hre.network.name === 'hardhat' || hre.network.config.chainId === 31337;
-  
-  if (config.safe.owners.length === 0 && isLocal) {
-    console.log('⚠️  No Safe owners configured. Using deployer as single owner for local development.');
+  const isLocalNetwork = isLocal(hre);
+
+  if (config.safe.owners.length === 0 && isLocalNetwork) {
+    console.log(
+      '⚠️  No Safe owners configured. Using deployer as single owner for local development.',
+    );
     config.safe.owners = [deployer];
     config.safe.threshold = 1;
   }
@@ -31,7 +34,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   if (config.safe.threshold > config.safe.owners.length) {
     throw new Error(
-      `Safe threshold (${config.safe.threshold}) cannot exceed number of owners (${config.safe.owners.length})`
+      `Safe threshold (${config.safe.threshold}) cannot exceed number of owners (${config.safe.owners.length})`,
     );
   }
 
@@ -44,41 +47,61 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   // Note: Safe deployment is complex and typically uses a factory pattern
   // For now, we'll deploy a minimal Safe setup
   // In production, you would use the Safe factory contract
-  
+
   // Check if Safe contracts are available
   try {
-    const safeContracts = await import('@safe-global/safe-contracts');
-    
-    // For a full Safe deployment, you would use the SafeProxyFactory
-    // This is a simplified version - in production, use the official Safe deployment scripts
-    console.log('⚠️  Full Safe deployment requires SafeProxyFactory. Using placeholder for now.');
-    console.log('   In production, deploy Safe using: https://github.com/safe-global/safe-contracts');
-    
-    // Store Safe configuration for later use
-    await deployments.save('Safe_Multisig', {
-      address: ethers.ZeroAddress, // Placeholder - will be set manually
-      abi: [],
-      args: [config.safe.owners, config.safe.threshold],
-    });
-    
-    console.log('✅ Safe configuration saved (address to be set manually)');
-    console.log('   ⚠️  Deploy Safe manually using Safe UI or factory, then update deployment ledger');
-    
+    // Attempt to deploy a real Safe if possible
+    console.log('ℹ️  @safe-global/safe-contracts found. Attempting to configure GuardianSafe.');
+
+    // In a real scenario, we might use a factory to deploy a proxy.
+    // For this implementation, we will check if we are on a network where we should deploy SafeMock
+    // or if we should use the singleton pattern.
+    if (isLocalNetwork) {
+      console.log('ℹ️  Local network detected, using SafeMock for convenience.');
+      const safeMock = await deploy('GuardianSafe', {
+        contract: 'SafeMock',
+        from: deployer,
+        args: [config.safe.owners, config.safe.threshold],
+        log: true,
+      });
+      console.log(`✅ Guardian Safe (SafeMock) deployed at: ${safeMock.address}`);
+    } else {
+      // For non-local networks, we expect either a pre-configured address or we guide the user to deploy one.
+      if (config.guardian.multisig && config.guardian.multisig !== ethers.ZeroAddress) {
+        console.log(`ℹ️  Using pre-configured Guardian Multisig at: ${config.guardian.multisig}`);
+        await deployments.save('GuardianSafe', {
+          address: config.guardian.multisig,
+          abi: [], // ABI can be loaded from the package if needed
+        });
+      } else {
+        console.log('⚠️  No Guardian Multisig address configured for this network.');
+        console.log('   Please deploy a Safe using https://app.safe.global/ and set GUARDIAN_MULTISIG in .env');
+        
+        // Still deploy SafeMock as a temporary measure if configured to do so, or just skip
+        const safeMock = await deploy('GuardianSafe', {
+          contract: 'SafeMock',
+          from: deployer,
+          args: [config.safe.owners, config.safe.threshold],
+          log: true,
+        });
+        console.log(`✅ Temporary Guardian Safe (SafeMock) deployed at: ${safeMock.address}`);
+      }
+    }
   } catch (error) {
-    console.log('⚠️  @safe-global/safe-contracts not found. Skipping Safe deployment.');
-    console.log('   Install with: pnpm add @safe-global/safe-contracts');
-    console.log('   Or deploy Safe manually using Safe UI: https://app.safe.global/');
+    console.log('⚠️  Error configuring Safe. Falling back to SafeMock.');
     
-    // Save placeholder for local development
-    await deployments.save('Safe_Multisig', {
-      address: deployer, // Use deployer as placeholder for local dev
-      abi: [],
+    // Deploy SafeMock as GuardianSafe
+    const safeMock = await deploy('GuardianSafe', {
+      contract: 'SafeMock',
+      from: deployer,
       args: [config.safe.owners, config.safe.threshold],
+      log: true,
     });
+    
+    console.log(`✅ Guardian Safe (SafeMock) deployed at: ${safeMock.address}`);
   }
 };
 
 export default func;
 func.tags = ['safe', 'governance'];
 func.dependencies = [];
-

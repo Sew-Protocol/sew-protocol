@@ -1,56 +1,76 @@
-# hardhat-deploy-hybrid (classic hardhat-deploy + Foundry)
+# Escrow Protocol (Hardhat Deploy + Foundry)
 
-This scaffold uses **classic** `hardhat-deploy` (not Ignition) and supports:
-- **Complex multi-step deployments** (script ordering + tags)
-- **Upgradeable deployments**: **Transparent** or **UUPS** (select via `PROXY_KIND`)
-- **Hardhat tests** (TypeScript)
-- **Foundry tests** (forge)
-- A timestamped deployment ledger in `deploy-ledger/<network>/<stamp>/`
+This repository contains the smart contracts, deployment scripts, governance tooling, and documentation for the escrow protocol.
 
-## Quick start
+It uses:
+- **Hardhat + hardhat-deploy** for deployments, verification, and TypeScript tooling
+- **Foundry** for fast Solidity unit tests, fuzzing, and invariants
+
+## Documentation
+
+- **Start here**: `docs/INDEX.md`
+- **Deployment**: `docs/deployment/`
+  - Base Sepolia core testnet guide: `docs/deployment/BASE_SEPOLIA_CORE_TESTNET_GUIDE.md`
+  - Release tracking: `docs/deployment/RELEASES.md`
+- **Governance**: `docs/governance/` and `governance/runbooks/`
+- **Security**:
+  - Responsible disclosure: `SECURITY.md`
+  - Security model: `docs/reviews/SECURITY_MODEL.md`
+
+## Quick start (local)
+
 ```bash
 pnpm i
 cp .env.example .env
+pnpm compile
 pnpm test
 ```
 
-## Deploy locally
+## Tests
+
 ```bash
-pnpm deploy:local
-pnpm export --network hardhat
+pnpm test                 # hardhat + foundry
+pnpm test:hardhat
+pnpm test:foundry
+pnpm lint
+pnpm typecheck
 ```
 
-## Deploy with proxies
-Transparent (default):
+## Deploy
+
+Local:
+
+```bash
+pnpm deploy:local
+```
+
+Base Sepolia (example):
+
 ```bash
 pnpm deploy --network baseSepolia
 ```
 
-UUPS:
-```bash
-PROXY_KIND=uups pnpm deploy --network baseSepolia
-```
+Verification and release workflow docs:
+- `docs/deployment/BASE_SEPOLIA_CORE_TESTNET_GUIDE.md`
+- `docs/deployment/RELEASES.md`
 
-## Deploy flow (example)
-- `deploy/00_impl.ts` deploys impl for bookkeeping
-- `deploy/10_proxy.ts` deploys proxy + runs initializer
-- `deploy/90_post.ts` sanity checks / wiring
+## Production safety notes (high level)
 
-## Production safety notes
 - Gate upgrades behind **Safe + Timelock**.
 - Require **storage layout checks** on every upgrade.
 - Never leave upgrade authority on an EOA.
 
 ## Governance
 
-The protocol uses onchain governance with TimelockController and OpenZeppelin Governor. See governance documentation:
+The protocol uses onchain governance with `TimelockController` and OpenZeppelin Governor.
 
-- [Governance Model](docs/governance.md) - Overview of governance structure
-- [Governance Surface Map](docs/GOVERNANCE_SURFACE_MAP.md) - Complete function → role → lane mapping
-- [Module Map](docs/MODULE_MAP.md) - Module interface → implementation mapping
-- [Upgrade Policy](docs/UPGRADE_POLICY.md) - Upgrade procedures and ossification plan
-- [Emergency Policy](docs/EMERGENCY_POLICY.md) - Emergency controls and procedures
-- [Governance Process](docs/GOVERNANCE_PROCESS.md) - Step-by-step governance workflow
+- [Governance Model](docs/governance/governance.md) - Overview of governance structure
+- [Governance Surface Map](docs/governance/GOVERNANCE_SURFACE_MAP.md) - Complete function → role → lane mapping
+- [Module Map](docs/reference/MODULE_MAP.md) - Module interface → implementation mapping
+- [Operational Runbooks](governance/runbooks/) - Step-by-step procedures for operations
+- [Upgrade Policy](docs/policies/UPGRADE_POLICY.md) - Upgrade procedures and ossification plan
+- [Emergency Policy](docs/policies/EMERGENCY_POLICY.md) - Emergency controls and procedures
+- [Governance Process](docs/governance/GOVERNANCE_PROCESS.md) - Step-by-step governance workflow
 
 ### Governance Tooling
 
@@ -71,4 +91,4 @@ pnpm gov:check governance/proposals/0001_set_token_cap.json --network baseMainne
 pnpm gov:emergency pause --contract EscrowableERC20 --network baseMainnet
 ```
 
-See [Phase 8 Documentation](docs/PHASE_8_COMPLETE.md) for complete tooling overview.
+See [Governance Documentation](docs/governance/) for complete tooling overview.

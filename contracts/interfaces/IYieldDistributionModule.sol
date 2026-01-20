@@ -1,7 +1,7 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.28;
+// SPDX-License-Identifier: Apache-2.0
+pragma solidity ^0.8.33;
 
-import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import '@openzeppelin/contracts/utils/introspection/IERC165.sol';
 
 /**
  * @title IYieldDistributionModule
@@ -37,5 +37,3 @@ interface IYieldDistributionModule is IERC165 {
      */
     function moduleVersion() external pure returns (string memory version);
 }
-
-

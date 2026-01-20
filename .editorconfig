@@ -1,12 +1,29 @@
+# EditorConfig is awesome: https://EditorConfig.org
+
+# Top-most EditorConfig file
 root = true
 
+# Unix-style newlines with a newline ending every file
 [*]
+charset = utf-8
 end_of_line = lf
 insert_final_newline = true
-charset = utf-8
-indent_style = space
-indent_size = 2
 trim_trailing_whitespace = true
 
+# JavaScript, TypeScript, JSON, YAML
+[*.{js,ts,json,yml,yaml}]
+indent_style = space
+indent_size = 2
+
+# Solidity
 [*.sol]
+indent_style = space
 indent_size = 4
+
+# Markdown
+[*.md]
+trim_trailing_whitespace = false
+
+# Makefile
+[Makefile]
+indent_style = tab

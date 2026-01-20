@@ -1,7 +1,7 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.28;
+// SPDX-License-Identifier: Apache-2.0
+pragma solidity ^0.8.33;
 
-import "../types/EscrowTypes.sol";
+import '../types/EscrowTypes.sol';
 
 /**
  * @title StateManagementLibrary
@@ -20,7 +20,6 @@ library StateManagementLibrary {
     ) internal returns (EscrowState oldStatus) {
         oldStatus = et.escrowState;
         et.escrowState = EscrowState.RELEASED;
-        et.remainingBalance = 0;
         return oldStatus;
     }
 
@@ -35,7 +34,6 @@ library StateManagementLibrary {
     ) internal returns (EscrowState oldStatus) {
         oldStatus = et.escrowState;
         et.escrowState = EscrowState.REFUNDED;
-        et.remainingBalance = 0;
         return oldStatus;
     }
 
@@ -66,15 +64,13 @@ library StateManagementLibrary {
     ) internal returns (EscrowState oldStatus) {
         oldStatus = et.escrowState;
         et.escrowState = EscrowState.DISPUTED;
-        
+
         if (isSender) {
             et.senderStatus = SenderStatus.RAISE_DISPUTE;
         } else {
             et.recipientStatus = RecipientStatus.RAISE_DISPUTE;
         }
-        
+
         return oldStatus;
     }
 }
-
-

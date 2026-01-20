@@ -1,7 +1,7 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.28;
+// SPDX-License-Identifier: Apache-2.0
+pragma solidity ^0.8.33;
 
-import "../types/EscrowTypes.sol";
+import '../types/EscrowTypes.sol';
 
 /**
  * @title SettingsValidationLibrary
@@ -11,7 +11,7 @@ import "../types/EscrowTypes.sol";
 library SettingsValidationLibrary {
     /// @notice Maximum auto time duration (10 years in seconds)
     uint256 public constant MAX_AUTO_TIME_DURATION = 10 * 365 * 24 * 60 * 60;
-    
+
     // Phase 6: Bounds constants
     uint256 public constant MAX_AUTO_TIME_DAYS = 30 days;
     uint256 public constant MAX_ATTACHMENTS = 20;
@@ -22,6 +22,11 @@ library SettingsValidationLibrary {
     uint256 public constant MAX_YIELD_RECIPIENTS = 10;
     uint256 public constant BPS_DENOMINATOR = 10_000;
     
+    // New constraints
+    uint256 public constant MIN_ESCROW_AMOUNT = 1000; // Minimum escrow amount (1000 wei)
+    uint256 public constant MAX_ESCROW_DURATION = 365 days; // Maximum escrow duration (1 year)
+    uint256 public constant MIN_YIELD_DEPOSIT = 1000e6; // Minimum yield deposit (1000 tokens with 6 decimals)
+
     // Phase 6: Custom errors (using different names to avoid conflicts with EscrowTypes)
     error OutOfBounds(bytes32 key, uint256 value, uint256 min, uint256 max);
     error InvalidAddressKey(bytes32 key);
@@ -34,27 +39,21 @@ library SettingsValidationLibrary {
      * @dev Validate a single auto time value
      * @param autoTime The auto time to validate (0 means no auto time, which is valid)
      * @param currentTime Current block timestamp
-     * @param timeType Description of the time type for error messages
      * @dev Reverts if autoTime is in the past or exceeds MAX_AUTO_TIME_DURATION from current block timestamp
      */
     function validateAutoTime(
         uint256 autoTime,
-        uint256 currentTime,
-        string memory timeType
+        uint256 currentTime
     ) internal pure {
         if (autoTime == 0) {
             return; // 0 means no auto time, which is valid
         }
-        
+
         // Validate time is in the future
         if (autoTime <= currentTime) {
-            revert InvalidAutoTime(
-                string.concat(timeType, " must be in the future"),
-                autoTime,
-                currentTime
-            );
+            revert InvalidAutoTime(AUTO_TIME_IN_PAST, autoTime, currentTime);
         }
-        
+
         // Validate time doesn't exceed maximum duration
         uint256 maxAllowedTime = currentTime + MAX_AUTO_TIME_DURATION;
         if (autoTime > maxAllowedTime) {
@@ -71,21 +70,99 @@ library SettingsValidationLibrary {
     function validateEscrowSettings(
         EscrowSettings memory settings,
         uint256 currentTime
-    ) internal pure {
+    ) internal view {
         // Validate auto times
         if (settings.autoReleaseTime != 0 && settings.autoCancelTime != 0) {
             revert CannotSetBothAutoTimes(settings.autoReleaseTime, settings.autoCancelTime);
         }
-        
+
         // Validate auto times using helper function
-        validateAutoTime(settings.autoReleaseTime, currentTime, "Auto release time");
-        validateAutoTime(settings.autoCancelTime, currentTime, "Auto cancel time");
+        validateAutoTime(settings.autoReleaseTime, currentTime);
+        validateAutoTime(settings.autoCancelTime, currentTime);
         
+        // Validate maximum escrow duration (for auto times)
+        if (settings.autoReleaseTime > 0) {
+            uint256 maxAllowedTime = currentTime + MAX_ESCROW_DURATION;
+            if (settings.autoReleaseTime > maxAllowedTime) {
+                revert OutOfBounds(
+                    'autoReleaseTime',
+                    settings.autoReleaseTime,
+                    currentTime + 1,
+                    maxAllowedTime
+                );
+            }
+        }
+        if (settings.autoCancelTime > 0) {
+            uint256 maxAllowedTime = currentTime + MAX_ESCROW_DURATION;
+            if (settings.autoCancelTime > maxAllowedTime) {
+                revert OutOfBounds(
+                    'autoCancelTime',
+                    settings.autoCancelTime,
+                    currentTime + 1,
+                    maxAllowedTime
+                );
+            }
+        }
+
         // Validate custom dispute resolver if set
         if (settings.customResolver != address(0)) {
-            // Could add additional validation here (e.g., isContract check)
-            // For now, just ensure it's not zero address (already checked above)
+            // Validate resolver is a contract
+            if (settings.customResolver.code.length == 0) {
+                revert InvalidAddressKey('customResolver');
+            }
         }
+
+        // DEPRECATED: Per-escrow yield distribution has been removed in favor of yield presets.
+        // Distribution is derived at runtime from `settings.yieldPreset` and participant addresses.
+    }
+    
+    /**
+     * @notice Validate escrow amount
+     * @param amount The escrow amount to validate
+     * @dev Reverts if amount is below minimum
+     */
+    function validateEscrowAmount(uint256 amount) internal pure {
+        if (amount < MIN_ESCROW_AMOUNT) {
+            revert OutOfBounds(
+                'amount',
+                amount,
+                MIN_ESCROW_AMOUNT,
+                type(uint256).max
+            );
+        }
+    }
+    
+    /**
+     * @notice Validate recipient address
+     * @param recipient The recipient address
+     * @param sender The sender address
+     * @dev Reverts if recipient is zero address or same as sender
+     */
+    function validateRecipient(address recipient, address sender) internal pure {
+        if (recipient == address(0)) {
+            revert InvalidAddressKey('recipient');
+        }
+        if (recipient == sender) {
+            revert InvalidAddressKey('sender');
+        }
+    }
+    
+    /**
+     * @notice Validate yield opt-in amount
+     * @param amount The amount to validate (amount after fee)
+     * @param yieldEnabled Whether yield is enabled
+     * @return shouldEnableYield Whether yield should actually be enabled (may be disabled if amount too small)
+     * @dev Returns false if yield is enabled but amount is below minimum (graceful degradation)
+     */
+    function validateYieldOptIn(uint256 amount, bool yieldEnabled) internal pure returns (bool shouldEnableYield) {
+        if (!yieldEnabled) {
+            return false;
+        }
+        // Graceful degradation: disable yield if amount is too small
+        if (amount < MIN_YIELD_DEPOSIT) {
+            return false; // Don't revert, just disable yield
+        }
+        return true;
     }
 
     /**
@@ -93,13 +170,13 @@ library SettingsValidationLibrary {
      * @return Default settings struct with all fields set to default values
      */
     function getDefaultSettings() internal pure returns (EscrowSettings memory) {
-        return EscrowSettings({
-            customResolver: address(0),
-            yieldEnabled: false,
-            autoReleaseTime: 0,
-            autoCancelTime: 0,
-            escrowType: EscrowType.STANDARD
-        });
+        return
+            EscrowSettings({
+                customResolver: address(0),
+                yieldPreset: YieldPreset.OFF, // Default: yield off
+                autoReleaseTime: 0,
+                autoCancelTime: 0
+            });
     }
 
     // ============ Phase 6: Bounds Validation Functions ============
@@ -115,10 +192,20 @@ library SettingsValidationLibrary {
         }
         uint256 currentTime = block.timestamp;
         if (t <= currentTime) {
-            revert OutOfBounds("autoCancelTime", t, currentTime + 1, currentTime + MAX_AUTO_TIME_DAYS);
+            revert OutOfBounds(
+                'autoCancelTime',
+                t,
+                currentTime + 1,
+                currentTime + MAX_AUTO_TIME_DAYS
+            );
         }
         if (t > currentTime + MAX_AUTO_TIME_DAYS) {
-            revert OutOfBounds("autoCancelTime", t, currentTime + 1, currentTime + MAX_AUTO_TIME_DAYS);
+            revert OutOfBounds(
+                'autoCancelTime',
+                t,
+                currentTime + 1,
+                currentTime + MAX_AUTO_TIME_DAYS
+            );
         }
     }
 
@@ -133,10 +220,20 @@ library SettingsValidationLibrary {
         }
         uint256 currentTime = block.timestamp;
         if (t <= currentTime) {
-            revert OutOfBounds("autoReleaseTime", t, currentTime + 1, currentTime + MAX_AUTO_TIME_DAYS);
+            revert OutOfBounds(
+                'autoReleaseTime',
+                t,
+                currentTime + 1,
+                currentTime + MAX_AUTO_TIME_DAYS
+            );
         }
         if (t > currentTime + MAX_AUTO_TIME_DAYS) {
-            revert OutOfBounds("autoReleaseTime", t, currentTime + 1, currentTime + MAX_AUTO_TIME_DAYS);
+            revert OutOfBounds(
+                'autoReleaseTime',
+                t,
+                currentTime + 1,
+                currentTime + MAX_AUTO_TIME_DAYS
+            );
         }
     }
 
@@ -147,7 +244,7 @@ library SettingsValidationLibrary {
      */
     function validateMaxAttachments(uint256 n) internal pure {
         if (n > MAX_ATTACHMENTS) {
-            revert OutOfBounds("maxAttachments", n, 0, MAX_ATTACHMENTS);
+            revert OutOfBounds('maxAttachments', n, 0, MAX_ATTACHMENTS);
         }
     }
 
@@ -158,7 +255,7 @@ library SettingsValidationLibrary {
      */
     function validateFeeBps(uint256 bps) internal pure {
         if (bps > MAX_FEE_BPS) {
-            revert OutOfBounds("escrowFee", bps, 0, MAX_FEE_BPS);
+            revert OutOfBounds('escrowFee', bps, 0, MAX_FEE_BPS);
         }
     }
 
@@ -169,10 +266,10 @@ library SettingsValidationLibrary {
      */
     function validateResolutionDelay(uint256 d) internal pure {
         if (d < MIN_RESOLUTION_DELAY) {
-            revert OutOfBounds("resolutionDelay", d, MIN_RESOLUTION_DELAY, MAX_RESOLUTION_DELAY);
+            revert OutOfBounds('resolutionDelay', d, MIN_RESOLUTION_DELAY, MAX_RESOLUTION_DELAY);
         }
         if (d > MAX_RESOLUTION_DELAY) {
-            revert OutOfBounds("resolutionDelay", d, MIN_RESOLUTION_DELAY, MAX_RESOLUTION_DELAY);
+            revert OutOfBounds('resolutionDelay', d, MIN_RESOLUTION_DELAY, MAX_RESOLUTION_DELAY);
         }
     }
 
@@ -192,38 +289,43 @@ library SettingsValidationLibrary {
         uint256[] memory bps
     ) internal pure {
         uint256 length = recipients.length;
-        
+
         // Check recipient count bounds
         if (length < MIN_YIELD_RECIPIENTS) {
-            revert OutOfBounds("yieldRecipients", length, MIN_YIELD_RECIPIENTS, MAX_YIELD_RECIPIENTS);
+            revert OutOfBounds(
+                'yieldRecipients',
+                length,
+                MIN_YIELD_RECIPIENTS,
+                MAX_YIELD_RECIPIENTS
+            );
         }
         if (length > MAX_YIELD_RECIPIENTS) {
             revert TooManyRecipients(length, MAX_YIELD_RECIPIENTS);
         }
-        
+
         // Check array lengths match
         if (length != bps.length) {
-            revert InvalidArrayLength("yieldDistribution", length, bps.length);
+            revert InvalidArrayLength('yieldDistribution', length, bps.length);
         }
-        
+
         // Validate recipients and calculate sum
         uint256 sum = 0;
         for (uint256 i = 0; i < length; i++) {
             // Check recipient is non-zero
             if (recipients[i] == address(0)) {
-                revert InvalidAddressKey("yieldRecipient");
+                revert InvalidAddressKey('yieldRecipient');
             }
-            
+
             // Check for duplicates
             for (uint256 j = i + 1; j < length; j++) {
                 if (recipients[i] == recipients[j]) {
                     revert DuplicateRecipient(recipients[i]);
                 }
             }
-            
+
             sum += bps[i];
         }
-        
+
         // Check sum equals 100%
         if (sum != BPS_DENOMINATOR) {
             revert InvalidBpsSum(sum);
@@ -241,4 +343,3 @@ library SettingsValidationLibrary {
         }
     }
 }
-

@@ -1,80 +1,103 @@
-# 🏗 Scaffold-ETH 2
+# Documentation
 
-<h4 align="center">
-  <a href="https://docs.scaffoldeth.io">Documentation</a> |
-  <a href="https://scaffoldeth.io">Website</a>
-</h4>
+Welcome to the protocol documentation. This directory contains comprehensive documentation for the escrow protocol, including technical specifications, implementation guides, and operational procedures.
 
-🧪 An open-source, up-to-date toolkit for building decentralized applications (dapps) on the Ethereum blockchain. It's designed to make it easier for developers to create and deploy smart contracts and build user interfaces that interact with those contracts.
+## Core Documents (Start Here)
 
-⚙️ Built using NextJS, RainbowKit, Hardhat, Wagmi, Viem, and Typescript.
+- **[README.md](./README.md)** - This file - overview of documentation structure
+- **[WHITEPAPER.md](./WHITEPAPER.md)** - Comprehensive protocol whitepaper
 
-- ✅ **Contract Hot Reload**: Your frontend auto-adapts to your smart contract as you edit it.
-- 🪝 **[Custom hooks](https://docs.scaffoldeth.io/hooks/)**: Collection of React hooks wrapper around [wagmi](https://wagmi.sh/) to simplify interactions with smart contracts with typescript autocompletion.
-- 🧱 [**Components**](https://docs.scaffoldeth.io/components/): Collection of common web3 components to quickly build your frontend.
-- 🔥 **Burner Wallet & Local Faucet**: Quickly test your application with a burner wallet and local faucet.
-- 🔐 **Integration with Wallet Providers**: Connect to different wallet providers and interact with the Ethereum network.
+## Quick Access to Important Documents
 
-![Debug Contracts tab](https://github.com/scaffold-eth/scaffold-eth-2/assets/55535804/b237af0c-5027-4849-a5c1-2e31495cccb1)
+- **[Document Index](./INDEX.md)** - Complete index of all documents
+- **[Technical Overview](./architecture/TECHNICAL_OVERVIEW.md)** - High-level technical overview
+- **[Security Model](./reviews/SECURITY_MODEL.md)** - Security model and threat analysis
+- **[Contributing Guide](./guides/CONTRIBUTING.md)** - Contributing guidelines
+- **[Coding Standards](./guides/CODING_STANDARDS.md)** - Code style and standards
 
-## Requirements
+## Documentation Structure
 
-Before you begin, you need to install the following tools:
+### `/architecture/` - System Architecture
+- Architecture overview
+- Technical overview (canonical)
+- Contracts summary (canonical)
+- Escrow creation and settings
+- Protocol fees and yield distribution
 
-- [Node (>= v20.18.3)](https://nodejs.org/en/download/)
-- Yarn ([v1](https://classic.yarnpkg.com/en/docs/install/) or [v2+](https://yarnpkg.com/getting-started/install))
-- [Git](https://git-scm.com/downloads)
+### `/dispute-resolution/` - Dispute Resolution System
+- Decentralized resolution module documentation
+- Resolver economics and incentives
+- Dispute resolution workflows
 
-## Quickstart
+### `/governance/` - Governance Documentation
+- Governance processes and procedures
+- Governance surface mapping
+- Governance structure & quorum analyses
 
-To get started with Scaffold-ETH 2, follow the steps below:
+### `/deployment/` - Deployment & Configuration
+- Chain configuration
+- Deployment checklists
+- Verification procedures
 
-1. Install dependencies if it was skipped in CLI:
+### `/reviews/` - Reviews & Audits
+- Security reviews
+- Contract reviews
+- Audit reports
 
-```
-cd my-dapp-example
-yarn install
-```
+### `/security/` - Security Notes & Reviews
+- Security reviews and tracking docs (in addition to `/reviews/`)
 
-2. Run a local network in the first terminal:
+### `/optimization/` - Contract size + gas optimization notes
+- Bytecode size investigations and mitigation plans
 
-```
-yarn chain
-```
+### `/test/` - Testing Documentation
+- Test plans and strategies
+- Test coverage reports
+- Testing guidelines
 
-This command starts a local Ethereum network using Hardhat. The network runs on your local machine and can be used for testing and development. You can customize the network configuration in `packages/hardhat/hardhat.config.ts`.
+### `/reference/` - Reference Materials
+- API references
+- Standards and conventions
+- Technical references
 
-3. On a second terminal, deploy the test contract:
+### `/guides/` - User Guides
+- User-facing guides
+- Developer guides
+- Operational guides
 
-```
-yarn deploy
-```
+### `/policies/` - Policies
+- Upgrade policies
+- Emergency policies
+- Operational policies
 
-This command deploys a test smart contract to the local network. The contract is located in `packages/hardhat/contracts` and can be modified to suit your needs. The `yarn deploy` command uses the deploy script located in `packages/hardhat/deploy` to deploy the contract to the network. You can also customize the deploy script.
+### `/token/` - Token Documentation
+- Tokenomics
+- Token specifications
+- Token-related documentation
 
-4. On a third terminal, start your NextJS app:
+## Quick Links
 
-```
-yarn start
-```
+- [Document Index](./INDEX.md) - Complete index of all documents
+- [Contributing Guide](./guides/CONTRIBUTING.md) - How to contribute
+- [Coding Standards](./guides/CODING_STANDARDS.md) - Code style guide
 
-Visit your app on: `http://localhost:3000`. You can interact with your smart contract using the `Debug Contracts` page. You can tweak the app config in `packages/nextjs/scaffold.config.ts`.
+## Document Organization
 
-Run smart contract test with `yarn hardhat:test`
+### Current Documentation
+Important, actively maintained documentation is organized in top-level directories:
+- `architecture/` - System architecture and design
+- `dispute-resolution/` - Dispute resolution system
+- `governance/` - Governance processes
+- `policies/` - Protocol policies
+- `deployment/` - Deployment guides
+- `reference/` - Technical references
+- `guides/` - User and developer guides
+- `reviews/` - Security reviews and audits
+- `token/` - Token documentation
 
-- Edit your smart contracts in `packages/hardhat/contracts`
-- Edit your frontend homepage at `packages/nextjs/app/page.tsx`. For guidance on [routing](https://nextjs.org/docs/app/building-your-application/routing/defining-routes) and configuring [pages/layouts](https://nextjs.org/docs/app/building-your-application/routing/pages-and-layouts) checkout the Next.js documentation.
-- Edit your deployment scripts in `packages/hardhat/deploy`
+### Historical Documentation
+Completed, superseded, or historical documentation is organized in:
+- `more/` - Additional historical documents (implementation notes, plans, status reports, test plans, etc.)
+- `archived/` - Archived or superseded documentation
 
-
-## Documentation
-
-Visit our [docs](https://docs.scaffoldeth.io) to learn how to start building with Scaffold-ETH 2.
-
-To know more about its features, check out our [website](https://scaffoldeth.io).
-
-## Contributing to Scaffold-ETH 2
-
-We welcome contributions to Scaffold-ETH 2!
-
-Please see [CONTRIBUTING.MD](https://github.com/scaffold-eth/scaffold-eth-2/blob/main/CONTRIBUTING.md) for more information and guidelines for contributing to Scaffold-ETH 2.
+For a complete list of all documents, see the [Document Index](./INDEX.md).
