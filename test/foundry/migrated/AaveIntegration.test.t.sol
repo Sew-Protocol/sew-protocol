@@ -1,64 +1,172 @@
 // SPDX-License-Identifier: MIT
-import "../../../contracts/types/YieldPresets.sol";
 pragma solidity ^0.8.33;
 
-import 'forge-std/Test.sol';
-import 'contracts/mocks/MockAavePool.sol';
-import 'contracts/mocks/ERC20Mock.sol';
-import 'contracts/modules/AaveYieldGenerationModule.sol';
+import "forge-std/Test.sol";
+
+import "../../../contracts/core/EscrowVault.sol";
+import "../../../contracts/core/ModuleManagementContract.sol";
+import "../../../contracts/core/modules/DefaultResolutionModule.sol";
+import "../../../contracts/mocks/ERC20Mock.sol";
+import "../../../contracts/mocks/MockAavePool.sol";
+import "../../../contracts/modules/AaveYieldGenerationModule.sol";
+import "../../../contracts/modules/DefaultYieldDistributionModule.sol";
+import "../../../contracts/types/EscrowTypes.sol";
+import "../../../contracts/types/YieldPresets.sol";
+import "../../../contracts/YieldOps.sol";
+import "../../../contracts/DisputeOps.sol";
+import "../../../contracts/CreateOps.sol";
+import "../../../contracts/SettlementOps.sol";
+import "../../../contracts/core/BondCollector.sol";
+import "../../../contracts/interfaces/aave/AaveV3Interfaces.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+/**
+ * @dev Delegatecall target used by BaseEscrow's "library pattern".
+ * Must match the selectors used in BaseEscrow:
+ * - supply(address,address,uint256,address)
+ * - withdraw(address,address,uint256,address)
+ */
+contract AaveLibraryWrapper {
+    using SafeERC20 for IERC20;
+
+    function supply(address pool, address token, uint256 amount, address onBehalfOf) external {
+        IERC20 tokenContract = IERC20(token);
+        uint256 currentAllowance = tokenContract.allowance(address(this), pool);
+
+        if (currentAllowance != amount) {
+            if (currentAllowance > 0) {
+                tokenContract.safeDecreaseAllowance(pool, currentAllowance);
+            }
+            tokenContract.safeIncreaseAllowance(pool, amount);
+        }
+
+        IAavePool(pool).supply(token, amount, onBehalfOf, 0);
+
+        uint256 remainingAllowance = tokenContract.allowance(address(this), pool);
+        if (remainingAllowance > 0) {
+            tokenContract.safeDecreaseAllowance(pool, remainingAllowance);
+        }
+    }
+
+    function withdraw(address pool, address token, uint256 amount, address to) external returns (uint256) {
+        return IAavePool(pool).withdraw(token, amount, to);
+    }
+}
 
 contract Test_AaveIntegration is Test {
-    MockAavePool pool;
-    ERC20Mock token;
-    MockAToken aToken;
-    MockPoolAddressesProvider provider;
-    AaveYieldGenerationModule aaveModule;
+    // Aave-ish mocks
+    MockAavePool internal pool;
+    ERC20Mock internal token;
+    MockAToken internal aToken;
+    MockPoolAddressesProvider internal provider;
+    AaveYieldGenerationModule internal aaveModule; // config provider for pool + aToken
 
-    address escrow = address(0xBEEF);
-    address owner = address(this);
+    // Core system
+    EscrowVault internal vault;
+    ModuleManagementContract internal mm;
+    YieldOps internal yieldOps;
+    DisputeOps internal disputeOps;
+    CreateOps internal createOps;
+    SettlementOps internal settlementOps;
+    BondCollector internal bondCollector;
+    DefaultResolutionModule internal resolutionModule;
+    DefaultYieldDistributionModule internal yieldDist;
+    AaveLibraryWrapper internal wrapper;
 
-    uint256 constant INITIAL_TRANSFER = 100 ether;
+    address internal feeAddress = address(0xFEE);
+    address internal resolver = address(0xBEEF);
+    address internal sender = address(0x1001);
+    address internal recipient = address(0x1002);
+
+    uint256 internal constant ESCROW_FEE_BPS = 100; // 1%
+    uint256 internal constant INITIAL_SENDER_BAL = 1_000_000 ether;
 
     function setUp() public {
-        // Deploy token and pool
-        token = new ERC20Mock('Mock Token', 'MOCK', address(this), 1_000_000 ether);
+        // Deploy underlying and Aave mocks
+        token = new ERC20Mock("Mock Token", "MOCK", address(this), 1_000_000 ether);
         pool = new MockAavePool();
 
-        // Deploy aToken and link to pool
-        aToken = new MockAToken(address(token), 'aMock', 'aM');
+        aToken = new MockAToken(address(token), "aMock", "aMOCK");
         aToken.setPool(address(pool));
         pool.setAToken(address(token), address(aToken));
-
-        // Deploy provider
         provider = new MockPoolAddressesProvider(address(pool));
 
-        // Deploy module with this test as admin
-        aaveModule = new AaveYieldGenerationModule(owner);
-        // Grant timelock role to owner (this contract) so we can queue/activate
-        bytes32 ROLE_TIMELOCK = aaveModule.ROLE_TIMELOCK();
-        aaveModule.grantRole(ROLE_TIMELOCK, owner);
-
-        // Queue provider and activate (Slow lane 7 days)
+        // Deploy module (used as config provider for BaseEscrow library pattern)
+        aaveModule = new AaveYieldGenerationModule(address(this));
+        aaveModule.grantRole(aaveModule.ROLE_TIMELOCK(), address(this));
         aaveModule.queueAavePoolProvider(address(provider));
-        vm.warp(block.timestamp + 7 days + 1);
+        (, uint64 etaProvider, bool existsProvider) = aaveModule.getPendingAavePoolProvider();
+        require(existsProvider, "pending provider must exist");
+        vm.warp(uint256(etaProvider) + 1);
         aaveModule.activateAavePoolProvider();
-
-        // Enable Aave
         aaveModule.setAaveEnabled(true);
-
-        // Register token for Aave
         aaveModule.registerTokenForAave(address(token), address(aToken));
 
-        // Fund escrow address with tokens
-        token.mint(escrow, INITIAL_TRANSFER);
+        // Deploy core system (minimal wiring to allow createEscrow + release)
+        yieldOps = new YieldOps(address(this));
+        disputeOps = new DisputeOps(address(this));
+        mm = new ModuleManagementContract(address(this));
+
+        vault = new EscrowVault(ESCROW_FEE_BPS, feeAddress, address(yieldOps), address(disputeOps), address(mm));
+
+        // Allow vault to call into ops
+        yieldOps.registerEscrowContract(address(vault));
+        disputeOps.registerEscrowContract(address(vault));
+        mm.registerEscrowContract(address(vault));
+
+        createOps = new CreateOps(address(this));
+        createOps.grantRole(createOps.ROLE_TIMELOCK(), address(this));
+        createOps.registerEscrowContract(address(vault));
+
+        settlementOps = new SettlementOps(address(this));
+        settlementOps.registerEscrowContract(address(vault));
+
+        bondCollector = new BondCollector(address(this));
+        bondCollector.registerEscrowContract(address(vault));
+
+        // Timelock-gated wiring (deployer has ROLE_TIMELOCK in constructor)
+        vault.setCreateOps(address(createOps));
+        vault.setSettlementOps(address(settlementOps));
+        vault.setBondCollector(address(bondCollector));
+
+        // Configure a resolution module so createEscrow can pick a resolver
+        resolutionModule = new DefaultResolutionModule(address(this), resolver);
+        vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
+        vault.setResolutionModule(address(resolutionModule));
+
+        // Set default yield modules for the vault (must be queued/activated by the vault itself)
+        yieldDist = new DefaultYieldDistributionModule();
+        vm.prank(address(vault));
+        mm.queueDefaultModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN, address(aaveModule));
+        vm.prank(address(vault));
+        mm.queueDefaultModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST, address(yieldDist));
+        (, uint64 etaGen, bool existsGen) = mm.getPendingDefaultModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN);
+        (, uint64 etaDist, bool existsDist) = mm.getPendingDefaultModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST);
+        require(existsGen && existsDist, "pending modules must exist");
+        uint256 maxEta = etaGen > etaDist ? uint256(etaGen) : uint256(etaDist);
+        vm.warp(maxEta + 1);
+        vm.prank(address(vault));
+        mm.activateDefaultModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN);
+        vm.prank(address(vault));
+        mm.activateDefaultModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST);
+
+        // Enable library pattern on the vault
+        wrapper = new AaveLibraryWrapper();
+        vault.setAaveYieldLibrary(address(wrapper));
+        vault.setAaveYieldLibraryEnabled(true);
+
+        // Make protocol fee on yield = 0 for deterministic assertions
+        vault.setYieldProtocolFeeBps(0);
+
+        // Fund sender
+        token.mint(sender, INITIAL_SENDER_BAL);
     }
 
     function test_provider_and_enable_disable() public {
-        address p = address(aaveModule.aavePoolAddressesProvider());
-        assertEq(p, address(provider));
+        assertEq(address(aaveModule.aavePoolAddressesProvider()), address(provider));
 
         assertTrue(aaveModule.aaveEnabled());
-        // disable then enable
         aaveModule.setAaveEnabled(false);
         assertFalse(aaveModule.aaveEnabled());
         aaveModule.setAaveEnabled(true);
@@ -66,74 +174,45 @@ contract Test_AaveIntegration is Test {
     }
 
     function test_register_and_support() public {
-        address at = aaveModule.getATokenAddress(address(token));
-        assertEq(at, address(aToken));
+        assertEq(aaveModule.getATokenAddress(address(token)), address(aToken));
         assertTrue(aaveModule.isTokenSupportedByAave(address(token)));
     }
 
-    function test_deposit_to_aave_and_withdraw_on_release() public {
-        uint256 workflowId = 1;
+    function test_library_pattern_deposit_and_withdraw_distributes_yield_to_sender() public {
         uint256 deposit = 10 ether;
 
-        // Approve pool to pull tokens from escrow
-        vm.prank(escrow);
-        token.approve(address(pool), deposit);
+        // Sender approves vault to pull tokens
+        vm.startPrank(sender);
+        token.approve(address(vault), deposit);
 
-        // Call depositForYield as if called by escrow contract
-        vm.prank(escrow);
-        (bool success, uint256 aBalance) = aaveModule.depositForYield(
-            workflowId,
-            address(token),
-            deposit
-        );
-        assertTrue(success);
-        assertEq(aBalance, deposit);
+        EscrowSettings memory settings = EscrowSettings({
+            customResolver: address(0),
+            yieldPreset: YieldPreset.TO_SENDER,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        });
 
-        // Ensure escrow tracked in aave
-        (bool inAave, uint256 atBal, uint256 orig) = aaveModule.getEscrowAaveData(
-            escrow,
-            workflowId
-        );
-        assertTrue(inAave);
-        assertEq(atBal, deposit);
-        assertEq(orig, deposit);
+        uint256 senderBalBefore = token.balanceOf(sender);
+        uint256 recipientBalBefore = token.balanceOf(recipient);
 
-        // Simulate yield
+        uint256 wid = vault.createEscrow(address(token), recipient, deposit, settings);
+        vm.stopPrank();
+
+        // Simulate yield in pool and ensure pool can pay it
         pool.simulateYield(address(token), 10);
-
-        // Ensure pool has enough underlying to cover withdrawal: mint to pool
         token.mint(address(pool), 1000 ether);
 
-        // Now withdraw as if escrow contract triggers a release
-        vm.prank(escrow);
-        (bool wsuccess, uint256 actualAmount, uint256 yieldAmount) = aaveModule.withdrawWithYield(
-            workflowId,
-            address(token),
-            deposit
-        );
-        assertTrue(wsuccess);
-        assertGe(actualAmount, deposit);
-        assertEq(yieldAmount, actualAmount > deposit ? actualAmount - deposit : 0);
+        // Release by sender; principal should go to recipient, yield to sender
+        vm.prank(sender);
+        vault.releaseEscrowTransfer(wid);
 
-        // inAave should be false now
-        (bool inAaveAfter, , ) = aaveModule.getEscrowAaveData(escrow, workflowId);
-        assertFalse(inAaveAfter);
-    }
+        uint256 fee = (deposit * ESCROW_FEE_BPS) / 10000;
+        uint256 principal = deposit - fee;
 
-    function test_calculate_yield_view() public {
-        uint256 workflowId = 3;
-        uint256 deposit = 30 ether;
-        vm.prank(escrow);
-        token.approve(address(pool), deposit);
-        vm.prank(escrow);
-        (bool s, uint256 aBal) = aaveModule.depositForYield(workflowId, address(token), deposit);
-        assertTrue(s);
+        uint256 senderBalAfter = token.balanceOf(sender);
+        uint256 recipientBalAfter = token.balanceOf(recipient);
 
-        pool.simulateYield(address(token), 100);
-
-        // Calculate yield via module (call from escrow)
-        vm.prank(escrow);
-        uint256 y = aaveModule.calculateYield(workflowId, address(token));
-        assertGe(y, 0);
+        assertEq(recipientBalAfter - recipientBalBefore, principal, "recipient should receive principal");
+        assertGt(senderBalAfter, senderBalBefore - deposit, "sender should receive some yield back");
     }
 }

@@ -96,6 +96,81 @@ contract YieldOps is AccessControl {
     }
 
     /**
+     * @notice Distribute yield that has already been withdrawn (no withdrawal step).
+     * @param distModule Yield distribution module
+     * @param workflowId Escrow workflow ID
+     * @param token Token address
+     * @param yieldAmount Yield amount already held by this contract
+     * @param protocolFeeBps Protocol fee in basis points (0-3000 = 0-30%)
+     * @param feeRecipient Address to receive protocol fee / fallback yield
+     * @param distributionData Encoded per-escrow yield distribution (recipients, percentages) or empty for module default
+     * @return success Whether distribution succeeded (or fallback succeeded)
+     * @return distributedAmount Amount distributed (or recovered to feeRecipient)
+     * @dev Intended for the BaseEscrow "library pattern" where BaseEscrow withdraws from Aave directly,
+     *      then transfers only the yield to YieldOps for distribution.
+     *      Only authorized escrow contracts can call this function.
+     */
+    function distributeWithdrawnYield(
+        IYieldDistributionModule distModule,
+        uint256 workflowId,
+        address token,
+        uint256 yieldAmount,
+        uint256 protocolFeeBps,
+        address feeRecipient,
+        bytes memory distributionData
+    ) external onlyRole(ROLE_ESCROW_CONTRACT) returns (bool success, uint256 distributedAmount) {
+        if (yieldAmount == 0) return (true, 0);
+
+        uint256 protocolFeeAmount = 0;
+        uint256 yieldToDistribute = yieldAmount;
+
+        // Calculate and collect protocol fee if enabled
+        if (protocolFeeBps > 0) {
+            if (feeRecipient == address(0)) revert FeeRecipientCannotBeZero();
+            if (protocolFeeBps > MAX_PROTOCOL_FEE_BPS)
+                revert ProtocolFeeExceedsMaximum(protocolFeeBps, MAX_PROTOCOL_FEE_BPS);
+            protocolFeeAmount = (yieldAmount * protocolFeeBps) / 10000;
+            if (protocolFeeAmount > 0) {
+                yieldToDistribute = yieldAmount - protocolFeeAmount;
+                IERC20(token).safeTransfer(feeRecipient, protocolFeeAmount);
+                emit YieldProtocolFeeCollected(workflowId, token, yieldAmount, protocolFeeAmount);
+            }
+        }
+
+        // Distribute remaining yield to recipients if a distribution module is set
+        if (yieldToDistribute > 0 && address(distModule) != address(0)) {
+            try this._distributeYieldInternal(distModule, workflowId, token, yieldToDistribute, distributionData) {
+                emit YieldDistributed(workflowId, token, yieldToDistribute);
+                return (true, yieldToDistribute);
+            } catch Error(string memory reason) {
+                emit YieldDistributionFailed(workflowId, token, yieldToDistribute, reason);
+            } catch {
+                emit YieldDistributionFailed(workflowId, token, yieldToDistribute, 'Unknown error');
+            }
+
+            // Fallback: route remaining yield to feeRecipient
+            if (feeRecipient != address(0)) {
+                IERC20(token).safeTransfer(feeRecipient, yieldToDistribute);
+                emit YieldRecoveredToFeeAddress(workflowId, token, yieldToDistribute, feeRecipient);
+                return (false, yieldToDistribute);
+            }
+
+            // No feeRecipient: yield remains in YieldOps (last resort)
+            return (false, 0);
+        }
+
+        // No distribution module: route to feeRecipient as fallback
+        if (yieldToDistribute > 0 && feeRecipient != address(0)) {
+            IERC20(token).safeTransfer(feeRecipient, yieldToDistribute);
+            emit YieldRecoveredToFeeAddress(workflowId, token, yieldToDistribute, feeRecipient);
+            return (true, yieldToDistribute);
+        }
+
+        // No distribution module and no feeRecipient: yield stays in contract
+        return (true, 0);
+    }
+
+    /**
      * @notice Handle yield withdrawal and distribution
      * @param genModule Yield generation module
      * @param distModule Yield distribution module

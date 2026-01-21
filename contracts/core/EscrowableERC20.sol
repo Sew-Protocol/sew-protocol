@@ -305,6 +305,15 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
     }
 
     /**
+     * @notice Get default yield generation module (for emergency operations)
+     * @return module Default yield generation module
+     * @dev Returns default module from ModuleManagementContract
+     */
+    function _getDefaultYieldGenerationModule() internal view override returns (IYieldGenerationModule module) {
+        return IYieldGenerationModule(_getModuleAddress(0, ModuleType.YIELD_GEN)); // workflowId 0 doesn't matter for default
+    }
+
+    /**
      * @dev Get the yield generation module for an escrow
      * @param workflowId The escrow transfer ID
      * @return The yield generation module (from snapshot or default)

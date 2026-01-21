@@ -14,7 +14,8 @@ contract MockAavePoolReverting {
     using SafeERC20 for IERC20;
 
     mapping(address => address) public tokenToAToken; // token => aToken
-    mapping(address => mapping(address => uint256)) public deposits; // user => token => amount
+    // Track deposits by the address that actually supplied (msg.sender), mirroring Aave semantics.
+    mapping(address => mapping(address => uint256)) public deposits; // supplier => token => amount
     mapping(address => uint256) public liquidityIndex; // token => liquidity index (for yield simulation)
 
     uint256 public constant INITIAL_LIQUIDITY_INDEX = 1e27; // 1.0 with 27 decimals
@@ -65,8 +66,10 @@ contract MockAavePoolReverting {
 
         require(tokenToAToken[asset] != address(0), 'Token not supported');
 
-        IERC20(asset).safeTransferFrom(onBehalfOf, address(this), amount);
-        deposits[onBehalfOf][asset] += amount;
+        // Aave v3 semantics: Pool pulls underlying from msg.sender (the caller),
+        // and mints aTokens to onBehalfOf.
+        IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
+        deposits[msg.sender][asset] += amount;
 
         MockAToken aTokenContract = MockAToken(tokenToAToken[asset]);
         uint256 currentBalance = aTokenContract.balanceOf(onBehalfOf);
@@ -88,7 +91,9 @@ contract MockAavePoolReverting {
 
         MockAToken aTokenContract = MockAToken(tokenToAToken[asset]);
 
-        uint256 aTokenBalance = aTokenContract.balanceOf(to);
+        // Aave v3 semantics: Pool burns aTokens from msg.sender (the caller),
+        // and sends underlying to `to`.
+        uint256 aTokenBalance = aTokenContract.balanceOf(msg.sender);
         require(amount <= aTokenBalance, 'Insufficient aToken balance');
 
         // Calculate actual underlying amount with yield
@@ -104,10 +109,10 @@ contract MockAavePoolReverting {
         require(poolBalance >= actualAmount, 'Insufficient pool balance');
 
         // State changes before external calls (effects)
-        deposits[to][asset] -= amount;
+        deposits[msg.sender][asset] -= amount;
 
         // External calls after state changes (interactions)
-        aTokenContract.burn(to, amount);
+        aTokenContract.burn(msg.sender, amount);
         IERC20(asset).safeTransfer(to, actualAmount);
 
         emit Withdraw(asset, to, actualAmount);

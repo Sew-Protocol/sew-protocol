@@ -2,7 +2,7 @@
 import "../../../contracts/types/YieldPresets.sol";
 pragma solidity ^0.8.33;
 
-import 'forge-std/Test.sol';
+import '../../../lib/forge-std/src/Test.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/core/EscrowableERC20.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
@@ -267,5 +267,14 @@ contract ProtocolFeeCalculationTest is Test {
                 assertEq(expectedYieldToDistribute, 70e18, 'Yield to distribute should be 70% of yield');
             }
         }
+    }
+
+    function test_protocol_fee_setters_reject_above_max() public {
+        // Depending on implementation, this can be rejected at queue-time or activate-time.
+        vm.expectRevert();
+        adminContract.queueYieldProtocolFeeBps(address(vault), 3001);
+
+        vm.expectRevert();
+        adminContract.queueAppealBondProtocolFeeBps(address(vault), 3001);
     }
 }

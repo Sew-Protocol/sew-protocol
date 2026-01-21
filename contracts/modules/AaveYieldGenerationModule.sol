@@ -9,31 +9,9 @@ import '@openzeppelin/contracts/utils/introspection/ERC165.sol';
 import '@openzeppelin/contracts/utils/Address.sol';
 import '../governance/SlowLaneQueueActivate.sol';
 import '../types/EscrowTypes.sol';
-
-// Aave V3 interfaces
-interface IPoolAddressesProvider {
-    function getPool() external view returns (address);
-}
-
-interface IPool {
-    function supply(
-        address asset,
-        uint256 amount,
-        address onBehalfOf,
-        uint16 referralCode
-    ) external;
-    function withdraw(address asset, uint256 amount, address to) external returns (uint256);
-    // Optional: Add more interface methods for validation if needed
-    // function getReserveData(address asset) external view returns (ReserveData memory);
-}
-
-interface IAToken {
-    function balanceOf(address account) external view returns (uint256);
-    function underlyingAsset() external view returns (address);
-}
+import '../interfaces/aave/AaveV3Interfaces.sol';
 
 // Custom errors
-error AavePoolNotConfigured();
 error TokenNotSupportedByAave(address token);
 error InvalidATokenAddress(address token, address aToken);
 // InvalidAddress and ArrayLengthMismatch imported from EscrowTypes.sol
@@ -54,14 +32,17 @@ error CapCannotBeRaised(uint256 newCap, uint256 currentCap);
  *      Distribution is handled separately by IYieldDistributionModule.
  */
 contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, SlowLaneQueueActivate {
+    // Module-specific errors (scoped to avoid global name collisions)
+    error AavePoolNotConfigured();
+
     // Role constants for governance
     bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');
     bytes32 public constant ROLE_GUARDIAN = keccak256('ROLE_GUARDIAN');
     using SafeERC20 for IERC20;
 
     // Aave configuration
-    IPoolAddressesProvider public aavePoolAddressesProvider;
-    IPool public aavePool;
+    IAavePoolAddressesProvider public aavePoolAddressesProvider;
+    IAavePool public aavePool;
     bool public aaveEnabled = false;
 
     // Cap bounds
@@ -170,7 +151,7 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
         aavePool.supply(token, amount, escrowContract, 0);
 
         // Get aToken balance after deposit
-        yieldTokenBalance = IAToken(aToken).balanceOf(escrowContract);
+        yieldTokenBalance = IAaveAToken(aToken).balanceOf(escrowContract);
 
         // Track deposit
         escrowInAave[escrowContract][workflowId] = true;
@@ -229,7 +210,7 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
         // Withdraw from Aave FIRST (interaction), then clear state (effect)
         // Use low-level call for error handling
         (bool callSuccess, bytes memory returnData) = address(aavePool).call(
-            abi.encodeWithSelector(IPool.withdraw.selector, token, aTokenBalance, escrowContract)
+            abi.encodeWithSelector(IAavePool.withdraw.selector, token, aTokenBalance, escrowContract)
         );
 
         if (!callSuccess) {
@@ -300,7 +281,7 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
             return 0; // Token not supported
         }
 
-        uint256 currentATokenBalance = IAToken(aToken).balanceOf(escrowContract);
+        uint256 currentATokenBalance = IAaveAToken(aToken).balanceOf(escrowContract);
         uint256 originalATokenBalance = escrowATokenBalance[escrowContract][workflowId];
         uint256 originalDeposit = escrowOriginalDeposit[escrowContract][workflowId];
 
@@ -421,7 +402,7 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
 
         // Safety validation 2: Get pool address with error handling
         address poolAddress;
-        try IPoolAddressesProvider(newProvider).getPool() returns (address pool) {
+        try IAavePoolAddressesProvider(newProvider).getPool() returns (address pool) {
             poolAddress = pool;
         } catch {
             revert PoolProviderCallFailed(newProvider);
@@ -443,8 +424,8 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
         // The pool will be validated during first use (depositForYield will fail if invalid).
 
         // All validations passed - update state (checks-effects-interactions pattern)
-        aavePoolAddressesProvider = IPoolAddressesProvider(newProvider);
-        aavePool = IPool(poolAddress);
+        aavePoolAddressesProvider = IAavePoolAddressesProvider(newProvider);
+        aavePool = IAavePool(poolAddress);
         aaveEnabled = true;
 
         emit AavePoolProviderActivated(oldProvider, newProvider);
@@ -494,6 +475,14 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
      * @param token ERC20 token address
      * @param aToken Corresponding aToken address
      */
+    /**
+     * @notice Register a token for Aave yield generation
+     * @param token ERC20 token address
+     * @param aToken Aave aToken address
+     * @dev Validates that the aToken's underlying asset matches the token
+     *      Tries UNDERLYING_ASSET_ADDRESS() first (Aave V3 standard), then falls back to underlyingAsset()
+     *      Uses staticcall with manual return data handling to avoid decode failures
+     */
     function registerTokenForAave(address token, address aToken) public onlyRole(ROLE_TIMELOCK) {
         if (token == address(0)) {
             revert InvalidAddress(ADDR_TOKEN, token);
@@ -502,14 +491,35 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
             revert InvalidAddress(ADDR_ATOKEN, aToken);
         }
 
-        // Verify aToken is valid by checking underlying asset (external call)
+        // Verify aToken is valid by checking underlying asset
+        // Try UNDERLYING_ASSET_ADDRESS() first (Aave V3 canonical method)
         address underlying;
-        try IAToken(aToken).underlyingAsset() returns (address underlyingAsset) {
-            underlying = underlyingAsset;
-        } catch {
-            revert InvalidATokenAddress(token, aToken);
+        bool success;
+        bytes memory returnData;
+
+        // Try UNDERLYING_ASSET_ADDRESS() (Aave V3 standard)
+        (success, returnData) = aToken.staticcall(
+            abi.encodeWithSelector(bytes4(keccak256("UNDERLYING_ASSET_ADDRESS()")))
+        );
+        
+        if (success && returnData.length == 32) {
+            // Decode the address (skip the first 12 bytes, last 20 bytes are the address)
+            underlying = abi.decode(returnData, (address));
+        } else {
+            // Fallback to underlyingAsset() (some wrappers/forks use this)
+            (success, returnData) = aToken.staticcall(
+                abi.encodeWithSelector(bytes4(keccak256("underlyingAsset()")))
+            );
+            
+            if (success && returnData.length == 32) {
+                underlying = abi.decode(returnData, (address));
+            } else {
+                // Neither method worked
+                revert InvalidATokenAddress(token, aToken);
+            }
         }
 
+        // Validate underlying matches expected token
         if (underlying != token) {
             revert InvalidATokenAddress(token, aToken);
         }
@@ -657,15 +667,6 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
     }
 
     /**
-     * @notice Get aToken address for a token
-     * @param token ERC20 token address
-     * @return aToken address (address(0) if not supported)
-     */
-    function getATokenAddress(address token) public view returns (address) {
-        return tokenToAToken[token];
-    }
-
-    /**
      * @notice Get total amount deposited to Aave for a token
      * @param token ERC20 token address
      * @return Total amount deposited
@@ -691,5 +692,22 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
             escrowATokenBalance[escrowContract][workflowId],
             escrowOriginalDeposit[escrowContract][workflowId]
         );
+    }
+
+    /**
+     * @notice Get Aave pool address (for library pattern)
+     * @return poolAddress Aave V3 Pool address (address(0) if not configured)
+     */
+    function getAavePoolAddress() external view returns (address poolAddress) {
+        return address(aavePool);
+    }
+
+    /**
+     * @notice Get aToken address for a token (for library pattern)
+     * @param token Underlying token address
+     * @return aTokenAddress aToken address (address(0) if token not supported)
+     */
+    function getATokenAddress(address token) external view returns (address aTokenAddress) {
+        return tokenToAToken[token];
     }
 }

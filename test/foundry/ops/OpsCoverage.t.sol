@@ -1065,6 +1065,8 @@ contract MockYieldGenerationModule is IYieldGenerationModule {
     function moduleName() external pure returns (string memory) { return "MockGen"; }
     function moduleVersion() external pure returns (string memory) { return "1.0"; }
     function supportsInterface(bytes4) external pure returns (bool) { return true; }
+    function getAavePoolAddress() external pure returns (address) { return address(0); }
+    function getATokenAddress(address) external pure returns (address) { return address(0); }
 }
 
 contract MockYieldDistributionModule is IYieldDistributionModule {

@@ -197,6 +197,15 @@ contract EscrowVault is BaseEscrow {
         return IYieldDistributionModule(_getModuleAddress(workflowId, ModuleType.YIELD_DIST));
     }
 
+    /**
+     * @notice Get default yield generation module (for emergency operations)
+     * @return module Default yield generation module
+     * @dev Returns default module from ModuleManagementContract
+     */
+    function _getDefaultYieldGenerationModule() internal view override returns (IYieldGenerationModule module) {
+        return IYieldGenerationModule(moduleManagement.getDefaultModule(address(this), ModuleType.YIELD_GEN));
+    }
+
     // PRIORITY: Removed thin wrapper functions (queueDefaultModule, activateDefaultModule, getPendingDefaultModule)
     // Users should call ModuleManagementContract directly to reduce EscrowVault bytecode size
 

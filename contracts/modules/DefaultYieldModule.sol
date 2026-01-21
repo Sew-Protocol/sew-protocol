@@ -80,6 +80,22 @@ contract DefaultYieldModule is IYieldGenerationModule, ERC165 {
     }
 
     /**
+     * @notice Get Aave pool address (for library pattern)
+     * @return poolAddress Always returns address(0) - default module doesn't support Aave
+     */
+    function getAavePoolAddress() external pure returns (address poolAddress) {
+        return address(0);
+    }
+
+    /**
+     * @notice Get aToken address for a token (for library pattern)
+     * @return aTokenAddress Always returns address(0) - default module doesn't support Aave
+     */
+    function getATokenAddress(address /* token */) external pure returns (address aTokenAddress) {
+        return address(0);
+    }
+
+    /**
      * @notice ERC-165 interface support
      */
     function supportsInterface(

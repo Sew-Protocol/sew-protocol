@@ -77,4 +77,21 @@ interface IYieldGenerationModule is IERC165 {
      * @return version The module version (semantic versioning, e.g., "1.0.0")
      */
     function moduleVersion() external pure returns (string memory version);
+
+    /**
+     * @notice Get Aave pool address (for library pattern)
+     * @return poolAddress Aave V3 Pool address (address(0) if not Aave module or not configured)
+     * @dev Optional method - modules can implement if they support Aave
+     *      BaseEscrow uses staticcall with try/catch, so modules don't need to implement this
+     */
+    function getAavePoolAddress() external view returns (address poolAddress);
+
+    /**
+     * @notice Get aToken address for a token (for library pattern)
+     * @param token Underlying token address
+     * @return aTokenAddress aToken address (address(0) if token not supported)
+     * @dev Optional method - modules can implement if they support Aave
+     *      BaseEscrow uses staticcall with try/catch, so modules don't need to implement this
+     */
+    function getATokenAddress(address token) external view returns (address aTokenAddress);
 }
