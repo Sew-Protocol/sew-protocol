@@ -33,6 +33,7 @@ import '../decentralized-resolution-module/IIncentiveModule.sol';
 import './BondCollector.sol';
 import '../libraries/AaveYieldLibrary.sol';
 import '../libraries/AaveYieldHandlingLibrary.sol';
+import '../libraries/ModuleSnapshotLibrary.sol';
 import '../interfaces/aave/AaveV3Interfaces.sol';
 
 // Failure reason codes for events (replaces string reasons to save bytecode)
@@ -69,7 +70,7 @@ enum FailureReason {
 // - If success == false: reasonCode is a FailureReason value.
 
 // Function selectors (replaces abi.encodeWithSignature strings to save bytecode)
-bytes4 constant SEL_INCENTIVE_MODULE = bytes4(keccak256("incentiveModule()"));
+// SEL_INCENTIVE_MODULE moved to ModuleSnapshotLibrary
 bytes4 constant SEL_FINALIZE_DISPUTE = bytes4(keccak256("finalizeDispute(uint256)"));
 bytes4 constant SEL_RECORD_RESOLUTION = bytes4(keccak256("recordResolution(uint256,address,uint8,uint256)"));
 
@@ -613,35 +614,16 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
 
     function _snapshotModulesForEscrow(uint256 workflowId) internal {
         address resModule = address(_getResolutionModule(workflowId));
-        address relStrat = address(_getReleaseStrategy(workflowId));
-        address genMod = address(_getYieldGenerationModule(workflowId));
-        address distMod = address(_getYieldDistributionModule(workflowId));
-        
-        // PRIORITY 3: Snapshot incentive module at creation to avoid dynamic discovery
-        address incentiveMod = address(0);
-        if (resModule != address(0)) {
-            // Try to read incentiveModule from resolution module (if supported)
-            (bool success, bytes memory data) = resModule.staticcall(
-                abi.encodeWithSelector(SEL_INCENTIVE_MODULE)
-            );
-            if (success && data.length >= 32) {
-                incentiveMod = abi.decode(data, (address));
-            }
-        }
-
-        // Snapshot modules and fees at creation time (immutable for this escrow)
+        address incentiveMod = ModuleSnapshotLibrary.getIncentiveModule(resModule);
         moduleSnapshots[workflowId] = ModuleSnapshot({
             resolutionModule: resModule,
-            releaseStrategy: relStrat,
-            yieldGenerationModule: genMod,
-            yieldDistributionModule: distMod,
+            releaseStrategy: address(_getReleaseStrategy(workflowId)),
+            yieldGenerationModule: address(_getYieldGenerationModule(workflowId)),
+            yieldDistributionModule: address(_getYieldDistributionModule(workflowId)),
             incentiveModule: incentiveMod,
             yieldProtocolFeeBps: yieldProtocolFeeBps,
             appealBondProtocolFeeBps: appealBondProtocolFeeBps
         });
-
-        // Module snapshot and fee data now included in EscrowCreated event
-        // No separate events needed
     }
 
     // ============ Escrow Actions ============
@@ -660,13 +642,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         if (address(settlementOps) == address(0)) return false;
 
         // Use SettlementOps to compute timed actions
-        // Convert storage to memory struct for external call
-        SettlementOps.SettlementPendingSettlement memory pendingMem = SettlementOps.SettlementPendingSettlement({
-            exists: pending.exists,
-            isRelease: pending.isRelease,
-            appealDeadline: pending.appealDeadline,
-            resolutionHash: pending.resolutionHash
-        });
+        SettlementOps.SettlementPendingSettlement memory pendingMem = _convertPendingSettlement(pending);
         (uint8 actionType, bool isRelease) = settlementOps.computeTimedActions(
             workflowId,
             et,
@@ -681,13 +657,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
             delete pendingSettlements[workflowId];
 
             // Optionally finalize dispute in resolution module
-            IResolutionModule resolutionModule = _getResolutionModule(workflowId);
-            if (address(resolutionModule) != address(0)) {
-                (bool success, ) = address(resolutionModule).call(
-                    abi.encodeWithSelector(SEL_FINALIZE_DISPUTE, workflowId)
-                );
-                success; // Ignore failure
-            }
+            _finalizeDisputeInModule(workflowId);
 
             // Execute the settlement
             if (isRelease) {
@@ -695,26 +665,16 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
             } else {
                 _cancelAndRefund(workflowId);
             }
-
             emit PendingSettlementExecuted(workflowId, isRelease);
-            emit EscrowTransferAutoResult(
-                workflowId,
-                isRelease ? et.to : et.from,
-                et.token,
-                et.amountAfterFee,
-                true,
-                3
-            );
+            _emitAutoResult(workflowId, isRelease ? et.to : et.from, et.token, et.amountAfterFee, 3);
             return true;
         } else if (actionType == 1) {
-            // Auto-release
             _releaseEscrowTransfer(workflowId);
-            emit EscrowTransferAutoResult(workflowId, et.to, et.token, et.amountAfterFee, true, 1);
+            _emitAutoResult(workflowId, et.to, et.token, et.amountAfterFee, 1);
             return true;
         } else if (actionType == 2) {
-            // Auto-cancel
             _cancelAndRefund(workflowId);
-            emit EscrowTransferAutoResult(workflowId, et.from, et.token, et.amountAfterFee, true, 2);
+            _emitAutoResult(workflowId, et.from, et.token, et.amountAfterFee, 2);
             return true;
         }
 
@@ -1158,13 +1118,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         }
 
         // Use SettlementOps to compute pending settlement execution
-        // Convert storage to memory struct for external call
-        SettlementOps.SettlementPendingSettlement memory pendingMem = SettlementOps.SettlementPendingSettlement({
-            exists: pending.exists,
-            isRelease: pending.isRelease,
-            appealDeadline: pending.appealDeadline,
-            resolutionHash: pending.resolutionHash
-        });
+        SettlementOps.SettlementPendingSettlement memory pendingMem = _convertPendingSettlement(pending);
         (bool canExecute, bool isRelease) = settlementOps.computePendingSettlementExecution(
             workflowId,
             pendingMem,
@@ -1188,11 +1142,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         if (address(resolutionModule) != address(0)) {
             // Try to call finalizeDispute if it exists (DecentralizedResolutionModule)
             // This is a best-effort call - if it fails, we still execute the settlement
-            (bool success, ) = address(resolutionModule).call(
-                abi.encodeWithSelector(SEL_FINALIZE_DISPUTE, workflowId)
-            );
-            // Ignore failure - settlement will execute regardless
-            success;
+            _finalizeDisputeInModule(workflowId);
         }
 
         // Execute the settlement
@@ -1299,25 +1249,62 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         EscrowTransfer storage et = escrowTransfers[workflowId];
         if (settings.customResolver != address(0)) et.disputeResolver = settings.customResolver;
         bool def = (settings.autoReleaseTime == 0 && settings.autoCancelTime == 0);
-
-        uint256 autoReleaseTime = settings.autoReleaseTime > 0
-            ? settings.autoReleaseTime
-            : (def ? timeoutConfig.defaultAutoReleaseTime : 0);
-        if (autoReleaseTime > type(uint64).max) {
-            revert InvalidAutoTime(AUTO_TIME_TOO_LARGE, autoReleaseTime, block.timestamp);
-        }
-        et.autoReleaseTime = uint64(autoReleaseTime);
-
-        uint256 autoCancelTime = settings.autoCancelTime > 0
-            ? settings.autoCancelTime
-            : (def ? timeoutConfig.defaultAutoCancelTime : 0);
-        if (autoCancelTime > type(uint64).max) {
-            revert InvalidAutoTime(AUTO_TIME_TOO_LARGE, autoCancelTime, block.timestamp);
-        }
-        et.autoCancelTime = uint64(autoCancelTime);
+        et.autoReleaseTime = uint64(_getAutoTime(settings.autoReleaseTime, def, timeoutConfig.defaultAutoReleaseTime));
+        et.autoCancelTime = uint64(_getAutoTime(settings.autoCancelTime, def, timeoutConfig.defaultAutoCancelTime));
         escrowSettings[workflowId] = settings;
-        
         emit EscrowSettingsUpdated(workflowId, settings);
+    }
+
+    /**
+     * @notice Get auto time value with validation
+     * @param customTime Custom time from settings (0 = use default)
+     * @param useDefault Whether to use default time
+     * @param defaultTime Default time from config
+     * @return time Final auto time value
+     */
+    function _getAutoTime(uint256 customTime, bool useDefault, uint256 defaultTime) internal view returns (uint256 time) {
+        time = customTime > 0 ? customTime : (useDefault ? defaultTime : 0);
+        if (time > type(uint64).max) {
+            revert InvalidAutoTime(AUTO_TIME_TOO_LARGE, time, block.timestamp);
+        }
+    }
+
+    /**
+     * @notice Convert PendingSettlement storage to memory (consolidated helper)
+     * @param pending Storage reference
+     * @return pendingMem Memory struct
+     */
+    function _convertPendingSettlement(PendingSettlement storage pending) internal view returns (SettlementOps.SettlementPendingSettlement memory pendingMem) {
+        return SettlementOps.SettlementPendingSettlement({
+            exists: pending.exists,
+            isRelease: pending.isRelease,
+            appealDeadline: pending.appealDeadline,
+            resolutionHash: pending.resolutionHash
+        });
+    }
+
+    /**
+     * @notice Emit auto result event (consolidated helper)
+     * @param workflowId Escrow ID
+     * @param recipient Recipient address
+     * @param token Token address
+     * @param amount Amount
+     * @param actionCode Action code (0=push, 1=auto-release, 2=auto-cancel, 3=pending settlement)
+     */
+    function _emitAutoResult(uint256 workflowId, address recipient, address token, uint256 amount, uint8 actionCode) internal {
+        emit EscrowTransferAutoResult(workflowId, recipient, token, amount, true, actionCode);
+    }
+
+    /**
+     * @notice Finalize dispute in resolution module (consolidated helper)
+     * @param workflowId Escrow ID
+     */
+    function _finalizeDisputeInModule(uint256 workflowId) internal {
+        IResolutionModule resolutionModule = _getResolutionModule(workflowId);
+        if (address(resolutionModule) != address(0)) {
+            (bool success, ) = address(resolutionModule).call(abi.encodeWithSelector(SEL_FINALIZE_DISPUTE, workflowId));
+            success; // Ignore failure
+        }
     }
 
     // ============ View Functions ============
@@ -1432,27 +1419,14 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         // Attempt transfer using low-level call
         bool success = _tryTransfer(token, recipient, amount);
         if (success) {
-            emit EscrowTransferAutoResult(workflowId, recipient, token, amount, true, 0);
+            _emitAutoResult(workflowId, recipient, token, amount, 0);
             return true;
         } else {
             // Transfer failed - fallback to pull model
             claimableBalances[workflowId][recipient] += amount;
             emit ClaimableBalanceSet(workflowId, recipient, token, amount);
-            emit EscrowTransferAutoResult(
-                workflowId,
-                recipient,
-                token,
-                amount,
-                false,
-                uint8(FailureReason.PUSH_FAILED_FALLBACK_TO_PULL)
-            );
-            emit OperationFailure(
-                4,
-                workflowId,
-                token,
-                IERC20.transfer.selector,
-                uint8(FailureReason.PUSH_FAILED_FALLBACK_TO_PULL)
-            );
+            emit EscrowTransferAutoResult(workflowId, recipient, token, amount, false, uint8(FailureReason.PUSH_FAILED_FALLBACK_TO_PULL));
+            emit OperationFailure(4, workflowId, token, IERC20.transfer.selector, uint8(FailureReason.PUSH_FAILED_FALLBACK_TO_PULL));
             return false;
         }
     }
