@@ -32,6 +32,7 @@ import '../CreateOps.sol';
 import '../decentralized-resolution-module/IIncentiveModule.sol';
 import './BondCollector.sol';
 import '../libraries/AaveYieldLibrary.sol';
+import '../libraries/AaveYieldHandlingLibrary.sol';
 import '../interfaces/aave/AaveV3Interfaces.sol';
 
 // Failure reason codes for events (replaces string reasons to save bytecode)
@@ -197,8 +198,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     // This tracks the escrow's share of the pooled aToken position without relying on total aToken balance snapshots.
     // Maps: workflowId => token => scaledShares (ray-scaled)
     mapping(uint256 => mapping(address => uint256)) internal escrowYieldScaledShares;
-
-    uint256 internal constant AAVE_RAY = 1e27;
 
     // Emergency unwind state
     uint256 public constant MAX_UNWIND_AMOUNT_PER_CALL = 1_000_000e18; // 1M tokens max per call
@@ -475,95 +474,52 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         address token,
         uint256 maxATokenAmount
     ) external onlyRole(ROLE_GUARDIAN) whenPaused returns (uint256 underlyingAmount) {
-        // Safety check 1: Must be paused
-        if (!paused()) {
-            emit EmergencyUnwindExecuted(token, 0, 0, block.timestamp, _msgSender(), 101); // 101 = not paused
+        // Validate preconditions using library
+        (bool isValid, uint8 reasonCode) = AaveYieldHandlingLibrary.validateEmergencyUnwind(
+            paused(),
+            lastUnwindTimestamp[token],
+            block.timestamp,
+            UNWIND_COOLDOWN,
+            MAX_UNWIND_AMOUNT_PER_CALL,
+            maxATokenAmount,
+            aaveYieldLibraryEnabled,
+            aaveYieldLibrary
+        );
+        if (!isValid) {
+            emit EmergencyUnwindExecuted(token, 0, 0, block.timestamp, _msgSender(), reasonCode);
             return 0;
         }
         
-        // Safety check 2: Rate limiting (cooldown per token)
-        uint256 lastUnwind = lastUnwindTimestamp[token];
-        if (block.timestamp < lastUnwind + UNWIND_COOLDOWN) {
-            emit EmergencyUnwindExecuted(token, 0, 0, block.timestamp, _msgSender(), 102); // 102 = cooldown
-            return 0;
-        }
-        
-        // Safety check 3: Amount limit
-        if (maxATokenAmount > MAX_UNWIND_AMOUNT_PER_CALL) {
-            emit EmergencyUnwindExecuted(token, 0, 0, block.timestamp, _msgSender(), 103); // 103 = exceeds limit
-            return 0;
-        }
-        
-        // Safety check 4: Library must be enabled and configured
-        if (!aaveYieldLibraryEnabled || aaveYieldLibrary == address(0)) {
-            emit EmergencyUnwindExecuted(token, 0, 0, block.timestamp, _msgSender(), uint8(FailureReason.MODULE_NOT_SET)); // 3 = MODULE_NOT_SET
-            return 0;
-        }
-        
-        // Get module and pool address (use default module for emergency)
+        // Get module and prepare unwind using library
         IYieldGenerationModule genModule = _getDefaultYieldGenerationModule();
-        if (address(genModule) == address(0)) {
-            emit EmergencyUnwindExecuted(token, 0, 0, block.timestamp, _msgSender(), uint8(FailureReason.MODULE_NOT_SET)); // 3 = MODULE_NOT_SET
+        address aToken = AaveYieldHandlingLibrary.getATokenAddress(genModule, token);
+        uint256 aTokenBalance = aToken != address(0) ? IAaveAToken(aToken).balanceOf(address(this)) : 0;
+        
+        (address aavePool, , uint256 unwindAmount, uint8 prepReasonCode) = 
+            AaveYieldHandlingLibrary.prepareEmergencyUnwind(
+                genModule,
+                token,
+                aTokenBalance,
+                maxATokenAmount
+            );
+        
+        if (prepReasonCode != 0) {
+            emit EmergencyUnwindExecuted(token, 0, 0, block.timestamp, _msgSender(), prepReasonCode);
             return 0;
         }
         
-        // Safety: Verify module is a contract before calling
-        if (address(genModule).code.length == 0) {
-            emit EmergencyUnwindExecuted(token, 0, 0, block.timestamp, _msgSender(), uint8(FailureReason.MODULE_NOT_SET));
-            return 0;
-        }
-        
-        address aavePool = _getAavePoolAddress(genModule);
-        address aToken = _getATokenAddress(genModule, token);
-        
-        if (aavePool == address(0) || aToken == address(0)) {
-            emit EmergencyUnwindExecuted(token, 0, 0, block.timestamp, _msgSender(), uint8(FailureReason.MODULE_NOT_SET)); // 3 = MODULE_NOT_SET
-            return 0;
-        }
-        
-        // Safety check 5: Get BaseEscrow's aToken balance (scope restriction - only this token)
-        uint256 aTokenBalance = IAaveAToken(aToken).balanceOf(address(this));
-        if (aTokenBalance == 0) {
-            emit EmergencyUnwindExecuted(token, 0, 0, block.timestamp, _msgSender(), 104); // 104 = nothing to unwind
-            return 0;
-        }
-        
-        // Safety check 6: Cap to max amount (amount limit)
-        uint256 unwindAmount = aTokenBalance < maxATokenAmount ? aTokenBalance : maxATokenAmount;
-        
-        // CRITICAL: Unwind to BaseEscrow (address(this)), NOT to guardian or arbitrary address
-        // This ensures guardian cannot reroute funds - destination is hardcoded
-        // Use delegatecall to call library function (maintains msg.sender = BaseEscrow)
+        // Execute unwind via delegatecall
         (bool success, bytes memory returnData) = aaveYieldLibrary.delegatecall(
             abi.encodeWithSelector(AaveYieldLibrary.withdraw.selector, aavePool, token, unwindAmount, address(this))
         );
         if (success && returnData.length >= 32) {
-            uint256 withdrawn = abi.decode(returnData, (uint256));
-            underlyingAmount = withdrawn;
-            
-            // Update state (rate limiting)
+            underlyingAmount = abi.decode(returnData, (uint256));
             lastUnwindTimestamp[token] = block.timestamp;
             totalUnwoundAmount += underlyingAmount;
-            
-            emit EmergencyUnwindExecuted(
-                token,
-                unwindAmount,
-                underlyingAmount,
-                block.timestamp,
-                _msgSender(),
-                0 // 0 = success
-            );
+            emit EmergencyUnwindExecuted(token, unwindAmount, underlyingAmount, block.timestamp, _msgSender(), 0);
             return underlyingAmount;
         }
-        // Delegatecall failed - emit event but don't revert (non-blocking)
-        emit EmergencyUnwindExecuted(
-            token,
-            unwindAmount,
-            0,
-            block.timestamp,
-            _msgSender(),
-            uint8(FailureReason.WITHDRAWAL_FAILED) // 9 = WITHDRAWAL_FAILED (consistent with yield withdrawal)
-        );
+        emit EmergencyUnwindExecuted(token, unwindAmount, 0, block.timestamp, _msgSender(), uint8(FailureReason.WITHDRAWAL_FAILED));
         return 0;
     }
 
@@ -628,29 +584,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
 
         // Yield deposit (optional, non-blocking)
         if (result.yieldEnabled && result.shouldDepositYield) {
-            // NEW: Check if library pattern is enabled
-            if (aaveYieldLibraryEnabled && aaveYieldLibrary != address(0)) {
-                _handleYieldDepositViaLibrary(workflowId, token, result.amountAfterFee);
-            } else {
-                // EXISTING: YieldOps pattern (unchanged)
-                IYieldGenerationModule genModule = _getYieldGenerationModule(workflowId);
-                if (address(genModule) != address(0) && genModule.isTokenSupported(token)) {
-                    // Use low-level call to save bytecode
-                    (bool success, ) = address(genModule).call(
-                        abi.encodeWithSelector(IYieldGenerationModule.depositForYield.selector, workflowId, token, result.amountAfterFee)
-                    );
-                    if (!success) {
-                        emit YieldHandlingFailed(workflowId, token, result.amountAfterFee, uint8(FailureReason.DEPOSIT_FAILED));
-                        emit OperationFailure(
-                            1,
-                            workflowId,
-                            address(genModule),
-                            IYieldGenerationModule.depositForYield.selector,
-                            uint8(FailureReason.DEPOSIT_FAILED)
-                        );
-                    }
-                }
-            }
+            _depositYieldForEscrow(workflowId, token, result.amountAfterFee);
         }
 
         // Emit events (state modification - must stay in BaseEscrow)
@@ -1552,61 +1486,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         return success;
     }
 
-    /**
-     * @notice Helper to get Aave pool address from module
-     * @param genModule Yield generation module
-     * @return poolAddress Aave pool address (0 if not available)
-     */
-    function _getAavePoolAddress(IYieldGenerationModule genModule) internal view returns (address poolAddress) {
-        // Early return if module is not set
-        if (address(genModule) == address(0)) {
-            return address(0);
-        }
-        // Try to call getAavePoolAddress() if module supports it
-        (bool success, bytes memory data) = address(genModule).staticcall(
-            abi.encodeWithSelector(bytes4(keccak256("getAavePoolAddress()")))
-        );
-        if (success && data.length >= 32) {
-            poolAddress = abi.decode(data, (address));
-        }
-    }
-
-    /**
-     * @notice Helper to get aToken address from module
-     * @param genModule Yield generation module
-     * @param token Underlying token address
-     * @return aTokenAddress aToken address (0 if not available)
-     */
-    function _getATokenAddress(IYieldGenerationModule genModule, address token) internal view returns (address aTokenAddress) {
-        // Early return if module is not set
-        if (address(genModule) == address(0)) {
-            return address(0);
-        }
-        // Try to call getATokenAddress(address) if module supports it
-        (bool success, bytes memory data) = address(genModule).staticcall(
-            abi.encodeWithSelector(bytes4(keccak256("getATokenAddress(address)")), token)
-        );
-        if (success && data.length >= 32) {
-            aTokenAddress = abi.decode(data, (address));
-        }
-    }
-
-    /**
-     * @notice Read Aave normalized income (RAY) for an asset.
-     * @dev Best-effort via staticcall; returns AAVE_RAY (1.0) if unavailable.
-     */
-    function _getAaveNormalizedIncome(address pool, address token) internal view returns (uint256 incomeRay) {
-        if (pool == address(0)) return AAVE_RAY;
-        (bool success, bytes memory data) = pool.staticcall(
-            abi.encodeWithSelector(bytes4(keccak256("getReserveNormalizedIncome(address)")), token)
-        );
-        if (success && data.length >= 32) {
-            incomeRay = abi.decode(data, (uint256));
-            if (incomeRay == 0) return AAVE_RAY;
-            return incomeRay;
-        }
-        return AAVE_RAY;
-    }
+    // Helper functions removed - use AaveYieldHandlingLibrary directly to save bytecode
 
     /**
      * @notice Get default yield generation module (for emergency operations)
@@ -1636,84 +1516,53 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         actualAmount = amount;
         
         EscrowSettings memory settings = escrowSettings[workflowId];
-        bool yieldEnabled = settings.yieldPreset != YieldPreset.OFF;
-        
-        if (!yieldEnabled) {
-            return actualAmount;
-        }
-        
-        IYieldGenerationModule genModule = _getYieldGenerationModule(workflowId);
-        if (address(genModule) == address(0)) {
-            return actualAmount;
-        }
         
         // Check if escrow has yield to withdraw
         if (!escrowInYield[workflowId][token]) {
             return actualAmount; // Not in yield, return original
         }
         
-        // Get aToken address from module
-        address aToken = _getATokenAddress(genModule, token);
-        if (aToken == address(0)) {
-            emit YieldWithdrawalAttempted(workflowId, token, amount, amount, false, uint8(FailureReason.MODULE_NOT_SET));
-            return actualAmount;
-        }
-        
-        // Get tracked scaled shares (v2). This must be present in production;
-        // legacy fallback is intentionally not supported (unsafe for multi-escrow).
+        IYieldGenerationModule genModule = _getYieldGenerationModule(workflowId);
         uint256 scaledShares = escrowYieldScaledShares[workflowId][token];
-        if (scaledShares == 0) {
-            // Clear state and treat as non-blocking failure (prevents stuck escrows).
-            escrowInYield[workflowId][token] = false;
-            emit YieldWithdrawalAttempted(workflowId, token, amount, amount, false, uint8(FailureReason.MALFORMED_RETURN_DATA));
-            return actualAmount;
-        }
-
-        // Get Aave pool address from module
-        address aavePool = _getAavePoolAddress(genModule);
-        if (aavePool == address(0)) {
-            emit YieldWithdrawalAttempted(workflowId, token, amount, amount, false, uint8(FailureReason.MODULE_NOT_SET));
-            return actualAmount;
-        }
-
-        // Compute underlying to withdraw = scaledShares * normalizedIncome / RAY.
-        uint256 incomeRay = _getAaveNormalizedIncome(aavePool, token);
-        uint256 underlyingToWithdraw = (scaledShares * incomeRay) / AAVE_RAY;
-        if (underlyingToWithdraw == 0) {
-            // Clear state and return
-            escrowInYield[workflowId][token] = false;
-            return actualAmount;
-        }
-
-        // Call library to withdraw (msg.sender = BaseEscrow)
-        // Use delegatecall to call library function (maintains msg.sender = BaseEscrow)
-        (bool success, bytes memory returnData) = aaveYieldLibrary.delegatecall(
-            abi.encodeWithSelector(AaveYieldLibrary.withdraw.selector, aavePool, token, underlyingToWithdraw, address(this))
-        );
-        if (success && returnData.length >= 32) {
-            uint256 withdrawnAmount = abi.decode(returnData, (uint256));
-            // If YieldOps is configured, we distribute yield separately and only pay out principal.
-            // Otherwise, we return the full withdrawn amount (principal + yield) to avoid trapping yield.
-            actualAmount = withdrawnAmount;
-            
-            // Clear tracking
-            escrowInYield[workflowId][token] = false;
-            escrowYieldScaledShares[workflowId][token] = 0;
-            escrowATokenBalances[workflowId][aToken] = 0; // legacy slot
-            
-            // Handle yield distribution (non-blocking)
-            _distributeYieldIfNeeded(workflowId, token, withdrawnAmount, amount);
-            if (address(yieldOps) != address(0) && address(yieldOps).code.length > 0) {
-                // Yield (if any) has been routed away; pay out principal only.
-                actualAmount = amount;
-            }
-            
-            emit YieldWithdrawalAttempted(workflowId, token, amount, actualAmount, true, 0);
-            return actualAmount;
-        }
-        // Delegatecall failed - non-blocking: return original amount
-        emit YieldWithdrawalAttempted(workflowId, token, amount, amount, false, uint8(FailureReason.WITHDRAWAL_FAILED));
         
+        // Call library to handle withdrawal
+        AaveYieldHandlingLibrary.WithdrawalResult memory result = AaveYieldHandlingLibrary.handleYieldWithdrawal(
+            workflowId,
+            token,
+            amount,
+            genModule,
+            settings,
+            scaledShares,
+            aaveYieldLibrary
+        );
+        
+        if (!result.success) {
+            // Clear state on failure
+            if (result.failureReason == 2) { // MALFORMED_RETURN_DATA
+                escrowInYield[workflowId][token] = false;
+            }
+            emit YieldWithdrawalAttempted(workflowId, token, amount, amount, false, result.failureReason);
+            return actualAmount;
+        }
+        
+        actualAmount = result.actualAmount;
+        
+        // Get aToken for legacy slot clearing
+        address aToken = AaveYieldHandlingLibrary.getATokenAddress(genModule, token);
+        
+        // Clear tracking
+        escrowInYield[workflowId][token] = false;
+        escrowYieldScaledShares[workflowId][token] = 0;
+        escrowATokenBalances[workflowId][aToken] = 0; // legacy slot
+        
+        // Handle yield distribution (non-blocking)
+        _distributeYieldIfNeeded(workflowId, token, actualAmount, amount);
+        if (address(yieldOps) != address(0) && address(yieldOps).code.length > 0) {
+            // Yield (if any) has been routed away; pay out principal only.
+            actualAmount = amount;
+        }
+        
+        emit YieldWithdrawalAttempted(workflowId, token, amount, actualAmount, true, 0);
         return actualAmount;
     }
 
@@ -1730,65 +1579,42 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         uint256 amount
     ) internal {
         EscrowSettings memory settings = escrowSettings[workflowId];
-        bool yieldEnabled = settings.yieldPreset != YieldPreset.OFF;
-        
-        if (!yieldEnabled) {
-            return;
-        }
-        
         IYieldGenerationModule genModule = _getYieldGenerationModule(workflowId);
-        if (address(genModule) == address(0)) {
-            return;
-        }
         
-        if (!genModule.isTokenSupported(token)) {
-            return;
-        }
-        
-        // Get Aave pool and aToken addresses from module
-        address aavePool = _getAavePoolAddress(genModule);
-        address aToken = _getATokenAddress(genModule, token);
-        
-        if (aavePool == address(0) || aToken == address(0)) {
-            emit YieldDepositAttempted(workflowId, token, amount, false, uint8(FailureReason.MODULE_NOT_SET));
-            return;
-        }
-
-        // Compute scaled shares for this escrow at current normalized income.
-        // scaledShares = amount * RAY / incomeRay
-        uint256 incomeRay = _getAaveNormalizedIncome(aavePool, token);
-        uint256 scaledShares = (amount * AAVE_RAY) / incomeRay;
-        if (scaledShares == 0) {
-            emit YieldDepositAttempted(workflowId, token, amount, false, uint8(FailureReason.DEPOSIT_FAILED));
-            return;
-        }
-        
-        // Call library to supply (msg.sender = BaseEscrow)
-        // Use delegatecall to call library function (maintains msg.sender = BaseEscrow)
-        (bool success, ) = aaveYieldLibrary.delegatecall(
-            abi.encodeWithSelector(AaveYieldLibrary.supply.selector, aavePool, token, amount, address(this))
+        // Call library to handle deposit
+        AaveYieldHandlingLibrary.DepositResult memory result = AaveYieldHandlingLibrary.handleYieldDeposit(
+            workflowId,
+            token,
+            amount,
+            genModule,
+            settings,
+            aaveYieldLibrary
         );
-        if (success) {
-            // Track per-escrow scaled shares (v2)
-            escrowYieldScaledShares[workflowId][token] = scaledShares;
-            // Legacy slot cleared (do not maintain in production; unsafe for multi-escrow).
-            escrowATokenBalances[workflowId][aToken] = 0;
-            escrowInYield[workflowId][token] = true;
-            
-            emit YieldDepositAttempted(workflowId, token, amount, true, 0);
-        } else {
-            // Delegatecall failed - non-blocking: continue without yield
-            emit YieldDepositAttempted(workflowId, token, amount, false, uint8(FailureReason.DEPOSIT_FAILED));
+        
+        if (!result.success) {
+            emit YieldDepositAttempted(workflowId, token, amount, false, result.failureReason);
+            return;
         }
+        
+        // Get aToken for legacy slot clearing
+        address aToken = AaveYieldHandlingLibrary.getATokenAddress(genModule, token);
+        
+        // Track per-escrow scaled shares (v2)
+        escrowYieldScaledShares[workflowId][token] = result.scaledShares;
+        // Legacy slot cleared (do not maintain in production; unsafe for multi-escrow).
+        escrowATokenBalances[workflowId][aToken] = 0;
+        escrowInYield[workflowId][token] = true;
+        
+        emit YieldDepositAttempted(workflowId, token, amount, true, 0);
     }
 
     /**
-     * @notice Distribute yield if needed (placeholder for now, uses YieldOps)
+     * @notice Distribute yield if needed (uses library for preparation, then YieldOps)
      * @param workflowId The escrow ID
      * @param token Token address
      * @param actualAmount Total amount withdrawn
      * @param originalAmount Original escrow amount
-     * @dev Can be refactored later to use library or direct distribution
+     * @dev Uses library to prepare distribution data, then calls YieldOps
      */
     function _distributeYieldIfNeeded(
         uint256 workflowId,
@@ -1858,124 +1684,47 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         address token,
         uint256 amount
     ) internal returns (uint256 actualAmount) {
-        actualAmount = amount;
-        
         // NEW: Check if library pattern is enabled
         if (aaveYieldLibraryEnabled && aaveYieldLibrary != address(0)) {
-            // Library pattern: BaseEscrow calls library directly
             return _handleYieldViaLibrary(workflowId, token, amount);
         }
         
-        // EXISTING: YieldOps pattern (unchanged, continues to work)
-        // P1: module wiring observability (only emit if yield is enabled for this escrow).
+        // EXISTING: YieldOps pattern
         EscrowSettings memory settings = escrowSettings[workflowId];
         bool yieldEnabled = settings.yieldPreset != YieldPreset.OFF;
+        
         if (address(yieldOps) == address(0)) {
-            if (yieldEnabled) {
-                emit YieldHandlingFailed(workflowId, token, amount, uint8(FailureReason.MODULE_NOT_SET));
-                emit OperationFailure(
-                    2,
-                    workflowId,
-                    address(0),
-                    YieldOps.handleYield.selector,
-                    uint8(FailureReason.MODULE_NOT_SET)
-                );
-            }
-            return actualAmount;
+            if (yieldEnabled) _emitYieldFailure(2, workflowId, address(0), YieldOps.handleYield.selector, token, amount, uint8(FailureReason.MODULE_NOT_SET));
+            return amount;
         }
         if (address(yieldOps).code.length == 0) {
-            if (yieldEnabled) {
-                emit YieldHandlingFailed(workflowId, token, amount, uint8(FailureReason.MODULE_NOT_CONTRACT));
-                emit OperationFailure(
-                    2,
-                    workflowId,
-                    address(yieldOps),
-                    YieldOps.handleYield.selector,
-                    uint8(FailureReason.MODULE_NOT_CONTRACT)
-                );
-            }
-            return actualAmount;
+            if (yieldEnabled) _emitYieldFailure(2, workflowId, address(yieldOps), YieldOps.handleYield.selector, token, amount, uint8(FailureReason.MODULE_NOT_CONTRACT));
+            return amount;
         }
         
         IYieldGenerationModule genModule = _getYieldGenerationModule(workflowId);
         IYieldDistributionModule distModule = _getYieldDistributionModule(workflowId);
-        
-        // Use snapshotted fee (immutable per-escrow) instead of global fee
         uint256 snapshottedYieldFee = moduleSnapshots[workflowId].yieldProtocolFeeBps;
-        
-        // Derive distribution data from preset
         EscrowTransfer memory et = escrowTransfers[workflowId];
-        bytes memory distributionData = YieldPresetLibrary.deriveDistributionData(
-            settings.yieldPreset,
-            et.from,  // sender (buyer)
-            et.to     // recipient (seller)
-        );
+        bytes memory distributionData = YieldPresetLibrary.deriveDistributionData(settings.yieldPreset, et.from, et.to);
 
-        // Low-level call to avoid try/catch bytecode bloat (yield is non-critical)
         (bool ok, bytes memory ret) = address(yieldOps).call(
-            abi.encodeWithSelector(
-                YieldOps.handleYield.selector,
-                genModule,
-                distModule,
-                workflowId,
-                token,
-                amount,
-                snapshottedYieldFee,
-                escrowFeeAddress,
-                distributionData
-            )
+            abi.encodeWithSelector(YieldOps.handleYield.selector, genModule, distModule, workflowId, token, amount, snapshottedYieldFee, escrowFeeAddress, distributionData)
         );
 
-        if (!ok) {
-            // For yield withdrawal paths, expose a stable "withdrawal failed" signal.
-            emit YieldHandlingFailed(workflowId, token, amount, uint8(FailureReason.WITHDRAWAL_FAILED));
-            emit OperationFailure(
-                2,
-                workflowId,
-                address(yieldOps),
-                YieldOps.handleYield.selector,
-                uint8(FailureReason.CALL_FAILED)
-            );
-            return actualAmount;
-        }
-        // YieldOps currently returns YieldOps.YieldResult (4 * 32-byte words).
-        // Guard decode so yield remains strictly non-blocking even if ABI drifts.
-        if (ret.length < 128) {
-            // For yield withdrawal paths, expose a stable "withdrawal failed" signal.
-            emit YieldHandlingFailed(workflowId, token, amount, uint8(FailureReason.WITHDRAWAL_FAILED));
-            emit OperationFailure(
-                2,
-                workflowId,
-                address(yieldOps),
-                YieldOps.handleYield.selector,
-                uint8(FailureReason.MALFORMED_RETURN_DATA)
-            );
-            return actualAmount;
+        if (!ok || ret.length < 128) {
+            if (yieldEnabled) _emitYieldFailure(2, workflowId, address(yieldOps), YieldOps.handleYield.selector, token, amount, uint8(FailureReason.CALL_FAILED));
+            return amount;
         }
 
         YieldOps.YieldResult memory result = abi.decode(ret, (YieldOps.YieldResult));
-
-        // Use actual withdrawn amount (may include yield)
-        // Yield is optional and non-critical - if withdrawal returns unexpected amount,
-        // treat yield as failed and proceed with principal amount
-        if (result.actualAmount > 0) {
-            // Basic sanity check: actual amount should be >= principal (no loss)
-            if (result.actualAmount < amount) {
-                emit YieldHandlingFailed(workflowId, token, amount, uint8(FailureReason.LESS_THAN_PRINCIPAL));
-                emit OperationFailure(
-                    2,
-                    workflowId,
-                    address(yieldOps),
-                    YieldOps.handleYield.selector,
-                    uint8(FailureReason.LESS_THAN_PRINCIPAL)
-                );
-                actualAmount = amount; // Use principal amount
-            } else {
-                actualAmount = result.actualAmount; // Use actual amount (may include yield)
-            }
+        if (result.actualAmount > 0 && result.actualAmount >= amount) {
+            return result.actualAmount;
         }
-        
-        return actualAmount;
+        if (result.actualAmount > 0 && result.actualAmount < amount && yieldEnabled) {
+            _emitYieldFailure(2, workflowId, address(yieldOps), YieldOps.handleYield.selector, token, amount, uint8(FailureReason.LESS_THAN_PRINCIPAL));
+        }
+        return amount;
     }
 
     function _cancelAndRefund(uint256 workflowId) internal {
@@ -2050,6 +1799,51 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
             return IResolutionModule(snap);
         }
         return IResolutionModule(disputeResolutionModule);
+    }
+
+    /**
+     * @notice Deposit yield for escrow (consolidated to save bytecode)
+     * @param workflowId Escrow ID
+     * @param token Token address
+     * @param amount Amount to deposit
+     */
+    function _depositYieldForEscrow(uint256 workflowId, address token, uint256 amount) internal {
+        if (aaveYieldLibraryEnabled && aaveYieldLibrary != address(0)) {
+            _handleYieldDepositViaLibrary(workflowId, token, amount);
+        } else {
+            IYieldGenerationModule genModule = _getYieldGenerationModule(workflowId);
+            if (address(genModule) != address(0) && genModule.isTokenSupported(token)) {
+                (bool success, ) = address(genModule).call(
+                    abi.encodeWithSelector(IYieldGenerationModule.depositForYield.selector, workflowId, token, amount)
+                );
+                if (!success) {
+                    _emitYieldFailure(1, workflowId, address(genModule), IYieldGenerationModule.depositForYield.selector, token, amount, uint8(FailureReason.DEPOSIT_FAILED));
+                }
+            }
+        }
+    }
+
+    /**
+     * @notice Emit yield failure events (consolidated to save bytecode)
+     * @param opType Operation type (1=deposit, 2=withdrawal)
+     * @param workflowId Escrow ID
+     * @param target Target address
+     * @param selector Function selector
+     * @param token Token address
+     * @param amount Amount
+     * @param reason Failure reason
+     */
+    function _emitYieldFailure(
+        uint8 opType,
+        uint256 workflowId,
+        address target,
+        bytes4 selector,
+        address token,
+        uint256 amount,
+        uint8 reason
+    ) internal {
+        emit YieldHandlingFailed(workflowId, token, amount, reason);
+        emit OperationFailure(opType, workflowId, target, selector, reason);
     }
 
     // Resolution outcome enum (matches DecentralizedResolverStructs.ResolutionOutcome)

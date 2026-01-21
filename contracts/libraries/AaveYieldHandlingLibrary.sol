@@ -1,0 +1,389 @@
+// SPDX-License-Identifier: Apache-2.0
+pragma solidity ^0.8.33;
+
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
+import '../interfaces/IYieldGenerationModule.sol';
+import '../interfaces/IYieldDistributionModule.sol';
+import '../interfaces/aave/AaveV3Interfaces.sol';
+import '../libraries/AaveYieldLibrary.sol';
+import '../libraries/YieldPresetLibrary.sol';
+import '../types/EscrowTypes.sol';
+import '../types/YieldPresets.sol';
+import '../YieldOps.sol';
+
+/**
+ * @title AaveYieldHandlingLibrary
+ * @notice Library for Aave V3 yield handling operations (deposit, withdrawal, distribution)
+ * @dev Extracted from BaseEscrow to reduce contract size
+ *      Handles Aave-specific yield operations using the library pattern (delegatecall)
+ */
+library AaveYieldHandlingLibrary {
+    using SafeERC20 for IERC20;
+
+    uint256 internal constant AAVE_RAY = 1e27;
+    uint256 internal constant MAX_PROTOCOL_FEE_BPS = 3000; // 30% maximum
+
+    /**
+     * @notice Result of yield withdrawal operation
+     */
+    struct WithdrawalResult {
+        uint256 actualAmount;
+        bool success;
+        uint8 failureReason; // 0 = success, otherwise FailureReason enum
+    }
+
+    /**
+     * @notice Result of yield deposit operation
+     */
+    struct DepositResult {
+        bool success;
+        uint256 scaledShares;
+        uint8 failureReason; // 0 = success, otherwise FailureReason enum
+    }
+
+    /**
+     * @notice Helper to get Aave pool address from module
+     * @param genModule Yield generation module
+     * @return poolAddress Aave pool address (0 if not available)
+     */
+    function getAavePoolAddress(IYieldGenerationModule genModule) internal view returns (address poolAddress) {
+        if (address(genModule) == address(0)) {
+            return address(0);
+        }
+        (bool success, bytes memory data) = address(genModule).staticcall(
+            abi.encodeWithSelector(bytes4(keccak256("getAavePoolAddress()")))
+        );
+        if (success && data.length >= 32) {
+            poolAddress = abi.decode(data, (address));
+        }
+    }
+
+    /**
+     * @notice Helper to get aToken address from module
+     * @param genModule Yield generation module
+     * @param token Underlying token address
+     * @return aTokenAddress aToken address (0 if not available)
+     */
+    function getATokenAddress(IYieldGenerationModule genModule, address token) internal view returns (address aTokenAddress) {
+        if (address(genModule) == address(0)) {
+            return address(0);
+        }
+        (bool success, bytes memory data) = address(genModule).staticcall(
+            abi.encodeWithSelector(bytes4(keccak256("getATokenAddress(address)")), token)
+        );
+        if (success && data.length >= 32) {
+            aTokenAddress = abi.decode(data, (address));
+        }
+    }
+
+    /**
+     * @notice Read Aave normalized income (RAY) for an asset
+     * @param pool Aave pool address
+     * @param token Token address
+     * @return incomeRay Normalized income in RAY (1e27 = 1.0)
+     * @dev Returns AAVE_RAY (1.0) if unavailable
+     */
+    function getAaveNormalizedIncome(address pool, address token) internal view returns (uint256 incomeRay) {
+        if (pool == address(0)) return AAVE_RAY;
+        (bool success, bytes memory data) = pool.staticcall(
+            abi.encodeWithSelector(bytes4(keccak256("getReserveNormalizedIncome(address)")), token)
+        );
+        if (success && data.length >= 32) {
+            incomeRay = abi.decode(data, (uint256));
+            if (incomeRay == 0) return AAVE_RAY;
+            return incomeRay;
+        }
+        return AAVE_RAY;
+    }
+
+    /**
+     * @notice Handle yield withdrawal via library pattern
+     * @param workflowId The escrow ID
+     * @param token Token address
+     * @param amount Original escrow amount
+     * @param genModule Yield generation module
+     * @param settings Escrow settings
+     * @param scaledShares Current scaled shares for this escrow
+     * @param aaveYieldLibrary Aave yield library address
+     * @return result Withdrawal result
+     */
+    function handleYieldWithdrawal(
+        uint256 workflowId,
+        address token,
+        uint256 amount,
+        IYieldGenerationModule genModule,
+        EscrowSettings memory settings,
+        uint256 scaledShares,
+        address aaveYieldLibrary
+    ) internal returns (WithdrawalResult memory result) {
+        result.actualAmount = amount;
+        result.success = false;
+        result.failureReason = 0;
+
+        // Check if yield is enabled
+        if (settings.yieldPreset == YieldPreset.OFF) {
+            return result;
+        }
+
+        if (address(genModule) == address(0)) {
+            return result;
+        }
+
+        // Get aToken address from module
+        address aToken = getATokenAddress(genModule, token);
+        if (aToken == address(0)) {
+            result.failureReason = 3; // MODULE_NOT_SET
+            return result;
+        }
+
+        // Check if we have scaled shares
+        if (scaledShares == 0) {
+            result.failureReason = 2; // MALFORMED_RETURN_DATA
+            return result;
+        }
+
+        // Get Aave pool address from module
+        address aavePool = getAavePoolAddress(genModule);
+        if (aavePool == address(0)) {
+            result.failureReason = 3; // MODULE_NOT_SET
+            return result;
+        }
+
+        // Compute underlying to withdraw = scaledShares * normalizedIncome / RAY
+        uint256 incomeRay = getAaveNormalizedIncome(aavePool, token);
+        uint256 underlyingToWithdraw = (scaledShares * incomeRay) / AAVE_RAY;
+        if (underlyingToWithdraw == 0) {
+            return result; // No underlying to withdraw
+        }
+
+        // Call library to withdraw (msg.sender = BaseEscrow via delegatecall)
+        (bool success, bytes memory returnData) = aaveYieldLibrary.delegatecall(
+            abi.encodeWithSelector(AaveYieldLibrary.withdraw.selector, aavePool, token, underlyingToWithdraw, address(this))
+        );
+        if (success && returnData.length >= 32) {
+            uint256 withdrawnAmount = abi.decode(returnData, (uint256));
+            result.actualAmount = withdrawnAmount;
+            result.success = true;
+            return result;
+        }
+        
+        // Delegatecall failed
+        result.failureReason = 9; // WITHDRAWAL_FAILED
+        return result;
+    }
+
+    /**
+     * @notice Handle yield deposit via library pattern
+     * @param workflowId The escrow ID
+     * @param token Token address
+     * @param amount Amount to deposit
+     * @param genModule Yield generation module
+     * @param settings Escrow settings
+     * @param aaveYieldLibrary Aave yield library address
+     * @return result Deposit result
+     */
+    function handleYieldDeposit(
+        uint256 workflowId,
+        address token,
+        uint256 amount,
+        IYieldGenerationModule genModule,
+        EscrowSettings memory settings,
+        address aaveYieldLibrary
+    ) internal returns (DepositResult memory result) {
+        result.success = false;
+        result.scaledShares = 0;
+        result.failureReason = 0;
+
+        // Check if yield is enabled
+        if (settings.yieldPreset == YieldPreset.OFF) {
+            return result;
+        }
+
+        if (address(genModule) == address(0)) {
+            return result;
+        }
+
+        if (!genModule.isTokenSupported(token)) {
+            return result;
+        }
+
+        // Get Aave pool and aToken addresses from module
+        address aavePool = getAavePoolAddress(genModule);
+        address aToken = getATokenAddress(genModule, token);
+
+        if (aavePool == address(0) || aToken == address(0)) {
+            result.failureReason = 3; // MODULE_NOT_SET
+            return result;
+        }
+
+        // Compute scaled shares for this escrow at current normalized income
+        // scaledShares = amount * RAY / incomeRay
+        uint256 incomeRay = getAaveNormalizedIncome(aavePool, token);
+        uint256 scaledShares = (amount * AAVE_RAY) / incomeRay;
+        if (scaledShares == 0) {
+            result.failureReason = 8; // DEPOSIT_FAILED
+            return result;
+        }
+
+        // Call library to supply (msg.sender = BaseEscrow via delegatecall)
+        (bool success, ) = aaveYieldLibrary.delegatecall(
+            abi.encodeWithSelector(AaveYieldLibrary.supply.selector, aavePool, token, amount, address(this))
+        );
+        if (success) {
+            result.success = true;
+            result.scaledShares = scaledShares;
+            return result;
+        }
+
+        // Delegatecall failed
+        result.failureReason = 8; // DEPOSIT_FAILED
+        return result;
+    }
+
+    /**
+     * @notice Distribute yield if needed (for library pattern)
+     * @param workflowId The escrow ID
+     * @param token Token address
+     * @param actualAmount Total amount withdrawn
+     * @param originalAmount Original escrow amount
+     * @param distModule Yield distribution module
+     * @param snapshottedYieldFee Snapshotted yield protocol fee (bps)
+     * @param feeRecipient Fee recipient address
+     * @param escrowTransfer Escrow transfer data
+     * @param settings Escrow settings
+     * @param yieldOps YieldOps contract address
+     * @return shouldDistribute Whether distribution should be attempted
+     * @return yieldAmount Yield amount to distribute
+     * @return distributionData Encoded distribution data
+     */
+    function prepareYieldDistribution(
+        uint256 workflowId,
+        address token,
+        uint256 actualAmount,
+        uint256 originalAmount,
+        IYieldDistributionModule distModule,
+        uint256 snapshottedYieldFee,
+        address feeRecipient,
+        EscrowTransfer memory escrowTransfer,
+        EscrowSettings memory settings,
+        address yieldOps
+    ) internal pure returns (
+        bool shouldDistribute,
+        uint256 yieldAmount,
+        bytes memory distributionData
+    ) {
+        if (actualAmount <= originalAmount) {
+            return (false, 0, "");
+        }
+
+        yieldAmount = actualAmount - originalAmount;
+
+        // Check if YieldOps is configured
+        if (yieldOps == address(0)) {
+            return (false, yieldAmount, "");
+        }
+
+        // Clamp fee to avoid revert
+        uint256 feeBps = snapshottedYieldFee;
+        if (feeBps > MAX_PROTOCOL_FEE_BPS) {
+            feeBps = 0;
+        }
+        if (feeRecipient == address(0)) {
+            feeBps = 0;
+        }
+
+        // Derive distribution data from preset
+        distributionData = YieldPresetLibrary.deriveDistributionData(
+            settings.yieldPreset,
+            escrowTransfer.from,
+            escrowTransfer.to
+        );
+
+        shouldDistribute = true;
+        return (shouldDistribute, yieldAmount, distributionData);
+    }
+
+    /**
+     * @notice Validate emergency unwind preconditions
+     * @param isPaused Whether contract is paused
+     * @param lastUnwind Last unwind timestamp for token
+     * @param currentTime Current block timestamp
+     * @param cooldown Cooldown period in seconds
+     * @param maxAmount Maximum unwind amount per call
+     * @param requestedAmount Requested unwind amount
+     * @param libraryEnabled Whether Aave library is enabled
+     * @param libraryAddress Aave library address
+     * @return isValid Whether validation passed
+     * @return reasonCode Failure reason code (0 = success, 101-104 = specific failures, 3 = MODULE_NOT_SET)
+     */
+    function validateEmergencyUnwind(
+        bool isPaused,
+        uint256 lastUnwind,
+        uint256 currentTime,
+        uint256 cooldown,
+        uint256 maxAmount,
+        uint256 requestedAmount,
+        bool libraryEnabled,
+        address libraryAddress
+    ) internal pure returns (bool isValid, uint8 reasonCode) {
+        if (!isPaused) {
+            return (false, 101); // not paused
+        }
+        if (currentTime < lastUnwind + cooldown) {
+            return (false, 102); // cooldown
+        }
+        if (requestedAmount > maxAmount) {
+            return (false, 103); // exceeds limit
+        }
+        if (!libraryEnabled || libraryAddress == address(0)) {
+            return (false, 3); // MODULE_NOT_SET
+        }
+        return (true, 0);
+    }
+
+    /**
+     * @notice Prepare emergency unwind operation
+     * @param genModule Yield generation module
+     * @param token Token address
+     * @param aTokenBalance Current aToken balance
+     * @param maxAmount Maximum amount to unwind
+     * @return aavePool Aave pool address
+     * @return aToken aToken address
+     * @return unwindAmount Amount to unwind
+     * @return reasonCode Failure reason code (0 = success)
+     */
+    function prepareEmergencyUnwind(
+        IYieldGenerationModule genModule,
+        address token,
+        uint256 aTokenBalance,
+        uint256 maxAmount
+    ) internal view returns (
+        address aavePool,
+        address aToken,
+        uint256 unwindAmount,
+        uint8 reasonCode
+    ) {
+        if (address(genModule) == address(0)) {
+            return (address(0), address(0), 0, 3); // MODULE_NOT_SET
+        }
+        if (address(genModule).code.length == 0) {
+            return (address(0), address(0), 0, 3); // MODULE_NOT_SET
+        }
+
+        aavePool = getAavePoolAddress(genModule);
+        aToken = getATokenAddress(genModule, token);
+
+        if (aavePool == address(0) || aToken == address(0)) {
+            return (address(0), address(0), 0, 3); // MODULE_NOT_SET
+        }
+
+        if (aTokenBalance == 0) {
+            return (address(0), address(0), 0, 104); // nothing to unwind
+        }
+
+        unwindAmount = aTokenBalance < maxAmount ? aTokenBalance : maxAmount;
+        return (aavePool, aToken, unwindAmount, 0);
+    }
+
+}
