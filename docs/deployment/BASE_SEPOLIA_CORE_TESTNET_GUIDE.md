@@ -115,6 +115,9 @@ pnpm hardhat deploy --network baseSepolia --tags governance
 - **release / cancel**:
   - release by sender
   - cancel by sender/recipient (where allowed)
+- **default module swapping (vNext required)**:
+  - queue + activate `DefaultReleaseStrategy` via `EscrowVault.queueDefaultReleaseStrategy(...)` / `activateDefaultReleaseStrategy()`
+  - confirm new defaults affect **new** escrows only (snapshot semantics)
 - **dispute**:
   - raise dispute
   - resolve using the default resolver module (if included)

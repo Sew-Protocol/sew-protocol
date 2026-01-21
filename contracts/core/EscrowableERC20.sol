@@ -189,7 +189,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         address from,
         address to,
         uint256 amount
-    ) internal override {
+    ) internal pure override {
         // EscrowCreated already provides this information (token is always address(this))
         workflowId;
         token;
@@ -211,7 +211,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         address token,
         address from,
         uint256 amount
-    ) internal override {
+    ) internal pure override {
         // EscrowStateChanged already provides this information
         workflowId;
         token;
@@ -232,7 +232,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         address token,
         address to,
         uint256 amount
-    ) internal override {
+    ) internal pure override {
         // EscrowStateChanged already provides this information
         workflowId;
         token;
@@ -279,6 +279,18 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
 
         // Query ModuleManagementContract for default module
         return moduleManagement.getDefaultModule(address(this), moduleType);
+    }
+
+    // ============ Default module swapping (escrow-originated calls) ============
+    // ModuleManagementContract requires msg.sender == escrowContract. These wrappers allow governance
+    // to perform append-only default swaps on this escrow contract.
+
+    function queueDefaultReleaseStrategy(address newModule) external onlyRole(ROLE_TIMELOCK) {
+        moduleManagement.queueDefaultModule(address(this), ModuleType.RELEASE, newModule);
+    }
+
+    function activateDefaultReleaseStrategy() external onlyRole(ROLE_TIMELOCK) {
+        moduleManagement.activateDefaultModule(address(this), ModuleType.RELEASE);
     }
 
     /**

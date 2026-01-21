@@ -54,3 +54,7 @@ docs/archived
 # References
 references
 
+# Generated analysis reports
+report.md
+*.report.md
+

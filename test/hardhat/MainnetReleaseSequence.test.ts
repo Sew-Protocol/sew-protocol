@@ -69,7 +69,7 @@ describe('Mainnet Release Sequence', function () {
   const TIMELOCK_DELAY = 2 * 24 * 60 * 60; // 2 days in seconds
   const VOTING_DELAY = 1; // 1 block
   const VOTING_PERIOD = 5; // 5 blocks
-  const PROPOSAL_THRESHOLD = ethers.parseEther('100000'); // 100k tokens needed to propose
+  const PROPOSAL_THRESHOLD = ethers.parseEther('50000'); // 50k tokens needed to propose
 
   beforeEach(async function () {
     [

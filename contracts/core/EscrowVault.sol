@@ -197,8 +197,17 @@ contract EscrowVault is BaseEscrow {
         return IYieldDistributionModule(_getModuleAddress(workflowId, ModuleType.YIELD_DIST));
     }
 
-    // PRIORITY: Removed thin wrapper functions (queueDefaultModule, activateDefaultModule, getPendingDefaultModule)
-    // Users should call ModuleManagementContract directly to reduce EscrowVault bytecode size
+    // ============ Default module swapping (escrow-originated calls) ============
+    // ModuleManagementContract requires msg.sender == escrowContract. These wrappers are intentionally
+    // minimal so governance can perform append-only default swaps while keeping bytecode impact low.
+
+    function queueDefaultReleaseStrategy(address newModule) external onlyRole(ROLE_TIMELOCK) {
+        moduleManagement.queueDefaultModule(address(this), ModuleType.RELEASE, newModule);
+    }
+
+    function activateDefaultReleaseStrategy() external onlyRole(ROLE_TIMELOCK) {
+        moduleManagement.activateDefaultModule(address(this), ModuleType.RELEASE);
+    }
 
     bytes32 public constant ROLE_FEE_RECIPIENT = keccak256('ROLE_FEE_RECIPIENT');
 
