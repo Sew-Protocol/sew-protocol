@@ -149,7 +149,7 @@ export function getGovConfig(hre: HardhatRuntimeEnvironment): GovDeployConfig {
     45818, // ~1 week @ 13s/block
     'VOTING_PERIOD',
   );
-  const proposalThreshold = process.env.PROPOSAL_THRESHOLD || '500000000000000000000000'; // 500k tokens (0.05% of supply)
+  const proposalThreshold = process.env.PROPOSAL_THRESHOLD || '50000000000000000000000'; // 50k tokens (0.05% of 100M initial circulating)
   const absoluteQuorum = process.env.ABSOLUTE_QUORUM || '4000000000000000000000000'; // 4M tokens (absolute quorum)
 
   // Initial non-circulating addresses (e.g., vesting contracts, locked tokens)

@@ -371,6 +371,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
 
     // ============ Minimal Admin Setters (Only callable by EscrowAdminContract) ============
     function setFeeRecipient(address newAddr) external onlyRole(ROLE_ADMIN_CONTRACT) {
+        if (newAddr == address(0)) revert InvalidAddress(ADDR_FEE_RECIPIENT, newAddr);
         escrowFeeAddress = newAddr;
     }
 
@@ -393,6 +394,8 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     }
 
     function setResolutionModule(address module) external onlyRole(ROLE_ADMIN_CONTRACT) {
+        if (module == address(0)) revert InvalidAddress(ADDR_GENERIC, module);
+        if (module.code.length == 0) revert ModuleNotContract(module);
         address oldModule = disputeResolutionModule;
         disputeResolutionModule = module;
         emit ResolutionModuleActivated(oldModule, module);
@@ -557,7 +560,17 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         );
 
         // Pull tokens (state modification - must stay in BaseEscrow)
+        //
+        // Accounting invariant: Escrow accounting assumes the contract receives `amount`.
+        // Fee-on-transfer / deflationary tokens can cause a deficit (recorded > actual),
+        // breaking fee withdrawal and potentially other flows. Enforce "at least amount received".
+        uint256 balBefore = IERC20(token).balanceOf(address(this));
         _pullTokens(token, _msgSender(), amount);
+        uint256 balAfter = IERC20(token).balanceOf(address(this));
+        // Defensive: if token misbehaves and balance decreases, treat as deficit
+        if (balAfter < balBefore) revert AccountingDeficit(token, amount);
+        uint256 received = balAfter - balBefore;
+        if (received < amount) revert AccountingDeficit(token, amount - received);
 
         // Store escrow struct (state modification - must stay in BaseEscrow)
         escrowTransfers.push(
@@ -701,7 +714,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
      * @param workflowId The escrow ID
      * @return success Whether the cancel request was processed
      */
-    function recipientCancel(uint256 workflowId) external returns (bool) {
+    function recipientCancel(uint256 workflowId) external nonReentrant whenNotPaused returns (bool) {
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
         if (et.to != _msgSender()) revert NotRecipient(workflowId, _msgSender(), et.to);
@@ -715,7 +728,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
      * @param workflowId The escrow ID
      * @return success Whether the cancel request was processed
      */
-    function senderCancel(uint256 workflowId) external returns (bool) {
+    function senderCancel(uint256 workflowId) external nonReentrant whenNotPaused returns (bool) {
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
         if (et.from != _msgSender()) revert NotSender(workflowId, _msgSender(), et.from);
@@ -732,6 +745,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
      * @dev Can be called by anyone once maxDisputeDuration has passed.
      *      Refunds the full amount to the sender.
      */
+    // slither-disable-next-line reentrancy-no-eth
     function autoCancelDisputedEscrow(uint256 workflowId) external nonReentrant returns (bool) {
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
@@ -760,7 +774,8 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
      * @param workflowId The escrow ID
      * @return success Whether the dispute was raised successfully
      */
-    function raiseDispute(uint256 workflowId) external returns (bool) {
+    // slither-disable-next-line reentrancy-no-eth
+    function raiseDispute(uint256 workflowId) external nonReentrant returns (bool) {
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
         if (et.escrowState != EscrowState.PENDING)
@@ -1416,8 +1431,19 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
             return false;
         }
 
-        // Attempt transfer using low-level call
-        bool success = _tryTransfer(token, recipient, amount);
+        // Distinguish "push failed" from "insufficient contract balance".
+        // If the contract is insolvent for this token, attempting the transfer is pointless and
+        // downstream systems benefit from a specific reason code.
+        uint8 reason = uint8(FailureReason.PUSH_FAILED_FALLBACK_TO_PULL);
+        uint256 bal = IERC20(token).balanceOf(address(this));
+        bool success;
+        if (bal < amount) {
+            reason = uint8(FailureReason.CONTRACT_INSUFFICIENT_BALANCE);
+            success = false;
+        } else {
+            // Attempt transfer using low-level call
+            success = _tryTransfer(token, recipient, amount);
+        }
         if (success) {
             _emitAutoResult(workflowId, recipient, token, amount, 0);
             return true;

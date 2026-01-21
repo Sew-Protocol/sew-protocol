@@ -102,79 +102,11 @@ contract EscrowEdgeCasesTest is Test {
         vm.startPrank(buyer);
         feeToken.approve(address(vault), amount);
         
-        // Fee is 1% (100 bps) on transfer
-        // Vault receives: amount * 0.99
-        // Vault expects: amount
-        // Vault calculates internal fee: amount * 0.01 (escrow fee)
-        // Vault records amountAfterFee: amount * 0.99
-        
-        // Total held recorded: amount * 0.99 (amountAfterFee) + amount * 0.01 (escrow fee) = amount
-        // Actual balance in vault: amount * 0.99 (transfer fee)
-        
-        // So vault thinks it has 'amount', but it has 'amount * 0.99'
-        // This is a deficit of 1%
-        
-        uint256 escrowId = vault.createEscrow(address(feeToken), seller, amount, SettingsValidationLibrary.getDefaultSettings());
+        // Policy: Fee-on-transfer / deflationary tokens are rejected at creation time,
+        // because they create an accounting deficit (recorded > actual).
+        vm.expectRevert(abi.encodeWithSelector(AccountingDeficit.selector, address(feeToken), 10e18));
+        vault.createEscrow(address(feeToken), seller, amount, SettingsValidationLibrary.getDefaultSettings());
         vm.stopPrank();
-
-        // Verify the deficit
-        uint256 actualBalance = feeToken.balanceOf(address(vault));
-        uint256 expectedBalance = amount; // The vault thinks it has this
-        
-        // If the bug exists, actual < expected
-        // With 1% transfer fee on 1000, actual should be 990
-        assertEq(actualBalance, 990e18); 
-        
-        // Check what the vault thinks
-        uint256 held = vault.totalHeldInEscrowPerToken(address(feeToken));
-        uint256 fees = vault.totalFeesPerToken(address(feeToken));
-        uint256 totalRecorded = held + fees;
-        
-        assertEq(totalRecorded, 1000e18);
-        
-        // This confirms the bug: Recorded (1000) > Actual (990)
-        assertGt(totalRecorded, actualBalance);
-        
-        // Now try to release - should fail due to insufficient balance
-        // releaseEscrowTransfer is called by sender (buyer) for release
-        
-        vm.prank(buyer);
-        // Expect revert because vault tries to transfer amountAfterFee (990)
-        // But fees (10) are also tracked.
-        // Wait, amountAfterFee = 1000 - 10 = 990.
-        // Fees = 10.
-        // Actual balance = 990.
-        // If we release 990, it might work IF fees are not withdrawn yet.
-        // But fees are "reserved".
-        // totalHeldInEscrowPerToken = 990.
-        // totalFeesPerToken = 10.
-        
-        // release transfers 'amountAfterFee' (990).
-        // It succeeds if balance >= 990. Balance IS 990.
-        // So release WORKS, but fees are stuck/insolvent.
-        
-        vault.releaseEscrowTransfer(escrowId);
-        
-        // Autotransfer may have automatically transferred funds
-        // If autotransfer succeeded, withdraw will fail (no claimable balance)
-        // If autotransfer failed (fallback), withdraw will succeed
-        uint256 claimable = vault.claimableBalances(escrowId, seller);
-        if (claimable > 0) {
-            // Fallback occurred, can withdraw
-            vm.prank(seller); // Seller is the recipient
-            vault.withdrawEscrow(escrowId);
-        } else {
-            // Autotransfer succeeded, funds already transferred
-            // No need to withdraw
-        }
-        
-        // Now withdraw fees
-        vm.prank(feeAddress);
-        // Withdraw 10 tokens
-        // Balance should be 0 (started 990, released 990).
-        // Try to withdraw 10.
-        vm.expectRevert(); // Should revert due to lack of funds
-        vault.withdrawFees(address(feeToken));
     }
 
     // ============ Large Amount Tests ============

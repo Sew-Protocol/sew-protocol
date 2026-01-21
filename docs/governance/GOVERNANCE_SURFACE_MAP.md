@@ -314,9 +314,7 @@ This pattern ensures:
 - `GOVERNANCE_IMPLEMENTATION_PLAN.md` - Implementation plan
 - `../reviews/GOVERNANCE_ROLES_CONSISTENCY.md` - Governance roles consistency review
 
-## Change Log
-
-### 2026-01-27- Added ops contracts to governance surface map:
+## Change Log### 2026-01-27 - Added ops contracts to governance surface map
   - CreateOps (with yield deposits pause/resume)
   - SettlementOps
   - DisputeOps

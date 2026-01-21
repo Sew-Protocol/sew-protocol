@@ -70,14 +70,16 @@ pnpm hardhat run --network baseSepolia scripts/verify-base-sepolia-sources.ts
 
 ## Known issues / gaps in the current testnet deployment
 
-### 1) Default module swapping is effectively disabled on the deployed escrows
-**Impact:** you cannot switch defaults (release strategy / resolution / yield modules) for `EscrowVault` post-deploy.
+### 1) Default module swapping was disabled on the originally deployed escrows (fixed in vNext)
+**Impact (original deployment):** you could not switch defaults (release strategy / resolution / yield modules) for `EscrowVault` post-deploy.
 
 **Root cause (design + wiring):**
 - `ModuleManagementContract.queueDefaultModule/activateDefaultModule` require `msg.sender == escrowContract`.
-- The escrow wrappers that would call these were removed from `EscrowVault` to save bytecode (and the escrow has no “module management setter”).
+- The escrow wrappers that originate these calls were removed from the deployed `EscrowVault` to save bytecode.
 
-**Result:** `ModuleManagementContract` is effectively read-only defaults for the deployed escrows.
+**vNext fix (recommended):**
+- Restore minimal timelock-gated wrappers on the escrow contracts (e.g. `queueDefaultReleaseStrategy` / `activateDefaultReleaseStrategy`)
+  so module swaps are executable again while preserving snapshot semantics.
 
 ### 2) Escrow fee was initially 0 bps (not 1%) and requires slow-lane activation to change
 **Status:** queued to 100 bps via slow lane on 2026-01-19.
