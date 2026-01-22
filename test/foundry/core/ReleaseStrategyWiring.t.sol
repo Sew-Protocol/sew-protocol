@@ -169,10 +169,10 @@ contract ReleaseStrategyWiringTest is Test {
 
     function _setDefaultReleaseStrategy(address newStrategy) internal {
         vm.prank(address(vault));
-        mm.queueDefaultModule(address(vault), BaseEscrow.ModuleType.RELEASE, newStrategy);
+        mm.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, newStrategy);
         vm.warp(block.timestamp + 7 days + 1);
         vm.prank(address(vault));
-        mm.activateDefaultModule(address(vault), BaseEscrow.ModuleType.RELEASE);
+        mm.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
     }
 
     function test_releaseStrategy_snapshot_persists_across_default_updates() public {
@@ -211,17 +211,17 @@ contract ReleaseStrategyWiringTest is Test {
         assertEq(vault.resolvedReleaseStrategy(wid0), address(s1), "resolved strategy follows current default if snapshot zero");
     }
 
-    function test_queueDefaultModule_release_requires_escrow_sender() public {
+    function test_queueModule_release_requires_escrow_sender() public {
         ReleaseStrategyMockS1 s1 = new ReleaseStrategyMockS1();
 
         // Not the escrow contract -> fails (onlyRole(ROLE_ESCROW_CONTRACT)).
         vm.expectRevert();
-        mm.queueDefaultModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(s1));
+        mm.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(s1));
 
         // Even if we impersonate a random address, msg.sender must equal escrowContract.
         vm.prank(address(0xBEEF));
         vm.expectRevert();
-        mm.queueDefaultModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(s1));
+        mm.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(s1));
     }
 }
 

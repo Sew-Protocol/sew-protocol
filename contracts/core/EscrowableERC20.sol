@@ -278,19 +278,19 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         }
 
         // Query ModuleManagementContract for default module
-        return moduleManagement.getDefaultModule(address(this), moduleType);
+        return moduleManagement.getModule(address(this), moduleType);
     }
 
-    // ============ Default module swapping (escrow-originated calls) ============
-    // ModuleManagementContract requires msg.sender == escrowContract. These wrappers allow governance
-    // to perform append-only default swaps on this escrow contract.
+    // ============ Module swapping (escrow-originated calls) ============
+    // ModuleManagementContract requires msg.sender == escrowContract. These wrappers allow
+    // governance (ROLE_TIMELOCK) to perform module swaps with 7-day slow lane delay.
 
-    function queueDefaultReleaseStrategy(address newModule) external onlyRole(ROLE_TIMELOCK) {
-        moduleManagement.queueDefaultModule(address(this), ModuleType.RELEASE, newModule);
+    function queueModule(BaseEscrow.ModuleType moduleType, address newModule) external onlyRole(ROLE_TIMELOCK) {
+        moduleManagement.queueModule(address(this), moduleType, newModule);
     }
 
-    function activateDefaultReleaseStrategy() external onlyRole(ROLE_TIMELOCK) {
-        moduleManagement.activateDefaultModule(address(this), ModuleType.RELEASE);
+    function activateModule(BaseEscrow.ModuleType moduleType) external onlyRole(ROLE_TIMELOCK) {
+        moduleManagement.activateModule(address(this), moduleType);
     }
 
     /**

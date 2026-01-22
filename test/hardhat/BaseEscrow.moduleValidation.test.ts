@@ -83,20 +83,20 @@ describe('BaseEscrow Module Validation', function () {
     // ModuleType.RESOLUTION = 0
     await escrowableERC20
       .connect(timelock)
-      .queueDefaultModule(0, await tempDefaultModule.getAddress()); // RESOLUTION
-    const [, eta] = await escrowableERC20.getPendingDefaultModule(0); // RESOLUTION
+      .queueModule(0, await tempDefaultModule.getAddress()); // RESOLUTION
+    const [, eta] = await escrowableERC20.getPendingModule(0); // RESOLUTION
     await time.increaseTo(Number(eta) + 1);
-    await escrowableERC20.connect(timelock).activateDefaultModule(0); // RESOLUTION
+    await escrowableERC20.connect(timelock).activateModule(0); // RESOLUTION
   });
 
   describe('Module Interface Validation', function () {
     it('Should accept valid IResolutionModule when queueing', async function () {
-      // Queue valid module (EscrowableERC20 uses consolidated queueDefaultModule)
+      // Queue valid module (EscrowableERC20 uses consolidated queueModule)
       // ModuleType.RESOLUTION = 0
       await expect(
         escrowableERC20
           .connect(timelock)
-          .queueDefaultModule(0, await decentralizedModule.getAddress()), // RESOLUTION
+          .queueModule(0, await decentralizedModule.getAddress()), // RESOLUTION
       ).to.emit(escrowableERC20, 'DefaultResolutionModuleQueued');
 
       // Verify module supports IResolutionModule interface
@@ -109,7 +109,7 @@ describe('BaseEscrow Module Validation', function () {
       await expect(
         escrowableERC20
           .connect(timelock)
-          .queueDefaultModule(0, await defaultModule.getAddress()), // RESOLUTION
+          .queueModule(0, await defaultModule.getAddress()), // RESOLUTION
       ).to.emit(escrowableERC20, 'DefaultResolutionModuleQueued');
 
       const interfaceId = await getIResolutionModuleInterfaceId();
@@ -118,17 +118,17 @@ describe('BaseEscrow Module Validation', function () {
     });
 
     it('Should activate valid module after delay', async function () {
-      // Queue module (EscrowableERC20 uses consolidated queueDefaultModule)
+      // Queue module (EscrowableERC20 uses consolidated queueModule)
       await escrowableERC20
         .connect(timelock)
-        .queueDefaultModule(0, await decentralizedModule.getAddress()); // RESOLUTION
+        .queueModule(0, await decentralizedModule.getAddress()); // RESOLUTION
 
       // Fast-forward time to pass delay (7 days default)
-      const [, eta] = await escrowableERC20.getPendingDefaultModule(0); // RESOLUTION
+      const [, eta] = await escrowableERC20.getPendingModule(0); // RESOLUTION
       await time.increaseTo(Number(eta) + 1);
 
       // Activate after delay
-      await expect(escrowableERC20.connect(timelock).activateDefaultModule(0)).to.emit( // RESOLUTION
+      await expect(escrowableERC20.connect(timelock).activateModule(0)).to.emit( // RESOLUTION
         escrowableERC20,
         'DefaultResolutionModuleActivated',
       );
@@ -139,15 +139,15 @@ describe('BaseEscrow Module Validation', function () {
     });
 
     it('Should reject activation before delay expires', async function () {
-      // Queue module (EscrowableERC20 uses consolidated queueDefaultModule)
+      // Queue module (EscrowableERC20 uses consolidated queueModule)
       // ModuleType.RESOLUTION = 0
       await escrowableERC20
         .connect(timelock)
-        .queueDefaultModule(0, await decentralizedModule.getAddress()); // RESOLUTION
+        .queueModule(0, await decentralizedModule.getAddress()); // RESOLUTION
 
       // Try to activate immediately (should fail - 7 day delay)
       await expect(
-        escrowableERC20.connect(timelock).activateDefaultModule(0), // RESOLUTION
+        escrowableERC20.connect(timelock).activateModule(0), // RESOLUTION
       ).to.be.revertedWithCustomError(escrowableERC20, 'NotReady');
     });
   });
@@ -157,10 +157,10 @@ describe('BaseEscrow Module Validation', function () {
       // Activate module
       await escrowableERC20
         .connect(timelock)
-        .queueDefaultModule(0, await decentralizedModule.getAddress()); // RESOLUTION
-      const [, eta] = await escrowableERC20.getPendingDefaultModule(0); // RESOLUTION
+        .queueModule(0, await decentralizedModule.getAddress()); // RESOLUTION
+      const [, eta] = await escrowableERC20.getPendingModule(0); // RESOLUTION
       await time.increaseTo(Number(eta) + 1);
-      await escrowableERC20.connect(timelock).activateDefaultModule(0); // RESOLUTION
+      await escrowableERC20.connect(timelock).activateModule(0); // RESOLUTION
 
       // Get module name
       const moduleName = await decentralizedModule.moduleName();
@@ -171,10 +171,10 @@ describe('BaseEscrow Module Validation', function () {
       // Activate module
       await escrowableERC20
         .connect(timelock)
-        .queueDefaultModule(0, await decentralizedModule.getAddress()); // RESOLUTION
-      const [, eta] = await escrowableERC20.getPendingDefaultModule(0); // RESOLUTION
+        .queueModule(0, await decentralizedModule.getAddress()); // RESOLUTION
+      const [, eta] = await escrowableERC20.getPendingModule(0); // RESOLUTION
       await time.increaseTo(Number(eta) + 1);
-      await escrowableERC20.connect(timelock).activateDefaultModule(0); // RESOLUTION
+      await escrowableERC20.connect(timelock).activateModule(0); // RESOLUTION
 
       // Get module version
       const version = await decentralizedModule.moduleVersion();
@@ -186,10 +186,10 @@ describe('BaseEscrow Module Validation', function () {
       // Activate module
       await escrowableERC20
         .connect(timelock)
-        .queueDefaultModule(0, await decentralizedModule.getAddress()); // RESOLUTION
-      const [, eta] = await escrowableERC20.getPendingDefaultModule(0); // RESOLUTION
+        .queueModule(0, await decentralizedModule.getAddress()); // RESOLUTION
+      const [, eta] = await escrowableERC20.getPendingModule(0); // RESOLUTION
       await time.increaseTo(Number(eta) + 1);
-      await escrowableERC20.connect(timelock).activateDefaultModule(0); // RESOLUTION
+      await escrowableERC20.connect(timelock).activateModule(0); // RESOLUTION
 
       // Check ERC-165 support
       const erc165Id = '0x01ffc9a7';
@@ -203,12 +203,12 @@ describe('BaseEscrow Module Validation', function () {
       // Activate DecentralizedResolutionModule
       await escrowableERC20
         .connect(timelock)
-        .queueDefaultModule(0, await decentralizedModule.getAddress()); // RESOLUTION
+        .queueModule(0, await decentralizedModule.getAddress()); // RESOLUTION
 
       // Fast-forward time to pass delay
-      const [, eta] = await escrowableERC20.getPendingDefaultModule(0); // RESOLUTION
+      const [, eta] = await escrowableERC20.getPendingModule(0); // RESOLUTION
       await time.increaseTo(Number(eta) + 1);
-      await escrowableERC20.connect(timelock).activateDefaultModule(0); // RESOLUTION
+      await escrowableERC20.connect(timelock).activateModule(0); // RESOLUTION
 
       // Register escrow contract in module
       const ROLE_TIMELOCK = await decentralizedModule.ROLE_TIMELOCK();
@@ -314,10 +314,10 @@ describe('BaseEscrow Module Validation', function () {
       // Activate module
       await escrowableERC20
         .connect(timelock)
-        .queueDefaultModule(0, await defaultModule.getAddress()); // RESOLUTION
-      const [, eta] = await escrowableERC20.getPendingDefaultModule(0); // RESOLUTION
+        .queueModule(0, await defaultModule.getAddress()); // RESOLUTION
+      const [, eta] = await escrowableERC20.getPendingModule(0); // RESOLUTION
       await time.increaseTo(Number(eta) + 1);
-      await escrowableERC20.connect(timelock).activateDefaultModule(0); // RESOLUTION
+      await escrowableERC20.connect(timelock).activateModule(0); // RESOLUTION
 
       // Module should still work even if we check metadata
       const moduleName = await defaultModule.moduleName();
@@ -348,10 +348,10 @@ describe('BaseEscrow Module Validation', function () {
       // Upgrade to new module
       await escrowableERC20
         .connect(timelock)
-        .queueDefaultModule(0, await decentralizedModule.getAddress()); // RESOLUTION
-      [, eta] = await escrowableERC20.getPendingDefaultModule(0); // RESOLUTION
+        .queueModule(0, await decentralizedModule.getAddress()); // RESOLUTION
+      [, eta] = await escrowableERC20.getPendingModule(0); // RESOLUTION
       await time.increaseTo(Number(eta) + 1);
-      await escrowableERC20.connect(timelock).activateDefaultModule(0); // RESOLUTION
+      await escrowableERC20.connect(timelock).activateModule(0); // RESOLUTION
 
       // Existing escrow should still use old resolver
       const escrowTransfer2 = await escrowableERC20.escrowTransfers(workflowId);
@@ -364,10 +364,10 @@ describe('BaseEscrow Module Validation', function () {
       // Activate module
       await escrowableERC20
         .connect(timelock)
-        .queueDefaultModule(0, await decentralizedModule.getAddress()); // RESOLUTION
-      const [, eta] = await escrowableERC20.getPendingDefaultModule(0); // RESOLUTION
+        .queueModule(0, await decentralizedModule.getAddress()); // RESOLUTION
+      const [, eta] = await escrowableERC20.getPendingModule(0); // RESOLUTION
       await time.increaseTo(Number(eta) + 1);
-      await escrowableERC20.connect(timelock).activateDefaultModule(0); // RESOLUTION
+      await escrowableERC20.connect(timelock).activateModule(0); // RESOLUTION
 
       // Get version
       const version = await decentralizedModule.moduleVersion();
@@ -388,10 +388,10 @@ describe('BaseEscrow Module Validation', function () {
       // Queue and activate
       await escrowableERC20
         .connect(timelock)
-        .queueDefaultModule(0, await decentralizedModule.getAddress()); // RESOLUTION
-      const [, eta] = await escrowableERC20.getPendingDefaultModule(0); // RESOLUTION
+        .queueModule(0, await decentralizedModule.getAddress()); // RESOLUTION
+      const [, eta] = await escrowableERC20.getPendingModule(0); // RESOLUTION
       await time.increaseTo(Number(eta) + 1);
-      await escrowableERC20.connect(timelock).activateDefaultModule(0); // RESOLUTION
+      await escrowableERC20.connect(timelock).activateModule(0); // RESOLUTION
 
       // Version should remain the same
       const versionAfter = await decentralizedModule.moduleVersion();

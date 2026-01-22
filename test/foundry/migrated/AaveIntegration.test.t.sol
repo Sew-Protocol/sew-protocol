@@ -138,18 +138,18 @@ contract Test_AaveIntegration is Test {
         // Set default yield modules for the vault (must be queued/activated by the vault itself)
         yieldDist = new DefaultYieldDistributionModule();
         vm.prank(address(vault));
-        mm.queueDefaultModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN, address(aaveModule));
+        mm.queueModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN, address(aaveModule));
         vm.prank(address(vault));
-        mm.queueDefaultModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST, address(yieldDist));
-        (, uint64 etaGen, bool existsGen) = mm.getPendingDefaultModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN);
-        (, uint64 etaDist, bool existsDist) = mm.getPendingDefaultModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST);
+        mm.queueModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST, address(yieldDist));
+        (, uint64 etaGen, bool existsGen) = mm.getPendingModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN);
+        (, uint64 etaDist, bool existsDist) = mm.getPendingModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST);
         require(existsGen && existsDist, "pending modules must exist");
         uint256 maxEta = etaGen > etaDist ? uint256(etaGen) : uint256(etaDist);
         vm.warp(maxEta + 1);
         vm.prank(address(vault));
-        mm.activateDefaultModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN);
+        mm.activateModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN);
         vm.prank(address(vault));
-        mm.activateDefaultModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST);
+        mm.activateModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST);
 
         // Enable library pattern on the vault
         wrapper = new AaveLibraryWrapper();

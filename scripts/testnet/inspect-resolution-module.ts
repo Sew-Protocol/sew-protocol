@@ -20,7 +20,7 @@ async function main() {
   const admin: any = await hre.ethers.getContractAt('EscrowAdminContract', escrowAdminAddr);
 
   const resolutionModule = await escrow.disputeResolutionModule();
-  const defaultResolutionModule = await mm.getDefaultModule(escrowVaultAddr, 0); // ModuleType.RESOLUTION = 0
+  const defaultResolutionModule = await mm.getModule(escrowVaultAddr, 0); // ModuleType.RESOLUTION = 0
 
   console.log(`\n🔎 Resolution module status`);
   console.log(`- chainId: ${net.chainId.toString()}`);

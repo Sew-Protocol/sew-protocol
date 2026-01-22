@@ -75,15 +75,15 @@ describe('EventValidation', () => {
     // Queue and activate modules
     const resolutionModuleAddress = await resolutionModule.getAddress();
     const releaseStrategyAddress = await releaseStrategy.getAddress();
-    await vault.queueDefaultResolutionModule(resolutionModuleAddress);
-    await vault.queueDefaultReleaseStrategy(releaseStrategyAddress);
+    await vault.queueModule(0, resolutionModuleAddress); // ModuleType.RESOLUTION = 0
+    await vault.queueModule(1, releaseStrategyAddress); // ModuleType.RELEASE = 1
 
     // Advance time by 14 days to pass slow-lane queue delay
     await ethers.provider.send('evm_increaseTime', [14 * 24 * 60 * 60 + 1]);
     await ethers.provider.send('hardhat_mine', ['0x1']);
 
-    await vault.activateDefaultResolutionModule();
-    await vault.activateDefaultReleaseStrategy();
+    await vault.activateModule(0); // ModuleType.RESOLUTION = 0
+    await vault.activateModule(1); // ModuleType.RELEASE = 1
 
     // Approve vault
     await token.approve(vaultAddress, ethers.parseEther('10000000'));

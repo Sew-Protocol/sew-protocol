@@ -94,11 +94,11 @@ contract EscrowConstraints is Test {
         bytes32 ROLE_ESCROW_CONTRACT = moduleManagement.ROLE_ESCROW_CONTRACT();
         moduleManagement.grantRole(ROLE_ESCROW_CONTRACT, address(vault));
         vm.prank(address(vault));
-        moduleManagement.queueDefaultModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
+        moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
         vm.warp(block.timestamp + 14 days + 1);
         adminContract.activateResolutionModule(address(vault));
         vm.prank(address(vault));
-        moduleManagement.activateDefaultModule(address(vault), BaseEscrow.ModuleType.RELEASE);
+        moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
     }
 
     function getDefaultSettings() internal view returns (EscrowSettings memory) {
@@ -343,11 +343,11 @@ contract EscrowConstraints is Test {
 
         adminContract.queueResolutionModule(address(maxFeeVault), address(resolutionModule));
         vm.prank(address(maxFeeVault));
-        moduleManagement.queueDefaultModule(address(maxFeeVault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
+        moduleManagement.queueModule(address(maxFeeVault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
         vm.warp(block.timestamp + 14 days + 1);
         adminContract.activateResolutionModule(address(maxFeeVault));
         vm.prank(address(maxFeeVault));
-        moduleManagement.activateDefaultModule(address(maxFeeVault), BaseEscrow.ModuleType.RELEASE);
+        moduleManagement.activateModule(address(maxFeeVault), BaseEscrow.ModuleType.RELEASE);
 
         // Test with a large amount that could cause overflow
         // Use a reasonable large amount that doesn't exceed practical limits

@@ -31,8 +31,8 @@ const REMOVED_FUNCTIONS = [
 const DEPRECATED_FUNCTIONS = ['setAuthorizedResolver'];
 
 const SLOW_LANE_FUNCTIONS = [
-  'queueDefaultReleaseStrategy',
-  'activateDefaultReleaseStrategy',
+  'queueModule',
+  'activateModule',
   'queueDefaultResolutionModule',
   'activateDefaultResolutionModule',
   'queueDefaultYieldGenerationModule',

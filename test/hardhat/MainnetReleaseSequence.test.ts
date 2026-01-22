@@ -238,24 +238,24 @@ describe('Mainnet Release Sequence', function () {
       // ModuleType: RESOLUTION=0, RELEASE=1, YIELD_GEN=2, YIELD_DIST=3
       await escrowableERC20
         .connect(deployer)
-        .queueDefaultModule(1, await defaultReleaseStrategy.getAddress()); // RELEASE
+        .queueModule(1, await defaultReleaseStrategy.getAddress()); // RELEASE
       await escrowableERC20
         .connect(deployer)
-        .queueDefaultModule(0, await defaultResolutionModule.getAddress()); // RESOLUTION
+        .queueModule(0, await defaultResolutionModule.getAddress()); // RESOLUTION
       await escrowableERC20
         .connect(deployer)
-        .queueDefaultModule(3, await defaultYieldDistributionModule.getAddress()); // YIELD_DIST
+        .queueModule(3, await defaultYieldDistributionModule.getAddress()); // YIELD_DIST
       // Fast-forward time for testing
       await time.increase(7 * 24 * 60 * 60 + 1);
-      await escrowableERC20.connect(deployer).activateDefaultModule(1); // RELEASE
-      await escrowableERC20.connect(deployer).activateDefaultModule(0); // RESOLUTION
-      await escrowableERC20.connect(deployer).activateDefaultModule(3); // YIELD_DIST
+      await escrowableERC20.connect(deployer).activateModule(1); // RELEASE
+      await escrowableERC20.connect(deployer).activateModule(0); // RESOLUTION
+      await escrowableERC20.connect(deployer).activateModule(3); // YIELD_DIST
 
       // EscrowVault uses direct setters (Standard lane)
       // Phase 8: EscrowVault now uses Slow lane (queue/activate) for consistency
       await escrowVault
         .connect(deployer)
-        .queueDefaultReleaseStrategy(await defaultReleaseStrategy.getAddress());
+        .queueModule(1, await defaultReleaseStrategy.getAddress()); // ModuleType.RELEASE = 1
       await escrowVault
         .connect(deployer)
         .queueDefaultResolutionModule(await defaultResolutionModule.getAddress());
@@ -268,7 +268,7 @@ describe('Mainnet Release Sequence', function () {
       await ethers.provider.send('evm_setNextBlockTimestamp', [Number(eta) + 1]);
       await ethers.provider.send('evm_mine', []);
 
-      await escrowVault.connect(deployer).activateDefaultReleaseStrategy();
+      await escrowVault.connect(deployer).activateModule(1); // ModuleType.RELEASE = 1
       await escrowVault.connect(deployer).activateDefaultResolutionModule();
       await escrowVault.connect(deployer).activateDefaultYieldDistributionModule();
 

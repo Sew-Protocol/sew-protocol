@@ -44,11 +44,11 @@ contract ModuleSwapExecutableTest is Test {
 
     function test_queueAndActivateDefaultReleaseStrategy_viaEscrowWrappers() public {
         // Default is unset.
-        assertEq(moduleManagement.getDefaultModule(address(vault), BaseEscrow.ModuleType.RELEASE), address(0));
+        assertEq(moduleManagement.getModule(address(vault), BaseEscrow.ModuleType.RELEASE), address(0));
 
         // Queue (escrow-originated call)
-        vault.queueDefaultReleaseStrategy(address(releaseV1));
-        (address pending, uint64 eta, bool exists) = moduleManagement.getPendingDefaultModule(
+        vault.queueModule(BaseEscrow.ModuleType.RELEASE, address(releaseV1));
+        (address pending, uint64 eta, bool exists) = moduleManagement.getPendingModule(
             address(vault),
             BaseEscrow.ModuleType.RELEASE
         );
@@ -58,25 +58,25 @@ contract ModuleSwapExecutableTest is Test {
 
         // Activate after slow delay (7 days)
         vm.warp(block.timestamp + 7 days + 1);
-        vault.activateDefaultReleaseStrategy();
+        vault.activateModule(BaseEscrow.ModuleType.RELEASE);
 
         assertEq(
-            moduleManagement.getDefaultModule(address(vault), BaseEscrow.ModuleType.RELEASE),
+            moduleManagement.getModule(address(vault), BaseEscrow.ModuleType.RELEASE),
             address(releaseV1)
         );
 
         // Swap again (append-only new default)
-        vault.queueDefaultReleaseStrategy(address(releaseV2));
-        ( , uint64 eta2, bool exists2) = moduleManagement.getPendingDefaultModule(
+        vault.queueModule(BaseEscrow.ModuleType.RELEASE, address(releaseV2));
+        ( , uint64 eta2, bool exists2) = moduleManagement.getPendingModule(
             address(vault),
             BaseEscrow.ModuleType.RELEASE
         );
         assertTrue(exists2);
         vm.warp(uint256(eta2) + 1);
-        vault.activateDefaultReleaseStrategy();
+        vault.activateModule(BaseEscrow.ModuleType.RELEASE);
 
         assertEq(
-            moduleManagement.getDefaultModule(address(vault), BaseEscrow.ModuleType.RELEASE),
+            moduleManagement.getModule(address(vault), BaseEscrow.ModuleType.RELEASE),
             address(releaseV2)
         );
     }

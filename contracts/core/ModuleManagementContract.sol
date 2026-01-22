@@ -101,14 +101,15 @@ contract ModuleManagementContract is AccessControl, SlowLaneQueueActivate {
     }
 
     /**
-     * @notice Queue a new default module
+     * @notice Queue a new module
      * @param escrowContract Address of the escrow contract
      * @param moduleType Type of module to queue
      * @param module Address of the new module to queue
      * @dev Only the escrow contract itself can queue modules (via ROLE_ESCROW_CONTRACT)
      *      This ensures pending state is namespaced to the calling escrow contract.
+     *      Enforces 7-day slow lane delay via SlowLaneQueueActivate.
      */
-    function queueDefaultModule(
+    function queueModule(
         address escrowContract,
         BaseEscrow.ModuleType moduleType,
         address module
@@ -152,13 +153,14 @@ contract ModuleManagementContract is AccessControl, SlowLaneQueueActivate {
     }
 
     /**
-     * @notice Activate the queued default module
+     * @notice Activate the queued module
      * @param escrowContract Address of the escrow contract
      * @param moduleType Type of module to activate
      * @dev Only the escrow contract itself can activate modules (via ROLE_ESCROW_CONTRACT)
      *      Reverts if no module is queued for the given type, or if the ETA has not passed yet.
+     *      Enforces 7-day slow lane delay - cannot be bypassed.
      */
-    function activateDefaultModule(
+    function activateModule(
         address escrowContract,
         BaseEscrow.ModuleType moduleType
     ) external onlyRole(ROLE_ESCROW_CONTRACT) {
@@ -188,14 +190,14 @@ contract ModuleManagementContract is AccessControl, SlowLaneQueueActivate {
     }
 
     /**
-     * @notice Get pending default module information
+     * @notice Get pending module information
      * @param escrowContract Address of the escrow contract
      * @param moduleType Type of module to query
      * @return value Pending module address
      * @return eta Timestamp when activation becomes available
      * @return exists Whether a pending module exists
      */
-    function getPendingDefaultModule(
+    function getPendingModule(
         address escrowContract,
         BaseEscrow.ModuleType moduleType
     ) external view returns (address value, uint64 eta, bool exists) {
@@ -248,13 +250,13 @@ contract ModuleManagementContract is AccessControl, SlowLaneQueueActivate {
     }
 
     /**
-     * @notice Get default module address for an escrow contract by type
+     * @notice Get module address for an escrow contract by type
      * @param escrowContract Address of the escrow contract
      * @param moduleType Type of module to retrieve
-     * @return The default module address (address(0) if not set)
+     * @return The module address (address(0) if not set)
      * @dev PRIORITY: Consolidated getter to reduce bytecode in escrow contracts
      */
-    function getDefaultModule(
+    function getModule(
         address escrowContract,
         BaseEscrow.ModuleType moduleType
     ) external view returns (address) {

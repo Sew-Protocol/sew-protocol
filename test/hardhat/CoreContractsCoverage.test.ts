@@ -117,7 +117,7 @@ describe('Core Contracts - Coverage Tests', function () {
       .queueDefaultResolutionModule(await resolutionModule.getAddress());
     await escrowVault
       .connect(owner)
-      .queueDefaultReleaseStrategy(await releaseStrategy.getAddress());
+      .queueModule(1, await releaseStrategy.getAddress()); // ModuleType.RELEASE = 1
     await escrowVault
       .connect(owner)
       .queueDefaultYieldDistributionModule(await yieldDistributionModule.getAddress());
@@ -125,26 +125,26 @@ describe('Core Contracts - Coverage Tests', function () {
     const [, eta] = await escrowVault.getPendingDefaultResolutionModule();
     await time.increaseTo(Number(eta) + 1);
     await escrowVault.connect(owner).activateDefaultResolutionModule();
-    await escrowVault.connect(owner).activateDefaultReleaseStrategy();
+    await escrowVault.connect(owner).activateModule(1); // ModuleType.RELEASE = 1
     await escrowVault.connect(owner).activateDefaultYieldDistributionModule();
 
     // EscrowableERC20 uses consolidated module management functions
     // ModuleType: RESOLUTION=0, RELEASE=1, YIELD_GEN=2, YIELD_DIST=3
     await escrowableERC20
       .connect(owner)
-      .queueDefaultModule(0, await resolutionModule.getAddress()); // RESOLUTION
+      .queueModule(0, await resolutionModule.getAddress()); // RESOLUTION
     await escrowableERC20
       .connect(owner)
-      .queueDefaultModule(1, await releaseStrategy.getAddress()); // RELEASE
+      .queueModule(1, await releaseStrategy.getAddress()); // RELEASE
     await escrowableERC20
       .connect(owner)
-      .queueDefaultModule(3, await yieldDistributionModule.getAddress()); // YIELD_DIST
+      .queueModule(3, await yieldDistributionModule.getAddress()); // YIELD_DIST
 
-    const [, eta2] = await escrowableERC20.getPendingDefaultModule(0); // RESOLUTION
+    const [, eta2] = await escrowableERC20.getPendingModule(0); // RESOLUTION
     await time.increaseTo(Number(eta2) + 1);
-    await escrowableERC20.connect(owner).activateDefaultModule(0); // RESOLUTION
-    await escrowableERC20.connect(owner).activateDefaultModule(1); // RELEASE
-    await escrowableERC20.connect(owner).activateDefaultModule(3); // YIELD_DIST
+    await escrowableERC20.connect(owner).activateModule(0); // RESOLUTION
+    await escrowableERC20.connect(owner).activateModule(1); // RELEASE
+    await escrowableERC20.connect(owner).activateModule(3); // YIELD_DIST
 
     // Transfer tokens
     await token1.transfer(buyer.address, ethers.parseEther('10000'));

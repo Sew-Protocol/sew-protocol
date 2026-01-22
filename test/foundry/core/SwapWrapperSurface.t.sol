@@ -14,20 +14,20 @@ import "../../../contracts/core/EscrowableERC20.sol";
  * (or the selector assertions will fail), preventing accidental regressions in swap executability.
  */
 contract SwapWrapperSurfaceTest is Test {
-    function test_escrowVault_hasDefaultReleaseStrategySwapWrappers() public {
-        bytes4 expectedQueue = bytes4(keccak256("queueDefaultReleaseStrategy(address)"));
-        bytes4 expectedActivate = bytes4(keccak256("activateDefaultReleaseStrategy()"));
+    function test_escrowVault_hasModuleSwapWrappers() public {
+        bytes4 expectedQueue = bytes4(keccak256("queueModule(uint8,address)"));
+        bytes4 expectedActivate = bytes4(keccak256("activateModule(uint8)"));
 
-        assertEq(EscrowVault.queueDefaultReleaseStrategy.selector, expectedQueue);
-        assertEq(EscrowVault.activateDefaultReleaseStrategy.selector, expectedActivate);
+        assertEq(EscrowVault.queueModule.selector, expectedQueue);
+        assertEq(EscrowVault.activateModule.selector, expectedActivate);
     }
 
-    function test_escrowableERC20_hasDefaultReleaseStrategySwapWrappers() public {
-        bytes4 expectedQueue = bytes4(keccak256("queueDefaultReleaseStrategy(address)"));
-        bytes4 expectedActivate = bytes4(keccak256("activateDefaultReleaseStrategy()"));
+    function test_escrowableERC20_hasModuleSwapWrappers() public {
+        bytes4 expectedQueue = bytes4(keccak256("queueModule(uint8,address)"));
+        bytes4 expectedActivate = bytes4(keccak256("activateModule(uint8)"));
 
-        assertEq(EscrowableERC20.queueDefaultReleaseStrategy.selector, expectedQueue);
-        assertEq(EscrowableERC20.activateDefaultReleaseStrategy.selector, expectedActivate);
+        assertEq(EscrowableERC20.queueModule.selector, expectedQueue);
+        assertEq(EscrowableERC20.activateModule.selector, expectedActivate);
     }
 }
 

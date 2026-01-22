@@ -116,14 +116,14 @@ contract EscalationDepthHistogramIntegrationTest is Test {
         // Configure resolution module in escrow (required for dispute operations)
         // Note: avoid vm.startPrank(deployer) then vm.prank(...) overwrite without an applied call
         vm.prank(address(escrow));
-        moduleManagement.queueDefaultModule(
+        moduleManagement.queueModule(
             address(escrow),
             BaseEscrow.ModuleType.RESOLUTION,
             address(resolutionModule)
         );
         vm.warp(block.timestamp + 7 days + 1);
         vm.prank(address(escrow));
-        moduleManagement.activateDefaultModule(address(escrow), BaseEscrow.ModuleType.RESOLUTION);
+        moduleManagement.activateModule(address(escrow), BaseEscrow.ModuleType.RESOLUTION);
 
         // Setup resolvers - first appoint seniorResolver via timelock, then it can appoint others
         vm.prank(timelock);

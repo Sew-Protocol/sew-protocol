@@ -116,42 +116,42 @@ describe('Module Snapshotting', function () {
     // ModuleType: RESOLUTION=0, RELEASE=1, YIELD_GEN=2, YIELD_DIST=3
     await escrowableERC20
       .connect(deployer)
-      .queueDefaultModule(1, await releaseStrategyA.getAddress()); // RELEASE
+      .queueModule(1, await releaseStrategyA.getAddress()); // RELEASE
     await escrowableERC20
       .connect(deployer)
-      .queueDefaultModule(0, await moduleA.getAddress()); // RESOLUTION
+      .queueModule(0, await moduleA.getAddress()); // RESOLUTION
     const yieldGenAAddress =
       typeof yieldGenA.getAddress === 'function' ? await yieldGenA.getAddress() : yieldGenA;
     if (yieldGenAAddress !== ethers.ZeroAddress) {
-      await escrowableERC20.connect(deployer).queueDefaultModule(2, yieldGenAAddress); // YIELD_GEN
+      await escrowableERC20.connect(deployer).queueModule(2, yieldGenAAddress); // YIELD_GEN
     }
     await escrowableERC20
       .connect(deployer)
-      .queueDefaultModule(3, await yieldDistA.getAddress()); // YIELD_DIST
+      .queueModule(3, await yieldDistA.getAddress()); // YIELD_DIST
 
     // Fast-forward time to allow activation (7 days = 604800 seconds)
-    const [, etaRelease] = await escrowableERC20.getPendingDefaultModule(1); // RELEASE
-    const [, etaResolution] = await escrowableERC20.getPendingDefaultModule(0); // RESOLUTION
-    const [, etaYieldDist] = await escrowableERC20.getPendingDefaultModule(3); // YIELD_DIST
+    const [, etaRelease] = await escrowableERC20.getPendingModule(1); // RELEASE
+    const [, etaResolution] = await escrowableERC20.getPendingModule(0); // RESOLUTION
+    const [, etaYieldDist] = await escrowableERC20.getPendingModule(3); // YIELD_DIST
     const maxEta = Math.max(Number(etaRelease), Number(etaResolution), Number(etaYieldDist));
     await ethers.provider.send('evm_setNextBlockTimestamp', [maxEta + 1]);
     await ethers.provider.send('evm_mine', []);
 
-    await escrowableERC20.connect(deployer).activateDefaultModule(1); // RELEASE
-    await escrowableERC20.connect(deployer).activateDefaultModule(0); // RESOLUTION
+    await escrowableERC20.connect(deployer).activateModule(1); // RELEASE
+    await escrowableERC20.connect(deployer).activateModule(0); // RESOLUTION
     if (yieldGenAAddress !== ethers.ZeroAddress) {
-      const [, etaYieldGen] = await escrowableERC20.getPendingDefaultModule(2); // YIELD_GEN
+      const [, etaYieldGen] = await escrowableERC20.getPendingModule(2); // YIELD_GEN
       await ethers.provider.send('evm_setNextBlockTimestamp', [Number(etaYieldGen) + 1]);
       await ethers.provider.send('evm_mine', []);
-      await escrowableERC20.connect(deployer).activateDefaultModule(2); // YIELD_GEN
+      await escrowableERC20.connect(deployer).activateModule(2); // YIELD_GEN
     }
-    await escrowableERC20.connect(deployer).activateDefaultModule(3); // YIELD_DIST
+    await escrowableERC20.connect(deployer).activateModule(3); // YIELD_DIST
 
     // EscrowVault uses direct setters (Standard lane)
     // Phase 8: EscrowVault now uses Slow lane (queue/activate) for consistency
     await escrowVault
       .connect(deployer)
-      .queueDefaultReleaseStrategy(await releaseStrategyA.getAddress());
+      .queueModule(1, await releaseStrategyA.getAddress()); // ModuleType.RELEASE = 1
     await escrowVault.connect(deployer).queueDefaultResolutionModule(await moduleA.getAddress());
 
     // Fast-forward time to allow activation
@@ -159,7 +159,7 @@ describe('Module Snapshotting', function () {
     await ethers.provider.send('evm_setNextBlockTimestamp', [Number(eta) + 1]);
     await ethers.provider.send('evm_mine', []);
 
-    await escrowVault.connect(deployer).activateDefaultReleaseStrategy();
+    await escrowVault.connect(deployer).activateModule(1); // ModuleType.RELEASE = 1
     await escrowVault.connect(deployer).activateDefaultResolutionModule();
     const yieldGenAAddressVault =
       typeof yieldGenA.getAddress === 'function' ? await yieldGenA.getAddress() : yieldGenA;

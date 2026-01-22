@@ -265,17 +265,17 @@ contract AaveForkTests is Test {
         // Calculate module queue time explicitly (after pool provider activation: initialTime + 7 days + 1)
         uint256 moduleQueueTime = initialTime + 7 days + 1;
         vm.prank(address(escrowVault));
-        moduleManagement.queueDefaultModule(address(escrowVault), BaseEscrow.ModuleType.YIELD_GEN, address(aaveModule));
+        moduleManagement.queueModule(address(escrowVault), BaseEscrow.ModuleType.YIELD_GEN, address(aaveModule));
         vm.stopPrank(); // Clear prank before warping
         // Warp to after the module queue ETA (ETA is set to moduleQueueTime + 7 days when queuing)
         uint256 activationTime = moduleQueueTime + 7 days + 1;
         vm.warp(activationTime);
         vm.prank(address(escrowVault));
-        moduleManagement.activateDefaultModule(address(escrowVault), BaseEscrow.ModuleType.YIELD_GEN);
+        moduleManagement.activateModule(address(escrowVault), BaseEscrow.ModuleType.YIELD_GEN);
         vm.stopPrank();
         
         // Verify module is registered (critical for emergency unwind)
-        address registeredModule = moduleManagement.getDefaultModule(address(escrowVault), BaseEscrow.ModuleType.YIELD_GEN);
+        address registeredModule = moduleManagement.getModule(address(escrowVault), BaseEscrow.ModuleType.YIELD_GEN);
         require(registeredModule == address(aaveModule), "Aave module must be registered after activation");
         
         // Deploy library wrapper for testing
@@ -557,7 +557,7 @@ contract AaveForkTests is Test {
         }
         
         // Verify module is registered (critical for emergency unwind)
-        address registeredModule = moduleManagement.getDefaultModule(address(escrowVault), BaseEscrow.ModuleType.YIELD_GEN);
+        address registeredModule = moduleManagement.getModule(address(escrowVault), BaseEscrow.ModuleType.YIELD_GEN);
         require(registeredModule == address(aaveModule), "Aave module must be registered for emergency unwind tests");
         
         // CRITICAL DEBUG: Verify EscrowVault can retrieve the module via its internal method

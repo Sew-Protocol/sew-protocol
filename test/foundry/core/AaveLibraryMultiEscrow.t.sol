@@ -219,14 +219,14 @@ contract AaveLibraryMultiEscrowTest is Test {
 
         // Set default yield gen + dist
         vm.prank(address(vault));
-        mm.queueDefaultModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN, address(configModule));
+        mm.queueModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN, address(configModule));
         vm.prank(address(vault));
-        mm.queueDefaultModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST, address(yieldDist));
+        mm.queueModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST, address(yieldDist));
         vm.warp(block.timestamp + 7 days + 1);
         vm.prank(address(vault));
-        mm.activateDefaultModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN);
+        mm.activateModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN);
         vm.prank(address(vault));
-        mm.activateDefaultModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST);
+        mm.activateModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST);
 
         // Enable library mode
         vault.setAaveYieldLibrary(address(wrapper));

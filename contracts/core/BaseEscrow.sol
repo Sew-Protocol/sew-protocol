@@ -34,6 +34,7 @@ import './BondCollector.sol';
 import '../libraries/AaveYieldLibrary.sol';
 import '../libraries/AaveYieldHandlingLibrary.sol';
 import '../libraries/ModuleSnapshotLibrary.sol';
+import '../libraries/BondHandlingLibrary.sol';
 import '../interfaces/aave/AaveV3Interfaces.sol';
 
 // Failure reason codes for events (replaces string reasons to save bytecode)
@@ -665,33 +666,22 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
 
         if (actionType == 0) return false;
 
+        // Handle pending settlement cleanup
         if (actionType == 3) {
-            // Pending settlement execution
             delete pendingSettlements[workflowId];
-
-            // Optionally finalize dispute in resolution module
             _finalizeDisputeInModule(workflowId);
-
-            // Execute the settlement
-            if (isRelease) {
-                _releaseEscrowTransfer(workflowId);
-            } else {
-                _cancelAndRefund(workflowId);
-            }
             emit PendingSettlementExecuted(workflowId, isRelease);
-            _emitAutoResult(workflowId, isRelease ? et.to : et.from, et.token, et.amountAfterFee, 3);
-            return true;
-        } else if (actionType == 1) {
-            _releaseEscrowTransfer(workflowId);
-            _emitAutoResult(workflowId, et.to, et.token, et.amountAfterFee, 1);
-            return true;
-        } else if (actionType == 2) {
-            _cancelAndRefund(workflowId);
-            _emitAutoResult(workflowId, et.from, et.token, et.amountAfterFee, 2);
-            return true;
         }
-
-        return false;
+        
+        // Execute release or cancel (consolidated)
+        address recipient = isRelease ? et.to : et.from;
+        if (isRelease) {
+            _releaseEscrowTransfer(workflowId);
+        } else {
+            _cancelAndRefund(workflowId);
+        }
+        _emitAutoResult(workflowId, recipient, et.token, et.amountAfterFee, actionType);
+        return true;
     }
 
     function _cancelWorkflow(uint256 id, address caller, bool isSender) internal returns (bool) {
@@ -944,64 +934,45 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
                 IIncentiveModule incentiveMod = IIncentiveModule(incentiveModAddr);
                 uint256 snapshottedBondFee = moduleSnapshots[workflowId].appealBondProtocolFeeBps;
 
-                // Collect protocol fee (if enabled) and record net bond amount.
-                uint256 protocolFeeAmount = 0;
-                uint256 bondToRecord = bondAmount;
+                // Process bond with fee calculation
+                BondHandlingLibrary.BondProcessingResult memory bondResult = BondHandlingLibrary.processBondWithFee(
+                    bondAmount,
+                    bondToken,
+                    snapshottedBondFee,
+                    escrowFeeAddress
+                );
 
-                if (snapshottedBondFee > 0 && escrowFeeAddress != address(0)) {
-                    protocolFeeAmount = (bondAmount * snapshottedBondFee) / 10000;
-                    if (protocolFeeAmount > 0) {
-                        bondToRecord = bondAmount - protocolFeeAmount;
-                        emit ProtocolFeeCollected(
-                            1,
-                            workflowId,
-                            bondToken,
-                            bondAmount,
-                            snapshottedBondFee,
-                            protocolFeeAmount
-                        );
-                    }
+                if (bondResult.protocolFeeAmount > 0) {
+                    emit ProtocolFeeCollected(1, workflowId, bondToken, bondAmount, snapshottedBondFee, bondResult.protocolFeeAmount);
                 }
 
                 if (bondToken == address(0)) {
-                    // ETH bond: pay protocol fee, then record bond (must match msg.value rules in incentive module).
-                    if (protocolFeeAmount > 0) {
-                        (bool feeSuccess, ) = payable(escrowFeeAddress).call{value: protocolFeeAmount}('');
-                        if (!feeSuccess) revert TransferFailed(1, bondToken, escrowFeeAddress, protocolFeeAmount);
-                    }
-
-                    // For ETH bonds, depositor MUST equal escalatedBy.
-                    incentiveMod.recordAppealBond{value: bondToRecord}(
+                    // ETH bond
+                    BondHandlingLibrary.handleETHBond(
+                        incentiveMod,
                         workflowId,
-                        _msgSender(), // depositor
-                        _msgSender(), // escalatedBy
-                        bondToRecord,
+                        _msgSender(),
+                        bondResult.bondToRecord,
                         bondToken,
-                        result.newLevel
+                        result.newLevel,
+                        escrowFeeAddress,
+                        bondResult.protocolFeeAmount
                     );
                 } else {
-                    // ERC20 bond: custody lives in BondCollector, but recordAppealBond must be called
-                    // by the escrow contract (onlyEscrowContract in incentive module).
+                    // ERC20 bond
                     if (address(bondCollector) == address(0)) revert ZeroBondCollector();
-
-                    // Pull full bond amount into escrow contract, then fan out fee + custody transfer.
                     _pullTokens(bondToken, _msgSender(), bondAmount);
-                    if (protocolFeeAmount > 0) {
-                        IERC20(bondToken).safeTransfer(escrowFeeAddress, protocolFeeAmount);
-                    }
-                    IERC20(bondToken).safeTransfer(address(bondCollector), bondToRecord);
-
-                    // Let incentive module pull tokens from BondCollector.
-                    bondCollector.approveBondSpender(bondToken, address(incentiveMod), bondToRecord);
-                    incentiveMod.recordAppealBond(
+                    BondHandlingLibrary.handleERC20BondAfterPull(
+                        incentiveMod,
+                        bondCollector,
                         workflowId,
-                        address(bondCollector), // depositor (custodian)
-                        _msgSender(), // escalatedBy
-                        bondToRecord,
+                        _msgSender(),
                         bondToken,
-                        result.newLevel
+                        bondResult.bondToRecord,
+                        result.newLevel,
+                        escrowFeeAddress,
+                        bondResult.protocolFeeAmount
                     );
-                    bondCollector.resetBondSpender(bondToken, address(incentiveMod));
                 }
             }
         }
@@ -1061,27 +1032,17 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         _recordResolutionOutcome(workflowId, _msgSender(), isRelease, resolutionHash);
         emit EscrowResolved(workflowId, _msgSender(), resolutionHash);
 
-        // Use SettlementOps to compute resolution execution parameters
+        // Get and validate resolution module
         IResolutionModule resolutionModule = _getResolutionModule(workflowId);
-        
-        // Validate resolution module matches snapshot before execution
         address snap = moduleSnapshots[workflowId].resolutionModule;
         if (snap != address(0) && address(resolutionModule) != snap) {
-            // Module has changed - use snapshotted module instead
             resolutionModule = IResolutionModule(snap);
         }
-        
-        // Validate module is still a valid contract before calling
-        if (address(resolutionModule) != address(0)) {
-            if (address(resolutionModule).code.length == 0) {
-                revert NotAContract(1, address(resolutionModule)); // 1 = resolutionModule
-            }
+        if (address(resolutionModule) != address(0) && address(resolutionModule).code.length == 0) {
+            revert NotAContract(1, address(resolutionModule));
         }
 
-        if (address(settlementOps) == address(0)) {
-            // Fallback if SettlementOps not set
-            revert ZeroSettlementOps();
-        }
+        if (address(settlementOps) == address(0)) revert ZeroSettlementOps();
 
         SettlementOps.ResolutionResult memory result = settlementOps.computeResolutionExecution(
             address(resolutionModule),
@@ -1090,9 +1051,8 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
             timeoutConfig
         );
         
-        // If final round (MAX_ROUND), execute immediately (no appeal window)
+        // Execute immediately if final round, otherwise store pending settlement
         if (result.shouldExecute) {
-            // Execute immediately - no appeal window for final round
             if (isRelease) {
                 _releaseEscrowTransfer(workflowId);
             } else {
@@ -1101,18 +1061,13 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
             return true;
         }
 
-        // Store pending settlement (appeal window enforcement)
-        // Transfer will be executed after appeal window expires via executePendingSettlement()
         pendingSettlements[workflowId] = PendingSettlement({
             exists: true,
             isRelease: isRelease,
             appealDeadline: result.appealDeadline,
             resolutionHash: resolutionHash
         });
-
-        // Keep state as DISPUTED (not RESOLVED yet - will be finalized after appeal window)
         emit PendingSettlementSet(workflowId, isRelease, result.appealDeadline);
-
         return true;
     }
 

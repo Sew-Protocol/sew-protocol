@@ -138,11 +138,11 @@ contract BaseEscrowComprehensive is Test {
 
         adminContract.queueResolutionModule(address(vault), address(resolutionModule));
         vm.prank(address(vault));
-        moduleManagement.queueDefaultModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
+        moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
         vm.warp(block.timestamp + 14 days + 1);
         adminContract.activateResolutionModule(address(vault));
         vm.prank(address(vault));
-        moduleManagement.activateDefaultModule(address(vault), BaseEscrow.ModuleType.RELEASE);
+        moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
         
         escrowView = new EscrowViewContract(address(vault));
     }

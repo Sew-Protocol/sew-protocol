@@ -38,19 +38,19 @@ export async function setupResolutionModule(
 
   // Set default resolution module (Derived contract level)
   // Phase 8: EscrowVault now uses Slow lane (queue/activate) like EscrowableERC20
-  // Updated: EscrowableERC20 now uses consolidated queueDefaultModule/activateDefaultModule
-  if ('queueDefaultModule' in contract || 'queueDefaultResolutionModule' in contract) {
+  // Updated: EscrowableERC20 now uses consolidated queueModule/activateModule
+  if ('queueModule' in contract || 'queueDefaultResolutionModule' in contract) {
     // EscrowableERC20 uses consolidated functions, EscrowVault may still use old or new
     const moduleAddress = await resolutionModule.getAddress();
     let eta: bigint;
     let exists: boolean;
     
-    if ('queueDefaultModule' in contract) {
+    if ('queueModule' in contract) {
       // New consolidated function (EscrowableERC20)
       await (contract as any)
         .connect(deployer)
-        .queueDefaultModule(0, moduleAddress); // 0 = ModuleType.RESOLUTION
-      const [, etaVal, existsVal] = await (contract as any).getPendingDefaultModule(0);
+        .queueModule(0, moduleAddress); // 0 = ModuleType.RESOLUTION
+      const [, etaVal, existsVal] = await (contract as any).getPendingModule(0);
       eta = etaVal;
       exists = existsVal;
     } else {
@@ -69,8 +69,8 @@ export async function setupResolutionModule(
     // Fast-forward time to allow activation (7 days = 604800 seconds)
     await time.increaseTo(Number(eta) + 1);
     
-    if ('activateDefaultModule' in contract) {
-      await (contract as any).connect(deployer).activateDefaultModule(0); // 0 = ModuleType.RESOLUTION
+    if ('activateModule' in contract) {
+      await (contract as any).connect(deployer).activateModule(0); // 0 = ModuleType.RESOLUTION
     } else {
       await (contract as any).connect(deployer).activateDefaultResolutionModule();
     }
@@ -92,7 +92,7 @@ export async function setupResolutionModule(
   }
 
   // Ensure at least one was set
-  if (!('queueDefaultModule' in contract) && !('queueDefaultResolutionModule' in contract) && !('queueResolutionModule' in contract)) {
+  if (!('queueModule' in contract) && !('queueDefaultResolutionModule' in contract) && !('queueResolutionModule' in contract)) {
     throw new Error('Contract does not have a method to set resolution module.');
   }
 
