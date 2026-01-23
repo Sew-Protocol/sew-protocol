@@ -47,6 +47,19 @@ contract EscrowViewContract {
      * @return summary Compact escrow summary
      */
     function getEscrowSummary(uint256 workflowId) external view returns (EscrowSummary memory summary) {
+        // Check bounds to avoid revert on invalid workflowId
+        if (workflowId >= escrowContract.getEscrowCount()) {
+            return EscrowSummary({
+                state: EscrowState.NONE,
+                token: address(0),
+                from: address(0),
+                to: address(0),
+                amountAfterFee: 0,
+                resolver: address(0),
+                autoReleaseTime: 0,
+                autoCancelTime: 0
+            });
+        }
         // Public array getter returns tuple - unpack into struct
         (
             address token,
@@ -103,6 +116,10 @@ contract EscrowViewContract {
     function getEscrowStatusInfo(
         uint256 workflowId
     ) external view returns (EscrowState status, bool isActive, bool isPending) {
+        // Check bounds to avoid revert on invalid workflowId
+        if (workflowId >= escrowContract.getEscrowCount()) {
+            return (EscrowState.NONE, false, false);
+        }
         // Public array getter returns tuple - extract only escrowState
         (
             , , , , , , ,
@@ -123,6 +140,10 @@ contract EscrowViewContract {
     function getEscrowParticipants(
         uint256 workflowId
     ) external view returns (address from, address to) {
+        // Check bounds to avoid revert on invalid workflowId
+        if (workflowId >= escrowContract.getEscrowCount()) {
+            return (address(0), address(0));
+        }
         // Public array getter returns tuple - extract only from and to
         (
             , address toAddr, address fromAddr, , , , , , ,
@@ -148,6 +169,10 @@ contract EscrowViewContract {
      * @return Total amount deposited after fee deduction
      */
     function getTotalDeposited(uint256 workflowId) external view returns (uint256) {
+        // Check bounds to avoid revert on invalid workflowId
+        if (workflowId >= escrowContract.getEscrowCount()) {
+            return 0;
+        }
         // Public array getter returns tuple - extract only amountAfterFee
         (
             , , , , uint256 amountAfterFee, , , , ,
@@ -159,12 +184,8 @@ contract EscrowViewContract {
      * @notice Get total number of escrows created
      * @return Total count of escrows
      */
-    function getEscrowCount() external pure returns (uint256) {
-        // escrowTransfers is a public array in BaseEscrow
-        // Access via public getter: escrowTransfers.length
-        // Note: Solidity generates a public getter for public arrays, but .length is not directly accessible
-        // We need to use a workaround or add a minimal getter in BaseEscrow
-        revert('EscrowCount accessor removed - use events to track escrow count');
+    function getEscrowCount() external view returns (uint256) {
+        return escrowContract.getEscrowCount();
     }
 
     /**
@@ -229,6 +250,10 @@ contract EscrowViewContract {
     function isDisputeTimedOut(
         uint256 workflowId
     ) external view returns (bool isTimedOut, uint256 timeRemaining) {
+        // Check bounds to avoid revert on invalid workflowId
+        if (workflowId >= escrowContract.getEscrowCount()) {
+            return (false, 0);
+        }
         // Public array getter returns tuple - extract escrowState
         (
             , , , , , , ,

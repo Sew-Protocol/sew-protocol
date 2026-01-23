@@ -729,6 +729,81 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
 
     // DEPRECATED: _collectEscalationBond removed - use BondCollector instead
 
+    /**
+     * @notice Internal function to refund excess ETH sent with escalation
+     * @dev Extracted to reduce stack depth in escalateDispute
+     */
+    function _refundExcessETH(
+        uint256 workflowId,
+        address bondToken,
+        uint256 bondAmount,
+        address sender
+    ) internal {
+        if (bondToken == address(0) && msg.value > bondAmount) {
+            uint256 excess = msg.value - bondAmount;
+            if (excess > 0) {
+                (bool s, ) = payable(sender).call{value: excess}('');
+                if (!s) revert ExcessRefundTransferFailed(workflowId, sender, excess);
+            }
+        }
+    }
+
+    /**
+     * @notice Internal function to handle escalation bond collection
+     * @dev Extracted to reduce stack depth in escalateDispute
+     */
+    function _handleEscalationBond(
+        uint256 workflowId,
+        uint256 bondAmount,
+        address bondToken,
+        uint8 newLevel,
+        address escalatedBy
+    ) internal {
+        address incentiveModAddr = moduleSnapshots[workflowId].incentiveModule;
+        uint256 snapshottedBondFee = moduleSnapshots[workflowId].appealBondProtocolFeeBps;
+
+        (BondHandlingLibrary.BondProcessingResult memory bondResult, IIncentiveModule incentiveMod) = 
+            DisputeEscalationLibrary.processBondWithFeeCalculation(
+                bondAmount,
+                bondToken,
+                incentiveModAddr,
+                snapshottedBondFee,
+                escrowFeeAddress
+            );
+
+        if (bondResult.protocolFeeAmount > 0) {
+            emit ProtocolFeeCollected(1, workflowId, bondToken, bondAmount, snapshottedBondFee, bondResult.protocolFeeAmount);
+        }
+
+        if (address(incentiveMod) != address(0)) {
+            if (bondToken == address(0)) {
+                BondHandlingLibrary.handleETHBond(
+                    incentiveMod,
+                    workflowId,
+                    escalatedBy,
+                    bondResult.bondToRecord,
+                    bondToken,
+                    newLevel,
+                    escrowFeeAddress,
+                    bondResult.protocolFeeAmount
+                );
+            } else {
+                if (address(bondCollector) == address(0)) revert ZeroBondCollector();
+                _pullTokens(bondToken, escalatedBy, bondAmount);
+                BondHandlingLibrary.handleERC20BondAfterPull(
+                    incentiveMod,
+                    bondCollector,
+                    workflowId,
+                    escalatedBy,
+                    bondToken,
+                    bondResult.bondToRecord,
+                    newLevel,
+                    escrowFeeAddress,
+                    bondResult.protocolFeeAmount
+                );
+            }
+        }
+    }
 
     function escalateDispute(
         uint256 workflowId
@@ -774,63 +849,15 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         }
 
         if (bondAmount > 0) {
-            address incentiveModAddr = moduleSnapshots[workflowId].incentiveModule;
-            uint256 snapshottedBondFee = moduleSnapshots[workflowId].appealBondProtocolFeeBps;
-
-            (BondHandlingLibrary.BondProcessingResult memory bondResult, IIncentiveModule incentiveMod) = 
-                DisputeEscalationLibrary.processBondWithFeeCalculation(
-                    bondAmount,
-                    bondToken,
-                    incentiveModAddr,
-                    snapshottedBondFee,
-                    escrowFeeAddress
-                );
-
-            if (bondResult.protocolFeeAmount > 0) {
-                emit ProtocolFeeCollected(1, workflowId, bondToken, bondAmount, snapshottedBondFee, bondResult.protocolFeeAmount);
-            }
-
-            if (address(incentiveMod) != address(0)) {
-                if (bondToken == address(0)) {
-                    BondHandlingLibrary.handleETHBond(
-                        incentiveMod,
-                        workflowId,
-                        _msgSender(),
-                        bondResult.bondToRecord,
-                        bondToken,
-                        result.newLevel,
-                        escrowFeeAddress,
-                        bondResult.protocolFeeAmount
-                    );
-                } else {
-                    if (address(bondCollector) == address(0)) revert ZeroBondCollector();
-                    _pullTokens(bondToken, _msgSender(), bondAmount);
-                    BondHandlingLibrary.handleERC20BondAfterPull(
-                        incentiveMod,
-                        bondCollector,
-                        workflowId,
-                        _msgSender(),
-                        bondToken,
-                        bondResult.bondToRecord,
-                        result.newLevel,
-                        escrowFeeAddress,
-                        bondResult.protocolFeeAmount
-                    );
-                }
-            }
+            _handleEscalationBond(workflowId, bondAmount, bondToken, result.newLevel, _msgSender());
         }
 
         address newResolver = result.newResolver;
         uint8 newLevel_ = result.newLevel;
         et.disputeResolver = newResolver;
         
-        if (bondToken == address(0) && msg.value > bondAmount) {
-            uint256 excess = msg.value - bondAmount;
-            if (excess > 0) {
-                (bool s, ) = payable(_msgSender()).call{value: excess}('');
-                if (!s) revert ExcessRefundTransferFailed(workflowId, _msgSender(), excess);
-            }
-        }
+        _refundExcessETH(workflowId, bondToken, bondAmount, _msgSender());
+        
         emit DisputeEscalated(
             workflowId,
             result.currentLevel,
@@ -1059,6 +1086,15 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         if (workflowId >= escrowTransfers.length) {
             revert InvalidWorkflowId(workflowId, escrowTransfers.length);
         }
+    }
+
+    /**
+     * @notice Get the total number of escrows created
+     * @return count Total number of escrows
+     * @dev Added for EscrowViewContract to check bounds without reverting
+     */
+    function getEscrowCount() external view returns (uint256 count) {
+        return escrowTransfers.length;
     }
 
     function _requirePending(uint256 workflowId) internal view {

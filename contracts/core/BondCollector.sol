@@ -88,72 +88,90 @@ contract BondCollector is AccessControl {
         if (address(incentiveMod) == address(0)) return false;
         
         if (bondToken == address(0)) {
-            // ETH bond
-            uint256 ethToSend = bondAmount;
-            if (msg.value > bondAmount) {
-                ethToSend = bondAmount;
-            }
-            
-            uint256 protocolFeeAmount = 0;
-            if (snapshottedBondFee > 0 && escrowFeeAddress != address(0)) {
-                protocolFeeAmount = (ethToSend * snapshottedBondFee) / 10000;
-                if (protocolFeeAmount > 0) {
-                    // Transfer protocol fee first - if it fails, revert to keep accounting clean
-                    (bool feeSuccess, ) = payable(escrowFeeAddress).call{value: protocolFeeAmount}('');
-                    if (!feeSuccess) {
-                        return false; // Fee transfer failed
-                    }
-                    ethToSend = ethToSend - protocolFeeAmount;
-                    emit ProtocolFeeCollected(1, workflowId, bondToken, bondAmount, snapshottedBondFee, protocolFeeAmount);
-                }
-            }
-            
-            if (ethToSend > 0) {
-                // ETH bond: call payable function with ETH value
-                // For ETH bonds, depositor = escalatedBy = user
-                (bool s, ) = address(incentiveMod).call{value: ethToSend}(
-                    abi.encodeWithSelector(
-                        IIncentiveModule.recordAppealBond.selector,
-                        workflowId,
-                        depositor, // depositor (user for ETH)
-                        escalatedBy, // escalatedBy (user)
-                        ethToSend,
-                        bondToken,
-                        newLevel
-                    )
-                );
-                return s;
-            }
+            return _collectETHBond(workflowId, incentiveMod, bondAmount, newLevel, snapshottedBondFee, escrowFeeAddress, depositor, escalatedBy);
         } else {
-            // ERC20 bond - custody is held by this contract
-            // BaseEscrow transfers tokens to this contract before calling collectBond
-            // Step 1: Calculate and transfer protocol fee
-            uint256 protocolFeeAmount = 0;
-            uint256 bondToRecord = bondAmount;
-            
-            if (snapshottedBondFee > 0 && escrowFeeAddress != address(0)) {
-                protocolFeeAmount = (bondAmount * snapshottedBondFee) / 10000;
-                if (protocolFeeAmount > 0) {
-                    bondToRecord = bondAmount - protocolFeeAmount;
-                    IERC20(bondToken).safeTransfer(escrowFeeAddress, protocolFeeAmount);
-                    emit ProtocolFeeCollected(1, workflowId, bondToken, bondAmount, snapshottedBondFee, protocolFeeAmount);
-                }
+            return _collectERC20Bond(workflowId, incentiveMod, bondAmount, bondToken, newLevel, snapshottedBondFee, escrowFeeAddress, depositor, escalatedBy);
+        }
+    }
+
+    /**
+     * @notice Internal function to handle ETH bond collection
+     */
+    function _collectETHBond(
+        uint256 workflowId,
+        IIncentiveModule incentiveMod,
+        uint256 bondAmount,
+        uint8 newLevel,
+        uint256 snapshottedBondFee,
+        address escrowFeeAddress,
+        address depositor,
+        address escalatedBy
+    ) internal returns (bool) {
+        uint256 ethToSend = bondAmount;
+        if (msg.value > bondAmount) {
+            ethToSend = bondAmount;
+        }
+        
+        if (snapshottedBondFee > 0 && escrowFeeAddress != address(0)) {
+            uint256 protocolFeeAmount = (ethToSend * snapshottedBondFee) / 10000;
+            if (protocolFeeAmount > 0) {
+                (bool feeSuccess, ) = payable(escrowFeeAddress).call{value: protocolFeeAmount}('');
+                if (!feeSuccess) return false;
+                ethToSend = ethToSend - protocolFeeAmount;
+                emit ProtocolFeeCollected(1, workflowId, address(0), bondAmount, snapshottedBondFee, protocolFeeAmount);
             }
-            
-            // Step 2: Approve incentive module to pull remaining tokens
-            if (bondToRecord > 0) {
-                // Pull-based pattern: approve incentive module to pull tokens
-                // If recordAppealBond fails, tokens remain with this contract (no loss)
-                IERC20(bondToken).safeIncreaseAllowance(address(incentiveMod), bondToRecord);
-                try incentiveMod.recordAppealBond(workflowId, depositor, escalatedBy, bondToRecord, bondToken, newLevel) {
-                    // Reset approval to zero after successful call
-                    IERC20(bondToken).approve(address(incentiveMod), 0);
-                    return true;
-                } catch {
-                    // Reset approval on failure
-                    IERC20(bondToken).approve(address(incentiveMod), 0);
-                    return false;
-                }
+        }
+        
+        if (ethToSend > 0) {
+            (bool s, ) = address(incentiveMod).call{value: ethToSend}(
+                abi.encodeWithSelector(
+                    IIncentiveModule.recordAppealBond.selector,
+                    workflowId,
+                    depositor,
+                    escalatedBy,
+                    ethToSend,
+                    address(0),
+                    newLevel
+                )
+            );
+            return s;
+        }
+        return false;
+    }
+
+    /**
+     * @notice Internal function to handle ERC20 bond collection
+     */
+    function _collectERC20Bond(
+        uint256 workflowId,
+        IIncentiveModule incentiveMod,
+        uint256 bondAmount,
+        address bondToken,
+        uint8 newLevel,
+        uint256 snapshottedBondFee,
+        address escrowFeeAddress,
+        address depositor,
+        address escalatedBy
+    ) internal returns (bool) {
+        uint256 bondToRecord = bondAmount;
+        
+        if (snapshottedBondFee > 0 && escrowFeeAddress != address(0)) {
+            uint256 protocolFeeAmount = (bondAmount * snapshottedBondFee) / 10000;
+            if (protocolFeeAmount > 0) {
+                bondToRecord = bondAmount - protocolFeeAmount;
+                IERC20(bondToken).safeTransfer(escrowFeeAddress, protocolFeeAmount);
+                emit ProtocolFeeCollected(1, workflowId, bondToken, bondAmount, snapshottedBondFee, protocolFeeAmount);
+            }
+        }
+        
+        if (bondToRecord > 0) {
+            IERC20(bondToken).safeIncreaseAllowance(address(incentiveMod), bondToRecord);
+            try incentiveMod.recordAppealBond(workflowId, depositor, escalatedBy, bondToRecord, bondToken, newLevel) {
+                IERC20(bondToken).approve(address(incentiveMod), 0);
+                return true;
+            } catch {
+                IERC20(bondToken).approve(address(incentiveMod), 0);
+                return false;
             }
         }
         return false;
