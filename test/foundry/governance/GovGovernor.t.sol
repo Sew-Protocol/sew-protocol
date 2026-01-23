@@ -127,6 +127,26 @@ contract GovGovernorTest is Test {
         assertEq(governor.getCurrentCirculatingSupply(), totalSupply - nonCirculating);
     }
 
+    function test_getCirculatingSupply_Historical() public {
+        // user1 is non-circulating
+        token.transfer(user1, 100000e18); // 100k to non-circulating
+        
+        // Delegate so that voting power is tracked for getPastVotes
+        vm.prank(user1);
+        token.delegate(user1);
+        
+        // Mine a block to checkpoint
+        vm.roll(block.number + 1);
+        
+        // Mine more blocks
+        vm.roll(block.number + 10);
+        
+        uint256 totalSupply = token.getPastTotalSupply(2);
+        uint256 nonCirculating = token.getPastVotes(user1, 2);
+        
+        assertEq(governor.getCirculatingSupply(2), totalSupply - nonCirculating);
+    }
+
     function test_addNonCirculatingAddress() public {
         vm.prank(address(timelock));
         governor.addNonCirculatingAddress(user2);
