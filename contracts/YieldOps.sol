@@ -148,14 +148,19 @@ contract YieldOps is AccessControl {
                 emit YieldDistributionFailed(workflowId, token, yieldToDistribute, 'Unknown error');
             }
 
-            // Fallback: route remaining yield to feeRecipient
+            // CRIT-2: Fallback: route remaining yield to feeRecipient
+            // If feeRecipient is zero, yield remains in YieldOps (can be recovered via recoverTokens)
+            // This is acceptable as YieldOps has guardian recovery function
             if (feeRecipient != address(0)) {
                 IERC20(token).safeTransfer(feeRecipient, yieldToDistribute);
                 emit YieldRecoveredToFeeAddress(workflowId, token, yieldToDistribute, feeRecipient);
                 return (false, yieldToDistribute);
             }
 
-            // No feeRecipient: yield remains in YieldOps (last resort)
+            // CRIT-2: No feeRecipient: yield remains in YieldOps (last resort)
+            // Yield can be recovered by guardian via recoverTokens() function
+            // Emit event to track this scenario
+            emit YieldDistributionFailed(workflowId, token, yieldToDistribute, 'No fee recipient for fallback');
             return (false, 0);
         }
 
@@ -166,7 +171,12 @@ contract YieldOps is AccessControl {
             return (true, yieldToDistribute);
         }
 
-        // No distribution module and no feeRecipient: yield stays in contract
+        // CRIT-2: No distribution module and no feeRecipient: yield stays in contract
+        // Yield can be recovered by guardian via recoverTokens() function
+        // Emit event to track this scenario
+        if (yieldToDistribute > 0) {
+            emit YieldDistributionFailed(workflowId, token, yieldToDistribute, 'No distribution module and no fee recipient');
+        }
         return (true, 0);
     }
 
@@ -307,19 +317,40 @@ contract YieldOps is AccessControl {
 
         if (yieldAmount == 0) return;
 
-        // Transfer yield to module
+        // CRIT-2: Transfer yield to module before calling distributeYield
+        // If distributeYield reverts or returns false, tokens are already in the module
+        // The module should handle this gracefully (return tokens or distribute them)
         IERC20(token).safeTransfer(address(distModule), yieldAmount);
 
-        // Distribute using per-escrow distribution data or module default (empty = module default)
-        (bool success, ) = distModule.distributeYield(
+        // CRIT-2: Distribute using per-escrow distribution data or module default
+        // If this reverts, the try/catch in caller will handle it
+        // If it returns false, we revert here and caller's catch block will recover
+        (bool success, uint256 distributedAmount) = distModule.distributeYield(
             workflowId,
             token,
             yieldAmount,
             distributionData
         );
-        if (!success) revert DistributionFailed(workflowId, token, yieldAmount);
+        
+        // CRIT-2: Handle partial distribution
+        // If distributedAmount < yieldAmount, some yield may be stuck in module
+        // This is acceptable as modules should handle their own accounting
+        if (!success) {
+            revert DistributionFailed(workflowId, token, yieldAmount);
+        }
+        
+        // CRIT-2: Verify full distribution (distributedAmount should equal yieldAmount)
+        // If not, emit warning but don't revert (module may have valid reasons)
+        if (distributedAmount < yieldAmount) {
+            emit YieldDistributionFailed(
+                workflowId, 
+                token, 
+                yieldAmount - distributedAmount, 
+                'Partial distribution - some yield may remain in module'
+            );
+        }
 
-        emit YieldDistributed(workflowId, token, yieldAmount);
+        emit YieldDistributed(workflowId, token, distributedAmount);
     }
 
     /**

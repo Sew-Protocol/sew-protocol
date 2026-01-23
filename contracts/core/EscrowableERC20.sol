@@ -9,6 +9,8 @@ import '../shared/interfaces/IResolutionModule.sol';
 import '../interfaces/IYieldGenerationModule.sol';
 import '../interfaces/IYieldDistributionModule.sol';
 import './ModuleManagementContract.sol';
+import '../libraries/ModuleGetterLibrary.sol';
+import '../libraries/ModuleGetterConsolidationLibrary.sol';
 
 /**
  * @title EscrowableERC20
@@ -262,23 +264,13 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
 
     // Consolidated module getters to reduce bytecode (mirrors EscrowVault)
     function _getModuleAddress(uint256 workflowId, ModuleType moduleType) internal view returns (address) {
-        address snapshotModule;
-        if (moduleType == ModuleType.RELEASE) {
-            snapshotModule = moduleSnapshots[workflowId].releaseStrategy;
-        } else if (moduleType == ModuleType.RESOLUTION) {
-            snapshotModule = moduleSnapshots[workflowId].resolutionModule;
-        } else if (moduleType == ModuleType.YIELD_GEN) {
-            snapshotModule = moduleSnapshots[workflowId].yieldGenerationModule;
-        } else if (moduleType == ModuleType.YIELD_DIST) {
-            snapshotModule = moduleSnapshots[workflowId].yieldDistributionModule;
-        }
-
-        if (snapshotModule != address(0)) {
-            return snapshotModule;
-        }
-
-        // Query ModuleManagementContract for default module
-        return moduleManagement.getModule(address(this), moduleType);
+        return ModuleGetterLibrary.getModuleAddress(
+            workflowId,
+            moduleType,
+            moduleSnapshots,
+            moduleManagement,
+            address(this)
+        );
     }
 
     // ============ Module swapping (escrow-originated calls) ============
@@ -293,54 +285,24 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         moduleManagement.activateModule(address(this), moduleType);
     }
 
-    /**
-     * @dev Get the release strategy for an escrow
-     * @param workflowId The escrow transfer ID
-     * @return The release strategy module (from snapshot or default)
-     */
     function _getReleaseStrategy(uint256 workflowId) internal view override returns (IReleaseStrategy) {
-        return IReleaseStrategy(_getModuleAddress(workflowId, ModuleType.RELEASE));
+        return ModuleGetterConsolidationLibrary.getReleaseStrategy(_getModuleAddress(workflowId, ModuleType.RELEASE));
     }
 
-    /**
-     * @dev Get the resolution module for an escrow
-     * @param workflowId The escrow transfer ID
-     * @return The resolution module (from snapshot or default or BaseEscrow's disputeResolutionModule)
-     */
     function _getResolutionModule(uint256 workflowId) internal view override returns (IResolutionModule) {
-        address moduleAddr = _getModuleAddress(workflowId, ModuleType.RESOLUTION);
-        if (moduleAddr != address(0)) {
-            return IResolutionModule(moduleAddr);
-        }
-        // Fallback to BaseEscrow's disputeResolutionModule
-        return IResolutionModule(disputeResolutionModule);
+        return ModuleGetterConsolidationLibrary.getResolutionModule(_getModuleAddress(workflowId, ModuleType.RESOLUTION), disputeResolutionModule);
     }
 
-    /**
-     * @notice Get default yield generation module (for emergency operations)
-     * @return module Default yield generation module
-     * @dev Returns default module from ModuleManagementContract
-     */
     function _getDefaultYieldGenerationModule() internal view override returns (IYieldGenerationModule module) {
-        return IYieldGenerationModule(_getModuleAddress(0, ModuleType.YIELD_GEN)); // workflowId 0 doesn't matter for default
+        return IYieldGenerationModule(moduleManagement.getModule(address(this), ModuleType.YIELD_GEN));
     }
 
-    /**
-     * @dev Get the yield generation module for an escrow
-     * @param workflowId The escrow transfer ID
-     * @return The yield generation module (from snapshot or default)
-     */
     function _getYieldGenerationModule(uint256 workflowId) internal view override returns (IYieldGenerationModule) {
-        return IYieldGenerationModule(_getModuleAddress(workflowId, ModuleType.YIELD_GEN));
+        return ModuleGetterConsolidationLibrary.getYieldGenerationModule(_getModuleAddress(workflowId, ModuleType.YIELD_GEN));
     }
 
-    /**
-     * @dev Get the yield distribution module for an escrow
-     * @param workflowId The escrow transfer ID
-     * @return The yield distribution module (from snapshot or default)
-     */
     function _getYieldDistributionModule(uint256 workflowId) internal view override returns (IYieldDistributionModule) {
-        return IYieldDistributionModule(_getModuleAddress(workflowId, ModuleType.YIELD_DIST));
+        return ModuleGetterConsolidationLibrary.getYieldDistributionModule(_getModuleAddress(workflowId, ModuleType.YIELD_DIST));
     }
 
     // ============ Fee Management ============
@@ -371,23 +333,13 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         totalFees = 0;
         
         emit FeesWithdrawn(feeAmount);
-        return true;
     }
 
-    /**
-     * @notice Recover ERC20 tokens sent to the contract
-     * @dev Overrides BaseEscrow.recoverERC20 to validate against escrow accounting
-     * @param token Token address to recover
-     * @param recipient Address to receive the recovered tokens
-     * @param amount Amount of tokens to recover
-     * @return success Whether recovery succeeded
-     * @dev Only ROLE_TIMELOCK can recover. Validates that recovery won't affect escrowed funds or fees.
-     */
     function recoverERC20(
         address token,
         address recipient,
         uint256 amount
-    ) external override onlyRole(ROLE_TIMELOCK) nonReentrant returns (bool) {
+    ) external override onlyRole(ROLE_TIMELOCK) nonReentrant {
         if (token != address(this)) revert InvalidAddress(ADDR_TOKEN, token);
         if (recipient == address(0)) revert InvalidAddress(ADDR_RECIPIENT, recipient);
         
@@ -412,7 +364,6 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         // Token is address(this): use ERC20 internal transfer directly (saves bytecode vs RecoveryLibrary)
         _transfer(address(this), recipient, recoveryAmount);
         emit ERC20Recovered(token, recipient, recoveryAmount);
-        return true;
     }
 }
 

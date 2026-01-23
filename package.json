@@ -11,6 +11,8 @@
     "test:foundry:modules": "forge test test/foundry/core/ModuleMetadataSimple.t.sol test/foundry/decentralized-resolution-module -vvv",
     "test:foundry:release-resolution": "bash scripts/test-core-modules.sh",
     "coverage": "forge coverage --report lcov --ir-minimum || true && node scripts/filter-coverage.js",
+    "coverage:summary": "bash scripts/coverage-summary.sh",
+    "coverage:report": "bash scripts/coverage-summary.sh > report 2>&1 || true",
     "compile": "hardhat compile && forge build",
     "deploy": "hardhat deploy",
     "deploy:local": "hardhat deploy --network hardhat",

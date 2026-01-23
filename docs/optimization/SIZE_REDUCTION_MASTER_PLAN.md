@@ -1,7 +1,26 @@
 # Contract Size Reduction - Master Plan
 
+**⚠️ OUTDATED - See Active Plan Below**
+
+**Date**: 2026-01-18 (Original)  
+**Last Updated**: 2026-01-23  
+**Status**: This document contains the original master plan. Many optimizations have been completed.
+
+## 📋 CURRENT ACTIVE PLAN
+
+**Use this document**: [`ESCROWVAULT_SIZE_REDUCTION_ACTIVE_PLAN.md`](./ESCROWVAULT_SIZE_REDUCTION_ACTIVE_PLAN.md)
+
+**Current Status** (2026-01-23):
+- EscrowVault: **27,832 bytes** (27.18 KB) - 13.2% over limit
+- Target: < 24,576 bytes (24 KB)
+- Remaining: **3,256 bytes** needed
+
+---
+
+## Original Master Plan (For Reference)
+
 **Date**: 2026-01-18  
-**Current Status**: EscrowVault 35,561 bytes (44.7% over limit), EscrowableERC20 37,197 bytes (51.4% over limit)  
+**Original Status**: EscrowVault 35,561 bytes (44.7% over limit), EscrowableERC20 37,197 bytes (51.4% over limit)  
 **Target**: All contracts < 24,576 bytes (24 KB)
 
 ## Priority Ranking (Biggest Wins First)

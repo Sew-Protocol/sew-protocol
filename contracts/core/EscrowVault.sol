@@ -15,6 +15,7 @@ import '../libraries/FeeRecordingLibrary.sol';
 import '../libraries/BalanceUpdateLibrary.sol';
 import '../libraries/ModuleGetterConsolidationLibrary.sol';
 import '../libraries/FeeWithdrawalLibrary.sol';
+import '../libraries/TokenRecoveryLibrary.sol';
 
 contract EscrowVault is BaseEscrow {
     using SafeERC20 for IERC20;
@@ -55,11 +56,10 @@ contract EscrowVault is BaseEscrow {
     }
 
 
-    function releaseEscrowTransfer(uint256 workflowId) public nonReentrant whenNotPaused returns (bool) {
+    function releaseEscrowTransfer(uint256 workflowId) public nonReentrant whenNotPaused {
         _requirePending(workflowId);
         if (escrowTransfers[workflowId].from != _msgSender()) revert NotSender(workflowId, _msgSender(), escrowTransfers[workflowId].from);
         _releaseEscrowTransfer(workflowId);
-        return true;
     }
 
     function _pullTokens(address token, address from, uint256 amount) internal override {
@@ -123,24 +123,24 @@ contract EscrowVault is BaseEscrow {
 
     bytes32 public constant ROLE_FEE_RECIPIENT = keccak256('ROLE_FEE_RECIPIENT');
 
-    function withdrawFees(address token) external onlyRole(ROLE_FEE_RECIPIENT) nonReentrant returns (bool) {
+    function withdrawFees(address token) external onlyRole(ROLE_FEE_RECIPIENT) nonReentrant {
         uint256 feeAmount = FeeWithdrawalLibrary.withdrawFees(totalFeesPerToken, token, escrowFeeAddress);
         emit FeesWithdrawn(token, feeAmount);
-        return true;
     }
 
     function recoverERC20(
         address token,
         address recipient,
         uint256 amount
-    ) external override onlyRole(ROLE_TIMELOCK) nonReentrant returns (bool) {
-        uint256 balance = IERC20(token).balanceOf(address(this));
-        uint256 protected = totalHeldInEscrowPerToken[token] + totalFeesPerToken[token];
-        uint256 available = balance > protected ? balance - protected : 0;
-        uint256 recoveryAmount = amount == 0 ? available : amount;
-        if (recoveryAmount == 0 || recoveryAmount > available) revert AmountExceedsAvailable(token, recoveryAmount, available);
-        IERC20(token).safeTransfer(recipient, recoveryAmount);
+    ) external override onlyRole(ROLE_TIMELOCK) nonReentrant {
+        (bool success, uint256 recoveryAmount, uint256 available) = TokenRecoveryLibrary.recoverERC20(
+            totalHeldInEscrowPerToken,
+            totalFeesPerToken,
+            token,
+            recipient,
+            amount
+        );
+        if (!success) revert AmountExceedsAvailable(token, recoveryAmount, available);
         emit ERC20Recovered(token, recipient, recoveryAmount);
-        return true;
     }
 }

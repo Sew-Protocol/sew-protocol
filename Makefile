@@ -1,4 +1,4 @@
-.PHONY: install compile test hh forge coverage format lint typecheck clean size size-check verify deploy deploy-local export help
+.PHONY: install compile test hh forge coverage coverage:report format lint typecheck clean size size-check verify deploy deploy-local export help
 
 # Default target
 help:
@@ -9,6 +9,7 @@ help:
 	@echo "  hh            - Run Hardhat tests only"
 	@echo "  forge         - Run Foundry tests only"
 	@echo "  coverage      - Generate test coverage report"
+	@echo "  coverage:report - Generate coverage report (with fallback)"
 	@echo "  format        - Format code with Prettier"
 	@echo "  lint          - Run ESLint"
 	@echo "  typecheck     - Type check TypeScript files"
@@ -40,6 +41,9 @@ forge:
 
 coverage:
 	pnpm coverage
+
+coverage:report:
+	bash scripts/generate-coverage-report.sh report
 
 # Code Quality
 format:
