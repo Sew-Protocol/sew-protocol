@@ -144,8 +144,7 @@ contract AaveEdgeCases is Test {
         mm.activateModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST);
 
         wrapper = new AaveLibraryWrapper();
-        vault.setAaveYieldLibrary(address(wrapper));
-        vault.setAaveYieldLibraryEnabled(true);
+        // Module pattern is now used directly (no delegatecall library needed)
         vault.setYieldProtocolFeeBps(0);
 
         token.mint(address(pool), 10_000_000 ether);

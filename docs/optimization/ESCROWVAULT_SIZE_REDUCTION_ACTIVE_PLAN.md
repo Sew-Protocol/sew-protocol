@@ -1,17 +1,20 @@
 # EscrowVault Size Reduction - Active Plan
 
 **Last Updated**: 2026-01-23  
-**Current Size**: 27,832 bytes (27.18 KB) - **13.2% over 24KB limit**  
+**Current Size**: 23,315 bytes (22.77 KB) - ✅ **UNDER 24KB LIMIT**  
 **Target Size**: < 24,576 bytes (24 KB)  
-**Remaining Reduction Needed**: **3,256 bytes**
+**Status**: ✅ **COMPLETE** - Both EscrowVault and EscrowableERC20 are under limit
 
 ## Size Verification
 
-Both measurement methods confirm the same size:
-- `forge build --sizes`: **27,832 bytes** (deployed bytecode)
-- `pnpm size` / `make size-check`: **27,832 bytes** (27.18 KB)
+Current sizes (2026-01-23):
+- **EscrowVault**: 23,315 bytes (22.77 KB) ✅ **UNDER LIMIT**
+- **EscrowableERC20**: 24,273 bytes (23.70 KB) ✅ **UNDER LIMIT**
+- **GuardianOps**: New contract created for emergency unwind (separate from size limit)
 
-**Note**: `forge build --sizes` also shows creation code (28,667 bytes), but EIP-170 limit applies to **deployed bytecode** only.
+**Measurement**: `pnpm size:check` using Hardhat compiler
+
+**Note**: EIP-170 limit applies to **deployed bytecode** only. Both contracts are now safely under the 24KB limit.
 
 ---
 

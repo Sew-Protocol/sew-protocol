@@ -15,41 +15,12 @@ import "../../../contracts/DisputeOps.sol";
 import "../../../contracts/CreateOps.sol";
 import "../../../contracts/SettlementOps.sol";
 import "../../../contracts/core/BondCollector.sol";
+import "../../../contracts/ops/GuardianOps.sol";
 import "../../../contracts/types/EscrowTypes.sol";
 import "../../../contracts/types/YieldPresets.sol";
 import "../../../contracts/interfaces/aave/AaveV3Interfaces.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-
-/**
- * @dev Delegatecall target for library pattern
- */
-contract AaveLibraryWrapper {
-    using SafeERC20 for IERC20;
-
-    function supply(address pool, address token, uint256 amount, address onBehalfOf) external {
-        IERC20 tokenContract = IERC20(token);
-        uint256 currentAllowance = tokenContract.allowance(address(this), pool);
-
-        if (currentAllowance != amount) {
-            if (currentAllowance > 0) {
-                tokenContract.safeDecreaseAllowance(pool, currentAllowance);
-            }
-            tokenContract.safeIncreaseAllowance(pool, amount);
-        }
-
-        IAavePool(pool).supply(token, amount, onBehalfOf, 0);
-
-        uint256 remainingAllowance = tokenContract.allowance(address(this), pool);
-        if (remainingAllowance > 0) {
-            tokenContract.safeDecreaseAllowance(pool, remainingAllowance);
-        }
-    }
-
-    function withdraw(address pool, address token, uint256 amount, address to) external returns (uint256) {
-        return IAavePool(pool).withdraw(token, amount, to);
-    }
-}
 
 /**
  * @title AavePauseSemantics
@@ -72,7 +43,7 @@ contract AavePauseSemantics is Test {
     BondCollector internal bondCollector;
     DefaultResolutionModule internal resolutionModule;
     DefaultYieldDistributionModule internal yieldDist;
-    AaveLibraryWrapper internal wrapper;
+    GuardianOps internal guardianOps;
 
     address internal feeAddress = address(0xFEE);
     address internal resolver = address(0xBEEF);
@@ -144,10 +115,11 @@ contract AavePauseSemantics is Test {
         vm.prank(address(vault));
         mm.activateModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST);
 
-        wrapper = new AaveLibraryWrapper();
-        vault.setAaveYieldLibrary(address(wrapper));
-        vault.setAaveYieldLibraryEnabled(true);
+        // Module pattern is now used directly (no delegatecall library needed)
         vault.setYieldProtocolFeeBps(0);
+
+        // Deploy GuardianOps for emergency unwind
+        guardianOps = new GuardianOps(address(vault));
 
         // Grant guardian role (needed for pause and emergency unwind)
         vault.grantRole(vault.ROLE_GUARDIAN(), guardian);
@@ -311,8 +283,12 @@ contract AavePauseSemantics is Test {
         uint256 amount = 100 ether;
         vm.startPrank(sender);
         token.approve(address(vault), amount);
-        vault.createEscrow(address(token), recipient, amount, settings);
+        uint256 wid = vault.createEscrow(address(token), recipient, amount, settings);
         vm.stopPrank();
+
+        // Verify deposit succeeded by checking module's escrowInAave status
+        bool inYield = aaveModule.escrowInAave(address(vault), wid);
+        require(inYield, "Yield deposit should have succeeded");
 
         // Verify aTokens exist
         uint256 aTokenBalanceBefore = aToken.balanceOf(address(vault));
@@ -322,14 +298,13 @@ contract AavePauseSemantics is Test {
         vm.prank(guardian);
         vault.pause();
 
-        // Emergency unwind should work
+        // Emergency unwind should work via GuardianOps
         // Use this contract (which has ROLE_GUARDIAN) instead of guardian address
-        // The guardian variable might have address issues in delegatecall context
         uint256 usdcBalanceBefore = token.balanceOf(address(vault));
         // This contract has ROLE_GUARDIAN from setUp
-        uint256 unwound = vault.emergencyUnwindAavePosition(
+        uint256 unwound = guardianOps.emergencyUnwindAavePosition(
             address(token),
-            vault.MAX_UNWIND_AMOUNT_PER_CALL()
+            guardianOps.MAX_UNWIND_AMOUNT_PER_CALL()
         );
 
         assertGt(unwound, 0, "Unwind should succeed");

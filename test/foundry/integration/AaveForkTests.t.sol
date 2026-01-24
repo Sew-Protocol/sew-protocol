@@ -16,6 +16,7 @@ import {DisputeOps} from "../../../contracts/DisputeOps.sol";
 import {CreateOps} from "../../../contracts/CreateOps.sol";
 import {SettlementOps} from "../../../contracts/SettlementOps.sol";
 import {ModuleManagementContract} from "../../../contracts/core/ModuleManagementContract.sol";
+import {GuardianOps} from "../../../contracts/ops/GuardianOps.sol";
 
 // Aave v3 interfaces
 interface IPool {
@@ -121,8 +122,8 @@ contract AaveForkTests is Test {
     address public recipient = address(0x5678);
     address public feeAddress = address(0xFEE);
     
-    // Wrapper contract to use library functions via delegatecall
-    LibraryWrapper public libraryWrapper;
+    // GuardianOps for emergency unwind
+    GuardianOps public guardianOps;
 
     // Fork guard: these tests should only run when an RPC URL is provided.
     bool internal forkActive;
@@ -278,18 +279,14 @@ contract AaveForkTests is Test {
         address registeredModule = moduleManagement.getModule(address(escrowVault), BaseEscrow.ModuleType.YIELD_GEN);
         require(registeredModule == address(aaveModule), "Aave module must be registered after activation");
         
-        // Deploy library wrapper for testing
-        // Libraries can't be deployed directly, so we create a minimal wrapper
-        libraryWrapper = new LibraryWrapper();
+        // Module pattern is now used directly (no delegatecall library needed)
         
-        // Configure EscrowVault with library wrapper address
-        escrowVault.setAaveYieldLibrary(address(libraryWrapper));
-        escrowVault.setAaveYieldLibraryEnabled(true);
+        // Deploy GuardianOps for emergency unwind
+        guardianOps = new GuardianOps(address(escrowVault));
         
         // Mint USDC to user for testing
-        // CRITICAL: Need enough for MIN_DEPOSIT_AMOUNT (1e15 for 6-decimal tokens = 1 billion USDC)
-        // After 1% fee, need at least 1.011 billion USDC
-        uint256 userBalance = 1_200_000_000e6; // 1.2 billion USDC (enough for deposit + buffer)
+        // For module pattern, no MIN_DEPOSIT_AMOUNT restriction
+        uint256 userBalance = 100_000e6; // 100k USDC (enough for tests)
         if (address(usdc) == BASE_SEPOLIA_USDC && address(usdc).code.length > 0) {
             // Real USDC on fork - use Foundry's deal cheatcode to give user USDC
             // This works in fork tests by manipulating the token's balance storage
@@ -341,8 +338,8 @@ contract AaveForkTests is Test {
         );
         vm.stopPrank();
         
-        // Verify deposit succeeded by checking escrowInYield status
-        bool inYield = escrowVault.escrowInYield(workflowId, address(usdc));
+        // Verify deposit succeeded by checking module's escrowInAave status
+        bool inYield = aaveModule.escrowInAave(address(escrowVault), workflowId);
         require(inYield, "Yield deposit should have succeeded - check MIN_DEPOSIT_AMOUNT for 6-decimal tokens");
         
         // Verify tokens were deposited to Aave
@@ -404,8 +401,8 @@ contract AaveForkTests is Test {
         );
         vm.stopPrank();
         
-        // Verify deposit succeeded by checking escrowInYield status
-        bool inYield = escrowVault.escrowInYield(workflowId, address(usdc));
+        // Verify deposit succeeded by checking module's escrowInAave status
+        bool inYield = aaveModule.escrowInAave(address(escrowVault), workflowId);
         require(inYield, "Yield deposit should have succeeded - check MIN_DEPOSIT_AMOUNT for 6-decimal tokens");
         
         // Verify aTokens were minted to BaseEscrow
@@ -476,8 +473,8 @@ contract AaveForkTests is Test {
         );
         vm.stopPrank();
         
-        // Verify deposit succeeded by checking escrowInYield status
-        bool inYield = escrowVault.escrowInYield(workflowId, address(usdc));
+        // Verify deposit succeeded by checking module's escrowInAave status
+        bool inYield = aaveModule.escrowInAave(address(escrowVault), workflowId);
         require(inYield, "Yield deposit should have succeeded - check MIN_DEPOSIT_AMOUNT for 6-decimal tokens");
         
         // Verify aTokens exist
@@ -490,10 +487,10 @@ contract AaveForkTests is Test {
         
         uint256 usdcBalanceBefore = IERC20(address(usdc)).balanceOf(address(escrowVault));
         
-        // Call emergency unwind
-        uint256 unwound = escrowVault.emergencyUnwindAavePosition(
+        // Call emergency unwind via GuardianOps
+        uint256 unwound = guardianOps.emergencyUnwindAavePosition(
             address(usdc),
-            escrowVault.MAX_UNWIND_AMOUNT_PER_CALL()
+            guardianOps.MAX_UNWIND_AMOUNT_PER_CALL()
         );
         
         assertGt(unwound, 0, "Unwind should succeed");
@@ -526,9 +523,8 @@ contract AaveForkTests is Test {
             return;
         }
         // Setup escrow with yield
-        // Need to deposit enough to meet MIN_YIELD_DEPOSIT (1000e6) after fee
-        // With 1% fee, need: depositAmount * 0.99 >= 1000e6
-        uint256 depositAmount = 1011e6; // 1011 USDC (ensures 1000 USDC after 1% fee)
+        // For module pattern, no MIN_DEPOSIT_AMOUNT check, but need enough for meaningful test
+        uint256 depositAmount = 10_000e6; // 10k USDC (enough for meaningful test)
         vm.startPrank(user);
         IERC20(address(usdc)).approve(address(escrowVault), depositAmount);
         EscrowSettings memory settings = EscrowSettings({
@@ -545,19 +541,19 @@ contract AaveForkTests is Test {
         escrowVault.pause();
         
         vm.prank(address(this));
-        escrowVault.emergencyUnwindAavePosition(address(usdc), 1000e6);
+        guardianOps.emergencyUnwindAavePosition(address(usdc), 1000e6);
         
         // Try to unwind again immediately - should fail due to cooldown
         vm.prank(address(this));
-        uint256 unwound = escrowVault.emergencyUnwindAavePosition(address(usdc), 1000e6);
+        uint256 unwound = guardianOps.emergencyUnwindAavePosition(address(usdc), 1000e6);
         assertEq(unwound, 0, "Should return 0 due to cooldown");
         
         // Wait for cooldown
-        vm.warp(block.timestamp + escrowVault.UNWIND_COOLDOWN() + 1);
+        vm.warp(block.timestamp + guardianOps.UNWIND_COOLDOWN() + 1);
         
         // Now should succeed
         vm.prank(address(this));
-        unwound = escrowVault.emergencyUnwindAavePosition(address(usdc), 1000e6);
+        unwound = guardianOps.emergencyUnwindAavePosition(address(usdc), 1000e6);
         // May be 0 if already unwound, but should not revert
     }
     
@@ -587,9 +583,8 @@ contract AaveForkTests is Test {
         require(address(escrowVault.moduleManagement()) == address(moduleManagement), "EscrowVault moduleManagement reference must match");
         
         // Setup escrow with yield
-        // Need to deposit enough to meet MIN_YIELD_DEPOSIT (1000e6) after fee
-        // With 1% fee, need: depositAmount * 0.99 >= 1000e6
-        uint256 depositAmount = 1011e6; // 1011 USDC (ensures 1000 USDC after 1% fee)
+        // For module pattern, no MIN_DEPOSIT_AMOUNT check, but need enough for meaningful test
+        uint256 depositAmount = 10_000e6; // 10k USDC (enough for meaningful test)
         vm.startPrank(user);
         IERC20(address(usdc)).approve(address(escrowVault), depositAmount);
         EscrowSettings memory settings = EscrowSettings({
@@ -601,10 +596,9 @@ contract AaveForkTests is Test {
         escrowVault.createEscrow(address(usdc), recipient, depositAmount, settings);
         vm.stopPrank();
         
-        // Try to unwind without pause - should revert (whenPaused modifier)
-        // The function has whenPaused modifier, so it will revert if not paused
-        vm.expectRevert(); // Pausable: EnforcedPause or similar from OpenZeppelin
-        escrowVault.emergencyUnwindAavePosition(address(usdc), 1000e6);
+        // Try to unwind without pause - should revert (GuardianOps checks paused)
+        vm.expectRevert(); // GuardianOps.EscrowNotPaused
+        guardianOps.emergencyUnwindAavePosition(address(usdc), 1000e6);
     }
 }
 

@@ -5,4 +5,17 @@ cache
 node_modules
 out
 coverage
+**/node_modules/**
+**/dist/**
+**/build/**
+**/.next/**
+**/.expo/**
+**/.turbo/**
+**/.cache/**
+**/.foundry/**
+**/coverage/**
+**/*.log
+**/artifacts/**
+**/out/**
+**/.openzeppelin/**
 

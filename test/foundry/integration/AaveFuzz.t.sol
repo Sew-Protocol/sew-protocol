@@ -154,8 +154,7 @@ contract AaveFuzz is Test {
 
         // Enable library pattern
         wrapper = new AaveLibraryWrapper();
-        vault.setAaveYieldLibrary(address(wrapper));
-        vault.setAaveYieldLibraryEnabled(true);
+        // Module pattern is now used directly (no delegatecall library needed)
         vault.setYieldProtocolFeeBps(0);
 
         // Fund sender and pool

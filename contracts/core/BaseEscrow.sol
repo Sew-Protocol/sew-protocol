@@ -111,6 +111,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     uint256 public constant MAX_ESCROW_FEE_BPS = 200; // 2% maximum escrow fee
     uint256 public constant MAX_AUTOMATION_RANGE = 100;
     uint256 public constant MAX_PROTOCOL_FEE_BPS = 3000; // 30% maximum
+    uint256 public constant DEFAULT_YIELD_PROTOCOL_FEE_BPS = 3000; // 30% default
     EscrowTransfer[] public escrowTransfers; // Array index IS the workflowId
     address public escrowFeeAddress;
 
@@ -1304,6 +1305,37 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
 
         YieldOps.YieldResult memory result = abi.decode(ret, (YieldOps.YieldResult));
         if (result.actualAmount > 0 && result.actualAmount >= amount) {
+            // PUSH MODEL: If yield was generated, transfer it to YieldOps and distribute
+            if (result.yield > 0) {
+                // Transfer yield portion to YieldOps (PUSH)
+                IERC20(token).safeTransfer(address(yieldOps), result.yield);
+                
+                // Call YieldOps to distribute the yield (best-effort, non-blocking)
+                (bool distOk, bytes memory distRet) = address(yieldOps).call(
+                    abi.encodeWithSelector(
+                        YieldOps.distributeWithdrawnYield.selector,
+                        distModule,
+                        workflowId,
+                        token,
+                        result.yield,
+                        snapshottedYieldFee,
+                        escrowFeeAddress,
+                        distributionData
+                    )
+                );
+                
+                // Decode distribution result (best-effort)
+                if (distOk && distRet.length >= 64) {
+                    (bool distSuccess, uint256 distributedAmount) = abi.decode(distRet, (bool, uint256));
+                    result.yieldDistributed = distributedAmount;
+                    result.success = distSuccess;
+                } else {
+                    // Distribution call failed - yield is in YieldOps, emit failure
+                    if (yieldEnabled) {
+                        _emitYieldFailure(2, workflowId, address(yieldOps), YieldOps.distributeWithdrawnYield.selector, token, result.yield, uint8(FailureReason.CALL_FAILED));
+                    }
+                }
+            }
             return result.actualAmount;
         }
         if (result.actualAmount > 0 && result.actualAmount < amount && yieldEnabled) {
@@ -1383,12 +1415,9 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         } else {
             IYieldGenerationModule genModule = _getYieldGenerationModule(workflowId);
             if (address(genModule) != address(0) && genModule.isTokenSupported(token)) {
-                (bool success, ) = address(genModule).call(
-                    abi.encodeWithSelector(IYieldGenerationModule.depositForYield.selector, workflowId, token, amount)
-                );
-                if (!success) {
-                    _emitYieldFailure(1, workflowId, address(genModule), IYieldGenerationModule.depositForYield.selector, token, amount, uint8(FailureReason.DEPOSIT_FAILED));
-                }
+                // Call _depositForYield which is overridden in child contracts (EscrowVault/EscrowableERC20)
+                // This allows child contracts to set approvals before calling the module
+                _depositForYield(genModule, workflowId, token, amount);
             }
         }
     }

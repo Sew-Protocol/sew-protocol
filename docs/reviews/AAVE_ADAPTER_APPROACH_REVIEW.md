@@ -520,12 +520,31 @@ The planning document identified a potential problem and proposed solutions. The
         // Check exposure caps before depositing (Phase 4)
         _checkAndAccrueExposure(token, amount);
 
-        // Note: Approval should be set by the escrow contract before calling this function
-        // The escrow contract (EscrowableERC20) handles approval since it's both the token and escrow contract
-        // No need to call forceApprove here as it would set allowance for the module, not the escrow contract
+        // Handle two cases:
+        // 1. EscrowVault: Escrow contract approved this module, module pulls tokens and supplies to pool
+        // 2. EscrowableERC20: Escrow contract IS the token, it approves pool directly, module just calls pool.supply
+        // Check if escrow contract approved this module (for EscrowVault)
+        uint256 moduleAllowance = IERC20(token).allowance(escrowContract, address(this));
+        bool pulledTokens = false;
+        
+        if (moduleAllowance >= amount) {
+            // EscrowVault case: Pull tokens from escrow contract
+            IERC20(token).safeTransferFrom(escrowContract, address(this), amount);
+            pulledTokens = true;
+            // Approve pool to spend tokens (module now holds the tokens)
+            // ... approval logic ...
+        }
+        // Else: EscrowableERC20 case - escrow contract approved pool directly, just call pool.supply
 
         // Deposit to Aave (referral code 0 = no referral)
+        // If we pulled tokens: msg.sender = module, pool pulls from module
+        // If we didn't pull: msg.sender = module, but pool will pull from escrowContract (EscrowableERC20 case)
         aavePool.supply(token, amount, escrowContract, 0);
+        
+        // Reset approval to zero for safety (only if we pulled tokens)
+        if (pulledTokens) {
+            // ... reset approval logic ...
+        }
 
         // Get aToken balance after deposit
         yieldTokenBalance = IAToken(aToken).balanceOf(escrowContract);

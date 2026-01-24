@@ -232,8 +232,7 @@ contract AaveFailureScenarios is Test {
         mm.activateModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST);
 
         wrapper = new AaveLibraryWrapper();
-        vault.setAaveYieldLibrary(address(wrapper));
-        vault.setAaveYieldLibraryEnabled(true);
+        // Module pattern is now used directly (no delegatecall library needed)
         vault.setYieldProtocolFeeBps(0);
 
         token.mint(sender, 10_000_000 ether);
@@ -310,8 +309,12 @@ contract AaveFailureScenarios is Test {
         uint256 firstAmount = 50 ether;
         vm.startPrank(sender);
         token.approve(address(vault), firstAmount);
-        vault.createEscrow(address(token), recipient, firstAmount, settings);
+        uint256 wid1 = vault.createEscrow(address(token), recipient, firstAmount, settings);
         vm.stopPrank();
+        
+        // Verify first deposit succeeded
+        bool firstInYield = aaveModule.escrowInAave(address(vault), wid1);
+        require(firstInYield, "First deposit should have succeeded");
 
         // Second deposit that exceeds cap - escrow creation succeeds, but yield deposit fails
         address sender2 = address(0x2001);
@@ -332,6 +335,11 @@ contract AaveFailureScenarios is Test {
         uint256 aTokenBalance = aToken.balanceOf(address(vault));
         // First deposit amount after fee: 50 ether - (50 * 100 / 10000) = 49.5 ether
         uint256 firstAmountAfterFee = firstAmount - (firstAmount * ESCROW_FEE_BPS / 10000);
+        // For module pattern, check escrowInAave status instead of aToken balance
+        // The first escrow should be in yield, second should not
+        bool secondInYield = aaveModule.escrowInAave(address(vault), wid2);
+        assertTrue(firstInYield, "First escrow should be in yield");
+        assertFalse(secondInYield, "Second escrow should NOT be in yield (cap exceeded)");
         assertEq(aTokenBalance, firstAmountAfterFee, "Only first deposit should have aTokens (after fee)");
     }
 

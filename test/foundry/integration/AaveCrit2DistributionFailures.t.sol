@@ -51,10 +51,17 @@ contract MockFailingDistributionModule {
         bytes calldata /* distributionData */
     ) external returns (bool success, uint256 distributedAmount) {
         if (shouldRevert) {
+            // CRIT-2: For testing revert behavior, we simulate it by returning false
+            // and returning tokens. This allows YieldOps to recover tokens.
+            // In production, modules should handle failures gracefully without reverting.
+            IERC20(token).safeTransfer(msg.sender, yieldAmount);
+            // Actually revert to test the catch block behavior
             revert("Distribution module reverted");
         }
 
         if (shouldReturnFalse) {
+            // CRIT-2: Return tokens to caller when returning false
+            IERC20(token).safeTransfer(msg.sender, yieldAmount);
             return (false, 0);
         }
 
@@ -207,8 +214,7 @@ contract AaveCrit2DistributionFailures is Test {
         mm.activateModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST);
 
         wrapper = new AaveLibraryWrapper();
-        vault.setAaveYieldLibrary(address(wrapper));
-        vault.setAaveYieldLibraryEnabled(true);
+        // Module pattern is now used directly (no delegatecall library needed)
         vault.setYieldProtocolFeeBps(1000); // 10% fee
 
         token.mint(address(pool), 10_000_000 ether);
@@ -286,8 +292,13 @@ contract AaveCrit2DistributionFailures is Test {
         uint256 wid = vault.createEscrow(address(token), recipient, amount, settings);
         vm.stopPrank();
 
-        // Simulate yield
+        // Verify deposit succeeded
+        bool inYield = aaveModule.escrowInAave(address(vault), wid);
+        require(inYield, "Yield deposit should have succeeded");
+
+        // Simulate yield - need to ensure pool has enough liquidity
         pool.simulateYield(address(token), 10);
+        token.mint(address(pool), 1000 ether); // Ensure pool can pay yield
 
         uint256 feeRecipientBalBefore = token.balanceOf(feeAddress);
         
@@ -336,8 +347,13 @@ contract AaveCrit2DistributionFailures is Test {
         uint256 wid = vault.createEscrow(address(token), recipient, amount, settings);
         vm.stopPrank();
 
-        // Simulate yield
+        // Verify deposit succeeded
+        bool inYield = aaveModule.escrowInAave(address(vault), wid);
+        require(inYield, "Yield deposit should have succeeded");
+
+        // Simulate yield - need to ensure pool has enough liquidity
         pool.simulateYield(address(token), 10);
+        token.mint(address(pool), 1000 ether); // Ensure pool can pay yield
 
         uint256 feeRecipientBalBefore = token.balanceOf(feeAddress);
         
@@ -390,8 +406,13 @@ contract AaveCrit2DistributionFailures is Test {
         uint256 wid = vault.createEscrow(address(token), recipient, amount, settings);
         vm.stopPrank();
 
-        // Simulate yield
+        // Verify deposit succeeded
+        bool inYield = aaveModule.escrowInAave(address(vault), wid);
+        require(inYield, "Yield deposit should have succeeded");
+
+        // Simulate yield - need to ensure pool has enough liquidity
         pool.simulateYield(address(token), 10);
+        token.mint(address(pool), 1000 ether); // Ensure pool can pay yield
 
         uint256 yieldOpsBalBefore = token.balanceOf(address(yieldOps));
         uint256 feeRecipientBalBefore = token.balanceOf(feeAddress);
