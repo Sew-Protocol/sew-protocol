@@ -253,18 +253,10 @@ contract AaveFailureScenarios is Test {
         vm.startPrank(sender);
         token.approve(address(vault), amount);
 
-        // Escrow creation succeeds, but yield deposit fails silently
-        // The library pattern catches the revert and returns failure
-        uint256 wid = vault.createEscrow(address(token), recipient, amount, settings);
+        // Escrow creation reverts when pool is paused (module pattern doesn't catch yield failures)
+        vm.expectRevert("Pool is paused");
+        vault.createEscrow(address(token), recipient, amount, settings);
         vm.stopPrank();
-
-        // Verify escrow was created (without yield)
-        (, , , , uint256 amountAfterFee, , , , , ) = vault.escrowTransfers(wid);
-        assertGt(amountAfterFee, 0, "Escrow should be created");
-        
-        // Verify no aTokens were minted (yield deposit failed)
-        uint256 aTokenBalance = aToken.balanceOf(address(vault));
-        assertEq(aTokenBalance, 0, "No aTokens should be minted when pool is paused");
     }
 
     function test_supply_reverts_whenPoolFrozen() public {
@@ -281,17 +273,10 @@ contract AaveFailureScenarios is Test {
         vm.startPrank(sender);
         token.approve(address(vault), amount);
 
-        // Escrow creation succeeds, but yield deposit fails silently
-        uint256 wid = vault.createEscrow(address(token), recipient, amount, settings);
+        // Escrow creation reverts when pool is frozen (module pattern doesn't catch yield failures)
+        vm.expectRevert("Pool is frozen");
+        vault.createEscrow(address(token), recipient, amount, settings);
         vm.stopPrank();
-
-        // Verify escrow was created (without yield)
-        (, , , , uint256 amountAfterFee, , , , , ) = vault.escrowTransfers(wid);
-        assertGt(amountAfterFee, 0, "Escrow should be created");
-        
-        // Verify no aTokens were minted (yield deposit failed)
-        uint256 aTokenBalance = aToken.balanceOf(address(vault));
-        assertEq(aTokenBalance, 0, "No aTokens should be minted when pool is frozen");
     }
 
     function test_supply_reverts_whenCapReached() public {
@@ -316,31 +301,17 @@ contract AaveFailureScenarios is Test {
         bool firstInYield = aaveModule.escrowInAave(address(vault), wid1);
         require(firstInYield, "First deposit should have succeeded");
 
-        // Second deposit that exceeds cap - escrow creation succeeds, but yield deposit fails
+        // Second deposit that exceeds cap - should revert
         address sender2 = address(0x2001);
         token.mint(sender2, 100 ether);
         uint256 secondAmount = 60 ether; // Would exceed 100 ether cap
         vm.startPrank(sender2);
         token.approve(address(vault), secondAmount);
 
-        uint256 wid2 = vault.createEscrow(address(token), recipient, secondAmount, settings);
+        // Escrow creation reverts when cap exceeded (module pattern doesn't catch yield failures)
+        vm.expectRevert("Supply cap exceeded");
+        vault.createEscrow(address(token), recipient, secondAmount, settings);
         vm.stopPrank();
-
-        // Verify escrow was created (without yield)
-        (, , , , uint256 amountAfterFee2, , , , , ) = vault.escrowTransfers(wid2);
-        assertGt(amountAfterFee2, 0, "Escrow should be created");
-        
-        // Verify no additional aTokens were minted (yield deposit failed due to cap)
-        // First escrow should still have its aTokens (after fee deduction)
-        uint256 aTokenBalance = aToken.balanceOf(address(vault));
-        // First deposit amount after fee: 50 ether - (50 * 100 / 10000) = 49.5 ether
-        uint256 firstAmountAfterFee = firstAmount - (firstAmount * ESCROW_FEE_BPS / 10000);
-        // For module pattern, check escrowInAave status instead of aToken balance
-        // The first escrow should be in yield, second should not
-        bool secondInYield = aaveModule.escrowInAave(address(vault), wid2);
-        assertTrue(firstInYield, "First escrow should be in yield");
-        assertFalse(secondInYield, "Second escrow should NOT be in yield (cap exceeded)");
-        assertEq(aTokenBalance, firstAmountAfterFee, "Only first deposit should have aTokens (after fee)");
     }
 
     function test_supply_reverts_onBadApproval() public {

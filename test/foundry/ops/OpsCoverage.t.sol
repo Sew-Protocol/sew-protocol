@@ -262,9 +262,35 @@ contract OpsCoverageTest is Test {
             ""
         );
 
+        assertFalse(result.success, "Should fail when module returns false");
+        assertTrue(bytes(result.failureReason).length > 0, "Should have failure reason");
+        assertEq(result.actualAmount, 1000, "Should return original amount"); // Falls back to original amount
+        assertEq(result.yield, 0, "Should have no yield");
+    }
+
+    function test_YieldOps_distributeWithdrawnYield_ProtocolFee() public {
+        vm.prank(timelock);
+        yieldOps.registerEscrowContract(escrowContract);
+
+        uint256 earned = 100;
+        token.mint(address(yieldOps), earned);
+
+        vm.prank(escrowContract);
+        YieldOps.DistributionResult memory result = yieldOps.distributeWithdrawnYield(
+            IYieldDistributionModule(address(0)),
+            1,
+            address(token),
+            earned,
+            1000, // 10% protocol fee
+            feeRecipient,
+            ""
+        );
+
         assertTrue(result.success);
-        assertEq(result.actualAmount, 1000); // Falls back to original amount
-        assertEq(result.yield, 0);
+        assertEq(result.distributedAmount, 90); // 90 after 10% fee
+        assertEq(bytes(result.failureReason).length, 0, "Should have no failure reason");
+        // feeRecipient should have: 10 (protocol fee) + 90 (distributed amount since no distModule) = 100
+        assertEq(token.balanceOf(feeRecipient), 100);
     }
 
     function test_YieldOps_recoverTokens_Guardian() public {
@@ -307,17 +333,14 @@ contract OpsCoverageTest is Test {
         yieldOps.registerEscrowContract(address(0));
     }
 
-    function test_YieldOps_handleYield_ProtocolFee() public {
+    function test_YieldOps_handleYield_NoYieldGenerated() public {
         mockGen = new MockYieldGenerationModule();
         vm.prank(timelock);
         yieldOps.registerEscrowContract(escrowContract);
 
-        uint256 total = 1100;
-        uint256 earned = 100;
-        token.mint(address(yieldOps), total);
-        mockGen.setWithdrawResult(true, total, earned);
+        // Withdrawal succeeds but no yield generated
+        mockGen.setWithdrawResult(true, 1000, 0);
 
-        // Success fee
         vm.prank(escrowContract);
         YieldOps.YieldResult memory result = yieldOps.handleYield(
             IYieldGenerationModule(address(mockGen)),
@@ -325,43 +348,15 @@ contract OpsCoverageTest is Test {
             1,
             address(token),
             1000,
-            1000, // 10% fee
+            0,
             feeRecipient,
             ""
         );
+
         assertTrue(result.success);
-        // Fee = 10. Remainder = 90. No dist module -> Remainder falls back to feeRecipient.
-        // Total to feeRecipient = 10 + 90 = 100.
-        assertEq(token.balanceOf(feeRecipient), 100); 
-        assertEq(result.yieldDistributed, 90);
-
-        // Fee > MAX
-        vm.prank(escrowContract);
-        vm.expectRevert(abi.encodeWithSelector(YieldOps.ProtocolFeeExceedsMaximum.selector, 5000, 3000));
-        yieldOps.handleYield(
-            IYieldGenerationModule(address(mockGen)),
-            IYieldDistributionModule(address(0)),
-            1,
-            address(token),
-            1000,
-            5000, // 50% fee
-            feeRecipient,
-            ""
-        );
-
-        // Zero Recipient
-        vm.prank(escrowContract);
-        vm.expectRevert(YieldOps.FeeRecipientCannotBeZero.selector);
-        yieldOps.handleYield(
-            IYieldGenerationModule(address(mockGen)),
-            IYieldDistributionModule(address(0)),
-            1,
-            address(token),
-            1000,
-            1000,
-            address(0),
-            ""
-        );
+        assertEq(result.yield, 0);
+        assertEq(result.actualAmount, 1000);
+        assertEq(result.yieldDistributed, 0);
     }
 
     // ============ SettlementOps Tests ============
@@ -690,6 +685,120 @@ contract OpsCoverageTest is Test {
         assertEq(data, expected);
     }
 
+    function test_DisputeOps_computeEscalation_ModuleNotConfigured() public {
+        vm.prank(timelock);
+        disputeOps.registerEscrowContract(escrowContract);
+
+        vm.prank(escrowContract);
+        DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
+            address(0), // No resolution module
+            1,
+            address(0x1),
+            address(0x1),
+            address(0x2),
+            address(token),
+            1000,
+            EscrowState.DISPUTED
+        );
+
+        assertFalse(result.success);
+        assertEq(result.failureReason, 'Resolution module not configured');
+    }
+
+    function test_DisputeOps_computeEscalation_NoDecision() public {
+        mockModule = new MockResolutionModule();
+        vm.prank(timelock);
+        disputeOps.registerEscrowContract(escrowContract);
+
+        // Set decision to 0 (NONE)
+        mockModule.setDecision(0);
+
+        vm.prank(escrowContract);
+        DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
+            address(mockModule),
+            1,
+            address(0x1), // Sender
+            address(0x1),
+            address(0x2),
+            address(token),
+            1000,
+            EscrowState.DISPUTED
+        );
+
+        assertFalse(result.success);
+        assertEq(result.failureReason, 'No decision to appeal');
+    }
+
+    function test_DisputeOps_computeEscalation_CanEscalateCallFails() public {
+        mockModule = new MockResolutionModule();
+        vm.prank(timelock);
+        disputeOps.registerEscrowContract(escrowContract);
+
+        // Set valid decision
+        mockModule.setDecision(1); // RELEASE
+        
+        // Make canEscalate revert by setting revert flag
+        // But we need to make it fail only for canEscalate, not getDisputeResolver
+        // Looking at mock, shouldRevert affects both. We need a different approach.
+        // Actually, the mock's canEscalate will revert if shouldRevert is true
+        // But getDisputeResolver also reverts. 
+        // For this test, we can't easily trigger only canEscalate failure with current mock
+        // Let's create a scenario where canEscalate tries to call but fails
+        
+        // Actually, looking at DisputeOps.sol line 177-179, the catch block sets
+        // 'Failed to check escalation eligibility'. This happens when canEscalate() reverts.
+        // We need getDisputeResolver to succeed but canEscalate to fail.
+        
+        // Create a new mock for this specific case
+        MockResolutionModuleCanEscalateFails mockSpecial = new MockResolutionModuleCanEscalateFails();
+        mockSpecial.setDecision(1);
+
+        vm.prank(escrowContract);
+        DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
+            address(mockSpecial),
+            1,
+            address(0x1), // Sender
+            address(0x1),
+            address(0x2),
+            address(token),
+            1000,
+            EscrowState.DISPUTED
+        );
+
+        assertFalse(result.success);
+        assertEq(result.failureReason, 'Failed to check escalation eligibility');
+    }
+
+    function test_DisputeOps_computeEscalation_ExecuteEscalationCallFails() public {
+        mockModule = new MockResolutionModule();
+        vm.prank(timelock);
+        disputeOps.registerEscrowContract(escrowContract);
+
+        // Set valid decision and canEscalate success
+        mockModule.setDecision(1);
+        mockModule.setEscalation(true, address(0x999), 0);
+        
+        // Create a mock that will revert on executeEscalation
+        MockResolutionModuleExecuteFails mockSpecial = new MockResolutionModuleExecuteFails();
+        mockSpecial.setDecision(1);
+        mockSpecial.setEscalation(true, address(0x999), 0);
+
+        vm.prank(escrowContract);
+        DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
+            address(mockSpecial),
+            1,
+            address(0x1), // Sender
+            address(0x1),
+            address(0x2),
+            address(token),
+            1000,
+            EscrowState.DISPUTED
+        );
+
+        assertFalse(result.success);
+        assertEq(result.failureReason, 'Module escalation call failed');
+    }
+
 
     // ============ CreateOps Extended Tests ============
 
@@ -770,7 +879,6 @@ contract OpsCoverageTest is Test {
 
     function test_YieldOps_handleYield_Success() public {
         mockGen = new MockYieldGenerationModule();
-        mockDist = new MockYieldDistributionModule();
         
         vm.prank(timelock);
         yieldOps.registerEscrowContract(escrowContract);
@@ -780,30 +888,26 @@ contract OpsCoverageTest is Test {
         uint256 earned = 100;
         uint256 total = 1100;
         
-        // Mock token in yieldOps (simulating pull from escrow)
-        token.mint(address(yieldOps), total);
-        
         mockGen.setWithdrawResult(true, total, earned);
-        mockDist.setDistributeResult(true, earned); // Actually distributed amount usually matches passed yield
 
         vm.prank(escrowContract);
         YieldOps.YieldResult memory result = yieldOps.handleYield(
             IYieldGenerationModule(address(mockGen)),
-            IYieldDistributionModule(address(mockDist)),
+            IYieldDistributionModule(address(0)), // Not used in handleYield anymore
             1,
             address(token),
             original,
-            0, // No protocol fee
+            0,
             feeRecipient,
             ""
         );
 
+        // handleYield ONLY withdraws, does NOT distribute
+        // Distribution must be done separately via distributeWithdrawnYield
         assertTrue(result.success);
         assertEq(result.yield, earned);
         assertEq(result.actualAmount, total);
-        // Note: yieldDistributed might differ based on exact logic in handleYield vs mock return
-        // In handleYield logic: yieldDistributed = result.yield (if success)
-        assertEq(result.yieldDistributed, earned);
+        assertEq(result.yieldDistributed, 0); // No distribution in handleYield
     }
 
     function test_YieldOps_handleYield_GenFailure() public {
@@ -814,7 +918,7 @@ contract OpsCoverageTest is Test {
         mockGen.setRevert(true);
 
         vm.prank(escrowContract);
-        // Should not revert, but return original amount
+        // Should not revert, but return failure with reason
         YieldOps.YieldResult memory result = yieldOps.handleYield(
             IYieldGenerationModule(address(mockGen)),
             IYieldDistributionModule(address(0)),
@@ -826,56 +930,145 @@ contract OpsCoverageTest is Test {
             ""
         );
 
-        assertTrue(result.success);
-        assertEq(result.yield, 0);
-        assertEq(result.actualAmount, 1000);
+        assertFalse(result.success, "Should fail");
+        assertTrue(bytes(result.failureReason).length > 0, "Should have failure reason");
+        assertEq(result.yield, 0, "Should have no yield");
+        assertEq(result.actualAmount, 1000, "Should return original amount");
     }
 
-    function test_YieldOps_handleYield_DistFailure() public {
-        mockGen = new MockYieldGenerationModule();
+    function test_YieldOps_distributeWithdrawnYield_DistFailure() public {
         mockDist = new MockYieldDistributionModule();
         
         vm.prank(timelock);
         yieldOps.registerEscrowContract(escrowContract);
 
-        uint256 original = 1000;
         uint256 earned = 100;
-        token.mint(address(yieldOps), original + earned);
+        token.mint(address(yieldOps), earned);
 
-        mockGen.setWithdrawResult(true, original + earned, earned);
         mockDist.setRevert(true);
 
         vm.prank(escrowContract);
-        YieldOps.YieldResult memory result = yieldOps.handleYield(
-            IYieldGenerationModule(address(mockGen)),
+        YieldOps.DistributionResult memory result = yieldOps.distributeWithdrawnYield(
             IYieldDistributionModule(address(mockDist)),
             1,
             address(token),
-            original,
+            earned,
             0,
             feeRecipient,
             ""
         );
 
-        // On failure, success = false, but logic usually falls back to feeRecipient
-        assertFalse(result.success); 
-        assertEq(result.yield, earned);
-        assertEq(result.yieldDistributed, earned); // It sends to feeRecipient on failure
+        // On failure, success = false, but yield is sent to feeRecipient as fallback
+        assertFalse(result.success, "Should fail"); 
+        assertEq(result.distributedAmount, earned, "Should distribute to fallback"); // Fallback amount
+        assertTrue(bytes(result.failureReason).length > 0, "Should have failure reason");
         
         // Verify feeRecipient got tokens
         assertEq(token.balanceOf(feeRecipient), earned);
     }
 
-    function test_YieldOps_handleYield_NoDistModule() public {
-        mockGen = new MockYieldGenerationModule();
+    function test_YieldOps_distributeWithdrawnYield_NoDistModule() public {
         vm.prank(timelock);
         yieldOps.registerEscrowContract(escrowContract);
 
-        uint256 original = 1000;
         uint256 earned = 100;
-        token.mint(address(yieldOps), original + earned);
+        token.mint(address(yieldOps), earned);
 
-        mockGen.setWithdrawResult(true, original + earned, earned);
+        vm.prank(escrowContract);
+        YieldOps.DistributionResult memory result = yieldOps.distributeWithdrawnYield(
+            IYieldDistributionModule(address(0)),
+            1,
+            address(token),
+            earned,
+            0,
+            feeRecipient,
+            ""
+        );
+
+        // No distribution module: yield goes to feeRecipient as fallback
+        assertTrue(result.success, "Should succeed with fallback");
+        assertEq(result.distributedAmount, earned, "Should distribute full amount");
+        assertEq(bytes(result.failureReason).length, 0, "Should have no failure reason");
+        assertEq(token.balanceOf(feeRecipient), earned);
+    }
+
+    function test_YieldOps_distributeWithdrawnYield_FeeRecipientCannotBeZero() public {
+        vm.prank(timelock);
+        yieldOps.registerEscrowContract(escrowContract);
+
+        uint256 earned = 100;
+        token.mint(address(yieldOps), earned);
+
+        vm.prank(escrowContract);
+        vm.expectRevert(YieldOps.FeeRecipientCannotBeZero.selector);
+        yieldOps.distributeWithdrawnYield(
+            IYieldDistributionModule(address(0)),
+            1,
+            address(token),
+            earned,
+            1000, // 10% protocol fee - requires feeRecipient
+            address(0), // Zero address for feeRecipient
+            ""
+        );
+    }
+
+    function test_YieldOps_distributeWithdrawnYield_ProtocolFeeExceedsMaximum() public {
+        vm.prank(timelock);
+        yieldOps.registerEscrowContract(escrowContract);
+
+        uint256 earned = 100;
+        token.mint(address(yieldOps), earned);
+
+        vm.prank(escrowContract);
+        vm.expectRevert(abi.encodeWithSelector(
+            YieldOps.ProtocolFeeExceedsMaximum.selector,
+            3001,
+            3000
+        ));
+        yieldOps.distributeWithdrawnYield(
+            IYieldDistributionModule(address(0)),
+            1,
+            address(token),
+            earned,
+            3001, // 30.01% protocol fee - exceeds 30% maximum
+            feeRecipient,
+            ""
+        );
+    }
+
+    function test_YieldOps_distributeWithdrawnYield_NoFeeRecipientNoDistModule() public {
+        vm.prank(timelock);
+        yieldOps.registerEscrowContract(escrowContract);
+
+        uint256 earned = 100;
+        token.mint(address(yieldOps), earned);
+
+        vm.prank(escrowContract);
+        YieldOps.DistributionResult memory result = yieldOps.distributeWithdrawnYield(
+            IYieldDistributionModule(address(0)), // No distribution module
+            1,
+            address(token),
+            earned,
+            0,
+            address(0), // No fee recipient
+            ""
+        );
+
+        // Yield should stay in YieldOps - returns success but 0 distributed
+        // This is a warning scenario tracked by failureReason
+        assertTrue(result.success, "Should succeed (yield stays in contract)");
+        assertEq(result.distributedAmount, 0, "Should not distribute");
+        assertTrue(bytes(result.failureReason).length > 0, "Should have failure reason explaining yield stayed in contract");
+        // Yield stays in contract
+        assertEq(token.balanceOf(address(yieldOps)), earned);
+    }
+
+    function test_YieldOps_handleYield_WithdrawalReturnsFalse() public {
+        MockYieldGenerationModule mockGen = new MockYieldGenerationModule();
+        mockGen.setWithdrawSuccess(false); // Make it return false
+        
+        vm.prank(timelock);
+        yieldOps.registerEscrowContract(escrowContract);
 
         vm.prank(escrowContract);
         YieldOps.YieldResult memory result = yieldOps.handleYield(
@@ -883,16 +1076,41 @@ contract OpsCoverageTest is Test {
             IYieldDistributionModule(address(0)),
             1,
             address(token),
-            original,
+            1000,
             0,
             feeRecipient,
             ""
         );
 
-        assertTrue(result.success);
-        assertEq(result.yield, earned);
-        assertEq(result.yieldDistributed, earned); // Falls back to feeRecipient
-        assertEq(token.balanceOf(feeRecipient), earned);
+        // Should fail with appropriate reason
+        assertFalse(result.success, "Should fail");
+        assertTrue(bytes(result.failureReason).length > 0, "Should have failure reason");
+        assertEq(result.yield, 0, "Should have no yield");
+    }
+
+    function test_YieldOps_handleYield_WithdrawalRevert() public {
+        MockYieldGenerationModule mockGen = new MockYieldGenerationModule();
+        mockGen.setRevert(true); // Make it revert
+        
+        vm.prank(timelock);
+        yieldOps.registerEscrowContract(escrowContract);
+
+        vm.prank(escrowContract);
+        YieldOps.YieldResult memory result = yieldOps.handleYield(
+            IYieldGenerationModule(address(mockGen)),
+            IYieldDistributionModule(address(0)),
+            1,
+            address(token),
+            1000,
+            0,
+            feeRecipient,
+            ""
+        );
+
+        // Should fail with appropriate reason
+        assertFalse(result.success, "Should fail");
+        assertTrue(bytes(result.failureReason).length > 0, "Should have failure reason");
+        assertEq(result.yield, 0, "Should have no yield");
     }
 
     function test_YieldOps_distributeYieldInternal_AccessControl() public {
@@ -1047,6 +1265,7 @@ contract MockYieldGenerationModule is IYieldGenerationModule {
     uint256 public yield;
 
     function setRevert(bool _r) external { shouldRevert = _r; }
+    function setWithdrawSuccess(bool _s) external { success = _s; }
     function setWithdrawResult(bool _s, uint256 _a, uint256 _y) external {
         success = _s;
         actual = _a;
@@ -1151,6 +1370,87 @@ contract MockResolutionModule {
     function getDecisionAtRound(uint256, uint8) external view returns (uint8) {
         if (shouldRevert) revert("Revert");
         return decision;
+    }
+
+    function isAuthorizedDisputeResolver(uint256, address, bytes calldata) external pure returns (bool, uint8) {
+        return (true, 0);
+    }
+
+    function getRequiredAppealBond(uint256, uint8, bytes calldata) external pure returns (uint256, address) {
+        return (0, address(0));
+    }
+
+    function moduleName() external pure returns (string memory) { return "Mock"; }
+    function moduleVersion() external pure returns (string memory) { return "1.0"; }
+    function supportsInterface(bytes4) external pure returns (bool) { return true; }
+}
+
+contract MockResolutionModuleCanEscalateFails {
+    uint8 public decision;
+
+    function setDecision(uint8 _decision) external {
+        decision = _decision;
+    }
+
+    function canEscalate(uint256, uint8, bytes calldata) external pure returns (bool, address, uint256) {
+        revert("canEscalate failed");
+    }
+
+    function getDisputeResolver(uint256, bytes calldata) external pure returns (address, uint8) {
+        return (address(0x123), 0);
+    }
+
+    function getDecisionAtRound(uint256, uint8) external view returns (uint8) {
+        return decision;
+    }
+
+    function executeEscalation(uint256, bytes calldata) external pure returns (bool, address, uint8) {
+        return (true, address(0x999), 1);
+    }
+
+    function isAuthorizedDisputeResolver(uint256, address, bytes calldata) external pure returns (bool, uint8) {
+        return (true, 0);
+    }
+
+    function getRequiredAppealBond(uint256, uint8, bytes calldata) external pure returns (uint256, address) {
+        return (0, address(0));
+    }
+
+    function moduleName() external pure returns (string memory) { return "Mock"; }
+    function moduleVersion() external pure returns (string memory) { return "1.0"; }
+    function supportsInterface(bytes4) external pure returns (bool) { return true; }
+}
+
+contract MockResolutionModuleExecuteFails {
+    bool public shouldEscalate;
+    address public nextResolver;
+    uint256 public escalationFee;
+    uint8 public decision;
+
+    function setDecision(uint8 _decision) external {
+        decision = _decision;
+    }
+
+    function setEscalation(bool _should, address _next, uint256 _fee) external {
+        shouldEscalate = _should;
+        nextResolver = _next;
+        escalationFee = _fee;
+    }
+
+    function canEscalate(uint256, uint8, bytes calldata) external view returns (bool, address, uint256) {
+        return (shouldEscalate, nextResolver, escalationFee);
+    }
+
+    function getDisputeResolver(uint256, bytes calldata) external pure returns (address, uint8) {
+        return (address(0x123), 0);
+    }
+
+    function getDecisionAtRound(uint256, uint8) external view returns (uint8) {
+        return decision;
+    }
+
+    function executeEscalation(uint256, bytes calldata) external pure returns (bool, address, uint8) {
+        revert("executeEscalation failed");
     }
 
     function isAuthorizedDisputeResolver(uint256, address, bytes calldata) external pure returns (bool, uint8) {
