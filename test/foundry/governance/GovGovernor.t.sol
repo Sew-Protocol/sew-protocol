@@ -174,6 +174,21 @@ contract GovGovernorTest is Test {
         assertEq(governor.getNonCirculatingAddressesCount(), 0);
     }
 
+    function test_removeNonCirculatingAddress_Middle() public {
+        vm.startPrank(address(timelock));
+        governor.addNonCirculatingAddress(user2);
+        address user3 = address(0x3);
+        governor.addNonCirculatingAddress(user3);
+        // List has [user1, user2, user3]
+        
+        governor.removeNonCirculatingAddress(user2);
+        
+        assertFalse(governor.nonCirculatingAddresses(user2));
+        assertEq(governor.getNonCirculatingAddressesCount(), 2);
+        // Should have [user1, user3]
+        vm.stopPrank();
+    }
+
     function test_removeNonCirculatingAddress_Unauthorized() public {
         vm.expectRevert(abi.encodeWithSelector(GovGovernor.OnlyTimelock.selector, address(this), address(timelock)));
         governor.removeNonCirculatingAddress(user1);
@@ -200,5 +215,96 @@ contract GovGovernorTest is Test {
         vm.prank(address(timelock));
         vm.expectRevert(GovGovernor.QuorumMustBePositive.selector);
         governor.setAbsoluteQuorum(0);
+    }
+
+    // ============ Governor Overrides Tests ============
+
+    function test_votingDelay() public {
+        assertEq(governor.votingDelay(), 1);
+    }
+
+    function test_votingPeriod() public {
+        assertEq(governor.votingPeriod(), 50400);
+    }
+
+    function test_proposalThreshold() public {
+        assertEq(governor.proposalThreshold(), 1000e18);
+    }
+
+    function test_supportsInterface() public {
+        assertTrue(governor.supportsInterface(0x01ffc9a7)); // IERC165
+        // IGovernor interfaceId is 0x438595a1? Let's check if it's correct.
+        // Or just check IERC6372 / IVotes
+        assertTrue(governor.supportsInterface(type(IGovernor).interfaceId));
+        assertFalse(governor.supportsInterface(0x12345678));
+    }
+
+    function test_executor() public {
+        assertEq(address(governor.timelock()), address(timelock));
+    }
+
+    function test_proposalLifeCycle_Simple() public {
+        // Need to give some tokens to proposer and delegate to self
+        // Quorum is 4M. Give 5M.
+        token.transfer(user2, 5000000e18);
+        vm.startPrank(user2);
+        token.delegate(user2);
+        vm.roll(block.number + 1);
+        
+        address[] memory targets = new address[](1);
+        targets[0] = address(governor);
+        uint256[] memory values = new uint256[](1);
+        values[0] = 0;
+        bytes[] memory calldatas = new bytes[](1);
+        // Call setAbsoluteQuorum(6M)
+        calldatas[0] = abi.encodeWithSelector(GovGovernor.setAbsoluteQuorum.selector, 6000000e18);
+        string memory description = "Set quorum to 6M";
+        
+        uint256 proposalId = governor.propose(targets, values, calldatas, description);
+        assertEq(uint256(governor.state(proposalId)), uint256(IGovernor.ProposalState.Pending));
+        
+        vm.roll(block.number + governor.votingDelay() + 1);
+        assertEq(uint256(governor.state(proposalId)), uint256(IGovernor.ProposalState.Active));
+        
+        governor.castVote(proposalId, 1); // For
+        
+        vm.roll(block.number + governor.votingPeriod() + 1);
+        assertEq(uint256(governor.state(proposalId)), uint256(IGovernor.ProposalState.Succeeded));
+        
+        bytes32 descriptionHash = keccak256(bytes(description));
+        governor.queue(targets, values, calldatas, descriptionHash);
+        assertEq(uint256(governor.state(proposalId)), uint256(IGovernor.ProposalState.Queued));
+        
+        vm.warp(block.timestamp + timelock.getMinDelay() + 1);
+        governor.execute(targets, values, calldatas, descriptionHash);
+        assertEq(uint256(governor.state(proposalId)), uint256(IGovernor.ProposalState.Executed));
+        
+        assertEq(governor.absoluteQuorum(), 6000000e18);
+        vm.stopPrank();
+    }
+
+    function test_cancelProposal() public {
+        token.transfer(user2, 2000e18);
+        vm.startPrank(user2);
+        token.delegate(user2);
+        vm.roll(block.number + 1);
+        
+        address[] memory targets = new address[](1);
+        targets[0] = address(governor);
+        uint256[] memory values = new uint256[](1);
+        values[0] = 0;
+        bytes[] memory calldatas = new bytes[](1);
+        calldatas[0] = abi.encodeWithSelector(GovGovernor.setAbsoluteQuorum.selector, 6000000e18);
+        string memory description = "Cancel me";
+        
+        uint256 proposalId = governor.propose(targets, values, calldatas, description);
+        
+        governor.cancel(targets, values, calldatas, keccak256(bytes(description)));
+        assertEq(uint256(governor.state(proposalId)), uint256(IGovernor.ProposalState.Canceled));
+        vm.stopPrank();
+    }
+
+    function test_proposalNeedsQueuing() public {
+        assertTrue(governor.proposalNeedsQueuing(1));
     }
 }

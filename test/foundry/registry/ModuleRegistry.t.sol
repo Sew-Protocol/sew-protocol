@@ -184,6 +184,30 @@ contract ModuleRegistryTest is Test {
         registry.deprecateModule(IModuleRegistry.ModuleType.YIELD_GENERATION, address(genModule));
     }
 
+    function test_deprecateModule_NotLast() public {
+        IModuleRegistry.ModuleMetadata memory meta = IModuleRegistry.ModuleMetadata({
+            name: "Gen",
+            version: "1.0",
+            status: IModuleRegistry.ModuleStatus.ACTIVE,
+            featureFlags: 0,
+            supportedTokens: new address[](0)
+        });
+
+        MockGenRegModule genModule2 = new MockGenRegModule();
+
+        vm.startPrank(timelock);
+        registry.addModule(IModuleRegistry.ModuleType.YIELD_GENERATION, address(genModule), meta);
+        registry.addModule(IModuleRegistry.ModuleType.YIELD_GENERATION, address(genModule2), meta);
+
+        // List has [genModule, genModule2]
+        registry.deprecateModule(IModuleRegistry.ModuleType.YIELD_GENERATION, address(genModule));
+        
+        address[] memory list = registry.enumerateModules(IModuleRegistry.ModuleType.YIELD_GENERATION);
+        assertEq(list.length, 1);
+        assertEq(list[0], address(genModule2));
+        vm.stopPrank();
+    }
+
     function test_deprecateModule_Unauthorized() public {
         vm.prank(unauthorized);
         vm.expectRevert();

@@ -135,6 +135,59 @@ contract EvidenceModuleV1Test is Test {
         
         assertEq(evidenceId, 0);
     }
+
+    function test_canSubmitEvidence_resolver_EmptyData() public {
+        vm.prank(resolver);
+        (bool allowed, ) = evidenceModule.canSubmitEvidence(WORKFLOW_ID, resolver, "");
+        assertTrue(allowed);
+    }
+
+    function test_canSubmitEvidence_ResolutionModuleRevert() public {
+        MockRevertingResolutionModule revertingRes = new MockRevertingResolutionModule();
+        vm.prank(timelock);
+        evidenceModule.setResolutionModule(address(revertingRes));
+
+        (bool allowed, string memory reason) = evidenceModule.canSubmitEvidence(WORKFLOW_ID, unauthorized, "");
+        assertFalse(allowed);
+        assertEq(reason, "Not authorized to submit evidence");
+    }
+    
+    function test_submitEvidence_ResolutionModuleRevert() public {
+        MockRevertingResolutionModule revertingRes = new MockRevertingResolutionModule();
+        vm.prank(timelock);
+        evidenceModule.setResolutionModule(address(revertingRes));
+
+        escrowContract.setEscrowState(WORKFLOW_ID, EscrowState.DISPUTED);
+        
+        vm.prank(unauthorized);
+        vm.expectRevert("Not authorized to submit evidence");
+        evidenceModule.submitEvidence(WORKFLOW_ID, EVIDENCE_HASH, "fail");
+    }
+
+    function test_setAllowPostResolution_Success() public {
+        vm.prank(timelock);
+        evidenceModule.setAllowPostResolution(true);
+        assertTrue(evidenceModule.allowPostResolution());
+    }
+    
+    function test_canSubmitEvidence_ResolutionModuleZero() public {
+        vm.prank(timelock);
+        evidenceModule.setResolutionModule(address(0));
+
+        (bool allowed, ) = evidenceModule.canSubmitEvidence(WORKFLOW_ID, unauthorized, "");
+        assertFalse(allowed);
+    }
+
+    function test_submitEvidence_ResolutionModuleZero_reverts() public {
+        vm.prank(timelock);
+        evidenceModule.setResolutionModule(address(0));
+
+        escrowContract.setEscrowState(WORKFLOW_ID, EscrowState.DISPUTED);
+        
+        vm.prank(unauthorized);
+        vm.expectRevert("Not authorized to submit evidence");
+        evidenceModule.submitEvidence(WORKFLOW_ID, EVIDENCE_HASH, "fail");
+    }
     
     function test_submitEvidence_allowAnyoneSubmit() public {
         vm.prank(timelock);
@@ -441,6 +494,11 @@ contract EvidenceModuleV1Test is Test {
         bool supported = evidenceModule.supportsInterface(type(IERC165).interfaceId);
         assertTrue(supported);
     }
+
+    function test_supportsInterface_unknown() public {
+        bool supported = evidenceModule.supportsInterface(0x12345678);
+        assertFalse(supported);
+    }
     
     // ============ Metadata Tests ============
     
@@ -467,5 +525,11 @@ contract MockEscrowContract {
     
     function setEscrowState(uint256 workflowId, EscrowState state) external {
         escrowStates[workflowId] = state;
+    }
+}
+
+contract MockRevertingResolutionModule {
+    function getDisputeResolver(uint256, bytes calldata) external pure returns (address, uint8) {
+        revert("Resolution error");
     }
 }
