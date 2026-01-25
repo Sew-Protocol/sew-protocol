@@ -143,11 +143,15 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
         // Check exposure caps before depositing (Phase 4)
         _checkAndAccrueExposure(token, amount);
 
-        // Note: Approval should be set by the escrow contract before calling this function
-        // The escrow contract (EscrowableERC20) handles approval since it's both the token and escrow contract
-        // No need to call forceApprove here as it would set allowance for the module, not the escrow contract
+        // Pull tokens from escrow contract (requires approval)
+        IERC20(token).safeTransferFrom(escrowContract, address(this), amount);
+
+        // Approve Aave Pool
+        IERC20(token).forceApprove(address(aavePool), amount);
 
         // Deposit to Aave (referral code 0 = no referral)
+        // Pool pulls from msg.sender (this module)
+        // aTokens are minted to escrowContract
         aavePool.supply(token, amount, escrowContract, 0);
 
         // Get aToken balance after deposit
@@ -206,6 +210,18 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
 
         uint256 originalDeposit = escrowOriginalDeposit[escrowContract][workflowId];
 
+        // Pull aTokens from escrow contract (requires approval)
+        // We need to hold aTokens to burn them via withdraw
+        try IERC20(aToken).transferFrom(escrowContract, address(this), aTokenBalance) returns (bool tfSuccess) {
+            if (!tfSuccess) {
+                emit AaveWithdrawalFailedEvent(workflowId, token);
+                return (false, originalAmount, 0);
+            }
+        } catch {
+            emit AaveWithdrawalFailedEvent(workflowId, token);
+            return (false, originalAmount, 0);
+        }
+
         // Fix checks-effects-interactions pattern
         // Withdraw from Aave FIRST (interaction), then clear state (effect)
         // Use low-level call for error handling
@@ -215,6 +231,11 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
 
         if (!callSuccess) {
             // Aave withdrawal failed - state not yet cleared, so tracking is preserved
+            // But we pulled aTokens! We should try to send them back?
+            // If we don't, they are stuck in Module.
+            // Try to return aTokens
+            try IERC20(aToken).transfer(escrowContract, aTokenBalance) {} catch {}
+            
             emit AaveWithdrawalFailedEvent(workflowId, token);
             return (false, originalAmount, 0);
         }
@@ -330,10 +351,8 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
         if (tokenToAToken[token] == address(0)) {
             return address(0); // Token not supported
         }
-        // For EscrowableERC20, the escrow contract needs to approve the Aave pool
-        // For EscrowVault, the module handles approvals, so return address(0)
-        // We return the pool address - the caller (EscrowableERC20) will handle approval if needed
-        return address(aavePool);
+        // Escrow contract must approve this module so it can pull tokens
+        return address(this);
     }
 
     /**

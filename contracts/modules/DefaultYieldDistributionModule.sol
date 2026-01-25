@@ -56,10 +56,6 @@ contract DefaultYieldDistributionModule is IYieldDistributionModule, ERC165 {
             return (false, 0);
         }
 
-        if (recipients.length == 0 || recipients.length != percentages.length) {
-            return (false, 0);
-        }
-
         // Validate percentages sum to 100% (10000 basis points)
         uint256 ESCROW_FEE_DENOMINATOR = 10000;
         uint256 totalPercentage = 0;

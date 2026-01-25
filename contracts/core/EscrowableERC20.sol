@@ -110,6 +110,17 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         return createEscrow(address(this), seller, amount, settings);
     }
 
+    /**
+     * @notice Release funds to the recipient (called by sender)
+     * @param workflowId The escrow transfer ID
+     * @dev Validates state is PENDING and caller is sender.
+     */
+    function releaseEscrowTransfer(uint256 workflowId) public nonReentrant whenNotPaused {
+        _requirePending(workflowId);
+        if (escrowTransfers[workflowId].from != _msgSender()) revert NotSender(workflowId, _msgSender(), escrowTransfers[workflowId].from);
+        _releaseEscrowTransfer(workflowId);
+    }
+
     // ============ BaseEscrow Hook Implementations ============
 
     /**

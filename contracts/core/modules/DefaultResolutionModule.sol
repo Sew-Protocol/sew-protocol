@@ -91,6 +91,16 @@ contract DefaultResolutionModule is AccessControl, IResolutionModule {
     }
 
     /**
+     * @notice Get incentive module address (optional interface)
+     * @return module Address of incentive module (0 for default)
+     * @dev Implemented to avoid "function selector not recognized" reverts in traces
+     *      when probed by ModuleSnapshotLibrary.
+     */
+    function incentiveModule() external pure returns (address) {
+        return address(0);
+    }
+
+    /**
      * @notice Get module name
      */
     function moduleName() external pure override returns (string memory) {

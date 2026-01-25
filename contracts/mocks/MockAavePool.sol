@@ -36,7 +36,7 @@ contract MockAavePool {
         tokenToAToken[token] = aToken;
     }
 
-    function supply(address asset, uint256 amount, address onBehalfOf, uint16) external {
+    function supply(address asset, uint256 amount, address onBehalfOf, uint16) external virtual {
         require(tokenToAToken[asset] != address(0), 'Token not supported');
 
         // Aave v3 semantics: Pool pulls underlying from msg.sender (the caller),
@@ -58,7 +58,7 @@ contract MockAavePool {
         emit Supply(asset, onBehalfOf, amount, 0);
     }
 
-    function withdraw(address asset, uint256 amount, address to) external returns (uint256) {
+    function withdraw(address asset, uint256 amount, address to) external virtual returns (uint256) {
         require(tokenToAToken[asset] != address(0), 'Token not supported');
 
         MockAToken aTokenContract = MockAToken(tokenToAToken[asset]);
