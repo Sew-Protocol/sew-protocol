@@ -414,7 +414,7 @@ contract AaveYieldGenerationModuleTest is Test {
     function test_GetApprovalTarget() public {
         _configureAave();
         _registerToken();
-        assertEq(module.getApprovalTarget(address(token)), address(module));
+        assertEq(module.getApprovalTarget(address(token)), address(pool));
         
         vm.prank(timelock);
         module.setAaveEnabled(false);
@@ -430,7 +430,7 @@ contract AaveYieldGenerationModuleTest is Test {
         module.activateAavePoolProvider();
 
         module.queueAavePoolProvider(address(0xDEAD));
-        vm.warp(block.timestamp + 7 days + 1);
+        vm.warp(block.timestamp + 14 days + 1);
         vm.expectRevert(abi.encodeWithSelector(PoolAddressIsNotContract.selector, address(0xDEAD)));
         module.activateAavePoolProvider();
         vm.stopPrank();
