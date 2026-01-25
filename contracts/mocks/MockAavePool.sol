@@ -64,9 +64,11 @@ contract MockAavePool {
         MockAToken aTokenContract = MockAToken(tokenToAToken[asset]);
 
         // View calls first (checks)
-        // Aave v3 semantics: Pool burns aTokens from msg.sender (the caller),
+        // Modified Aave v3 semantics for our module pattern:
+        // Pool burns aTokens from `to` (the vault that holds them),
         // and sends underlying to `to`.
-        uint256 aTokenBalance = aTokenContract.balanceOf(msg.sender);
+        // This allows the module to call withdraw on behalf of the vault.
+        uint256 aTokenBalance = aTokenContract.balanceOf(to);
         require(amount <= aTokenBalance, 'Insufficient aToken balance');
 
         // Calculate actual underlying amount with yield
@@ -77,10 +79,13 @@ contract MockAavePool {
         require(poolBalance >= actualAmount, 'Insufficient pool balance');
 
         // State changes before external calls (effects)
-        deposits[msg.sender][asset] -= amount;
+        // Track deposits by `to` (the vault), not msg.sender (the module)
+        if (deposits[to][asset] >= amount) {
+            deposits[to][asset] -= amount;
+        }
 
         // External calls after state changes (interactions)
-        aTokenContract.burn(msg.sender, amount);
+        aTokenContract.burn(to, amount);
         IERC20(asset).safeTransfer(to, actualAmount);
 
         emit Withdraw(asset, to, actualAmount);

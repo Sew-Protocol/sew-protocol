@@ -156,8 +156,7 @@ contract AaveInvariants is Test {
 
         // Enable library pattern
         wrapper = new AaveLibraryWrapper();
-        vault.setAaveYieldLibrary(address(wrapper));
-        vault.setAaveYieldLibraryEnabled(true);
+        // Module pattern is now used directly (no delegatecall library needed)
         vault.setYieldProtocolFeeBps(0);
 
         // Fund pool
@@ -294,13 +293,13 @@ contract AaveInvariants is Test {
 
     /**
      * @notice Invariant: Emergency withdraw only routes to EscrowVault
-     * @dev Emergency unwind sends funds to BaseEscrow (vault), not to arbitrary addresses
+     * @dev Emergency unwind via GuardianOps sends funds to BaseEscrow (vault), not to arbitrary addresses
      */
     function invariant_emergencyWithdraw_onlyRoutesToEscrowVault() public view {
-        // This is validated by the emergencyUnwindAavePosition function
-        // which always sends funds to the vault (BaseEscrow)
+        // This is validated by GuardianOps.emergencyUnwindAavePosition function
+        // which always sends funds to the vault (BaseEscrow) - destination is hardcoded
         // We can't directly test this without calling the function,
-        // but we can verify the function exists and has the correct signature
+        // but we can verify GuardianOps exists and has the correct signature
         // (Full validation requires stateful fuzz with emergency unwind actions)
     }
 

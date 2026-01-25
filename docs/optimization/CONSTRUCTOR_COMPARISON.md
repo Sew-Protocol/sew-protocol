@@ -1,6 +1,9 @@
 # Constructor Comparison: EscrowVault vs EscrowableERC20
 
-## EscrowVault Constructor
+**Last Updated**: 2026-01-23  
+**Status**: ⚠️ **OUTDATED** - See `docs/reviews/CONSTRUCTOR_REVIEW.md` for current implementation
+
+## EscrowVault Constructor (OUTDATED - See CONSTRUCTOR_REVIEW.md)
 
 ```solidity
 constructor(

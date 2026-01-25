@@ -34,6 +34,11 @@ contract BadYieldOps {
     ) external returns (uint256) {
         return 0;
     }
+    
+    // Implement ERC165 to pass EscrowVault constructor validation
+    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
+        return interfaceId == 0x01ffc9a7; // ERC165 interface ID
+    }
 }
 
 contract YieldWithdrawalNonBlockingTest is Test {

@@ -60,7 +60,8 @@ contract MockAavePoolConfigurableIncome {
         require(tokenToAToken[asset] != address(0), "Token not supported");
         
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
-        underlyingBalances[msg.sender] += amount;
+        // Track balances for onBehalfOf, not msg.sender (Aave v3 semantics)
+        underlyingBalances[onBehalfOf] += amount;
 
         uint256 income = normalizedIncome[asset];
         if (income == 0 || income < MIN_NORMALIZED_INCOME) {
@@ -68,8 +69,9 @@ contract MockAavePoolConfigurableIncome {
         }
 
         // Calculate scaled shares: scaledShares = amount * RAY / incomeRay
+        // Credit shares to onBehalfOf, not msg.sender (Aave v3 semantics)
         uint256 scaled = (amount * RAY) / income;
-        scaledShares[msg.sender][asset] += scaled;
+        scaledShares[onBehalfOf][asset] += scaled;
     }
 
     function withdraw(address asset, uint256 amount, address to) external returns (uint256) {
@@ -82,10 +84,15 @@ contract MockAavePoolConfigurableIncome {
 
         // Calculate how many scaled shares to burn for this underlying amount
         uint256 scaledToBurn = (amount * RAY) / income;
-        require(scaledShares[msg.sender][asset] >= scaledToBurn, "Insufficient scaled shares");
         
-        scaledShares[msg.sender][asset] -= scaledToBurn;
-        underlyingBalances[msg.sender] -= amount;
+        // Aave v3: withdraw burns shares from msg.sender (the caller)
+        // However, in our module pattern, the module calls withdraw on behalf of the vault
+        // The vault holds the shares (credited during supply with onBehalfOf=vault)
+        // So we need to check and burn shares from `to` (the vault), not msg.sender (the module)
+        require(scaledShares[to][asset] >= scaledToBurn, "Insufficient scaled shares");
+        
+        scaledShares[to][asset] -= scaledToBurn;
+        underlyingBalances[to] -= amount;
 
         IERC20(asset).safeTransfer(to, amount);
         return amount;
@@ -93,9 +100,12 @@ contract MockAavePoolConfigurableIncome {
 
     /**
      * @notice Get current underlying amount for scaled shares (for testing)
-     * @param account Account address
+     * @param account Account address (should be the account that has the shares)
      * @param asset Asset address
      * @return underlyingAmount Current underlying amount
+     * @dev Note: During supply, shares are credited to onBehalfOf (vault)
+     *      During withdraw, shares are burned from msg.sender (module)
+     *      So this function should check the account parameter (vault) for shares
      */
     function getUnderlyingAmount(address account, address asset) external view returns (uint256 underlyingAmount) {
         uint256 income = normalizedIncome[asset];
@@ -234,8 +244,7 @@ contract AaveCrit1EdgeCases is Test {
         mm.activateModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST);
 
         wrapper = new AaveLibraryWrapper();
-        vault.setAaveYieldLibrary(address(wrapper));
-        vault.setAaveYieldLibraryEnabled(true);
+        // Module pattern is now used directly (no delegatecall library needed)
         vault.setYieldProtocolFeeBps(0);
 
         token.mint(address(pool), 10_000_000 ether);

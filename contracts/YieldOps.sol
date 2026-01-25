@@ -93,6 +93,16 @@ contract YieldOps is AccessControl {
         uint256 yield; // Total yield amount
         uint256 yieldDistributed; // Amount successfully distributed
         bool success; // Whether distribution succeeded
+        string failureReason; // Reason if operation failed (empty string if success)
+    }
+
+    /**
+     * @dev Result of yield distribution operation
+     */
+    struct DistributionResult {
+        bool success; // Whether distribution succeeded (or fallback succeeded)
+        uint256 distributedAmount; // Amount distributed (or recovered to feeRecipient)
+        string failureReason; // Reason if distribution failed (empty string if success)
     }
 
     /**
@@ -104,8 +114,7 @@ contract YieldOps is AccessControl {
      * @param protocolFeeBps Protocol fee in basis points (0-3000 = 0-30%)
      * @param feeRecipient Address to receive protocol fee / fallback yield
      * @param distributionData Encoded per-escrow yield distribution (recipients, percentages) or empty for module default
-     * @return success Whether distribution succeeded (or fallback succeeded)
-     * @return distributedAmount Amount distributed (or recovered to feeRecipient)
+     * @return result Distribution result with success status, distributed amount, and failure reason
      * @dev Intended for the BaseEscrow "library pattern" where BaseEscrow withdraws from Aave directly,
      *      then transfers only the yield to YieldOps for distribution.
      *      Only authorized escrow contracts can call this function.
@@ -118,8 +127,12 @@ contract YieldOps is AccessControl {
         uint256 protocolFeeBps,
         address feeRecipient,
         bytes memory distributionData
-    ) external onlyRole(ROLE_ESCROW_CONTRACT) returns (bool success, uint256 distributedAmount) {
-        if (yieldAmount == 0) return (true, 0);
+    ) external onlyRole(ROLE_ESCROW_CONTRACT) returns (DistributionResult memory result) {
+        result.success = true;
+        result.distributedAmount = 0;
+        result.failureReason = '';
+
+        if (yieldAmount == 0) return result;
 
         uint256 protocolFeeAmount = 0;
         uint256 yieldToDistribute = yieldAmount;
@@ -141,10 +154,13 @@ contract YieldOps is AccessControl {
         if (yieldToDistribute > 0 && address(distModule) != address(0)) {
             try this._distributeYieldInternal(distModule, workflowId, token, yieldToDistribute, distributionData) {
                 emit YieldDistributed(workflowId, token, yieldToDistribute);
-                return (true, yieldToDistribute);
+                result.distributedAmount = yieldToDistribute;
+                return result;
             } catch Error(string memory reason) {
+                result.failureReason = reason;
                 emit YieldDistributionFailed(workflowId, token, yieldToDistribute, reason);
             } catch {
+                result.failureReason = 'Unknown error';
                 emit YieldDistributionFailed(workflowId, token, yieldToDistribute, 'Unknown error');
             }
 
@@ -154,30 +170,36 @@ contract YieldOps is AccessControl {
             if (feeRecipient != address(0)) {
                 IERC20(token).safeTransfer(feeRecipient, yieldToDistribute);
                 emit YieldRecoveredToFeeAddress(workflowId, token, yieldToDistribute, feeRecipient);
-                return (false, yieldToDistribute);
+                result.success = false;
+                result.distributedAmount = yieldToDistribute;
+                return result;
             }
 
             // CRIT-2: No feeRecipient: yield remains in YieldOps (last resort)
             // Yield can be recovered by guardian via recoverTokens() function
             // Emit event to track this scenario
-            emit YieldDistributionFailed(workflowId, token, yieldToDistribute, 'No fee recipient for fallback');
-            return (false, 0);
+            result.failureReason = 'No fee recipient for fallback';
+            emit YieldDistributionFailed(workflowId, token, yieldToDistribute, result.failureReason);
+            result.success = false;
+            return result;
         }
 
         // No distribution module: route to feeRecipient as fallback
         if (yieldToDistribute > 0 && feeRecipient != address(0)) {
             IERC20(token).safeTransfer(feeRecipient, yieldToDistribute);
             emit YieldRecoveredToFeeAddress(workflowId, token, yieldToDistribute, feeRecipient);
-            return (true, yieldToDistribute);
+            result.distributedAmount = yieldToDistribute;
+            return result;
         }
 
         // CRIT-2: No distribution module and no feeRecipient: yield stays in contract
         // Yield can be recovered by guardian via recoverTokens() function
         // Emit event to track this scenario
         if (yieldToDistribute > 0) {
-            emit YieldDistributionFailed(workflowId, token, yieldToDistribute, 'No distribution module and no fee recipient');
+            result.failureReason = 'No distribution module and no fee recipient';
+            emit YieldDistributionFailed(workflowId, token, yieldToDistribute, result.failureReason);
         }
-        return (true, 0);
+        return result;
     }
 
     /**
@@ -210,8 +232,9 @@ contract YieldOps is AccessControl {
         result.yield = 0;
         result.yieldDistributed = 0;
         result.success = true;
+        result.failureReason = '';
 
-        // No yield module - early return
+        // No yield module - not an error, just no yield to handle
         if (address(genModule) == address(0)) {
             return result;
         }
@@ -228,71 +251,26 @@ contract YieldOps is AccessControl {
                     result.yield = actualAmount - amount;
                     emit YieldWithdrawn(workflowId, token, result.yield);
                 }
+            } else {
+                result.success = false;
+                result.failureReason = 'Yield generation module returned false';
+                emit YieldDistributionFailed(workflowId, token, 0, result.failureReason);
             }
-        } catch {
+        } catch Error(string memory reason) {
             // Withdrawal failed - continue with original amount
-            emit YieldDistributionFailed(workflowId, token, 0, 'Yield withdrawal failed');
+            result.success = false;
+            result.failureReason = string(abi.encodePacked('Yield withdrawal failed: ', reason));
+            emit YieldDistributionFailed(workflowId, token, 0, result.failureReason);
+        } catch {
+            result.success = false;
+            result.failureReason = 'Yield withdrawal failed: unknown error';
+            emit YieldDistributionFailed(workflowId, token, 0, result.failureReason);
         }
 
-        // Deduct protocol fee and distribute remaining yield if any
-        if (result.yield > 0) {
-            uint256 protocolFeeAmount = 0;
-            uint256 yieldToDistribute = result.yield;
-
-            // Calculate and collect protocol fee if enabled
-            // MED-3: Validate fee recipient is not zero address
-            if (protocolFeeBps > 0) {
-                if (feeRecipient == address(0)) revert FeeRecipientCannotBeZero();
-                if (protocolFeeBps > MAX_PROTOCOL_FEE_BPS) revert ProtocolFeeExceedsMaximum(protocolFeeBps, MAX_PROTOCOL_FEE_BPS);
-                protocolFeeAmount = (result.yield * protocolFeeBps) / 10000;
-                if (protocolFeeAmount > 0) {
-                    yieldToDistribute = result.yield - protocolFeeAmount;
-                    // Transfer protocol fee to fee recipient
-                    IERC20(token).safeTransfer(feeRecipient, protocolFeeAmount);
-                    emit YieldProtocolFeeCollected(workflowId, token, result.yield, protocolFeeAmount);
-                }
-            }
-
-            // Distribute remaining yield to recipients if distribution module is set
-            if (yieldToDistribute > 0 && address(distModule) != address(0)) {
-                try this._distributeYieldInternal(distModule, workflowId, token, yieldToDistribute, distributionData) {
-                    result.yieldDistributed = yieldToDistribute;
-                    result.success = true;
-                } catch Error(string memory reason) {
-                    emit YieldDistributionFailed(workflowId, token, yieldToDistribute, reason);
-                    result.success = false;
-                    
-                    // CRIT-2: Fallback to fee recipient on distribution failure
-                    if (feeRecipient != address(0)) {
-                        IERC20(token).safeTransfer(feeRecipient, yieldToDistribute);
-                        result.yieldDistributed = yieldToDistribute;
-                        emit YieldRecoveredToFeeAddress(workflowId, token, yieldToDistribute, feeRecipient);
-                    }
-                } catch {
-                    emit YieldDistributionFailed(workflowId, token, yieldToDistribute, 'Unknown error');
-                    result.success = false;
-                    
-                    // CRIT-2: Fallback to fee recipient on distribution failure
-                    if (feeRecipient != address(0)) {
-                        IERC20(token).safeTransfer(feeRecipient, yieldToDistribute);
-                        result.yieldDistributed = yieldToDistribute;
-                        emit YieldRecoveredToFeeAddress(workflowId, token, yieldToDistribute, feeRecipient);
-                    }
-                }
-            } else if (yieldToDistribute > 0) {
-                // CRIT-2: No distribution module - route to fee recipient as fallback
-                if (feeRecipient != address(0)) {
-                    IERC20(token).safeTransfer(feeRecipient, yieldToDistribute);
-                    result.yieldDistributed = yieldToDistribute;
-                    emit YieldRecoveredToFeeAddress(workflowId, token, yieldToDistribute, feeRecipient);
-                } else {
-                    // No distribution module and no fee recipient - yield stays in contract
-                    result.yieldDistributed = 0;
-                }
-                result.success = true;
-            }
-        }
-
+        // NOTE: Distribution is NOT done here (PUSH MODEL)
+        // Escrow must transfer yield to YieldOps and call distributeWithdrawnYield
+        // This keeps custody clear: vault holds tokens, YieldOps only holds during distribution
+        
         return result;
     }
 

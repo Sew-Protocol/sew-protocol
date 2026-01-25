@@ -23,17 +23,16 @@ import '../libraries/ModuleGetterConsolidationLibrary.sol';
 contract EscrowableERC20 is ERC20, BaseEscrow {
     uint256 public constant INITIAL_SUPPLY = 1000000000000000000000000; // 1,000,000 tokens with 18 decimals
     
-    /// @notice Default yield protocol fee (30%)
-    uint256 public constant DEFAULT_YIELD_PROTOCOL_FEE_BPS = 3000; // 30% default
     
     // Single token tracking (not per-token like EscrowVault)
     uint256 public totalHeldInEscrow = 0;
     uint256 public totalFees = 0;
     
     // Module management contract (stores module state externally to reduce contract size)
-    ModuleManagementContract public moduleManagement;
+    ModuleManagementContract public immutable moduleManagement;
 
     event FeesWithdrawn(uint256 amount);
+    event WiringConfigured(address indexed yieldOps, address indexed disputeOps, address indexed moduleManagement);
 
     /// @notice Compact error for zero address validation (saves bytecode vs string-based errors)
     error ZeroAddress(uint8 which); // 1=fee, 2=yieldOps, 3=disputeOps, 4=moduleMgmt
@@ -53,6 +52,9 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         if (yieldOpsAddress == address(0)) revert ZeroAddress(2);
         if (disputeOpsAddress == address(0)) revert ZeroAddress(3);
         if (moduleManagementAddress == address(0)) revert ZeroAddress(4);
+        if (yieldOpsAddress.code.length == 0 || !_supportsInterface(yieldOpsAddress, 0x01ffc9a7)) revert ZeroAddress(2);
+        if (disputeOpsAddress.code.length == 0 || !_supportsInterface(disputeOpsAddress, 0x01ffc9a7)) revert ZeroAddress(3);
+        if (moduleManagementAddress.code.length == 0 || !_supportsInterface(moduleManagementAddress, 0x01ffc9a7)) revert ZeroAddress(4);
 
         escrowFee = escrowFeeBps;
         escrowFeeAddress = feeAddress;
@@ -72,8 +74,15 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         timeoutConfig.appealWindowDuration = 2 days;
         // Note: defaultAutoReleaseTime and defaultAutoCancelTime are zero by default
         
+        emit WiringConfigured(yieldOpsAddress, disputeOpsAddress, moduleManagementAddress);
+        
         // Mint initial supply to deployer
         _mint(_msgSender(), INITIAL_SUPPLY);
+    }
+
+    function _supportsInterface(address target, bytes4 interfaceId) private view returns (bool) {
+        (bool success, bytes memory data) = target.staticcall(abi.encodeWithSelector(0x01ffc9a7, interfaceId));
+        return success && data.length >= 32 && abi.decode(data, (bool));
     }
 
     // ============ Convenience Functions ============

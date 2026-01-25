@@ -24,9 +24,10 @@ contract EscrowVault is BaseEscrow {
     mapping(address => uint256) public totalFeesPerToken;
     mapping(address => uint256) public totalHeldInEscrowPerToken;
 
-    ModuleManagementContract public moduleManagement;
+    ModuleManagementContract public immutable moduleManagement;
 
     event FeesWithdrawn(address indexed token, uint256 amount);
+    event WiringConfigured(address indexed yieldOps, address indexed disputeOps, address indexed moduleManagement);
 
     error ZeroAddress(uint8 which);
 
@@ -45,14 +46,24 @@ contract EscrowVault is BaseEscrow {
         if (yieldOpsAddress == address(0)) revert ZeroAddress(2);
         if (disputeOpsAddress == address(0)) revert ZeroAddress(3);
         if (moduleManagementAddress == address(0)) revert ZeroAddress(4);
+        if (yieldOpsAddress.code.length == 0 || !_supportsInterface(yieldOpsAddress, 0x01ffc9a7)) revert ZeroAddress(2);
+        if (disputeOpsAddress.code.length == 0 || !_supportsInterface(disputeOpsAddress, 0x01ffc9a7)) revert ZeroAddress(3);
+        if (moduleManagementAddress.code.length == 0 || !_supportsInterface(moduleManagementAddress, 0x01ffc9a7)) revert ZeroAddress(4);
         escrowFee = escrowFeeBps;
         escrowFeeAddress = feeAddress;
         moduleManagement = ModuleManagementContract(moduleManagementAddress);
         yieldOps = YieldOps(yieldOpsAddress);
         disputeOps = DisputeOps(disputeOpsAddress);
-        yieldProtocolFeeBps = 3000; // 30% default
+        yieldProtocolFeeBps = DEFAULT_YIELD_PROTOCOL_FEE_BPS;
+        appealBondProtocolFeeBps = 0;
         timeoutConfig.maxDisputeDuration = 90 days;
         timeoutConfig.appealWindowDuration = 2 days;
+        emit WiringConfigured(yieldOpsAddress, disputeOpsAddress, moduleManagementAddress);
+    }
+
+    function _supportsInterface(address target, bytes4 interfaceId) private view returns (bool) {
+        (bool success, bytes memory data) = target.staticcall(abi.encodeWithSelector(0x01ffc9a7, interfaceId));
+        return success && data.length >= 32 && abi.decode(data, (bool));
     }
 
 
@@ -74,7 +85,29 @@ contract EscrowVault is BaseEscrow {
         address token,
         uint256 amount
     ) internal override {
+        // For EscrowVault, the module needs to pull tokens from the escrow contract
+        // So we need to approve the module (not the pool) to spend tokens
+        // The module will then pull tokens and supply them to Aave
+        address moduleAddress = address(generationModule);
+        if (moduleAddress != address(0)) {
+            // Approve the module to spend tokens
+            // Use safeIncreaseAllowance/safeDecreaseAllowance (safeApprove is deprecated)
+            uint256 currentAllowance = IERC20(token).allowance(address(this), moduleAddress);
+            if (currentAllowance < amount) {
+                if (currentAllowance > 0) {
+                    IERC20(token).safeDecreaseAllowance(moduleAddress, currentAllowance);
+                }
+                IERC20(token).safeIncreaseAllowance(moduleAddress, amount);
+            }
+        }
         generationModule.depositForYield(workflowId, token, amount);
+        // Reset approval to zero for safety
+        if (moduleAddress != address(0)) {
+            uint256 remainingAllowance = IERC20(token).allowance(address(this), moduleAddress);
+            if (remainingAllowance > 0) {
+                IERC20(token).safeDecreaseAllowance(moduleAddress, remainingAllowance);
+            }
+        }
     }
     function _emitEscrowTransferCreated(uint256, address, address, address, uint256) internal pure override {}
     function _transferTokens(address token, address to, uint256 amount) internal override {
@@ -85,6 +118,21 @@ contract EscrowVault is BaseEscrow {
     }
     function _emitEscrowTransferCancelled(uint256, address, address, uint256) internal pure override {}
     function _emitEscrowTransferReleased(uint256, address, address, uint256) internal pure override {}
+
+    function getAccountingBreakdown(address token) external view returns (
+        uint256 principalHeld,
+        uint256 feesCollected,
+        uint256 contractBalance,
+        uint256 yieldInBalance
+    ) {
+        principalHeld = totalHeldInEscrowPerToken[token];
+        feesCollected = totalFeesPerToken[token];
+        contractBalance = IERC20(token).balanceOf(address(this));
+        unchecked {
+            uint256 expected = principalHeld + feesCollected;
+            yieldInBalance = contractBalance > expected ? contractBalance - expected : 0;
+        }
+    }
 
     function _getModuleAddress(uint256 workflowId, ModuleType moduleType) internal view returns (address) {
         return ModuleGetterLibrary.getModuleAddress(
