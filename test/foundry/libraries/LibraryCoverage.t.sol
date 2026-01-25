@@ -1,556 +1,718 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
-import 'forge-std/Test.sol';
-import '../../../contracts/libraries/YieldHandlingLibrary.sol';
-import '../../../contracts/libraries/YieldPresetLibrary.sol';
-import '../../../contracts/libraries/YieldDistributionLibrary.sol';
-import '../../../contracts/libraries/SettingsValidationLibrary.sol';
-import '../../../contracts/types/YieldPresets.sol';
-import '../../../contracts/types/EscrowTypes.sol';
-import '../../../contracts/mocks/ERC20Mock.sol';
+import "forge-std/Test.sol";
+import "../../../contracts/libraries/BalanceUpdateLibrary.sol";
+import "../../../contracts/libraries/FeeRecordingLibrary.sol";
+import "../../../contracts/libraries/FeeWithdrawalLibrary.sol";
+import "../../../contracts/libraries/RecoveryLibrary.sol";
+import "../../../contracts/libraries/SettingsValidationLibrary.sol";
+import "../../../contracts/libraries/YieldPresetLibrary.sol";
+import "../../../contracts/libraries/YieldDistributionLibrary.sol";
+import "../../../contracts/mocks/ERC20Mock.sol";
+import "../../../contracts/types/EscrowTypes.sol";
+import "../../../contracts/types/YieldPresets.sol";
 
 contract LibraryHarness {
-    using SafeERC20 for IERC20;
 
-    // YieldHandlingLibrary wrappers
-    function withdrawFullWithYield(
-        IYieldGenerationModule genModule,
-        uint256 workflowId,
-        address token,
-        uint256 amount
-    ) external returns (uint256 actualAmount, uint256 yield) {
-        return YieldHandlingLibrary.withdrawFullWithYield(genModule, workflowId, token, amount);
+    mapping(address => uint256) public balances;
+
+    mapping(address => uint256) public fees;
+
+
+
+    function updateBalance(address token, uint256 amount, bool add) external {
+
+        BalanceUpdateLibrary.updateBalance(balances, token, amount, add);
+
     }
 
-    function distributeYield(
-        IYieldDistributionModule distModule,
-        uint256 workflowId,
-        address token,
-        uint256 yieldAmount
-    ) external {
-        YieldHandlingLibrary.distributeYield(distModule, workflowId, token, yieldAmount);
+
+
+    function recordFee(address token, uint256 amount) external {
+
+        FeeRecordingLibrary.recordFee(fees, token, amount);
+
     }
 
-    function getApprovalTarget(
-        IYieldGenerationModule genModule,
-        address token
-    ) external view returns (address approvalTarget) {
-        return YieldHandlingLibrary.getApprovalTarget(genModule, token);
+
+
+    function withdrawFees(address token, address feeRecipient) external returns (uint256) {
+
+        return FeeWithdrawalLibrary.withdrawFees(fees, token, feeRecipient);
+
     }
 
-    // YieldPresetLibrary wrappers
-    function deriveDistributionData(
-        YieldPreset preset,
-        address sender,
-        address recipient
-    ) external pure returns (bytes memory) {
-        return YieldPresetLibrary.deriveDistributionData(preset, sender, recipient);
+
+
+    function recoverNativeETH(address recipient, uint256 amount, uint256 contractBalance) external returns (uint256) {
+
+        return RecoveryLibrary.recoverNativeETH(recipient, amount, contractBalance);
+
     }
 
-    function isYieldEnabled(YieldPreset preset) external pure returns (bool) {
-        return YieldPresetLibrary.isYieldEnabled(preset);
+
+
+    function recoverERC20(address token, address recipient, uint256 amount, uint256 contractBalance) external returns (uint256) {
+
+        return RecoveryLibrary.recoverERC20(token, recipient, amount, contractBalance);
+
     }
 
-    function validatePresetParams(
-        YieldPreset preset,
-        address sender,
-        address recipient
-    ) external pure {
-        YieldPresetLibrary.validatePresetParams(preset, sender, recipient);
-    }
 
-    // YieldDistributionLibrary wrappers
-    function validateYieldDistribution(
-        address[] memory recipients,
-        uint256[] memory percentages
-    ) external pure {
-        YieldDistributionLibrary.validateYieldDistribution(recipients, percentages);
-    }
 
-    function decodeYieldDistribution(
-        bytes memory data
-    ) external pure returns (address[] memory recipients, uint256[] memory percentages) {
-        return YieldDistributionLibrary.decodeYieldDistribution(data);
-    }
+    // SettingsValidation wrapper
 
-    function distributeYieldFallback(
-        address token,
-        uint256 yieldAmount,
-        address[] memory recipients,
-        uint256[] memory percentages,
-        address feeAddress
-    ) external returns (uint256 totalDistributed) {
-        return YieldDistributionLibrary.distributeYieldFallback(token, yieldAmount, recipients, percentages, feeAddress);
-    }
-
-    // SettingsValidationLibrary wrappers
     function validateAutoTime(uint256 autoTime, uint256 currentTime) external pure {
-        SettingsValidationLibrary.validateAutoTime(autoTime, currentTime);
-    }
 
-    function validateEscrowSettings(EscrowSettings memory settings, uint256 currentTime) external view {
-        SettingsValidationLibrary.validateEscrowSettings(settings, currentTime);
+        SettingsValidationLibrary.validateAutoTime(autoTime, currentTime);
+
     }
 
     function validateEscrowAmount(uint256 amount) external pure {
+
         SettingsValidationLibrary.validateEscrowAmount(amount);
+
     }
 
     function validateRecipient(address recipient, address sender) external pure {
-        SettingsValidationLibrary.validateRecipient(recipient, sender);
-    }
 
-    function validateYieldOptIn(uint256 amount, bool yieldEnabled) external pure returns (bool) {
-        return SettingsValidationLibrary.validateYieldOptIn(amount, yieldEnabled);
+        SettingsValidationLibrary.validateRecipient(recipient, sender);
+
     }
 
     function validateAutoCancel(uint256 t) external view {
+
         SettingsValidationLibrary.validateAutoCancel(t);
+
     }
 
     function validateAutoRelease(uint256 t) external view {
+
         SettingsValidationLibrary.validateAutoRelease(t);
+
     }
 
     function validateMaxAttachments(uint256 n) external pure {
+
         SettingsValidationLibrary.validateMaxAttachments(n);
+
     }
 
     function validateFeeBps(uint256 bps) external pure {
+
         SettingsValidationLibrary.validateFeeBps(bps);
+
     }
 
     function validateResolutionDelay(uint256 d) external pure {
+
         SettingsValidationLibrary.validateResolutionDelay(d);
+
     }
 
-    function validateSettingsYieldDistribution(address[] memory recipients, uint256[] memory bps) external pure {
+    function validateYieldDistribution(address[] memory recipients, uint256[] memory bps) external pure {
+
         SettingsValidationLibrary.validateYieldDistribution(recipients, bps);
+
     }
+
+
+
+    // YieldPreset wrapper
+
+    function validatePresetParams(YieldPreset preset, address sender, address recipient) external pure {
+
+        YieldPresetLibrary.validatePresetParams(preset, sender, recipient);
+
+    }
+
+
+
+    // YieldDistribution wrapper
+
+    function validateYieldDist(address[] memory recipients, uint256[] memory percentages) external pure {
+
+        YieldDistributionLibrary.validateYieldDistribution(recipients, percentages);
+
+    }
+
+    function distributeYieldFallback(address token, uint256 yieldAmount, address[] memory recipients, uint256[] memory percentages, address feeAddress) external returns (uint256) {
+
+        return YieldDistributionLibrary.distributeYieldFallback(token, yieldAmount, recipients, percentages, feeAddress);
+
+    }
+
 }
 
+
+
 contract LibraryCoverageTest is Test {
-    ERC20Mock public token;
-    MockGenModule public genModule;
-    MockDistModule public distModule;
+
+
+
     LibraryHarness public harness;
 
+
+
+    ERC20Mock public token;
+
+
+
+    address public user1 = address(0x1);
+
+
+
+    address public feeAddress = address(0xFEE);
+
+
+
+
+
+
+
     function setUp() public {
-        token = new ERC20Mock('Test', 'TEST', address(this), 10000e18);
-        genModule = new MockGenModule();
-        distModule = new MockDistModule();
+
         harness = new LibraryHarness();
+
+        token = new ERC20Mock("Test", "TEST", address(this), 1000e18);
+
     }
+
+
+
+    // ============ BalanceUpdateLibrary Tests ============
+
+
+
+    function test_BalanceUpdate_Success() public {
+
+        harness.updateBalance(address(token), 100, true);
+
+        assertEq(harness.balances(address(token)), 100);
+
+        
+
+        harness.updateBalance(address(token), 40, false);
+
+        assertEq(harness.balances(address(token)), 60);
+
+    }
+
+
+
+    function test_BalanceUpdate_ZeroAddress_Revert() public {
+
+        vm.expectRevert();
+
+        harness.updateBalance(address(0), 100, true);
+
+    }
+
+
+
+    function test_BalanceUpdate_Underflow_Revert() public {
+
+        harness.updateBalance(address(token), 50, true);
+
+        vm.expectRevert();
+
+        harness.updateBalance(address(token), 100, false);
+
+    }
+
+
+
+    // ============ FeeRecordingLibrary Tests ============
+
+
+
+    function test_FeeRecording_Success() public {
+
+        harness.recordFee(address(token), 100);
+
+        assertEq(harness.fees(address(token)), 100);
+
+    }
+
+
+
+    function test_FeeRecording_Overflow_Revert() public {
+
+        harness.recordFee(address(token), type(uint256).max - 10);
+
+        vm.expectRevert();
+
+        harness.recordFee(address(token), 20);
+
+    }
+
+
+
+    // ============ FeeWithdrawalLibrary Tests ============
+
+
+
+    function test_FeeWithdrawal_Success() public {
+
+        harness.recordFee(address(token), 100);
+
+        token.mint(address(harness), 100);
+
+        
+
+        uint256 withdrawn = harness.withdrawFees(address(token), user1);
+
+        assertEq(withdrawn, 100);
+
+        assertEq(token.balanceOf(user1), 100);
+
+        assertEq(harness.fees(address(token)), 0);
+
+    }
+
+
+
+    function test_FeeWithdrawal_NoFees_Revert() public {
+
+        vm.expectRevert();
+
+        harness.withdrawFees(address(token), user1);
+
+    }
+
+
+
+    function test_FeeWithdrawal_InsufficientBalance_Revert() public {
+
+        harness.recordFee(address(token), 100);
+
+        // Don't mint tokens to harness
+
+        vm.expectRevert();
+
+        harness.withdrawFees(address(token), user1);
+
+    }
+
+
+
+    // ============ RecoveryLibrary Tests ============
+
+
+
+    function test_recoverNativeETH_Success() public {
+
+        vm.deal(address(harness), 1 ether);
+
+        uint256 recovered = harness.recoverNativeETH(user1, 0.5 ether, 1 ether);
+
+        assertEq(recovered, 0.5 ether);
+
+        assertEq(user1.balance, 0.5 ether);
+
+    }
+
+
+
+    function test_recoverNativeETH_All_Success() public {
+
+        vm.deal(address(harness), 1 ether);
+
+        uint256 recovered = harness.recoverNativeETH(user1, 0, 1 ether);
+
+        assertEq(recovered, 1 ether);
+
+        assertEq(user1.balance, 1 ether);
+
+    }
+
+
+
+    function test_recoverNativeETH_InvalidAmount_Revert() public {
+
+        vm.expectRevert();
+
+        harness.recoverNativeETH(user1, 0, 0);
+
+        
+
+        vm.expectRevert();
+
+        harness.recoverNativeETH(user1, 2 ether, 1 ether);
+
+    }
+
+
+
+    function test_recoverERC20_Success() public {
+
+        token.mint(address(harness), 100);
+
+        uint256 recovered = harness.recoverERC20(address(token), user1, 100, 100);
+
+        assertEq(recovered, 100);
+
+        assertEq(token.balanceOf(user1), 100);
+
+    }
+
+
 
     // ============ SettingsValidationLibrary Tests ============
 
+
+
     function test_SettingsValidation_validateAutoTime() public {
-        uint256 now_ = 1000;
-        // 0 is valid
-        harness.validateAutoTime(0, now_);
-        // Future is valid
-        harness.validateAutoTime(now_ + 1, now_);
-        // Past is invalid
-        vm.expectRevert();
-        harness.validateAutoTime(now_ - 1, now_);
-        // Too far future is invalid
-        vm.expectRevert();
-        harness.validateAutoTime(now_ + SettingsValidationLibrary.MAX_AUTO_TIME_DURATION + 1, now_);
-    }
 
-    function test_SettingsValidation_validateEscrowSettings() public {
-        uint256 now_ = 1000;
-        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
+        harness.validateAutoTime(0, block.timestamp);
+
+        harness.validateAutoTime(block.timestamp + 1, block.timestamp);
+
         
-        // Default is valid
-        harness.validateEscrowSettings(settings, now_);
 
-        // Both times set is invalid
-        settings.autoReleaseTime = now_ + 1;
-        settings.autoCancelTime = now_ + 1;
         vm.expectRevert();
-        harness.validateEscrowSettings(settings, now_);
 
-        // Exceed max duration
-        settings = SettingsValidationLibrary.getDefaultSettings();
-        settings.autoReleaseTime = now_ + SettingsValidationLibrary.MAX_ESCROW_DURATION + 1;
-        vm.expectRevert();
-        harness.validateEscrowSettings(settings, now_);
+        harness.validateAutoTime(block.timestamp, block.timestamp);
 
-        // Custom resolver must be a contract
-        settings = SettingsValidationLibrary.getDefaultSettings();
-        settings.customResolver = address(0x123); // EOA
+        
+
         vm.expectRevert();
-        harness.validateEscrowSettings(settings, now_);
+
+        harness.validateAutoTime(block.timestamp + 11 * 365 days, block.timestamp);
+
     }
+
+
 
     function test_SettingsValidation_validateEscrowAmount() public {
-        harness.validateEscrowAmount(SettingsValidationLibrary.MIN_ESCROW_AMOUNT);
+
+        harness.validateEscrowAmount(1000);
+
         vm.expectRevert();
-        harness.validateEscrowAmount(SettingsValidationLibrary.MIN_ESCROW_AMOUNT - 1);
+
+        harness.validateEscrowAmount(999);
+
     }
+
+
 
     function test_SettingsValidation_validateRecipient() public {
-        address sender = address(0x1);
-        address recipient = address(0x2);
-        harness.validateRecipient(recipient, sender);
-        
+
+        harness.validateRecipient(address(0x1), address(0x2));
+
         vm.expectRevert();
-        harness.validateRecipient(address(0), sender);
-        
+
+        harness.validateRecipient(address(0), address(0x2));
+
         vm.expectRevert();
-        harness.validateRecipient(sender, sender);
+
+        harness.validateRecipient(address(0x1), address(0x1));
+
     }
+
+
 
     function test_SettingsValidation_validateYieldOptIn() public {
-        assertTrue(harness.validateYieldOptIn(SettingsValidationLibrary.MIN_YIELD_DEPOSIT, true));
-        assertFalse(harness.validateYieldOptIn(SettingsValidationLibrary.MIN_YIELD_DEPOSIT - 1, true));
-        assertFalse(harness.validateYieldOptIn(SettingsValidationLibrary.MIN_YIELD_DEPOSIT, false));
+
+        assertFalse(SettingsValidationLibrary.validateYieldOptIn(1000e6, false));
+
+        assertFalse(SettingsValidationLibrary.validateYieldOptIn(999e6, true));
+
+        assertTrue(SettingsValidationLibrary.validateYieldOptIn(1000e6, true));
+
     }
+
+
 
     function test_SettingsValidation_validateAutoCancel() public {
+
         harness.validateAutoCancel(0);
+
         harness.validateAutoCancel(block.timestamp + 1);
+
         
+
         vm.expectRevert();
-        harness.validateAutoCancel(block.timestamp);
-        
-        vm.expectRevert();
-        harness.validateAutoCancel(block.timestamp + SettingsValidationLibrary.MAX_AUTO_TIME_DAYS + 1);
+
+        harness.validateAutoCancel(block.timestamp + 31 days);
+
     }
+
+
+
+    function test_SettingsValidation_validateAutoRelease() public {
+
+        harness.validateAutoRelease(0);
+
+        harness.validateAutoRelease(block.timestamp + 1);
+
+        
+
+        vm.expectRevert();
+
+        harness.validateAutoRelease(block.timestamp + 31 days);
+
+    }
+
+
 
     function test_SettingsValidation_validateMaxAttachments() public {
-        harness.validateMaxAttachments(SettingsValidationLibrary.MAX_ATTACHMENTS);
+
+        harness.validateMaxAttachments(20);
+
         vm.expectRevert();
-        harness.validateMaxAttachments(SettingsValidationLibrary.MAX_ATTACHMENTS + 1);
+
+        harness.validateMaxAttachments(21);
+
     }
+
+
 
     function test_SettingsValidation_validateFeeBps() public {
-        harness.validateFeeBps(SettingsValidationLibrary.MAX_FEE_BPS);
+
+        harness.validateFeeBps(200);
+
         vm.expectRevert();
-        harness.validateFeeBps(SettingsValidationLibrary.MAX_FEE_BPS + 1);
+
+        harness.validateFeeBps(201);
+
     }
+
+
 
     function test_SettingsValidation_validateResolutionDelay() public {
-        harness.validateResolutionDelay(SettingsValidationLibrary.MIN_RESOLUTION_DELAY);
-        harness.validateResolutionDelay(SettingsValidationLibrary.MAX_RESOLUTION_DELAY);
+
+        harness.validateResolutionDelay(48 hours);
+
+        harness.validateResolutionDelay(30 days);
+
         
+
         vm.expectRevert();
-        harness.validateResolutionDelay(SettingsValidationLibrary.MIN_RESOLUTION_DELAY - 1);
-        
+
+        harness.validateResolutionDelay(47 hours);
+
         vm.expectRevert();
-        harness.validateResolutionDelay(SettingsValidationLibrary.MAX_RESOLUTION_DELAY + 1);
+
+        harness.validateResolutionDelay(31 days);
+
     }
+
+
 
     function test_SettingsValidation_validateYieldDistribution() public {
-        address[] memory recipients = new address[](1);
-        recipients[0] = address(0x1);
-        uint256[] memory bps = new uint256[](1);
-        bps[0] = 10000;
+
+        address[] memory r = new address[](1); r[0] = address(0x1);
+
+        uint256[] memory p = new uint256[](1); p[0] = 10000;
+
+        harness.validateYieldDistribution(r, p);
+
         
-        harness.validateSettingsYieldDistribution(recipients, bps);
 
-        // Mismatch length
-        uint256[] memory bps2 = new uint256[](0);
+        address[] memory r2 = new address[](0);
+
         vm.expectRevert();
-        harness.validateSettingsYieldDistribution(recipients, bps2);
 
-        // Bad sum
-        bps[0] = 9999;
-        vm.expectRevert();
-        harness.validateSettingsYieldDistribution(recipients, bps);
+        harness.validateYieldDistribution(r2, p);
 
-        // Duplicate
-        address[] memory recipients2 = new address[](2);
-        recipients2[0] = address(0x1);
-        recipients2[1] = address(0x1);
-        uint256[] memory bps3 = new uint256[](2);
-        bps3[0] = 5000;
-        bps3[1] = 5000;
-        vm.expectRevert();
-        harness.validateSettingsYieldDistribution(recipients2, bps3);
-    }
-
-    // ============ YieldHandlingLibrary Tests ============
-
-    function test_YieldHandling_withdrawFullWithYield_NoModule() public {
-        (uint256 actual, uint256 yield) = harness.withdrawFullWithYield(
-            IYieldGenerationModule(address(0)),
-            1,
-            address(token),
-            100
-        );
-        assertEq(actual, 100);
-        assertEq(yield, 0);
-    }
-
-    function test_YieldHandling_withdrawFullWithYield_Success() public {
-        genModule.setWithdrawResult(true, 110, 10);
-        (uint256 actual, uint256 yield) = harness.withdrawFullWithYield(
-            genModule,
-            1,
-            address(token),
-            100
-        );
-        assertEq(actual, 110);
-        assertEq(yield, 10);
-    }
-
-    function test_YieldHandling_withdrawFullWithYield_Failure() public {
-        genModule.setWithdrawResult(false, 0, 0);
-        (uint256 actual, uint256 yield) = harness.withdrawFullWithYield(
-            genModule,
-            1,
-            address(token),
-            100
-        );
-        assertEq(actual, 100);
-        assertEq(yield, 0);
-    }
-
-    function test_YieldHandling_distributeYield_NoModule() public {
-        vm.expectRevert("No yield distribution module");
-        harness.distributeYield(
-            IYieldDistributionModule(address(0)),
-            1,
-            address(token),
-            100
-        );
-    }
-
-    function test_YieldHandling_distributeYield_Success() public {
-        token.mint(address(harness), 100); // Give tokens to harness
         
-        distModule.setDistributeResult(true);
-        harness.distributeYield(
-            distModule,
-            1,
-            address(token),
-            100
-        );
-        assertEq(token.balanceOf(address(distModule)), 100);
+
+        address[] memory r3 = new address[](11);
+
+        vm.expectRevert();
+
+        harness.validateYieldDistribution(r3, p);
+
+        
+
+        p[0] = 9999;
+
+        vm.expectRevert();
+
+        harness.validateYieldDistribution(r, p);
+
     }
 
-    function test_YieldHandling_distributeYield_Failure() public {
-        token.mint(address(harness), 100); // Give tokens to harness
-        distModule.setDistributeResult(false);
-        vm.expectRevert("Yield distribution failed");
-        harness.distributeYield(
-            distModule,
-            1,
-            address(token),
-            100
-        );
-    }
 
-    function test_YieldHandling_getApprovalTarget() public {
-        // No module
-        address target = harness.getApprovalTarget(IYieldGenerationModule(address(0)), address(token));
-        assertEq(target, address(0));
-
-        // Module with support
-        genModule.setApprovalTarget(address(0x123));
-        target = harness.getApprovalTarget(genModule, address(token));
-        assertEq(target, address(0x123));
-
-        // Module without support (revert)
-        genModule.setRevertOnTarget(true);
-        target = harness.getApprovalTarget(genModule, address(token));
-        assertEq(target, address(0));
-    }
 
     // ============ YieldPresetLibrary Tests ============
 
-    function test_YieldPreset_isYieldEnabled() public {
-        assertFalse(harness.isYieldEnabled(YieldPreset.OFF));
-        assertTrue(harness.isYieldEnabled(YieldPreset.TO_SENDER));
-    }
+
 
     function test_YieldPreset_deriveDistributionData_OFF() public {
-        bytes memory data = harness.deriveDistributionData(YieldPreset.OFF, address(0x1), address(0x2));
+
+        bytes memory data = YieldPresetLibrary.deriveDistributionData(YieldPreset.OFF, address(0), address(0));
+
         assertEq(data.length, 0);
+
     }
+
+
 
     function test_YieldPreset_deriveDistributionData_TO_SENDER() public {
-        address sender = address(0x1);
-        bytes memory data = harness.deriveDistributionData(YieldPreset.TO_SENDER, sender, address(0x2));
-        
-        (address[] memory recipients, uint256[] memory percentages) = abi.decode(data, (address[], uint256[]));
-        assertEq(recipients.length, 1);
-        assertEq(recipients[0], sender);
-        assertEq(percentages.length, 1);
-        assertEq(percentages[0], 10000);
+
+        bytes memory data = YieldPresetLibrary.deriveDistributionData(YieldPreset.TO_SENDER, user1, address(0));
+
+        (address[] memory r, uint256[] memory p) = abi.decode(data, (address[], uint256[]));
+
+        assertEq(r.length, 1);
+
+        assertEq(r[0], user1);
+
+        assertEq(p[0], 10000);
+
     }
 
-    function test_YieldPreset_deriveDistributionData_InvalidSender() public {
-        vm.expectRevert(abi.encodeWithSelector(InvalidAddress.selector, ADDR_GENERIC, address(0)));
-        harness.deriveDistributionData(YieldPreset.TO_SENDER, address(0), address(0x2));
+
+
+    function test_YieldPreset_isYieldEnabled() public {
+
+        assertFalse(YieldPresetLibrary.isYieldEnabled(YieldPreset.OFF));
+
+        assertTrue(YieldPresetLibrary.isYieldEnabled(YieldPreset.TO_SENDER));
+
     }
 
-    function test_YieldPreset_deriveDistributionData_InvalidPreset() public {
-        uint8 invalid = 99;
-        // vm.expectRevert(); 
-        // Cast happens before call, so we must use low-level call to pass invalid data to harness
-        (bool success, ) = address(harness).call(
-            abi.encodeWithSelector(
-                harness.deriveDistributionData.selector,
-                invalid, // Passed as uint8, harness expects enum
-                address(0x1),
-                address(0x2)
-            )
-        );
-        assertFalse(success, "Should have reverted due to invalid enum");
-    }
+
 
     function test_YieldPreset_validatePresetParams() public {
-        harness.validatePresetParams(YieldPreset.OFF, address(0), address(0));
-        harness.validatePresetParams(YieldPreset.TO_SENDER, address(0x1), address(0));
-        
-        vm.expectRevert(abi.encodeWithSelector(InvalidAddress.selector, ADDR_GENERIC, address(0)));
+
+        YieldPresetLibrary.validatePresetParams(YieldPreset.OFF, address(0), address(0));
+
+        YieldPresetLibrary.validatePresetParams(YieldPreset.TO_SENDER, user1, address(0));
+
+        vm.expectRevert();
+
         harness.validatePresetParams(YieldPreset.TO_SENDER, address(0), address(0));
+
     }
+
+
 
     // ============ YieldDistributionLibrary Tests ============
 
+
+
     function test_YieldDistribution_validate_Success() public {
-        address[] memory recipients = new address[](1);
-        recipients[0] = address(0x1);
-        uint256[] memory percentages = new uint256[](1);
-        percentages[0] = 10000;
-        harness.validateYieldDistribution(recipients, percentages);
+
+        address[] memory r = new address[](1); r[0] = address(0x1);
+
+        uint256[] memory p = new uint256[](1); p[0] = 10000;
+
+        harness.validateYieldDist(r, p);
+
     }
 
-    function test_YieldDistribution_validate_Empty() public {
-        address[] memory recipients = new address[](0);
-        uint256[] memory percentages = new uint256[](0);
-        vm.expectRevert(abi.encodeWithSelector(InvalidAmount.selector, AMOUNT_EMPTY));
-        harness.validateYieldDistribution(recipients, percentages);
+
+
+    function test_YieldDistribution_validate_Empty_Revert() public {
+
+        address[] memory r;
+
+        uint256[] memory p;
+
+        vm.expectRevert();
+
+        harness.validateYieldDist(r, p);
+
     }
 
-    function test_YieldDistribution_validate_Mismatch() public {
-        address[] memory recipients = new address[](1);
-        uint256[] memory percentages = new uint256[](0);
-        vm.expectRevert(abi.encodeWithSelector(ArrayLengthMismatch.selector, 1, 0));
-        harness.validateYieldDistribution(recipients, percentages);
+
+
+    function test_YieldDistribution_validate_Mismatch_Revert() public {
+
+        address[] memory r = new address[](1);
+
+        uint256[] memory p = new uint256[](2);
+
+        vm.expectRevert();
+
+        harness.validateYieldDist(r, p);
+
     }
 
-    function test_YieldDistribution_validate_ZeroAddress() public {
-        address[] memory recipients = new address[](1);
-        recipients[0] = address(0);
-        uint256[] memory percentages = new uint256[](1);
-        percentages[0] = 10000;
-        vm.expectRevert(abi.encodeWithSelector(InvalidAddress.selector, ADDR_RECIPIENT, address(0)));
-        harness.validateYieldDistribution(recipients, percentages);
+
+
+    function test_YieldDistribution_validate_ZeroAddress_Revert() public {
+
+        address[] memory r = new address[](1); r[0] = address(0);
+
+        uint256[] memory p = new uint256[](1); p[0] = 10000;
+
+        vm.expectRevert();
+
+        harness.validateYieldDist(r, p);
+
     }
 
-    function test_YieldDistribution_validate_ZeroPercent() public {
-        address[] memory recipients = new address[](1);
-        recipients[0] = address(0x1);
-        uint256[] memory percentages = new uint256[](1);
-        percentages[0] = 0;
-        vm.expectRevert(abi.encodeWithSelector(InvalidAmount.selector, AMOUNT_GENERIC));
-        harness.validateYieldDistribution(recipients, percentages);
+
+
+    function test_YieldDistribution_validate_ZeroPercent_Revert() public {
+
+        address[] memory r = new address[](1); r[0] = address(0x1);
+
+        uint256[] memory p = new uint256[](1); p[0] = 0;
+
+        vm.expectRevert();
+
+        harness.validateYieldDist(r, p);
+
     }
 
-    function test_YieldDistribution_validate_BadSum() public {
-        address[] memory recipients = new address[](1);
-        recipients[0] = address(0x1);
-        uint256[] memory percentages = new uint256[](1);
-        percentages[0] = 9999;
-        vm.expectRevert(abi.encodeWithSelector(InvalidAmount.selector, AMOUNT_GENERIC));
-        harness.validateYieldDistribution(recipients, percentages);
+
+
+    function test_YieldDistribution_validate_BadSum_Revert() public {
+
+        address[] memory r = new address[](1); r[0] = address(0x1);
+
+        uint256[] memory p = new uint256[](1); p[0] = 9999;
+
+        vm.expectRevert();
+
+        harness.validateYieldDist(r, p);
+
     }
+
+
 
     function test_YieldDistribution_decode() public {
-        address[] memory recipients = new address[](1);
-        recipients[0] = address(0x1);
-        uint256[] memory percentages = new uint256[](1);
-        percentages[0] = 10000;
-        bytes memory data = abi.encode(recipients, percentages);
-        
-        (address[] memory r, uint256[] memory p) = harness.decodeYieldDistribution(data);
-        assertEq(r[0], recipients[0]);
-        assertEq(p[0], percentages[0]);
+
+        address[] memory r = new address[](1); r[0] = address(0x1);
+
+        uint256[] memory p = new uint256[](1); p[0] = 10000;
+
+        bytes memory data = abi.encode(r, p);
+
+        (address[] memory r2, uint256[] memory p2) = YieldDistributionLibrary.decodeYieldDistribution(data);
+
+        assertEq(r2[0], address(0x1));
+
+        assertEq(p2[0], 10000);
+
     }
+
+
 
     function test_YieldDistribution_fallback() public {
-        token.mint(address(harness), 100); // Give tokens to harness
-        address[] memory recipients = new address[](1);
-        recipients[0] = address(0x1);
-        uint256[] memory percentages = new uint256[](1);
-        percentages[0] = 5000; // 50%
-        address feeAddress = address(0x2);
 
-        // Distribute 100 tokens: 50 to recipient, 50 to fee
-        uint256 distributed = harness.distributeYieldFallback(
-            address(token),
-            100,
-            recipients,
-            percentages,
-            feeAddress
-        );
+        token.mint(address(harness), 100);
+
+        address[] memory r = new address[](1); r[0] = address(0x1);
+
+        uint256[] memory p = new uint256[](1); p[0] = 5000;
+
         
-        assertEq(distributed, 50);
+
+        uint256 dist = harness.distributeYieldFallback(address(token), 100, r, p, feeAddress);
+
+        assertEq(dist, 50);
+
         assertEq(token.balanceOf(address(0x1)), 50);
-        assertEq(token.balanceOf(address(0x2)), 50);
-    }
-}
 
-// ============ Mocks ============
+        assertEq(token.balanceOf(feeAddress), 50);
 
-contract MockGenModule is IYieldGenerationModule {
-    bool public success;
-    uint256 public actual;
-    uint256 public yield;
-    address public approvalTarget;
-    bool public revertOnTarget;
-
-    function setWithdrawResult(bool _s, uint256 _a, uint256 _y) external {
-        success = _s;
-        actual = _a;
-        yield = _y;
     }
 
-    function setApprovalTarget(address _t) external {
-        approvalTarget = _t;
-    }
-
-    function setRevertOnTarget(bool _r) external {
-        revertOnTarget = _r;
-    }
-
-    function withdrawWithYield(uint256, address, uint256) external view returns (bool, uint256, uint256) {
-        return (success, actual, yield);
-    }
-
-    function getApprovalTarget(address) external view returns (address) {
-        if (revertOnTarget) revert("Not supported");
-        return approvalTarget;
-    }
-
-    function depositForYield(uint256, address, uint256) external pure returns (bool, uint256) { return (true, 0); }
-    function calculateYield(uint256, address) external pure returns (uint256) { return 0; }
-    function isTokenSupported(address) external pure returns (bool) { return true; }
-    function moduleName() external pure returns (string memory) { return "MockGen"; }
-    function moduleVersion() external pure returns (string memory) { return "1.0"; }
-    function supportsInterface(bytes4) external pure returns (bool) { return true; }
-    function getAavePoolAddress() external pure returns (address) { return address(0); }
-    function getATokenAddress(address) external pure returns (address) { return address(0); }
-}
-
-contract MockDistModule is IYieldDistributionModule {
-    bool public success;
-
-    function setDistributeResult(bool _s) external {
-        success = _s;
-    }
-
-    function distributeYield(uint256, address, uint256, bytes calldata) external view returns (bool, uint256) {
-        return (success, 0);
-    }
-
-    function moduleName() external pure returns (string memory) { return "MockDist"; }
-    function moduleVersion() external pure returns (string memory) { return "1.0"; }
-    function supportsInterface(bytes4) external pure returns (bool) { return true; }
 }

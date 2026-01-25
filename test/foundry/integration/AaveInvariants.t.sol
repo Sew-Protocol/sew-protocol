@@ -154,9 +154,7 @@ contract AaveInvariants is Test {
         vm.prank(address(vault));
         mm.activateModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST);
 
-        // Enable library pattern
-        wrapper = new AaveLibraryWrapper();
-        // Module pattern is now used directly (no delegatecall library needed)
+        // Module pattern is now used directly
         vault.setYieldProtocolFeeBps(0);
 
         // Fund pool

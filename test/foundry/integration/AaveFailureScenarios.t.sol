@@ -347,7 +347,7 @@ contract AaveFailureScenarios is Test {
         // Set insufficient liquidity flag
         pool.setInsufficientLiquidity(true);
 
-        // Withdrawal will fail silently (library pattern catches revert)
+        // Withdrawal will fail silently (module pattern catches revert)
         // However, releaseEscrowTransfer itself may fail if yield withdrawal is critical
         // Let's check what actually happens - the release might succeed with principal only
         uint256 recipientBalBefore = token.balanceOf(recipient);

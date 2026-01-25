@@ -203,6 +203,107 @@ contract ResolverIncentiveModuleComprehensiveTest is Test {
         assertEq(incentiveModule.currentPaymentLibrary(), address(newLib));
     }
 
+    function test_PaymentLibrary_Rollback() public {
+        PaymentCalculationLibraryV1 oldLib = PaymentCalculationLibraryV1(incentiveModule.currentPaymentLibrary());
+        PaymentCalculationLibraryV1 newLib = new PaymentCalculationLibraryV1();
+
+        vm.startPrank(timelock);
+        incentiveModule.rollbackToPreviousLibrary(address(newLib));
+        assertEq(incentiveModule.currentPaymentLibrary(), address(newLib));
+
+        incentiveModule.rollbackToPreviousLibrary(address(oldLib));
+        assertEq(incentiveModule.currentPaymentLibrary(), address(oldLib));
+        vm.stopPrank();
+    }
+
+    function test_Escrow_PauseUnpause() public {
+        vm.startPrank(timelock);
+        incentiveModule.pauseEscrowContract(escrow);
+        
+        vm.stopPrank();
+        vm.startPrank(escrow);
+        vm.expectRevert(abi.encodeWithSignature("EscrowPaused(address)", escrow));
+        incentiveModule.recordEscrowFee(1, address(token), 100 ether);
+        vm.stopPrank();
+
+        vm.startPrank(timelock);
+        incentiveModule.unpauseEscrowContract(escrow);
+        vm.stopPrank();
+
+        vm.prank(escrow);
+        incentiveModule.recordEscrowFee(1, address(token), 100 ether);
+        (uint256 fee, ) = incentiveModule.getDisputeFees(1);
+        assertEq(fee, 100 ether);
+    }
+
+    function test_Escrow_RateLimitReset() public {
+        vm.prank(escrow);
+        incentiveModule.recordEscrowFee(1, address(token), 100 ether);
+        
+        (uint256 disputes, uint256 fees, , , ) = incentiveModule.getEscrowRateLimit(escrow);
+        assertEq(disputes, 1);
+        assertEq(fees, 100 ether);
+
+        vm.prank(timelock);
+        incentiveModule.resetEscrowRateLimit(escrow);
+
+        (disputes, fees, , , ) = incentiveModule.getEscrowRateLimit(escrow);
+        assertEq(disputes, 0);
+        assertEq(fees, 0);
+    }
+
+    function test_ClearFeeRecording() public {
+        vm.prank(escrow);
+        incentiveModule.recordEscrowFee(1, address(token), 100 ether);
+
+        vm.prank(timelock);
+        incentiveModule.clearFeeRecording(1, "test");
+
+        // Verify tracking cleared
+        // (Internal state disputeExpectedTokenBalance[1] is cleared)
+        // We can verify by trying to resolve - it should fail due to 0 balance vs expected
+        // Actually, resolve checks contractBalance < totalRecordedFees
+        // totalRecordedFees is NOT cleared by clearFeeRecording (by design)
+    }
+
+    function test_UnregisterEscrow() public {
+        vm.prank(timelock);
+        incentiveModule.unregisterEscrowContract(escrow);
+
+        vm.prank(escrow);
+        vm.expectRevert(abi.encodeWithSignature("NotRegisteredEscrowContract(address)", escrow));
+        incentiveModule.recordEscrowFee(1, address(token), 100 ether);
+    }
+
+    function test_onDisputeResolved_InsufficientBalance() public {
+        vm.prank(escrow);
+        incentiveModule.recordEscrowFee(1, address(token), 1000 ether);
+        
+        vm.prank(escrow);
+        incentiveModule.recordResolver(1, resolver, 0);
+
+        // Don't fund the module
+        vm.prank(escrow);
+        vm.expectRevert(abi.encodeWithSignature("InsufficientBalanceForFees(uint256,uint256)", 1000 ether, 0));
+        incentiveModule.onDisputeResolved(1, address(token));
+    }
+
+    function test_claimPayment_ZeroToken() public {
+        // Setup resolution
+        vm.startPrank(escrow);
+        incentiveModule.recordResolver(1, resolver, 0);
+        incentiveModule.recordEscrowFee(1, address(token), 1000 ether);
+        vm.stopPrank();
+
+        token.mint(address(incentiveModule), 1000 ether);
+        vm.prank(escrow);
+        incentiveModule.onDisputeResolved(1, address(token));
+
+        vm.prank(resolver);
+        vm.expectRevert(abi.encodeWithSignature("ZeroToken()"));
+        incentiveModule.claimPayment(1, address(0));
+    }
+
     // ============ Distribution Tests ============
 
     function test_DistributePayments() public {

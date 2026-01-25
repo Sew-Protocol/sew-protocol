@@ -389,3 +389,10 @@ Given you care about telemetry codes, write tests that assert:
 -   Ensure loops are bounded (per-escrow lists, module registries)
 
 -   Ensure settlement doesn't become uncallable as positions grow
+
+---
+
+## Verification (2026-01-23)
+
+-   **Gap analysis:** [AAVE_INTEGRATION_CHECKLIST_GAP_ANALYSIS.md](./AAVE_INTEGRATION_CHECKLIST_GAP_ANALYSIS.md) — checklist vs. current tests; most items complete, remaining gaps low priority.
+-   **Status and accounting:** [AAVE_INTEGRATION_CHECKLIST_STATUS.md](./AAVE_INTEGRATION_CHECKLIST_STATUS.md) — test inventory, accounting verification (principal, fees, yield, PUSH model, `remainingAllowance`).

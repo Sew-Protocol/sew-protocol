@@ -97,9 +97,9 @@ error AccountingDeficit(address token, uint256 deficit);
 abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;
 
-    // Aave library errors (scoped to avoid global name collisions)
-    error AaveLibraryNotConfigured();
-    error AavePoolNotConfigured();
+    // External yield library errors (scoped to avoid global name collisions)
+    error YieldLibraryNotConfigured();
+    error YieldPoolNotConfigured();
 
     bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');
     bytes32 public constant ROLE_GUARDIAN = keccak256('ROLE_GUARDIAN');
@@ -161,9 +161,9 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     BondCollector public bondCollector;
     CreateOps public createOps;
 
-    // Aave library pattern support
-    address public aaveYieldLibrary; // Library address (0 = not configured, use YieldOps)
-    bool public aaveYieldLibraryEnabled = false; // Feature flag
+    // External yield library pattern support
+    address public externalYieldLibrary; // Library address (0 = not configured, use YieldOps)
+    bool public externalYieldLibraryEnabled = false; // Feature flag
 
     // Per-escrow aToken tracking (for library pattern)
     // Maps: workflowId => aToken address => aToken balance at deposit
@@ -281,8 +281,8 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     );
 
     // Aave library events
-    event AaveYieldLibrarySet(address indexed oldLibrary, address indexed newLibrary);
-    event AaveYieldLibraryEnabled(bool enabled);
+    event ExternalYieldLibrarySet(address indexed oldLibrary, address indexed newLibrary);
+    event ExternalYieldLibraryEnabled(bool enabled);
     event YieldDepositAttempted(
         uint256 indexed workflowId,
         address indexed token,
@@ -400,31 +400,31 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     }
 
     /**
-     * @notice Set Aave yield library address (governance-controlled)
-     * @param libraryAddress Address of AaveYieldLibrary contract
+     * @notice Set external yield library address (governance-controlled)
+     * @param libraryAddress Address of external yield library contract
      * @dev Only ROLE_TIMELOCK can set. Library must be a contract with code.
-     *      Setting library does NOT enable it - use setAaveYieldLibraryEnabled().
+     *      Setting library does NOT enable it - use setExternalYieldLibraryEnabled().
      */
-    function setAaveYieldLibrary(address libraryAddress) external onlyRole(ROLE_TIMELOCK) {
+    function setExternalYieldLibrary(address libraryAddress) external onlyRole(ROLE_TIMELOCK) {
         if (libraryAddress != address(0) && libraryAddress.code.length == 0) {
-            revert NotAContract(2, libraryAddress); // 2 = aaveYieldLibrary
+            revert NotAContract(2, libraryAddress); // 2 = externalYieldLibrary
         }
-        address oldLibrary = aaveYieldLibrary;
-        aaveYieldLibrary = libraryAddress;
-        emit AaveYieldLibrarySet(oldLibrary, libraryAddress);
+        address oldLibrary = externalYieldLibrary;
+        externalYieldLibrary = libraryAddress;
+        emit ExternalYieldLibrarySet(oldLibrary, libraryAddress);
     }
 
     /**
-     * @notice Enable/disable Aave yield library (governance-controlled)
+     * @notice Enable/disable external yield library (governance-controlled)
      * @param enabled True to use library, false to use YieldOps
      * @dev Only ROLE_TIMELOCK can enable. ROLE_GUARDIAN can disable (emergency).
      *      When disabled, falls back to YieldOps pattern.
      */
-    function setAaveYieldLibraryEnabled(bool enabled) external {
+    function setExternalYieldLibraryEnabled(bool enabled) external {
         if (enabled) {
             require(hasRole(ROLE_TIMELOCK, _msgSender()), "Only timelock can enable");
-            if (aaveYieldLibrary == address(0)) {
-                revert AaveLibraryNotConfigured();
+            if (externalYieldLibrary == address(0)) {
+                revert YieldLibraryNotConfigured();
             }
         } else {
             require(
@@ -432,73 +432,11 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
                 "Only timelock or guardian can disable"
             );
         }
-        aaveYieldLibraryEnabled = enabled;
-        emit AaveYieldLibraryEnabled(enabled);
+        externalYieldLibraryEnabled = enabled;
+        emit ExternalYieldLibraryEnabled(enabled);
     }
 
-    /**
-     * @notice Emergency unwind Aave positions for a specific token (guardian only)
-     * @param token Underlying token address to unwind
-     * @param maxATokenAmount Maximum aToken amount to unwind (safety limit)
-     * @return underlyingAmount Actual underlying amount withdrawn to BaseEscrow
-     * @dev CRITICAL SAFETY CONSTRAINTS:
-     *      - Only callable by ROLE_GUARDIAN
-     *      - Only callable when paused
-     *      - Proceeds ALWAYS go to BaseEscrow (not guardian)
-     *      - Rate limited (cooldown per token + max per call)
-     *      - Scoped to specific token (not arbitrary transfers)
-     *      - Cannot reroute funds (hardcoded destination = address(this))
-     *      - Non-blocking (fails gracefully, doesn't revert)
-     */
-    function emergencyUnwindAavePosition(
-        address token,
-        uint256 maxATokenAmount
-    ) external onlyRole(ROLE_GUARDIAN) whenPaused returns (uint256 underlyingAmount) {
-        (bool isValid, uint8 reasonCode) = AaveYieldHandlingLibrary.validateEmergencyUnwind(
-            paused(),
-            lastUnwindTimestamp[token],
-            block.timestamp,
-            UNWIND_COOLDOWN,
-            MAX_UNWIND_AMOUNT_PER_CALL,
-            maxATokenAmount,
-            aaveYieldLibraryEnabled,
-            aaveYieldLibrary
-        );
-        if (!isValid) {
-            emit EmergencyUnwindExecuted(token, 0, 0, block.timestamp, _msgSender(), reasonCode);
-            return 0;
-        }
-        
-        IYieldGenerationModule genModule = _getDefaultYieldGenerationModule();
-        address aToken = AaveYieldHandlingLibrary.getATokenAddress(genModule, token);
-        uint256 aTokenBalance = aToken != address(0) ? IAaveAToken(aToken).balanceOf(address(this)) : 0;
-        
-        (address aavePool, , uint256 unwindAmount, uint8 prepReasonCode) = 
-            AaveYieldHandlingLibrary.prepareEmergencyUnwind(
-                genModule,
-                token,
-                aTokenBalance,
-                maxATokenAmount
-            );
-        
-        if (prepReasonCode != 0) {
-            emit EmergencyUnwindExecuted(token, 0, 0, block.timestamp, _msgSender(), prepReasonCode);
-            return 0;
-        }
-        
-        (bool success, bytes memory returnData) = aaveYieldLibrary.delegatecall(
-            abi.encodeWithSelector(AaveYieldLibrary.withdraw.selector, aavePool, token, unwindAmount, address(this))
-        );
-        if (success && returnData.length >= 32) {
-            underlyingAmount = abi.decode(returnData, (uint256));
-            lastUnwindTimestamp[token] = block.timestamp;
-            totalUnwoundAmount += underlyingAmount;
-            emit EmergencyUnwindExecuted(token, unwindAmount, underlyingAmount, block.timestamp, _msgSender(), 0);
-            return underlyingAmount;
-        }
-        emit EmergencyUnwindExecuted(token, unwindAmount, 0, block.timestamp, _msgSender(), uint8(FailureReason.WITHDRAWAL_FAILED));
-        return 0;
-    }
+    // emergencyUnwindAavePosition REMOVED - now handled by GuardianOps contract
 
     function createEscrow(
         address token,
@@ -1156,7 +1094,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
             genModule,
             settings,
             scaledShares,
-            aaveYieldLibrary
+            externalYieldLibrary
         );
         
         if (!result.success) {
@@ -1208,7 +1146,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
             amount,
             genModule,
             settings,
-            aaveYieldLibrary
+            externalYieldLibrary
         );
         
         if (!result.success) {
@@ -1279,7 +1217,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         address token,
         uint256 amount
     ) internal returns (uint256 actualAmount) {
-        if (aaveYieldLibraryEnabled && aaveYieldLibrary != address(0)) {
+        if (externalYieldLibraryEnabled && externalYieldLibrary != address(0)) {
             return _handleYieldViaLibrary(workflowId, token, amount);
         }
         EscrowSettings memory settings = escrowSettings[workflowId];
@@ -1420,7 +1358,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     }
 
     function _depositYieldForEscrow(uint256 workflowId, address token, uint256 amount) internal {
-        if (aaveYieldLibraryEnabled && aaveYieldLibrary != address(0)) {
+        if (externalYieldLibraryEnabled && externalYieldLibrary != address(0)) {
             _handleYieldDepositViaLibrary(workflowId, token, amount);
         } else {
             IYieldGenerationModule genModule = _getYieldGenerationModule(workflowId);
