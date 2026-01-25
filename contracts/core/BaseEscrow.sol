@@ -1062,6 +1062,15 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         }
     }
 
+    /**
+     * @notice Get the total number of escrows created
+     * @return count Total number of escrows
+     * @dev Added for EscrowViewContract to check bounds without reverting
+     */
+    function getEscrowCount() external view returns (uint256 count) {
+        return escrowTransfers.length;
+    }
+
     function _requirePending(uint256 workflowId) internal view {
         _validateWorkflowId(workflowId);
         EscrowState st = escrowTransfers[workflowId].escrowState;
