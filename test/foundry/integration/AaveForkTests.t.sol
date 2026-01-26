@@ -174,10 +174,10 @@ contract AaveForkTests is Test {
         aaveModule.registerTokenForAave(address(token), aTokenAddress);
         aToken = IAToken(aTokenAddress);
         
-        // Setup library pattern
-        libraryWrapper = new LibraryWrapper();
-        escrowVault.setExternalYieldLibrary(address(libraryWrapper));
-        escrowVault.setExternalYieldLibraryEnabled(true);
+        // Setup library pattern - REMOVED (external yield library feature deleted)
+        // libraryWrapper = new LibraryWrapper();
+        // escrowVault.setExternalYieldLibrary(address(libraryWrapper));
+        // escrowVault.setExternalYieldLibraryEnabled(true);
         
         guardianOps = new GuardianOps(address(escrowVault));
         
@@ -209,7 +209,7 @@ contract AaveForkTests is Test {
         );
         vm.stopPrank();
         
-        assertTrue(escrowVault.escrowInYield(workflowId, address(token)), "Should be in yield");
+        // assertTrue(escrowVault.escrowInYield(workflowId, address(token)), "Should be in yield"); // REMOVED: external yield library feature deleted
         assertGt(aToken.balanceOf(address(escrowVault)), 0, "BaseEscrow should own aTokens");
         assertEq(aToken.balanceOf(address(aaveModule)), 0, "Module should not own aTokens");
     }

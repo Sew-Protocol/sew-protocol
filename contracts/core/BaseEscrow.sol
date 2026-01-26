@@ -33,11 +33,8 @@ import '../SettlementOps.sol';
 import '../CreateOps.sol';
 import '../decentralized-resolution-module/IIncentiveModule.sol';
 import './BondCollector.sol';
-import '../libraries/AaveYieldLibrary.sol';
-import '../libraries/AaveYieldHandlingLibrary.sol';
 import '../libraries/ModuleSnapshotLibrary.sol';
 import '../libraries/BondHandlingLibrary.sol';
-import '../interfaces/aave/AaveV3Interfaces.sol';
 
 enum FailureReason {
     UNKNOWN, CALL_FAILED, MALFORMED_RETURN_DATA, MODULE_NOT_SET, MODULE_NOT_CONTRACT,
@@ -63,7 +60,6 @@ error TransferNotInDispute(uint256 workflowId, EscrowState currentStatus);
 error NotParticipant(uint256 workflowId, address caller, address sender, address recipient);
 error NotSender(uint256 workflowId, address caller, address expectedSender);
 error NotRecipient(uint256 workflowId, address caller, address expectedRecipient);
-error AmountExceedsTransfer(uint256 workflowId, uint256 requestedAmount, uint256 availableAmount);
 error InvalidEscrowFee(uint256 fee, uint256 maxFee);
 error FeeExceedsMaximum(uint256 feeBps, uint256 maxFeeBps);
 error NoClaimableBalance(uint256 workflowId, address recipient, address token);
@@ -71,7 +67,6 @@ error TransferNotFinalized(uint256 workflowId, EscrowState currentState);
 error NoPendingSettlement(uint256 workflowId);
 error AppealWindowNotExpired(uint256 workflowId, uint256 appealDeadline, uint256 currentTime);
 error NotInDisputedState(uint256 workflowId, EscrowState currentState);
-error YieldPresetLocked(uint256 workflowId);
 error ExcessRefundTransferFailed(uint256 workflowId, address recipient, uint256 amount);
 
 error InvalidState(uint256 workflowId, uint8 expected, uint8 actual);
@@ -84,7 +79,6 @@ error EscalationNotAllowed();
 error AppealBondQueryFailed(uint256 workflowId);
 error InvalidBondMsgValue(uint256 workflowId, uint256 required, uint256 provided);
 error UnexpectedETH(uint256 workflowId, uint256 provided);
-error BondCollectionFailed(uint256 workflowId);
 
 // Errors used by child contracts (EscrowVault, EscrowableERC20)
 error BalanceUnderflow(address token, uint256 currentBalance, uint256 requestedAmount);
@@ -97,9 +91,6 @@ error AccountingDeficit(address token, uint256 deficit);
 abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;
 
-    // External yield library errors (scoped to avoid global name collisions)
-    error YieldLibraryNotConfigured();
-    error YieldPoolNotConfigured();
 
     bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');
     bytes32 public constant ROLE_GUARDIAN = keccak256('ROLE_GUARDIAN');
@@ -161,25 +152,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     BondCollector public bondCollector;
     CreateOps public createOps;
 
-    // External yield library pattern support
-    address public externalYieldLibrary; // Library address (0 = not configured, use YieldOps)
-    bool public externalYieldLibraryEnabled = false; // Feature flag
-
-    // Per-escrow aToken tracking (for library pattern)
-    // Maps: workflowId => aToken address => aToken balance at deposit
-    mapping(uint256 => mapping(address => uint256)) internal escrowATokenBalances;
-    // Maps: workflowId => token => is in yield (for library pattern)
-    mapping(uint256 => mapping(address => bool)) public escrowInYield; // CRIT-3: Made public for transparency
-
-    // Library pattern v2: Per-escrow "scaled" shares tracking to support multiple concurrent escrows per token.
-    // Maps: workflowId => token => scaledShares (ray-scaled)
-    mapping(uint256 => mapping(address => uint256)) internal escrowYieldScaledShares;
-
-    // Emergency unwind state
-    uint256 public constant MAX_UNWIND_AMOUNT_PER_CALL = 1_000_000e18; // 1M tokens max per call
-    uint256 public constant UNWIND_COOLDOWN = 1 hours; // Minimum time between unwinds per token
-    mapping(address => uint256) public lastUnwindTimestamp; // token => last unwind time
-    uint256 public totalUnwoundAmount; // Total amount unwound across all tokens (for monitoring)
 
     event EscrowStateChanged(
         uint256 indexed workflowId,
@@ -280,41 +252,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         uint8 reasonCode
     );
 
-    // Aave library events
-    event ExternalYieldLibrarySet(address indexed oldLibrary, address indexed newLibrary);
-    event ExternalYieldLibraryEnabled(bool enabled);
-    event YieldDepositAttempted(
-        uint256 indexed workflowId,
-        address indexed token,
-        uint256 amount,
-        bool success,
-        uint8 reasonCode
-    );
-    event YieldWithdrawalAttempted(
-        uint256 indexed workflowId,
-        address indexed token,
-        uint256 amount,
-        uint256 actualAmount,
-        bool success,
-        uint8 reasonCode
-    );
-    // CRIT-3: Enhanced event for principal-only withdrawals (when Aave withdrawal fails)
-    event YieldWithdrawalPrincipalOnly(
-        uint256 indexed workflowId,
-        address indexed token,
-        uint256 principalAmount,
-        uint8 reasonCode
-    );
-    event EmergencyUnwindExecuted(
-        address indexed token,
-        uint256 aTokenAmount,
-        uint256 underlyingAmount,
-        uint256 timestamp,
-        address indexed caller,
-        uint8 reasonCode
-    );
-
-    // P2: consolidated telemetry surface for operational failures (best-effort paths only).
     // op codes (append-only):
     // 1 = yield deposit
     // 2 = yield withdraw/distribute
@@ -397,43 +334,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     function setBondCollector(address collector) external onlyRole(ROLE_TIMELOCK) {
         if (collector == address(0)) revert ZeroBondCollector();
         bondCollector = BondCollector(collector);
-    }
-
-    /**
-     * @notice Set external yield library address (governance-controlled)
-     * @param libraryAddress Address of external yield library contract
-     * @dev Only ROLE_TIMELOCK can set. Library must be a contract with code.
-     *      Setting library does NOT enable it - use setExternalYieldLibraryEnabled().
-     */
-    function setExternalYieldLibrary(address libraryAddress) external onlyRole(ROLE_TIMELOCK) {
-        if (libraryAddress != address(0) && libraryAddress.code.length == 0) {
-            revert NotAContract(2, libraryAddress); // 2 = externalYieldLibrary
-        }
-        address oldLibrary = externalYieldLibrary;
-        externalYieldLibrary = libraryAddress;
-        emit ExternalYieldLibrarySet(oldLibrary, libraryAddress);
-    }
-
-    /**
-     * @notice Enable/disable external yield library (governance-controlled)
-     * @param enabled True to use library, false to use YieldOps
-     * @dev Only ROLE_TIMELOCK can enable. ROLE_GUARDIAN can disable (emergency).
-     *      When disabled, falls back to YieldOps pattern.
-     */
-    function setExternalYieldLibraryEnabled(bool enabled) external {
-        if (enabled) {
-            require(hasRole(ROLE_TIMELOCK, _msgSender()), "Only timelock can enable");
-            if (externalYieldLibrary == address(0)) {
-                revert YieldLibraryNotConfigured();
-            }
-        } else {
-            require(
-                hasRole(ROLE_TIMELOCK, _msgSender()) || hasRole(ROLE_GUARDIAN, _msgSender()),
-                "Only timelock or guardian can disable"
-            );
-        }
-        externalYieldLibraryEnabled = enabled;
-        emit ExternalYieldLibraryEnabled(enabled);
     }
 
     // emergencyUnwindAavePosition REMOVED - now handled by GuardianOps contract
@@ -1017,10 +917,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         }
     }
 
-    function _validateEscrowSettings(EscrowSettings memory settings) internal view {
-        SettingsValidationLibrary.validateEscrowSettings(settings, block.timestamp);
-    }
-
     /**
      * @notice Attempt automatic transfer with graceful fallback to claimable balance
      * @param workflowId The escrow ID
@@ -1065,105 +961,8 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         }
     }
 
-
     function _getDefaultYieldGenerationModule() internal view virtual returns (IYieldGenerationModule module) {
         return IYieldGenerationModule(address(0));
-    }
-
-    function _handleYieldViaLibrary(
-        uint256 workflowId,
-        address token,
-        uint256 amount
-    ) internal returns (uint256 actualAmount) {
-        actualAmount = amount;
-        
-        EscrowSettings memory settings = escrowSettings[workflowId];
-        
-        if (!escrowInYield[workflowId][token]) {
-            return actualAmount;
-        }
-        
-        IYieldGenerationModule genModule = _getYieldGenerationModule(workflowId);
-        uint256 scaledShares = escrowYieldScaledShares[workflowId][token];
-        
-        // Call library to handle withdrawal
-        AaveYieldHandlingLibrary.WithdrawalResult memory result = AaveYieldHandlingLibrary.handleYieldWithdrawal(
-            workflowId,
-            token,
-            amount,
-            genModule,
-            settings,
-            scaledShares,
-            externalYieldLibrary
-        );
-        
-        if (!result.success) {
-            if (result.failureReason == 2) escrowInYield[workflowId][token] = false;
-            emit YieldWithdrawalAttempted(workflowId, token, amount, amount, false, result.failureReason);
-            // CRIT-3: Emit principal-only event when withdrawal fails
-            emit YieldWithdrawalPrincipalOnly(workflowId, token, amount, result.failureReason);
-            return actualAmount;
-        }
-        
-        actualAmount = result.actualAmount;
-        
-        // CRIT-3: Handle principal-only withdrawal (when Aave returns less than principal)
-        if (actualAmount < amount) {
-            uint256 contractBalance = IERC20(token).balanceOf(address(this));
-            uint256 shortfall = amount - actualAmount;
-            if (contractBalance >= shortfall) {
-                actualAmount = amount;
-            } else {
-                // CRIT-3: Emit event when principal cannot be fully recovered
-                emit YieldHandlingFailed(workflowId, token, amount, uint8(FailureReason.LESS_THAN_PRINCIPAL));
-                emit YieldWithdrawalPrincipalOnly(workflowId, token, actualAmount, uint8(FailureReason.LESS_THAN_PRINCIPAL));
-            }
-        }
-        address aToken = AaveYieldHandlingLibrary.getATokenAddress(genModule, token);
-        escrowInYield[workflowId][token] = false;
-        escrowYieldScaledShares[workflowId][token] = 0;
-        escrowATokenBalances[workflowId][aToken] = 0;
-        _distributeYieldIfNeeded(workflowId, token, actualAmount, amount);
-        if (address(yieldOps) != address(0) && address(yieldOps).code.length > 0) {
-            actualAmount = amount;
-        }
-        
-        emit YieldWithdrawalAttempted(workflowId, token, amount, actualAmount, true, 0);
-        return actualAmount;
-    }
-
-    function _handleYieldDepositViaLibrary(
-        uint256 workflowId,
-        address token,
-        uint256 amount
-    ) internal {
-        EscrowSettings memory settings = escrowSettings[workflowId];
-        IYieldGenerationModule genModule = _getYieldGenerationModule(workflowId);
-        
-        AaveYieldHandlingLibrary.DepositResult memory result = AaveYieldHandlingLibrary.handleYieldDeposit(
-            workflowId,
-            token,
-            amount,
-            genModule,
-            settings,
-            externalYieldLibrary
-        );
-        
-        if (!result.success) {
-            // CRIT-3: Emit comprehensive failure event with reason code
-            // This makes failures user-visible and trackable
-            emit YieldDepositAttempted(workflowId, token, amount, false, result.failureReason);
-            // CRIT-3: Also emit OperationFailure for consistency with other failure paths
-            _emitYieldFailure(1, workflowId, address(genModule), IYieldGenerationModule.depositForYield.selector, token, amount, result.failureReason);
-            return;
-        }
-        
-        address aToken = AaveYieldHandlingLibrary.getATokenAddress(genModule, token);
-        escrowYieldScaledShares[workflowId][token] = result.scaledShares;
-        escrowATokenBalances[workflowId][aToken] = 0;
-        escrowInYield[workflowId][token] = true;
-        
-        emit YieldDepositAttempted(workflowId, token, amount, true, 0);
     }
 
     function _distributeYieldIfNeeded(
@@ -1217,9 +1016,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         address token,
         uint256 amount
     ) internal returns (uint256 actualAmount) {
-        if (externalYieldLibraryEnabled && externalYieldLibrary != address(0)) {
-            return _handleYieldViaLibrary(workflowId, token, amount);
-        }
         EscrowSettings memory settings = escrowSettings[workflowId];
         bool yieldEnabled = settings.yieldPreset != YieldPreset.OFF;
         
@@ -1358,15 +1154,11 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     }
 
     function _depositYieldForEscrow(uint256 workflowId, address token, uint256 amount) internal {
-        if (externalYieldLibraryEnabled && externalYieldLibrary != address(0)) {
-            _handleYieldDepositViaLibrary(workflowId, token, amount);
-        } else {
-            IYieldGenerationModule genModule = _getYieldGenerationModule(workflowId);
-            if (address(genModule) != address(0) && genModule.isTokenSupported(token)) {
-                // Call _depositForYield which is overridden in child contracts (EscrowVault/EscrowableERC20)
-                // This allows child contracts to set approvals before calling the module
-                _depositForYield(genModule, workflowId, token, amount);
-            }
+        IYieldGenerationModule genModule = _getYieldGenerationModule(workflowId);
+        if (address(genModule) != address(0) && genModule.isTokenSupported(token)) {
+            // Call _depositForYield which is overridden in child contracts (EscrowVault/EscrowableERC20)
+            // This allows child contracts to set approvals before calling the module
+            _depositForYield(genModule, workflowId, token, amount);
         }
     }
 

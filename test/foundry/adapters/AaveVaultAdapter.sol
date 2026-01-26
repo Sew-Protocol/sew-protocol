@@ -1,0 +1,201 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.33;
+
+import "forge-std/Test.sol";
+import "./IVaultLike.sol";
+import "../../../contracts/modules/AaveYieldGenerationModule.sol";
+import "../../../contracts/interfaces/aave/AaveV3Interfaces.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+/**
+ * @title AaveVaultAdapter
+ * @notice Adapts AaveYieldGenerationModule to IVaultLike interface for testing
+ * @dev This adapter allows us to test Aave integration using standard vault behavior tests
+ *      without requiring full ERC-4626 compliance in production code yet.
+ * 
+ *      Design notes:
+ *      - Wraps AaveYieldGenerationModule to look like an ERC-4626 vault
+ *      - Tracks per-account "shares" internally
+ *      - Shares are 1:1 with deposited aTokens (simplified for initial testing)
+ *      - Allows testing with the VaultBehaviorInvariants suite
+ * 
+ *      Simplifications for v1:
+ *      - Each user gets a unique workflowId
+ *      - Shares track initial deposit amount (not yield-adjusted)
+ *      - This is enough to validate deposit/withdraw flows
+ */
+contract AaveVaultAdapter is IVaultLike {
+    using SafeERC20 for IERC20;
+
+    AaveYieldGenerationModule public immutable aaveModule;
+    address public immutable underlyingAsset;
+    address public immutable aToken;
+    IAavePool public immutable aavePool;
+    
+    // Track shares per account (adapter-level accounting)
+    mapping(address => uint256) private _shares;
+    mapping(address => uint256) private _workflowIds; // user => workflowId
+    uint256 private _totalShares;
+    uint256 private _nextWorkflowId = 1;
+    
+    error ZeroAmount();
+    error InsufficientShares(address owner, uint256 requested, uint256 available);
+    error DepositFailed(string reason);
+    error WithdrawFailed(string reason);
+    error ModuleNotEnabled();
+
+    /**
+     * @notice Create adapter for an Aave yield module
+     * @param _aaveModule The AaveYieldGenerationModule to wrap
+     * @param _underlyingAsset The underlying ERC20 token
+     */
+    constructor(AaveYieldGenerationModule _aaveModule, address _underlyingAsset) {
+        aaveModule = _aaveModule;
+        underlyingAsset = _underlyingAsset;
+        
+        // Get aToken address from module
+        aToken = _aaveModule.tokenToAToken(_underlyingAsset);
+        require(aToken != address(0), "Token not registered in Aave module");
+        
+        // Get Aave pool
+        aavePool = _aaveModule.aavePool();
+        require(address(aavePool) != address(0), "Aave pool not configured");
+        
+        // Verify module is enabled
+        require(_aaveModule.aaveEnabled(), "Aave module not enabled");
+    }
+
+    /// @inheritdoc IVaultLike
+    function asset() external view returns (address) {
+        return underlyingAsset;
+    }
+
+    /// @inheritdoc IVaultLike
+    function deposit(uint256 assets, address receiver) external returns (uint256 shares) {
+        if (assets == 0) revert ZeroAmount();
+        if (!aaveModule.aaveEnabled()) revert ModuleNotEnabled();
+        
+        // Get or create workflowId for receiver
+        uint256 workflowId = _workflowIds[receiver];
+        if (workflowId == 0) {
+            workflowId = _nextWorkflowId++;
+            _workflowIds[receiver] = workflowId;
+        }
+        
+        // Transfer assets from caller to this adapter
+        IERC20(underlyingAsset).safeTransferFrom(msg.sender, address(this), assets);
+        
+        // Approve Aave module
+        IERC20(underlyingAsset).approve(address(aaveModule), assets);
+        
+        // Calculate shares: 1:1 with assets for initial deposit, then proportional
+        if (_totalShares == 0) {
+            shares = assets;
+        } else {
+            // shares = assets * totalShares / totalAssets
+            uint256 currentAssets = totalAssets();
+            shares = (assets * _totalShares) / currentAssets;
+        }
+        
+        // Deposit to Aave via the module
+        try aaveModule.depositForYield(workflowId, underlyingAsset, assets) {
+            // Success - update share accounting
+            _shares[receiver] += shares;
+            _totalShares += shares;
+        } catch Error(string memory reason) {
+            revert DepositFailed(reason);
+        } catch {
+            revert DepositFailed("Unknown error");
+        }
+        
+        return shares;
+    }
+
+    /// @inheritdoc IVaultLike
+    function redeem(uint256 shares, address receiver, address owner) external returns (uint256 assets) {
+        if (shares == 0) revert ZeroAmount();
+        if (_shares[owner] < shares) {
+            revert InsufficientShares(owner, shares, _shares[owner]);
+        }
+        
+        uint256 workflowId = _workflowIds[owner];
+        require(workflowId != 0, "No deposits for owner");
+        
+        // Calculate assets: proportional to shares
+        uint256 currentAssets = totalAssets();
+        assets = (shares * currentAssets) / _totalShares;
+        
+        // Withdraw from Aave via the module
+        try aaveModule.withdrawWithYield(workflowId, underlyingAsset, assets) returns (
+            bool success,
+            uint256 actualAmount,
+            uint256 /* yield */
+        ) {
+            if (!success) revert WithdrawFailed("Module returned success=false");
+            
+            assets = actualAmount; // Use actual amount received
+            
+            // Update share accounting
+            _shares[owner] -= shares;
+            _totalShares -= shares;
+            
+            // Transfer assets to receiver
+            IERC20(underlyingAsset).safeTransfer(receiver, assets);
+        } catch Error(string memory reason) {
+            revert WithdrawFailed(reason);
+        } catch {
+            revert WithdrawFailed("Unknown error");
+        }
+        
+        return assets;
+    }
+
+    /// @inheritdoc IVaultLike
+    function convertToShares(uint256 assets) external view returns (uint256 shares) {
+        if (_totalShares == 0) {
+            return assets; // 1:1 if no deposits yet
+        }
+        
+        uint256 currentAssets = totalAssets();
+        if (currentAssets == 0) {
+            return assets; // Edge case: 1:1
+        }
+        
+        return (assets * _totalShares) / currentAssets;
+    }
+
+    /// @inheritdoc IVaultLike
+    function convertToAssets(uint256 shares) external view returns (uint256 assets) {
+        if (_totalShares == 0) {
+            return shares; // 1:1 if no deposits yet
+        }
+        
+        uint256 currentAssets = totalAssets();
+        return (shares * currentAssets) / _totalShares;
+    }
+
+    /// @inheritdoc IVaultLike
+    function totalAssets() public view returns (uint256) {
+        // Get total value from Aave (aToken balance includes accrued yield)
+        return IERC20(aToken).balanceOf(address(this));
+    }
+
+    /// @inheritdoc IVaultLike
+    function balanceOf(address owner) external view returns (uint256) {
+        return _shares[owner];
+    }
+    
+    /**
+     * @notice Helper to get total shares (not in IVaultLike but useful for testing)
+     */
+    function totalShares() external view returns (uint256) {
+        return _totalShares;
+    }
+    
+    /**
+     * @notice Helper to get workflowId for an account
+     */
+    function getWorkflowId(address account) external view returns (uint256) {
+        return _workflowIds[account];
+    }
+}

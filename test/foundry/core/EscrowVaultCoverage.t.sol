@@ -60,13 +60,13 @@ contract EscrowVaultCoverageTest is Test {
     }
 
     function test_Constructor_InvalidParams() public {
-        vm.expectRevert(); // InvalidEscrowFee
+        vm.expectRevert(abi.encodeWithSelector(InvalidEscrowFee.selector, 201, 200));
         new EscrowVault(201, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
         
-        vm.expectRevert(); // ZeroAddress(1)
+        vm.expectRevert(abi.encodeWithSelector(EscrowVault.ZeroAddress.selector, 1));
         new EscrowVault(100, address(0), address(yieldOps), address(disputeOps), address(moduleManagement));
         
-        vm.expectRevert(); // ZeroAddress(2)
+        vm.expectRevert(abi.encodeWithSelector(EscrowVault.ZeroAddress.selector, 2));
         new EscrowVault(100, feeAddress, address(0), address(disputeOps), address(moduleManagement));
     }
 
@@ -120,7 +120,14 @@ contract EscrowVaultCoverageTest is Test {
 
     function test_recoverERC20_FailExceeds() public {
         token.mint(address(vault), 50e18);
-        vm.expectRevert(); // AmountExceedsAvailable
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                AmountExceedsAvailable.selector,
+                address(token),
+                0,
+                50e18
+            )
+        );
         vault.recoverERC20(address(token), owner, 100e18);
     }
 
@@ -133,7 +140,7 @@ contract EscrowVaultCoverageTest is Test {
         vm.stopPrank();
 
         vm.prank(address(0xDEAD));
-        vm.expectRevert(); // NotSender
+        vm.expectRevert(abi.encodeWithSelector(NotSender.selector, wid, address(0xDEAD), buyer));
         vault.releaseEscrowTransfer(wid);
     }
 }

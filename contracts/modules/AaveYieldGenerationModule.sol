@@ -2,6 +2,8 @@
 pragma solidity ^0.8.33;
 
 import '../interfaces/IYieldGenerationModule.sol';
+import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
+import '@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/access/AccessControl.sol';
@@ -24,14 +26,16 @@ error PoolProviderCallFailed(address provider);
 error BatchSizeTooLarge(uint256 batchSize, uint256 maxBatchSize);
 error EscrowContractCannotBeZero();
 error CapCannotBeRaised(uint256 newCap, uint256 currentCap);
+error NotImplementedYet();
 
 /**
  * @title AaveYieldGenerationModule
- * @notice Yield generation module implementing Aave V3 integration
- * @dev Handles Aave-specific yield generation: deposits, withdrawals, yield calculation, and configuration.
+ * @notice Yield generation module implementing Aave V3 integration with ERC-4626 vault standard
+ * @dev Implements ERC-4626 for standardized vault semantics while maintaining Aave V3 integration.
+ *      Shares are tracked as ERC20 tokens (via ERC4626 base).
  *      Distribution is handled separately by IYieldDistributionModule.
  */
-contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, SlowLaneQueueActivate {
+contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessControl, SlowLaneQueueActivate {
     // Module-specific errors (scoped to avoid global name collisions)
     error AavePoolNotConfigured();
 
@@ -66,6 +70,10 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
     mapping(address => mapping(uint256 => bool)) public escrowInAave; // escrowContract => workflowId => is in Aave
     mapping(address => mapping(uint256 => uint256)) public escrowATokenBalance; // escrowContract => workflowId => aToken balance at deposit
     mapping(address => mapping(uint256 => uint256)) public escrowOriginalDeposit; // escrowContract => workflowId => original deposit amount
+    
+    // ERC-4626 escrow-specific tracking (per-workflow share accounting)
+    mapping(uint256 => uint256) public escrowShares; // workflowId => shares minted for this escrow
+    mapping(uint256 => uint256) public escrowPrincipal; // workflowId => principal deposited for this escrow
     
     // Track which escrow contract corresponds to each workflowId (for withdrawWithYield called by YieldOps)
     mapping(uint256 => address) public workflowIdToEscrow; // workflowId => escrowContract
@@ -109,7 +117,14 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
     event ExposureUpdated(address indexed token, uint256 oldExposure, uint256 newExposure);
     event TotalYieldGeneratedUpdated(address indexed token, uint256 totalYieldGenerated);
 
-    constructor(address initialOwner) {
+    // Underlying asset for ERC-4626 (can be any token; module supports multi-token deposits)
+    // This is primarily for ERC4626 interface compatibility
+    address private _singleUnderlyingAsset;
+
+    constructor(address initialOwner) 
+        ERC4626(IERC20(address(0)))
+        ERC20("Aave Yield Shares", "AAVE-SHARES") {
+        _singleUnderlyingAsset = address(0);
         // Grant DEFAULT_ADMIN_ROLE to initialOwner so roles can be granted later
         _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
     }
@@ -838,5 +853,174 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, AccessControl, Slo
      */
     function getATokenAddress(address token) external view returns (address aTokenAddress) {
         return tokenToAToken[token];
+    }
+
+    // ==================== ERC-4626 Escrow-Specific Methods ====================
+    // These methods track shares per-escrow (workflowId) for yield calculation
+
+    /**
+     * @notice Deposit assets for an escrow, minting shares
+     * @dev ERC-4626 compatible: takes assets, returns shares
+     * @param workflowId The escrow workflow ID (from BaseEscrow)
+     * @param asset The underlying token to deposit
+     * @param assets Amount of assets to deposit
+     * @return shares Amount of shares minted
+     */
+    function depositForEscrow(
+        uint256 workflowId,
+        address asset,
+        uint256 assets
+    ) external returns (uint256 shares) {
+        // Ensure Aave is enabled
+        if (!aaveEnabled) {
+            revert("Aave not enabled");
+        }
+
+        // Check that token is registered
+        address aToken = tokenToAToken[asset];
+        if (aToken == address(0)) {
+            revert("Token not supported by Aave");
+        }
+
+        // Transfer assets from caller to this module
+        IERC20(asset).safeTransferFrom(msg.sender, address(this), assets);
+
+        // Calculate shares to mint (1:1 for first deposit, then use conversion)
+        if (totalSupply() == 0) {
+            shares = assets; // First deposit, 1:1 ratio
+        } else {
+            shares = _convertToShares(assets);
+        }
+
+        // Mint shares to this contract (held in escrowShares)
+        _mint(address(this), shares);
+
+        // Track escrow-specific data
+        escrowShares[workflowId] += shares;
+        escrowPrincipal[workflowId] += assets;
+
+        // Approve pool and deposit to Aave
+        uint256 currentAllowance = IERC20(asset).allowance(address(this), address(aavePool));
+        if (currentAllowance < assets) {
+            if (currentAllowance > 0) {
+                IERC20(asset).safeDecreaseAllowance(address(aavePool), currentAllowance);
+            }
+            IERC20(asset).safeIncreaseAllowance(address(aavePool), assets);
+        }
+        
+        aavePool.supply(asset, assets, address(this), 0);
+
+        return shares;
+    }
+
+    /**
+     * @notice Redeem shares for an escrow, returning assets
+     * @dev ERC-4626 compatible: takes shares, returns assets
+     * @param workflowId The escrow workflow ID (from BaseEscrow)
+     * @param asset The underlying token to redeem
+     * @param shares Amount of shares to redeem
+     * @return assets Amount of assets returned
+     */
+    function redeemForEscrow(
+        uint256 workflowId,
+        address asset,
+        uint256 shares
+    ) external returns (uint256 assets) {
+        // Ensure workflow has shares to redeem
+        if (escrowShares[workflowId] < shares) {
+            revert("Insufficient shares for escrow");
+        }
+
+        // Calculate assets to return
+        assets = _convertToAssets(shares);
+
+        // Burn the shares
+        _burn(address(this), shares);
+
+        // Update escrow tracking
+        escrowShares[workflowId] -= shares;
+        uint256 principal = escrowPrincipal[workflowId];
+        if (principal >= assets) {
+            escrowPrincipal[workflowId] -= assets;
+        } else {
+            escrowPrincipal[workflowId] = 0;
+        }
+
+        // Withdraw from Aave
+        uint256 withdrawn = aavePool.withdraw(asset, assets, address(this));
+
+        // Transfer assets to caller
+        IERC20(asset).safeTransfer(msg.sender, withdrawn);
+
+        return withdrawn;
+    }
+
+    /**
+     * @notice Get shares allocated to an escrow
+     * @param workflowId The escrow workflow ID
+     * @return shares Amount of shares for this escrow
+     */
+    function sharesOfEscrow(uint256 workflowId) external view returns (uint256) {
+        return escrowShares[workflowId];
+    }
+
+    /**
+     * @notice Get principal amount for an escrow
+     * @param workflowId The escrow workflow ID
+     * @return principal Amount of principal deposited for this escrow
+     */
+    function principalOfEscrow(uint256 workflowId) external view returns (uint256) {
+        return escrowPrincipal[workflowId];
+    }
+
+    /**
+     * @notice Calculate yield earned for an escrow
+     * @dev yield = currentValue - principal
+     * @param workflowId The escrow workflow ID
+     * @return yield Amount of yield earned
+     */
+    function yieldOfEscrow(uint256 workflowId) external view returns (uint256) {
+        uint256 shares = escrowShares[workflowId];
+        uint256 principal = escrowPrincipal[workflowId];
+
+        if (shares == 0 || totalSupply() == 0) {
+            return 0;
+        }
+
+        // Convert shares back to assets to get current value
+        uint256 currentValue = _convertToAssets(shares);
+        
+        if (currentValue > principal) {
+            return currentValue - principal;
+        }
+        return 0;
+    }
+
+    /**
+     * @notice Internal helper to convert assets to shares
+     * @param assets Amount of assets
+     * @return shares Equivalent shares
+     */
+    function _convertToShares(uint256 assets) internal view returns (uint256 shares) {
+        uint256 supply = totalSupply();
+        if (supply == 0) {
+            return assets;
+        }
+        // shares = assets * totalSupply / totalAssets
+        return (assets * supply) / totalAssets();
+    }
+
+    /**
+     * @notice Internal helper to convert shares to assets
+     * @param shares Amount of shares
+     * @return assets Equivalent assets
+     */
+    function _convertToAssets(uint256 shares) internal view returns (uint256 assets) {
+        uint256 supply = totalSupply();
+        if (supply == 0) {
+            return shares;
+        }
+        // assets = shares * totalAssets / totalSupply
+        return (shares * totalAssets()) / supply;
     }
 }

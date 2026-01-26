@@ -10,6 +10,7 @@ import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/YieldOps.sol';
 import '../../../contracts/DisputeOps.sol';
 import '../../../contracts/core/ModuleManagementContract.sol';
+import '../../../contracts/decentralized-resolution-module/ResolverIncentiveModuleV1.sol';
 /**
  * @title AppealBondDistributionTest
  * @notice Unit tests for distributeAppealBond functionality
@@ -133,12 +134,13 @@ contract AppealBondDistributionTest is Test {
      */
     function test_distributeAppealBond_NoBondRecorded() public {
         vm.prank(address(escrow));
-        vm.expectRevert();
+        vm.expectRevert('No bond recorded');
         incentiveModule.distributeAppealBond(WORKFLOW_ID, 0, true);
     }
 
     /**
      * @notice Test already distributed - should revert
+     * @dev Note: bond.amount is zeroed after distribution, so recheck gets "No bond recorded"
      */
     function test_distributeAppealBond_AlreadyDistributed() public {
         _recordBond(WORKFLOW_ID, 1);
@@ -148,8 +150,9 @@ contract AppealBondDistributionTest is Test {
         incentiveModule.distributeAppealBond(WORKFLOW_ID, 0, true);
 
         // Try to distribute again
+        // Note: The contract zeros bond.amount after distribution, so second call fails on "No bond recorded"
         vm.prank(address(escrow));
-        vm.expectRevert();
+        vm.expectRevert('No bond recorded');
         incentiveModule.distributeAppealBond(WORKFLOW_ID, 0, true);
     }
 

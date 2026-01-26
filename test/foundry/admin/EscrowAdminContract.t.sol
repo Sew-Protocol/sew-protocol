@@ -2,6 +2,7 @@
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import '../../../contracts/admin/EscrowAdminContract.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/core/modules/DefaultResolutionModule.sol';

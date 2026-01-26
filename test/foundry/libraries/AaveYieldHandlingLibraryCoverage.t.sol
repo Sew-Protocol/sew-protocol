@@ -46,48 +46,6 @@ contract AaveYieldHandlingLibraryHarness {
             workflowId, token, amount, genModule, settings, aaveYieldLibrary
         );
     }
-
-    function prepareYieldDistribution(
-        uint256 workflowId,
-        address token,
-        uint256 actualAmount,
-        uint256 originalAmount,
-        IYieldDistributionModule distModule,
-        uint256 snapshottedYieldFee,
-        address feeRecipient,
-        EscrowTransfer memory escrowTransfer,
-        EscrowSettings memory settings,
-        address yieldOps
-    ) external pure returns (bool, uint256, bytes memory) {
-        return AaveYieldHandlingLibrary.prepareYieldDistribution(
-            workflowId, token, actualAmount, originalAmount, distModule,
-            snapshottedYieldFee, feeRecipient, escrowTransfer, settings, yieldOps
-        );
-    }
-
-    function validateEmergencyUnwind(
-        bool isPaused,
-        uint256 lastUnwind,
-        uint256 currentTime,
-        uint256 cooldown,
-        uint256 maxAmount,
-        uint256 requestedAmount,
-        bool libraryEnabled,
-        address libraryAddress
-    ) external pure returns (bool, uint8) {
-        return AaveYieldHandlingLibrary.validateEmergencyUnwind(
-            isPaused, lastUnwind, currentTime, cooldown, maxAmount, requestedAmount, libraryEnabled, libraryAddress
-        );
-    }
-
-    function prepareEmergencyUnwind(
-        IYieldGenerationModule genModule,
-        address token,
-        uint256 aTokenBalance,
-        uint256 maxAmount
-    ) external view returns (address, address, uint256, uint8) {
-        return AaveYieldHandlingLibrary.prepareEmergencyUnwind(genModule, token, aTokenBalance, maxAmount);
-    }
 }
 
 contract MockYieldGen is IYieldGenerationModule {
@@ -240,17 +198,4 @@ contract AaveYieldHandlingLibraryCoverageTest is Test {
         assertEq(res.actualAmount, 100);
     }
 
-    function test_prepareEmergencyUnwind_Success() public {
-        mockGen.setPool(address(mockPool));
-        mockGen.setAToken(address(0xABC));
-        
-        (address p, address a, uint256 u, uint8 r) = harness.prepareEmergencyUnwind(mockGen, address(0), 100, 1000);
-        assertEq(p, address(mockPool));
-        assertEq(a, address(0xABC));
-        assertEq(u, 100);
-        assertEq(r, 0);
-
-        (p, a, u, r) = harness.prepareEmergencyUnwind(mockGen, address(0), 2000, 1000);
-        assertEq(u, 1000);
-    }
 }

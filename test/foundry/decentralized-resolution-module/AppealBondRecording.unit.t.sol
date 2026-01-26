@@ -5,6 +5,7 @@ import 'forge-std/Test.sol';
 import '../../../contracts/decentralized-resolution-module/ResolverIncentiveModuleV2.sol';
 import '../../../contracts/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
 import '../../../contracts/decentralized-resolution-module/DecentralizedResolverStructs.sol';
+import '../../../contracts/decentralized-resolution-module/ResolverIncentiveModuleV1.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/YieldOps.sol';
@@ -154,7 +155,7 @@ contract AppealBondRecordingTest is Test {
 
         // Try to record duplicate (should revert)
         vm.prank(address(escrow));
-        vm.expectRevert();
+        vm.expectRevert('Bond already exists');
         incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, depositor, amount, address(token), round);
     }
 
@@ -164,12 +165,8 @@ contract AppealBondRecordingTest is Test {
     function test_recordAppealBond_InvalidRoundZero() public {
         uint256 amount = 1 ether;
         uint8 round = 0;
-
-        vm.prank(depositor);
-        token.approve(address(incentiveModule), amount);
-
         vm.prank(address(escrow));
-        vm.expectRevert();
+        vm.expectRevert('Invalid round');
         incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, depositor, amount, address(token), round);
     }
 
@@ -180,11 +177,8 @@ contract AppealBondRecordingTest is Test {
         uint256 amount = 1 ether;
         uint8 round = 3;
 
-        vm.prank(depositor);
-        token.approve(address(incentiveModule), amount);
-
         vm.prank(address(escrow));
-        vm.expectRevert();
+        vm.expectRevert('Invalid round');
         incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, depositor, amount, address(token), round);
     }
 
@@ -196,7 +190,7 @@ contract AppealBondRecordingTest is Test {
         uint8 round = 1;
 
         vm.prank(address(escrow));
-        vm.expectRevert();
+        vm.expectRevert('Invalid amount');
         incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, depositor, amount, address(token), round);
     }
 
@@ -207,11 +201,9 @@ contract AppealBondRecordingTest is Test {
         uint256 amount = 1 ether;
         uint8 round = 1;
 
-        vm.prank(depositor);
-        token.transfer(address(incentiveModule), amount);
-
+        // Call from non-escrow address
         vm.prank(address(escrow));
-        vm.expectRevert();
+        vm.expectRevert('Invalid depositor');
         incentiveModule.recordAppealBond(WORKFLOW_ID, address(0), address(0), amount, address(token), round);
     }
 
@@ -228,7 +220,12 @@ contract AppealBondRecordingTest is Test {
         // Call from non-escrow address
         address nonEscrow = makeAddr('nonEscrow');
         vm.prank(nonEscrow);
-        vm.expectRevert();
+        vm.expectRevert(
+            abi.encodeWithSignature(
+                "NotRegisteredEscrowContract(address)",
+                nonEscrow
+            )
+        );
         incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, depositor, amount, address(token), round);
     }
 
@@ -249,7 +246,6 @@ contract AppealBondRecordingTest is Test {
         incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, depositor, amount, address(token), round);
     }
 
-    // Event declaration for testing (matching ResolverIncentiveModuleV2)
     event AppealBondRecorded(
         uint256 indexed escrowId,
         uint8 round,

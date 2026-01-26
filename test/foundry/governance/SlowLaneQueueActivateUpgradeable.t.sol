@@ -60,17 +60,22 @@ contract SlowLaneQueueActivateUpgradeableTest is Test {
 
     function test_ActivateAddress_NotReady() public {
         harness.queueAddress(user1);
-        vm.expectRevert(); // NotReady
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                SlowLaneQueueActivateUpgradeable.NotReady.selector,
+                uint64(block.timestamp + SLOW_DELAY)
+            )
+        );
         harness.activateAddress();
     }
 
     function test_ActivateAddress_NoPending() public {
-        vm.expectRevert(); // NoPending
+        vm.expectRevert(SlowLaneQueueActivateUpgradeable.NoPending.selector);
         harness.activateAddress();
     }
 
     function test_QueueAddress_Invalid() public {
-        vm.expectRevert(); // InvalidValue
+        vm.expectRevert(SlowLaneQueueActivateUpgradeable.InvalidValue.selector);
         harness.queueAddress(address(0));
     }
 
@@ -92,12 +97,17 @@ contract SlowLaneQueueActivateUpgradeableTest is Test {
 
     function test_ActivateUint_NotReady() public {
         harness.queueUint(123);
-        vm.expectRevert(); // NotReady
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                SlowLaneQueueActivateUpgradeable.NotReady.selector,
+                uint64(block.timestamp + SLOW_DELAY)
+            )
+        );
         harness.activateUint();
     }
 
     function test_ActivateUint_NoPending() public {
-        vm.expectRevert(); // NoPending
+        vm.expectRevert(SlowLaneQueueActivateUpgradeable.NoPending.selector);
         harness.activateUint();
     }
 
