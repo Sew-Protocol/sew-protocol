@@ -52,9 +52,9 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         if (yieldOpsAddress == address(0)) revert ZeroAddress(2);
         if (disputeOpsAddress == address(0)) revert ZeroAddress(3);
         if (moduleManagementAddress == address(0)) revert ZeroAddress(4);
-        if (yieldOpsAddress.code.length == 0 || !_supportsInterface(yieldOpsAddress, 0x01ffc9a7)) revert ZeroAddress(2);
-        if (disputeOpsAddress.code.length == 0 || !_supportsInterface(disputeOpsAddress, 0x01ffc9a7)) revert ZeroAddress(3);
-        if (moduleManagementAddress.code.length == 0 || !_supportsInterface(moduleManagementAddress, 0x01ffc9a7)) revert ZeroAddress(4);
+        if (yieldOpsAddress.code.length == 0) revert ZeroAddress(2);
+        if (disputeOpsAddress.code.length == 0) revert ZeroAddress(3);
+        if (moduleManagementAddress.code.length == 0) revert ZeroAddress(4);
 
         escrowFee = escrowFeeBps;
         escrowFeeAddress = feeAddress;
@@ -80,32 +80,16 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         _mint(_msgSender(), INITIAL_SUPPLY);
     }
 
-    function _supportsInterface(address target, bytes4 interfaceId) private view returns (bool) {
-        (bool success, bytes memory data) = target.staticcall(abi.encodeWithSelector(0x01ffc9a7, interfaceId));
-        return success && data.length >= 32 && abi.decode(data, (bool));
-    }
-
     // ============ Convenience Functions ============
 
     /**
-     * @notice Create a new escrow with default settings
+     * @notice Create a new escrow with custom auto-release or auto-cancel time
      * @param seller Recipient address (seller)
-     * @param amount Amount to escrow (fee will be deducted)
-     * @return workflowId The ID of the created escrow transfer
-     * @dev Convenience function - calls BaseEscrow.createEscrow with address(this) as token
-     */
-    function createEscrow(address seller, uint256 amount) public whenNotPaused returns (uint256) {
-        return createEscrow(address(this), seller, amount, SettingsValidationLibrary.getDefaultSettings());
-    }
-
-    /**
-     * @notice Create an escrow with custom auto-release or auto-cancel time
-     * @param seller Recipient address (seller)
-     * @param amount Amount to escrow (after fee deduction)
+     * @param amount Total amount to escrow (after fee deduction)
      * @param autoReleaseTime Timestamp for automatic release (0 = no auto-release)
      * @param autoCancelTime Timestamp for automatic cancel (0 = no auto-cancel)
      * @return workflowId The ID of the created escrow transfer
-     * @dev Convenience function - calls BaseEscrow.createEscrow with timing settings
+     * @dev Convenience function - calls BaseEscrow.createEscrow with address(this) as token
      */
     function createEscrow(
         address seller,
@@ -120,14 +104,14 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
     }
 
     /**
-     * @notice Release funds to the recipient (called by sender)
-     * @param workflowId The escrow transfer ID
-     * @dev Validates state is PENDING and caller is sender.
+     * @notice Create a new escrow with default settings
+     * @param seller Recipient address (seller)
+     * @param amount Total amount to escrow (after fee deduction)
+     * @return workflowId The ID of the created escrow transfer
+     * @dev Convenience function - calls BaseEscrow.createEscrow with address(this) as token
      */
-    function releaseEscrowTransfer(uint256 workflowId) public nonReentrant whenNotPaused {
-        _requirePending(workflowId);
-        if (escrowTransfers[workflowId].from != _msgSender()) revert NotSender(workflowId, _msgSender(), escrowTransfers[workflowId].from);
-        _releaseEscrowTransfer(workflowId);
+    function createEscrow(address seller, uint256 amount) public whenNotPaused returns (uint256) {
+        return createEscrow(address(this), seller, amount, SettingsValidationLibrary.getDefaultSettings());
     }
 
     // ============ BaseEscrow Hook Implementations ============
@@ -276,7 +260,6 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         address token,
         uint256 amount
     ) internal override {
-        if (token != address(this)) revert InvalidAddress(ADDR_TOKEN, token);
         generationModule.depositForYield(workflowId, token, amount);
     }
 

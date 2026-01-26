@@ -80,11 +80,9 @@ contract EscrowVault is BaseEscrow {
         uint256 amount
     ) internal override {
         address moduleAddress = address(generationModule);
-        if (moduleAddress != address(0)) {
-            uint256 currentAllowance = IERC20(token).allowance(address(this), moduleAddress);
-            if (currentAllowance < amount) {
-                IERC20(token).safeIncreaseAllowance(moduleAddress, type(uint256).max);
-            }
+        uint256 currentAllowance = IERC20(token).allowance(address(this), moduleAddress);
+        if (currentAllowance < amount) {
+            IERC20(token).safeIncreaseAllowance(moduleAddress, type(uint256).max);
         }
         generationModule.depositForYield(workflowId, token, amount);
     }

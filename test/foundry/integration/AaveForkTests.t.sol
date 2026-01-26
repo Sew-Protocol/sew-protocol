@@ -143,6 +143,9 @@ contract AaveForkTests is Test {
         aaveModule.grantRole(aaveModule.DEFAULT_ADMIN_ROLE(), address(this));
         aaveModule.grantRole(aaveModule.ROLE_TIMELOCK(), address(this));
         
+        guardianOps = new GuardianOps(address(escrowVault));
+        aaveModule.grantRole(aaveModule.ROLE_GUARDIAN(), address(guardianOps));
+        
         // Queue both provider and module before warping
         aaveModule.queueAavePoolProvider(BASE_SEPOLIA_POOL_PROVIDER);
         vm.prank(address(escrowVault));
@@ -210,8 +213,8 @@ contract AaveForkTests is Test {
         vm.stopPrank();
         
         // assertTrue(escrowVault.escrowInYield(workflowId, address(token)), "Should be in yield"); // REMOVED: external yield library feature deleted
-        assertGt(aToken.balanceOf(address(escrowVault)), 0, "BaseEscrow should own aTokens");
-        assertEq(aToken.balanceOf(address(aaveModule)), 0, "Module should not own aTokens");
+        assertGt(aToken.balanceOf(address(aaveModule)), 0, "Module should own aTokens");
+        assertEq(aToken.balanceOf(address(escrowVault)), 0, "BaseEscrow should not own aTokens");
     }
     
     function test_WithdrawalWorksWithRealAave() public {
@@ -271,12 +274,9 @@ contract AaveForkTests is Test {
         escrowVault.pause();
         uint256 tokenBalanceBefore = token.balanceOf(address(escrowVault));
         
-        try guardianOps.emergencyUnwindAavePosition(address(token), guardianOps.MAX_UNWIND_AMOUNT_PER_CALL()) returns (uint256 unwound) {
-            assertGt(unwound, 0, "Unwind should succeed");
-            assertGt(token.balanceOf(address(escrowVault)), tokenBalanceBefore, "BaseEscrow should receive funds");
-        } catch {
-            vm.skip(true);
-        }
+        uint256 unwound = guardianOps.emergencyUnwindAavePosition(address(token), guardianOps.MAX_UNWIND_AMOUNT_PER_CALL());
+        assertGt(unwound, 0, "Unwind should succeed");
+        assertGt(token.balanceOf(address(escrowVault)), tokenBalanceBefore, "BaseEscrow should receive funds");
     }
     
     function test_EmergencyUnwindRespectsCooldown() public {

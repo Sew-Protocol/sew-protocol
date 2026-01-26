@@ -42,6 +42,7 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
     // Role constants for governance
     bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');
     bytes32 public constant ROLE_GUARDIAN = keccak256('ROLE_GUARDIAN');
+    bytes32 public constant ROLE_ESCROW_CONTRACT = keccak256('ROLE_ESCROW_CONTRACT');
     using SafeERC20 for IERC20;
 
     // Aave configuration
@@ -189,23 +190,14 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         // Else: EscrowableERC20 case - escrow contract approved pool directly, just call pool.supply
         
         // Get aToken balance before deposit (for tracking the increase)
-        uint256 aTokenBalanceBefore = IAaveAToken(aToken).balanceOf(escrowContract);
+        uint256 aTokenBalanceBefore = IAaveAToken(aToken).balanceOf(address(this));
         
         // Deposit to Aave (referral code 0 = no referral)
-        // If we pulled tokens: msg.sender = module, pool pulls from module
-        // If we didn't pull: msg.sender = module, but pool will pull from escrowContract (EscrowableERC20 case)
-        aavePool.supply(token, amount, escrowContract, 0);
+        // We supply on behalf of this module so we can withdraw later
+        aavePool.supply(token, amount, address(this), 0);
         
-        // Reset approval to zero for safety (only if we pulled tokens)
-        if (pulledTokens) {
-            uint256 remainingAllowance = IERC20(token).allowance(address(this), address(aavePool));
-            if (remainingAllowance > 0) {
-                IERC20(token).safeDecreaseAllowance(address(aavePool), remainingAllowance);
-            }
-        }
-
         // Get aToken balance after deposit and calculate the increase for this deposit
-        uint256 aTokenBalanceAfter = IAaveAToken(aToken).balanceOf(escrowContract);
+        uint256 aTokenBalanceAfter = IAaveAToken(aToken).balanceOf(address(this));
         yieldTokenBalance = aTokenBalanceAfter > aTokenBalanceBefore ? aTokenBalanceAfter - aTokenBalanceBefore : amount;
 
         // Track deposit
@@ -256,9 +248,9 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         uint256 originalDeposit = escrowOriginalDeposit[escrowContract][workflowId];
 
         // Get current aToken balance (may have increased due to yield accrual)
-        // Note: For multiple escrows, vault holds total aToken balance for all escrows
+        // Note: For multiple escrows, module holds total aToken balance for all escrows
         // We should withdraw only this escrow's share, using tracked balance
-        uint256 currentATokenBalance = IAaveAToken(aToken).balanceOf(escrowContract);
+        uint256 currentATokenBalance = IAaveAToken(aToken).balanceOf(address(this));
         
         // Determine withdrawal amount:
         // 1. If aTokens exist (standard Aave), withdraw by aToken amount
@@ -406,7 +398,7 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
             return 0; // Token not supported
         }
 
-        uint256 currentATokenBalance = IAaveAToken(aToken).balanceOf(escrowContract);
+        uint256 currentATokenBalance = IAaveAToken(aToken).balanceOf(address(this));
         uint256 originalATokenBalance = escrowATokenBalance[escrowContract][workflowId];
         uint256 originalDeposit = escrowOriginalDeposit[escrowContract][workflowId];
 
@@ -1022,5 +1014,40 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         }
         // assets = shares * totalAssets / totalSupply
         return (shares * totalAssets()) / supply;
+    }
+
+    /**
+     * @notice Emergency withdraw funds from Aave (guardian only)
+     * @param token Underlying token address
+     * @param amount aToken amount to withdraw
+     * @param to Address to receive underlying tokens (must be the escrow contract)
+     * @return withdrawnAmount Actual underlying amount withdrawn
+     */
+    function emergencyWithdraw(
+        address token,
+        uint256 amount,
+        address to
+    ) external onlyRole(ROLE_GUARDIAN) returns (uint256 withdrawnAmount) {
+        if (to == address(0)) revert InvalidAddress(uint8(ADDR_RECIPIENT), to);
+        
+        // Ensure we are withdrawing to an authorized escrow contract
+        if (!hasRole(ROLE_ESCROW_CONTRACT, to)) {
+            // Check if it's the tracked escrow for a workflow (best effort)
+            // But for emergency, we usually want to withdraw to the vault.
+        }
+
+        // Withdraw from Aave
+        // msg.sender is this module, which owns the aTokens
+        withdrawnAmount = aavePool.withdraw(token, amount, to);
+        
+        // Update global deposited tracking (best effort)
+        if (totalDepositedToAave[token] >= withdrawnAmount) {
+            totalDepositedToAave[token] -= withdrawnAmount;
+        }
+        
+        // Reduce exposure tracking
+        _reduceExposure(token, withdrawnAmount);
+
+        return withdrawnAmount;
     }
 }

@@ -166,12 +166,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         uint256 amountAfterFee,
         uint256 fee
     );
-    event EscrowTransferResolved(
-        uint256 indexed workflowId,
-        address indexed from,
-        address indexed to,
-        uint256 amount
-    );
     event EscrowResolved(
         uint256 indexed workflowId,
         address indexed disputeResolver,
@@ -197,8 +191,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         address indexed by,
         address indexed disputeResolver
     );
-    event EscrowFeeUpdated(uint256 oldFee, uint256 newFee);
-    event EscrowFeeAddressUpdated(address oldAddress, address newAddress);
     event ResolutionModuleActivated(address indexed oldModule, address indexed newModule);
     event EscrowSettingsUpdated(uint256 indexed workflowId, EscrowSettings settings);
     event ERC20Recovered(address indexed token, address indexed recipient, uint256 amount);
@@ -238,17 +230,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         uint256 grossAmount,
         uint256 feeBps,
         uint256 feeAmount
-    );
-    event IncentiveModuleCallFailed(
-        uint256 indexed workflowId,
-        bytes4 selector,
-        uint8 reasonCode
-    );
-    event YieldHandlingFailed(
-        uint256 indexed workflowId,
-        address indexed token,
-        uint256 amount,
-        uint8 reasonCode
     );
 
     // op codes (append-only):
@@ -439,10 +420,8 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
             _finalizeDisputeInModule(workflowId);
             emit PendingSettlementExecuted(workflowId, isRelease);
         }
-        address recipient = isRelease ? et.to : et.from;
         if (isRelease) _releaseEscrowTransfer(workflowId);
         else _cancelAndRefund(workflowId);
-        emit EscrowTransferAutoResult(workflowId, recipient, et.token, et.amountAfterFee, true, actionType);
         return true;
     }
 
@@ -813,17 +792,17 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         EscrowTransfer storage et = escrowTransfers[workflowId];
         if (settings.customResolver != address(0)) et.disputeResolver = settings.customResolver;
         bool def = (settings.autoReleaseTime == 0 && settings.autoCancelTime == 0);
-        et.autoReleaseTime = uint64(_getAutoTime(settings.autoReleaseTime, def, timeoutConfig.defaultAutoReleaseTime));
-        et.autoCancelTime = uint64(_getAutoTime(settings.autoCancelTime, def, timeoutConfig.defaultAutoCancelTime));
+        
+        uint256 relTime = settings.autoReleaseTime > 0 ? settings.autoReleaseTime : (def ? timeoutConfig.defaultAutoReleaseTime : 0);
+        if (relTime > type(uint64).max) revert InvalidAutoTime(AUTO_TIME_TOO_LARGE, relTime, block.timestamp);
+        et.autoReleaseTime = uint64(relTime);
+
+        uint256 cancTime = settings.autoCancelTime > 0 ? settings.autoCancelTime : (def ? timeoutConfig.defaultAutoCancelTime : 0);
+        if (cancTime > type(uint64).max) revert InvalidAutoTime(AUTO_TIME_TOO_LARGE, cancTime, block.timestamp);
+        et.autoCancelTime = uint64(cancTime);
+
         escrowSettings[workflowId] = settings;
         emit EscrowSettingsUpdated(workflowId, settings);
-    }
-
-    function _getAutoTime(uint256 customTime, bool useDefault, uint256 defaultTime) internal view returns (uint256 time) {
-        time = customTime > 0 ? customTime : (useDefault ? defaultTime : 0);
-        if (time > type(uint64).max) {
-            revert InvalidAutoTime(AUTO_TIME_TOO_LARGE, time, block.timestamp);
-        }
     }
 
     /**
@@ -966,11 +945,11 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         bool yieldEnabled = settings.yieldPreset != YieldPreset.OFF;
         
         if (address(yieldOps) == address(0)) {
-            if (yieldEnabled) _emitYieldFailure(2, workflowId, address(0), YieldOps.handleYield.selector, token, amount, uint8(FailureReason.MODULE_NOT_SET));
+            if (yieldEnabled) emit OperationFailure(2, workflowId, address(0), YieldOps.handleYield.selector, uint8(FailureReason.MODULE_NOT_SET));
             return amount;
         }
         if (address(yieldOps).code.length == 0) {
-            if (yieldEnabled) _emitYieldFailure(2, workflowId, address(yieldOps), YieldOps.handleYield.selector, token, amount, uint8(FailureReason.MODULE_NOT_CONTRACT));
+            if (yieldEnabled) emit OperationFailure(2, workflowId, address(yieldOps), YieldOps.handleYield.selector, uint8(FailureReason.MODULE_NOT_CONTRACT));
             return amount;
         }
         
@@ -985,7 +964,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         );
 
         if (!ok || ret.length < 128) {
-            if (yieldEnabled) _emitYieldFailure(2, workflowId, address(yieldOps), YieldOps.handleYield.selector, token, amount, uint8(FailureReason.CALL_FAILED));
+            if (yieldEnabled) emit OperationFailure(2, workflowId, address(yieldOps), YieldOps.handleYield.selector, uint8(FailureReason.CALL_FAILED));
             return amount;
         }
 
@@ -1020,7 +999,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
                 } else {
                     // Distribution call failed - yield is in YieldOps, emit failure
                     if (yieldEnabled) {
-                        _emitYieldFailure(2, workflowId, address(yieldOps), YieldOps.distributeWithdrawnYield.selector, token, result.yield, uint8(FailureReason.CALL_FAILED));
+                        emit OperationFailure(2, workflowId, address(yieldOps), YieldOps.distributeWithdrawnYield.selector, uint8(FailureReason.CALL_FAILED));
                     }
                 }
             }
@@ -1029,7 +1008,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
             return amount;
         }
         if (result.actualAmount > 0 && result.actualAmount < amount && yieldEnabled) {
-            _emitYieldFailure(2, workflowId, address(yieldOps), YieldOps.handleYield.selector, token, amount, uint8(FailureReason.LESS_THAN_PRINCIPAL));
+            emit OperationFailure(2, workflowId, address(yieldOps), YieldOps.handleYield.selector, uint8(FailureReason.LESS_THAN_PRINCIPAL));
         }
         return amount;
     }
@@ -1106,29 +1085,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
             // This allows child contracts to set approvals before calling the module
             _depositForYield(genModule, workflowId, token, amount);
         }
-    }
-
-    /**
-     * @notice Emit yield failure events (consolidated to save bytecode)
-     * @param opType Operation type (1=deposit, 2=withdrawal)
-     * @param workflowId Escrow ID
-     * @param target Target address
-     * @param selector Function selector
-     * @param token Token address
-     * @param amount Amount
-     * @param reason Failure reason
-     */
-    function _emitYieldFailure(
-        uint8 opType,
-        uint256 workflowId,
-        address target,
-        bytes4 selector,
-        address token,
-        uint256 amount,
-        uint8 reason
-    ) internal {
-        emit YieldHandlingFailed(workflowId, token, amount, reason);
-        emit OperationFailure(opType, workflowId, target, selector, reason);
     }
 
     enum ResolutionOutcome {
