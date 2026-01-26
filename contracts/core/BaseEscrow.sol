@@ -78,7 +78,6 @@ error ZeroBondCollector();
 error EscalationNotAllowed();
 error AppealBondQueryFailed(uint256 workflowId);
 error InvalidBondMsgValue(uint256 workflowId, uint256 required, uint256 provided);
-error UnexpectedETH(uint256 workflowId, uint256 provided);
 
 // Errors used by child contracts (EscrowVault, EscrowableERC20)
 error BalanceUnderflow(address token, uint256 currentBalance, uint256 requestedAmount);
@@ -443,7 +442,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         address recipient = isRelease ? et.to : et.from;
         if (isRelease) _releaseEscrowTransfer(workflowId);
         else _cancelAndRefund(workflowId);
-        _emitAutoResult(workflowId, recipient, et.token, et.amountAfterFee, actionType);
+        emit EscrowTransferAutoResult(workflowId, recipient, et.token, et.amountAfterFee, true, actionType);
         return true;
     }
 
@@ -491,9 +490,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         address from = et.from;
         uint256 amt = et.amountAfterFee;
         _cancelAndRefund(workflowId);
-        et.escrowState = EscrowState.RESOLVED;
         delete disputeRaisedTimestamp[workflowId];
-        emit EscrowStateChanged(workflowId, EscrowState.DISPUTED, EscrowState.RESOLVED);
         emit DisputeAutoCancelled(workflowId, from, amt, uint8(FailureReason.TIMEOUT));
     }
 
@@ -606,10 +603,9 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         );
         if (!bondQuerySuccess) revert AppealBondQueryFailed(workflowId);
 
-        (bool msgValueValid, uint8 errorCode) = DisputeEscalationLibrary.validateBondMsgValue(bondToken, bondAmount, msg.value);
+        (bool msgValueValid, ) = DisputeEscalationLibrary.validateBondMsgValue(bondToken, bondAmount, msg.value);
         if (!msgValueValid) {
-            if (errorCode == 1) revert InvalidBondMsgValue(workflowId, bondAmount, msg.value);
-            if (errorCode == 2) revert UnexpectedETH(workflowId, msg.value);
+            revert InvalidBondMsgValue(workflowId, bondAmount, msg.value);
         }
 
         if (bondAmount > 0) {
@@ -844,10 +840,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         });
     }
 
-    function _emitAutoResult(uint256 workflowId, address recipient, address token, uint256 amount, uint8 actionCode) internal {
-        emit EscrowTransferAutoResult(workflowId, recipient, token, amount, true, actionCode);
-    }
-
     function _finalizeDisputeInModule(uint256 workflowId) internal {
         IResolutionModule resolutionModule = _getResolutionModule(workflowId);
         if (address(resolutionModule) != address(0)) {
@@ -938,7 +930,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         uint256 bal = IERC20(token).balanceOf(address(this));
         bool success = bal >= amount && _tryTransfer(token, recipient, amount);
         if (success) {
-            _emitAutoResult(workflowId, recipient, token, amount, 0);
+            emit EscrowTransferAutoResult(workflowId, recipient, token, amount, true, 0);
             return true;
         }
         claimableBalances[workflowId][recipient] += amount;
@@ -963,52 +955,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
 
     function _getDefaultYieldGenerationModule() internal view virtual returns (IYieldGenerationModule module) {
         return IYieldGenerationModule(address(0));
-    }
-
-    function _distributeYieldIfNeeded(
-        uint256 workflowId,
-        address token,
-        uint256 actualAmount,
-        uint256 originalAmount
-    ) internal {
-        if (actualAmount <= originalAmount) return;
-        
-        uint256 yieldAmount = actualAmount - originalAmount;
-        
-        if (address(yieldOps) != address(0) && address(yieldOps).code.length > 0) {
-            IYieldDistributionModule distModule = _getYieldDistributionModule(workflowId);
-            uint256 snapshottedYieldFee = moduleSnapshots[workflowId].yieldProtocolFeeBps;
-            if (snapshottedYieldFee > MAX_PROTOCOL_FEE_BPS) {
-                snapshottedYieldFee = 0; // clamp to avoid YieldOps revert and stranded funds
-            }
-        address feeRecipient = escrowFeeAddress;
-            if (feeRecipient == address(0)) {
-                snapshottedYieldFee = 0;
-            } else if (snapshottedYieldFee > 0) {
-                // CRIT-2: Ensure feeRecipient is valid when fees are non-zero
-                // This prevents yield from being stuck if distribution fails
-                // Note: feeRecipient validation happens in YieldOps, but we check here for early detection
-            }
-            
-            EscrowTransfer memory et = escrowTransfers[workflowId];
-            EscrowSettings memory settings = escrowSettings[workflowId];
-            bytes memory distributionData = YieldPresetLibrary.deriveDistributionData(
-                settings.yieldPreset,
-                et.from,
-                et.to
-            );
-            
-            IERC20(token).safeTransfer(address(yieldOps), yieldAmount);
-            
-            (bool success, bytes memory returnData) = address(yieldOps).call(
-                abi.encodeWithSelector(YieldOps.distributeWithdrawnYield.selector, distModule, workflowId, token, yieldAmount, snapshottedYieldFee, feeRecipient, distributionData)
-            );
-            if (!success) {
-                emit YieldHandlingFailed(workflowId, token, yieldAmount, uint8(FailureReason.CALL_FAILED));
-            }
-            // Note: We don't decode the return value in the library pattern
-            // The yield has been distributed or recovered, we just continue with principal
-        }
     }
 
     function _handleYieldAndGetActualAmount(

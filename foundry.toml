@@ -7,7 +7,7 @@ cache_path = "cache-foundry"
 solc = "0.8.33"
 optimizer = true
 # Reduced to 100 runs to prioritize contract size over gas (EIP-170 24kb limit)
-optimizer_runs = 50
+optimizer_runs = 25
 via_ir = true
 verbosity = 3
 ffi = false
