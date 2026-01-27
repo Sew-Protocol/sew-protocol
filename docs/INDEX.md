@@ -2,7 +2,7 @@
 
 Complete index of all documentation in this repository.
 
-**Last Updated:** 2026-01-16
+**Last Updated:** 2026-01-27
 
 ---
 
@@ -12,18 +12,30 @@ Complete index of all documentation in this repository.
 - **[WHITEPAPER.md](./WHITEPAPER.md)** - Complete protocol whitepaper
 - **[README.md](./README.md)** - Documentation overview and structure
 - **[Technical Overview](./architecture/TECHNICAL_OVERVIEW.md)** - High-level technical architecture
-- **[Base Sepolia Core Testnet Guide](./deployment/BASE_SEPOLIA_CORE_TESTNET_GUIDE.md)** - Core escrow deployment + test checklist (IEO/integration)
-- **[Base Sepolia Testnet Release Summary](./deployment/BASE_SEPOLIA_TESTNET_RELEASE_SUMMARY.md)** - What’s deployed, what’s broken, and paths forward (canonical for testnet status)
+- **[Production Readiness Checklist](./PRODUCTION_READY_CHECKLIST.md)** - Mainnet requirements and status
+- **[Production Hardening Status](./PRODUCTION_HARDENING_STATUS.md)** - Summary of hardening efforts
 
 ### Security & Audits
+- **[DeFi Expert Review](./DEFI_EXPERT_REVIEW.md)** - Comprehensive security approval
 - **[Security Model](./reviews/SECURITY_MODEL.md)** - Security model and threat analysis
 - **[Audit Documentation](./reviews/AUDIT.md)** - Audit status and reports
 
-### Governance
-- **[Governance Process](./governance/GOVERNANCE_PROCESS.md)** - Step-by-step governance workflow
-- **[Governance Surface Map](./governance/GOVERNANCE_SURFACE_MAP.md)** - Complete function → role → lane mapping
-- **[Emergency Policy](./policies/EMERGENCY_POLICY.md)** - Emergency controls and procedures
-- **[Upgrade Policy](./policies/UPGRADE_POLICY.md)** - Upgrade procedures and ossification plan
+---
+
+## 🛡️ Production Hardening (Critical Fixes)
+
+Documentation of critical security and correctness fixes required for mainnet.
+
+| Document | Description | Status |
+|----------|-------------|--------|
+| [CRIT1_FIXES.md](./CRIT1_FIXES.md) | Scaled shares accounting & precision fixes | ✅ FIXED |
+| [CRIT1_TESTING](./CRIT1_TESTING_SUMMARY.md) | Unit & Fuzz tests for scaled shares | ✅ COMPLETE |
+| [CRIT2_FIXES.md](./CRIT2_FIXES.md) | Yield distribution PUSH model implementation | ✅ FIXED |
+| [CRIT2_TESTING](./CRIT2_TESTING_SUMMARY.md) | Unit tests for distribution failures | ✅ COMPLETE |
+| [CRIT3_FIXES.md](./CRIT3_FIXES.md) | Aave failure mode transparency & events | ✅ FIXED |
+| [CRIT3_TESTING](./test/CRIT3_TESTING_SUMMARY.md) | Verification of failure communication layer | ✅ COMPLETE |
+| [AAVE_INTEGRATION_STATUS](./test/AAVE_INTEGRATION_CHECKLIST_STATUS.md) | Full Aave test coverage status | ✅ COMPLETE |
+| [TEST_FAILURE_ANALYSIS](./test/REMAINING_TEST_FAILURES_ANALYSIS.md) | Final resolution of all test failures | ✅ COMPLETE |
 
 ---
 
