@@ -260,6 +260,11 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         address token,
         uint256 amount
     ) internal override {
+        address moduleAddress = address(generationModule);
+        uint256 currentAllowance = allowance(address(this), moduleAddress);
+        if (currentAllowance < amount) {
+            _approve(address(this), moduleAddress, type(uint256).max);
+        }
         generationModule.depositForYield(workflowId, token, amount);
     }
 
@@ -277,16 +282,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
     }
 
     // ============ Module swapping (escrow-originated calls) ============
-    // ModuleManagementContract requires msg.sender == escrowContract. These wrappers allow
-    // governance (ROLE_TIMELOCK) to perform module swaps with 7-day slow lane delay.
-
-    function queueModule(BaseEscrow.ModuleType moduleType, address newModule) external onlyRole(ROLE_TIMELOCK) {
-        moduleManagement.queueModule(address(this), moduleType, newModule);
-    }
-
-    function activateModule(BaseEscrow.ModuleType moduleType) external onlyRole(ROLE_TIMELOCK) {
-        moduleManagement.activateModule(address(this), moduleType);
-    }
+    // Removed wrappers as ModuleManagementContract now allows direct ROLE_TIMELOCK calls
 
     function _getReleaseStrategy(uint256 workflowId) internal view override returns (IReleaseStrategy) {
         return ModuleGetterConsolidationLibrary.getReleaseStrategy(_getModuleAddress(workflowId, ModuleType.RELEASE));
@@ -336,6 +332,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         totalFees = 0;
         
         emit FeesWithdrawn(feeAmount);
+        return true;
     }
 
     function recoverERC20(

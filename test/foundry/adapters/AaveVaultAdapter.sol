@@ -177,7 +177,8 @@ contract AaveVaultAdapter is IVaultLike {
     /// @inheritdoc IVaultLike
     function totalAssets() public view returns (uint256) {
         // Get total value from Aave (aToken balance includes accrued yield)
-        return IERC20(aToken).balanceOf(address(this));
+        // aTokens are held by the module, not the adapter
+        return IERC20(aToken).balanceOf(address(aaveModule));
     }
 
     /// @inheritdoc IVaultLike

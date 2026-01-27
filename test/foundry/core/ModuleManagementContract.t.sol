@@ -104,7 +104,7 @@ contract ModuleManagementContractTest is Test {
     // ============ queueModule Tests ============
     
     function test_queueModule_RELEASE_success() public {
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.queueModule(
             address(escrowContract),
             BaseEscrow.ModuleType.RELEASE,
@@ -122,7 +122,7 @@ contract ModuleManagementContractTest is Test {
     }
     
     function test_queueModule_YIELD_GEN_success() public {
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.queueModule(
             address(escrowContract),
             BaseEscrow.ModuleType.YIELD_GEN,
@@ -139,7 +139,7 @@ contract ModuleManagementContractTest is Test {
     }
     
     function test_queueModule_YIELD_DIST_success() public {
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.queueModule(
             address(escrowContract),
             BaseEscrow.ModuleType.YIELD_DIST,
@@ -156,7 +156,7 @@ contract ModuleManagementContractTest is Test {
     }
     
     function test_queueModule_RESOLUTION_success() public {
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.queueModule(
             address(escrowContract),
             BaseEscrow.ModuleType.RESOLUTION,
@@ -173,7 +173,7 @@ contract ModuleManagementContractTest is Test {
     }
     
     function test_queueModule_zeroAddress_reverts() public {
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         vm.expectRevert(SlowLaneQueueActivate.InvalidValue.selector);
         moduleManagement.queueModule(
             address(escrowContract),
@@ -193,8 +193,8 @@ contract ModuleManagementContractTest is Test {
     }
     
     function test_queueModule_differentEscrowContract_reverts() public {
-        vm.prank(address(escrowContract));
-        vm.expectRevert(SlowLaneQueueActivate.InvalidValue.selector);
+        vm.prank(timelock);
+        vm.expectRevert(abi.encodeWithSelector(ModuleManagementContract.EscrowNotRegistered.selector, address(0x4444)));
         moduleManagement.queueModule(
             address(0x4444), // Different escrow
             BaseEscrow.ModuleType.RELEASE,
@@ -206,7 +206,7 @@ contract ModuleManagementContractTest is Test {
     
     function test_activateModule_RELEASE_success() public {
         // Queue module
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.queueModule(
             address(escrowContract),
             BaseEscrow.ModuleType.RELEASE,
@@ -217,7 +217,7 @@ contract ModuleManagementContractTest is Test {
         vm.warp(block.timestamp + 7 days + 1);
         
         // Activate
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.activateModule(
             address(escrowContract),
             BaseEscrow.ModuleType.RELEASE
@@ -236,7 +236,7 @@ contract ModuleManagementContractTest is Test {
     }
     
     function test_activateModule_YIELD_GEN_success() public {
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.queueModule(
             address(escrowContract),
             BaseEscrow.ModuleType.YIELD_GEN,
@@ -245,7 +245,7 @@ contract ModuleManagementContractTest is Test {
         
         vm.warp(block.timestamp + 7 days + 1);
         
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.activateModule(
             address(escrowContract),
             BaseEscrow.ModuleType.YIELD_GEN
@@ -256,7 +256,7 @@ contract ModuleManagementContractTest is Test {
     }
     
     function test_activateModule_YIELD_DIST_success() public {
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.queueModule(
             address(escrowContract),
             BaseEscrow.ModuleType.YIELD_DIST,
@@ -265,7 +265,7 @@ contract ModuleManagementContractTest is Test {
         
         vm.warp(block.timestamp + 7 days + 1);
         
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.activateModule(
             address(escrowContract),
             BaseEscrow.ModuleType.YIELD_DIST
@@ -276,7 +276,7 @@ contract ModuleManagementContractTest is Test {
     }
     
     function test_activateModule_RESOLUTION_success() public {
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.queueModule(
             address(escrowContract),
             BaseEscrow.ModuleType.RESOLUTION,
@@ -285,7 +285,7 @@ contract ModuleManagementContractTest is Test {
         
         vm.warp(block.timestamp + 7 days + 1);
         
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.activateModule(
             address(escrowContract),
             BaseEscrow.ModuleType.RESOLUTION
@@ -296,7 +296,7 @@ contract ModuleManagementContractTest is Test {
     }
     
     function test_activateModule_noPending_reverts() public {
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         vm.expectRevert(SlowLaneQueueActivate.NoPending.selector);
         moduleManagement.activateModule(
             address(escrowContract),
@@ -305,7 +305,7 @@ contract ModuleManagementContractTest is Test {
     }
     
     function test_activateModule_premature_reverts() public {
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.queueModule(
             address(escrowContract),
             BaseEscrow.ModuleType.RELEASE,
@@ -313,7 +313,7 @@ contract ModuleManagementContractTest is Test {
         );
         
         // Try to activate before delay
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         vm.expectRevert(abi.encodeWithSelector(SlowLaneQueueActivate.NotReady.selector, uint64(block.timestamp + 7 days)));
         moduleManagement.activateModule(
             address(escrowContract),
@@ -322,7 +322,7 @@ contract ModuleManagementContractTest is Test {
     }
     
     function test_activateModule_wrongCaller_reverts() public {
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.queueModule(
             address(escrowContract),
             BaseEscrow.ModuleType.RELEASE,
@@ -341,7 +341,7 @@ contract ModuleManagementContractTest is Test {
     
     function test_activateModule_replaceExisting() public {
         // Queue and activate first module
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.queueModule(
             address(escrowContract),
             BaseEscrow.ModuleType.RELEASE,
@@ -352,14 +352,14 @@ contract ModuleManagementContractTest is Test {
             BaseEscrow.ModuleType.RELEASE
         );
         vm.warp(firstEta + 1);
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.activateModule(
             address(escrowContract),
             BaseEscrow.ModuleType.RELEASE
         );
         
         // Queue and activate second module
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.queueModule(
             address(escrowContract),
             BaseEscrow.ModuleType.RELEASE,
@@ -370,7 +370,7 @@ contract ModuleManagementContractTest is Test {
             BaseEscrow.ModuleType.RELEASE
         );
         vm.warp(secondEta + 1);
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.activateModule(
             address(escrowContract),
             BaseEscrow.ModuleType.RELEASE
@@ -384,7 +384,7 @@ contract ModuleManagementContractTest is Test {
     // ============ getPendingModule Tests ============
     
     function test_getPendingModule_exists() public {
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.queueModule(
             address(escrowContract),
             BaseEscrow.ModuleType.RELEASE,
@@ -415,14 +415,14 @@ contract ModuleManagementContractTest is Test {
     // ============ Getter Functions Tests ============
     
     function test_getDefaultReleaseStrategy() public {
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.queueModule(
             address(escrowContract),
             BaseEscrow.ModuleType.RELEASE,
             address(releaseStrategy1)
         );
         vm.warp(block.timestamp + 7 days + 1);
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.activateModule(
             address(escrowContract),
             BaseEscrow.ModuleType.RELEASE
@@ -433,14 +433,14 @@ contract ModuleManagementContractTest is Test {
     }
     
     function test_getDefaultYieldGenerationModule() public {
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.queueModule(
             address(escrowContract),
             BaseEscrow.ModuleType.YIELD_GEN,
             address(yieldGenModule1)
         );
         vm.warp(block.timestamp + 7 days + 1);
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.activateModule(
             address(escrowContract),
             BaseEscrow.ModuleType.YIELD_GEN
@@ -451,14 +451,14 @@ contract ModuleManagementContractTest is Test {
     }
     
     function test_getDefaultYieldDistributionModule() public {
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.queueModule(
             address(escrowContract),
             BaseEscrow.ModuleType.YIELD_DIST,
             address(yieldDistModule1)
         );
         vm.warp(block.timestamp + 7 days + 1);
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.activateModule(
             address(escrowContract),
             BaseEscrow.ModuleType.YIELD_DIST
@@ -469,14 +469,14 @@ contract ModuleManagementContractTest is Test {
     }
     
     function test_getDefaultResolutionModule() public {
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.queueModule(
             address(escrowContract),
             BaseEscrow.ModuleType.RESOLUTION,
             address(resolutionModule1)
         );
         vm.warp(block.timestamp + 7 days + 1);
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.activateModule(
             address(escrowContract),
             BaseEscrow.ModuleType.RESOLUTION
@@ -487,14 +487,14 @@ contract ModuleManagementContractTest is Test {
     }
     
     function test_getModule_RELEASE() public {
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.queueModule(
             address(escrowContract),
             BaseEscrow.ModuleType.RELEASE,
             address(releaseStrategy1)
         );
         vm.warp(block.timestamp + 7 days + 1);
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.activateModule(
             address(escrowContract),
             BaseEscrow.ModuleType.RELEASE
@@ -508,14 +508,14 @@ contract ModuleManagementContractTest is Test {
     }
     
     function test_getModule_YIELD_GEN() public {
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.queueModule(
             address(escrowContract),
             BaseEscrow.ModuleType.YIELD_GEN,
             address(yieldGenModule1)
         );
         vm.warp(block.timestamp + 7 days + 1);
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.activateModule(
             address(escrowContract),
             BaseEscrow.ModuleType.YIELD_GEN
@@ -529,14 +529,14 @@ contract ModuleManagementContractTest is Test {
     }
     
     function test_getModule_YIELD_DIST() public {
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.queueModule(
             address(escrowContract),
             BaseEscrow.ModuleType.YIELD_DIST,
             address(yieldDistModule1)
         );
         vm.warp(block.timestamp + 7 days + 1);
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.activateModule(
             address(escrowContract),
             BaseEscrow.ModuleType.YIELD_DIST
@@ -550,14 +550,14 @@ contract ModuleManagementContractTest is Test {
     }
     
     function test_getModule_RESOLUTION() public {
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.queueModule(
             address(escrowContract),
             BaseEscrow.ModuleType.RESOLUTION,
             address(resolutionModule1)
         );
         vm.warp(block.timestamp + 7 days + 1);
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.activateModule(
             address(escrowContract),
             BaseEscrow.ModuleType.RESOLUTION
@@ -599,14 +599,14 @@ contract ModuleManagementContractTest is Test {
         moduleManagement.grantRole(moduleManagement.ROLE_ESCROW_CONTRACT(), address(escrow2));
         
         // Queue modules for both escrows
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.queueModule(
             address(escrowContract),
             BaseEscrow.ModuleType.RELEASE,
             address(releaseStrategy1)
         );
         
-        vm.prank(address(escrow2));
+        vm.prank(timelock);
         moduleManagement.queueModule(
             address(escrow2),
             BaseEscrow.ModuleType.RELEASE,
@@ -638,7 +638,7 @@ contract ModuleManagementContractTest is Test {
             uint64(block.timestamp + 7 days)
         );
         
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.queueModule(
             address(escrowContract),
             BaseEscrow.ModuleType.RELEASE,
@@ -647,7 +647,7 @@ contract ModuleManagementContractTest is Test {
     }
     
     function test_activateModule_emitsEvent_RELEASE() public {
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.queueModule(
             address(escrowContract),
             BaseEscrow.ModuleType.RELEASE,
@@ -663,7 +663,7 @@ contract ModuleManagementContractTest is Test {
             address(releaseStrategy1)
         );
         
-        vm.prank(address(escrowContract));
+        vm.prank(timelock);
         moduleManagement.activateModule(
             address(escrowContract),
             BaseEscrow.ModuleType.RELEASE

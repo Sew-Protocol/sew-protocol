@@ -57,6 +57,7 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
     // Token support mapping
     mapping(address => address) public tokenToAToken; // token => aToken address
     mapping(address => uint256) public totalDepositedToAave; // token => total amount
+    mapping(address => uint256) public totalTrackedATokenBalance; // token => total aTokens tracked
     
     // Aggregate yield tracking (for auditability)
     mapping(address => uint256) public totalYieldGenerated; // token => total yield generated (all time)
@@ -206,6 +207,7 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         escrowOriginalDeposit[escrowContract][workflowId] = amount;
         workflowIdToEscrow[workflowId] = escrowContract; // Track for withdrawWithYield (called by YieldOps)
         totalDepositedToAave[token] += amount;
+        totalTrackedATokenBalance[token] += yieldTokenBalance;
 
         emit EscrowDepositedToAave(workflowId, token, amount, yieldTokenBalance);
 
@@ -260,9 +262,12 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         bool withdrawByUnderlying = false;
         
         if (currentATokenBalance > 0 && trackedATokenBalance > 0) {
-            // Standard case: withdraw by tracked aToken amount for this escrow
-            // Use tracked balance, not total vault balance (vault may have multiple escrows)
-            withdrawalAmount = trackedATokenBalance;
+            // Standard case: calculate current underlying value including interest
+            // withdrawalAmount = (currentATokenBalance * trackedATokenBalance) / totalTrackedATokenBalance
+            withdrawalAmount = (currentATokenBalance * trackedATokenBalance) / totalTrackedATokenBalance[token];
+            if (withdrawalAmount > currentATokenBalance) {
+                withdrawalAmount = currentATokenBalance;
+            }
         } else if (trackedATokenBalance > 0) {
             // Fallback: use tracked aToken balance
             withdrawalAmount = trackedATokenBalance;
@@ -356,6 +361,9 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         // Update total deposited (subtract original, not actual)
         if (totalDepositedToAave[token] >= originalAmount) {
             totalDepositedToAave[token] -= originalAmount;
+        }
+        if (totalTrackedATokenBalance[token] >= trackedATokenBalance) {
+            totalTrackedATokenBalance[token] -= trackedATokenBalance;
         }
 
         // Reduce exposure (Phase 4)

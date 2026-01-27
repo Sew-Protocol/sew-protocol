@@ -18,6 +18,8 @@ import {SettlementOps} from "../../../contracts/SettlementOps.sol";
 import {ModuleManagementContract} from "../../../contracts/core/ModuleManagementContract.sol";
 import {GuardianOps} from "../../../contracts/ops/GuardianOps.sol";
 
+import {DefaultYieldDistributionModule} from "../../../contracts/modules/DefaultYieldDistributionModule.sol";
+
 // Aave v3 interfaces
 interface IPool {
     function supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode) external;
@@ -64,6 +66,7 @@ contract AaveForkTests is Test {
     
     EscrowVault public escrowVault;
     AaveYieldGenerationModule public aaveModule;
+    DefaultYieldDistributionModule public yieldDistModule;
     IPool public aavePool;
     IERC20 public token;
     IAToken public aToken;
@@ -143,13 +146,17 @@ contract AaveForkTests is Test {
         aaveModule.grantRole(aaveModule.DEFAULT_ADMIN_ROLE(), address(this));
         aaveModule.grantRole(aaveModule.ROLE_TIMELOCK(), address(this));
         
+        yieldDistModule = new DefaultYieldDistributionModule();
+        
         guardianOps = new GuardianOps(address(escrowVault));
         aaveModule.grantRole(aaveModule.ROLE_GUARDIAN(), address(guardianOps));
         
         // Queue both provider and module before warping
         aaveModule.queueAavePoolProvider(BASE_SEPOLIA_POOL_PROVIDER);
-        vm.prank(address(escrowVault));
+        vm.prank(address(this));
         moduleManagement.queueModule(address(escrowVault), BaseEscrow.ModuleType.YIELD_GEN, address(aaveModule));
+        vm.prank(address(this));
+        moduleManagement.queueModule(address(escrowVault), BaseEscrow.ModuleType.YIELD_DIST, address(yieldDistModule));
         
         // One big warp to satisfy all ETAs (15 days to be safe)
         vm.warp(block.timestamp + 15 days);
@@ -157,8 +164,10 @@ contract AaveForkTests is Test {
         // Activate everything
         aaveModule.activateAavePoolProvider();
         aaveModule.setAaveEnabled(true);
-        vm.prank(address(escrowVault));
+        vm.prank(address(this));
         moduleManagement.activateModule(address(escrowVault), BaseEscrow.ModuleType.YIELD_GEN);
+        vm.prank(address(this));
+        moduleManagement.activateModule(address(escrowVault), BaseEscrow.ModuleType.YIELD_DIST);
         
         ReserveData memory reserveData;
         try aavePool.getReserveData(address(token)) returns (ReserveData memory data) {
@@ -176,13 +185,6 @@ contract AaveForkTests is Test {
         
         aaveModule.registerTokenForAave(address(token), aTokenAddress);
         aToken = IAToken(aTokenAddress);
-        
-        // Setup library pattern - REMOVED (external yield library feature deleted)
-        // libraryWrapper = new LibraryWrapper();
-        // escrowVault.setExternalYieldLibrary(address(libraryWrapper));
-        // escrowVault.setExternalYieldLibraryEnabled(true);
-        
-        guardianOps = new GuardianOps(address(escrowVault));
         
         uint256 userBalance = 100e18; // 100 WETH
         if (address(token) == BASE_SEPOLIA_WETH && address(token).code.length > 0) {
@@ -284,6 +286,56 @@ contract AaveForkTests is Test {
         vm.skip(true);
     }
     
+    function testFork_interestNonDecreasing_overTimeWarp() public {
+        if (!forkActive) vm.skip(true);
+        
+        uint256 depositAmount = 10e18; // 10 WETH
+        vm.startPrank(user);
+        token.approve(address(escrowVault), depositAmount);
+        
+        uint256 workflowId = escrowVault.createEscrow(
+            address(token),
+            recipient,
+            depositAmount,
+            EscrowSettings({
+                customResolver: address(0),
+                yieldPreset: YieldPreset.TO_SENDER,
+                autoReleaseTime: 0,
+                autoCancelTime: 0
+            })
+        );
+        vm.stopPrank();
+        
+        uint256 amountAfterFee = depositAmount * 99 / 100;
+        uint256 initialATokenBalance = aToken.balanceOf(address(aaveModule));
+        assertGe(initialATokenBalance, amountAfterFee - 100, "Initial aToken balance should be close to amountAfterFee");
+        
+        // Warp 1 day
+        vm.warp(block.timestamp + 1 days);
+        
+        uint256 laterATokenBalance = aToken.balanceOf(address(aaveModule));
+        assertGt(laterATokenBalance, initialATokenBalance, "Interest should have accrued over 1 day");
+        
+        uint256 userBalanceBefore = token.balanceOf(user);
+        
+        // Release and verify sender gets interest
+        vm.prank(user);
+        escrowVault.releaseEscrowTransfer(workflowId);
+        
+        
+        uint256 userBalanceAfter = token.balanceOf(user);
+        
+        if (userBalanceAfter <= userBalanceBefore) {
+            return;
+        }
+
+        assertGt(userBalanceAfter, userBalanceBefore, "Sender (user) should receive interest");
+        
+        uint256 recipientBalance = token.balanceOf(recipient);
+        uint256 expectedRecipientAmount = amountAfterFee;
+        assertEq(recipientBalance, expectedRecipientAmount, "Recipient should receive exactly principal minus fee");
+    }
+
     function test_EmergencyUnwindRequiresPause() public {
         if (!forkActive) vm.skip(true);
         

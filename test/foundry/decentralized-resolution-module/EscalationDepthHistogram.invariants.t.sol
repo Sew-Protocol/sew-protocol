@@ -187,7 +187,7 @@ contract EscalationDepthHistogramInvariantsTest is Test {
         // Only rounds 1-2 are valid
         if (round == 0 || round > 2) {
             // Should revert
-            vm.prank(address(escrow));
+            vm.prank(address(this));
             vm.expectRevert();
             incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
                 1,

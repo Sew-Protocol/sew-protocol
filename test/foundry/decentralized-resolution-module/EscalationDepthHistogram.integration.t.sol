@@ -64,9 +64,13 @@ contract EscalationDepthHistogramIntegrationTest is Test {
 
         // Deploy incentive module
         incentiveModule = new ResolverIncentiveModuleV2(deployer, address(paymentLib));
+        incentiveModule.grantRole(incentiveModule.ROLE_TIMELOCK(), address(this));
+        incentiveModule.registerEscrowContract(address(this));
 
         // Deploy resolution module
         resolutionModule = new DecentralizedResolutionModule(deployer);
+        resolutionModule.grantRole(resolutionModule.ROLE_TIMELOCK(), address(this));
+        resolutionModule.registerEscrowContract(address(this));
 
         // Deploy escrow
         yieldOps = new YieldOps(address(this));
@@ -115,14 +119,14 @@ contract EscalationDepthHistogramIntegrationTest is Test {
         
         // Configure resolution module in escrow (required for dispute operations)
         // Note: avoid vm.startPrank(deployer) then vm.prank(...) overwrite without an applied call
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         moduleManagement.queueModule(
             address(escrow),
             BaseEscrow.ModuleType.RESOLUTION,
             address(resolutionModule)
         );
         vm.warp(block.timestamp + 7 days + 1);
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         moduleManagement.activateModule(address(escrow), BaseEscrow.ModuleType.RESOLUTION);
 
         // Setup resolvers - first appoint seniorResolver via timelock, then it can appoint others
@@ -196,7 +200,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
 
         // Simulate escalation by recording bond directly (in real flow, BaseEscrow does this)
         vm.deal(address(escrow), BOND_AMOUNT);
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
             workflowId,
             user1,
@@ -228,7 +232,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
 
         // Record bond at round 1
         vm.deal(address(escrow), BOND_AMOUNT * 2); // Enough for both rounds
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
             workflowId,
             user1,
@@ -243,7 +247,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
         assertEq(round1, 1, "Round 1 should be 1");
 
         // Record bond at round 2 (escalate from round 1)
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
             workflowId,
             user1,
@@ -278,7 +282,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
 
             // Record bond at round 1 for each
             vm.deal(address(escrow), BOND_AMOUNT * (i + 1));
-            vm.prank(address(escrow));
+            vm.prank(address(this));
             incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
                 workflowId,
                 user1,
@@ -297,7 +301,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
 
         // Escalate second dispute to round 2
         vm.deal(address(escrow), BOND_AMOUNT);
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
             1, // workflowId 1
             user1,
@@ -322,7 +326,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
         uint256 initialRound1 = round1;
 
         // Attempt to record bond with zero amount (should revert)
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         vm.expectRevert();
         incentiveModule.recordAppealBond{value: 0}(
             1,
@@ -339,7 +343,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
 
         // Attempt to record bond with invalid round (should revert)
         vm.deal(address(escrow), BOND_AMOUNT);
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         vm.expectRevert();
         incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
             1,

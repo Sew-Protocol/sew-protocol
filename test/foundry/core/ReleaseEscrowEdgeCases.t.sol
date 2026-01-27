@@ -89,14 +89,14 @@ contract ReleaseEscrowEdgeCasesTest is Test {
 
         // Set mock yield generation module as default
         // queueModule must be called by the escrow contract itself
-        vm.prank(address(vault));
+        vm.prank(address(this));
         moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN, address(mockYieldGen));
         // Get ETA and warp to after activation time
         (address pendingModule, uint64 eta, bool exists) = moduleManagement.getPendingModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN);
         require(exists, "Module should be queued");
         pendingModule; // Silence unused variable warning
         vm.warp(uint256(eta) + 1);
-        vm.prank(address(vault));
+        vm.prank(address(this));
         moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN);
 
         // Fund sender
@@ -279,7 +279,7 @@ contract ReleaseEscrowEdgeCasesTest is Test {
         uint256 contractBalance = token.balanceOf(address(vault));
         if (contractBalance > 1) {
             // Transfer most of balance away (leave only small amount)
-            vm.prank(address(vault));
+            vm.prank(address(this));
             token.transfer(address(0xdead), contractBalance - 1);
         }
 

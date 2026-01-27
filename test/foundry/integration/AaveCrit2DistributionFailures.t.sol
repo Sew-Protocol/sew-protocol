@@ -199,18 +199,18 @@ contract AaveCrit2DistributionFailures is Test {
         yieldDist = new DefaultYieldDistributionModule();
         failingDistModule = new MockFailingDistributionModule();
         
-        vm.prank(address(vault));
+        vm.prank(address(this));
         mm.queueModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN, address(aaveModule));
-        vm.prank(address(vault));
+        vm.prank(address(this));
         mm.queueModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST, address(yieldDist));
         (, uint64 etaGen, bool existsGen) = mm.getPendingModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN);
         (, uint64 etaDist, bool existsDist) = mm.getPendingModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST);
         require(existsGen && existsDist, "pending modules must exist");
         uint256 maxEta = etaGen > etaDist ? uint256(etaGen) : uint256(etaDist);
         vm.warp(maxEta + 1);
-        vm.prank(address(vault));
+        vm.prank(address(this));
         mm.activateModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN);
-        vm.prank(address(vault));
+        vm.prank(address(this));
         mm.activateModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST);
 
         wrapper = new AaveLibraryWrapper();
@@ -268,12 +268,12 @@ contract AaveCrit2DistributionFailures is Test {
         token.mint(sender, amount);
 
         // Swap to failing distribution module
-        vm.prank(address(vault));
+        vm.prank(address(this));
         mm.queueModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST, address(failingDistModule));
         (, uint64 eta, bool exists) = mm.getPendingModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST);
         require(exists, "pending module must exist");
         vm.warp(uint256(eta) + 1);
-        vm.prank(address(vault));
+        vm.prank(address(this));
         mm.activateModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST);
 
         // Configure module to revert
@@ -323,12 +323,12 @@ contract AaveCrit2DistributionFailures is Test {
         token.mint(sender, amount);
 
         // Swap to failing distribution module
-        vm.prank(address(vault));
+        vm.prank(address(this));
         mm.queueModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST, address(failingDistModule));
         (, uint64 eta, bool exists) = mm.getPendingModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST);
         require(exists, "pending module must exist");
         vm.warp(uint256(eta) + 1);
-        vm.prank(address(vault));
+        vm.prank(address(this));
         mm.activateModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST);
 
         // Configure module to return false
@@ -382,12 +382,12 @@ contract AaveCrit2DistributionFailures is Test {
         vault.setYieldProtocolFeeBps(0); // No protocol fees
 
         // Swap to failing distribution module
-        vm.prank(address(vault));
+        vm.prank(address(this));
         mm.queueModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST, address(failingDistModule));
         (, uint64 eta, bool exists) = mm.getPendingModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST);
         require(exists, "pending module must exist");
         vm.warp(uint256(eta) + 1);
-        vm.prank(address(vault));
+        vm.prank(address(this));
         mm.activateModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST);
 
         // Configure module to revert
@@ -443,12 +443,12 @@ contract AaveCrit2DistributionFailures is Test {
         token.mint(sender, amount);
 
         // Swap to failing distribution module
-        vm.prank(address(vault));
+        vm.prank(address(this));
         mm.queueModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST, address(failingDistModule));
         (, uint64 eta, bool exists) = mm.getPendingModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST);
         require(exists, "pending module must exist");
         vm.warp(uint256(eta) + 1);
-        vm.prank(address(vault));
+        vm.prank(address(this));
         mm.activateModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST);
 
         // Configure module for partial distribution (distribute 50% of yield)

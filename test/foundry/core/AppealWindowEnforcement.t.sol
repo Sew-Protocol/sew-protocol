@@ -89,6 +89,12 @@ contract AppealWindowEnforcementTest is Test {
         createOps.registerEscrowContract(address(escrow));
         bondCollector.registerEscrowContract(address(escrow));
 
+        // Also register this test contract as an escrow contract because it calls ops directly
+        disputeOps.registerEscrowContract(address(this));
+        settlementOps.registerEscrowContract(address(this));
+        createOps.registerEscrowContract(address(this));
+        bondCollector.registerEscrowContract(address(this));
+
         // Allow this test contract to wire ops on the vault
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(this));
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(adminContract));
@@ -98,22 +104,23 @@ contract AppealWindowEnforcementTest is Test {
 
         // Setup roles
         bytes32 roleTimelock = resolutionModule.ROLE_TIMELOCK();
+        resolutionModule.grantRole(roleTimelock, address(this)); // Grant to self so we can register
         resolutionModule.grantRole(roleTimelock, timelock);
 
         bytes32 incentiveRoleTimelock = incentiveModule.ROLE_TIMELOCK();
+        incentiveModule.grantRole(incentiveRoleTimelock, address(this)); // Grant to self so we can register
         incentiveModule.grantRole(incentiveRoleTimelock, timelock);
 
         bytes32 escrowRoleTimelock = escrow.ROLE_TIMELOCK();
         escrow.grantRole(escrowRoleTimelock, address(this));
 
         // Register escrow contract in resolution module
-        vm.prank(timelock);
         resolutionModule.registerEscrowContract(address(escrow));
+        resolutionModule.registerEscrowContract(address(this)); // Register self because we call setEscrowCategory
 
         // Register escrow contract in incentive module
-        vm.prank(timelock);
         incentiveModule.registerEscrowContract(address(escrow));
-        vm.prank(timelock);
+        incentiveModule.registerEscrowContract(address(this));
         incentiveModule.registerEscrowContract(address(resolutionModule));
 
         // Set incentive module in resolution module
@@ -178,7 +185,7 @@ contract AppealWindowEnforcementTest is Test {
     function raiseDispute(uint256 workflowId) internal {
         // Set category before raising dispute (required for DecentralizedResolutionModule)
         bytes32 category = keccak256('TEST_CATEGORY');
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         resolutionModule.setEscrowCategory(workflowId, category);
 
         // raiseDispute() automatically initializes the dispute via DisputeInitializationLibrary

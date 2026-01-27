@@ -48,6 +48,8 @@ contract EscalationDepthHistogramTest is Test {
         paymentLib = new PaymentCalculationLibraryV1();
         incentiveModule = new ResolverIncentiveModuleV2(deployer, address(paymentLib));
         token = new ERC20Mock('Test Token', 'TEST', address(this), 0);
+        incentiveModule.grantRole(incentiveModule.ROLE_TIMELOCK(), address(this));
+        incentiveModule.registerEscrowContract(address(this));
         yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps(address(this));
         moduleManagement = new ModuleManagementContract(address(this));
@@ -158,7 +160,7 @@ contract EscalationDepthHistogramTest is Test {
     function test_histogramNeverIncrementsRound0() public {
         // Attempt to record bond at round 0 (should revert)
         vm.deal(address(escrow), BOND_AMOUNT);
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         vm.expectRevert("Invalid round");
         incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
             WORKFLOW_ID_1,
@@ -182,7 +184,7 @@ contract EscalationDepthHistogramTest is Test {
     function test_histogramRound3Rejected() public {
         // Attempt to record bond at round 3 (should revert)
         vm.deal(address(escrow), BOND_AMOUNT);
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         vm.expectRevert("Invalid round");
         incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
             WORKFLOW_ID_1,
@@ -207,7 +209,7 @@ contract EscalationDepthHistogramTest is Test {
         // Attempt to record bond at round 255 (maximum uint8, should revert)
         // Round must be > 0 && <= 2, so 255 should revert with "Invalid round"
         vm.deal(address(escrow), BOND_AMOUNT);
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         vm.expectRevert("Invalid round");
         incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
             WORKFLOW_ID_1,
@@ -239,7 +241,7 @@ contract EscalationDepthHistogramTest is Test {
         assertEq(round1, 1, "Round 1 should be 1");
 
         // Distribute bond (refund)
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         incentiveModule.distributeAppealBond(WORKFLOW_ID_1, 0, true); // outcomeFlipped = true (refund)
 
         // Verify histogram unchanged (histogram is cumulative, doesn't decrease)
@@ -313,7 +315,7 @@ contract EscalationDepthHistogramTest is Test {
         token.approve(address(incentiveModule), BOND_AMOUNT);
 
         // Record bond with ERC20 token - incentive module will pull tokens
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         incentiveModule.recordAppealBond(
             WORKFLOW_ID_1,
             depositor,
@@ -372,7 +374,7 @@ contract EscalationDepthHistogramTest is Test {
     function test_histogramUnaffectedByFailedBondRecording() public {
         // Attempt to record bond with invalid parameters (should revert)
         vm.deal(address(escrow), 0);
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         vm.expectRevert("Invalid amount");
         incentiveModule.recordAppealBond{value: 0}(
             WORKFLOW_ID_1,
@@ -393,7 +395,7 @@ contract EscalationDepthHistogramTest is Test {
         _recordBond(WORKFLOW_ID_1, depositor, BOND_AMOUNT, address(0), 1);
 
         vm.deal(address(escrow), BOND_AMOUNT);
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         vm.expectRevert("Bond already exists");
         incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
             WORKFLOW_ID_1,
@@ -429,7 +431,7 @@ contract EscalationDepthHistogramTest is Test {
         if (tokenAddr == address(0)) {
             // ETH bond - fund escrow first
             vm.deal(address(escrow), amount);
-            vm.prank(address(escrow));
+            vm.prank(address(this));
             incentiveModule.recordAppealBond{value: amount}(
                 workflowId,
                 depositorAddr,
@@ -444,7 +446,7 @@ contract EscalationDepthHistogramTest is Test {
             IERC20(tokenAddr).approve(address(incentiveModule), amount);
 
             // Record bond - incentive module will pull tokens from depositor
-            vm.prank(address(escrow));
+            vm.prank(address(this));
             incentiveModule.recordAppealBond(
                 workflowId,
                 depositorAddr,

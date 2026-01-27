@@ -81,6 +81,9 @@ contract Coverage99PercentTest is Test {
         vault.grantRole(ROLE_GUARDIAN, guardian);
         vault.grantRole(vault.ROLE_FEE_RECIPIENT(), feeRecipient);
 
+        moduleManagement.grantRole(ROLE_TIMELOCK, owner);
+        moduleManagement.grantRole(ROLE_TIMELOCK, timelock);
+
         yieldOps.registerEscrowContract(address(vault));
         disputeOps.registerEscrowContract(address(vault));
         settlementOps.registerEscrowContract(address(vault));
@@ -95,11 +98,11 @@ contract Coverage99PercentTest is Test {
         moduleManagement.registerEscrowContract(address(vault));
 
         adminContract.queueResolutionModule(address(vault), address(resolutionModule));
-        vm.prank(address(vault));
+        vm.prank(owner);
         moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
         vm.warp(block.timestamp + 14 days + 1);
         adminContract.activateResolutionModule(address(vault));
-        vm.prank(address(vault));
+        vm.prank(address(this));
         moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
     }
 
@@ -145,28 +148,29 @@ contract Coverage99PercentTest is Test {
     function test_queueModule() public {
         DefaultReleaseStrategy newStrategy = new DefaultReleaseStrategy();
         vm.prank(timelock);
-        vault.queueModule(BaseEscrow.ModuleType.RELEASE, address(newStrategy));
+        moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(newStrategy));
     }
 
     function test_queueModule_reverts_notTimelock() public {
         DefaultReleaseStrategy newStrategy = new DefaultReleaseStrategy();
         vm.prank(buyer); // buyer doesn't have ROLE_TIMELOCK
         vm.expectRevert();
-        vault.queueModule(BaseEscrow.ModuleType.RELEASE, address(newStrategy));
+        moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(newStrategy));
     }
 
     function test_activateModule() public {
         DefaultReleaseStrategy newStrategy = new DefaultReleaseStrategy();
         vm.prank(timelock);
-        vault.queueModule(BaseEscrow.ModuleType.RELEASE, address(newStrategy));
+        moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(newStrategy));
         vm.warp(block.timestamp + 7 days + 1);
         vm.prank(timelock);
-        vault.activateModule(BaseEscrow.ModuleType.RELEASE);
+        moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
     }
 
     function test_activateModule_reverts_notTimelock() public {
         vm.expectRevert();
-        vault.activateModule(BaseEscrow.ModuleType.RELEASE);
+        vm.prank(timelock);
+        moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
     }
 
     // ============ EscrowVault Fee Withdrawal Tests ============

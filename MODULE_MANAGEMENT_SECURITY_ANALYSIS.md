@@ -230,7 +230,7 @@ During a previous optimization attempt, wrapper functions (`queueDefaultReleaseS
 
 **Proposed Solution:**
 Instead of keeping wrapper functions in escrow contracts, modify `ModuleManagementContract` to:
-1. Change `queueDefaultModule` from `onlyRole(ROLE_ESCROW_CONTRACT)` to `onlyRole(ROLE_TIMELOCK)`
+1. Change `queueModule` from `onlyRole(ROLE_ESCROW_CONTRACT)` to `onlyRole(ROLE_TIMELOCK)`
 2. Remove `msg.sender == escrowContract` check
 3. Add explicit `hasRole(ROLE_ESCROW_CONTRACT, escrowContract)` check instead
 4. This allows governance to call `ModuleManagementContract` directly
@@ -248,27 +248,27 @@ Instead of keeping wrapper functions in escrow contracts, modify `ModuleManageme
 
 **Status:**
 - ✅ Security analysis completed (see above)
-- ⏳ **NOT YET IMPLEMENTED** - Awaiting final approval
-- ⏳ Implementation blocked until decision is made
+- ✅ **IMPLEMENTED** - ModuleManagementContract updated and wrapper functions removed from escrow contracts.
+- ✅ Implementation verified (2026-01-26)
 
 ---
 
-### Current State (2026-01-XX)
+### Current State (2026-01-26)
 
 **Wrapper Functions:**
-- ✅ **KEPT** in `EscrowVault` and `EscrowableERC20`
-- ✅ Required for governance to swap modules
-- ✅ Cannot be removed until `ModuleManagementContract` is updated
+- ✅ **REMOVED** from `EscrowVault` and `EscrowableERC20`
+- ✅ No longer required as governance can call ModuleManagementContract directly
+- ✅ Bytecode size reduced in escrow contracts
 
 **ModuleManagementContract:**
-- ⏳ Still uses `onlyRole(ROLE_ESCROW_CONTRACT)` + `msg.sender == escrowContract`
-- ⏳ Cannot be called directly by governance
-- ⏳ Requires escrow contract wrapper functions
+- ✅ Updated to use `onlyRole(ROLE_TIMELOCK)`
+- ✅ Can be called directly by governance
+- ✅ Explicitly checks `hasRole(ROLE_ESCROW_CONTRACT, escrowContract)`
 
-**Decision Pending:**
-- Should we change `ModuleManagementContract` to `onlyRole(ROLE_TIMELOCK)`?
-- This would allow removal of wrapper functions and save ~400 bytes
-- Security analysis indicates it's safe, but reduces defense-in-depth
+**Decision Finalized:**
+- Changed `ModuleManagementContract` to `onlyRole(ROLE_TIMELOCK)`
+- Removed wrapper functions to save ~400 bytes
+- Security is maintained via explicit registration check
 
 ---
 

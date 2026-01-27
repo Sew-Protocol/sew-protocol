@@ -77,6 +77,9 @@ contract ModuleManagementContract is AccessControl, SlowLaneQueueActivate {
         address indexed newModule
     );
 
+    /// @notice Error when escrow contract is not registered
+    error EscrowNotRegistered(address escrowContract);
+
     /**
      * @notice Deploy the ModuleManagementContract.
      * @param initialAdmin Initial admin for bootstrap (expected to be replaced/managed by governance wiring).
@@ -105,16 +108,18 @@ contract ModuleManagementContract is AccessControl, SlowLaneQueueActivate {
      * @param escrowContract Address of the escrow contract
      * @param moduleType Type of module to queue
      * @param module Address of the new module to queue
-     * @dev Only the escrow contract itself can queue modules (via ROLE_ESCROW_CONTRACT)
-     *      This ensures pending state is namespaced to the calling escrow contract.
+     * @dev Only governance (ROLE_TIMELOCK) can queue modules directly.
+     *      Ensures the escrow contract is registered.
      *      Enforces 7-day slow lane delay via SlowLaneQueueActivate.
      */
     function queueModule(
         address escrowContract,
         BaseEscrow.ModuleType moduleType,
         address module
-    ) external onlyRole(ROLE_ESCROW_CONTRACT) {
-        if (msg.sender != escrowContract) revert InvalidValue();
+    ) external onlyRole(ROLE_TIMELOCK) {
+        if (!hasRole(ROLE_ESCROW_CONTRACT, escrowContract)) {
+            revert EscrowNotRegistered(escrowContract);
+        }
         if (module == address(0)) revert InvalidValue();
 
         ModuleState storage state = escrowModuleStates[escrowContract];
@@ -156,15 +161,18 @@ contract ModuleManagementContract is AccessControl, SlowLaneQueueActivate {
      * @notice Activate the queued module
      * @param escrowContract Address of the escrow contract
      * @param moduleType Type of module to activate
-     * @dev Only the escrow contract itself can activate modules (via ROLE_ESCROW_CONTRACT)
+     * @dev Only governance (ROLE_TIMELOCK) can activate modules directly.
+     *      Ensures the escrow contract is registered.
      *      Reverts if no module is queued for the given type, or if the ETA has not passed yet.
      *      Enforces 7-day slow lane delay - cannot be bypassed.
      */
     function activateModule(
         address escrowContract,
         BaseEscrow.ModuleType moduleType
-    ) external onlyRole(ROLE_ESCROW_CONTRACT) {
-        if (msg.sender != escrowContract) revert InvalidValue();
+    ) external onlyRole(ROLE_TIMELOCK) {
+        if (!hasRole(ROLE_ESCROW_CONTRACT, escrowContract)) {
+            revert EscrowNotRegistered(escrowContract);
+        }
 
         ModuleState storage state = escrowModuleStates[escrowContract];
         address newModule = _activateAddress(state.pendingModules[moduleType]);

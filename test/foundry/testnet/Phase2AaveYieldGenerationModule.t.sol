@@ -53,9 +53,8 @@ contract MockPool {
         address aToken = assetToAToken[asset];
         require(aToken != address(0), "pool/no-aToken");
 
-        // Burn aTokens from `to` (escrow contract).
-        // This matches the module's call pattern (module calls pool, but escrow holds aTokens).
-        MockAToken(aToken).burn(to, amount);
+        // Burn aTokens from module (msg.sender)
+        MockAToken(aToken).burn(msg.sender, amount);
 
         uint256 y = (amount * yieldBps[asset]) / 10_000;
         uint256 payout = amount + y;
@@ -99,9 +98,8 @@ contract MockPoolEscrowPull {
         address aToken = assetToAToken[asset];
         require(aToken != address(0), "pool/no-aToken");
 
-        // Burn aTokens from `to` (escrow contract).
-        // This matches the module call pattern (module calls pool, escrow holds aTokens).
-        MockAToken(aToken).burn(to, amount);
+        // Burn aTokens from module (msg.sender)
+        MockAToken(aToken).burn(msg.sender, amount);
 
         uint256 y = (amount * yieldBps[asset]) / 10_000;
         uint256 payout = amount + y;
@@ -166,11 +164,12 @@ contract Phase2AaveYieldGenerationModuleTest is Test {
 
         vm.startPrank(escrowContract);
         token.approve(address(pool), depositAmount);
+        token.approve(address(module), depositAmount);
         (bool ok, uint256 yBal) = module.depositForYield(workflowId, address(token), depositAmount);
         vm.stopPrank();
 
         assertTrue(ok, "deposit should succeed");
-        assertEq(yBal, MockAToken(address(aToken)).balanceOf(escrowContract), "aToken balance mismatch");
+        assertEq(yBal, MockAToken(address(aToken)).balanceOf(address(module)), "aToken balance mismatch");
         assertTrue(module.escrowInAave(escrowContract, workflowId), "escrowInAave not set");
         assertEq(module.escrowOriginalDeposit(escrowContract, workflowId), depositAmount, "original deposit mismatch");
         assertEq(module.getTotalDepositedToAave(address(token)), depositAmount, "totalDepositedToAave mismatch");

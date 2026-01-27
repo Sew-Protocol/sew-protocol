@@ -60,7 +60,7 @@ contract MockAavePoolConfigurableIncome {
         require(tokenToAToken[asset] != address(0), "Token not supported");
         
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
-        // Track balances for onBehalfOf, not msg.sender (Aave v3 semantics)
+        // Track balances for onBehalfOf (Aave v3 semantics)
         underlyingBalances[onBehalfOf] += amount;
 
         uint256 income = normalizedIncome[asset];
@@ -69,7 +69,7 @@ contract MockAavePoolConfigurableIncome {
         }
 
         // Calculate scaled shares: scaledShares = amount * RAY / incomeRay
-        // Credit shares to onBehalfOf, not msg.sender (Aave v3 semantics)
+        // Credit shares to onBehalfOf (Aave v3 semantics)
         uint256 scaled = (amount * RAY) / income;
         scaledShares[onBehalfOf][asset] += scaled;
     }
@@ -86,13 +86,15 @@ contract MockAavePoolConfigurableIncome {
         uint256 scaledToBurn = (amount * RAY) / income;
         
         // Aave v3: withdraw burns shares from msg.sender (the caller)
-        // However, in our module pattern, the module calls withdraw on behalf of the vault
-        // The vault holds the shares (credited during supply with onBehalfOf=vault)
-        // So we need to check and burn shares from `to` (the vault), not msg.sender (the module)
-        require(scaledShares[to][asset] >= scaledToBurn, "Insufficient scaled shares");
+        // In our module pattern, the module holds the shares (credited during supply)
+        require(scaledShares[msg.sender][asset] >= scaledToBurn, "Insufficient scaled shares");
         
-        scaledShares[to][asset] -= scaledToBurn;
-        underlyingBalances[to] -= amount;
+        scaledShares[msg.sender][asset] -= scaledToBurn;
+        
+        // Track underlying balances (best effort)
+        if (underlyingBalances[msg.sender] >= amount) {
+            underlyingBalances[msg.sender] -= amount;
+        }
 
         IERC20(asset).safeTransfer(to, amount);
         return amount;
@@ -229,18 +231,18 @@ contract AaveCrit1EdgeCases is Test {
         vault.setResolutionModule(address(resolutionModule));
 
         yieldDist = new DefaultYieldDistributionModule();
-        vm.prank(address(vault));
+        vm.prank(address(this));
         mm.queueModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN, address(aaveModule));
-        vm.prank(address(vault));
+        vm.prank(address(this));
         mm.queueModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST, address(yieldDist));
         (, uint64 etaGen, bool existsGen) = mm.getPendingModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN);
         (, uint64 etaDist, bool existsDist) = mm.getPendingModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST);
         require(existsGen && existsDist, "pending modules must exist");
         uint256 maxEta = etaGen > etaDist ? uint256(etaGen) : uint256(etaDist);
         vm.warp(maxEta + 1);
-        vm.prank(address(vault));
+        vm.prank(address(this));
         mm.activateModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN);
-        vm.prank(address(vault));
+        vm.prank(address(this));
         mm.activateModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST);
 
         wrapper = new AaveLibraryWrapper();

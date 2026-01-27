@@ -41,6 +41,8 @@ contract BondRoundingTest is Test {
         paymentLib = new PaymentCalculationLibraryV1();
         incentiveModule = new ResolverIncentiveModuleV2(deployer, address(paymentLib));
         token = new ERC20Mock('Test Token', 'TEST', address(this), 0);
+        incentiveModule.grantRole(incentiveModule.ROLE_TIMELOCK(), address(this));
+        incentiveModule.registerEscrowContract(address(this));
         yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps(address(this));
         moduleManagement = new ModuleManagementContract(address(this));
@@ -68,7 +70,7 @@ contract BondRoundingTest is Test {
      */
     function _recordResolvers(uint256 workflowId, uint8 round, uint256 resolverCount) internal {
         for (uint256 i = 0; i < resolverCount; i++) {
-            vm.prank(address(escrow));
+            vm.prank(address(this));
             incentiveModule.recordResolver(workflowId, resolvers[i], round);
         }
     }
@@ -89,14 +91,14 @@ contract BondRoundingTest is Test {
         vm.prank(depositor);
         token.approve(address(incentiveModule), bondAmount);
 
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         incentiveModule.recordAppealBond(workflowId, depositor, depositor, bondAmount, address(token), 1);
 
         // Record resolvers at round 0
         _recordResolvers(workflowId, 0, 3);
 
         // Distribute bond on failed appeal
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         incentiveModule.distributeAppealBond(workflowId, 0, false);
 
         // Verify no rounding loss
@@ -132,14 +134,14 @@ contract BondRoundingTest is Test {
         vm.prank(depositor);
         token.approve(address(incentiveModule), bondAmount);
 
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         incentiveModule.recordAppealBond(workflowId, depositor, depositor, bondAmount, address(token), 1);
 
         // Record resolvers at round 0
         _recordResolvers(workflowId, 0, 5);
 
         // Distribute bond
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         incentiveModule.distributeAppealBond(workflowId, 0, false);
 
         // Verify no rounding loss
@@ -170,14 +172,14 @@ contract BondRoundingTest is Test {
         vm.prank(depositor);
         token.approve(address(incentiveModule), bondAmount);
 
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         incentiveModule.recordAppealBond(workflowId, depositor, depositor, bondAmount, address(token), 1);
 
         // Record resolvers at round 0
         _recordResolvers(workflowId, 0, 2);
 
         // Distribute bond
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         incentiveModule.distributeAppealBond(workflowId, 0, false);
 
         // Verify equal split
@@ -204,14 +206,14 @@ contract BondRoundingTest is Test {
         vm.prank(depositor);
         token.approve(address(incentiveModule), bondAmount);
 
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         incentiveModule.recordAppealBond(workflowId, depositor, depositor, bondAmount, address(token), 1);
 
         // Record resolver at round 0
         _recordResolvers(workflowId, 0, 1);
 
         // Distribute bond
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         incentiveModule.distributeAppealBond(workflowId, 0, false);
 
         // Verify resolver gets entire bond
@@ -241,17 +243,17 @@ contract BondRoundingTest is Test {
         vm.prank(depositor);
         token.approve(address(incentiveModule), bondAmount);
 
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         incentiveModule.recordAppealBond(workflowId, depositor, depositor, bondAmount, address(token), 1);
 
         // Record resolvers
         for (uint8 i = 0; i < resolverCount; i++) {
-            vm.prank(address(escrow));
+            vm.prank(address(this));
             incentiveModule.recordResolver(workflowId, resolvers[i], 0);
         }
 
         // Distribute bond
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         incentiveModule.distributeAppealBond(workflowId, 0, false);
 
         // Verify no rounding loss

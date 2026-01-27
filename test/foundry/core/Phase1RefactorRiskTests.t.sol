@@ -91,17 +91,17 @@ contract Phase1RefactorRiskTests is Test {
         moduleManagement.grantRole(moduleManagement.ROLE_ESCROW_CONTRACT(), address(vault));
         
         // Queue modules (must be called by vault itself)
-        vm.prank(address(vault));
+        vm.prank(address(this));
         moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RESOLUTION, address(resolutionModule));
-        vm.prank(address(vault));
+        vm.prank(address(this));
         moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
         // YIELD_GEN and YIELD_DIST not needed for basic refactor risk tests
         
         // Activate modules (skip slow lane for tests)
         vm.warp(block.timestamp + 8 days);
-        vm.prank(address(vault));
+        vm.prank(address(this));
         moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RESOLUTION);
-        vm.prank(address(vault));
+        vm.prank(address(this));
         moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
         // YIELD_GEN and YIELD_DIST not needed for basic refactor risk tests
         
@@ -186,10 +186,10 @@ contract Phase1RefactorRiskTests is Test {
         
         // Change default resolution module
         DefaultResolutionModule newModule = new DefaultResolutionModule(address(this), address(0x999));
-        vm.prank(address(vault));
+        vm.prank(address(this));
         moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RESOLUTION, address(newModule));
         vm.warp(block.timestamp + 8 days);
-        vm.prank(address(vault));
+        vm.prank(address(this));
         moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RESOLUTION);
         
         // Original escrow should still use old module (snapshotted)

@@ -218,14 +218,14 @@ contract AaveLibraryMultiEscrowTest is Test {
         vault.setResolutionModule(address(rm));
 
         // Set default yield gen + dist
-        vm.prank(address(vault));
+        vm.prank(address(this));
         mm.queueModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN, address(configModule));
-        vm.prank(address(vault));
+        vm.prank(address(this));
         mm.queueModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST, address(yieldDist));
         vm.warp(block.timestamp + 7 days + 1);
-        vm.prank(address(vault));
+        vm.prank(address(this));
         mm.activateModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN);
-        vm.prank(address(vault));
+        vm.prank(address(this));
         mm.activateModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST);
 
         // Module pattern is now used directly (no delegatecall library needed)

@@ -54,6 +54,7 @@ contract EvidenceModuleV1Test is Test {
         ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initData);
         evidenceModule = EvidenceModuleV1(address(proxy));
         
+        evidenceModule.grantRole(evidenceModule.ROLE_ESCROW_CONTRACT(), address(escrowContract));
         evidenceModule.grantRole(evidenceModule.ROLE_TIMELOCK(), timelock);
     }
     

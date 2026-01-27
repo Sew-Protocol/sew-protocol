@@ -140,18 +140,18 @@ contract AaveInvariants is Test {
 
         // Set default yield modules
         yieldDist = new DefaultYieldDistributionModule();
-        vm.prank(address(vault));
+        vm.prank(address(this));
         mm.queueModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN, address(aaveModule));
-        vm.prank(address(vault));
+        vm.prank(address(this));
         mm.queueModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST, address(yieldDist));
         (, uint64 etaGen, bool existsGen) = mm.getPendingModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN);
         (, uint64 etaDist, bool existsDist) = mm.getPendingModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST);
         require(existsGen && existsDist, "pending modules must exist");
         uint256 maxEta = etaGen > etaDist ? uint256(etaGen) : uint256(etaDist);
         vm.warp(maxEta + 1);
-        vm.prank(address(vault));
+        vm.prank(address(this));
         mm.activateModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN);
-        vm.prank(address(vault));
+        vm.prank(address(this));
         mm.activateModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST);
 
         // Module pattern is now used directly

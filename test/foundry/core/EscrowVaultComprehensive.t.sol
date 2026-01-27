@@ -85,14 +85,14 @@ contract EscrowVaultComprehensive is Test {
         vault.setResolutionModule(address(resolutionModule));
 
         // Queue and activate default modules
-        vm.startPrank(address(vault));
+        vm.startPrank(owner);
         moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
         moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST, address(yieldDistributionModule));
         vm.stopPrank();
         
         vm.warp(block.timestamp + 8 days);
         
-        vm.startPrank(address(vault));
+        vm.startPrank(owner);
         moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
         moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST);
         vm.stopPrank();

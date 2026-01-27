@@ -70,9 +70,9 @@
 ## ❌ Missing Tests (Low Priority Gaps)
 
 ### Fork Tests (Base Sepolia)
-1. ❌ `testFork_interestNonDecreasing_overTimeWarp()`
+1. ✅ `testFork_interestNonDecreasing_overTimeWarp`
    - **Purpose:** Explicitly verify interest accrual over long time warps on fork.
-   - **Priority:** Low (Partially covered by withdrawal tests)
+   - **Status:** Implemented in `AaveForkTests.t.sol` (2026-01-26)
 
 ---
 
@@ -84,7 +84,7 @@
 
 ### 2. Stateful Fuzz / Handler Tests
 **Section:** 4 - Stateful fuzz / invariant harness
-**Status:** ❌ **MISSING** - Could benefit from a dedicated `AaveHandler` for deeper invariant exploration.
+**Status:** ✅ **DONE** - Dedicated `AaveHandler` and `AaveStatefulFuzz` implemented (2026-01-26). Covers multi-escrow accounting and interest accrual.
 
 ### 3. Event-Driven Assertions
 **Section:** 8.B - Event-driven assertions
@@ -156,10 +156,11 @@ yieldInBalance  = contractBalance > (principalHeld + feesCollected) ? contractBa
 ## 📋 Summary
 
 ### Test Coverage Status
-- **Unit Tests:** ✅ 90% complete
+- **Unit Tests:** ✅ 95% complete
 - **Fuzz Tests:** ✅ 100% complete
 - **Invariants:** ✅ 100% complete
-- **Fork Tests:** ✅ 90% complete
+- **Fork Tests:** ✅ 100% complete
+- **Stateful Fuzz:** ✅ 100% complete
 
 ### Critical Missing Tests
 - None. High-priority security and integration tests are all implemented.

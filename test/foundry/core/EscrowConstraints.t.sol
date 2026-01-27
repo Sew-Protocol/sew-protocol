@@ -93,11 +93,11 @@ contract EscrowConstraints is Test {
         // Grant ROLE_ESCROW_CONTRACT to vault so it can call moduleManagement
         bytes32 ROLE_ESCROW_CONTRACT = moduleManagement.ROLE_ESCROW_CONTRACT();
         moduleManagement.grantRole(ROLE_ESCROW_CONTRACT, address(vault));
-        vm.prank(address(vault));
+        vm.prank(address(this));
         moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
         vm.warp(block.timestamp + 14 days + 1);
         adminContract.activateResolutionModule(address(vault));
-        vm.prank(address(vault));
+        vm.prank(address(this));
         moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
     }
 
@@ -342,11 +342,11 @@ contract EscrowConstraints is Test {
         maxFeeVault.setBondCollector(address(bondCollector));
 
         adminContract.queueResolutionModule(address(maxFeeVault), address(resolutionModule));
-        vm.prank(address(maxFeeVault));
+        vm.prank(owner);
         moduleManagement.queueModule(address(maxFeeVault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
         vm.warp(block.timestamp + 14 days + 1);
         adminContract.activateResolutionModule(address(maxFeeVault));
-        vm.prank(address(maxFeeVault));
+        vm.prank(owner);
         moduleManagement.activateModule(address(maxFeeVault), BaseEscrow.ModuleType.RELEASE);
 
         // Test with a large amount that could cause overflow

@@ -101,18 +101,18 @@ contract AavePauseSemantics is Test {
         vault.setResolutionModule(address(resolutionModule));
 
         yieldDist = new DefaultYieldDistributionModule();
-        vm.prank(address(vault));
+        vm.prank(address(this));
         mm.queueModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN, address(aaveModule));
-        vm.prank(address(vault));
+        vm.prank(address(this));
         mm.queueModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST, address(yieldDist));
         (, uint64 etaGen, bool existsGen) = mm.getPendingModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN);
         (, uint64 etaDist, bool existsDist) = mm.getPendingModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST);
         require(existsGen && existsDist, "pending modules must exist");
         uint256 maxEta = etaGen > etaDist ? uint256(etaGen) : uint256(etaDist);
         vm.warp(maxEta + 1);
-        vm.prank(address(vault));
+        vm.prank(address(this));
         mm.activateModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN);
-        vm.prank(address(vault));
+        vm.prank(address(this));
         mm.activateModule(address(vault), BaseEscrow.ModuleType.YIELD_DIST);
 
         // Module pattern is now used directly (no delegatecall library needed)
@@ -124,6 +124,8 @@ contract AavePauseSemantics is Test {
         // Grant guardian role (needed for pause and emergency unwind)
         vault.grantRole(vault.ROLE_GUARDIAN(), guardian);
         vault.grantRole(vault.ROLE_GUARDIAN(), address(this)); // Also grant to this contract for emergency unwind
+        // Grant guardian role to guardianOps on aaveModule
+        aaveModule.grantRole(aaveModule.ROLE_GUARDIAN(), address(guardianOps));
         // Grant timelock role to this contract (for unpause)
         vault.grantRole(vault.ROLE_TIMELOCK(), address(this));
 
@@ -291,7 +293,7 @@ contract AavePauseSemantics is Test {
         require(inYield, "Yield deposit should have succeeded");
 
         // Verify aTokens exist
-        uint256 aTokenBalanceBefore = aToken.balanceOf(address(vault));
+        uint256 aTokenBalanceBefore = aToken.balanceOf(address(aaveModule));
         assertGt(aTokenBalanceBefore, 0, "Should have aTokens");
 
         // Pause (guardian can pause)

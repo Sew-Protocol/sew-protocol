@@ -42,12 +42,12 @@ contract ModuleSwapExecutableTest is Test {
         assertTrue(vault.hasRole(ROLE_TIMELOCK, owner));
     }
 
-    function test_queueAndActivateDefaultReleaseStrategy_viaEscrowWrappers() public {
+    function test_queueAndActivateDefaultReleaseStrategy_viaDirectCalls() public {
         // Default is unset.
         assertEq(moduleManagement.getModule(address(vault), BaseEscrow.ModuleType.RELEASE), address(0));
 
-        // Queue (escrow-originated call)
-        vault.queueModule(BaseEscrow.ModuleType.RELEASE, address(releaseV1));
+        // Queue (direct call)
+        moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(releaseV1));
         (address pending, uint64 eta, bool exists) = moduleManagement.getPendingModule(
             address(vault),
             BaseEscrow.ModuleType.RELEASE
@@ -58,7 +58,7 @@ contract ModuleSwapExecutableTest is Test {
 
         // Activate after slow delay (7 days)
         vm.warp(block.timestamp + 7 days + 1);
-        vault.activateModule(BaseEscrow.ModuleType.RELEASE);
+        moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
 
         assertEq(
             moduleManagement.getModule(address(vault), BaseEscrow.ModuleType.RELEASE),
@@ -66,14 +66,14 @@ contract ModuleSwapExecutableTest is Test {
         );
 
         // Swap again (append-only new default)
-        vault.queueModule(BaseEscrow.ModuleType.RELEASE, address(releaseV2));
+        moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(releaseV2));
         ( , uint64 eta2, bool exists2) = moduleManagement.getPendingModule(
             address(vault),
             BaseEscrow.ModuleType.RELEASE
         );
         assertTrue(exists2);
         vm.warp(uint256(eta2) + 1);
-        vault.activateModule(BaseEscrow.ModuleType.RELEASE);
+        moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
 
         assertEq(
             moduleManagement.getModule(address(vault), BaseEscrow.ModuleType.RELEASE),

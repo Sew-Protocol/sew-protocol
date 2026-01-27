@@ -44,6 +44,8 @@ contract AppealBondRecordingTest is Test {
         paymentLib = new PaymentCalculationLibraryV1();
         incentiveModule = new ResolverIncentiveModuleV2(deployer, address(paymentLib));
         token = new ERC20Mock('Test Token', 'TEST', address(this), 0);
+        incentiveModule.grantRole(incentiveModule.ROLE_TIMELOCK(), address(this));
+        incentiveModule.registerEscrowContract(address(this));
         yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps(address(this));
         moduleManagement = new ModuleManagementContract(address(this));
@@ -72,7 +74,7 @@ contract AppealBondRecordingTest is Test {
         token.approve(address(incentiveModule), amount);
 
         // Record bond - incentive module will pull tokens from depositor
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, depositor, amount, address(token), round);
 
         // Verify bond recorded
@@ -95,7 +97,7 @@ contract AppealBondRecordingTest is Test {
         vm.deal(address(escrow), amount);
 
         // Record bond - function is now payable and requires msg.value == amount
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         incentiveModule.recordAppealBond{value: amount}(
             WORKFLOW_ID,
             depositor,
@@ -126,7 +128,7 @@ contract AppealBondRecordingTest is Test {
         token.approve(address(incentiveModule), amount);
 
         // Record bond - incentive module will pull tokens from depositor
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, depositor, amount, address(token), round);
 
         // Verify bond recorded
@@ -150,11 +152,11 @@ contract AppealBondRecordingTest is Test {
         token.approve(address(incentiveModule), amount * 2);
 
         // Record first bond
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, depositor, amount, address(token), round);
 
         // Try to record duplicate (should revert)
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         vm.expectRevert('Bond already exists');
         incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, depositor, amount, address(token), round);
     }
@@ -165,7 +167,7 @@ contract AppealBondRecordingTest is Test {
     function test_recordAppealBond_InvalidRoundZero() public {
         uint256 amount = 1 ether;
         uint8 round = 0;
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         vm.expectRevert('Invalid round');
         incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, depositor, amount, address(token), round);
     }
@@ -177,7 +179,7 @@ contract AppealBondRecordingTest is Test {
         uint256 amount = 1 ether;
         uint8 round = 3;
 
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         vm.expectRevert('Invalid round');
         incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, depositor, amount, address(token), round);
     }
@@ -189,7 +191,7 @@ contract AppealBondRecordingTest is Test {
         uint256 amount = 0;
         uint8 round = 1;
 
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         vm.expectRevert('Invalid amount');
         incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, depositor, amount, address(token), round);
     }
@@ -202,7 +204,7 @@ contract AppealBondRecordingTest is Test {
         uint8 round = 1;
 
         // Call from non-escrow address
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         vm.expectRevert('Invalid depositor');
         incentiveModule.recordAppealBond(WORKFLOW_ID, address(0), address(0), amount, address(token), round);
     }
@@ -239,7 +241,7 @@ contract AppealBondRecordingTest is Test {
         vm.prank(depositor);
         token.approve(address(incentiveModule), amount);
 
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         vm.expectEmit(true, true, true, true);
         emit AppealBondRecorded(WORKFLOW_ID, round, depositor, amount, address(token));
 

@@ -48,6 +48,8 @@ contract AppealBondDistributionTest is Test {
         paymentLib = new PaymentCalculationLibraryV1();
         incentiveModule = new ResolverIncentiveModuleV2(deployer, address(paymentLib));
         token = new ERC20Mock('Test Token', 'TEST', address(this), 0);
+        incentiveModule.grantRole(incentiveModule.ROLE_TIMELOCK(), address(this));
+        incentiveModule.registerEscrowContract(address(this));
         yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps(address(this));
         moduleManagement = new ModuleManagementContract(address(this));
@@ -73,7 +75,7 @@ contract AppealBondDistributionTest is Test {
         token.approve(address(incentiveModule), BOND_AMOUNT);
 
         // Record bond - incentive module will pull tokens from depositor
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         incentiveModule.recordAppealBond(workflowId, depositor, depositor, BOND_AMOUNT, address(token), round);
     }
 
@@ -87,7 +89,7 @@ contract AppealBondDistributionTest is Test {
         uint256 depositBalanceBefore = token.balanceOf(depositor);
 
         // Distribute bond on successful appeal (outcomeFlipped = true)
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         incentiveModule.distributeAppealBond(WORKFLOW_ID, 0, true);
 
         // Verify bond refunded to depositor
@@ -106,14 +108,14 @@ contract AppealBondDistributionTest is Test {
         _recordBond(WORKFLOW_ID, 1);
 
         // Record resolvers at round 0 (prior to appeal)
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         incentiveModule.recordResolver(WORKFLOW_ID, resolver1, 0);
 
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         incentiveModule.recordResolver(WORKFLOW_ID, resolver2, 0);
 
         // Distribute bond on failed appeal (outcomeFlipped = false)
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         incentiveModule.distributeAppealBond(WORKFLOW_ID, 0, false);
 
         // Verify resolvers have claimable payments
@@ -133,7 +135,7 @@ contract AppealBondDistributionTest is Test {
      * @notice Test no bond recorded - should revert
      */
     function test_distributeAppealBond_NoBondRecorded() public {
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         vm.expectRevert('No bond recorded');
         incentiveModule.distributeAppealBond(WORKFLOW_ID, 0, true);
     }
@@ -146,12 +148,12 @@ contract AppealBondDistributionTest is Test {
         _recordBond(WORKFLOW_ID, 1);
 
         // Distribute once
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         incentiveModule.distributeAppealBond(WORKFLOW_ID, 0, true);
 
         // Try to distribute again
         // Note: The contract zeros bond.amount after distribution, so second call fails on "No bond recorded"
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         vm.expectRevert('No bond recorded');
         incentiveModule.distributeAppealBond(WORKFLOW_ID, 0, true);
     }
@@ -165,7 +167,7 @@ contract AppealBondDistributionTest is Test {
         // No resolvers recorded at round 0
 
         // Distribute bond
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         incentiveModule.distributeAppealBond(WORKFLOW_ID, 0, false);
 
         // Bond should be forfeited (remains in protocol)
@@ -180,7 +182,7 @@ contract AppealBondDistributionTest is Test {
     function test_distributeAppealBond_EventEmittedOnRefund() public {
         _recordBond(WORKFLOW_ID, 1);
 
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         vm.expectEmit(true, true, true, true);
         emit AppealBondRefunded(WORKFLOW_ID, 1, depositor, BOND_AMOUNT, address(token));
 
@@ -194,13 +196,13 @@ contract AppealBondDistributionTest is Test {
         _recordBond(WORKFLOW_ID, 1);
 
         // Record resolver
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         incentiveModule.recordResolver(WORKFLOW_ID, resolver1, 0);
 
         address[] memory resolvers = new address[](1);
         resolvers[0] = resolver1;
 
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         vm.expectEmit(true, true, true, true);
         emit AppealBondPaidToResolvers(WORKFLOW_ID, 0, resolvers, BOND_AMOUNT, address(token));
 

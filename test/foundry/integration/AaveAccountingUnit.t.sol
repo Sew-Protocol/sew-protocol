@@ -100,7 +100,7 @@ contract AaveAccountingUnit is Test {
         vault.setResolutionModule(address(resolutionModule));
 
         yieldDist = new DefaultYieldDistributionModule();
-        vm.prank(address(vault));
+        vm.prank(address(this));
         mm.queueModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN, address(aaveModule));
 
         // Fund accounts

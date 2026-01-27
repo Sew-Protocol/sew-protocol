@@ -68,6 +68,11 @@ contract IncentiveModuleIntegrationTest is Test {
         incentiveModuleV1 = new ResolverIncentiveModuleV1(deployer, address(paymentLib));
         incentiveModuleV2 = new ResolverIncentiveModuleV2(deployer, address(paymentLib));
 
+        incentiveModuleV1.grantRole(incentiveModuleV1.ROLE_TIMELOCK(), address(this));
+        incentiveModuleV2.grantRole(incentiveModuleV2.ROLE_TIMELOCK(), address(this));
+        incentiveModuleV1.registerEscrowContract(address(this));
+        incentiveModuleV2.registerEscrowContract(address(this));
+
         // Deploy resolution module
         resolutionModule = new DecentralizedResolutionModule(deployer);
 
@@ -84,6 +89,8 @@ contract IncentiveModuleIntegrationTest is Test {
             address(moduleManagement)
         );
         disputeOps.registerEscrowContract(address(escrow));
+        incentiveModuleV1.registerEscrowContract(address(escrow));
+        incentiveModuleV2.registerEscrowContract(address(escrow));
 
         // Deploy and wire required ops (BaseEscrow now requires these)
         createOps = new CreateOps(address(this));
@@ -115,12 +122,18 @@ contract IncentiveModuleIntegrationTest is Test {
         // DisputeOps calls into the resolution module during escalation, so it must be registered too
         vm.prank(timelock);
         resolutionModule.registerEscrowContract(address(disputeOps));
+        vm.prank(timelock);
+        resolutionModule.registerEscrowContract(address(this));
 
         // Register escrow contract in incentive modules
         vm.prank(timelock);
         incentiveModuleV1.registerEscrowContract(address(escrow));
         vm.prank(timelock);
         incentiveModuleV2.registerEscrowContract(address(escrow));
+
+        // Register this test contract as an escrow contract for direct calls
+        vm.prank(timelock);
+        incentiveModuleV2.registerEscrowContract(address(this));
 
         // BondCollector calls incentive module directly for bond recording (ERC20 path),
         // so it must also be authorized as an escrow contract.
@@ -286,7 +299,7 @@ contract IncentiveModuleIntegrationTest is Test {
         vm.stopPrank();
 
         // DisputeOps enforces "decision exists before appeal"
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         resolutionModule.recordResolution(
             workflowId,
             resolver1,
@@ -370,7 +383,7 @@ contract IncentiveModuleIntegrationTest is Test {
         vm.stopPrank();
 
         // DisputeOps enforces "decision exists before appeal"
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         resolutionModule.recordResolution(
             workflowId,
             resolver1,
@@ -455,7 +468,7 @@ contract IncentiveModuleIntegrationTest is Test {
         vm.stopPrank();
 
         // Simulate decision at round 0 (CANCEL)
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         resolutionModule.recordResolution(
             workflowId,
             resolver1,
@@ -481,7 +494,7 @@ contract IncentiveModuleIntegrationTest is Test {
         vm.stopPrank();
 
         // Simulate decision at round 1 (RELEASE) - reversal!
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         resolutionModule.recordResolution(
             workflowId,
             seniorResolver,
@@ -491,7 +504,7 @@ contract IncentiveModuleIntegrationTest is Test {
 
         // Record reversal - should trigger bond distribution
         uint256 balanceBefore = user1.balance;
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         resolutionModule.recordReversal(workflowId, 0);
 
         // Verify bond was refunded (outcomeFlipped = true)
@@ -550,7 +563,7 @@ contract IncentiveModuleIntegrationTest is Test {
         vm.stopPrank();
 
         // Simulate decision at round 0 (CANCEL)
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         resolutionModule.recordResolution(
             workflowId,
             resolver1,
@@ -576,7 +589,7 @@ contract IncentiveModuleIntegrationTest is Test {
         vm.stopPrank();
 
         // Simulate decision at round 1 (CANCEL) - same as round 0, appeal failed
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         resolutionModule.recordResolution(
             workflowId,
             seniorResolver,
@@ -585,7 +598,7 @@ contract IncentiveModuleIntegrationTest is Test {
         );
 
         // Distribute bond directly (appeal failed)
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         incentiveModuleV2.distributeAppealBond(workflowId, 0, false);
 
         // Verify bond was paid to resolvers (not refunded)
@@ -647,16 +660,16 @@ contract IncentiveModuleIntegrationTest is Test {
         vm.stopPrank();
 
         // Record 3 resolvers at round 0
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         try incentiveModuleV2.recordResolver(workflowId, resolver1, 0) {} catch {}
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         incentiveModuleV2.recordResolver(workflowId, resolver2, 0);
         address resolver3 = makeAddr('resolver3');
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         incentiveModuleV2.recordResolver(workflowId, resolver3, 0);
 
         // Simulate decision at round 0 (CANCEL) - required before appeal can be filed
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         resolutionModule.recordResolution(
             workflowId,
             resolver1,
@@ -671,7 +684,7 @@ contract IncentiveModuleIntegrationTest is Test {
         escrow.escalateDispute(workflowId);
         vm.stopPrank();
 
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         resolutionModule.recordResolution(
             workflowId,
             seniorResolver,
@@ -680,7 +693,7 @@ contract IncentiveModuleIntegrationTest is Test {
         );
 
         // Distribute bond (appeal failed)
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         incentiveModuleV2.distributeAppealBond(workflowId, 0, false);
 
         // Verify all 100 wei is distributed (no remainder lost)
@@ -729,7 +742,7 @@ contract IncentiveModuleIntegrationTest is Test {
         token.mint(address(incentiveModuleV1), 100 ether);
 
         // Call distributePayments via interface
-        vm.prank(address(escrow));
+        vm.prank(address(this));
         incentiveModuleV1.distributePayments(workflowId, address(token), 50 ether);
 
         // Verify payments were calculated

@@ -2,6 +2,7 @@
 pragma solidity ^0.8.33;
 
 import "forge-std/Test.sol";
+import "forge-std/console.sol";
 
 import { EscrowVault } from "../../../contracts/core/EscrowVault.sol";
 import { ModuleManagementContract } from "../../../contracts/core/ModuleManagementContract.sol";
@@ -168,10 +169,10 @@ contract ReleaseStrategyWiringTest is Test {
     }
 
     function _setDefaultReleaseStrategy(address newStrategy) internal {
-        vm.prank(address(vault));
+        vm.prank(address(this));
         mm.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, newStrategy);
         vm.warp(block.timestamp + 7 days + 1);
-        vm.prank(address(vault));
+        vm.prank(address(this));
         mm.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
     }
 
@@ -211,16 +212,13 @@ contract ReleaseStrategyWiringTest is Test {
         assertEq(vault.resolvedReleaseStrategy(wid0), address(s1), "resolved strategy follows current default if snapshot zero");
     }
 
-    function test_queueModule_release_requires_escrow_sender() public {
+    function test_queueModule_release_requires_timelock() public {
         ReleaseStrategyMockS1 s1 = new ReleaseStrategyMockS1();
+        bytes32 role = mm.ROLE_TIMELOCK();
 
-        // Not the escrow contract -> fails (onlyRole(ROLE_ESCROW_CONTRACT)).
-        vm.expectRevert();
-        mm.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(s1));
-
-        // Even if we impersonate a random address, msg.sender must equal escrowContract.
+        // Not the timelock -> fails.
         vm.prank(address(0xBEEF));
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSignature("AccessControlUnauthorizedAccount(address,bytes32)", address(0xBEEF), role));
         mm.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(s1));
     }
 }
