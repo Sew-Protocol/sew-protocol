@@ -11,9 +11,9 @@
 
 **Status:** ✅ COMPLETE  
 **Report:** `report.md`  
-**Total Issues:** 35 (7 High, 28 Low)
+**Total Issues:** 36 (8 High, 28 Low)
 
-#### High Issues (7)
+#### High Issues (8)
 
 **H-1: Arbitrary `from` Passed to `transferFrom`**
 - **Location:** `contracts/mocks/MockRevertingERC20.sol:46`
@@ -62,6 +62,12 @@
 - **Severity:** HIGH
 - **Status:** ✅ **REVIEWED & ACCEPTABLE**
 - **Justification:** All 25 instances have been manually reviewed. They either follow the Checks-Effects-Interactions (CEI) pattern (updating state before external calls) or are protected by the `nonReentrant` modifier from OpenZeppelin. Many are false positives from view calls or trusted module interactions.
+
+**H-8: ABI EncodePacked Hash Collision**
+- **Location:** `contracts/YieldOps.sol:262`
+- **Severity:** HIGH
+- **Status:** ✅ **REVIEWED & ACCEPTABLE**
+- **Justification:** The `abi.encodePacked` usage here is for concatenating a string error message (`'Yield withdrawal failed: '`) with a `string` reason. This does not involve hashing multiple dynamic types in a way that causes collisions relevant to security logic. It is purely for error message formatting.
 
 #### Low Issues (28)
 
