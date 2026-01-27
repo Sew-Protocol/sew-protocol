@@ -134,10 +134,6 @@ contract EscrowVault is BaseEscrow {
         return ModuleGetterConsolidationLibrary.getYieldDistributionModule(_getModuleAddress(workflowId, ModuleType.YIELD_DIST));
     }
 
-    function _getDefaultYieldGenerationModule() internal view override returns (IYieldGenerationModule module) {
-        return IYieldGenerationModule(moduleManagement.getModule(address(this), ModuleType.YIELD_GEN));
-    }
-
     bytes32 public constant ROLE_FEE_RECIPIENT = keccak256('ROLE_FEE_RECIPIENT');
 
     function withdrawFees(address token) external onlyRole(ROLE_FEE_RECIPIENT) nonReentrant {

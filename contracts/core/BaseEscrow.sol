@@ -762,32 +762,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         return disputeResolver == et.disputeResolver;
     }
 
-    function _getDisputeResolverForNewEscrow(
-        uint256 workflowId,
-        address token,
-        address from,
-        address to,
-        uint256 amount
-    ) internal view virtual returns (address) {
-        IResolutionModule module = _getResolutionModule(workflowId);
-        if (address(module) == address(0)) revert ResolutionModuleError(1);
-        
-        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(token, from, to, amount);
-        (bool success, bytes memory data) = address(module).staticcall(
-            abi.encodeWithSelector(IResolutionModule.getDisputeResolver.selector, workflowId, escrowData)
-        );
-        
-        if (!success || data.length < 64) {
-            revert ResolutionModuleError(2);
-        }
-        
-        (address disputeResolver, ) = abi.decode(data, (address, uint8));
-        if (disputeResolver == address(0)) {
-            revert ResolutionModuleError(3);
-        }
-        return disputeResolver;
-    }
-
     function _applyEscrowSettings(uint256 workflowId, EscrowSettings memory settings) internal {
         EscrowTransfer storage et = escrowTransfers[workflowId];
         if (settings.customResolver != address(0)) et.disputeResolver = settings.customResolver;
@@ -930,10 +904,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
                 }
             }
         }
-    }
-
-    function _getDefaultYieldGenerationModule() internal view virtual returns (IYieldGenerationModule module) {
-        return IYieldGenerationModule(address(0));
     }
 
     function _handleYieldAndGetActualAmount(

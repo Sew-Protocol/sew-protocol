@@ -27,6 +27,7 @@ contract DefaultResolutionModule is AccessControl, IResolutionModule {
     }
 
     function setResolver(address newResolver) external onlyRole(ROLE_TIMELOCK) {
+        if (newResolver == address(0)) revert InvalidAddress(ADDR_INITIAL_RESOLVER, newResolver);
         address oldResolver = resolver;
         resolver = newResolver;
         emit ResolverUpdated(oldResolver, newResolver);

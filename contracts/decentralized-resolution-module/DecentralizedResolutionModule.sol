@@ -707,6 +707,7 @@ contract DecentralizedResolutionModule is
     }
 
     function setExternalResolver(address resolver) external onlyRole(ROLE_TIMELOCK) {
+        if (resolver == address(0)) revert ZeroAddress('resolver');
         externalResolver = resolver;
         if (resolver != address(0)) {
             escalationConfig[2].enabled = true;
@@ -899,14 +900,17 @@ contract DecentralizedResolutionModule is
     }
 
     function registerEscrowContract(address c) external onlyRole(ROLE_TIMELOCK) {
+        if (c == address(0)) revert ZeroAddress('escrowContract');
         registeredEscrowContracts[c] = true;
         emit EscrowContractRegistered(c);
     }
     function unregisterEscrowContract(address c) external onlyRole(ROLE_TIMELOCK) {
+        if (c == address(0)) revert ZeroAddress('escrowContract');
         registeredEscrowContracts[c] = false;
         emit EscrowContractUnregistered(c);
     }
     function setIncentiveModule(address m) external onlyRole(ROLE_TIMELOCK) {
+        // Allow zero address to disable incentive module
         incentiveModule = IIncentiveModule(m);
         emit IncentiveModuleUpdated(address(0), m);
     }

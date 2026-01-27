@@ -292,9 +292,6 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         return ModuleGetterConsolidationLibrary.getResolutionModule(_getModuleAddress(workflowId, ModuleType.RESOLUTION), disputeResolutionModule);
     }
 
-    function _getDefaultYieldGenerationModule() internal view override returns (IYieldGenerationModule module) {
-        return IYieldGenerationModule(moduleManagement.getModule(address(this), ModuleType.YIELD_GEN));
-    }
 
     function _getYieldGenerationModule(uint256 workflowId) internal view override returns (IYieldGenerationModule) {
         return ModuleGetterConsolidationLibrary.getYieldGenerationModule(_getModuleAddress(workflowId, ModuleType.YIELD_GEN));
