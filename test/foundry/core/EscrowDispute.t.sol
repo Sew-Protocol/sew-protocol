@@ -67,6 +67,9 @@ contract EscrowDisputeTest is Test {
         vault.setSettlementOps(address(settlementOps));
         vault.setBondCollector(address(bondCollector));
         vault.setResolutionModule(address(resolutionModule));
+
+        // Allow this test contract to change the default resolver in DefaultResolutionModule
+        resolutionModule.grantRole(resolutionModule.ROLE_TIMELOCK(), owner);
     }
 
     function test_raiseDispute_NonParticipant() public {
@@ -97,4 +100,110 @@ contract EscrowDisputeTest is Test {
         vm.expectRevert(); // EscalationNotAllowed
         vault.escalateDispute(wid);
     }
+
+    function test_Dispute_GlobalResolverChange_AllowsNewResolverOnExistingEscrow() public {
+        uint256 amount = 1000e18;
+        address newResolver = address(0xDEAD);
+
+        // Buyer creates escrow with default settings (no customResolver)
+        token.mint(buyer, amount);
+        vm.startPrank(buyer);
+        token.approve(address(vault), amount);
+        uint256 wid = vault.createEscrow(
+            address(token),
+            seller,
+            amount,
+            SettingsValidationLibrary.getDefaultSettings()
+        );
+        vm.stopPrank();
+
+        // Snapshot the per-escrow resolver chosen at creation time
+        ( , , , address snapResolver, , , , , , ) = vault.escrowTransfers(wid);
+        assertEq(snapResolver, resolver, "initial per-escrow resolver should be DefaultResolutionModule.resolver");
+
+        // Move escrow into DISPUTED state
+        vm.prank(buyer);
+        vault.raiseDispute(wid);
+
+        // Governance updates the global default resolver in DefaultResolutionModule
+        resolutionModule.setResolver(newResolver);
+        assertEq(resolutionModule.resolver(), newResolver, "global resolver should be updated");
+
+        // New resolver (set after escrow creation) can issue a resolution, but because
+        // DefaultResolutionModule does not expose appeal metadata, SettlementOps will
+        // create a pending settlement and leave the escrow in DISPUTED state until
+        // the appeal window expires and executePendingSettlement is called.
+        vm.prank(newResolver);
+        vault.releaseAsDisputeResolver(wid, bytes32("hash"));
+
+        // Escrow should remain DISPUTED with a pending settlement
+        ( , , , , , , , EscrowState stAfter, , ) = vault.escrowTransfers(wid);
+        assertEq(uint256(stAfter), uint256(EscrowState.DISPUTED), "escrow should remain DISPUTED with pending settlement");
+
+        (bool exists, bool isRelease, uint256 appealDeadline, ) = vault.pendingSettlements(wid);
+        assertTrue(exists, "pending settlement should exist");
+        assertTrue(isRelease, "pending settlement should be a release");
+        assertGt(appealDeadline, block.timestamp, "appeal deadline should be in the future");
+    }
+
+    function test_Dispute_CustomResolver_OverriddenByGlobalResolverChange() public {
+        uint256 amount = 1000e18;
+        address newResolver = address(0xBEEF);
+
+        // Deploy a custom resolver contract (must have code)
+        TestCustomResolver customResolver = new TestCustomResolver();
+
+        // Buyer creates escrow with explicit customResolver
+        token.mint(buyer, amount);
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
+        settings.customResolver = address(customResolver);
+
+        vm.startPrank(buyer);
+        token.approve(address(vault), amount);
+        uint256 wid = vault.createEscrow(address(token), seller, amount, settings);
+        vm.stopPrank();
+
+        // Confirm per-escrow resolver is the custom one
+        ( , , , address resolverOnTransfer, , , , , , ) = vault.escrowTransfers(wid);
+        assertEq(resolverOnTransfer, address(customResolver), "disputeResolver should be customResolver");
+
+        // Move escrow into DISPUTED state
+        vm.prank(buyer);
+        vault.raiseDispute(wid);
+
+        // Before global resolver change, newResolver is NOT authorized
+        vm.startPrank(newResolver);
+        vm.expectRevert(); // NotAuthorizedResolver
+        vault.releaseAsDisputeResolver(wid, bytes32("before-change"));
+        vm.stopPrank();
+
+        // Governance updates the global default resolver in DefaultResolutionModule
+        resolutionModule.setResolver(newResolver);
+        assertEq(resolutionModule.resolver(), newResolver, "global resolver should be updated");
+
+        // After global resolver change, newResolver is still NOT authorized for this escrow
+        vm.startPrank(newResolver);
+        vm.expectRevert(); // NotAuthorizedResolver
+        vault.releaseAsDisputeResolver(wid, bytes32("after-change"));
+        vm.stopPrank();
+
+        // The per-escrow customResolver remains the only authorized resolver
+        vm.prank(address(customResolver));
+        vault.releaseAsDisputeResolver(wid, bytes32("custom-resolver"));
+
+        // As with the global resolver test, DefaultResolutionModule does not expose
+        // appeal metadata, so SettlementOps creates a pending settlement and the
+        // escrow stays DISPUTED until executePendingSettlement is called.
+        ( , , , , , , , EscrowState stAfter, , ) = vault.escrowTransfers(wid);
+        assertEq(uint256(stAfter), uint256(EscrowState.DISPUTED), "escrow should remain DISPUTED with pending settlement after customResolver decision");
+
+        (bool exists, bool isRelease, uint256 appealDeadline, ) = vault.pendingSettlements(wid);
+        assertTrue(exists, "pending settlement should exist for customResolver decision");
+        assertTrue(isRelease, "pending settlement from customResolver should be a release");
+        assertGt(appealDeadline, block.timestamp, "appeal deadline should be in the future");
+    }
+}
+
+contract TestCustomResolver {
+    // Intentionally empty; only existence (code size > 0) matters for SettingsValidationLibrary
 }

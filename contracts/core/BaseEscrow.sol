@@ -743,6 +743,14 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         address disputeResolver
     ) internal view returns (bool) {
         EscrowTransfer storage et = escrowTransfers[workflowId];
+
+        // If a customResolver is set for this escrow, it is the only authorized resolver.
+        // Governance or module-level resolver changes must NOT override this per-escrow choice.
+        EscrowSettings memory settings = escrowSettings[workflowId];
+        if (settings.customResolver != address(0)) {
+            return disputeResolver == settings.customResolver;
+        }
+
         address snap = moduleSnapshots[workflowId].resolutionModule;
         if (snap != address(0)) {
             bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(

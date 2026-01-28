@@ -55,5 +55,8 @@
     "ts-node": "^10.9.2",
     "typechain": "^8.3.0",
     "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@google/gemini-cli": "^0.26.0"
   }
 }
