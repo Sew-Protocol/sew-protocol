@@ -365,8 +365,8 @@ contract Coverage99PercentTest is Test {
 
     function test_setTimeoutConfig() public {
         TimeoutConfig memory config = TimeoutConfig({
-            defaultAutoReleaseTime: block.timestamp + 7 days, // Must be absolute timestamp, not relative
-            defaultAutoCancelTime: block.timestamp + 14 days, // Must be absolute timestamp, not relative
+            defaultAutoReleaseDelay: 7 days,
+            defaultAutoCancelDelay: 14 days,
             maxDisputeDuration: 30 days,
             appealWindowDuration: 2 days
         });
@@ -645,8 +645,8 @@ contract Coverage99PercentTest is Test {
         vault.raiseDispute(workflowId);
 
         TimeoutConfig memory config = TimeoutConfig({
-            defaultAutoReleaseTime: 0,
-            defaultAutoCancelTime: 0,
+            defaultAutoReleaseDelay: 0,
+            defaultAutoCancelDelay: 0,
             maxDisputeDuration: 90 days,
             appealWindowDuration: 1 days
         });

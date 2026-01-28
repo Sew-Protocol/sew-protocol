@@ -122,11 +122,8 @@ contract EscrowConstraints is Test {
         vm.prank(sender);
         vm.expectRevert(
             abi.encodeWithSelector(
-                SettingsValidationLibrary.OutOfBounds.selector,
-                bytes32('amount'),
-                belowMinimum,
-                MIN_ESCROW_AMOUNT,
-                type(uint256).max
+                InvalidAmount.selector,
+                AMOUNT_EMPTY
             )
         );
         vault.createEscrow(address(token), recipient, belowMinimum, getDefaultSettings());
@@ -174,8 +171,9 @@ contract EscrowConstraints is Test {
         vm.prank(sender);
         vm.expectRevert(
             abi.encodeWithSelector(
-                SettingsValidationLibrary.InvalidAddressKey.selector,
-                bytes32('recipient')
+                InvalidAddress.selector,
+                ADDR_RECIPIENT,
+                address(0)
             )
         );
         vault.createEscrow(address(token), address(0), AMOUNT, getDefaultSettings());
@@ -189,8 +187,9 @@ contract EscrowConstraints is Test {
         vm.prank(sender);
         vm.expectRevert(
             abi.encodeWithSelector(
-                SettingsValidationLibrary.InvalidAddressKey.selector,
-                bytes32('sender')
+                InvalidAddress.selector,
+                ADDR_GENERIC,
+                sender
             )
         );
         vault.createEscrow(address(token), sender, AMOUNT, getDefaultSettings());
@@ -279,8 +278,9 @@ contract EscrowConstraints is Test {
         vm.prank(sender);
         vm.expectRevert(
             abi.encodeWithSelector(
-                SettingsValidationLibrary.InvalidAddressKey.selector,
-                bytes32('customResolver')
+                NotAContract.selector,
+                ADDR_INITIAL_RESOLVER,
+                eoaResolver
             )
         );
         vault.createEscrow(address(token), recipient, AMOUNT, settings);

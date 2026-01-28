@@ -156,13 +156,13 @@ describe('Core Contracts - Coverage Tests', function () {
     it('Should set default auto cancel time', async function () {
       const newTime = (await time.latest()) + 7 * 24 * 60 * 60;
       await escrowVault.connect(timelock).setDefaultAutoCancelTime(newTime);
-      expect(await escrowVault.defaultAutoCancelTime()).to.equal(newTime);
+      expect(await escrowVault.defaultAutoCancelDelay()).to.equal(newTime);
     });
 
     it('Should set default auto release time', async function () {
       const newTime = (await time.latest()) + 7 * 24 * 60 * 60;
       await escrowVault.connect(timelock).setDefaultAutoReleaseTime(newTime);
-      expect(await escrowVault.defaultAutoReleaseTime()).to.equal(newTime);
+      expect(await escrowVault.defaultAutoReleaseDelay()).to.equal(newTime);
     });
 
     it('Should set max dispute duration', async function () {

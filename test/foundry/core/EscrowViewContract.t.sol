@@ -552,8 +552,8 @@ contract EscrowViewContractTest is Test {
 
     function test_getTimeoutConfig_afterUpdate() public {
         TimeoutConfig memory newConfig = TimeoutConfig({
-            defaultAutoReleaseTime: block.timestamp + 10 days,
-            defaultAutoCancelTime: block.timestamp + 5 days,
+            defaultAutoReleaseDelay: 10 days,
+            defaultAutoCancelDelay: 5 days,
             maxDisputeDuration: 60 days,
             appealWindowDuration: 3 days
         });
@@ -563,97 +563,65 @@ contract EscrowViewContractTest is Test {
 
         TimeoutConfig memory retrieved = escrowView.getTimeoutConfig();
 
-        assertEq(retrieved.defaultAutoReleaseTime, newConfig.defaultAutoReleaseTime);
-        assertEq(retrieved.defaultAutoCancelTime, newConfig.defaultAutoCancelTime);
+        assertEq(retrieved.defaultAutoReleaseDelay, newConfig.defaultAutoReleaseDelay);
+        assertEq(retrieved.defaultAutoCancelDelay, newConfig.defaultAutoCancelDelay);
         assertEq(retrieved.maxDisputeDuration, newConfig.maxDisputeDuration);
         assertEq(retrieved.appealWindowDuration, newConfig.appealWindowDuration);
     }
 
-    // ============ isDisputeTimedOut Tests ============
+    // ============ getEscrowTimeline Tests ============
 
-    function test_isDisputeTimedOut_notDisputed() public {
-        token.transfer(buyer, INITIAL_AMOUNT);
+    function test_getEscrowTimeline_pending() public {
+        uint256 amount = 1000e18;
+        uint256 autoReleaseTime = block.timestamp + 10 days;
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
+        settings.autoReleaseTime = autoReleaseTime;
+
+        token.transfer(buyer, amount);
         vm.prank(buyer);
-        token.approve(address(vault), INITIAL_AMOUNT);
+        token.approve(address(vault), amount);
         vm.prank(buyer);
-        uint256 workflowId = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, SettingsValidationLibrary.getDefaultSettings());
+        uint256 wid = vault.createEscrow(address(token), seller, amount, settings);
 
-        // Not disputed, should return false
-        (bool isTimedOut, uint256 timeRemaining) = escrowView.isDisputeTimedOut(workflowId);
-
-        assertFalse(isTimedOut);
-        assertEq(timeRemaining, 0);
+        EscrowTimeline memory timeline = escrowView.getEscrowTimeline(wid);
+        assertEq(uint8(timeline.status), uint8(ActionableStatus.AWAITING_CONDITION));
+        assertEq(timeline.nextDeadline, autoReleaseTime);
+        assertEq(uint8(timeline.urgency), uint8(UrgencyLevel.LOW));
+        assertFalse(timeline.userCanExecute);
     }
 
-    function test_isDisputeTimedOut_disputed_notTimedOut() public {
-        token.transfer(buyer, INITIAL_AMOUNT);
+    function test_getEscrowTimeline_actionable() public {
+        uint256 amount = 1000e18;
+        uint256 autoReleaseTime = block.timestamp + 1 days;
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
+        settings.autoReleaseTime = autoReleaseTime;
+
+        token.transfer(buyer, amount);
         vm.prank(buyer);
-        token.approve(address(vault), INITIAL_AMOUNT);
+        token.approve(address(vault), amount);
         vm.prank(buyer);
-        uint256 workflowId = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, SettingsValidationLibrary.getDefaultSettings());
+        uint256 wid = vault.createEscrow(address(token), seller, amount, settings);
 
-        // Raise dispute
-        vm.prank(buyer);
-        vault.raiseDispute(workflowId);
-
-        // Get timeout config
-        TimeoutConfig memory config = escrowView.getTimeoutConfig();
-
-        // Check immediately after dispute (should not be timed out)
-        (bool isTimedOut, uint256 timeRemaining) = escrowView.isDisputeTimedOut(workflowId);
-
-        assertFalse(isTimedOut);
-        assertGt(timeRemaining, 0);
-        assertLe(timeRemaining, config.maxDisputeDuration);
+        vm.warp(autoReleaseTime + 1);
+        EscrowTimeline memory timeline = escrowView.getEscrowTimeline(wid);
+        assertEq(uint8(timeline.status), uint8(ActionableStatus.TIME_CONDITION_MET));
+        assertTrue(timeline.userCanExecute);
     }
 
-    function test_isDisputeTimedOut_disputed_timedOut() public {
-        token.transfer(buyer, INITIAL_AMOUNT);
+    // ============ getWorkflowsByRole Tests ============
+
+    function test_getWorkflowsByRole_buyer() public {
+        token.transfer(buyer, INITIAL_AMOUNT * 2);
         vm.prank(buyer);
-        token.approve(address(vault), INITIAL_AMOUNT);
+        token.approve(address(vault), INITIAL_AMOUNT * 2);
+        
         vm.prank(buyer);
-        uint256 workflowId = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, SettingsValidationLibrary.getDefaultSettings());
-
-        // Raise dispute
+        vault.createEscrow(address(token), seller, INITIAL_AMOUNT, SettingsValidationLibrary.getDefaultSettings());
         vm.prank(buyer);
-        vault.raiseDispute(workflowId);
+        vault.createEscrow(address(token), seller, INITIAL_AMOUNT, SettingsValidationLibrary.getDefaultSettings());
 
-        // Get timeout config
-        TimeoutConfig memory config = escrowView.getTimeoutConfig();
-
-        // Warp past max dispute duration
-        vm.warp(block.timestamp + config.maxDisputeDuration + 1);
-
-        (bool isTimedOut, uint256 timeRemaining) = escrowView.isDisputeTimedOut(workflowId);
-
-        assertTrue(isTimedOut);
-        assertEq(timeRemaining, 0);
-    }
-
-    function test_isDisputeTimedOut_invalidWorkflowId() public {
-        uint256 invalidWorkflowId = 999999;
-        (bool isTimedOut, uint256 timeRemaining) = escrowView.isDisputeTimedOut(invalidWorkflowId);
-
-        // Should return false for non-disputed escrow
-        assertFalse(isTimedOut);
-        assertEq(timeRemaining, 0);
-    }
-
-    function test_isDisputeTimedOut_released() public {
-        token.transfer(buyer, INITIAL_AMOUNT);
-        vm.prank(buyer);
-        token.approve(address(vault), INITIAL_AMOUNT);
-        vm.prank(buyer);
-        uint256 workflowId = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, SettingsValidationLibrary.getDefaultSettings());
-
-        // Release escrow (not disputed)
-        vm.prank(buyer);
-        vault.releaseEscrowTransfer(workflowId);
-
-        (bool isTimedOut, uint256 timeRemaining) = escrowView.isDisputeTimedOut(workflowId);
-
-        assertFalse(isTimedOut);
-        assertEq(timeRemaining, 0);
+        uint256[] memory ids = escrowView.getWorkflowsByRole(buyer, UserRole.BUYER, 0, 10);
+        assertEq(ids.length, 2);
     }
 
     // ============ Integration Tests ============

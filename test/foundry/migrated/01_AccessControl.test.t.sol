@@ -63,12 +63,12 @@ contract Test_01_AccessControl_test is Test {
         uint256 newTime = block.timestamp + 7 days;
         (uint256 dar, uint256 dac, uint256 mdd, uint256 awd) = escrowable.timeoutConfig();
         TimeoutConfig memory config = TimeoutConfig({
-            defaultAutoReleaseTime: dar,
-            defaultAutoCancelTime: dac,
+            defaultAutoReleaseDelay: dar,
+            defaultAutoCancelDelay: dac,
             maxDisputeDuration: mdd,
             appealWindowDuration: awd
         });
-        config.defaultAutoCancelTime = newTime;
+        config.defaultAutoCancelDelay = newTime;
         vm.prank(timelock);
         adminContract.setTimeoutConfig(address(escrowable), config);
         (, uint256 newDefaultAutoCancelTime, , ) = escrowable.timeoutConfig();

@@ -71,7 +71,7 @@ describe('Bounds Enforcement', function () {
   describe('Auto Cancel Time Bounds', function () {
     it('Should accept 0 (disabled)', async function () {
       await escrowableERC20.connect(timelock).setDefaultAutoCancelTime(0);
-      const time = await escrowableERC20.defaultAutoCancelTime();
+      const time = await escrowableERC20.defaultAutoCancelDelay();
       expect(time).to.equal(0);
     });
 
@@ -79,7 +79,7 @@ describe('Bounds Enforcement', function () {
       const currentTime = await time.latest();
       const maxTime = BigInt(currentTime) + BigInt(MAX_AUTO_TIME_DAYS);
       await escrowableERC20.connect(timelock).setDefaultAutoCancelTime(maxTime);
-      const result = await escrowableERC20.defaultAutoCancelTime();
+      const result = await escrowableERC20.defaultAutoCancelDelay();
       expect(result).to.equal(maxTime);
     });
 
@@ -87,7 +87,7 @@ describe('Bounds Enforcement', function () {
       const currentTime = await time.latest();
       const validTime = BigInt(currentTime) + BigInt(7 * 24 * 60 * 60); // 7 days in the future
       await escrowableERC20.connect(timelock).setDefaultAutoCancelTime(validTime);
-      const result = await escrowableERC20.defaultAutoCancelTime();
+      const result = await escrowableERC20.defaultAutoCancelDelay();
       expect(result).to.equal(validTime);
     });
 
@@ -104,7 +104,7 @@ describe('Bounds Enforcement', function () {
   describe('Auto Release Time Bounds', function () {
     it('Should accept 0 (disabled)', async function () {
       await escrowableERC20.connect(timelock).setDefaultAutoReleaseTime(0);
-      const time = await escrowableERC20.defaultAutoReleaseTime();
+      const time = await escrowableERC20.defaultAutoReleaseDelay();
       expect(time).to.equal(0);
     });
 
@@ -112,7 +112,7 @@ describe('Bounds Enforcement', function () {
       const currentTime = await time.latest();
       const maxTime = BigInt(currentTime) + BigInt(MAX_AUTO_TIME_DAYS);
       await escrowableERC20.connect(timelock).setDefaultAutoReleaseTime(maxTime);
-      const result = await escrowableERC20.defaultAutoReleaseTime();
+      const result = await escrowableERC20.defaultAutoReleaseDelay();
       expect(result).to.equal(maxTime);
     });
 

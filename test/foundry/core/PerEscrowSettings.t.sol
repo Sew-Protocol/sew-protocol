@@ -178,7 +178,7 @@ contract PerEscrowSettingsTest is Test {
     }
 
     function test_PerEscrow_CustomResolver() public {
-        address customResolver = address(0xCAFE);
+        address customResolver = address(resolutionV2);
         EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
         settings.customResolver = customResolver;
         
@@ -238,8 +238,8 @@ contract PerEscrowSettingsTest is Test {
 
         // Configure default auto times via admin
         TimeoutConfig memory cfg = TimeoutConfig({
-            defaultAutoReleaseTime: block.timestamp + 3 days,
-            defaultAutoCancelTime: block.timestamp + 7 days,
+            defaultAutoReleaseDelay: 3 days,
+            defaultAutoCancelDelay: 7 days,
             maxDisputeDuration: 90 days,
             appealWindowDuration: 2 days
         });
@@ -259,8 +259,8 @@ contract PerEscrowSettingsTest is Test {
         // EscrowTransfer struct has effective times from timeoutConfig
         ( , , , , , uint64 autoReleaseOnTransfer, uint64 autoCancelOnTransfer, , , ) =
             vault.escrowTransfers(wid);
-        assertEq(autoReleaseOnTransfer, uint64(cfg.defaultAutoReleaseTime));
-        assertEq(autoCancelOnTransfer, uint64(cfg.defaultAutoCancelTime));
+        assertEq(autoReleaseOnTransfer, uint64(block.timestamp + cfg.defaultAutoReleaseDelay));
+        assertEq(autoCancelOnTransfer, uint64(block.timestamp + cfg.defaultAutoCancelDelay));
     }
 
     function test_PerEscrow_InvalidCustomResolver_RevertsAndDoesNotCreateEscrow() public {
@@ -270,7 +270,7 @@ contract PerEscrowSettingsTest is Test {
         settings.customResolver = address(0x1234);
 
         vm.startPrank(buyer);
-        vm.expectRevert(SettingsValidationLibrary.InvalidAddressKey.selector);
+        vm.expectRevert(abi.encodeWithSelector(NotAContract.selector, ADDR_INITIAL_RESOLVER, address(0x1234)));
         vault.createEscrow(address(token), seller, amount, settings);
         vm.stopPrank();
 
@@ -285,7 +285,7 @@ contract PerEscrowSettingsTest is Test {
         settings.autoCancelTime = block.timestamp + 6 days;
 
         vm.startPrank(buyer);
-        vm.expectRevert(CannotSetBothAutoTimes.selector);
+        vm.expectRevert(abi.encodeWithSelector(CannotSetBothAutoTimes.selector, settings.autoReleaseTime, settings.autoCancelTime));
         vault.createEscrow(address(token), seller, amount, settings);
         vm.stopPrank();
 
@@ -298,7 +298,7 @@ contract PerEscrowSettingsTest is Test {
         settings.autoReleaseTime = block.timestamp - 1;
 
         vm.startPrank(buyer);
-        vm.expectRevert(InvalidAutoTime.selector);
+        vm.expectRevert(abi.encodeWithSelector(InvalidAutoTime.selector, AUTO_TIME_IN_PAST, settings.autoReleaseTime, block.timestamp));
         vault.createEscrow(address(token), seller, amount, settings);
         vm.stopPrank();
 

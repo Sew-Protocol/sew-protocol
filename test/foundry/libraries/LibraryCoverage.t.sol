@@ -413,47 +413,87 @@ contract LibraryCoverageTest is Test {
 
 
 
-    function test_SettingsValidation_validateYieldOptIn() public {
-
-        assertFalse(SettingsValidationLibrary.validateYieldOptIn(1000e6, false));
-
-        assertFalse(SettingsValidationLibrary.validateYieldOptIn(999e6, true));
-
-        assertTrue(SettingsValidationLibrary.validateYieldOptIn(1000e6, true));
-
-    }
+        function test_SettingsValidation_validateYieldOptIn() public {
 
 
 
-    function test_SettingsValidation_validateAutoCancel() public {
-
-        harness.validateAutoCancel(0);
-
-        harness.validateAutoCancel(block.timestamp + 1);
-
-        
-
-        vm.expectRevert();
-
-        harness.validateAutoCancel(block.timestamp + 31 days);
-
-    }
+            assertFalse(SettingsValidationLibrary.validateYieldOptIn(1000e6, false));
 
 
 
-    function test_SettingsValidation_validateAutoRelease() public {
+            assertTrue(SettingsValidationLibrary.validateYieldOptIn(1000e6, true));
 
-        harness.validateAutoRelease(0);
 
-        harness.validateAutoRelease(block.timestamp + 1);
 
-        
+            assertTrue(SettingsValidationLibrary.validateYieldOptIn(999e6, true));
 
-        vm.expectRevert();
 
-        harness.validateAutoRelease(block.timestamp + 31 days);
 
-    }
+        }
+
+
+
+    
+
+
+
+        function test_SettingsValidation_validateAutoCancel() public {
+
+
+
+            harness.validateAutoCancel(0);
+
+
+
+            harness.validateAutoCancel(1);
+
+
+
+            
+
+
+
+            vm.expectRevert();
+
+
+
+            harness.validateAutoCancel(31 days);
+
+
+
+        }
+
+
+
+    
+
+
+
+        function test_SettingsValidation_validateAutoRelease() public {
+
+
+
+            harness.validateAutoRelease(0);
+
+
+
+            harness.validateAutoRelease(1);
+
+
+
+            
+
+
+
+            vm.expectRevert();
+
+
+
+            harness.validateAutoRelease(31 days);
+
+
+
+        }
 
 
 

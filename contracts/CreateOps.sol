@@ -38,6 +38,9 @@ contract CreateOps is AccessControl {
     // ============ State Variables ============
     /// @notice Pause flag for yield deposits (emergency control)
     bool public yieldDepositsPaused;
+
+    /// @notice Policy flag: whether customResolver must be a contract (default true)
+    bool public resolverMustBeContract = true;
     
     // ============ Custom Errors ============
     error ZeroOwner();
@@ -50,9 +53,21 @@ contract CreateOps is AccessControl {
     event YieldDepositsPaused(address indexed caller, string reason);
     /// @notice Emitted when yield deposits are resumed
     event YieldDepositsResumed(address indexed caller);
-    
+    /// @notice Emitted when resolver policy is updated
+    event ResolverPolicyUpdated(bool mustBeContract);
+
     // Note: Monitoring events are emitted by BaseEscrow (EscrowCreated, EscrowStateChanged)
     // This contract is compute-only (view functions) and emits minimal events
+
+    /**
+     * @notice Set whether customResolver must be a contract
+     * @param mustBeContract True if resolver must be a contract, false if EOAs are allowed
+     * @dev Only callable by ROLE_TIMELOCK (governance-controlled).
+     */
+    function setResolverPolicy(bool mustBeContract) external onlyRole(ROLE_TIMELOCK) {
+        resolverMustBeContract = mustBeContract;
+        emit ResolverPolicyUpdated(mustBeContract);
+    }
     
     /**
      * @notice Constructor for CreateOps
@@ -148,7 +163,7 @@ contract CreateOps is AccessControl {
         
         // Use explicit validation time (always block.timestamp in production)
         uint256 validationTime = block.timestamp;
-        SettingsValidationLibrary.validateEscrowSettings(settings, validationTime);
+        SettingsValidationLibrary.validateEscrowSettings(settings, validationTime, resolverMustBeContract);
 
         // Fee calculation: fee = (amount * escrowFee) / ESCROW_FEE_DENOMINATOR
         result.fee = (amount * escrowFee) / ESCROW_FEE_DENOMINATOR;

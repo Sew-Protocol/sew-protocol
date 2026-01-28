@@ -70,6 +70,8 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         appealBondProtocolFeeBps = 0; // 0% default
 
         // Set timeout config fields directly (avoid struct literal to save bytecode)
+        timeoutConfig.defaultAutoReleaseDelay = 0;
+        timeoutConfig.defaultAutoCancelDelay = 0;
         timeoutConfig.maxDisputeDuration = 90 days;
         timeoutConfig.appealWindowDuration = 2 days;
         // Note: defaultAutoReleaseTime and defaultAutoCancelTime are zero by default

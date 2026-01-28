@@ -341,8 +341,8 @@ contract EscrowAdminContractTest is Test {
     
     function test_setTimeoutConfig_success() public {
         TimeoutConfig memory config = TimeoutConfig({
-            defaultAutoReleaseTime: block.timestamp + 10 days,
-            defaultAutoCancelTime: block.timestamp + 5 days,
+            defaultAutoReleaseDelay: 10 days,
+            defaultAutoCancelDelay: 5 days,
             maxDisputeDuration: 60 days,
             appealWindowDuration: 3 days
         });
@@ -351,21 +351,21 @@ contract EscrowAdminContractTest is Test {
         adminContract.setTimeoutConfig(address(vault), config);
         
         (
-            uint256 defaultAutoReleaseTime,
-            uint256 defaultAutoCancelTime,
+            uint256 defaultAutoReleaseDelay,
+            uint256 defaultAutoCancelDelay,
             uint256 maxDisputeDuration,
             uint256 appealWindowDuration
         ) = vault.timeoutConfig();
-        assertEq(defaultAutoReleaseTime, config.defaultAutoReleaseTime);
-        assertEq(defaultAutoCancelTime, config.defaultAutoCancelTime);
+        assertEq(defaultAutoReleaseDelay, config.defaultAutoReleaseDelay);
+        assertEq(defaultAutoCancelDelay, config.defaultAutoCancelDelay);
         assertEq(maxDisputeDuration, config.maxDisputeDuration);
         assertEq(appealWindowDuration, config.appealWindowDuration);
     }
     
     function test_setTimeoutConfig_validBounds() public {
         TimeoutConfig memory config = TimeoutConfig({
-            defaultAutoReleaseTime: 0, // Disabled
-            defaultAutoCancelTime: 0,  // Disabled
+            defaultAutoReleaseDelay: 0, // Disabled
+            defaultAutoCancelDelay: 0,  // Disabled
             maxDisputeDuration: 7 days,  // Minimum
             appealWindowDuration: 1 days  // Minimum
         });
@@ -385,8 +385,8 @@ contract EscrowAdminContractTest is Test {
     
     function test_setTimeoutConfig_maxBounds() public {
         TimeoutConfig memory config = TimeoutConfig({
-            defaultAutoReleaseTime: 0,
-            defaultAutoCancelTime: 0,
+            defaultAutoReleaseDelay: 0,
+            defaultAutoCancelDelay: 0,
             maxDisputeDuration: 365 days,  // Maximum
             appealWindowDuration: 7 days   // Maximum
         });
@@ -406,8 +406,8 @@ contract EscrowAdminContractTest is Test {
     
     function test_setTimeoutConfig_maxDisputeDuration_tooShort_reverts() public {
         TimeoutConfig memory config = TimeoutConfig({
-            defaultAutoReleaseTime: 0,
-            defaultAutoCancelTime: 0,
+            defaultAutoReleaseDelay: 0,
+            defaultAutoCancelDelay: 0,
             maxDisputeDuration: 6 days,  // Too short
             appealWindowDuration: 1 days
         });
@@ -419,8 +419,8 @@ contract EscrowAdminContractTest is Test {
     
     function test_setTimeoutConfig_maxDisputeDuration_tooLong_reverts() public {
         TimeoutConfig memory config = TimeoutConfig({
-            defaultAutoReleaseTime: 0,
-            defaultAutoCancelTime: 0,
+            defaultAutoReleaseDelay: 0,
+            defaultAutoCancelDelay: 0,
             maxDisputeDuration: 366 days,  // Too long
             appealWindowDuration: 1 days
         });
@@ -432,8 +432,8 @@ contract EscrowAdminContractTest is Test {
     
     function test_setTimeoutConfig_appealWindow_tooShort_reverts() public {
         TimeoutConfig memory config = TimeoutConfig({
-            defaultAutoReleaseTime: 0,
-            defaultAutoCancelTime: 0,
+            defaultAutoReleaseDelay: 0,
+            defaultAutoCancelDelay: 0,
             maxDisputeDuration: 30 days,
             appealWindowDuration: 23 hours  // Too short
         });
@@ -445,8 +445,8 @@ contract EscrowAdminContractTest is Test {
     
     function test_setTimeoutConfig_appealWindow_tooLong_reverts() public {
         TimeoutConfig memory config = TimeoutConfig({
-            defaultAutoReleaseTime: 0,
-            defaultAutoCancelTime: 0,
+            defaultAutoReleaseDelay: 0,
+            defaultAutoCancelDelay: 0,
             maxDisputeDuration: 30 days,
             appealWindowDuration: 8 days  // Too long
         });
@@ -458,8 +458,8 @@ contract EscrowAdminContractTest is Test {
     
     function test_setTimeoutConfig_unauthorized_reverts() public {
         TimeoutConfig memory config = TimeoutConfig({
-            defaultAutoReleaseTime: 0,
-            defaultAutoCancelTime: 0,
+            defaultAutoReleaseDelay: 0,
+            defaultAutoCancelDelay: 0,
             maxDisputeDuration: 30 days,
             appealWindowDuration: 1 days
         });

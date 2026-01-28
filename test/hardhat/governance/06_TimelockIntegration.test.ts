@@ -123,7 +123,7 @@ describe('Timelock Integration', function () {
       const currentTime = await time.latest();
       const newTime = BigInt(currentTime) + BigInt(7 * 24 * 60 * 60); // 7 days in the future
       await escrowableERC20.connect(timelockSigner).setDefaultAutoCancelTime(newTime);
-      const autoCancelTime = await escrowableERC20.defaultAutoCancelTime();
+      const autoCancelTime = await escrowableERC20.defaultAutoCancelDelay();
       expect(autoCancelTime).to.equal(newTime);
     });
   });

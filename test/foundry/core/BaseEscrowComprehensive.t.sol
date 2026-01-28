@@ -153,8 +153,8 @@ contract BaseEscrowComprehensive is Test {
         // Default auto cancel time is a future timestamp
         uint256 newTime = block.timestamp + 7 days;
         TimeoutConfig memory config = TimeoutConfig({
-            defaultAutoReleaseTime: 0,
-            defaultAutoCancelTime: newTime,
+            defaultAutoReleaseDelay: 0,
+            defaultAutoCancelDelay: newTime,
             maxDisputeDuration: 30 days,
             appealWindowDuration: 1 days
         });
@@ -167,8 +167,8 @@ contract BaseEscrowComprehensive is Test {
         // Default auto release time is a future timestamp
         uint256 newTime = block.timestamp + 7 days;
         TimeoutConfig memory config = TimeoutConfig({
-            defaultAutoReleaseTime: newTime,
-            defaultAutoCancelTime: 0,
+            defaultAutoReleaseDelay: newTime,
+            defaultAutoCancelDelay: 0,
             maxDisputeDuration: 30 days,
             appealWindowDuration: 1 days
         });
@@ -180,8 +180,8 @@ contract BaseEscrowComprehensive is Test {
     function test_setMaxDisputeDuration() public {
         uint256 newDuration = 30 days;
         TimeoutConfig memory config = TimeoutConfig({
-            defaultAutoReleaseTime: 0,
-            defaultAutoCancelTime: 0,
+            defaultAutoReleaseDelay: 0,
+            defaultAutoCancelDelay: 0,
             maxDisputeDuration: newDuration,
             appealWindowDuration: 1 days
         });
@@ -307,8 +307,8 @@ contract BaseEscrowComprehensive is Test {
 
         // Set max dispute duration to short time (minimum is 7 days)
         TimeoutConfig memory config = TimeoutConfig({
-            defaultAutoReleaseTime: 0,
-            defaultAutoCancelTime: 0,
+            defaultAutoReleaseDelay: 0,
+            defaultAutoCancelDelay: 0,
             maxDisputeDuration: 7 days,
             appealWindowDuration: 1 days
         });
@@ -334,8 +334,8 @@ contract BaseEscrowComprehensive is Test {
         vault.raiseDispute(workflowId);
 
         TimeoutConfig memory config = TimeoutConfig({
-            defaultAutoReleaseTime: 0,
-            defaultAutoCancelTime: 0,
+            defaultAutoReleaseDelay: 0,
+            defaultAutoCancelDelay: 0,
             maxDisputeDuration: 7 days,
             appealWindowDuration: 1 days
         });
@@ -344,9 +344,8 @@ contract BaseEscrowComprehensive is Test {
 
         vm.warp(block.timestamp + 7 days + 1);
 
-        (bool isTimedOut, uint256 timeRemaining) = escrowView.isDisputeTimedOut(workflowId);
-        assertTrue(isTimedOut);
-        assertEq(timeRemaining, 0);
+        EscrowTimeline memory timeline = escrowView.getEscrowTimeline(workflowId);
+        assertEq(uint8(timeline.status), uint8(ActionableStatus.DISPUTED_WAITING));
     }
 
     // ============ Timed Actions ============
@@ -357,26 +356,27 @@ contract BaseEscrowComprehensive is Test {
         vm.prank(buyer);
         token.approve(address(vault), amount);
 
-        // Set default auto cancel time to future timestamp
-        uint256 autoCancelTime = block.timestamp + 1 days;
+        // Set default auto cancel delay to 1 day
+        uint256 autoCancelDelay = 1 days;
         TimeoutConfig memory config = TimeoutConfig({
-            defaultAutoReleaseTime: 0,
-            defaultAutoCancelTime: autoCancelTime,
+            defaultAutoReleaseDelay: 0,
+            defaultAutoCancelDelay: autoCancelDelay,
             maxDisputeDuration: 30 days,
             appealWindowDuration: 1 days
         });
         vm.prank(timelock);
         adminContract.setTimeoutConfig(address(vault), config);
 
-        // Create escrow - it will use default auto cancel time
+        // Create escrow - it will use default auto cancel delay
+        uint256 startTime = block.timestamp;
         vm.prank(buyer);
         uint256 workflowId = vault.createEscrow(address(token), seller, amount, SettingsValidationLibrary.getDefaultSettings());
 
         // Get the escrow to verify auto cancel time
         EscrowTransfer memory et = _loadTransfer(workflowId);
-        assertEq(et.autoCancelTime, autoCancelTime);
+        assertEq(et.autoCancelTime, startTime + autoCancelDelay);
 
-        vm.warp(autoCancelTime + 1);
+        vm.warp(startTime + autoCancelDelay + 1);
 
         vault.automateTimedActions(workflowId);
     }
@@ -387,18 +387,19 @@ contract BaseEscrowComprehensive is Test {
         vm.prank(buyer);
         token.approve(address(vault), amount * 3);
 
-        // Set default auto cancel time to future timestamp
-        uint256 autoCancelTime = block.timestamp + 1 days;
+        // Set default auto cancel delay to 1 day
+        uint256 autoCancelDelay = 1 days;
         TimeoutConfig memory config = TimeoutConfig({
-            defaultAutoReleaseTime: 0,
-            defaultAutoCancelTime: autoCancelTime,
+            defaultAutoReleaseDelay: 0,
+            defaultAutoCancelDelay: autoCancelDelay,
             maxDisputeDuration: 30 days,
             appealWindowDuration: 1 days
         });
         vm.prank(timelock);
         adminContract.setTimeoutConfig(address(vault), config);
 
-        // Create escrows - they will use default auto cancel time
+        // Create escrows - they will use default auto cancel delay
+        uint256 startTime = block.timestamp;
         vm.prank(buyer);
         uint256 workflowId1 = vault.createEscrow(address(token), seller, amount, SettingsValidationLibrary.getDefaultSettings());
         vm.prank(buyer);
@@ -406,7 +407,7 @@ contract BaseEscrowComprehensive is Test {
         vm.prank(buyer);
         vault.createEscrow(address(token), seller, amount, SettingsValidationLibrary.getDefaultSettings());
 
-        vm.warp(autoCancelTime + 1);
+        vm.warp(startTime + autoCancelDelay + 1);
 
         vault.automateTimedActions(workflowId1);
     }

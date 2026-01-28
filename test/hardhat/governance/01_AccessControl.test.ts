@@ -97,7 +97,7 @@ describe('Access Control', function () {
       const currentTime = await time.latest();
       const newTime = BigInt(currentTime) + BigInt(7 * 24 * 60 * 60); // 7 days in the future
       await escrowableERC20.connect(timelock).setDefaultAutoCancelTime(newTime);
-      const autoCancelTime = await escrowableERC20.defaultAutoCancelTime();
+      const autoCancelTime = await escrowableERC20.defaultAutoCancelDelay();
       expect(autoCancelTime).to.equal(newTime);
     });
 
@@ -198,7 +198,7 @@ describe('Access Control', function () {
       const currentTime = await time.latest();
       const newTime = BigInt(currentTime) + BigInt(7 * 24 * 60 * 60); // 7 days in the future
       await escrowVault.connect(timelock).setDefaultAutoCancelTime(newTime);
-      const autoCancelTime = await escrowVault.defaultAutoCancelTime();
+      const autoCancelTime = await escrowVault.defaultAutoCancelDelay();
       expect(autoCancelTime).to.equal(newTime);
     });
   });

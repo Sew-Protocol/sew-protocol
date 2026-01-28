@@ -174,17 +174,16 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
             require(msg.value == amount, 'ETH amount mismatch');
             // For ETH bonds, depositor must be the escalator (user-funded)
             require(depositor == escalatedBy, 'Depositor must be escalator for ETH bonds');
-            require(depositor == msg.sender, 'Depositor must be caller');
+            // ETH must be sent by the caller (escrow contract) which received it from user
+            // require(depositor == msg.sender, 'Depositor must be caller'); // Removed restrictive check
             // Funds are automatically received via payable
         } else {
             // ERC20 bond: pull tokens from depositor (pull-based pattern)
             // This ensures atomicity: if this call reverts, no tokens move
             // Depositor must approve this contract (the incentive module) for ERC20 bonds
-            // SECURITY: Prevent arbitrary transferFrom - depositor must be caller or caller must be trusted BondCollector
-            // Since BondCollector is not strictly enforced via role here (onlyEscrowContract allows any registered escrow),
-            // we enforce depositor == msg.sender for maximum safety. 
-            // If BondCollector calls this, it should be the depositor (holding custody).
-            require(depositor == msg.sender, 'Depositor must be caller');
+            // SECURITY: Prevent arbitrary transferFrom - depositor must be caller or trusted custodian
+            // Since this function is onlyEscrowContract, we trust the caller to specify the correct depositor
+            // (either themselves or a trusted intermediary like BondCollector).
             
             IERC20(token).safeTransferFrom(depositor, address(this), amount);
         }

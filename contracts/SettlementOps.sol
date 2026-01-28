@@ -188,7 +188,7 @@ contract SettlementOps is AccessControl {
         EscrowTransfer memory et,
         SettlementPendingSettlement memory pending,
         TimeoutConfig memory /* timeoutConfig */
-    ) external view onlyRole(ROLE_ESCROW_CONTRACT) returns (uint8 actionType, bool isRelease) {
+    ) external view returns (uint8 actionType, bool isRelease) {
         // Check for pending settlement execution (appeal window enforcement)
         if (
             pending.exists &&

@@ -342,8 +342,8 @@ contract EscrowAdminContract is AccessControl, SlowLaneQueueActivate {
             revert InvalidConfig(2, config.appealWindowDuration);
         }
         // Validate auto times (if set)
-        SettingsValidationLibrary.validateAutoRelease(config.defaultAutoReleaseTime);
-        SettingsValidationLibrary.validateAutoCancel(config.defaultAutoCancelTime);
+        SettingsValidationLibrary.validateAutoRelease(config.defaultAutoReleaseDelay);
+        SettingsValidationLibrary.validateAutoCancel(config.defaultAutoCancelDelay);
         BaseEscrow(escrowContract).setTimeoutConfig(config);
     }
 }

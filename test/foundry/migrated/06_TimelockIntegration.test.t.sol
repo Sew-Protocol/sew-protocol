@@ -52,12 +52,12 @@ contract Test_06_TimelockIntegration_test is Test {
         uint256 newTime = block.timestamp + 7 days;
         (uint256 dar, uint256 dac, uint256 mdd, uint256 awd) = token.timeoutConfig();
         TimeoutConfig memory config = TimeoutConfig({
-            defaultAutoReleaseTime: dar,
-            defaultAutoCancelTime: dac,
+            defaultAutoReleaseDelay: dar,
+            defaultAutoCancelDelay: dac,
             maxDisputeDuration: mdd,
             appealWindowDuration: awd
         });
-        config.defaultAutoCancelTime = newTime;
+        config.defaultAutoCancelDelay = newTime;
         vm.prank(timelock);
         adminContract.setTimeoutConfig(address(token), config);
         (, uint256 newDefaultAutoCancelTime, , ) = token.timeoutConfig();

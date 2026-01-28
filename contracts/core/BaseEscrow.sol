@@ -136,7 +136,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         uint256 yieldProtocolFeeBps;      // Snapshotted at creation - fee on yield generated
         uint256 appealBondProtocolFeeBps; // Snapshotted at creation - fee on appeal bonds
     }
-    mapping(uint256 => ModuleSnapshot) internal moduleSnapshots;
+    mapping(uint256 => ModuleSnapshot) public moduleSnapshots;
 
     enum ModuleType {
         RESOLUTION,
@@ -199,6 +199,18 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         address indexed recipient,
         address indexed token,
         uint256 amount
+    );
+
+    /// @notice Emitted when a time-based action is triggered (auto-release/cancel/settle)
+    /// @param workflowId The escrow ID
+    /// @param actionType 1=Release, 2=Cancel, 3=Settlement
+    /// @param source Authority source (USER, KEEPER, GOVERNANCE)
+    /// @param executor Address that triggered the transaction
+    event TimedActionTriggered(
+        uint256 indexed workflowId,
+        uint8 actionType,
+        ExecutionSource source,
+        address indexed executor
     );
     event EscrowWithdrawn(
         uint256 indexed workflowId,
@@ -414,15 +426,31 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         if (address(settlementOps) == address(0)) return false;
         SettlementOps.SettlementPendingSettlement memory pendingMem = _convertPendingSettlement(pendingSettlements[workflowId]);
         (uint8 actionType, bool isRelease) = settlementOps.computeTimedActions(workflowId, et, pendingMem, timeoutConfig);
-        if (actionType == 0) return false;
-        if (actionType == 3) {
+        if (actionType == ACTION_NONE) return false;
+
+        ExecutionSource source = hasRole(ROLE_TIMELOCK, _msgSender()) ? ExecutionSource.GOVERNANCE : ExecutionSource.KEEPER;
+        // If participant calls it, it's USER authority
+        if (_msgSender() == et.from || _msgSender() == et.to) source = ExecutionSource.USER;
+
+        if (actionType == ACTION_EXECUTE_PENDING) {
             delete pendingSettlements[workflowId];
             _finalizeDisputeInModule(workflowId);
+            if (isRelease) _releaseEscrowTransfer(workflowId);
+            else _cancelAndRefund(workflowId);
             emit PendingSettlementExecuted(workflowId, isRelease);
+            emit TimedActionTriggered(workflowId, ACTION_EXECUTE_PENDING, source, _msgSender());
+            return true;
+        } else if (actionType == ACTION_AUTO_RELEASE) {
+            _releaseEscrowTransfer(workflowId);
+            emit TimedActionTriggered(workflowId, ACTION_AUTO_RELEASE, source, _msgSender());
+            return true;
+        } else if (actionType == ACTION_AUTO_CANCEL) {
+            _cancelAndRefund(workflowId);
+            emit TimedActionTriggered(workflowId, ACTION_AUTO_CANCEL, source, _msgSender());
+            return true;
         }
-        if (isRelease) _releaseEscrowTransfer(workflowId);
-        else _cancelAndRefund(workflowId);
-        return true;
+
+        return false;
     }
 
     function _cancelWorkflow(uint256 id, address caller, bool isSender) internal returns (bool) {
@@ -471,6 +499,10 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         _cancelAndRefund(workflowId);
         delete disputeRaisedTimestamp[workflowId];
         emit DisputeAutoCancelled(workflowId, from, amt, uint8(FailureReason.TIMEOUT));
+        
+        ExecutionSource source = hasRole(ROLE_TIMELOCK, _msgSender()) ? ExecutionSource.GOVERNANCE : ExecutionSource.KEEPER;
+        if (_msgSender() == et.from || _msgSender() == et.to) source = ExecutionSource.USER;
+        emit TimedActionTriggered(workflowId, ACTION_AUTO_CANCEL, source, _msgSender());
     }
 
     // slither-disable-next-line reentrancy-no-eth
@@ -773,13 +805,19 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     function _applyEscrowSettings(uint256 workflowId, EscrowSettings memory settings) internal {
         EscrowTransfer storage et = escrowTransfers[workflowId];
         if (settings.customResolver != address(0)) et.disputeResolver = settings.customResolver;
-        bool def = (settings.autoReleaseTime == 0 && settings.autoCancelTime == 0);
+        bool useDefaults = (settings.autoReleaseTime == 0 && settings.autoCancelTime == 0);
         
-        uint256 relTime = settings.autoReleaseTime > 0 ? settings.autoReleaseTime : (def ? timeoutConfig.defaultAutoReleaseTime : 0);
+        uint256 relTime = settings.autoReleaseTime;
+        if (relTime == 0 && useDefaults && timeoutConfig.defaultAutoReleaseDelay > 0) {
+            relTime = block.timestamp + timeoutConfig.defaultAutoReleaseDelay;
+        }
         if (relTime > type(uint64).max) revert InvalidAutoTime(AUTO_TIME_TOO_LARGE, relTime, block.timestamp);
         et.autoReleaseTime = uint64(relTime);
 
-        uint256 cancTime = settings.autoCancelTime > 0 ? settings.autoCancelTime : (def ? timeoutConfig.defaultAutoCancelTime : 0);
+        uint256 cancTime = settings.autoCancelTime;
+        if (cancTime == 0 && useDefaults && timeoutConfig.defaultAutoCancelDelay > 0) {
+            cancTime = block.timestamp + timeoutConfig.defaultAutoCancelDelay;
+        }
         if (cancTime > type(uint64).max) revert InvalidAutoTime(AUTO_TIME_TOO_LARGE, cancTime, block.timestamp);
         et.autoCancelTime = uint64(cancTime);
 

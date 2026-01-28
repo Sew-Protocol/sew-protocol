@@ -867,7 +867,7 @@ describe('EscrowableERC20', function () {
       const defaultTime = BigInt(currentTime) + BigInt(7 * 24 * 60 * 60); // 7 days in the future (within 30-day limit)
       await escrowableERC20.connect(owner).setDefaultAutoReleaseTime(defaultTime);
 
-      expect(await escrowableERC20.defaultAutoReleaseTime()).to.equal(defaultTime);
+      expect(await escrowableERC20.defaultAutoReleaseDelay()).to.equal(defaultTime);
 
       await escrowableERC20.transfer(sender.address, INITIAL_TRANSFER_AMOUNT);
 
@@ -890,7 +890,7 @@ describe('EscrowableERC20', function () {
       const defaultTime = BigInt(currentTime) + BigInt(7 * 24 * 60 * 60); // 7 days in the future (within 30-day limit)
       await escrowableERC20.connect(owner).setDefaultAutoCancelTime(defaultTime);
 
-      expect(await escrowableERC20.defaultAutoCancelTime()).to.equal(defaultTime);
+      expect(await escrowableERC20.defaultAutoCancelDelay()).to.equal(defaultTime);
 
       await escrowableERC20.transfer(sender.address, INITIAL_TRANSFER_AMOUNT);
 

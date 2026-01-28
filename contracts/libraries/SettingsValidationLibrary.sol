@@ -25,12 +25,9 @@ library SettingsValidationLibrary {
     // New constraints
     uint256 public constant MIN_ESCROW_AMOUNT = 1000; // Minimum escrow amount (1000 wei)
     uint256 public constant MAX_ESCROW_DURATION = 365 days; // Maximum escrow duration (1 year)
-    uint256 public constant MIN_YIELD_DEPOSIT = 1000e6; // Minimum yield deposit (1000 tokens with 6 decimals)
 
     // Phase 6: Custom errors (using different names to avoid conflicts with EscrowTypes)
-    error OutOfBounds(bytes32 key, uint256 value, uint256 min, uint256 max);
-    error InvalidAddressKey(bytes32 key);
-    error InvalidArrayLength(bytes32 key, uint256 a, uint256 b);
+    error InvalidArrayLength(uint256 a, uint256 b);
     error InvalidBpsSum(uint256 sum);
     error TooManyRecipients(uint256 n, uint256 max);
     error DuplicateRecipient(address recipient);
@@ -59,17 +56,24 @@ library SettingsValidationLibrary {
         if (autoTime > maxAllowedTime) {
             revert AutoTimeExceedsMaxLimit(autoTime, maxAllowedTime);
         }
+
+        // Ensure it fits in uint64 (belt and suspenders)
+        if (autoTime > type(uint64).max) {
+            revert InvalidAutoTime(AUTO_TIME_TOO_LARGE, autoTime, currentTime);
+        }
     }
 
     /**
      * @dev Validate escrow settings
      * @param settings EscrowSettings struct to validate
      * @param currentTime Current block timestamp
+     * @param resolverMustBeContract Whether customResolver must be a contract
      * @dev Reverts if settings are invalid (e.g., both auto times set, invalid times, etc.)
      */
     function validateEscrowSettings(
         EscrowSettings memory settings,
-        uint256 currentTime
+        uint256 currentTime,
+        bool resolverMustBeContract
     ) internal view {
         // Validate auto times
         if (settings.autoReleaseTime != 0 && settings.autoCancelTime != 0) {
@@ -84,32 +88,24 @@ library SettingsValidationLibrary {
         if (settings.autoReleaseTime > 0) {
             uint256 maxAllowedTime = currentTime + MAX_ESCROW_DURATION;
             if (settings.autoReleaseTime > maxAllowedTime) {
-                revert OutOfBounds(
-                    'autoReleaseTime',
-                    settings.autoReleaseTime,
-                    currentTime + 1,
-                    maxAllowedTime
-                );
+                revert AutoTimeExceedsMaxLimit(settings.autoReleaseTime, maxAllowedTime);
             }
         }
         if (settings.autoCancelTime > 0) {
             uint256 maxAllowedTime = currentTime + MAX_ESCROW_DURATION;
             if (settings.autoCancelTime > maxAllowedTime) {
-                revert OutOfBounds(
-                    'autoCancelTime',
-                    settings.autoCancelTime,
-                    currentTime + 1,
-                    maxAllowedTime
-                );
+                revert AutoTimeExceedsMaxLimit(settings.autoCancelTime, maxAllowedTime);
             }
         }
 
         // Validate custom dispute resolver if set
         if (settings.customResolver != address(0)) {
-            // Validate resolver is a contract
-            if (settings.customResolver.code.length == 0) {
-                revert InvalidAddressKey('customResolver');
+            // Validate resolver is a contract if policy requires it
+            if (resolverMustBeContract && settings.customResolver.code.length == 0) {
+                revert NotAContract(ADDR_INITIAL_RESOLVER, settings.customResolver);
             }
+            // Basic validation: resolver cannot be zero address (already checked)
+            // or any other critical protocol address could be added here if needed
         }
 
         // DEPRECATED: Per-escrow yield distribution has been removed in favor of yield presets.
@@ -123,12 +119,7 @@ library SettingsValidationLibrary {
      */
     function validateEscrowAmount(uint256 amount) internal pure {
         if (amount < MIN_ESCROW_AMOUNT) {
-            revert OutOfBounds(
-                'amount',
-                amount,
-                MIN_ESCROW_AMOUNT,
-                type(uint256).max
-            );
+            revert InvalidAmount(AMOUNT_EMPTY);
         }
     }
     
@@ -140,10 +131,10 @@ library SettingsValidationLibrary {
      */
     function validateRecipient(address recipient, address sender) internal pure {
         if (recipient == address(0)) {
-            revert InvalidAddressKey('recipient');
+            revert InvalidAddress(ADDR_RECIPIENT, address(0));
         }
         if (recipient == sender) {
-            revert InvalidAddressKey('sender');
+            revert InvalidAddress(ADDR_GENERIC, recipient); // ADDR_GENERIC for same address
         }
     }
     
@@ -151,18 +142,12 @@ library SettingsValidationLibrary {
      * @notice Validate yield opt-in amount
      * @param amount The amount to validate (amount after fee)
      * @param yieldEnabled Whether yield is enabled
-     * @return shouldEnableYield Whether yield should actually be enabled (may be disabled if amount too small)
-     * @dev Returns false if yield is enabled but amount is below minimum (graceful degradation)
+     * @return shouldEnableYield Whether yield should actually be enabled
+     * @dev Simplified: No longer uses hardcoded MIN_YIELD_DEPOSIT
      */
     function validateYieldOptIn(uint256 amount, bool yieldEnabled) internal pure returns (bool shouldEnableYield) {
-        if (!yieldEnabled) {
-            return false;
-        }
-        // Graceful degradation: disable yield if amount is too small
-        if (amount < MIN_YIELD_DEPOSIT) {
-            return false; // Don't revert, just disable yield
-        }
-        return true;
+        amount; // Unused
+        return yieldEnabled;
     }
 
     /**
@@ -182,58 +167,30 @@ library SettingsValidationLibrary {
     // ============ Phase 6: Bounds Validation Functions ============
 
     /**
-     * @notice Validate auto cancel time (default setting)
-     * @param t Absolute timestamp (0 means disabled, which is valid)
-     * @dev Bounds: t must be within 30 days from current block timestamp
+     * @notice Validate auto cancel delay (default setting)
+     * @param d Delay in seconds (0 means disabled, which is valid)
+     * @dev Bounds: d must be <= MAX_AUTO_TIME_DAYS
      */
-    function validateAutoCancel(uint256 t) internal view {
-        if (t == 0) {
+    function validateAutoCancel(uint256 d) internal pure {
+        if (d == 0) {
             return; // 0 means disabled, which is valid
         }
-        uint256 currentTime = block.timestamp;
-        if (t <= currentTime) {
-            revert OutOfBounds(
-                'autoCancelTime',
-                t,
-                currentTime + 1,
-                currentTime + MAX_AUTO_TIME_DAYS
-            );
-        }
-        if (t > currentTime + MAX_AUTO_TIME_DAYS) {
-            revert OutOfBounds(
-                'autoCancelTime',
-                t,
-                currentTime + 1,
-                currentTime + MAX_AUTO_TIME_DAYS
-            );
+        if (d > MAX_AUTO_TIME_DAYS) {
+            revert AutoTimeExceedsMaxLimit(d, MAX_AUTO_TIME_DAYS);
         }
     }
 
     /**
-     * @notice Validate auto release time (default setting)
-     * @param t Absolute timestamp (0 means disabled, which is valid)
-     * @dev Bounds: t must be within 30 days from current block timestamp
+     * @notice Validate auto release delay (default setting)
+     * @param d Delay in seconds (0 means disabled, which is valid)
+     * @dev Bounds: d must be <= MAX_AUTO_TIME_DAYS
      */
-    function validateAutoRelease(uint256 t) internal view {
-        if (t == 0) {
+    function validateAutoRelease(uint256 d) internal pure {
+        if (d == 0) {
             return; // 0 means disabled, which is valid
         }
-        uint256 currentTime = block.timestamp;
-        if (t <= currentTime) {
-            revert OutOfBounds(
-                'autoReleaseTime',
-                t,
-                currentTime + 1,
-                currentTime + MAX_AUTO_TIME_DAYS
-            );
-        }
-        if (t > currentTime + MAX_AUTO_TIME_DAYS) {
-            revert OutOfBounds(
-                'autoReleaseTime',
-                t,
-                currentTime + 1,
-                currentTime + MAX_AUTO_TIME_DAYS
-            );
+        if (d > MAX_AUTO_TIME_DAYS) {
+            revert AutoTimeExceedsMaxLimit(d, MAX_AUTO_TIME_DAYS);
         }
     }
 
@@ -244,7 +201,7 @@ library SettingsValidationLibrary {
      */
     function validateMaxAttachments(uint256 n) internal pure {
         if (n > MAX_ATTACHMENTS) {
-            revert OutOfBounds('maxAttachments', n, 0, MAX_ATTACHMENTS);
+            revert InvalidAmount(AMOUNT_GENERIC);
         }
     }
 
@@ -255,7 +212,7 @@ library SettingsValidationLibrary {
      */
     function validateFeeBps(uint256 bps) internal pure {
         if (bps > MAX_FEE_BPS) {
-            revert OutOfBounds('escrowFee', bps, 0, MAX_FEE_BPS);
+            revert FeeOverflow();
         }
     }
 
@@ -265,11 +222,8 @@ library SettingsValidationLibrary {
      * @dev Bounds: 48h <= d <= 30 days
      */
     function validateResolutionDelay(uint256 d) internal pure {
-        if (d < MIN_RESOLUTION_DELAY) {
-            revert OutOfBounds('resolutionDelay', d, MIN_RESOLUTION_DELAY, MAX_RESOLUTION_DELAY);
-        }
-        if (d > MAX_RESOLUTION_DELAY) {
-            revert OutOfBounds('resolutionDelay', d, MIN_RESOLUTION_DELAY, MAX_RESOLUTION_DELAY);
+        if (d < MIN_RESOLUTION_DELAY || d > MAX_RESOLUTION_DELAY) {
+            revert InvalidAutoTime(AUTO_TIME_TOO_LARGE, d, 0);
         }
     }
 
@@ -291,21 +245,13 @@ library SettingsValidationLibrary {
         uint256 length = recipients.length;
 
         // Check recipient count bounds
-        if (length < MIN_YIELD_RECIPIENTS) {
-            revert OutOfBounds(
-                'yieldRecipients',
-                length,
-                MIN_YIELD_RECIPIENTS,
-                MAX_YIELD_RECIPIENTS
-            );
-        }
-        if (length > MAX_YIELD_RECIPIENTS) {
+        if (length < MIN_YIELD_RECIPIENTS || length > MAX_YIELD_RECIPIENTS) {
             revert TooManyRecipients(length, MAX_YIELD_RECIPIENTS);
         }
 
         // Check array lengths match
         if (length != bps.length) {
-            revert InvalidArrayLength('yieldDistribution', length, bps.length);
+            revert InvalidArrayLength(length, bps.length);
         }
 
         // Validate recipients and calculate sum
@@ -313,7 +259,7 @@ library SettingsValidationLibrary {
         for (uint256 i = 0; i < length; i++) {
             // Check recipient is non-zero
             if (recipients[i] == address(0)) {
-                revert InvalidAddressKey('yieldRecipient');
+                revert InvalidAddress(ADDR_YIELD_OPS, address(0));
             }
 
             // Check for duplicates
@@ -335,11 +281,11 @@ library SettingsValidationLibrary {
     /**
      * @notice Validate address is non-zero
      * @param a Address to validate
-     * @param key Key for error message
+     * @param which Key for error message
      */
-    function validateNonZero(address a, bytes32 key) internal pure {
+    function validateNonZero(address a, uint8 which) internal pure {
         if (a == address(0)) {
-            revert InvalidAddressKey(key);
+            revert InvalidAddress(which, address(0));
         }
     }
 }

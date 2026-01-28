@@ -96,10 +96,71 @@ struct EscrowTransfer {
     RecipientStatus recipientStatus;
 }
 
+// ============ Wallet UX & Actionability Types ============
+
+enum ExecutionSource { USER, KEEPER, GOVERNANCE }
+
+enum UrgencyLevel { NONE, LOW, MEDIUM, HIGH, CRITICAL }
+
+enum ActionableStatus {
+    NONE,
+    AWAITING_CONDITION, // Pending, time/condition not yet met
+    AWAITING_CONSENSUS, // One party agreed to cancel, waiting for other
+    TIME_CONDITION_MET, // Ready for trigger (automateTimedActions)
+    DISPUTED_WAITING,   // In dispute, awaiting resolver
+    APPEAL_WINDOW,      // Resolved, awaiting appeal expiry
+    APPEAL_READY,       // Appeal window met, call executePending()
+    FINALIZED           // Closed
+}
+
+uint8 constant ACTION_NONE = 0;
+uint8 constant ACTION_AUTO_RELEASE = 1;
+uint8 constant ACTION_AUTO_CANCEL = 2;
+uint8 constant ACTION_EXECUTE_PENDING = 3;
+
+enum UserRole { BUYER, SELLER, RESOLVER }
+
+struct EscrowTimeline {
+    uint64 createdAt;
+    uint64 nextDeadline;
+    uint64 finalDeadline; // Irreversible settlement timestamp
+    ActionableStatus status;
+    UrgencyLevel urgency;
+    bool userCanExecute;
+}
+
+/**
+ * Consensus status for multi-party agreement flows (e.g., cancel)
+ */
+struct CollaborationStatus {
+    bool senderAgreed;
+    bool recipientAgreed;
+    bool canFinalize;
+}
+
+/**
+ * Real-time yield metrics for transparency
+ */
+struct YieldMetrics {
+    uint256 principal;
+    uint256 accruedInterest;
+    address yieldToken;
+}
+
+/**
+ * Contextual information about the assigned resolver
+ */
+struct ResolverContext {
+    address resolver;
+    bool isContract;
+    bytes4 interfaceId;
+    string label;
+}
+
 struct TimeoutConfig {
-    // Auto-execution defaults (0 = disabled, absolute timestamps)
-    uint256 defaultAutoReleaseTime; // Default auto-release timestamp (0 = disabled)
-    uint256 defaultAutoCancelTime; // Default auto-cancel timestamp (0 = disabled)
+    // Auto-execution defaults (0 = disabled, relative delays in seconds)
+    uint256 defaultAutoReleaseDelay; // Default auto-release delay (0 = disabled)
+    uint256 defaultAutoCancelDelay; // Default auto-cancel delay (0 = disabled)
     // Safety timeouts (durations in seconds)
     uint256 maxDisputeDuration; // Max time for disputes (7-365 days)
     uint256 appealWindowDuration; // Time to appeal resolution (1-7 days)

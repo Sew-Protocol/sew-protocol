@@ -56,6 +56,8 @@ contract EscrowVault is BaseEscrow {
         disputeOps = DisputeOps(disputeOpsAddress);
         yieldProtocolFeeBps = DEFAULT_YIELD_PROTOCOL_FEE_BPS;
         appealBondProtocolFeeBps = 0;
+        timeoutConfig.defaultAutoReleaseDelay = 0;
+        timeoutConfig.defaultAutoCancelDelay = 0;
         timeoutConfig.maxDisputeDuration = 90 days;
         timeoutConfig.appealWindowDuration = 2 days;
         emit WiringConfigured(yieldOpsAddress, disputeOpsAddress, moduleManagementAddress);
