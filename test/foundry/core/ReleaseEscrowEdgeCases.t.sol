@@ -243,13 +243,13 @@ contract ReleaseEscrowEdgeCasesTest is Test {
         vm.prank(sender);
         vault.releaseEscrowTransfer(wid);
 
-        // Verify: Transfer should fail (contract doesn't have enough)
-        // OR: Fallback to claimable should work
-        // Note: Current implementation may set claimable to amount, but contract only has actualAmount
-        // This test exposes the issue
+        // Verify: Transfer should succeed for the partial amount recovered
+        // because the Push Model ensures tokens arrive at the vault before transfer
+        uint256 recipientBalance = token.balanceOf(recipient);
+        assertEq(recipientBalance, partialAmount, "Recipient should receive the partial amount");
+        
         uint256 claimable = vault.claimableBalances(wid, recipient);
-        // Claimable should be set (transfer failed due to insufficient balance)
-        assertGt(claimable, 0, "Claimable should be set when transfer fails");
+        assertEq(claimable, 0, "Claimable should be zero as transfer succeeded");
     }
 
     // ============ Test 4: Insufficient Balance After Yield Distribution ============

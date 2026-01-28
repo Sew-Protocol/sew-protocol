@@ -93,8 +93,8 @@ contract MockAaveConfigModule is ERC165, IYieldGenerationModule {
     function depositForYield(uint256, address, uint256) external pure override returns (bool, uint256) {
         return (true, 0);
     }
-    function withdrawWithYield(uint256, address, uint256) external pure override returns (bool, uint256, uint256) {
-        return (true, 0, 0);
+    function withdrawWithYield(uint256, address, uint256 amount) external pure override returns (bool, uint256, uint256) {
+        return (true, amount, 0);
     }
     function calculateYield(uint256, address) external pure override returns (uint256) {
         return 0;

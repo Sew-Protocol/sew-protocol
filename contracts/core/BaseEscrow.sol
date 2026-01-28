@@ -650,7 +650,13 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
                     );
                 } else {
                     if (address(bondCollector) == address(0)) revert ZeroBondCollector();
+                    
+                    // CRIT-3: Verify received amount to handle fee-on-transfer tokens
+                    uint256 balBefore = IERC20(bondToken).balanceOf(address(this));
                     _pullTokens(bondToken, _msgSender(), bondAmount);
+                    uint256 received = IERC20(bondToken).balanceOf(address(this)) - balBefore;
+                    if (received < bondAmount) revert AccountingDeficit(bondToken, bondAmount - received);
+
                     BondHandlingLibrary.handleERC20BondAfterPull(
                         incentiveMod,
                         bondCollector,
@@ -985,7 +991,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         }
 
         YieldOps.YieldResult memory result = abi.decode(ret, (YieldOps.YieldResult));
-        if (result.actualAmount > 0 && result.actualAmount >= amount) {
+        if (result.actualAmount > 0) {
             // PUSH MODEL: If yield was generated, transfer it to YieldOps and distribute
             if (result.yield > 0) {
                 // Transfer yield portion to YieldOps (PUSH)
@@ -1005,28 +1011,27 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
                     )
                 );
                 
-                // Decode distribution result (best-effort)
-                // Note: Don't decode the struct in production as it causes issues
-                // The distribution has already happened, we just need to know if it succeeded
-                if (distOk) {
-                    // Success - distribution happened
-                    result.yieldDistributed = result.yield;
-                    result.success = true;
-                } else {
-                    // Distribution call failed - yield is in YieldOps, emit failure
-                    if (yieldEnabled) {
-                        emit OperationFailure(2, workflowId, address(yieldOps), YieldOps.distributeWithdrawnYield.selector, uint8(FailureReason.CALL_FAILED));
-                    }
+                if (distOk && distRet.length >= 32) {
+                    YieldOps.DistributionResult memory distResult = abi.decode(distRet, (YieldOps.DistributionResult));
+                    result.yieldDistributed = distResult.distributedAmount;
+                    result.success = distResult.success;
+                } else if (yieldEnabled) {
+                    emit OperationFailure(2, workflowId, address(yieldOps), YieldOps.distributeWithdrawnYield.selector, uint8(FailureReason.CALL_FAILED));
                 }
             }
-            // PUSH MODEL: After yield is transferred out, return only principal
-            // The yield has been sent to YieldOps, so vault only has principal remaining
+            // If loss occurred, result.actualAmount reflects the lower value.
+            if (result.actualAmount < amount) {
+                if (yieldEnabled) emit OperationFailure(2, workflowId, address(yieldOps), YieldOps.handleYield.selector, uint8(FailureReason.LESS_THAN_PRINCIPAL));
+                return result.actualAmount;
+            }
+            
+            // If yield was generated, it was pushed to YieldOps for distribution.
+            // The vault now only holds the principal 'amount'.
             return amount;
         }
-        if (result.actualAmount > 0 && result.actualAmount < amount && yieldEnabled) {
-            emit OperationFailure(2, workflowId, address(yieldOps), YieldOps.handleYield.selector, uint8(FailureReason.LESS_THAN_PRINCIPAL));
-        }
-        return amount;
+        // If yield was enabled but actualAmount is 0, it means withdrawal failed or returned nothing.
+        // Return 0 to prevent stealing principal from other escrows.
+        return yieldEnabled ? 0 : amount;
     }
 
     function _cancelAndRefund(uint256 workflowId) internal {
