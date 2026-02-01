@@ -65,7 +65,7 @@ contract SlashingModuleNoOp is ISlashingModule, AccessControl {
             resolver,
             reason,
             0, // No actual amount in no-op
-            msg.sender
+            _msgSender()
         );
 
         return slashId;
@@ -90,7 +90,7 @@ contract SlashingModuleNoOp is ISlashingModule, AccessControl {
         string calldata reason,
         bytes calldata /* evidence */
     ) external override {
-        emit SlashAppealed(slashId, msg.sender, _dummyConfig.appealBond, reason);
+        emit SlashAppealed(slashId, _msgSender(), _dummyConfig.appealBond, reason);
     }
 
     function resolveAppeal(uint256 slashId, bool upheld) external override onlyRole(ROLE_TIMELOCK) {
@@ -120,7 +120,7 @@ contract SlashingModuleNoOp is ISlashingModule, AccessControl {
             resolver,
             reason,
             0, // No actual amount in no-op
-            msg.sender
+            _msgSender()
         );
 
         return slashId;
@@ -139,7 +139,7 @@ contract SlashingModuleNoOp is ISlashingModule, AccessControl {
             resolver,
             SlashReason.REVERSAL,
             0, // No actual amount in no-op
-            msg.sender
+            _msgSender()
         );
 
         return slashId;
@@ -158,7 +158,7 @@ contract SlashingModuleNoOp is ISlashingModule, AccessControl {
             resolver,
             SlashReason.FRAUD,
             0, // No actual amount in no-op
-            msg.sender
+            _msgSender()
         );
 
         return slashId;

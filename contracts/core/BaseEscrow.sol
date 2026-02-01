@@ -117,6 +117,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     mapping(uint256 => EscrowSettings) public escrowSettings;
 
     mapping(uint256 => mapping(address => uint256)) public claimableBalances;
+    mapping(address => uint256) public totalClaimableAssets;
 
     // Phase 1: Pending settlement storage (appeal window enforcement)
     struct PendingSettlement {
@@ -490,6 +491,12 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         if (et.escrowState != EscrowState.DISPUTED) {
             revert TransferNotInDispute(workflowId, et.escrowState);
         }
+        
+        // CRIT-3: Prevent overriding a resolver's decision that is pending settlement
+        if (pendingSettlements[workflowId].exists) {
+            revert InvalidState(workflowId, uint8(EscrowState.DISPUTED), uint8(et.escrowState)); // Has pending settlement
+        }
+
         uint256 ts = disputeRaisedTimestamp[workflowId];
         if (ts == 0 || block.timestamp < ts + timeoutConfig.maxDisputeDuration) {
             revert InvalidState(workflowId, uint8(EscrowState.DISPUTED), uint8(et.escrowState)); // Dispute timeout not exceeded
@@ -865,14 +872,15 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         }
 
         address token = et.token; // Single token per escrow
-        uint256 amount = claimableBalances[workflowId][msg.sender];
-        if (amount == 0) revert NoClaimableBalance(workflowId, msg.sender, token);
+        uint256 amount = claimableBalances[workflowId][_msgSender()];
+        if (amount == 0) revert NoClaimableBalance(workflowId, _msgSender(), token);
 
-        claimableBalances[workflowId][msg.sender] = 0;
+        claimableBalances[workflowId][_msgSender()] = 0;
+        totalClaimableAssets[token] -= amount;
 
-        _transferTokens(token, msg.sender, amount);
+        _transferTokens(token, _msgSender(), amount);
 
-        emit EscrowWithdrawn(workflowId, msg.sender, token, amount);
+        emit EscrowWithdrawn(workflowId, _msgSender(), token, amount);
         return amount;
     }
 
@@ -939,6 +947,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
             return true;
         }
         claimableBalances[workflowId][recipient] += amount;
+        totalClaimableAssets[token] += amount;
         emit ClaimableBalanceSet(workflowId, recipient, token, amount);
         uint8 reason = bal < amount ? uint8(FailureReason.CONTRACT_INSUFFICIENT_BALANCE) : uint8(FailureReason.PUSH_FAILED_FALLBACK_TO_PULL);
         emit EscrowTransferAutoResult(workflowId, recipient, token, amount, false, reason);
@@ -1039,10 +1048,19 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         uint256 amount = et.amountAfterFee;
         address from = et.from;
         address token = et.token;
+
+        if (pendingSettlements[workflowId].exists) {
+            delete pendingSettlements[workflowId];
+            emit PendingSettlementCancelled(workflowId);
+        }
+
         EscrowState oldStatus = StateManagementLibrary.transitionToRefunded(et, workflowId);
         emit EscrowStateChanged(workflowId, oldStatus, EscrowState.REFUNDED);
         
         uint256 actualAmount = _handleYieldAndGetActualAmount(workflowId, token, amount);
+        
+        // Update accounting based on full principal amount (regardless of yield loss)
+        // This ensures that losses are recognized and the "expected" balance is reduced correctly.
         _updateEscrowBalance(token, amount, false);
         
         // Auto-transfer: Attempt automatic transfer, fallback to claimable if fails
@@ -1055,10 +1073,18 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         uint256 amount = et.amountAfterFee;
         address to = et.to;
         address token = et.token;
+
+        if (pendingSettlements[workflowId].exists) {
+            delete pendingSettlements[workflowId];
+            emit PendingSettlementCancelled(workflowId);
+        }
+
         EscrowState oldStatus = StateManagementLibrary.transitionToReleased(et, workflowId);
         emit EscrowStateChanged(workflowId, oldStatus, EscrowState.RELEASED);
         
         uint256 actualAmount = _handleYieldAndGetActualAmount(workflowId, token, amount);
+        
+        // Update accounting based on full principal amount (regardless of yield loss)
         _updateEscrowBalance(token, amount, false);
         
         // Auto-transfer: Attempt automatic transfer, fallback to claimable if fails

@@ -26,6 +26,7 @@ error PoolProviderCallFailed(address provider);
 error BatchSizeTooLarge(uint256 batchSize, uint256 maxBatchSize);
 error EscrowContractCannotBeZero();
 error CapCannotBeRaised(uint256 newCap, uint256 currentCap);
+error NotAuthorized(address caller);
 error NotImplementedYet();
 
 /**
@@ -146,7 +147,7 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         uint256 amount
     ) external override returns (bool success, uint256 yieldTokenBalance) {
         // MED-3: Zero address check for escrow contract (msg.sender)
-        address escrowContract = msg.sender;
+        address escrowContract = _msgSender();
         if (escrowContract == address(0)) revert EscrowContractCannotBeZero();
         
         // Check if Aave is enabled
@@ -395,7 +396,7 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         uint256 workflowId,
         address token
     ) external view override returns (uint256 yieldAmount) {
-        address escrowContract = msg.sender; // BaseEscrow contract calling this
+        address escrowContract = _msgSender(); // BaseEscrow contract calling this
 
         if (!escrowInAave[escrowContract][workflowId]) {
             return 0; // Not in Aave, no yield
@@ -494,6 +495,15 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
      */
     function moduleVersion() external pure override returns (string memory version) {
         return '1.0.0';
+    }
+
+    /**
+     * @notice Register an authorized escrow contract
+     * @param escrow Address of the escrow contract
+     */
+    function registerEscrowContract(address escrow) external onlyRole(ROLE_TIMELOCK) {
+        if (escrow == address(0)) revert InvalidAddress(uint8(ADDR_ESCROW_CONTRACT), escrow);
+        _grantRole(ROLE_ESCROW_CONTRACT, escrow);
     }
 
     /**
@@ -883,7 +893,7 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         }
 
         // Transfer assets from caller to this module
-        IERC20(asset).safeTransferFrom(msg.sender, address(this), assets);
+        IERC20(asset).safeTransferFrom(_msgSender(), address(this), assets);
 
         // Calculate shares to mint (1:1 for first deposit, then use conversion)
         if (totalSupply() == 0) {
@@ -950,7 +960,7 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         uint256 withdrawn = aavePool.withdraw(asset, assets, address(this));
 
         // Transfer assets to caller
-        IERC20(asset).safeTransfer(msg.sender, withdrawn);
+        IERC20(asset).safeTransfer(_msgSender(), withdrawn);
 
         return withdrawn;
     }
@@ -1040,8 +1050,7 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         
         // Ensure we are withdrawing to an authorized escrow contract
         if (!hasRole(ROLE_ESCROW_CONTRACT, to)) {
-            // Check if it's the tracked escrow for a workflow (best effort)
-            // But for emergency, we usually want to withdraw to the vault.
+            revert NotAuthorized(to);
         }
 
         // Withdraw from Aave

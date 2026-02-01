@@ -25,7 +25,7 @@ contract SafeMock is Ownable {
      * @param _owners Array of owner addresses
      * @param _threshold Number of signatures required
      */
-    constructor(address[] memory _owners, uint256 _threshold) Ownable(msg.sender) {
+    constructor(address[] memory _owners, uint256 _threshold) Ownable(_msgSender()) {
         require(_owners.length > 0, 'SafeMock: No owners');
         require(_threshold > 0 && _threshold <= _owners.length, 'SafeMock: Invalid threshold');
 
@@ -54,7 +54,7 @@ contract SafeMock is Ownable {
         bytes memory data,
         uint8 operation
     ) external returns (bool success) {
-        require(_isOwner[msg.sender], 'SafeMock: Not an owner');
+        require(_isOwner[_msgSender()], 'SafeMock: Not an owner');
 
         bytes32 txHash = keccak256(abi.encodePacked(to, value, data, operation, block.timestamp));
 

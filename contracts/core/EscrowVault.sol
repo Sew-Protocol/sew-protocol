@@ -86,7 +86,14 @@ contract EscrowVault is BaseEscrow {
         if (currentAllowance < amount) {
             IERC20(token).safeIncreaseAllowance(moduleAddress, type(uint256).max);
         }
-        generationModule.depositForYield(workflowId, token, amount);
+        
+        uint256 balBefore = IERC20(token).balanceOf(address(this));
+        (bool success, ) = generationModule.depositForYield(workflowId, token, amount);
+        uint256 balAfter = IERC20(token).balanceOf(address(this));
+
+        if (!success || balBefore - balAfter < amount) {
+            revert AccountingDeficit(token, amount);
+        }
     }
     function _emitEscrowTransferCreated(uint256, address, address, address, uint256) internal pure override {}
     function _transferTokens(address token, address to, uint256 amount) internal override {
@@ -108,7 +115,7 @@ contract EscrowVault is BaseEscrow {
         feesCollected = totalFeesPerToken[token];
         contractBalance = IERC20(token).balanceOf(address(this));
         unchecked {
-            uint256 expected = principalHeld + feesCollected;
+            uint256 expected = principalHeld + feesCollected + totalClaimableAssets[token];
             yieldInBalance = contractBalance > expected ? contractBalance - expected : 0;
         }
     }
@@ -151,6 +158,7 @@ contract EscrowVault is BaseEscrow {
         (bool success, uint256 recoveryAmount, uint256 available) = TokenRecoveryLibrary.recoverERC20(
             totalHeldInEscrowPerToken,
             totalFeesPerToken,
+            totalClaimableAssets,
             token,
             recipient,
             amount

@@ -18,6 +18,7 @@ contract NewLibraryHarness {
     mapping(uint256 => BaseEscrow.ModuleSnapshot) public moduleSnapshots;
     mapping(address => uint256) public totalHeldInEscrowPerToken;
     mapping(address => uint256) public totalFeesPerToken;
+    mapping(address => uint256) public totalClaimablePerToken;
 
     function setModuleSnapshot(uint256 workflowId, BaseEscrow.ModuleSnapshot memory snapshot) external {
         moduleSnapshots[workflowId] = snapshot;
@@ -64,6 +65,7 @@ contract NewLibraryHarness {
         return TokenRecoveryLibrary.recoverERC20(
             totalHeldInEscrowPerToken,
             totalFeesPerToken,
+            totalClaimablePerToken,
             token,
             recipient,
             amount
@@ -76,6 +78,10 @@ contract NewLibraryHarness {
 
     function setFees(address token, uint256 amount) external {
         totalFeesPerToken[token] = amount;
+    }
+
+    function setClaimable(address token, uint256 amount) external {
+        totalClaimablePerToken[token] = amount;
     }
     
     receive() external payable {}
@@ -234,6 +240,23 @@ contract NewLibraryCoverageTest is Test {
         assertFalse(success);
         assertEq(recoveryAmount, 0);
         assertEq(available, 400);
+    }
+
+    function test_TokenRecovery_ProtectClaimable() public {
+        harness.setHeld(address(token), 200);
+        harness.setFees(address(token), 100);
+        harness.setClaimable(address(token), 300);
+        // Total protected = 600. Balance = 1000. Available = 400.
+        
+        address recipient = address(0x999);
+        (bool success, uint256 recoveryAmount, uint256 available) = harness.recoverERC20(address(token), recipient, 401);
+        
+        assertFalse(success);
+        assertEq(available, 400);
+        
+        (success, recoveryAmount, available) = harness.recoverERC20(address(token), recipient, 400);
+        assertTrue(success);
+        assertEq(recoveryAmount, 400);
     }
 
     // ============ BondHandlingLibrary Tests ============

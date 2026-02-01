@@ -56,6 +56,15 @@ contract InsurancePoolVault is AccessControl, ReentrancyGuard {
     // Withdrawal controls
     bool public withdrawalsEnabled;
 
+    // ============ Custom Errors ============
+    error NotAuthorized(address caller);
+    error InsufficientBalance(uint256 total, uint256 requested);
+    error PayoutNotFound(uint256 payoutId);
+    error DelayNotPassed(uint64 eta, uint256 currentTime);
+    error ZeroAmount();
+    error ZeroAddress();
+    error ZeroToken();
+
     // ============ Events ============
 
     event InsuranceFunded(
@@ -87,15 +96,7 @@ contract InsurancePoolVault is AccessControl, ReentrancyGuard {
 
     // ============ Modifiers ============
 
-    modifier onlySlashingModule() {
-        require(hasRole(ROLE_SLASHING_MODULE, msg.sender), 'Not slashing module');
-        _;
-    }
-
-    modifier onlyTimelock() {
-        require(hasRole(ROLE_TIMELOCK, msg.sender), 'Not timelock');
-        _;
-    }
+    // Custom modifiers removed in favor of onlyRole(ROLE_...) to match project consistency
 
     // ============ Initialization ============
 
@@ -128,11 +129,11 @@ contract InsurancePoolVault is AccessControl, ReentrancyGuard {
         uint256 amount,
         ISlashingModule.SlashReason source,
         uint256 workflowId
-    ) external onlySlashingModule nonReentrant {
-        require(amount > 0, 'Zero amount');
+    ) external onlyRole(ROLE_SLASHING_MODULE) nonReentrant {
+        if (amount == 0) revert ZeroAmount();
 
         // Transfer tokens from slashing module
-        stableToken.safeTransferFrom(msg.sender, address(this), amount);
+        stableToken.safeTransferFrom(_msgSender(), address(this), amount);
 
         _recordDeposit(amount, source, workflowId);
     }
@@ -147,8 +148,8 @@ contract InsurancePoolVault is AccessControl, ReentrancyGuard {
         uint256 amount,
         ISlashingModule.SlashReason source,
         uint256 workflowId
-    ) external onlySlashingModule nonReentrant {
-        require(amount > 0, 'Zero amount');
+    ) external onlyRole(ROLE_SLASHING_MODULE) nonReentrant {
+        if (amount == 0) revert ZeroAmount();
         _recordDeposit(amount, source, workflowId);
     }
 
@@ -194,10 +195,10 @@ contract InsurancePoolVault is AccessControl, ReentrancyGuard {
         uint256 amount,
         uint256 workflowId,
         string memory reason
-    ) external onlyTimelock returns (uint256 payoutId) {
-        require(to != address(0), 'Zero address');
-        require(amount > 0, 'Zero amount');
-        require(sourceBalance.total >= amount, 'Insufficient balance');
+    ) external onlyRole(ROLE_TIMELOCK) returns (uint256 payoutId) {
+        if (to == address(0)) revert ZeroAddress();
+        if (amount == 0) revert ZeroAmount();
+        if (sourceBalance.total < amount) revert InsufficientBalance(sourceBalance.total, amount);
 
         payoutId = _nextPayoutId++;
 
@@ -226,11 +227,11 @@ contract InsurancePoolVault is AccessControl, ReentrancyGuard {
      * @notice Execute pending payout (after slow lane delay)
      * @param payoutId Pending payout ID
      */
-    function executePayout(uint256 payoutId) external onlyTimelock nonReentrant {
+    function executePayout(uint256 payoutId) external onlyRole(ROLE_TIMELOCK) nonReentrant {
         PendingPayout storage payout = pendingPayouts[payoutId];
-        require(payout.exists, 'Payout not found');
-        require(block.timestamp >= payout.eta, 'Delay not passed');
-        require(sourceBalance.total >= payout.amount, 'Insufficient balance');
+        if (!payout.exists) revert PayoutNotFound(payoutId);
+        if (block.timestamp < payout.eta) revert DelayNotPassed(payout.eta, block.timestamp);
+        if (sourceBalance.total < payout.amount) revert InsufficientBalance(sourceBalance.total, payout.amount);
 
         // Mark as executed
         address to = payout.to;
@@ -252,9 +253,9 @@ contract InsurancePoolVault is AccessControl, ReentrancyGuard {
      * @notice Cancel pending payout
      * @param payoutId Pending payout ID
      */
-    function cancelPayout(uint256 payoutId) external onlyTimelock {
+    function cancelPayout(uint256 payoutId) external onlyRole(ROLE_TIMELOCK) {
         PendingPayout storage payout = pendingPayouts[payoutId];
-        require(payout.exists, 'Payout not found');
+        if (!payout.exists) revert PayoutNotFound(payoutId);
 
         delete pendingPayouts[payoutId];
 
@@ -280,11 +281,11 @@ contract InsurancePoolVault is AccessControl, ReentrancyGuard {
         address to,
         uint256 amount,
         uint256 workflowId
-    ) external onlyTimelock nonReentrant {
+    ) external onlyRole(ROLE_TIMELOCK) nonReentrant {
         require(withdrawalsEnabled, 'Withdrawals disabled');
-        require(to != address(0), 'Zero address');
-        require(amount > 0, 'Zero amount');
-        require(sourceBalance.total >= amount, 'Insufficient balance');
+        if (to == address(0)) revert ZeroAddress();
+        if (amount == 0) revert ZeroAmount();
+        if (sourceBalance.total < amount) revert InsufficientBalance(sourceBalance.total, amount);
 
         // Update balances
         _reduceBalances(amount);

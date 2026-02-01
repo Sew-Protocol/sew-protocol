@@ -48,6 +48,7 @@ error NothingToClaim(uint256 workflowId, address claimer);
 error ZeroAddressField(string fieldName);
 error InvalidPercentage(uint256 percentage, uint256 maxPercentage);
 error InvalidWeight(uint8 level, uint256 weight);
+error InvalidPayoutToken(address expected, address actual);
 
 /**
  * @title ResolverIncentiveModuleV1
@@ -127,6 +128,9 @@ contract ResolverIncentiveModuleV1 is
         bool paused; // Whether this escrow is paused (emergency stop)
     }
     mapping(address => EscrowRateLimit) public escrowRateLimits; // escrow => rate limit data
+
+    // CRIT-FIX: Enforce single payout token per dispute to prevent token-mixing in claimablePayments
+    mapping(uint256 => address) public payoutToken;
 
     // ============ Events ============
 
@@ -569,6 +573,9 @@ contract ResolverIncentiveModuleV1 is
         if (token == address(0)) revert ZeroToken();
         if (paymentsCalculated[workflowId]) revert PaymentsAlreadyCalculated(workflowId);
 
+        // CRIT-FIX: Enforce single payout token per dispute
+        _requirePayoutToken(workflowId, token);
+
         // Gather data (imperative - state reads)
         ResolverRecord[] memory resolvers = disputeResolvers[workflowId];
         if (resolvers.length == 0) revert NoResolvers(workflowId);
@@ -712,6 +719,12 @@ contract ResolverIncentiveModuleV1 is
         if (token == address(0)) revert ZeroToken();
         if (!paymentsCalculated[workflowId]) revert PaymentsNotCalculated(workflowId);
 
+        // CRIT-FIX: Validate token matches payout token
+        address expectedToken = payoutToken[workflowId];
+        if (expectedToken != address(0) && token != expectedToken) {
+            revert InvalidPayoutToken(expectedToken, token);
+        }
+
         uint256 amount = claimablePayments[workflowId][_msgSender()];
         if (amount == 0) revert NothingToClaim(workflowId, _msgSender());
 
@@ -724,6 +737,23 @@ contract ResolverIncentiveModuleV1 is
         tokenContract.safeTransfer(_msgSender(), amount);
 
         emit PaymentClaimed(workflowId, _msgSender(), amount);
+    }
+
+    /**
+     * @notice Enforce single payout token per dispute
+     * @param workflowId Dispute ID
+     * @param token Token address to check/enforce
+     * @dev Sets payout token on first payment source (fee or bond), subsequent payments must match
+     */
+    function _requirePayoutToken(uint256 workflowId, address token) internal {
+        address p = payoutToken[workflowId];
+        if (p == address(0)) {
+            // First payment source - set the payout token
+            payoutToken[workflowId] = token;
+        } else {
+            // Subsequent payment - must match
+            if (p != token) revert InvalidPayoutToken(p, token);
+        }
     }
 
     /**

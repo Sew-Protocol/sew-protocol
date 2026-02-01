@@ -28,12 +28,13 @@ library TokenRecoveryLibrary {
     function recoverERC20(
         mapping(address => uint256) storage totalHeldInEscrowPerToken,
         mapping(address => uint256) storage totalFeesPerToken,
+        mapping(address => uint256) storage totalClaimablePerToken,
         address token,
         address recipient,
         uint256 amount
     ) internal returns (bool success, uint256 recoveryAmount, uint256 available) {
         uint256 balance = IERC20(token).balanceOf(address(this));
-        uint256 protected = totalHeldInEscrowPerToken[token] + totalFeesPerToken[token];
+        uint256 protected = totalHeldInEscrowPerToken[token] + totalFeesPerToken[token] + totalClaimablePerToken[token];
         available = balance > protected ? balance - protected : 0;
         recoveryAmount = amount == 0 ? available : amount;
         if (recoveryAmount == 0 || recoveryAmount > available) {

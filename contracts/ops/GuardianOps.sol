@@ -4,6 +4,7 @@ pragma solidity ^0.8.33;
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/utils/Address.sol';
+import '@openzeppelin/contracts/utils/Context.sol';
 import '../interfaces/IYieldGenerationModule.sol';
 import '../interfaces/aave/AaveV3Interfaces.sol';
 import '../core/BaseEscrow.sol';
@@ -23,7 +24,7 @@ import '../modules/AaveYieldGenerationModule.sol';
  * - Scoped to specific token (not arbitrary transfers)
  * - Non-blocking (fails gracefully)
  */
-contract GuardianOps {
+contract GuardianOps is Context {
     using SafeERC20 for IERC20;
     using Address for address;
 
@@ -88,26 +89,26 @@ contract GuardianOps {
     ) external returns (uint256 underlyingAmount) {
         // Safety check 1: Verify caller is guardian
         bytes32 ROLE_GUARDIAN = keccak256('ROLE_GUARDIAN');
-        if (!escrowContract.hasRole(ROLE_GUARDIAN, msg.sender)) {
-            revert NotGuardian(msg.sender);
+        if (!escrowContract.hasRole(ROLE_GUARDIAN, _msgSender())) {
+            revert NotGuardian(_msgSender());
         }
 
         // Safety check 2: Escrow must be paused
         if (!escrowContract.paused()) {
-            emit EmergencyUnwindExecuted(token, 0, 0, block.timestamp, msg.sender, 3); // 3 = not paused
+            emit EmergencyUnwindExecuted(token, 0, 0, block.timestamp, _msgSender(), 3); // 3 = not paused
             revert EscrowNotPaused();
         }
 
         // Safety check 3: Rate limiting (cooldown per token)
         uint256 lastUnwind = lastUnwindTimestamp[token];
         if (block.timestamp < lastUnwind + UNWIND_COOLDOWN) {
-            emit EmergencyUnwindExecuted(token, 0, 0, block.timestamp, msg.sender, 4); // 4 = cooldown
+            emit EmergencyUnwindExecuted(token, 0, 0, block.timestamp, _msgSender(), 4); // 4 = cooldown
             revert CooldownNotExpired(token, lastUnwind, block.timestamp);
         }
 
         // Safety check 4: Amount limit
         if (maxATokenAmount > MAX_UNWIND_AMOUNT_PER_CALL) {
-            emit EmergencyUnwindExecuted(token, 0, 0, block.timestamp, msg.sender, 5); // 5 = exceeds limit
+            emit EmergencyUnwindExecuted(token, 0, 0, block.timestamp, _msgSender(), 5); // 5 = exceeds limit
             revert AmountExceedsLimit(maxATokenAmount, MAX_UNWIND_AMOUNT_PER_CALL);
         }
 
@@ -129,7 +130,7 @@ contract GuardianOps {
         }
         
         if (address(genModule) == address(0)) {
-            emit EmergencyUnwindExecuted(token, 0, 0, block.timestamp, msg.sender, 7); // 7 = no module
+            emit EmergencyUnwindExecuted(token, 0, 0, block.timestamp, _msgSender(), 7); // 7 = no module
             revert ModuleNotConfigured();
         }
 
@@ -144,7 +145,7 @@ contract GuardianOps {
             }
         }
         if (aToken == address(0)) {
-            emit EmergencyUnwindExecuted(token, 0, 0, block.timestamp, msg.sender, 8); // 8 = pool not configured
+            emit EmergencyUnwindExecuted(token, 0, 0, block.timestamp, _msgSender(), 8); // 8 = pool not configured
             revert PoolNotConfigured();
         }
 
@@ -159,7 +160,7 @@ contract GuardianOps {
             }
         }
         if (aavePool == address(0)) {
-            emit EmergencyUnwindExecuted(token, 0, 0, block.timestamp, msg.sender, 8); // 8 = pool not configured
+            emit EmergencyUnwindExecuted(token, 0, 0, block.timestamp, _msgSender(), 8); // 8 = pool not configured
             revert PoolNotConfigured();
         }
 
@@ -170,7 +171,7 @@ contract GuardianOps {
         uint256 totalATokenBalance = vaultATokenBalance + moduleATokenBalance;
         
         if (totalATokenBalance == 0) {
-            emit EmergencyUnwindExecuted(token, 0, 0, block.timestamp, msg.sender, 2); // 2 = nothing to unwind
+            emit EmergencyUnwindExecuted(token, 0, 0, block.timestamp, _msgSender(), 2); // 2 = nothing to unwind
             revert NothingToUnwind(token);
         }
 
@@ -215,14 +216,14 @@ contract GuardianOps {
                 unwindAmount,
                 underlyingAmount,
                 block.timestamp,
-                msg.sender,
+                _msgSender(),
                 0 // 0 = success
             );
             return underlyingAmount;
         }
 
         // Unwind failed - emit event but don't revert (non-blocking)
-        emit EmergencyUnwindExecuted(token, unwindAmount, 0, block.timestamp, msg.sender, 1); // 1 = withdrawal failed
+        emit EmergencyUnwindExecuted(token, unwindAmount, 0, block.timestamp, _msgSender(), 1); // 1 = withdrawal failed
         revert WithdrawalFailed(token, unwindAmount);
     }
 }

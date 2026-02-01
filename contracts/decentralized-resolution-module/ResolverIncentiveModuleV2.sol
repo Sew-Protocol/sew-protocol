@@ -51,11 +51,7 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
     // Escalation depth histogram: round => count
     mapping(uint8 => uint256) public escalationDepthHistogram;
 
-    // ============ Token Consistency Enforcement ============
-    
-    /// @dev Enforce single payout token per dispute to prevent token-mixing in claimablePayments
-    /// @dev Set on first payment source (fee or bond), subsequent payments must match
-    mapping(uint256 => address) public payoutToken;
+    // Note: payoutToken mapping is inherited from V1
 
     // ============ Feature Support Constants ============
     
@@ -250,23 +246,7 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
 
     // ============ Internal DR v2 Functions ============
 
-    /**
-     * @notice Enforce single payout token per dispute
-     * @param workflowId Dispute ID
-     * @param token Token address to check/enforce
-     * @dev Sets payout token on first payment source (fee or bond)
-     *      Subsequent payments must match to prevent token-mixing in claimablePayments
-     */
-    function _requirePayoutToken(uint256 workflowId, address token) internal {
-        address p = payoutToken[workflowId];
-        if (p == address(0)) {
-            // First payment source - set the payout token
-            payoutToken[workflowId] = token;
-        } else {
-            // Subsequent payment - must match
-            require(p == token, 'Mixed payout tokens - bond token must match fee token');
-        }
-    }
+    // Note: _requirePayoutToken is inherited from V1
 
     /**
      * @notice Refund bond to depositor

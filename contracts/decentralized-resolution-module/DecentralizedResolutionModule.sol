@@ -1695,27 +1695,24 @@ contract DecentralizedResolutionModule is
      *      Requires ROLE_TIMELOCK (slow lane) or ROLE_GUARDIAN (emergency)
      */
     function pauseNewAssignments(string memory reason) external {
-        if (!hasRole(ROLE_TIMELOCK, msg.sender) && !hasRole(ROLE_GUARDIAN, msg.sender)) {
-            revert NotAuthorized(msg.sender);
+        if (!hasRole(ROLE_TIMELOCK, _msgSender()) && !hasRole(ROLE_GUARDIAN, _msgSender())) {
+            revert NotAuthorized(_msgSender());
         }
         if (newAssignmentsPaused) revert AlreadyPaused();
 
         newAssignmentsPaused = true;
-        emit NewAssignmentsPaused(msg.sender, reason);
+        emit NewAssignmentsPaused(_msgSender(), reason);
     }
 
     /**
      * @notice Resume new resolver assignments
      * @dev Requires ROLE_TIMELOCK (slow lane). Guardian is down-only and cannot resume.
      */
-    function resumeNewAssignments() external {
-        if (!hasRole(ROLE_TIMELOCK, msg.sender)) {
-            revert NotAuthorized(msg.sender);
-        }
+    function resumeNewAssignments() external onlyRole(ROLE_TIMELOCK) {
         if (!newAssignmentsPaused) revert NotPaused();
 
         newAssignmentsPaused = false;
-        emit NewAssignmentsResumed(msg.sender);
+        emit NewAssignmentsResumed(_msgSender());
     }
 
     /**

@@ -150,6 +150,8 @@ contract AaveForkTests is Test {
         
         guardianOps = new GuardianOps(address(escrowVault));
         aaveModule.grantRole(aaveModule.ROLE_GUARDIAN(), address(guardianOps));
+        // Grant escrow contract role to vault on aaveModule (needed for emergency unwind)
+        aaveModule.grantRole(aaveModule.ROLE_ESCROW_CONTRACT(), address(escrowVault));
         
         // Queue both provider and module before warping
         aaveModule.queueAavePoolProvider(BASE_SEPOLIA_POOL_PROVIDER);

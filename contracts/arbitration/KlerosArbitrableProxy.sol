@@ -114,7 +114,7 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
         // Store mappings (add 1 to klerosDisputeId for storage to distinguish from "no dispute")
         workflowToKlerosDispute[workflowId] = klerosDisputeId + 1;
         klerosDisputeToWorkflow[klerosDisputeId] = workflowId;
-        workflowToEscrow[workflowId] = msg.sender;
+        workflowToEscrow[workflowId] = _msgSender();
 
         // Store dispute metadata
         disputes[workflowId] = DisputeMetadata({
@@ -133,7 +133,7 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
 
         // Refund excess
         if (msg.value > cost) {
-            (bool success, ) = payable(msg.sender).call{value: msg.value - cost}('');
+            (bool success, ) = payable(_msgSender()).call{value: msg.value - cost}('');
             require(success, 'Refund failed');
         }
 
@@ -151,7 +151,7 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
         require(!dispute.resolved, 'Dispute already resolved');
 
         // Anyone can submit evidence (sender, recipient, or others)
-        emit EvidenceSubmitted(workflowId, dispute.klerosDisputeId, msg.sender, evidence);
+        emit EvidenceSubmitted(workflowId, dispute.klerosDisputeId, _msgSender(), evidence);
     }
 
     /**
@@ -160,7 +160,7 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
      * @param _ruling The ruling (0 = refused to rule, 1 = release to recipient, 2 = cancel to sender)
      */
     function rule(uint256 _disputeID, uint256 _ruling) external override {
-        require(msg.sender == address(arbitrator), 'Only arbitrator can rule');
+        require(_msgSender() == address(arbitrator), 'Only arbitrator can rule');
 
         uint256 workflowId = klerosDisputeToWorkflow[_disputeID];
         require(workflowId != 0, 'Unknown dispute');

@@ -223,7 +223,7 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
      * @param amount Amount to unstake (withdraws proportionally from stable/SEW)
      */
     function requestUnstake(uint256 amount) external {
-        address resolver = msg.sender;
+        address resolver = _msgSender();
         BondComposition storage bond = resolverBonds[resolver];
 
         // Calculate proportional withdrawal
@@ -246,7 +246,7 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
         if (paused) revert ContractPaused();
         if (stableAmount == 0 && sewAmount == 0) revert ZeroStakeAmount();
 
-        address resolver = msg.sender;
+        address resolver = _msgSender();
         BondComposition storage bond = resolverBonds[resolver];
 
         // Calculate new total amounts
@@ -316,7 +316,7 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
         if (paused) revert ContractPaused();
         if (stableAmount == 0 && sewAmount == 0) revert ZeroStakeAmount();
 
-        address resolver = msg.sender;
+        address resolver = _msgSender();
 
         // CRITICAL: Check if resolver is frozen (recent slash)
         if (isResolverFrozen(resolver)) revert ResolverFrozen(resolver);
@@ -395,7 +395,7 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
      * @notice Cancel unbonding request
      */
     function cancelUnstake() external nonReentrant {
-        address resolver = msg.sender;
+        address resolver = _msgSender();
         if (!unbondRequests[resolver].exists) revert NoUnbondRequest(resolver);
 
         uint256 amount = unbondRequests[resolver].stableAmount + unbondRequests[resolver].sewAmount;
@@ -411,7 +411,7 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
      * @notice Complete unbonding after delay
      */
     function completeUnstake() external nonReentrant {
-        address resolver = msg.sender;
+        address resolver = _msgSender();
         UnbondRequest storage request = unbondRequests[resolver];
 
         if (!request.exists) revert NoUnbondRequest(resolver);
@@ -464,7 +464,7 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
      * @param to Address to send tokens to
      */
     function emergencyWithdraw(address to) external onlyRole(ROLE_TIMELOCK) {
-        address resolver = msg.sender;
+        address resolver = _msgSender();
         BondComposition storage bond = resolverBonds[resolver];
 
         uint256 stableAmount = bond.stableAmount;
@@ -504,7 +504,7 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
     ) external nonReentrant {
         if (paused) revert ContractPaused();
 
-        address junior = msg.sender;
+        address junior = _msgSender();
         if (junior == senior) revert CannotDelegateToSelf(junior);
         if (resolverTier[junior] != 0) revert OnlyResolversCanDelegate(junior, resolverTier[junior]);
         if (resolverTier[senior] != 1) revert MustDelegateToSenior(senior, resolverTier[senior]);
@@ -551,7 +551,7 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
      * @notice Junior undelegates from senior
      */
     function undelegateStake(address senior, uint256 /* amount - unused */) external nonReentrant {
-        address junior = msg.sender;
+        address junior = _msgSender();
         DelegationRecord storage delegation = delegations[junior];
 
         if (!delegation.active) revert NotDelegated(junior);
@@ -963,12 +963,14 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
 
         // Transfer slashed stable to slashing module
         if (stableSlashed > 0) {
-            stableToken.safeTransfer(msg.sender, stableSlashed);
+            if (slashingModule == address(0)) revert ZeroAddress('slashingModule');
+            stableToken.safeTransfer(slashingModule, stableSlashed);
         }
         // Burn slashed SEW tokens (deflationary)
         // Transfer to slashing module first, then it burns
         if (sewSlashed > 0) {
-            sewToken.safeTransfer(msg.sender, sewSlashed);
+            if (slashingModule == address(0)) revert ZeroAddress('slashingModule');
+            sewToken.safeTransfer(slashingModule, sewSlashed);
         }
 
         emit BondSlashed(resolver, stableSlashed, sewSlashed, amount);
@@ -1055,11 +1057,13 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
 
         // Transfer slashed stable to slashing module
         if (stableSlashed > 0) {
-            stableToken.safeTransfer(msg.sender, stableSlashed);
+            if (slashingModule == address(0)) revert ZeroAddress('slashingModule');
+            stableToken.safeTransfer(slashingModule, stableSlashed);
         }
         // Transfer slashed SEW tokens to slashing module (for burning)
         if (sewSlashed > 0) {
-            sewToken.safeTransfer(msg.sender, sewSlashed);
+            if (slashingModule == address(0)) revert ZeroAddress('slashingModule');
+            sewToken.safeTransfer(slashingModule, sewSlashed);
         }
 
         emit CoverageSlashed(senior, amount, slashedFor);
@@ -1108,7 +1112,7 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
      */
     function pause(string memory reason) external onlyRole(ROLE_TIMELOCK) {
         paused = true;
-        emit EmergencyPaused(msg.sender, reason);
+        emit EmergencyPaused(_msgSender(), reason);
     }
 
     /**
@@ -1116,7 +1120,7 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
      */
     function unpause() external onlyRole(ROLE_TIMELOCK) {
         paused = false;
-        emit EmergencyUnpaused(msg.sender);
+        emit EmergencyUnpaused(_msgSender());
     }
 
     /**

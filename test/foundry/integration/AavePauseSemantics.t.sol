@@ -126,6 +126,8 @@ contract AavePauseSemantics is Test {
         vault.grantRole(vault.ROLE_GUARDIAN(), address(this)); // Also grant to this contract for emergency unwind
         // Grant guardian role to guardianOps on aaveModule
         aaveModule.grantRole(aaveModule.ROLE_GUARDIAN(), address(guardianOps));
+        // Grant escrow contract role to vault on aaveModule (needed for emergency unwind)
+        aaveModule.grantRole(aaveModule.ROLE_ESCROW_CONTRACT(), address(vault));
         // Grant timelock role to this contract (for unpause)
         vault.grantRole(vault.ROLE_TIMELOCK(), address(this));
 

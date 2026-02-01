@@ -208,8 +208,8 @@ contract GovGovernor is
      * @dev Reverts if address is zero, already added, or would exceed MAX_NON_CIRCULATING_ADDRESSES
      */
     function addNonCirculatingAddress(address addr) external {
-        if (msg.sender != address(timelock())) {
-            revert OnlyTimelock(msg.sender, address(timelock()));
+        if (_msgSender() != address(timelock())) {
+            revert OnlyTimelock(_msgSender(), address(timelock()));
         }
         if (addr == address(0)) revert ZeroAddress();
         if (nonCirculatingAddresses[addr]) revert DuplicateAddress(addr);
@@ -229,8 +229,8 @@ contract GovGovernor is
      * @dev Removes from mapping and array (swaps with last element for gas efficiency)
      */
     function removeNonCirculatingAddress(address addr) external {
-        if (msg.sender != address(timelock())) {
-            revert OnlyTimelock(msg.sender, address(timelock()));
+        if (_msgSender() != address(timelock())) {
+            revert OnlyTimelock(_msgSender(), address(timelock()));
         }
         if (!nonCirculatingAddresses[addr]) revert AddressNotInList(addr);
 
@@ -267,8 +267,8 @@ contract GovGovernor is
      * @dev Reverts if new quorum is zero
      */
     function setAbsoluteQuorum(uint256 newQuorum) external {
-        if (msg.sender != address(timelock())) {
-            revert OnlyTimelock(msg.sender, address(timelock()));
+        if (_msgSender() != address(timelock())) {
+            revert OnlyTimelock(_msgSender(), address(timelock()));
         }
         if (newQuorum == 0) revert QuorumMustBePositive();
 

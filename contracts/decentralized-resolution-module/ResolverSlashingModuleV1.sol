@@ -40,6 +40,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
     error FraudSlashingNotEnabled();
     error InvalidBps(uint256 bps, uint256 maxBps);
     error CooldownNotPassed(uint256 availableAt, uint256 currentTime);
+    error ZeroAmount();
 
     // ============ Constants ============
 
@@ -220,11 +221,11 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
             executedAt: 0,
             appealDeadline: block.timestamp + slashConfig.appealWindow,
             status: SlashStatus.PENDING,
-            proposer: msg.sender,
+            proposer: _msgSender(),
             evidence: ''
         });
 
-        emit SlashProposed(slashId, workflowId, resolver, reason, slashAmount, msg.sender);
+        emit SlashProposed(slashId, workflowId, resolver, reason, slashAmount, _msgSender());
     }
 
     /**
@@ -299,13 +300,13 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         if (block.timestamp > slashEvent.appealDeadline) {
             revert AppealWindowClosed(slashId, slashEvent.appealDeadline, block.timestamp);
         }
-        if (msg.sender != slashEvent.resolver) revert NotResolver(msg.sender, slashEvent.resolver);
+        if (_msgSender() != slashEvent.resolver) revert NotResolver(_msgSender(), slashEvent.resolver);
         if (slashAppeals[slashId].resolved) revert AlreadyAppealed(slashId);
 
         // Record appeal
         slashAppeals[slashId] = SlashAppeal({
             slashId: slashId,
-            appellant: msg.sender,
+            appellant: _msgSender(),
             appealBond: slashConfig.appealBond,
             appealedAt: block.timestamp,
             reason: reason,
@@ -314,7 +315,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
             upheld: false
         });
 
-        emit SlashAppealed(slashId, msg.sender, slashConfig.appealBond, reason);
+        emit SlashAppealed(slashId, _msgSender(), slashConfig.appealBond, reason);
     }
 
     /**
@@ -354,6 +355,10 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         address resolver,
         uint8 timeoutType
     ) external onlyRole(ROLE_RESOLUTION_MODULE) returns (uint256 slashId) {
+        // Reset tracking before slash
+        _currentSlashStableAmount = 0;
+        _currentSlashSewAmount = 0;
+
         // Check if already slashed for this workflow
         if (workflowSlashed[workflowId][resolver]) {
             return 0; // Already slashed, skip
@@ -392,7 +397,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
             executedAt: block.timestamp, // Auto-execute
             appealDeadline: 0, // No appeal for automated slashes
             status: SlashStatus.EXECUTED,
-            proposer: msg.sender,
+            proposer: _msgSender(),
             evidence: ''
         });
 
@@ -424,7 +429,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         // Update unavailability stats
         _updateUnavailabilityStats(resolver, true);
 
-        emit SlashProposed(slashId, workflowId, resolver, reason, slashAmount, msg.sender);
+        emit SlashProposed(slashId, workflowId, resolver, reason, slashAmount, _msgSender());
         emit SlashExecuted(slashId, resolver, totalSlashed, distribution);
         emit SlashExecutedWithWaterfall(
             slashId,
@@ -462,6 +467,10 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         address resolver,
         bytes calldata evidence
     ) external onlyRole(ROLE_TIMELOCK) returns (uint256 slashId) {
+        // Reset tracking before slash
+        _currentSlashStableAmount = 0;
+        _currentSlashSewAmount = 0;
+
         // Check if already slashed for this workflow
         if (workflowSlashed[workflowId][resolver]) {
             return 0; // Already slashed, skip
@@ -500,7 +509,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
             executedAt: block.timestamp, // Auto-execute for TIMELOCK-initiated fraud slashes
             appealDeadline: block.timestamp + slashConfig.appealWindow, // Allow appeal
             status: SlashStatus.EXECUTED,
-            proposer: msg.sender,
+            proposer: _msgSender(),
             evidence: evidence // Store evidence for audit
         });
 
@@ -532,7 +541,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         // Update unavailability stats
         _updateUnavailabilityStats(resolver, true);
 
-        emit SlashProposed(slashId, workflowId, resolver, reason, slashAmount, msg.sender);
+        emit SlashProposed(slashId, workflowId, resolver, reason, slashAmount, _msgSender());
         emit SlashExecuted(slashId, resolver, totalSlashed, distribution);
         emit SlashExecutedWithWaterfall(
             slashId,
@@ -816,7 +825,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         distribution.toSlashProposer = 0; // Not implemented yet
 
         // Transfer insurance pool portion to vault (with source tag)
-        if (distribution.toInsurancePool > 0 && address(insurancePoolVault) != address(0)) {
+        if (amount > 0 && distribution.toInsurancePool > 0 && address(insurancePoolVault) != address(0)) {
             // Transfer funds directly to vault (they're already in this contract from staking module)
             stableToken.safeTransfer(address(insurancePoolVault), distribution.toInsurancePool);
 
@@ -1052,7 +1061,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         // This function is deprecated - use InsurancePoolVault.deposit() directly
         // Kept for backward compatibility
         if (address(insurancePoolVault) != address(0)) {
-            stableToken.safeTransferFrom(msg.sender, address(this), amount);
+            stableToken.safeTransferFrom(_msgSender(), address(this), amount);
             stableToken.safeTransfer(address(insurancePoolVault), amount);
             insurancePoolVault.recordDeposit(amount, SlashReason.TIMEOUT_ACCEPT, 0);
         }

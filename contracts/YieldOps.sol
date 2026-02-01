@@ -177,7 +177,7 @@ contract YieldOps is AccessControl {
                 // CRIT-2 FIX: Forward any tokens actually received to the caller (Vault)
                 // This maintains the Push Model while being robust to module behavior
                 if (received > 0) {
-                    IERC20(token).safeTransfer(msg.sender, received);
+                    IERC20(token).safeTransfer(_msgSender(), received);
                 }
             } else {
                 result.success = false;
@@ -203,7 +203,7 @@ contract YieldOps is AccessControl {
         uint256 yieldAmount,
         bytes memory distributionData
     ) public {
-        if (msg.sender != address(this)) revert InternalOnly(msg.sender);
+        if (_msgSender() != address(this)) revert InternalOnly(_msgSender());
         if (yieldAmount == 0) return;
         IERC20(token).safeTransfer(address(distModule), yieldAmount);
         (bool success, uint256 distributedAmount) = distModule.distributeYield(workflowId, token, yieldAmount, distributionData);

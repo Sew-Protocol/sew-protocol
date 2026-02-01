@@ -98,13 +98,13 @@ contract CreateOps is AccessControl {
      * @dev Reverts if already paused, or if caller is not authorized.
      */
     function pauseYieldDeposits(string memory reason) external {
-        if (!hasRole(ROLE_TIMELOCK, msg.sender) && !hasRole(ROLE_GUARDIAN, msg.sender)) {
-            revert NotAuthorized(msg.sender);
+        if (!hasRole(ROLE_TIMELOCK, _msgSender()) && !hasRole(ROLE_GUARDIAN, _msgSender())) {
+            revert NotAuthorized(_msgSender());
         }
         if (yieldDepositsPaused) revert AlreadyPaused();
         
         yieldDepositsPaused = true;
-        emit YieldDepositsPaused(msg.sender, reason);
+        emit YieldDepositsPaused(_msgSender(), reason);
     }
     
     /**
@@ -116,7 +116,7 @@ contract CreateOps is AccessControl {
         if (!yieldDepositsPaused) revert NotPaused();
         
         yieldDepositsPaused = false;
-        emit YieldDepositsResumed(msg.sender);
+        emit YieldDepositsResumed(_msgSender());
     }
     
     /**

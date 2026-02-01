@@ -43,34 +43,34 @@ contract StakingModuleNoOp is IStakingModule, AccessControl {
     // ============ Core Staking Functions (No-Op) ============
 
     function stake(uint256 amount) external override {
-        emit StakeDeposited(msg.sender, amount, amount);
+        emit StakeDeposited(_msgSender(), amount, amount);
     }
 
     function requestUnstake(uint256 amount) external override {
         uint256 availableAt = block.timestamp + _dummyUnstakePeriod;
-        emit UnstakeRequested(msg.sender, amount, availableAt);
+        emit UnstakeRequested(_msgSender(), amount, availableAt);
     }
 
     function cancelUnstake() external override {
-        emit UnstakeCancelled(msg.sender, 0);
+        emit UnstakeCancelled(_msgSender(), 0);
     }
 
     function completeUnstake() external override {
-        emit StakeWithdrawn(msg.sender, 0, 0);
+        emit StakeWithdrawn(_msgSender(), 0, 0);
     }
 
     function emergencyWithdraw(address to) external override {
-        emit EmergencyWithdrawal(msg.sender, 0, to);
+        emit EmergencyWithdrawal(_msgSender(), 0, to);
     }
 
     // ============ Delegation Functions (No-Op) ============
 
     function delegateStake(address resolver, uint256 amount) external override {
-        emit StakeDelegated(msg.sender, resolver, amount);
+        emit StakeDelegated(_msgSender(), resolver, amount);
     }
 
     function undelegateStake(address resolver, uint256 amount) external override {
-        emit StakeUndelegated(msg.sender, resolver, amount);
+        emit StakeUndelegated(_msgSender(), resolver, amount);
     }
 
     // ============ Lifecycle Hooks (No-Op) ============
@@ -200,12 +200,12 @@ contract StakingModuleNoOp is IStakingModule, AccessControl {
 
     function pause(string memory reason) external override onlyRole(ROLE_TIMELOCK) {
         paused = true;
-        emit EmergencyPaused(msg.sender, reason);
+        emit EmergencyPaused(_msgSender(), reason);
     }
 
     function unpause() external override onlyRole(ROLE_TIMELOCK) {
         paused = false;
-        emit EmergencyUnpaused(msg.sender);
+        emit EmergencyUnpaused(_msgSender());
     }
 
     // ============ Setup Functions ============

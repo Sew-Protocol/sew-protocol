@@ -21,6 +21,7 @@ import '../libraries/ModuleGetterConsolidationLibrary.sol';
  *      Token parameter is always address(this) - single token escrow contract.
  */
 contract EscrowableERC20 is ERC20, BaseEscrow {
+    using SafeERC20 for IERC20;
     uint256 public constant INITIAL_SUPPLY = 1000000000000000000000000; // 1,000,000 tokens with 18 decimals
     
     
@@ -114,6 +115,12 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
      */
     function createEscrow(address seller, uint256 amount) public whenNotPaused returns (uint256) {
         return createEscrow(address(this), seller, amount, SettingsValidationLibrary.getDefaultSettings());
+    }
+
+    function releaseEscrowTransfer(uint256 workflowId) public nonReentrant whenNotPaused {
+        _requirePending(workflowId);
+        if (escrowTransfers[workflowId].from != _msgSender()) revert NotSender(workflowId, _msgSender(), escrowTransfers[workflowId].from);
+        _releaseEscrowTransfer(workflowId);
     }
 
     // ============ BaseEscrow Hook Implementations ============
@@ -267,7 +274,14 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         if (currentAllowance < amount) {
             _approve(address(this), moduleAddress, type(uint256).max);
         }
-        generationModule.depositForYield(workflowId, token, amount);
+        
+        uint256 balBefore = balanceOf(address(this));
+        (bool success, ) = generationModule.depositForYield(workflowId, token, amount);
+        uint256 balAfter = balanceOf(address(this));
+
+        if (!success || balBefore - balAfter < amount) {
+            revert AccountingDeficit(token, amount);
+        }
     }
 
     // ============ Module Getters ============
@@ -339,30 +353,41 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         address recipient,
         uint256 amount
     ) external override onlyRole(ROLE_TIMELOCK) nonReentrant {
-        if (token != address(this)) revert InvalidAddress(ADDR_TOKEN, token);
         if (recipient == address(0)) revert InvalidAddress(ADDR_RECIPIENT, recipient);
         
-        uint256 balance = balanceOf(address(this));
-        uint256 escrowBalance = totalHeldInEscrow;
-        uint256 feeBalance = totalFees;
-        
-        // Calculate available excess (balance minus escrow and fees)
-        uint256 available = balance > escrowBalance + feeBalance ? balance - escrowBalance - feeBalance : 0;
-        
-        // CRIT-2: Determine recovery amount - if amount == 0, recover all available excess
-        uint256 recoveryAmount = amount == 0 ? available : amount;
-        
-        // CRIT-2: Critical validation - ensure requested amount doesn't exceed available excess
-        if (recoveryAmount > available) {
-            revert AmountExceedsAvailable(token, recoveryAmount, available);
-        }
-        if (recoveryAmount == 0) {
-            revert NoTokensToRecover();
-        }
+        if (token == address(this)) {
+            uint256 balance = balanceOf(address(this));
+            uint256 escrowBalance = totalHeldInEscrow;
+            uint256 feeBalance = totalFees;
+            uint256 claimableBalance = totalClaimableAssets[address(this)];
+            
+            // Calculate available excess (balance minus escrow, fees and claimable)
+            uint256 available = balance > escrowBalance + feeBalance + claimableBalance ? balance - escrowBalance - feeBalance - claimableBalance : 0;
+            
+            // CRIT-2: Determine recovery amount - if amount == 0, recover all available excess
+            uint256 recoveryAmount = amount == 0 ? available : amount;
+            
+            // CRIT-2: Critical validation - ensure requested amount doesn't exceed available excess
+            if (recoveryAmount > available) {
+                revert AmountExceedsAvailable(token, recoveryAmount, available);
+            }
+            if (recoveryAmount == 0) {
+                revert NoTokensToRecover();
+            }
 
-        // Token is address(this): use ERC20 internal transfer directly (saves bytecode vs RecoveryLibrary)
-        _transfer(address(this), recipient, recoveryAmount);
-        emit ERC20Recovered(token, recipient, recoveryAmount);
+            // Token is address(this): use ERC20 internal transfer directly
+            _transfer(address(this), recipient, recoveryAmount);
+            emit ERC20Recovered(token, recipient, recoveryAmount);
+        } else {
+            // CRIT-2: Support recovery of external ERC20 tokens
+            uint256 balance = IERC20(token).balanceOf(address(this));
+            uint256 recoveryAmount = amount == 0 ? balance : amount;
+            if (recoveryAmount > balance) revert AmountExceedsAvailable(token, recoveryAmount, balance);
+            if (recoveryAmount == 0) revert NoTokensToRecover();
+            
+            IERC20(token).safeTransfer(recipient, recoveryAmount);
+            emit ERC20Recovered(token, recipient, recoveryAmount);
+        }
     }
 }
 

@@ -89,6 +89,7 @@ contract SlashingModuleUnitTest is Test {
         slashingModule.grantRole(slashingModule.ROLE_TIMELOCK(), timelock);
         slashingModule.grantRole(slashingModule.ROLE_RESOLUTION_MODULE(), resolutionModule);
         stakingModule.setResolutionModule(resolutionModule);
+        stakingModule.setSlashingModule(address(slashingModule));
         stakingModule.grantRole(stakingModule.ROLE_SLASHING_MODULE(), address(slashingModule));
         insurancePool.grantRole(insurancePool.ROLE_SLASHING_MODULE(), address(slashingModule));
 

@@ -90,6 +90,9 @@ contract SlashingModuleInvariantsTest is Test {
         // Grant slashing module role on insurance pool vault (required for recordDeposit)
         insurancePool.grantRole(insurancePool.ROLE_SLASHING_MODULE(), address(slashingModule));
 
+        // Configure slashing module in staking module
+        stakingModule.setSlashingModule(address(slashingModule));
+
         // Setup tiers - these require ROLE_TIMELOCK
         stakingModule.setResolverTier(resolver1, 0);
         stakingModule.setResolverTier(resolver2, 0);

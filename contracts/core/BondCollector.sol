@@ -153,6 +153,9 @@ contract BondCollector is AccessControl {
         address depositor,
         address escalatedBy
     ) internal returns (bool) {
+        // CRIT-3: Actually pull the tokens from the caller
+        IERC20(bondToken).safeTransferFrom(_msgSender(), address(this), bondAmount);
+
         uint256 bondToRecord = bondAmount;
         
         if (snapshottedBondFee > 0 && escrowFeeAddress != address(0)) {
@@ -196,5 +199,33 @@ contract BondCollector is AccessControl {
      */
     function resetBondSpender(address token, address spender) external onlyRole(ROLE_ESCROW_CONTRACT) {
         IERC20(token).approve(spender, 0);
+    }
+
+    /**
+     * @notice Recover ERC20 tokens sent to this contract by mistake
+     */
+    function recoverERC20(
+        address token,
+        address recipient,
+        uint256 amount
+    ) external onlyRole(ROLE_TIMELOCK) {
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        uint256 recoveryAmount = amount == 0 ? balance : amount;
+        if (recoveryAmount > balance) revert InvalidAmount(AMOUNT_GENERIC);
+        IERC20(token).safeTransfer(recipient, recoveryAmount);
+    }
+
+    /**
+     * @notice Recover native ETH sent to this contract by mistake
+     */
+    function recoverNativeETH(
+        address recipient,
+        uint256 amount
+    ) external onlyRole(ROLE_TIMELOCK) {
+        uint256 balance = address(this).balance;
+        uint256 recoveryAmount = amount == 0 ? balance : amount;
+        if (recoveryAmount > balance) revert InvalidAmount(AMOUNT_GENERIC);
+        (bool success, ) = payable(recipient).call{value: recoveryAmount}("");
+        if (!success) revert InvalidAddress(ADDR_RECIPIENT, recipient);
     }
 }

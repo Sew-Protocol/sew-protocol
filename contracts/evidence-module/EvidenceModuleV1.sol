@@ -66,7 +66,7 @@ contract EvidenceModuleV1 is IEvidenceModule, AccessControlUpgradeable, Reentran
     // ============ Modifiers ============
 
     modifier onlyEscrowContract() {
-        require(msg.sender == escrowContract, 'Not escrow contract');
+        require(_msgSender() == escrowContract, 'Not escrow contract');
         _;
     }
 
@@ -121,7 +121,7 @@ contract EvidenceModuleV1 is IEvidenceModule, AccessControlUpgradeable, Reentran
     ) external nonReentrant returns (uint256 evidenceId) {
         // Check access control
         // Note: escrowData not available here, will check via other means
-        (bool allowed, string memory reason) = _canSubmitEvidenceInternal(workflowId, msg.sender);
+        (bool allowed, string memory reason) = _canSubmitEvidenceInternal(workflowId, _msgSender());
         require(allowed, reason);
 
         // Check limit
@@ -133,7 +133,7 @@ contract EvidenceModuleV1 is IEvidenceModule, AccessControlUpgradeable, Reentran
         for (uint256 i = 0; i < currentCount; i++) {
             if (
                 disputeEvidence[workflowId][i].hash == evidenceHash &&
-                disputeEvidence[workflowId][i].submitter == msg.sender
+                disputeEvidence[workflowId][i].submitter == _msgSender()
             ) {
                 revert('Duplicate evidence');
             }
@@ -143,14 +143,14 @@ contract EvidenceModuleV1 is IEvidenceModule, AccessControlUpgradeable, Reentran
         disputeEvidence[workflowId].push(
             EvidenceRecord({
                 hash: evidenceHash,
-                submitter: msg.sender,
+                submitter: _msgSender(),
                 submittedAt: block.timestamp
             })
         );
 
         evidenceId = currentCount;
 
-        emit EvidenceSubmitted(workflowId, evidenceId, msg.sender, evidenceHash, metadata);
+        emit EvidenceSubmitted(workflowId, evidenceId, _msgSender(), evidenceHash, metadata);
 
         return evidenceId;
     }
