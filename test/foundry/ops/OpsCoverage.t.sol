@@ -1141,15 +1141,15 @@ contract OpsCoverageTest is Test {
     }
 
     function test_YieldOps_handleYield_WithdrawalReturnsFalse() public {
-        MockYieldGenerationModule mockGen = new MockYieldGenerationModule();
-        mockGen.setWithdrawSuccess(false); // Make it return false
+        MockYieldGenerationModule mockGen2 = new MockYieldGenerationModule();
+        mockGen2.setWithdrawSuccess(false); // Make it return false
         
         vm.prank(timelock);
         yieldOps.registerEscrowContract(escrowContract);
 
         vm.prank(escrowContract);
         YieldOps.YieldResult memory result = yieldOps.handleYield(
-            IYieldGenerationModule(address(mockGen)),
+            IYieldGenerationModule(address(mockGen2)),
             IYieldDistributionModule(address(0)),
             1,
             address(token),
@@ -1166,15 +1166,15 @@ contract OpsCoverageTest is Test {
     }
 
     function test_YieldOps_handleYield_WithdrawalRevert() public {
-        MockYieldGenerationModule mockGen = new MockYieldGenerationModule();
-        mockGen.setRevert(true); // Make it revert
+        MockYieldGenerationModule mockGen3 = new MockYieldGenerationModule();
+        mockGen3.setRevert(true); // Make it revert
         
         vm.prank(timelock);
         yieldOps.registerEscrowContract(escrowContract);
 
         vm.prank(escrowContract);
         YieldOps.YieldResult memory result = yieldOps.handleYield(
-            IYieldGenerationModule(address(mockGen)),
+            IYieldGenerationModule(address(mockGen3)),
             IYieldDistributionModule(address(0)),
             1,
             address(token),
