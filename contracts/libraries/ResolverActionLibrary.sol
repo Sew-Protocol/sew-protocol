@@ -41,7 +41,8 @@ library ResolverActionLibrary {
      */
     function executeAction(
         ActionParams memory params,
-        IYieldGenerationModule genModule
+        IYieldGenerationModule genModule,
+        address escrowContract
     ) internal returns (ActionResult memory result) {
         result.isComplete = true; // Always complete for full resolution
         result.actualAmount = params.amount;
@@ -52,7 +53,8 @@ library ResolverActionLibrary {
             genModule,
             params.workflowId,
             params.token,
-            params.amount
+            params.amount,
+            escrowContract
         );
         result.actualAmount = actualAmount;
         result.yieldToDistribute = yield;

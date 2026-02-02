@@ -78,9 +78,6 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
     mapping(uint256 => uint256) public escrowShares; // workflowId => shares minted for this escrow
     mapping(uint256 => uint256) public escrowPrincipal; // workflowId => principal deposited for this escrow
     
-    // Track which escrow contract corresponds to each workflowId (for withdrawWithYield called by YieldOps)
-    mapping(uint256 => address) public workflowIdToEscrow; // workflowId => escrowContract
-
     // Slow lane pending changes (Phase 3)
     PendingAddress private _pendingPoolProvider;
 
@@ -206,7 +203,6 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         escrowInAave[escrowContract][workflowId] = true;
         escrowATokenBalance[escrowContract][workflowId] = yieldTokenBalance;
         escrowOriginalDeposit[escrowContract][workflowId] = amount;
-        workflowIdToEscrow[workflowId] = escrowContract; // Track for withdrawWithYield (called by YieldOps)
         totalDepositedToAave[token] += amount;
         totalTrackedATokenBalance[token] += yieldTokenBalance;
 
@@ -228,11 +224,9 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
     function withdrawWithYield(
         uint256 workflowId,
         address token,
-        uint256 originalAmount
+        uint256 originalAmount,
+        address escrowContract
     ) external override returns (bool success, uint256 actualAmount, uint256 yieldAmount) {
-        // Note: msg.sender might be YieldOps (not escrowContract directly)
-        // Use workflowIdToEscrow to get the correct escrow contract
-        address escrowContract = workflowIdToEscrow[workflowId];
         if (escrowContract == address(0)) {
             // No escrow tracked for this workflowId, return original amount
             return (true, originalAmount, 0);
@@ -357,7 +351,6 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         escrowInAave[escrowContract][workflowId] = false;
         escrowATokenBalance[escrowContract][workflowId] = 0;
         escrowOriginalDeposit[escrowContract][workflowId] = 0;
-        workflowIdToEscrow[workflowId] = address(0); // Clear tracking
 
         // Update total deposited (subtract original, not actual)
         if (totalDepositedToAave[token] >= originalAmount) {
@@ -415,12 +408,13 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
             return 0; // No tracking data
         }
 
-        // Calculate current value of aTokens
-        // We need to estimate what the current aToken balance represents in underlying tokens
-        // For simplicity, we'll use the ratio: (currentATokenBalance / originalATokenBalance) * originalDeposit
-        // This gives us an estimate of current value
-        uint256 estimatedCurrentValue = (currentATokenBalance * originalDeposit) /
-            originalATokenBalance;
+        // Calculate current value of aTokens using the pool share logic
+        // estimatedCurrentValue = (Total Underlying * Escrow aTokens) / Total aTokens
+        uint256 totalTracked = totalTrackedATokenBalance[token];
+        if (totalTracked == 0) return 0;
+        
+        uint256 estimatedCurrentValue = (currentATokenBalance * originalATokenBalance) /
+            totalTracked;
 
         // Yield = estimated current value - original deposit
         if (estimatedCurrentValue > originalDeposit) {

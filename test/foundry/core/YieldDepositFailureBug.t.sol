@@ -18,7 +18,7 @@ contract SilentFailureModule is IYieldGenerationModule {
     function depositForYield(uint256, address, uint256) external pure override returns (bool success, uint256 yieldTokenBalance) {
         return (false, 0); // SILENT FAILURE
     }
-    function withdrawWithYield(uint256, address, uint256) external pure override returns (bool success, uint256 actualAmount, uint256 yieldAmount) {
+    function withdrawWithYield(uint256, address, uint256, address) external pure override returns (bool success, uint256 actualAmount, uint256 yieldAmount) {
         return (true, 0, 0); // SUCCESSFULLY WITHDREW 0
     }
     function calculateYield(uint256, address) external pure override returns (uint256) { return 0; }

@@ -423,14 +423,19 @@ contract MockYieldGenForEdgeCases is IYieldGenerationModule {
     function withdrawWithYield(
         uint256 workflowId,
         address token,
-        uint256 originalAmount
+        uint256 originalAmount,
+        address escrowContract
     ) external override returns (bool, uint256, uint256) {
         if (shouldRevert) {
             revert("MockYieldGen: Reverted");
         }
         
-        // Get escrow contract from tracking (YieldOps calls this, not escrow contract)
-        address escrowContract = workflowToEscrow[workflowId];
+        // Use the passed escrowContract instead of tracking it
+        if (escrowContract == address(0)) {
+            // Fallback to tracking for legacy tests if needed
+            escrowContract = workflowToEscrow[workflowId];
+        }
+        
         if (escrowContract == address(0)) {
             // No escrow tracked, use configured values or return original
             if (actualAmount > 0 || yieldAmount > 0) {

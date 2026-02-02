@@ -37,7 +37,8 @@ library YieldHandlingLibrary {
         IYieldGenerationModule genModule,
         uint256 workflowId,
         address token,
-        uint256 amount
+        uint256 amount,
+        address escrowContract
     ) internal returns (uint256 actualAmount, uint256 yield) {
         actualAmount = amount;
         yield = 0;
@@ -46,7 +47,7 @@ library YieldHandlingLibrary {
             return (actualAmount, yield);
         }
 
-        (bool success, uint256 amt, ) = genModule.withdrawWithYield(workflowId, token, amount);
+        (bool success, uint256 amt, ) = genModule.withdrawWithYield(workflowId, token, amount, escrowContract);
 
         if (success) {
             actualAmount = amt;

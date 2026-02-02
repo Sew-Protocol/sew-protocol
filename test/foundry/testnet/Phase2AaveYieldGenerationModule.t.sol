@@ -178,7 +178,7 @@ contract Phase2AaveYieldGenerationModuleTest is Test {
         // Withdraw with yield as escrowContract (same msg.sender as deposit path expects)
         uint256 balBefore = token.balanceOf(escrowContract);
         vm.prank(escrowContract);
-        (bool wOk, uint256 actual, uint256 y) = module.withdrawWithYield(workflowId, address(token), depositAmount);
+        (bool wOk, uint256 actual, uint256 y) = module.withdrawWithYield(workflowId, address(token), depositAmount, escrowContract);
         uint256 balAfter = token.balanceOf(escrowContract);
 
         assertTrue(wOk, "withdraw should succeed");

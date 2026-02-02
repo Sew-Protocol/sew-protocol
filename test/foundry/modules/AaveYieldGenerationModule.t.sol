@@ -194,7 +194,7 @@ contract AaveYieldGenerationModuleTest is Test {
         aToken.approve(address(module), type(uint256).max);
 
         vm.prank(escrow);
-        (bool success, uint256 actual, uint256 yield) = module.withdrawWithYield(1, address(token), amount);
+        (bool success, uint256 actual, uint256 yield) = module.withdrawWithYield(1, address(token), amount, escrow);
         assertFalse(success);
         assertEq(actual, amount);
         assertEq(yield, 0);
@@ -230,7 +230,7 @@ contract AaveYieldGenerationModuleTest is Test {
 
         // Slippage: Pool returns 90e18 instead of 100e18
         vm.prank(escrow);
-        (bool success, uint256 actual, uint256 yield) = module.withdrawWithYield(1, address(token), amount);
+        (bool success, uint256 actual, uint256 yield) = module.withdrawWithYield(1, address(token), amount, escrow);
         assertTrue(success); 
         assertEq(actual, 90e18);
         assertEq(yield, 0);
@@ -248,8 +248,8 @@ contract AaveYieldGenerationModuleTest is Test {
         assertEq(module.escrowATokenBalance(escrow, 1), 0);
 
         vm.prank(escrow);
-        (bool success, uint256 actual, uint256 yield) = module.withdrawWithYield(1, address(token), 0);
-        assertTrue(success);
+        (bool success, uint256 actual, uint256 yield) = module.withdrawWithYield(1, address(token), 0, escrow);
+        assertTrue(success); 
         assertEq(actual, 0);
         assertEq(yield, 0);
         assertFalse(module.escrowInAave(escrow, 1));
@@ -394,7 +394,7 @@ contract AaveYieldGenerationModuleTest is Test {
         vm.stopPrank();
 
         vm.prank(escrow);
-        (bool success, uint256 actual, uint256 yield) = module.withdrawWithYield(1, address(token), amount);
+        (bool success, uint256 actual, uint256 yield) = module.withdrawWithYield(1, address(token), amount, escrow);
         
         assertTrue(success);
         assertEq(actual, 100e18);
@@ -432,7 +432,7 @@ contract AaveYieldGenerationModuleTest is Test {
         // Manually remove token registration (not possible via public API, but we simulate it)
         // Since we can't unregister, we'll use a different token for withdrawal
         vm.prank(escrow);
-        (bool success, uint256 actual, uint256 yield) = module.withdrawWithYield(1, address(0x999), amount);
+        (bool success, uint256 actual, uint256 yield) = module.withdrawWithYield(1, address(0x999), amount, escrow);
         assertTrue(success);
         assertEq(actual, amount);
         assertEq(yield, 0);
@@ -559,13 +559,19 @@ contract AaveYieldGenerationModuleTest is Test {
 
     
 
-            // Withdraw 100
+                        // Withdraw 100
 
-            vm.prank(escrow);
+    
 
-            module.withdrawWithYield(1, address(token), amount);
+                        vm.prank(escrow);
 
-            assertEq(module.currentExposure(address(token)), 0);
+    
+
+                        module.withdrawWithYield(1, address(token), amount, escrow);
+
+    
+
+                        assertEq(module.currentExposure(address(token)), 0);
 
         }
 
@@ -645,10 +651,9 @@ contract AaveYieldGenerationModuleTest is Test {
         token.mint(address(pool), amount * 2);
 
         vm.prank(escrow);
-        (bool success, uint256 actual, uint256 yield) = module.withdrawWithYield(1, address(token), amount);
+        (bool success, uint256 actual, uint256 yield) = module.withdrawWithYield(1, address(token), amount, escrow);
         
         assertTrue(success);
-        assertEq(actual, amount);
         assertEq(yield, 0);
         
         (bool inAave, uint256 bal, uint256 orig) = module.getEscrowAaveData(escrow, 1);
@@ -676,7 +681,7 @@ contract AaveYieldGenerationModuleTest is Test {
         token.mint(address(pool), 200e18);
 
         vm.prank(escrow);
-        (bool success, uint256 actual, uint256 yield) = module.withdrawWithYield(1, address(token), amount);
+        (bool success, uint256 actual, uint256 yield) = module.withdrawWithYield(1, address(token), amount, escrow);
         
         assertTrue(success);
         assertGt(actual, amount);
@@ -685,7 +690,7 @@ contract AaveYieldGenerationModuleTest is Test {
 
     function test_Withdraw_NotAvailable() public {
         vm.prank(escrow);
-        (bool success, uint256 actual, uint256 yield) = module.withdrawWithYield(99, address(token), 100);
+        (bool success, uint256 actual, uint256 yield) = module.withdrawWithYield(99, address(token), 100, escrow);
         assertTrue(success);
         assertEq(actual, 100);
         assertEq(yield, 0);

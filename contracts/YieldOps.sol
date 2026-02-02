@@ -159,7 +159,7 @@ contract YieldOps is AccessControl {
 
         uint256 balBefore = IERC20(token).balanceOf(address(this));
 
-        try genModule.withdrawWithYield(workflowId, token, amount) returns (
+        try genModule.withdrawWithYield(workflowId, token, amount, _msgSender()) returns (
             bool withdrawSuccess,
             uint256 actualAmountWithdrawn,
             uint256 /* yieldGenerated */

@@ -126,7 +126,7 @@ contract AaveVaultAdapter is IVaultLike {
         assets = (shares * currentAssets) / _totalShares;
         
         // Withdraw from Aave via the module
-        try aaveModule.withdrawWithYield(workflowId, underlyingAsset, assets) returns (
+        try aaveModule.withdrawWithYield(workflowId, underlyingAsset, assets, address(this)) returns (
             bool success,
             uint256 actualAmount,
             uint256 /* yield */

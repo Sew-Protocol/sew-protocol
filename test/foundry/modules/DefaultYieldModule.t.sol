@@ -55,7 +55,8 @@ contract DefaultYieldModuleTest is Test {
         (bool success, uint256 actualAmount, uint256 yieldAmount) = yieldModule.withdrawWithYield(
             1,
             address(token),
-            AMOUNT
+            AMOUNT,
+            address(this)
         );
         
         assertTrue(success);
@@ -67,7 +68,8 @@ contract DefaultYieldModuleTest is Test {
         (bool success, uint256 actualAmount, uint256 yieldAmount) = yieldModule.withdrawWithYield(
             1,
             address(token),
-            0
+            0,
+            address(this)
         );
         
         assertTrue(success);

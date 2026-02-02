@@ -20,7 +20,7 @@ contract OverreportingModule is IYieldGenerationModule {
         IERC20(token).transferFrom(msg.sender, address(this), amount);
         return (true, amount);
     }
-    function withdrawWithYield(uint256, address token, uint256 originalAmount) external override returns (bool success, uint256 actualAmount, uint256 yieldAmount) {
+    function withdrawWithYield(uint256, address token, uint256 originalAmount, address) external override returns (bool success, uint256 actualAmount, uint256 yieldAmount) {
         // Send BACK the original tokens so YieldOps sees "received"
         IERC20(token).transfer(msg.sender, originalAmount);
         // Report 1000 ether EXTRA yield but don't transfer any tokens for it

@@ -28,7 +28,7 @@ contract MockLossyYieldModule is IYieldGenerationModule {
         return (true, 0);
     }
 
-    function withdrawWithYield(uint256, address token, uint256 originalAmount) external returns (bool, uint256, uint256) {
+    function withdrawWithYield(uint256, address token, uint256 originalAmount, address) external returns (bool, uint256, uint256) {
         // Return full amount to vault but report the loss
         IERC20(token).safeTransfer(msg.sender, originalAmount);
         return (true, originalAmount - lossAmount, 0);

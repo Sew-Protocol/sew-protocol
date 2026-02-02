@@ -1349,7 +1349,7 @@ contract MockYieldGenerationModule is IYieldGenerationModule {
         yield = _y;
     }
 
-    function withdrawWithYield(uint256, address, uint256) external view returns (bool, uint256, uint256) {
+    function withdrawWithYield(uint256, address, uint256, address) external view returns (bool, uint256, uint256) {
         if (shouldRevert) revert("Gen Fail");
         return (success, actual, yield);
     }

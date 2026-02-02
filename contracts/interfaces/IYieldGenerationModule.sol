@@ -35,7 +35,8 @@ interface IYieldGenerationModule is IERC165 {
     function withdrawWithYield(
         uint256 workflowId,
         address token,
-        uint256 originalAmount
+        uint256 originalAmount,
+        address escrowContract
     ) external returns (bool success, uint256 actualAmount, uint256 yieldAmount);
 
     /**
