@@ -42,7 +42,8 @@ contract DefaultYieldModule is IYieldGenerationModule, ERC165 {
      */
     function calculateYield(
         uint256 /* workflowId */,
-        address /* token */
+        address /* token */,
+        address /* escrowContract */
     ) external pure override returns (uint256 yieldAmount) {
         return 0;
     }

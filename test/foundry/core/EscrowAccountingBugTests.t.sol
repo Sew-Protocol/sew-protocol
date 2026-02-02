@@ -34,7 +34,7 @@ contract MockLossyYieldModule is IYieldGenerationModule {
         return (true, originalAmount - lossAmount, 0);
     }
 
-    function calculateYield(uint256, address) external pure returns (uint256) {
+    function calculateYield(uint256, address, address) external pure returns (uint256) {
         return 0;
     }
 

@@ -43,11 +43,13 @@ interface IYieldGenerationModule is IERC165 {
      * @notice Calculate current yield for an escrow
      * @param workflowId The escrow transfer ID
      * @param token Token address
+     * @param escrowContract Address of the escrow contract
      * @return yieldAmount Current yield amount
      */
     function calculateYield(
         uint256 workflowId,
-        address token
+        address token,
+        address escrowContract
     ) external view returns (uint256 yieldAmount);
 
     /**

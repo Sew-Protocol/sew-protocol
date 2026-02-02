@@ -80,12 +80,12 @@ contract DefaultYieldModuleTest is Test {
     // ============ calculateYield Tests ============
     
     function test_calculateYield_returnsZero() public {
-        uint256 yield = yieldModule.calculateYield(1, address(token));
+        uint256 yield = yieldModule.calculateYield(1, address(token), address(this));
         assertEq(yield, 0);
     }
     
     function test_calculateYield_differentWorkflowId() public {
-        uint256 yield = yieldModule.calculateYield(999, address(token));
+        uint256 yield = yieldModule.calculateYield(999, address(token), address(this));
         assertEq(yield, 0);
     }
     

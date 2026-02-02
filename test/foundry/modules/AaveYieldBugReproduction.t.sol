@@ -63,9 +63,9 @@ contract AaveYieldBugReproduction is Test {
 
         // No interest accrued yet. Yield for both should be 0.
         vm.prank(escrow);
-        uint256 yield1 = module.calculateYield(1, address(token));
+        uint256 yield1 = module.calculateYield(1, address(token), escrow);
         vm.prank(escrow);
-        uint256 yield2 = module.calculateYield(2, address(token));
+        uint256 yield2 = module.calculateYield(2, address(token), escrow);
 
         console.log("Yield 1 reported:", yield1);
         console.log("Yield 2 reported:", yield2);

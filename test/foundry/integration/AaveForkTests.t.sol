@@ -278,7 +278,7 @@ contract AaveForkTests is Test {
         escrowVault.pause();
         uint256 tokenBalanceBefore = token.balanceOf(address(escrowVault));
         
-        uint256 unwound = guardianOps.emergencyUnwindAavePosition(address(token), guardianOps.MAX_UNWIND_AMOUNT_PER_CALL());
+        uint256 unwound = guardianOps.emergencyUnwindAavePosition(address(token), workflowId, address(escrowVault));
         assertGt(unwound, 0, "Unwind should succeed");
         assertGt(token.balanceOf(address(escrowVault)), tokenBalanceBefore, "BaseEscrow should receive funds");
     }
@@ -358,7 +358,7 @@ contract AaveForkTests is Test {
         vm.stopPrank();
         
         vm.expectRevert(); 
-        guardianOps.emergencyUnwindAavePosition(address(token), 1e17);
+        guardianOps.emergencyUnwindAavePosition(address(token), 1, address(escrowVault));
     }
 }
 

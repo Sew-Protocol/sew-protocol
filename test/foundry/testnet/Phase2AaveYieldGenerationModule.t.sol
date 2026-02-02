@@ -188,7 +188,7 @@ contract Phase2AaveYieldGenerationModuleTest is Test {
 
         // State cleared + exposure reduced
         assertTrue(!module.escrowInAave(escrowContract, workflowId), "escrowInAave not cleared");
-        assertEq(module.escrowATokenBalance(escrowContract, workflowId), 0, "aToken balance not cleared");
+        assertEq(module.escrowScaledBalance(escrowContract, workflowId), 0, "aToken balance not cleared");
         assertEq(module.escrowOriginalDeposit(escrowContract, workflowId), 0, "original deposit not cleared");
         assertEq(module.currentExposure(address(token)), 0, "exposure not reduced");
     }

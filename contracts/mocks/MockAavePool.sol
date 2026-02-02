@@ -36,24 +36,24 @@ contract MockAavePool {
         tokenToAToken[token] = aToken;
     }
 
+    function getLiquidityIndex(address asset) public view returns (uint256) {
+        return liquidityIndex[asset] > 0 ? liquidityIndex[asset] : INITIAL_LIQUIDITY_INDEX;
+    }
+
     function supply(address asset, uint256 amount, address onBehalfOf, uint16) external virtual {
         require(tokenToAToken[asset] != address(0), 'Token not supported');
+
+        uint256 currentIndex = getLiquidityIndex(asset);
 
         // Aave v3 semantics: Pool pulls underlying from msg.sender (the caller),
         // and mints aTokens to onBehalfOf.
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
-        deposits[msg.sender][asset] += amount;
-
-        // Mint aTokens to onBehalfOf (mint the same amount as deposited)
+        
+        // Calculate scaled amount to mint
+        uint256 scaledAmount = (amount * INITIAL_LIQUIDITY_INDEX) / currentIndex;
+        
         MockAToken aTokenContract = MockAToken(tokenToAToken[asset]);
-        // Get current balance to calculate new balance
-        uint256 currentBalance = aTokenContract.balanceOf(onBehalfOf);
-        aTokenContract.mint(onBehalfOf, amount);
-        // Verify the balance increased correctly
-        require(
-            aTokenContract.balanceOf(onBehalfOf) == currentBalance + amount,
-            'aToken mint failed'
-        );
+        aTokenContract.mint(onBehalfOf, scaledAmount);
 
         emit Supply(asset, onBehalfOf, amount, 0);
     }
@@ -62,32 +62,26 @@ contract MockAavePool {
         require(tokenToAToken[asset] != address(0), 'Token not supported');
 
         MockAToken aTokenContract = MockAToken(tokenToAToken[asset]);
+        uint256 currentIndex = getLiquidityIndex(asset);
 
-        // View calls first (checks)
-        // Aave v3 semantics: Pool burns aTokens from msg.sender (the module),
-        // and sends underlying to `to`.
-        uint256 aTokenBalance = aTokenContract.balanceOf(msg.sender);
-        require(amount <= aTokenBalance, 'Insufficient aToken balance');
+        // In Aave V3, 'amount' in withdraw is the amount of underlying requested.
+        // We calculate how many scaled tokens to burn.
+        uint256 scaledToBurn = (amount * INITIAL_LIQUIDITY_INDEX) / currentIndex;
+        
+        // Ensure msg.sender has enough scaled tokens
+        require(aTokenContract.scaledBalanceOf(msg.sender) >= scaledToBurn, 'Insufficient scaled balance');
 
-        // Calculate actual underlying amount with yield
-        uint256 actualAmount = _calculateWithYield(asset, amount);
+        // Burn scaled tokens
+        aTokenContract.burn(msg.sender, scaledToBurn);
 
         // Ensure we have enough tokens to transfer
         uint256 poolBalance = IERC20(asset).balanceOf(address(this));
-        require(poolBalance >= actualAmount, 'Insufficient pool balance');
+        require(poolBalance >= amount, 'Insufficient pool balance');
 
-        // State changes before external calls (effects)
-        // Track deposits by msg.sender (the module)
-        if (deposits[msg.sender][asset] >= amount) {
-            deposits[msg.sender][asset] -= amount;
-        }
+        IERC20(asset).safeTransfer(to, amount);
 
-        // External calls after state changes (interactions)
-        aTokenContract.burn(msg.sender, amount);
-        IERC20(asset).safeTransfer(to, actualAmount);
-
-        emit Withdraw(asset, to, actualAmount);
-        return actualAmount;
+        emit Withdraw(asset, to, amount);
+        return amount;
     }
 
     function getReserveData(address asset) external view returns (ReserveData memory) {
@@ -97,9 +91,7 @@ contract MockAavePool {
         return
             ReserveData({
                 configuration: ReserveConfigurationMap(0),
-                liquidityIndex: uint128(
-                    liquidityIndex[asset] > 0 ? liquidityIndex[asset] : INITIAL_LIQUIDITY_INDEX
-                ),
+                liquidityIndex: uint128(getLiquidityIndex(asset)),
                 currentLiquidityRate: 0,
                 variableBorrowIndex: 0,
                 currentVariableBorrowRate: 0,
@@ -128,11 +120,6 @@ contract MockAavePool {
             INITIAL_LIQUIDITY_INDEX;
     }
 
-    function _calculateWithYield(address token, uint256 amount) internal view returns (uint256) {
-        uint256 index = liquidityIndex[token] > 0 ? liquidityIndex[token] : INITIAL_LIQUIDITY_INDEX;
-        return (amount * index) / INITIAL_LIQUIDITY_INDEX;
-    }
-
     // ReserveData struct (simplified)
     struct ReserveData {
         ReserveConfigurationMap configuration;
@@ -159,7 +146,7 @@ contract MockAavePool {
 
 /**
  * @title MockAToken
- * @notice Mock aToken implementation
+ * @notice Mock aToken implementation that simulates rebasing balance
  */
 contract MockAToken is ERC20 {
     address public immutable underlyingAsset;
@@ -175,6 +162,24 @@ contract MockAToken is ERC20 {
 
     function setPool(address _pool) external {
         pool = MockAavePool(_pool);
+    }
+
+    /**
+     * @dev Returns the rebased balance (scaled balance * liquidity index)
+     */
+    function balanceOf(address account) public view override returns (uint256) {
+        uint256 scaledBalance = super.balanceOf(account);
+        if (address(pool) == address(0)) return scaledBalance;
+        
+        uint256 currentIndex = pool.getLiquidityIndex(underlyingAsset);
+        return (scaledBalance * currentIndex) / pool.INITIAL_LIQUIDITY_INDEX();
+    }
+
+    /**
+     * @dev Returns the non-rebased (scaled) balance
+     */
+    function scaledBalanceOf(address account) public view returns (uint256) {
+        return super.balanceOf(account);
     }
 
     function mint(address to, uint256 amount) external {

@@ -101,7 +101,7 @@ contract MockAaveConfigModule is ERC165, IYieldGenerationModule {
         uint256 withdrawn = MockAavePoolNormalizedIncome(pool).withdraw(token, amount, msg.sender);
         return (true, withdrawn, 0);
     }
-    function calculateYield(uint256, address) external pure override returns (uint256) {
+    function calculateYield(uint256, address, address) external pure override returns (uint256) {
         return 0;
     }
     function getApprovalTarget(address) external view override returns (address) {

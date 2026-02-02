@@ -245,7 +245,7 @@ contract AaveYieldGenerationModuleTest is Test {
         module.depositForYield(1, address(token), 0);
 
         assertTrue(module.escrowInAave(escrow, 1));
-        assertEq(module.escrowATokenBalance(escrow, 1), 0);
+        assertEq(module.escrowScaledBalance(escrow, 1), 0);
 
         vm.prank(escrow);
         (bool success, uint256 actual, uint256 yield) = module.withdrawWithYield(1, address(token), 0, escrow);
@@ -443,11 +443,11 @@ contract AaveYieldGenerationModuleTest is Test {
         _registerToken();
 
         // Escrow not in Aave
-        assertEq(module.calculateYield(99, address(token)), 0);
+        assertEq(module.calculateYield(99, address(token), escrow), 0);
 
         // Record escrow but with 0 balances (simulated)
         // We can't easily simulate this without internal access, but we can call with invalid token
-        assertEq(module.calculateYield(1, address(0x999)), 0);
+        assertEq(module.calculateYield(1, address(0x999), escrow), 0);
     }
 
     function test_getYieldStatistics() public {
@@ -708,11 +708,11 @@ contract AaveYieldGenerationModuleTest is Test {
         module.depositForYield(1, address(token), amount);
 
         vm.prank(escrow);
-        uint256 yield = module.calculateYield(1, address(token));
+        uint256 yield = module.calculateYield(1, address(token), escrow);
         assertEq(yield, 0);
 
         vm.prank(escrow);
-        assertEq(module.calculateYield(1, address(0x999)), 0);
+        assertEq(module.calculateYield(1, address(0x999), escrow), 0);
     }
 
     function test_GetApprovalTarget() public {

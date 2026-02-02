@@ -119,4 +119,10 @@ interface IYieldGenerationModuleV2 is IERC4626, IERC165 {
         uint256 originalAmount,
         address escrowContract
     ) external returns (bool success, uint256 actualAmount, uint256 yieldAmount);
+
+    function calculateYield(
+        uint256 workflowId,
+        address token,
+        address escrowContract
+    ) external view returns (uint256 yieldAmount);
 }

@@ -59,7 +59,7 @@ contract MockYieldGen is IYieldGenerationModule {
 
     function depositForYield(uint256, address, uint256) external pure returns (bool, uint256) { return (true, 0); }
     function withdrawWithYield(uint256, address, uint256, address) external pure returns (bool, uint256, uint256) { return (true, 0, 0); }
-    function calculateYield(uint256, address) external pure returns (uint256) { return 0; }
+    function calculateYield(uint256, address, address) external pure returns (uint256) { return 0; }
     function isTokenSupported(address) external view returns (bool) { return supported; }
     function getApprovalTarget(address) external view returns (address) { return pool; }
     function moduleName() external pure returns (string memory) { return "Mock"; }

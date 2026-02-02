@@ -57,8 +57,8 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
 
     // Token support mapping
     mapping(address => address) public tokenToAToken; // token => aToken address
-    mapping(address => uint256) public totalDepositedToAave; // token => total amount
-    mapping(address => uint256) public totalTrackedATokenBalance; // token => total aTokens tracked
+    mapping(address => uint256) public totalDepositedToAave; // token => total underlying amount
+    mapping(address => uint256) public totalScaledBalance; // token => total scaled shares (non-rebasing)
     
     // Aggregate yield tracking (for auditability)
     mapping(address => uint256) public totalYieldGenerated; // token => total yield generated (all time)
@@ -71,7 +71,7 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
 
     // Per-escrow tracking (escrow contract address => workflowId => data)
     mapping(address => mapping(uint256 => bool)) public escrowInAave; // escrowContract => workflowId => is in Aave
-    mapping(address => mapping(uint256 => uint256)) public escrowATokenBalance; // escrowContract => workflowId => aToken balance at deposit
+    mapping(address => mapping(uint256 => uint256)) public escrowScaledBalance; // escrowContract => workflowId => scaled balance (shares)
     mapping(address => mapping(uint256 => uint256)) public escrowOriginalDeposit; // escrowContract => workflowId => original deposit amount
     
     // ERC-4626 escrow-specific tracking (per-workflow share accounting)
@@ -188,25 +188,36 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         }
         // Else: EscrowableERC20 case - escrow contract approved pool directly, just call pool.supply
         
-        // Get aToken balance before deposit (for tracking the increase)
-        uint256 aTokenBalanceBefore = IAaveAToken(aToken).balanceOf(address(this));
+        // Get scaled balance before deposit (for tracking the increase in shares)
+        uint256 scaledBalanceBefore = IAaveAToken(aToken).scaledBalanceOf(address(this));
         
         // Deposit to Aave (referral code 0 = no referral)
         // We supply on behalf of this module so we can withdraw later
         aavePool.supply(token, amount, address(this), 0);
         
-        // Get aToken balance after deposit and calculate the increase for this deposit
-        uint256 aTokenBalanceAfter = IAaveAToken(aToken).balanceOf(address(this));
-        yieldTokenBalance = aTokenBalanceAfter > aTokenBalanceBefore ? aTokenBalanceAfter - aTokenBalanceBefore : amount;
+        // Get scaled balance after deposit and calculate the increase in shares for this deposit
+        uint256 scaledBalanceAfter = IAaveAToken(aToken).scaledBalanceOf(address(this));
+        uint256 mintedShares = scaledBalanceAfter > scaledBalanceBefore ? scaledBalanceAfter - scaledBalanceBefore : 0;
+        
+        // If scaledBalanceOf is not supported or returns 0 (unlikely for real aToken), 
+        // fall back to calculating from amount and liquidity index
+        if (mintedShares == 0 && amount > 0) {
+            uint256 index = aavePool.getReserveNormalizedIncome(token);
+            if (index > 0) {
+                mintedShares = (amount * 1e27) / index;
+            }
+        }
+        
+        yieldTokenBalance = amount; // Return underlying amount for compatibility
 
         // Track deposit
         escrowInAave[escrowContract][workflowId] = true;
-        escrowATokenBalance[escrowContract][workflowId] = yieldTokenBalance;
+        escrowScaledBalance[escrowContract][workflowId] = mintedShares;
         escrowOriginalDeposit[escrowContract][workflowId] = amount;
         totalDepositedToAave[token] += amount;
-        totalTrackedATokenBalance[token] += yieldTokenBalance;
+        totalScaledBalance[token] += mintedShares;
 
-        emit EscrowDepositedToAave(workflowId, token, amount, yieldTokenBalance);
+        emit EscrowDepositedToAave(workflowId, token, amount, mintedShares);
 
         return (true, yieldTokenBalance);
     }
@@ -241,78 +252,23 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
             return (true, originalAmount, 0); // Token mapping lost, return original
         }
 
-        uint256 trackedATokenBalance = escrowATokenBalance[escrowContract][workflowId];
+        uint256 trackedScaledBalance = escrowScaledBalance[escrowContract][workflowId];
         uint256 originalDeposit = escrowOriginalDeposit[escrowContract][workflowId];
 
-        // Get current aToken balance (may have increased due to yield accrual)
-        // Note: For multiple escrows, module holds total aToken balance for all escrows
-        // We should withdraw only this escrow's share, using tracked balance
+        // Get current aToken balance (includes accrued yield)
         uint256 currentATokenBalance = IAaveAToken(aToken).balanceOf(address(this));
         
-        // Determine withdrawal amount:
-        // 1. If aTokens exist (standard Aave), withdraw by aToken amount
-        // 2. If no aTokens (some mocks like MockAavePoolConfigurableIncome), withdraw by underlying amount
-        //    Use originalDeposit as base, but try to calculate current value if pool supports it
+        // Determine withdrawal amount based on shares (scaled balance)
         uint256 withdrawalAmount;
-        bool withdrawByUnderlying = false;
-        
-        if (currentATokenBalance > 0 && trackedATokenBalance > 0) {
-            // Standard case: calculate current underlying value including interest
-            // withdrawalAmount = (currentATokenBalance * trackedATokenBalance) / totalTrackedATokenBalance
-            withdrawalAmount = (currentATokenBalance * trackedATokenBalance) / totalTrackedATokenBalance[token];
+        if (currentATokenBalance > 0 && trackedScaledBalance > 0) {
+            // withdrawalAmount = (Total Aave Balance * Escrow Shares) / Total Shares
+            withdrawalAmount = (currentATokenBalance * trackedScaledBalance) / totalScaledBalance[token];
             if (withdrawalAmount > currentATokenBalance) {
                 withdrawalAmount = currentATokenBalance;
             }
-        } else if (trackedATokenBalance > 0) {
-            // Fallback: use tracked aToken balance
-            withdrawalAmount = trackedATokenBalance;
         } else {
-            // No aToken balance: some pools (like MockAavePoolConfigurableIncome) don't mint aTokens
-            // Try to get current underlying amount from pool (if it supports getUnderlyingAmount)
-            // Note: Some mocks track by msg.sender (module), not escrowContract
-            // Otherwise, calculate using normalized income
-            // If that fails, withdraw original deposit amount
-            bool foundAmount = false;
-            // Try getUnderlyingAmount with module address first (mocks track by msg.sender)
-            (bool successGetAmountModule, bytes memory amountDataModule) = address(aavePool).staticcall(
-                abi.encodeWithSignature("getUnderlyingAmount(address,address)", address(this), token)
-            );
-            if (successGetAmountModule && amountDataModule.length >= 32) {
-                uint256 underlyingAmount = abi.decode(amountDataModule, (uint256));
-                if (underlyingAmount > 0) {
-                    withdrawalAmount = underlyingAmount;
-                    foundAmount = true;
-                }
-            }
-            
-            // If that didn't work, try with escrowContract
-            if (!foundAmount) {
-                (bool successGetAmountEscrow, bytes memory amountDataEscrow) = address(aavePool).staticcall(
-                    abi.encodeWithSignature("getUnderlyingAmount(address,address)", escrowContract, token)
-                );
-                if (successGetAmountEscrow && amountDataEscrow.length >= 32) {
-                    uint256 underlyingAmount = abi.decode(amountDataEscrow, (uint256));
-                    if (underlyingAmount > 0) {
-                        withdrawalAmount = underlyingAmount;
-                        foundAmount = true;
-                    }
-                }
-            }
-            
-            if (!foundAmount) {
-                // Fallback: try getReserveNormalizedIncome
-                try aavePool.getReserveNormalizedIncome(token) returns (uint256 normalizedIncome) {
-                    // Calculate current underlying value: originalDeposit * normalizedIncome / RAY
-                    uint256 RAY = 1e27;
-                    uint256 currentValue = (originalDeposit * normalizedIncome) / RAY;
-                    withdrawalAmount = currentValue > 0 ? currentValue : originalDeposit;
-                    withdrawByUnderlying = true;
-                } catch {
-                    // Pool doesn't support either method, withdraw original deposit
-                    withdrawalAmount = originalDeposit;
-                    withdrawByUnderlying = true;
-                }
-            }
+            // Fallback for cases where scaled balance is zero or not used
+            withdrawalAmount = originalDeposit;
         }
 
         // Fix checks-effects-interactions pattern
@@ -331,33 +287,25 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         // Decode actual amount withdrawn
         actualAmount = abi.decode(returnData, (uint256));
 
-        // Slippage protection - validate actual amount meets minimum expected
-        // For aTokens, the actual amount should be close to the original deposit if we're withdrawing all aTokens
-        // Calculate expected minimum: we expect at least original deposit (no loss, only potential yield)
-        // Allow 0.1% slippage tolerance (10 basis points) for rounding/edge cases
-        uint256 slippageBps = 10; // 0.1% = 10 basis points  
+        // Slippage protection - allow 0.1% slippage
+        uint256 slippageBps = 10; 
         uint256 minimumAmount = originalDeposit * (10000 - slippageBps) / 10000;
         
         if (actualAmount < minimumAmount) {
-            // Slippage protection - actual withdrawal less than expected minimum
-            // Since withdrawal already succeeded, we log the issue but proceed
-            // This protects against significant losses while allowing edge cases
             emit AaveWithdrawalFailedEvent(workflowId, token);
-            // Could revert here, but that would require reverting the withdrawal (impossible)
-            // Better to clear state and let escrow proceed with actual amount received
         }
 
-        // Clear state AFTER successful withdrawal (checks-effects-interactions pattern)
+        // Clear state AFTER successful withdrawal
         escrowInAave[escrowContract][workflowId] = false;
-        escrowATokenBalance[escrowContract][workflowId] = 0;
+        escrowScaledBalance[escrowContract][workflowId] = 0;
         escrowOriginalDeposit[escrowContract][workflowId] = 0;
 
-        // Update total deposited (subtract original, not actual)
+        // Update total deposited and total scaled balance
         if (totalDepositedToAave[token] >= originalAmount) {
             totalDepositedToAave[token] -= originalAmount;
         }
-        if (totalTrackedATokenBalance[token] >= trackedATokenBalance) {
-            totalTrackedATokenBalance[token] -= trackedATokenBalance;
+        if (totalScaledBalance[token] >= trackedScaledBalance) {
+            totalScaledBalance[token] -= trackedScaledBalance;
         }
 
         // Reduce exposure (Phase 4)
@@ -382,15 +330,15 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
      * @notice Calculate current yield for an escrow
      * @param workflowId The escrow transfer ID
      * @param token Token address
+     * @param escrowContract Address of the escrow contract
      * @return yieldAmount Current yield amount
      * @dev Calculates yield by comparing current aToken value to original deposit
      */
     function calculateYield(
         uint256 workflowId,
-        address token
+        address token,
+        address escrowContract
     ) external view override returns (uint256 yieldAmount) {
-        address escrowContract = _msgSender(); // BaseEscrow contract calling this
-
         if (!escrowInAave[escrowContract][workflowId]) {
             return 0; // Not in Aave, no yield
         }
@@ -401,20 +349,20 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         }
 
         uint256 currentATokenBalance = IAaveAToken(aToken).balanceOf(address(this));
-        uint256 originalATokenBalance = escrowATokenBalance[escrowContract][workflowId];
+        uint256 trackedScaledBalance = escrowScaledBalance[escrowContract][workflowId];
         uint256 originalDeposit = escrowOriginalDeposit[escrowContract][workflowId];
 
-        if (originalATokenBalance == 0 || originalDeposit == 0) {
+        if (trackedScaledBalance == 0 || originalDeposit == 0) {
             return 0; // No tracking data
         }
 
         // Calculate current value of aTokens using the pool share logic
-        // estimatedCurrentValue = (Total Underlying * Escrow aTokens) / Total aTokens
-        uint256 totalTracked = totalTrackedATokenBalance[token];
-        if (totalTracked == 0) return 0;
+        // estimatedCurrentValue = (Total Underlying * Escrow Shares) / Total Shares
+        uint256 totalScaled = totalScaledBalance[token];
+        if (totalScaled == 0) return 0;
         
-        uint256 estimatedCurrentValue = (currentATokenBalance * originalATokenBalance) /
-            totalTracked;
+        uint256 estimatedCurrentValue = (currentATokenBalance * trackedScaledBalance) /
+            totalScaled;
 
         // Yield = estimated current value - original deposit
         if (estimatedCurrentValue > originalDeposit) {
@@ -837,7 +785,7 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
     ) public view returns (bool inAave, uint256 aTokenBalance, uint256 originalDeposit) {
         return (
             escrowInAave[escrowContract][workflowId],
-            escrowATokenBalance[escrowContract][workflowId],
+            escrowScaledBalance[escrowContract][workflowId],
             escrowOriginalDeposit[escrowContract][workflowId]
         );
     }
@@ -1029,36 +977,57 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
     }
 
     /**
-     * @notice Emergency withdraw funds from Aave (guardian only)
+     * @notice Emergency unwind funds from Aave (guardian only)
      * @param token Underlying token address
-     * @param amount aToken amount to withdraw
-     * @param to Address to receive underlying tokens (must be the escrow contract)
-     * @return withdrawnAmount Actual underlying amount withdrawn
+     * @param workflowId The escrow transfer ID to unwind
+     * @param escrowContract Address of the escrow contract (funds will be sent here)
+     * @return unwoundAmount Actual underlying amount unwound
+     * @dev Guardian can only trigger withdrawal back to the legitimate vault owner.
+     *      Must not be able to transfer money to arbitrary addresses.
      */
-    function emergencyWithdraw(
+    function emergencyUnwind(
         address token,
-        uint256 amount,
-        address to
-    ) external onlyRole(ROLE_GUARDIAN) returns (uint256 withdrawnAmount) {
-        if (to == address(0)) revert InvalidAddress(uint8(ADDR_RECIPIENT), to);
-        
-        // Ensure we are withdrawing to an authorized escrow contract
-        if (!hasRole(ROLE_ESCROW_CONTRACT, to)) {
-            revert NotAuthorized(to);
-        }
+        uint256 workflowId,
+        address escrowContract
+    ) external onlyRole(ROLE_GUARDIAN) returns (uint256 unwoundAmount) {
+        if (escrowContract == address(0)) revert InvalidAddress(uint8(ADDR_RECIPIENT), escrowContract);
+        if (!escrowInAave[escrowContract][workflowId]) return 0;
 
-        // Withdraw from Aave
-        // msg.sender is this module, which owns the aTokens
-        withdrawnAmount = aavePool.withdraw(token, amount, to);
+        uint256 trackedScaledBalance = escrowScaledBalance[escrowContract][workflowId];
+        uint256 originalDeposit = escrowOriginalDeposit[escrowContract][workflowId];
+        address aToken = tokenToAToken[token];
+
+        // Calculate underlying to withdraw based on shares
+        uint256 currentATokenBalance = IAaveAToken(aToken).balanceOf(address(this));
+        uint256 withdrawalAmount = (currentATokenBalance * trackedScaledBalance) / totalScaledBalance[token];
+
+        // Track scaled balance before and after to accurately update totalScaledBalance
+        uint256 scaledBalanceBefore = IAaveAToken(aToken).scaledBalanceOf(address(this));
+
+        // Withdraw from Aave - funds go STRICTLY back to the escrow vault
+        unwoundAmount = aavePool.withdraw(token, withdrawalAmount, escrowContract);
         
-        // Update global deposited tracking (best effort)
-        if (totalDepositedToAave[token] >= withdrawnAmount) {
-            totalDepositedToAave[token] -= withdrawnAmount;
+        uint256 scaledBalanceAfter = IAaveAToken(aToken).scaledBalanceOf(address(this));
+        uint256 burnedShares = scaledBalanceBefore > scaledBalanceAfter ? scaledBalanceBefore - scaledBalanceAfter : trackedScaledBalance;
+
+        // Clear escrow state
+        escrowInAave[escrowContract][workflowId] = false;
+        escrowScaledBalance[escrowContract][workflowId] = 0;
+        escrowOriginalDeposit[escrowContract][workflowId] = 0;
+
+        // Update global tracking
+        if (totalDepositedToAave[token] >= originalDeposit) {
+            totalDepositedToAave[token] -= originalDeposit;
+        }
+        if (totalScaledBalance[token] >= burnedShares) {
+            totalScaledBalance[token] -= burnedShares;
         }
         
         // Reduce exposure tracking
-        _reduceExposure(token, withdrawnAmount);
+        _reduceExposure(token, originalDeposit);
 
-        return withdrawnAmount;
+        emit EscrowWithdrawnFromAave(workflowId, token, originalDeposit, unwoundAmount, 0);
+
+        return unwoundAmount;
     }
 }

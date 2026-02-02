@@ -413,7 +413,7 @@ contract EscrowViewContract {
         // Try to query current yield from the generation module
         (address genMod, , , , , ,) = escrowContract.moduleSnapshots(workflowId);
         if (genMod != address(0) && genMod.code.length > 0) {
-            try IYieldGenerationModule(genMod).calculateYield(workflowId, token) returns (uint256 yield) {
+            try IYieldGenerationModule(genMod).calculateYield(workflowId, token, address(escrowContract)) returns (uint256 yield) {
                 metrics.accruedInterest = yield;
             } catch {}
         }

@@ -308,7 +308,8 @@ contract AavePauseSemantics is Test {
         // This contract has ROLE_GUARDIAN from setUp
         uint256 unwound = guardianOps.emergencyUnwindAavePosition(
             address(token),
-            guardianOps.MAX_UNWIND_AMOUNT_PER_CALL()
+            wid,
+            address(vault)
         );
 
         assertGt(unwound, 0, "Unwind should succeed");

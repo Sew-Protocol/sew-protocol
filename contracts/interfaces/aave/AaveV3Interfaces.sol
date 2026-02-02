@@ -19,6 +19,7 @@ interface IAavePool {
 
 interface IAaveAToken {
     function balanceOf(address account) external view returns (uint256);
+    function scaledBalanceOf(address account) external view returns (uint256);
     // Aave V3 canonical method (uppercase)
     function UNDERLYING_ASSET_ADDRESS() external view returns (address);
     // Fallback for some wrappers/forks (lowercase)
