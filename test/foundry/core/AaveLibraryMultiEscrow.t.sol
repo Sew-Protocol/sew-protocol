@@ -81,6 +81,7 @@ contract MockAavePoolNormalizedIncome {
  * It supplies pool + aToken addresses and claims token support.
  */
 contract MockAaveConfigModule is ERC165, IYieldGenerationModule {
+    using SafeERC20 for IERC20;
     address public pool;
     address public aToken;
 
@@ -89,12 +90,16 @@ contract MockAaveConfigModule is ERC165, IYieldGenerationModule {
         aToken = aToken_;
     }
 
-    // Not used in library pattern tests
-    function depositForYield(uint256, address, uint256) external pure override returns (bool, uint256) {
+    // Used in direct module pattern tests
+    function depositForYield(uint256, address token, uint256 amount) external override returns (bool, uint256) {
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+        IERC20(token).approve(pool, amount);
+        MockAavePoolNormalizedIncome(pool).supply(token, amount, address(this), 0);
         return (true, 0);
     }
-    function withdrawWithYield(uint256, address, uint256 amount) external pure override returns (bool, uint256, uint256) {
-        return (true, amount, 0);
+    function withdrawWithYield(uint256, address token, uint256 amount) external override returns (bool, uint256, uint256) {
+        uint256 withdrawn = MockAavePoolNormalizedIncome(pool).withdraw(token, amount, msg.sender);
+        return (true, withdrawn, 0);
     }
     function calculateYield(uint256, address) external pure override returns (uint256) {
         return 0;

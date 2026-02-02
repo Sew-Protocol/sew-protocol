@@ -15,6 +15,7 @@ import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/interfaces/IYieldGenerationModule.sol';
 
 contract MockLossyYieldModule is IYieldGenerationModule {
+    using SafeERC20 for IERC20;
     uint256 public lossAmount;
     bool public tokenSupported = true;
 
@@ -22,11 +23,14 @@ contract MockLossyYieldModule is IYieldGenerationModule {
         lossAmount = _loss;
     }
 
-    function depositForYield(uint256, address, uint256) external pure returns (bool, uint256) {
+    function depositForYield(uint256, address token, uint256 amount) external returns (bool, uint256) {
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
         return (true, 0);
     }
 
-    function withdrawWithYield(uint256, address, uint256 originalAmount) external view returns (bool, uint256, uint256) {
+    function withdrawWithYield(uint256, address token, uint256 originalAmount) external returns (bool, uint256, uint256) {
+        // Return full amount to vault but report the loss
+        IERC20(token).safeTransfer(msg.sender, originalAmount);
         return (true, originalAmount - lossAmount, 0);
     }
 

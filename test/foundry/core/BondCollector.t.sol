@@ -251,7 +251,9 @@ contract BondCollectorTest is Test {
     
     function test_collectBond_ERC20_success_noFee() public {
         uint256 bondAmount = 1000e18;
-        token.transfer(address(bondCollector), bondAmount);
+        token.transfer(escrowContract, bondAmount);
+        vm.prank(escrowContract);
+        token.approve(address(bondCollector), bondAmount);
         
         vm.prank(escrowContract);
         bool collected = bondCollector.collectBond(
@@ -276,7 +278,9 @@ contract BondCollectorTest is Test {
         uint256 expectedFee = (bondAmount * PROTOCOL_FEE_BPS) / 10000;
         uint256 expectedToModule = bondAmount - expectedFee;
         
-        token.transfer(address(bondCollector), bondAmount);
+        token.transfer(escrowContract, bondAmount);
+        vm.prank(escrowContract);
+        token.approve(address(bondCollector), bondAmount);
         
         vm.prank(escrowContract);
         bool collected = bondCollector.collectBond(
@@ -299,7 +303,9 @@ contract BondCollectorTest is Test {
     
     function test_collectBond_ERC20_zeroFeeAddress() public {
         uint256 bondAmount = 1000e18;
-        token.transfer(address(bondCollector), bondAmount);
+        token.transfer(escrowContract, bondAmount);
+        vm.prank(escrowContract);
+        token.approve(address(bondCollector), bondAmount);
         
         vm.prank(escrowContract);
         bool collected = bondCollector.collectBond(
@@ -321,7 +327,9 @@ contract BondCollectorTest is Test {
     
     function test_collectBond_ERC20_moduleCallFails() public {
         uint256 bondAmount = 1000e18;
-        token.transfer(address(bondCollector), bondAmount);
+        token.transfer(escrowContract, bondAmount);
+        vm.prank(escrowContract);
+        token.approve(address(bondCollector), bondAmount);
         
         incentiveModule.setRevert(true);
         
@@ -345,7 +353,9 @@ contract BondCollectorTest is Test {
     
     function test_collectBond_ERC20_zeroIncentiveModule() public {
         uint256 bondAmount = 1000e18;
-        token.transfer(address(bondCollector), bondAmount);
+        token.transfer(escrowContract, bondAmount);
+        vm.prank(escrowContract);
+        token.approve(address(bondCollector), bondAmount);
         
         vm.prank(escrowContract);
         bool collected = bondCollector.collectBond(
@@ -454,7 +464,9 @@ contract BondCollectorTest is Test {
         // Test with amount that causes rounding
         uint256 bondAmount = 1001; // Small amount
         uint256 feeBps = 333; // 3.33%
-        token.transfer(address(bondCollector), bondAmount);
+        token.transfer(escrowContract, bondAmount);
+        vm.prank(escrowContract);
+        token.approve(address(bondCollector), bondAmount);
         
         vm.prank(escrowContract);
         bool collected = bondCollector.collectBond(
