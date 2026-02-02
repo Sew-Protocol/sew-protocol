@@ -21,6 +21,9 @@ contract SilentFailureModule is IYieldGenerationModule {
     function withdrawWithYield(uint256, address, uint256, address) external pure override returns (bool success, uint256 actualAmount, uint256 yieldAmount) {
         return (true, 0, 0);
     }
+    function getPosition(uint256, address, address) external pure override returns (YieldPosition memory) {
+        return YieldPosition(false, 0, 0, 0);
+    }
     function calculateYield(uint256, address, address) external pure override returns (uint256) { return 0; }
     function isTokenSupported(address) external pure override returns (bool) { return true; }
     function getApprovalTarget(address) external pure override returns (address) { return address(0); }

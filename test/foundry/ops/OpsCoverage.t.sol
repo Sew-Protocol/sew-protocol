@@ -1355,6 +1355,9 @@ contract MockYieldGenerationModule is IYieldGenerationModule {
     }
 
     function depositForYield(uint256, address, uint256) external pure returns (bool, uint256) { return (true, 0); }
+    function getPosition(uint256, address, address) external pure returns (IYieldGenerationModule.YieldPosition memory) {
+        return IYieldGenerationModule.YieldPosition(false, 0, 0, 0);
+    }
     function calculateYield(uint256, address, address) external pure returns (uint256) { return 0; }
     function isTokenSupported(address) external pure returns (bool) { return true; }
     function getApprovalTarget(address) external pure returns (address) { return address(0); }

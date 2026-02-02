@@ -34,6 +34,9 @@ contract MockLossyYieldModule is IYieldGenerationModule {
         return (true, originalAmount - lossAmount, 0);
     }
 
+    function getPosition(uint256, address, address) external pure returns (IYieldGenerationModule.YieldPosition memory) {
+        return IYieldGenerationModule.YieldPosition(false, 0, 0, 0);
+    }
     function calculateYield(uint256, address, address) external pure returns (uint256) {
         return 0;
     }

@@ -121,6 +121,20 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
     // This is primarily for ERC4626 interface compatibility
     address private _singleUnderlyingAsset;
 
+    // Dust tracking per token
+    mapping(address => uint256) public protocolDust;
+    // Deficit tracking (negative dust absorbed by protocol)
+    mapping(address => uint256) public protocolDeficit;
+
+    // Events
+    event DustAccumulated(address indexed token, uint256 amount);
+    event DeficitAccumulated(address indexed token, uint256 amount);
+    event DustSwept(address indexed token, address indexed recipient, uint256 amount);
+
+    /**
+     * @notice Constructor
+     * @param initialOwner Initial admin address
+     */
     constructor(address initialOwner) 
         ERC4626(IERC20(address(0)))
         ERC20("Aave Yield Shares", "AAVE-SHARES") {
@@ -263,6 +277,12 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         if (currentATokenBalance > 0 && trackedScaledBalance > 0) {
             // withdrawalAmount = (Total Aave Balance * Escrow Shares) / Total Shares
             withdrawalAmount = (currentATokenBalance * trackedScaledBalance) / totalScaledBalance[token];
+            
+            // Ensure we withdraw at least 1 unit if shares exist (prevent rounding to 0)
+            if (withdrawalAmount == 0 && trackedScaledBalance > 0) {
+                withdrawalAmount = 1;
+            }
+
             if (withdrawalAmount > currentATokenBalance) {
                 withdrawalAmount = currentATokenBalance;
             }
@@ -287,14 +307,6 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         // Decode actual amount withdrawn
         actualAmount = abi.decode(returnData, (uint256));
 
-        // Slippage protection - allow 0.1% slippage
-        uint256 slippageBps = 10; 
-        uint256 minimumAmount = originalDeposit * (10000 - slippageBps) / 10000;
-        
-        if (actualAmount < minimumAmount) {
-            emit AaveWithdrawalFailedEvent(workflowId, token);
-        }
-
         // Clear state AFTER successful withdrawal
         escrowInAave[escrowContract][workflowId] = false;
         escrowScaledBalance[escrowContract][workflowId] = 0;
@@ -311,8 +323,38 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         // Reduce exposure (Phase 4)
         _reduceExposure(token, originalAmount);
 
-        // Calculate yield
-        yieldAmount = actualAmount > originalAmount ? actualAmount - originalAmount : 0;
+        // Dust & Yield Handling
+        // Dust is defined as rounding discrepancies <= 5 wei
+        uint256 dustThreshold = 5;
+
+        if (actualAmount >= originalAmount) {
+            yieldAmount = actualAmount - originalAmount;
+            // If yield is extremely tiny, it might be dust rather than actual yield
+            if (yieldAmount > 0 && yieldAmount <= dustThreshold) {
+                protocolDust[token] += yieldAmount;
+                emit DustAccumulated(token, yieldAmount);
+                yieldAmount = 0;
+                actualAmount = originalAmount;
+            }
+        } else {
+            uint256 shortfall = originalAmount - actualAmount;
+            if (shortfall <= dustThreshold) {
+                // Shortfall is within dust bounds. Try to cover with accumulated dust first.
+                if (protocolDust[token] >= shortfall) {
+                    protocolDust[token] -= shortfall;
+                } else {
+                    uint256 remainingShortfall = shortfall - protocolDust[token];
+                    protocolDust[token] = 0;
+                    protocolDeficit[token] += remainingShortfall;
+                    emit DeficitAccumulated(token, remainingShortfall);
+                }
+                actualAmount = originalAmount;
+                yieldAmount = 0;
+            } else {
+                yieldAmount = 0;
+                // Significant loss occurred
+            }
+        }
 
         // Update aggregate yield tracking (for auditability)
         if (yieldAmount > 0) {
@@ -324,6 +366,26 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         emit EscrowWithdrawnFromAave(workflowId, token, originalAmount, actualAmount, yieldAmount);
 
         return (true, actualAmount, yieldAmount);
+    }
+
+    /**
+     * @notice Get consolidated position data for an escrow
+     * @param workflowId The escrow transfer ID
+     * @param token Token address
+     * @param escrowContract Address of the escrow contract
+     * @return position Consolidated position data
+     */
+    function getPosition(
+        uint256 workflowId,
+        address token,
+        address escrowContract
+    ) external view override returns (YieldPosition memory position) {
+        position.isActive = escrowInAave[escrowContract][workflowId];
+        if (position.isActive) {
+            position.scaledShares = escrowScaledBalance[escrowContract][workflowId];
+            position.principal = escrowOriginalDeposit[escrowContract][workflowId];
+            position.currentYield = this.calculateYield(workflowId, token, escrowContract);
+        }
     }
 
     /**
@@ -572,12 +634,24 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
      * @param aToken Corresponding aToken address
      */
     /**
-     * @notice Register a token for Aave yield generation
-     * @param token ERC20 token address
+     * @notice Sweep accumulated dust (timelock only)
+     * @param token Token address
+     * @param recipient Recipient of the dust
+     */
+    function sweepDust(address token, address recipient) external onlyRole(ROLE_TIMELOCK) {
+        uint256 amount = protocolDust[token];
+        if (amount == 0) return;
+        
+        protocolDust[token] = 0;
+        IERC20(token).safeTransfer(recipient, amount);
+        
+        emit DustSwept(token, recipient, amount);
+    }
+
+    /**
+     * @notice Register a token and its corresponding aToken for Aave yield generation
+     * @param token Underlying token address
      * @param aToken Aave aToken address
-     * @dev Validates that the aToken's underlying asset matches the token
-     *      Tries UNDERLYING_ASSET_ADDRESS() first (Aave V3 standard), then falls back to underlyingAsset()
-     *      Uses staticcall with manual return data handling to avoid decode failures
      */
     function registerTokenForAave(address token, address aToken) public onlyRole(ROLE_TIMELOCK) {
         if (token == address(0)) {
@@ -1001,6 +1075,11 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         uint256 currentATokenBalance = IAaveAToken(aToken).balanceOf(address(this));
         uint256 withdrawalAmount = (currentATokenBalance * trackedScaledBalance) / totalScaledBalance[token];
 
+        // Ensure we withdraw at least 1 unit if shares exist (prevent rounding to 0)
+        if (withdrawalAmount == 0 && trackedScaledBalance > 0) {
+            withdrawalAmount = 1;
+        }
+
         // Track scaled balance before and after to accurately update totalScaledBalance
         uint256 scaledBalanceBefore = IAaveAToken(aToken).scaledBalanceOf(address(this));
 
@@ -1026,8 +1105,34 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         // Reduce exposure tracking
         _reduceExposure(token, originalDeposit);
 
-        emit EscrowWithdrawnFromAave(workflowId, token, originalDeposit, unwoundAmount, 0);
+        // Dust handling (5 wei threshold)
+        uint256 finalUnwound = unwoundAmount;
+        uint256 dustThreshold = 5;
 
-        return unwoundAmount;
+        if (unwoundAmount >= originalDeposit) {
+            uint256 excess = unwoundAmount - originalDeposit;
+            if (excess > 0 && excess <= dustThreshold) {
+                protocolDust[token] += excess;
+                emit DustAccumulated(token, excess);
+                finalUnwound = originalDeposit;
+            }
+        } else {
+            uint256 shortfall = originalDeposit - unwoundAmount;
+            if (shortfall <= dustThreshold) {
+                if (protocolDust[token] >= shortfall) {
+                    protocolDust[token] -= shortfall;
+                } else {
+                    uint256 remainingShortfall = shortfall - protocolDust[token];
+                    protocolDust[token] = 0;
+                    protocolDeficit[token] += remainingShortfall;
+                    emit DeficitAccumulated(token, remainingShortfall);
+                }
+                finalUnwound = originalDeposit;
+            }
+        }
+
+        emit EscrowWithdrawnFromAave(workflowId, token, originalDeposit, finalUnwound, 0);
+
+        return finalUnwound;
     }
 }

@@ -14,6 +14,18 @@ contract MockAToken {
         underlyingAsset = underlying;
     }
 
+    function scaledBalanceOf(address account) external view returns (uint256) {
+        return balanceOf[account];
+    }
+
+    function UNDERLYING_ASSET_ADDRESS() external view returns (address) {
+        return underlyingAsset;
+    }
+
+    function decimals() external pure returns (uint8) {
+        return 18;
+    }
+
     function mint(address to, uint256 amount) external {
         balanceOf[to] += amount;
     }
@@ -35,6 +47,14 @@ contract MockPool {
     function setYieldBps(address asset, uint256 bps) external {
         require(bps <= 10_000, "bps");
         yieldBps[asset] = bps;
+    }
+
+    function getLiquidityIndex(address /* asset */) public pure returns (uint256) {
+        return 1e27;
+    }
+
+    function INITIAL_LIQUIDITY_INDEX() external pure returns (uint256) {
+        return 1e27;
     }
 
     // Mimic a simple "supply": pull underlying from msg.sender, mint aTokens to onBehalfOf 1:1.
@@ -83,6 +103,14 @@ contract MockPoolEscrowPull {
     function setYieldBps(address asset, uint256 bps) external {
         require(bps <= 10_000, "bps");
         yieldBps[asset] = bps;
+    }
+
+    function getLiquidityIndex(address /* asset */) public pure returns (uint256) {
+        return 1e27;
+    }
+
+    function INITIAL_LIQUIDITY_INDEX() external pure returns (uint256) {
+        return 1e27;
     }
 
     function supply(address asset, uint256 amount, address onBehalfOf, uint16) external {

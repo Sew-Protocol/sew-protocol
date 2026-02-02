@@ -159,6 +159,17 @@ contract AaveInvariants is Test {
 
         // Fund pool
         token.mint(address(pool), 10_000_000 ether);
+
+        // Target core contracts for fuzzing
+        targetContract(address(vault));
+        targetContract(address(aaveModule));
+        targetContract(address(mm));
+        
+        // Exclude mocks from being targeted directly by fuzzer
+        excludeContract(address(token));
+        excludeContract(address(aToken));
+        excludeContract(address(pool));
+        excludeContract(address(provider));
     }
 
     /**

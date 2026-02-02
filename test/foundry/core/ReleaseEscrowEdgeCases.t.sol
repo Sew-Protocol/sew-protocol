@@ -495,6 +495,14 @@ contract MockYieldGenForEdgeCases is IYieldGenerationModule {
         return (false, actualAmount, 0);
     }
 
+    function getPosition(
+        uint256 /* workflowId */,
+        address /* token */,
+        address /* escrowContract */
+    ) external view override returns (YieldPosition memory) {
+        return YieldPosition(true, 0, 0, yieldAmount);
+    }
+
     function calculateYield(
         uint256 /* workflowId */,
         address /* token */,

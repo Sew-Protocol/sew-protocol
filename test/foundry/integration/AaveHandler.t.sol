@@ -53,6 +53,7 @@ contract AaveHandler is CommonBase, StdCheats, StdUtils {
         vm.startPrank(user);
         token.approve(address(vault), amount);
         
+        uint256 claimableBefore = vault.totalClaimableAssets(address(token));
         uint256 workflowId = vault.createEscrow(
             address(token),
             recipient,
@@ -66,6 +67,11 @@ contract AaveHandler is CommonBase, StdCheats, StdUtils {
         );
         vm.stopPrank();
         
+        uint256 claimableAfter = vault.totalClaimableAssets(address(token));
+        if (claimableAfter > claimableBefore) {
+            totalClaimable += (claimableAfter - claimableBefore);
+        }
+        
         activeWorkflows.push(workflowId);
     }
     
@@ -74,20 +80,23 @@ contract AaveHandler is CommonBase, StdCheats, StdUtils {
         uint256 index = bound(workflowIndex, 0, activeWorkflows.length - 1);
         uint256 workflowId = activeWorkflows[index];
         
-        (address token_, address to, address from, , uint256 principal, , , EscrowState state, , ) = vault.escrowTransfers(workflowId);
+        (address token_, , address from, , , , , EscrowState state, , ) = vault.escrowTransfers(workflowId);
         if (state != EscrowState.PENDING) return;
         
-        uint256 balanceBefore = token.balanceOf(to);
+        uint256 claimableBefore = vault.totalClaimableAssets(token_);
         vm.prank(from);
         vault.releaseEscrowTransfer(workflowId);
-        uint256 balanceAfter = token.balanceOf(to);
+        uint256 claimableAfter = vault.totalClaimableAssets(token_);
         
-        // If balance didn't increase by principal, it must have gone to claimable
-        if (balanceAfter < balanceBefore + principal) {
-            totalClaimable += (principal - (balanceAfter - balanceBefore));
+        if (claimableAfter > claimableBefore) {
+            totalClaimable += (claimableAfter - claimableBefore);
         }
         
-        _removeWorkflow(index);
+        // Remove from active if no longer pending
+        (, , , , , , , EscrowState newState, , ) = vault.escrowTransfers(workflowId);
+        if (newState != EscrowState.PENDING) {
+            _removeWorkflow(index);
+        }
     }
 
     function withdrawClaimable(uint256 userIndex, uint256 workflowId) public {
@@ -95,9 +104,60 @@ contract AaveHandler is CommonBase, StdCheats, StdUtils {
         uint256 amount = vault.claimableBalances(workflowId, user);
         if (amount == 0) return;
         
+        uint256 claimableBefore = vault.totalClaimableAssets(address(token));
         vm.prank(user);
         vault.withdrawEscrow(workflowId);
-        totalClaimable -= amount;
+        uint256 claimableAfter = vault.totalClaimableAssets(address(token));
+        
+        if (claimableBefore > claimableAfter) {
+            totalClaimable -= (claimableBefore - claimableAfter);
+        }
+    }
+
+    function senderCancel(uint256 workflowIndex) public {
+        if (activeWorkflows.length == 0) return;
+        uint256 index = bound(workflowIndex, 0, activeWorkflows.length - 1);
+        uint256 workflowId = activeWorkflows[index];
+        
+        (address token_, , address from, , , , , EscrowState state, , ) = vault.escrowTransfers(workflowId);
+        if (state != EscrowState.PENDING) return;
+        
+        uint256 claimableBefore = vault.totalClaimableAssets(token_);
+        vm.prank(from);
+        vault.senderCancel(workflowId);
+        
+        uint256 claimableAfter = vault.totalClaimableAssets(token_);
+        if (claimableAfter > claimableBefore) {
+            totalClaimable += (claimableAfter - claimableBefore);
+        }
+        
+        (, , , , , , , EscrowState newState, , ) = vault.escrowTransfers(workflowId);
+        if (newState != EscrowState.PENDING) {
+            _removeWorkflow(index);
+        }
+    }
+    
+    function recipientCancel(uint256 workflowIndex) public {
+        if (activeWorkflows.length == 0) return;
+        uint256 index = bound(workflowIndex, 0, activeWorkflows.length - 1);
+        uint256 workflowId = activeWorkflows[index];
+        
+        (address token_, address to, , , , , , EscrowState state, , ) = vault.escrowTransfers(workflowId);
+        if (state != EscrowState.PENDING) return;
+        
+        uint256 claimableBefore = vault.totalClaimableAssets(token_);
+        vm.prank(to);
+        vault.recipientCancel(workflowId);
+        
+        uint256 claimableAfter = vault.totalClaimableAssets(token_);
+        if (claimableAfter > claimableBefore) {
+            totalClaimable += (claimableAfter - claimableBefore);
+        }
+
+        (, , , , , , , EscrowState newState, , ) = vault.escrowTransfers(workflowId);
+        if (newState != EscrowState.PENDING) {
+            _removeWorkflow(index);
+        }
     }
     
     function accrueInterest(uint256 blocks) public {

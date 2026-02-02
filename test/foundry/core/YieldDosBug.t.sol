@@ -26,6 +26,9 @@ contract OverreportingModule is IYieldGenerationModule {
         // Report 1000 ether EXTRA yield but don't transfer any tokens for it
         return (true, originalAmount + 1000 ether, 1000 ether);
     }
+    function getPosition(uint256, address, address) external pure override returns (YieldPosition memory) {
+        return YieldPosition(false, 0, 0, 0);
+    }
     function calculateYield(uint256, address, address) external pure override returns (uint256) { return 0; }
     function isTokenSupported(address) external pure override returns (bool) { return true; }
     function getApprovalTarget(address) external pure override returns (address) { return address(0); }

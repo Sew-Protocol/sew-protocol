@@ -38,6 +38,22 @@ contract DefaultYieldModule is IYieldGenerationModule, ERC165 {
     }
 
     /**
+     * @notice Get empty position
+     */
+    function getPosition(
+        uint256 /* workflowId */,
+        address /* token */,
+        address /* escrowContract */
+    ) external pure override returns (YieldPosition memory position) {
+        return YieldPosition({
+            isActive: false,
+            scaledShares: 0,
+            principal: 0,
+            currentYield: 0
+        });
+    }
+
+    /**
      * @notice Calculate yield (returns 0)
      */
     function calculateYield(

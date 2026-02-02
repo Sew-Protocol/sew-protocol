@@ -39,6 +39,26 @@ interface IYieldGenerationModule is IERC165 {
         address escrowContract
     ) external returns (bool success, uint256 actualAmount, uint256 yieldAmount);
 
+    struct YieldPosition {
+        bool isActive;
+        uint256 scaledShares;
+        uint256 principal;
+        uint256 currentYield;
+    }
+
+    /**
+     * @notice Get consolidated position data for an escrow
+     * @param workflowId The escrow transfer ID
+     * @param token Token address
+     * @param escrowContract Address of the escrow contract
+     * @return position Consolidated position data
+     */
+    function getPosition(
+        uint256 workflowId,
+        address token,
+        address escrowContract
+    ) external view returns (YieldPosition memory position);
+
     /**
      * @notice Calculate current yield for an escrow
      * @param workflowId The escrow transfer ID

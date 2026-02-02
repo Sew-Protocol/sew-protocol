@@ -117,6 +117,64 @@ contract MockAavePoolConfigurableIncome {
         uint256 scaled = scaledShares[account][asset];
         underlyingAmount = (scaled * income) / RAY;
     }
+
+    function getLiquidityIndex(address asset) public view returns (uint256) {
+        uint256 income = normalizedIncome[asset];
+        if (income == 0 || income < MIN_NORMALIZED_INCOME) {
+            return RAY; // Fallback to 1.0
+        }
+        return income;
+    }
+
+    function INITIAL_LIQUIDITY_INDEX() external pure returns (uint256) {
+        return RAY;
+    }
+
+    function getReserveData(address asset) external view returns (ReserveData memory) {
+        address aTokenAddr = tokenToAToken[asset];
+        require(aTokenAddr != address(0), "Token not supported");
+
+        return ReserveData({
+            configuration: ReserveConfigurationMap(0),
+            liquidityIndex: uint128(getLiquidityIndex(asset)),
+            currentLiquidityRate: 0,
+            variableBorrowIndex: 0,
+            currentVariableBorrowRate: 0,
+            currentStableBorrowRate: 0,
+            lastUpdateTimestamp: 0,
+            id: 0,
+            aTokenAddress: aTokenAddr,
+            stableDebtTokenAddress: address(0),
+            variableDebtTokenAddress: address(0),
+            interestRateStrategyAddress: address(0),
+            accruedToTreasury: 0,
+            unbacked: 0,
+            isolationModeTotalDebt: 0
+        });
+    }
+
+    // ReserveData struct (simplified to match IAavePool)
+    struct ReserveData {
+        ReserveConfigurationMap configuration;
+        uint128 liquidityIndex;
+        uint128 currentLiquidityRate;
+        uint128 variableBorrowIndex;
+        uint128 currentVariableBorrowRate;
+        uint128 currentStableBorrowRate;
+        uint40 lastUpdateTimestamp;
+        uint16 id;
+        address aTokenAddress;
+        address stableDebtTokenAddress;
+        address variableDebtTokenAddress;
+        address interestRateStrategyAddress;
+        uint128 accruedToTreasury;
+        uint128 unbacked;
+        uint128 isolationModeTotalDebt;
+    }
+
+    struct ReserveConfigurationMap {
+        uint256 data;
+    }
 }
 
 /**
