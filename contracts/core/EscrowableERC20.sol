@@ -276,7 +276,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         }
         
         uint256 balBefore = balanceOf(address(this));
-        (bool success, ) = generationModule.depositForYield(workflowId, token, amount);
+        (bool success, ) = generationModule.depositForYield(workflowId, token, amount, address(this));
         uint256 balAfter = balanceOf(address(this));
 
         if (!success || balBefore - balAfter < amount) {

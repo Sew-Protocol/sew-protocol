@@ -31,7 +31,7 @@ import '../YieldOps.sol';
 import '../DisputeOps.sol';
 import '../SettlementOps.sol';
 import '../CreateOps.sol';
-import '../decentralized-resolution-module/IIncentiveModule.sol';
+import '../modules/decentralized-resolution-module/IIncentiveModule.sol';
 import './BondCollector.sol';
 import '../libraries/ModuleSnapshotLibrary.sol';
 import '../libraries/BondHandlingLibrary.sol';
@@ -51,7 +51,7 @@ enum FailureReason {
 // - If success == false: reasonCode is a FailureReason value.
 
 bytes4 constant SEL_FINALIZE_DISPUTE = bytes4(keccak256("finalizeDispute(uint256)"));
-bytes4 constant SEL_RECORD_RESOLUTION = bytes4(keccak256("recordResolution(uint256,address,uint8,uint256)"));
+bytes4 constant SEL_RECORD_RESOLUTION = bytes4(keccak256("recordResolution(uint256,address,address,uint8,uint256)"));
 
 error InvalidWorkflowId(uint256 workflowId, uint256 maxWorkflowId);
 error TransferNotPending(uint256 workflowId, EscrowState currentStatus);
@@ -614,7 +614,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
             et.amountAfterFee
         );
         (bool bondQuerySuccess, uint256 bondAmount, address bondToken) = DisputeEscalationLibrary.queryAppealBond(
-            resolutionModule,
+            address(resolutionModule),
             workflowId,
             result.currentLevel,
             escrowData
@@ -805,7 +805,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
                 et.amountAfterFee
             );
             (bool success, bytes memory data) = snap.staticcall(
-                abi.encodeWithSelector(IResolutionModule.isAuthorizedDisputeResolver.selector, workflowId, disputeResolver, escrowData)
+                abi.encodeWithSelector(IResolutionModule.isAuthorizedDisputeResolver.selector, workflowId, address(this), disputeResolver, escrowData)
             );
             if (success && data.length >= 64) {
                 (bool authorized, ) = abi.decode(data, (bool, uint8));
@@ -1134,11 +1134,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         }
     }
 
-    enum ResolutionOutcome {
-        NONE, // 0 - No resolution yet
-        RELEASE, // 1 - Funds released to recipient
-        CANCEL // 2 - Funds refunded to sender
-    }
+    // ResolutionOutcome enum removed - using version from EscrowTypes.sol
 
     function _recordResolutionOutcome(
         uint256 workflowId,
@@ -1156,6 +1152,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
             abi.encodeWithSelector(
                 SEL_RECORD_RESOLUTION,
                 workflowId,
+                address(this),
                 disputeResolver,
                 uint8(outcome),
                 resolutionTime

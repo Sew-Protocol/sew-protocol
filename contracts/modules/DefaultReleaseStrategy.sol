@@ -15,6 +15,7 @@ contract DefaultReleaseStrategy is IReleaseStrategy, ERC165 {
      */
     function canRelease(
         uint256 /* workflowId */,
+        address /* escrowContract */,
         address /* caller */,
         bytes calldata /* escrowData */
     ) external pure override returns (bool allowed, string memory reason) {
@@ -29,6 +30,7 @@ contract DefaultReleaseStrategy is IReleaseStrategy, ERC165 {
      */
     function executeRelease(
         uint256 /* workflowId */,
+        address /* escrowContract */,
         bytes calldata /* escrowData */
     ) external pure override returns (bool success, address recipient, uint256 amount) {
         // This is a placeholder - actual release logic handled by main contract

@@ -88,7 +88,7 @@ contract EscrowVault is BaseEscrow {
         }
         
         uint256 balBefore = IERC20(token).balanceOf(address(this));
-        (bool success, ) = generationModule.depositForYield(workflowId, token, amount);
+        (bool success, ) = generationModule.depositForYield(workflowId, token, amount, address(this));
         uint256 balAfter = IERC20(token).balanceOf(address(this));
 
         if (!success || balBefore - balAfter < amount) {

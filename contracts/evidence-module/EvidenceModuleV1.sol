@@ -33,8 +33,8 @@ contract EvidenceModuleV1 is IEvidenceModule, AccessControlUpgradeable, Reentran
         uint256 submittedAt; // Timestamp
     }
 
-    // Per-dispute evidence storage
-    mapping(uint256 => EvidenceRecord[]) public disputeEvidence;
+    // Evidence storage: escrowContract => workflowId => EvidenceRecord[]
+    mapping(address => mapping(uint256 => EvidenceRecord[])) public disputeEvidence;
 
     // Configuration
     uint256 public maxEvidencePerDispute; // Max evidence submissions per dispute (default: 20)
@@ -110,37 +110,39 @@ contract EvidenceModuleV1 is IEvidenceModule, AccessControlUpgradeable, Reentran
     /**
      * @notice Submit evidence for a dispute
      * @param workflowId The escrow workflow ID
+     * @param _escrowContract Address of the escrow contract
      * @param evidenceHash Hash of evidence content (keccak256)
      * @param metadata Additional metadata (IPFS hash, document type, etc.) - emitted only
      * @return evidenceId Unique evidence ID for this dispute (0-indexed)
      */
     function submitEvidence(
         uint256 workflowId,
+        address _escrowContract,
         bytes32 evidenceHash,
         string calldata metadata
-    ) external nonReentrant returns (uint256 evidenceId) {
+    ) external nonReentrant override returns (uint256 evidenceId) {
         // Check access control
         // Note: escrowData not available here, will check via other means
-        (bool allowed, string memory reason) = _canSubmitEvidenceInternal(workflowId, _msgSender());
+        (bool allowed, string memory reason) = _canSubmitEvidenceInternal(workflowId, _escrowContract, _msgSender());
         require(allowed, reason);
 
         // Check limit
-        uint256 currentCount = disputeEvidence[workflowId].length;
+        uint256 currentCount = disputeEvidence[_escrowContract][workflowId].length;
         require(currentCount < maxEvidencePerDispute, 'Evidence limit reached');
 
         // Check for duplicates (same hash by same submitter)
         // Note: Different submitters can submit same hash (e.g., same document)
         for (uint256 i = 0; i < currentCount; i++) {
             if (
-                disputeEvidence[workflowId][i].hash == evidenceHash &&
-                disputeEvidence[workflowId][i].submitter == _msgSender()
+                disputeEvidence[_escrowContract][workflowId][i].hash == evidenceHash &&
+                disputeEvidence[_escrowContract][workflowId][i].submitter == _msgSender()
             ) {
                 revert('Duplicate evidence');
             }
         }
 
         // Store evidence
-        disputeEvidence[workflowId].push(
+        disputeEvidence[_escrowContract][workflowId].push(
             EvidenceRecord({
                 hash: evidenceHash,
                 submitter: _msgSender(),
@@ -157,12 +159,16 @@ contract EvidenceModuleV1 is IEvidenceModule, AccessControlUpgradeable, Reentran
 
     /**
      * @notice Get all evidence for a dispute
+     * @param workflowId The escrow workflow ID
+     * @param _escrowContract Address of the escrow contract
      */
     function getEvidence(
-        uint256 workflowId
+        uint256 workflowId,
+        address _escrowContract
     )
         external
         view
+        override
         returns (
             bytes32[] memory hashes,
             address[] memory submitters,
@@ -170,7 +176,7 @@ contract EvidenceModuleV1 is IEvidenceModule, AccessControlUpgradeable, Reentran
             string[] memory metadata
         )
     {
-        EvidenceRecord[] memory evidence = disputeEvidence[workflowId];
+        EvidenceRecord[] memory evidence = disputeEvidence[_escrowContract][workflowId];
         uint256 count = evidence.length;
 
         hashes = new bytes32[](count);
@@ -187,23 +193,30 @@ contract EvidenceModuleV1 is IEvidenceModule, AccessControlUpgradeable, Reentran
 
     /**
      * @notice Get evidence count
+     * @param workflowId The escrow workflow ID
+     * @param _escrowContract Address of the escrow contract
      */
-    function getEvidenceCount(uint256 workflowId) external view returns (uint256 count) {
-        return disputeEvidence[workflowId].length;
+    function getEvidenceCount(uint256 workflowId, address _escrowContract) external view override returns (uint256 count) {
+        return disputeEvidence[_escrowContract][workflowId].length;
     }
 
     /**
      * @notice Get specific evidence record
+     * @param workflowId The escrow workflow ID
+     * @param _escrowContract Address of the escrow contract
+     * @param evidenceId Unique evidence ID
      */
     function getEvidenceRecord(
         uint256 workflowId,
+        address _escrowContract,
         uint256 evidenceId
     )
         external
         view
+        override
         returns (bytes32 hash, address submitter, uint256 submittedAt, string memory metadata)
     {
-        EvidenceRecord[] memory evidence = disputeEvidence[workflowId];
+        EvidenceRecord[] memory evidence = disputeEvidence[_escrowContract][workflowId];
         require(evidenceId < evidence.length, 'Invalid evidence ID');
 
         EvidenceRecord memory record = evidence[evidenceId];
@@ -212,9 +225,13 @@ contract EvidenceModuleV1 is IEvidenceModule, AccessControlUpgradeable, Reentran
 
     /**
      * @notice Check if evidence submission is allowed (internal, without escrowData)
+     * @param workflowId The escrow workflow ID
+     * @param _escrowContract Address of the escrow contract
+     * @param submitter Address attempting to submit
      */
     function _canSubmitEvidenceInternal(
         uint256 workflowId,
+        address _escrowContract,
         address submitter
     ) internal view returns (bool allowed, string memory reason) {
         // Check if anyone can submit
@@ -226,7 +243,7 @@ contract EvidenceModuleV1 is IEvidenceModule, AccessControlUpgradeable, Reentran
         if (resolutionModule != address(0)) {
             bytes memory emptyEscrowData;
             try
-                IResolutionModule(resolutionModule).getDisputeResolver(workflowId, emptyEscrowData)
+                IResolutionModule(resolutionModule).getDisputeResolver(workflowId, _escrowContract, emptyEscrowData)
             returns (address resolver, uint8) {
                 if (submitter == resolver) {
                     return (true, '');
@@ -241,6 +258,10 @@ contract EvidenceModuleV1 is IEvidenceModule, AccessControlUpgradeable, Reentran
 
     /**
      * @notice Check if evidence submission is allowed
+     * @param workflowId The escrow workflow ID
+     * @param _escrowContract Address of the escrow contract
+     * @param submitter Address attempting to submit
+     * @param escrowData Encoded escrow data
      * @dev Validates:
      *      1. Participant (buyer/seller) - always allowed
      *      2. Current resolver - allowed if assigned
@@ -249,9 +270,10 @@ contract EvidenceModuleV1 is IEvidenceModule, AccessControlUpgradeable, Reentran
      */
     function canSubmitEvidence(
         uint256 workflowId,
+        address _escrowContract,
         address submitter,
         bytes calldata escrowData
-    ) public view returns (bool allowed, string memory reason) {
+    ) public view override returns (bool allowed, string memory reason) {
         // Check if anyone can submit
         if (allowAnyoneSubmit) {
             return (true, '');
@@ -273,7 +295,7 @@ contract EvidenceModuleV1 is IEvidenceModule, AccessControlUpgradeable, Reentran
         // Check if submitter is current resolver
         if (resolutionModule != address(0)) {
             try
-                IResolutionModule(resolutionModule).getDisputeResolver(workflowId, escrowData)
+                IResolutionModule(resolutionModule).getDisputeResolver(workflowId, _escrowContract, escrowData)
             returns (address resolver, uint8) {
                 if (submitter == resolver) {
                     return (true, '');
@@ -286,8 +308,10 @@ contract EvidenceModuleV1 is IEvidenceModule, AccessControlUpgradeable, Reentran
 
     /**
      * @notice Callback when dispute is opened
+     * @param workflowId The escrow workflow ID
+     * @param _escrowContract Address of the escrow contract
      */
-    function onDisputeOpened(uint256 workflowId) external onlyEscrowContract {
+    function onDisputeOpened(uint256 workflowId, address _escrowContract) external override onlyEscrowContract {
         // Optional: Initialize dispute-specific state
         // For now, no-op (evidence array initialized on first submission)
     }

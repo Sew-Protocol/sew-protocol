@@ -77,6 +77,7 @@ contract YieldOps is AccessControl {
         address feeRecipient,
         bytes memory distributionData
     ) external onlyRole(ROLE_ESCROW_CONTRACT) returns (DistributionResult memory result) {
+        address escrowContract = _msgSender();
         result.success = true;
         result.distributedAmount = 0;
         result.failureReason = '';
@@ -98,7 +99,7 @@ contract YieldOps is AccessControl {
         }
 
         if (yieldToDistribute > 0 && address(distModule) != address(0)) {
-            try this._distributeYieldInternal(distModule, workflowId, token, yieldToDistribute, distributionData) {
+            try this._distributeYieldInternal(distModule, workflowId, escrowContract, token, yieldToDistribute, distributionData) {
                 emit YieldDistributed(workflowId, token, yieldToDistribute);
                 result.distributedAmount = yieldToDistribute;
                 return result;
@@ -149,6 +150,7 @@ contract YieldOps is AccessControl {
         address /* feeRecipient */,
         bytes memory /* distributionData */
     ) external onlyRole(ROLE_ESCROW_CONTRACT) returns (YieldResult memory result) {
+        address escrowContract = _msgSender();
         result.actualAmount = amount;
         result.yield = 0;
         result.yieldDistributed = 0;
@@ -159,7 +161,7 @@ contract YieldOps is AccessControl {
 
         uint256 balBefore = IERC20(token).balanceOf(address(this));
 
-        try genModule.withdrawWithYield(workflowId, token, amount, _msgSender()) returns (
+        try genModule.withdrawWithYield(workflowId, token, amount, escrowContract) returns (
             bool withdrawSuccess,
             uint256 actualAmountWithdrawn,
             uint256 /* yieldGenerated */
@@ -177,7 +179,7 @@ contract YieldOps is AccessControl {
                 // CRIT-2 FIX: Forward any tokens actually received to the caller (Vault)
                 // This maintains the Push Model while being robust to module behavior
                 if (received > 0) {
-                    IERC20(token).safeTransfer(_msgSender(), received);
+                    IERC20(token).safeTransfer(escrowContract, received);
                 }
             } else {
                 result.success = false;
@@ -199,6 +201,7 @@ contract YieldOps is AccessControl {
     function _distributeYieldInternal(
         IYieldDistributionModule distModule,
         uint256 workflowId,
+        address escrowContract,
         address token,
         uint256 yieldAmount,
         bytes memory distributionData
@@ -206,7 +209,7 @@ contract YieldOps is AccessControl {
         if (_msgSender() != address(this)) revert InternalOnly(_msgSender());
         if (yieldAmount == 0) return;
         IERC20(token).safeTransfer(address(distModule), yieldAmount);
-        (bool success, uint256 distributedAmount) = distModule.distributeYield(workflowId, token, yieldAmount, distributionData);
+        (bool success, uint256 distributedAmount) = distModule.distributeYield(workflowId, escrowContract, token, yieldAmount, distributionData);
         if (!success) revert DistributionFailed(workflowId, token, yieldAmount);
         if (distributedAmount < yieldAmount) {
              emit YieldDistributionFailed(workflowId, token, yieldAmount - distributedAmount, 'Partial distribution');

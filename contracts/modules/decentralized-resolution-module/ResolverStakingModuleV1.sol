@@ -151,8 +151,8 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
     // Tier tracking
     mapping(address => uint8) public resolverTier; // 0 = resolver, 1 = senior
 
-    // Locked stakes (per dispute)
-    mapping(uint256 => mapping(address => uint256)) public lockedStakes; // workflowId => resolver => locked amount
+    // Locked stake tracking (for active disputes)
+    mapping(address => mapping(uint256 => mapping(address => uint256))) public lockedStakes; // escrowContract => workflowId => resolver => locked amount
     mapping(address => uint256) public totalLockedStake; // Total locked across all disputes
 
     // Slashing module reference (for freeze checks)
@@ -590,17 +590,22 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
     /**
      * @notice Lock stake when resolver is assigned to dispute
      * @param workflowId Dispute ID
+     * @param escrowContract Address of the vault
      * @param resolver Resolver address
+     * @param stakeRequired Amount of stake required for this dispute (if 0, uses tier minimum)
      */
     function onResolverAssigned(
         uint256 workflowId,
+        address escrowContract,
         address resolver,
         uint256 stakeRequired
     ) external onlyRole(ROLE_RESOLUTION_MODULE) {
-        stakeRequired;
-        // Lock minimum stake for tier
-        uint8 tier = resolverTier[resolver];
-        uint256 lockAmount = minimumStakes[tier];
+        // Lock minimum stake for tier if not specified
+        uint256 lockAmount = stakeRequired;
+        if (lockAmount == 0) {
+            uint8 tier = resolverTier[resolver];
+            lockAmount = minimumStakes[tier];
+        }
 
         // Check resolver has sufficient available stake
         BondComposition storage bond = resolverBonds[resolver];
@@ -608,7 +613,7 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
         if (availableStake < lockAmount) revert InsufficientAvailableStake(resolver, availableStake, lockAmount);
 
         // Lock stake
-        lockedStakes[workflowId][resolver] = lockAmount;
+        lockedStakes[escrowContract][workflowId][resolver] = lockAmount;
         totalLockedStake[resolver] += lockAmount;
 
         emit StakeLocked(resolver, lockAmount, workflowId, 'Assignment');
@@ -617,20 +622,22 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
     /**
      * @notice Unlock stake when resolution is finalized
      * @param workflowId Dispute ID
+     * @param escrowContract Address of the vault
      * @param resolver Resolver address
      */
     function onResolutionFinalized(
         uint256 workflowId,
+        address escrowContract,
         address resolver,
         bool outcome
     ) external onlyRole(ROLE_RESOLUTION_MODULE) {
         outcome;
-        uint256 lockedAmount = lockedStakes[workflowId][resolver];
+        uint256 lockedAmount = lockedStakes[escrowContract][workflowId][resolver];
 
         if (lockedAmount > 0) {
             // Unlock stake
             totalLockedStake[resolver] -= lockedAmount;
-            delete lockedStakes[workflowId][resolver];
+            delete lockedStakes[escrowContract][workflowId][resolver];
 
             emit StakeUnlocked(resolver, lockedAmount, workflowId);
         }
@@ -639,18 +646,20 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
     /**
      * @notice Unlock stake when dispute is escalated
      * @param workflowId Dispute ID
+     * @param escrowContract Address of the vault
      * @param resolver Prior round resolver
      */
     function onDisputeEscalated(
         uint256 workflowId,
+        address escrowContract,
         address resolver
     ) external onlyRole(ROLE_RESOLUTION_MODULE) {
-        uint256 lockedAmount = lockedStakes[workflowId][resolver];
+        uint256 lockedAmount = lockedStakes[escrowContract][workflowId][resolver];
 
         if (lockedAmount > 0) {
             // Unlock stake from prior resolver
             totalLockedStake[resolver] -= lockedAmount;
-            delete lockedStakes[workflowId][resolver];
+            delete lockedStakes[escrowContract][workflowId][resolver];
 
             emit StakeUnlocked(resolver, lockedAmount, workflowId);
         }
@@ -661,6 +670,7 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
      */
     function lockStake(
         uint256 workflowId,
+        address escrowContract,
         address resolver,
         uint256 amount,
         uint256 duration
@@ -670,7 +680,7 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
         uint256 availableStake = bond.effectiveBondUSD - totalLockedStake[resolver];
         if (availableStake < amount) revert InsufficientAvailableStake(resolver, availableStake, amount);
 
-        lockedStakes[workflowId][resolver] = amount;
+        lockedStakes[escrowContract][workflowId][resolver] = amount;
         totalLockedStake[resolver] += amount;
 
         emit StakeLocked(resolver, amount, workflowId, 'Manual lock');
@@ -681,13 +691,14 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
      */
     function unlockStake(
         uint256 workflowId,
+        address escrowContract,
         address resolver
     ) external onlyRole(ROLE_RESOLUTION_MODULE) {
-        uint256 lockedAmount = lockedStakes[workflowId][resolver];
+        uint256 lockedAmount = lockedStakes[escrowContract][workflowId][resolver];
 
         if (lockedAmount > 0) {
             totalLockedStake[resolver] -= lockedAmount;
-            delete lockedStakes[workflowId][resolver];
+            delete lockedStakes[escrowContract][workflowId][resolver];
 
             emit StakeUnlocked(resolver, lockedAmount, workflowId);
         }
@@ -749,7 +760,7 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
     }
 
     /**
-     * @notice Get effective stake (including delegation coverage)
+     * @notice Get total effective stake (including delegation coverage)
      */
     function getEffectiveStake(address resolver) external view returns (uint256 effective) {
         BondComposition storage bond = resolverBonds[resolver];

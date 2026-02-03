@@ -24,7 +24,10 @@ contract MockAppealModule is DefaultResolutionModule {
         finalRound = _finalRound;
     }
 
-    function getAppealDeadlineAndRound(uint256) external view returns (uint256, uint8, bool) {
+    function getAppealDeadlineAndRound(
+        uint256,
+        address
+    ) external view override returns (uint256 appealDeadline, uint8 currentRound, bool isFinalRound) {
         return (deadline, 1, finalRound);
     }
 }

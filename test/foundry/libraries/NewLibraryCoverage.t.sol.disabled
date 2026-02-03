@@ -101,9 +101,9 @@ contract MockIncentiveModule is IIncentiveModule {
     }
 
     function onResolverAssigned(uint256, address, uint8) external override {}
-    function onDecisionSubmitted(uint256, address, uint8, DecentralizedResolverStructs.ResolutionOutcome, uint256) external override {}
+    function onDecisionSubmitted(uint256, address, uint8, ResolutionOutcome, uint256) external override {}
     function onEscalated(uint256, uint8, uint8, address) external override {}
-    function onDisputeFinalized(uint256, uint8, DecentralizedResolverStructs.ResolutionOutcome) external override {}
+    function onDisputeFinalized(uint256, uint8, ResolutionOutcome) external override {}
     function onResolverTimeout(uint256, address, uint8, uint8) external override {}
     function distributePayments(uint256, address, uint256) external override {}
     function getClaimablePayment(uint256, address) external view override returns (uint256) { return 0; }

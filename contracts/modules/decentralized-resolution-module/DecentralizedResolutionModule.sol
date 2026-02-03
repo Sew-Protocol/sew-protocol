@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
-import '../shared/interfaces/IResolutionModule.sol';
+import '../../shared/interfaces/IResolutionModule.sol';
 import '@openzeppelin/contracts/access/AccessControl.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
-import '../governance/SlowLaneQueueActivate.sol';
+import '../../governance/SlowLaneQueueActivate.sol';
 import './IIncentiveModule.sol';
 import './IStakingModule.sol';
 import './ISlashingModule.sol';
 import './DecentralizedResolverStructs.sol';
 import './ResolutionAnalytics.sol';
 import './EscalationCostLibrary.sol';
-import '../libraries/ResolutionTableLibrary.sol';
+import '../../libraries/ResolutionTableLibrary.sol';
 
 /**
  * @title DecentralizedResolutionModule
@@ -128,13 +128,13 @@ contract DecentralizedResolutionModule is
     address[] public approvedSeniorResolvers;
 
     mapping(address => ResolverMetadata) public resolverMetadata;
-    mapping(uint256 => DisputeMetadata) public disputeMetadata;
+    mapping(address => mapping(uint256 => DisputeMetadata)) public disputeMetadata;
     uint256 public disputeTimeout = DEFAULT_DISPUTE_TIMEOUT;
     mapping(uint8 => EscalationConfig) public escalationConfig;
     mapping(uint8 => PendingEscalationConfig) private _pendingEscalationConfig;
 
     mapping(bytes32 => ResolutionTableEntry) public resolutionTable;
-    mapping(uint256 => bytes32) public escrowCategory;
+    mapping(address => mapping(uint256 => bytes32)) public escrowCategory;
     mapping(bytes32 => uint256) public categoryResolverIndex;
     mapping(bytes32 => uint256) public categorySeniorResolverIndex;
 
@@ -420,35 +420,41 @@ contract DecentralizedResolutionModule is
     function getDisputeResolverRole(address disputeResolver) external view returns (ResolverRole) {
         return resolverRoles[disputeResolver];
     }
-    function getDisputeMetadata(uint256 workflowId) external view returns (DisputeMetadata memory) {
-        return disputeMetadata[workflowId];
+    function getDisputeMetadata(
+        uint256 workflowId,
+        address escrowContract
+    ) external view returns (DisputeMetadata memory) {
+        return disputeMetadata[escrowContract][workflowId];
     }
 
     /**
      * @notice Get decision at a specific round (helper for appeal access control)
      * @param workflowId Dispute ID
+     * @param escrowContract Address of the vault
      * @param round Round to check (0, 1, or 2)
      * @return decision ResolutionOutcome enum value (0 = NONE, 1 = RELEASE, 2 = CANCEL)
      * @dev Returns the decision made at the specified round
      */
-    function getDecisionAtRound(uint256 workflowId, uint8 round) external view returns (uint8 decision) {
+    function getDecisionAtRound(uint256 workflowId, address escrowContract, uint8 round) external view override returns (uint8 decision) {
         require(round < 3, 'Invalid round');
-        DisputeMetadata storage dm = disputeMetadata[workflowId];
+        DisputeMetadata storage dm = disputeMetadata[escrowContract][workflowId];
         decision = uint8(dm.decisionAtRound[round]);
     }
 
     /**
      * @notice Get appeal deadline and current round for a dispute (for appeal window enforcement)
      * @param workflowId Dispute ID
+     * @param escrowContract Address of the vault
      * @return appealDeadline Appeal deadline for current round (0 if no deadline or final round)
      * @return currentRound Current round (0-2)
      * @return isFinalRound True if this is the final round (MAX_ROUND)
      * @dev Used by BaseEscrow to enforce appeal windows before executing transfers
      */
     function getAppealDeadlineAndRound(
-        uint256 workflowId
-    ) external view returns (uint256 appealDeadline, uint8 currentRound, bool isFinalRound) {
-        DisputeMetadata storage dm = disputeMetadata[workflowId];
+        uint256 workflowId,
+        address escrowContract
+    ) external view override returns (uint256 appealDeadline, uint8 currentRound, bool isFinalRound) {
+        DisputeMetadata storage dm = disputeMetadata[escrowContract][workflowId];
         currentRound = dm.currentRound;
         isFinalRound = (currentRound >= MAX_ROUND);
 
@@ -465,10 +471,11 @@ contract DecentralizedResolutionModule is
 
     function isAuthorizedDisputeResolver(
         uint256 workflowId,
+        address escrowContract,
         address disputeResolver,
         bytes calldata
     ) external view override returns (bool authorized, uint8 role) {
-        DisputeMetadata memory dm = disputeMetadata[workflowId];
+        DisputeMetadata memory dm = disputeMetadata[escrowContract][workflowId];
         address currentResolver = dm.resolverAtRound[dm.currentRound];
         if (disputeResolver == currentResolver) return (true, dm.currentRound);
         ResolverRole rRole = resolverRoles[disputeResolver];
@@ -484,12 +491,13 @@ contract DecentralizedResolutionModule is
 
     function getDisputeResolver(
         uint256 workflowId,
+        address escrowContract,
         bytes calldata
     ) external view override returns (address disputeResolver, uint8 escalationLevel) {
-        DisputeMetadata memory dm = disputeMetadata[workflowId];
+        DisputeMetadata memory dm = disputeMetadata[escrowContract][workflowId];
         address currentResolver = dm.resolverAtRound[dm.currentRound];
         if (currentResolver != address(0)) return (currentResolver, dm.currentRound);
-        bytes32 cat = escrowCategory[workflowId];
+        bytes32 cat = escrowCategory[escrowContract][workflowId];
         if (cat != bytes32(0) && resolutionTable[cat].enabled) {
             address selected = selectResolverRoundRobin(cat, false);
             if (selected != address(0)) return (selected, 0);
@@ -499,6 +507,7 @@ contract DecentralizedResolutionModule is
 
     function canEscalate(
         uint256 workflowId,
+        address escrowContract,
         uint8 currentLevel,
         bytes calldata
     ) external view override returns (bool allowed, address nextResolver, uint256 escalationFee) {
@@ -506,7 +515,7 @@ contract DecentralizedResolutionModule is
         if (nextRound > MAX_ROUND || !escalationConfig[nextRound].enabled)
             return (false, address(0), 0);
         if (nextRound == 1)
-            nextResolver = selectResolverRoundRobin(escrowCategory[workflowId], true);
+            nextResolver = selectResolverRoundRobin(escrowCategory[escrowContract][workflowId], true);
         else if (nextRound == 2) nextResolver = externalResolver;
         if (nextResolver == address(0)) return (false, address(0), 0);
 
@@ -524,9 +533,10 @@ contract DecentralizedResolutionModule is
 
     function executeEscalation(
         uint256 workflowId,
+        address escrowContract,
         bytes calldata
     ) external override nonReentrant returns (bool success, address newResolver, uint8 newLevel) {
-        DisputeMetadata storage dm = disputeMetadata[workflowId];
+        DisputeMetadata storage dm = disputeMetadata[escrowContract][workflowId];
         uint8 fromRound = dm.currentRound;
         uint8 toRound = fromRound + 1;
 
@@ -536,8 +546,8 @@ contract DecentralizedResolutionModule is
 
         address nextRes;
         if (toRound == 1) {
-            nextRes = selectResolverRoundRobin(escrowCategory[workflowId], true);
-            if (nextRes != address(0)) advanceRoundRobinCounter(escrowCategory[workflowId], true);
+            nextRes = selectResolverRoundRobin(escrowCategory[escrowContract][workflowId], true);
+            if (nextRes != address(0)) advanceRoundRobinCounter(escrowCategory[escrowContract][workflowId], true);
         } else if (toRound == 2) {
             nextRes = externalResolver;
         }
@@ -549,37 +559,28 @@ contract DecentralizedResolutionModule is
         // Update round-based metadata
         dm.currentRound = toRound;
         dm.resolverAtRound[toRound] = nextRes;
-        dm.escalatedBy = _msgSender();
-        dm.escalationTimestamp = block.timestamp;
         dm.assignedAt = block.timestamp;
         dm.resolveBy = block.timestamp + resolveDeadlines[toRound];
-        dm.status = DisputeStatus.Escalated;
 
-        emit DisputeEscalatedToRound(workflowId, fromRound, toRound, nextRes);
-        emit ResolverAssigned(workflowId, nextRes, escrowCategory[workflowId], toRound);
-
-        // Increment case counter for new resolver
         resolverStats[nextRes].casesAssigned++;
 
-        // Call incentive module hooks
-        if (address(incentiveModule) != address(0)) {
-            try incentiveModule.onResolverAssigned(workflowId, nextRes, toRound) {} catch {
-                emit IncentiveModuleCallFailed(workflowId, 'onResolverAssigned', 'FAILED');
-            }
+        emit ResolverAssigned(workflowId, nextRes, escrowCategory[escrowContract][workflowId], toRound);
 
-            try incentiveModule.onEscalated(workflowId, fromRound, toRound, _msgSender()) {} catch {
-                emit IncentiveModuleCallFailed(workflowId, 'onEscalated', 'FAILED');
+        if (address(incentiveModule) != address(0)) {
+            try
+                incentiveModule.onResolverAssigned(workflowId, address(this), nextRes, toRound)
+            {} catch {
+                emit IncentiveModuleCallFailed(workflowId, 'onResolverAssigned', 'FAILED');
             }
         }
 
-        // DR v3: Call staking module hooks (if enabled)
+        // DR v3: Lock stake for new resolver
         if (address(stakingModule) != address(0)) {
-            // Unlock stake from prior round resolver
-            address priorResolver = dm.resolverAtRound[fromRound];
-            try stakingModule.onDisputeEscalated(workflowId, priorResolver) {} catch {}
-
-            // Lock stake for new resolver
-            try stakingModule.onResolverAssigned(workflowId, nextRes, 0) {} catch {}
+            try stakingModule.onResolverAssigned(workflowId, address(this), nextRes, toRound) {
+                // Success - stake locked for this dispute
+            } catch {
+                // Non-critical: Continue even if lock fails
+            }
         }
 
         return (true, nextRes, toRound);
@@ -594,6 +595,7 @@ contract DecentralizedResolutionModule is
      */
     function getRequiredAppealBond(
         uint256 /* workflowId */,
+        address /* escrowContract */,
         uint8 currentLevel,
         bytes calldata escrowData
     ) external view override returns (uint256 amount, address token) {
@@ -654,9 +656,10 @@ contract DecentralizedResolutionModule is
     }
     function setEscrowCategory(
         uint256 workflowId,
+        address escrowContract,
         bytes32 categoryKey
     ) external onlyEscrowContract {
-        escrowCategory[workflowId] = categoryKey;
+        escrowCategory[escrowContract][workflowId] = categoryKey;
     }
     function generateCategoryKey(
         address token,
@@ -848,10 +851,11 @@ contract DecentralizedResolutionModule is
 
     function initializeDispute(
         uint256 workflowId,
+        address escrowContract,
         address resolver,
         bytes32 categoryKey
     ) external onlyEscrowContract {
-        DisputeMetadata storage dm = disputeMetadata[workflowId];
+        DisputeMetadata storage dm = disputeMetadata[escrowContract][workflowId];
         if (dm.resolverAtRound[0] != address(0)) revert AlreadyInitialized(workflowId);
 
         // Atomic capacity check and increment
@@ -874,7 +878,7 @@ contract DecentralizedResolutionModule is
         dm.resolverAtRound[0] = resolver;
         dm.assignedAt = block.timestamp;
         dm.resolveBy = block.timestamp + resolveDeadlines[0];
-        escrowCategory[workflowId] = categoryKey;
+        escrowCategory[escrowContract][workflowId] = categoryKey;
 
         // Increment case counter
         resolverStats[resolver].casesAssigned++;
@@ -884,14 +888,14 @@ contract DecentralizedResolutionModule is
 
         // Call incentive module hooks
         if (address(incentiveModule) != address(0)) {
-            try incentiveModule.onResolverAssigned(workflowId, resolver, 0) {} catch {
+            try incentiveModule.onResolverAssigned(workflowId, address(this), resolver, 0) {} catch {
                 emit IncentiveModuleCallFailed(workflowId, 'onResolverAssigned', 'FAILED');
             }
         }
 
         // DR v3: Call staking module hook (if enabled)
         if (address(stakingModule) != address(0)) {
-            try stakingModule.onResolverAssigned(workflowId, resolver, 0) {
+            try stakingModule.onResolverAssigned(workflowId, address(this), resolver, 0) {
                 // Success - stake locked for this dispute
             } catch {
                 // Non-critical: Continue even if staking hook fails
@@ -971,8 +975,8 @@ contract DecentralizedResolutionModule is
      * @dev Anyone can call. If resolver timeout occurred, auto-reassigns within same round or escalates.
      *      Records timeout penalty, updates EMA score, calls incentive hooks.
      */
-    function forceProgress(uint256 workflowId) external nonReentrant {
-        DisputeMetadata storage dm = disputeMetadata[workflowId];
+    function forceProgress(uint256 workflowId, address escrowContract) external nonReentrant {
+        DisputeMetadata storage dm = disputeMetadata[escrowContract][workflowId];
 
         // Check if resolve deadline passed
         if (block.timestamp < dm.resolveBy) {
@@ -999,7 +1003,7 @@ contract DecentralizedResolutionModule is
         // Call incentive module hook
         if (address(incentiveModule) != address(0)) {
             try
-                incentiveModule.onResolverTimeout(workflowId, timedOutResolver, currentRound, 1)
+                incentiveModule.onResolverTimeout(workflowId, escrowContract, timedOutResolver, currentRound, 1)
             {} catch {
                 emit IncentiveModuleCallFailed(workflowId, 'onResolverTimeout', 'FAILED');
             }
@@ -1007,7 +1011,7 @@ contract DecentralizedResolutionModule is
 
         // DR v3: Call slashing module hook for timeout (if enabled)
         if (address(slashingModule) != address(0)) {
-            try slashingModule.slashForTimeout(workflowId, timedOutResolver, 1) {
+            try slashingModule.slashForTimeout(workflowId, address(this), timedOutResolver, 1) {
                 // Success - timeout recorded for potential slashing
             } catch {
                 // Non-critical: Continue even if slashing hook fails
@@ -1015,7 +1019,7 @@ contract DecentralizedResolutionModule is
         }
 
         // Auto-reassign within same round
-        bytes32 category = escrowCategory[workflowId];
+        bytes32 category = escrowCategory[escrowContract][workflowId];
         address newResolver;
 
         if (currentRound == 0) {
@@ -1029,7 +1033,7 @@ contract DecentralizedResolutionModule is
         if (newResolver != address(0) && newResolver != timedOutResolver) {
             // DR v3: Unlock old resolver's stake when reassigning
             if (address(stakingModule) != address(0)) {
-                try stakingModule.unlockStake(workflowId, timedOutResolver) {
+                try stakingModule.unlockStake(workflowId, address(this), timedOutResolver) {
                     // Success - old resolver's stake unlocked
                 } catch {
                     // Non-critical: Continue even if unlock fails
@@ -1047,7 +1051,7 @@ contract DecentralizedResolutionModule is
 
             if (address(incentiveModule) != address(0)) {
                 try
-                    incentiveModule.onResolverAssigned(workflowId, newResolver, currentRound)
+                    incentiveModule.onResolverAssigned(workflowId, escrowContract, newResolver, currentRound)
                 {} catch {
                     emit IncentiveModuleCallFailed(workflowId, 'onResolverAssigned', 'FAILED');
                 }
@@ -1055,7 +1059,7 @@ contract DecentralizedResolutionModule is
 
             // DR v3: Lock stake for new resolver
             if (address(stakingModule) != address(0)) {
-                try stakingModule.onResolverAssigned(workflowId, newResolver, currentRound) {
+                try stakingModule.onResolverAssigned(workflowId, address(this), newResolver, currentRound) {
                     // Success - new resolver's stake locked
                 } catch {
                     // Non-critical: Continue even if lock fails
@@ -1065,7 +1069,7 @@ contract DecentralizedResolutionModule is
             // No suitable replacement, mark as timed out
             // DR v3: Unlock timed out resolver's stake
             if (address(stakingModule) != address(0)) {
-                try stakingModule.unlockStake(workflowId, timedOutResolver) {
+                try stakingModule.unlockStake(workflowId, address(this), timedOutResolver) {
                     // Success - resolver's stake unlocked
                 } catch {
                     // Non-critical: Continue even if unlock fails
@@ -1091,11 +1095,12 @@ contract DecentralizedResolutionModule is
      */
     function recordResolution(
         uint256 workflowId,
+        address escrowContract,
         address resolver,
         ResolutionOutcome outcome,
         uint256 resolutionTime
     ) external onlyEscrowContract {
-        DisputeMetadata storage dm = disputeMetadata[workflowId];
+        DisputeMetadata storage dm = disputeMetadata[escrowContract][workflowId];
         uint8 currentRound = dm.currentRound;
 
         // Update round-based decision tracking
@@ -1119,6 +1124,7 @@ contract DecentralizedResolutionModule is
             try
                 incentiveModule.onDecisionSubmitted(
                     workflowId,
+                    escrowContract,
                     resolver,
                     currentRound,
                     outcome,
@@ -1131,7 +1137,7 @@ contract DecentralizedResolutionModule is
 
         // DR v3: Call staking module hook (if enabled)
         if (address(stakingModule) != address(0)) {
-            try stakingModule.onResolutionFinalized(workflowId, resolver, true) {
+            try stakingModule.onResolutionFinalized(workflowId, address(this), resolver, true) {
                 // Success - stake unlocked
             } catch {
                 // Non-critical: Continue even if staking hook fails
@@ -1263,12 +1269,13 @@ contract DecentralizedResolutionModule is
     /**
      * @notice Record a reversal when escalation reveals prior decision was wrong (DR v1)
      * @param workflowId Dispute ID
+     * @param escrowContract Address of the vault
      * @param priorRound Round where original decision was made
      * @dev Called when a decision at priorRound is overturned by decision at priorRound+1
      *      Updates EMA score with penalty for the original resolver
      */
-    function recordReversal(uint256 workflowId, uint8 priorRound) external onlyEscrowContract {
-        DisputeMetadata storage dm = disputeMetadata[workflowId];
+    function recordReversal(uint256 workflowId, address escrowContract, uint8 priorRound) external override onlyEscrowContract {
+        DisputeMetadata storage dm = disputeMetadata[escrowContract][workflowId];
 
         if (priorRound >= dm.currentRound) revert InvalidRound(priorRound, dm.currentRound);
         if (dm.decisionAtRound[priorRound] == ResolutionOutcome.NONE) revert NoPriorDecision(priorRound);
@@ -1293,7 +1300,7 @@ contract DecentralizedResolutionModule is
 
             // DR v2: Distribute appeal bond if reversal occurred (appeal succeeded)
             if (address(incentiveModule) != address(0)) {
-                try incentiveModule.distributeAppealBond(workflowId, priorRound, true) {
+                try incentiveModule.distributeAppealBond(workflowId, address(this), priorRound, true) {
                     // Success - bond refunded to depositor
                 } catch {
                     // Non-critical: Continue even if bond distribution fails
@@ -1302,7 +1309,7 @@ contract DecentralizedResolutionModule is
 
             // DR v3: Call slashing module hook for reversal (if enabled)
             if (address(slashingModule) != address(0)) {
-                try slashingModule.slashForReversal(workflowId, priorResolver, priorRound) {
+                try slashingModule.slashForReversal(workflowId, address(this), priorResolver, priorRound) {
                     // Success - reversal recorded for potential slashing
                 } catch {
                     // Non-critical: Continue even if slashing hook fails
@@ -1317,8 +1324,11 @@ contract DecentralizedResolutionModule is
      * @dev Called when appeal window expires or final round decision is made
      *      Triggers onDisputeFinalized hook and distributes any remaining appeal bonds
      */
-    function finalizeDispute(uint256 workflowId) external onlyEscrowContract {
-        DisputeMetadata storage dm = disputeMetadata[workflowId];
+    function finalizeDispute(
+        uint256 workflowId,
+        address escrowContract
+    ) external onlyEscrowContract {
+        DisputeMetadata storage dm = disputeMetadata[escrowContract][workflowId];
 
         if (dm.status == DisputeStatus.Final) revert AlreadyFinalized(workflowId);
         if (dm.decisionAtRound[dm.currentRound] == ResolutionOutcome.NONE) {
@@ -1343,27 +1353,14 @@ contract DecentralizedResolutionModule is
 
         // Call incentive module onDisputeFinalized hook
         if (address(incentiveModule) != address(0)) {
-            try incentiveModule.onDisputeFinalized(workflowId, finalRound, finalDecision) {
+            try incentiveModule.onDisputeFinalized(workflowId, escrowContract, finalRound, finalDecision) {
                 // Success
             } catch {
-                // Non-critical: Continue even if hook fails
-            }
-
-            // Distribute any appeal bonds that haven't been distributed yet
-            // Check each round for bonds and distribute based on outcome
-            // Note: We try to distribute bonds for each prior round
-            // The incentive module will check if bond exists internally
-            for (uint8 round = 0; round < finalRound; round++) {
-                // Prior round - check if decision at finalRound matches decision at round
-                bool outcomeFlipped = (dm.decisionAtRound[round] != finalDecision);
-                try incentiveModule.distributeAppealBond(workflowId, round, outcomeFlipped) {
-                    // Success - bond distributed (or no bond existed, which is fine)
-                } catch {
-                    // Non-critical: Continue even if bond distribution fails
-                }
+                emit IncentiveModuleCallFailed(workflowId, 'onDisputeFinalized', 'FAILED');
             }
         }
     }
+
 
     // ============ DR v2 Governance Functions ============
 

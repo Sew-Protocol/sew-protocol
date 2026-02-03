@@ -4,7 +4,7 @@ pragma solidity ^0.8.33;
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/access/AccessControl.sol';
-import '../decentralized-resolution-module/IIncentiveModule.sol';
+import '../modules/decentralized-resolution-module/IIncentiveModule.sol';
 import '../types/EscrowTypes.sol';
 
 /**
@@ -169,7 +169,7 @@ contract BondCollector is AccessControl {
         
         if (bondToRecord > 0) {
             IERC20(bondToken).safeIncreaseAllowance(address(incentiveMod), bondToRecord);
-            try incentiveMod.recordAppealBond(workflowId, depositor, escalatedBy, bondToRecord, bondToken, newLevel) {
+            try incentiveMod.recordAppealBond(workflowId, address(this), depositor, escalatedBy, bondToRecord, bondToken, newLevel) {
                 IERC20(bondToken).approve(address(incentiveMod), 0);
                 return true;
             } catch {

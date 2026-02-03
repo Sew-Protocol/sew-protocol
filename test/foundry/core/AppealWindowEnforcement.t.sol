@@ -4,9 +4,9 @@ pragma solidity ^0.8.33;
 import 'forge-std/Test.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/core/BaseEscrow.sol';
-import '../../../contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol';
-import '../../../contracts/decentralized-resolution-module/ResolverIncentiveModuleV2.sol';
-import '../../../contracts/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol';
+import '../../../contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV2.sol';
+import '../../../contracts/modules/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/YieldOps.sol';
@@ -186,7 +186,7 @@ contract AppealWindowEnforcementTest is Test {
         // Set category before raising dispute (required for DecentralizedResolutionModule)
         bytes32 category = keccak256('TEST_CATEGORY');
         vm.prank(address(this));
-        resolutionModule.setEscrowCategory(workflowId, category);
+        resolutionModule.setEscrowCategory(workflowId, address(escrow), category);
 
         // raiseDispute() automatically initializes the dispute via DisputeInitializationLibrary
         vm.prank(buyer);
@@ -201,7 +201,7 @@ contract AppealWindowEnforcementTest is Test {
 
         // Get resolver
         bytes memory escrowData = abi.encode(address(token), buyer, seller, ESCROW_AMOUNT);
-        (address resolver, ) = resolutionModule.getDisputeResolver(workflowId, escrowData);
+        (address resolver, ) = resolutionModule.getDisputeResolver(workflowId, address(escrow), escrowData);
 
         // Resolver resolves (release)
         vm.prank(resolver);
@@ -239,7 +239,7 @@ contract AppealWindowEnforcementTest is Test {
         bytes memory escrowData = abi.encode(address(token), buyer, seller, ESCROW_AMOUNT);
 
         // Round 0 resolver must first issue a decision before escalation is allowed
-        (address round0Resolver, ) = resolutionModule.getDisputeResolver(workflowId, escrowData);
+        (address round0Resolver, ) = resolutionModule.getDisputeResolver(workflowId, address(escrow), escrowData);
         vm.prank(round0Resolver);
         escrow.releaseAsDisputeResolver(workflowId, bytes32(0));
 
@@ -247,26 +247,26 @@ contract AppealWindowEnforcementTest is Test {
         vm.deal(buyer, 1 ether);
 
         // Escalate to round 1 (appeal)
-        (uint256 bond0, ) = resolutionModule.getRequiredAppealBond(workflowId, 0, escrowData);
+        (uint256 bond0, ) = resolutionModule.getRequiredAppealBond(workflowId, address(escrow), 0, escrowData);
         vm.prank(buyer);
         token.approve(address(escrow), bond0);
         vm.prank(buyer);
         escrow.escalateDispute(workflowId);
 
         // Round 1 resolver must issue a decision before further escalation is allowed
-        (address round1Resolver, ) = resolutionModule.getDisputeResolver(workflowId, escrowData);
+        (address round1Resolver, ) = resolutionModule.getDisputeResolver(workflowId, address(escrow), escrowData);
         vm.prank(round1Resolver);
         escrow.releaseAsDisputeResolver(workflowId, bytes32(0));
 
         // Escalate to round 2 (final round) - cost is 0.02 ether (baseCost + stepSize * escalationCount)
-        (uint256 bond1, ) = resolutionModule.getRequiredAppealBond(workflowId, 1, escrowData);
+        (uint256 bond1, ) = resolutionModule.getRequiredAppealBond(workflowId, address(escrow), 1, escrowData);
         vm.prank(buyer);
         token.approve(address(escrow), bond1);
         vm.prank(buyer);
         escrow.escalateDispute(workflowId);
 
         // Get senior resolver for round 2 (after escalation, resolver is updated)
-        (address seniorRes, ) = resolutionModule.getDisputeResolver(workflowId, escrowData);
+        (address seniorRes, ) = resolutionModule.getDisputeResolver(workflowId, address(escrow), escrowData);
 
         // Senior resolver resolves (release) at final round
         vm.prank(seniorRes);
@@ -300,7 +300,7 @@ contract AppealWindowEnforcementTest is Test {
 
         // Get resolver
         bytes memory escrowData = abi.encode(address(token), buyer, seller, ESCROW_AMOUNT);
-        (address resolver, ) = resolutionModule.getDisputeResolver(workflowId, escrowData);
+        (address resolver, ) = resolutionModule.getDisputeResolver(workflowId, address(escrow), escrowData);
 
         // Resolver resolves (release)
         vm.prank(resolver);
@@ -345,7 +345,7 @@ contract AppealWindowEnforcementTest is Test {
 
         // Get resolver
         bytes memory escrowData = abi.encode(address(token), buyer, seller, ESCROW_AMOUNT);
-        (address resolver, ) = resolutionModule.getDisputeResolver(workflowId, escrowData);
+        (address resolver, ) = resolutionModule.getDisputeResolver(workflowId, address(escrow), escrowData);
 
         // Resolver resolves (release)
         vm.prank(resolver);
@@ -383,7 +383,7 @@ contract AppealWindowEnforcementTest is Test {
 
         // Get resolver
         bytes memory escrowData = abi.encode(address(token), buyer, seller, ESCROW_AMOUNT);
-        (address resolver, ) = resolutionModule.getDisputeResolver(workflowId, escrowData);
+        (address resolver, ) = resolutionModule.getDisputeResolver(workflowId, address(escrow), escrowData);
 
         // Resolver resolves (release)
         vm.prank(resolver);
@@ -397,7 +397,7 @@ contract AppealWindowEnforcementTest is Test {
         vm.deal(buyer, 1 ether);
 
         // Escalate during appeal window
-        (uint256 bond0, ) = resolutionModule.getRequiredAppealBond(workflowId, 0, escrowData);
+        (uint256 bond0, ) = resolutionModule.getRequiredAppealBond(workflowId, address(escrow), 0, escrowData);
         vm.prank(buyer);
         token.approve(address(escrow), bond0);
         vm.prank(buyer);
@@ -429,7 +429,7 @@ contract AppealWindowEnforcementTest is Test {
 
         // Get resolver
         bytes memory escrowData = abi.encode(address(token), buyer, seller, ESCROW_AMOUNT);
-        (address resolver, ) = resolutionModule.getDisputeResolver(workflowId, escrowData);
+        (address resolver, ) = resolutionModule.getDisputeResolver(workflowId, address(escrow), escrowData);
 
         // Resolver resolves (release)
         vm.prank(resolver);
@@ -469,7 +469,7 @@ contract AppealWindowEnforcementTest is Test {
 
         // Get resolver
         bytes memory escrowData = abi.encode(address(token), buyer, seller, ESCROW_AMOUNT);
-        (address resolver, ) = resolutionModule.getDisputeResolver(workflowId, escrowData);
+        (address resolver, ) = resolutionModule.getDisputeResolver(workflowId, address(escrow), escrowData);
 
         // Resolver resolves (release)
         vm.prank(resolver);
@@ -497,7 +497,7 @@ contract AppealWindowEnforcementTest is Test {
 
         // Get resolver
         bytes memory escrowData = abi.encode(address(token), buyer, seller, ESCROW_AMOUNT);
-        (address resolver, ) = resolutionModule.getDisputeResolver(workflowId, escrowData);
+        (address resolver, ) = resolutionModule.getDisputeResolver(workflowId, address(escrow), escrowData);
 
         // Resolver resolves (release)
         vm.prank(resolver);
@@ -534,7 +534,7 @@ contract AppealWindowEnforcementTest is Test {
 
         // Get resolver
         bytes memory escrowData = abi.encode(address(token), buyer, seller, ESCROW_AMOUNT);
-        (address resolver, ) = resolutionModule.getDisputeResolver(workflowId, escrowData);
+        (address resolver, ) = resolutionModule.getDisputeResolver(workflowId, address(escrow), escrowData);
 
         // Resolver resolves (cancel)
         vm.prank(resolver);
@@ -579,7 +579,7 @@ contract AppealWindowEnforcementTest is Test {
 
         // Get resolver
         bytes memory escrowData = abi.encode(address(token), buyer, seller, ESCROW_AMOUNT);
-        (address resolver, ) = resolutionModule.getDisputeResolver(workflowId, escrowData);
+        (address resolver, ) = resolutionModule.getDisputeResolver(workflowId, address(escrow), escrowData);
 
         // Resolver resolves (release)
         vm.prank(resolver);

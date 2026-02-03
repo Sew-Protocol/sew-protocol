@@ -20,6 +20,7 @@ interface IReleaseStrategy is IERC165 {
      */
     function canRelease(
         uint256 workflowId,
+        address escrowContract,
         address caller,
         bytes calldata escrowData
     ) external view returns (bool allowed, string memory reason);
@@ -27,6 +28,7 @@ interface IReleaseStrategy is IERC165 {
     /**
      * @notice Execute the release logic
      * @param workflowId The escrow transfer ID
+     * @param escrowContract Address of the vault
      * @param escrowData Encoded escrow data
      * @return success True if release was successful
      * @return recipient Address to receive the funds
@@ -34,6 +36,7 @@ interface IReleaseStrategy is IERC165 {
      */
     function executeRelease(
         uint256 workflowId,
+        address escrowContract,
         bytes calldata escrowData
     ) external returns (bool success, address recipient, uint256 amount);
 

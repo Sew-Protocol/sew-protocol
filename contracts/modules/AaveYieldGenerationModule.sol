@@ -65,9 +65,13 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
     mapping(address => uint256) public totalYieldWithdrawn; // token => total yield withdrawn (all time)
 
     // Exposure tracking and caps (Phase 4)
-    mapping(address => uint256) public tokenCap; // token => maximum exposure per token
-    mapping(address => uint256) public globalCap; // token => global maximum exposure
-    mapping(address => uint256) public currentExposure; // token => current exposure
+    mapping(address => uint256) public tokenCap; // token => maximum exposure per token (DEPRECATED: use globalCap)
+    mapping(address => uint256) public globalCap; // token => global maximum exposure (System Safety)
+    mapping(address => uint256) public currentExposure; // token => current total exposure
+
+    // Per-escrow fairness caps (Recommendation 1.B)
+    mapping(address => mapping(address => uint256)) public escrowCap; // escrowContract => token => maximum exposure (Fairness)
+    mapping(address => mapping(address => uint256)) public currentEscrowExposure; // escrowContract => token => current exposure
 
     // Per-escrow tracking (escrow contract address => workflowId => data)
     mapping(address => mapping(uint256 => bool)) public escrowInAave; // escrowContract => workflowId => is in Aave
@@ -75,8 +79,8 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
     mapping(address => mapping(uint256 => uint256)) public escrowOriginalDeposit; // escrowContract => workflowId => original deposit amount
     
     // ERC-4626 escrow-specific tracking (per-workflow share accounting)
-    mapping(uint256 => uint256) public escrowShares; // workflowId => shares minted for this escrow
-    mapping(uint256 => uint256) public escrowPrincipal; // workflowId => principal deposited for this escrow
+    mapping(address => mapping(uint256 => uint256)) public escrowShares; // escrowContract => workflowId => shares minted
+    mapping(address => mapping(uint256 => uint256)) public escrowPrincipal; // escrowContract => workflowId => principal deposited
     
     // Slow lane pending changes (Phase 3)
     PendingAddress private _pendingPoolProvider;
@@ -99,6 +103,9 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
     event AavePoolConfigured(address indexed provider, address indexed pool);
     event AaveEnabledUpdated(bool enabled);
     event TokenRegisteredForAave(address indexed token, address indexed aToken);
+    event EscrowCapSet(address indexed escrowContract, address indexed token, uint256 oldCap, uint256 newCap);
+
+    error EscrowCapExceeded(address escrowContract, address token, uint256 requested, uint256 cap);
 
     // Slow lane queue/activate events (Phase 3)
     event AavePoolProviderQueued(
@@ -155,12 +162,20 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
     function depositForYield(
         uint256 workflowId,
         address token,
-        uint256 amount
+        uint256 amount,
+        address escrowContract
     ) external override returns (bool success, uint256 yieldTokenBalance) {
-        // MED-3: Zero address check for escrow contract (msg.sender)
-        address escrowContract = _msgSender();
+        // MED-3: Zero address check for escrow contract
         if (escrowContract == address(0)) revert EscrowContractCannotBeZero();
         
+        // HIGH-1: Authorization check
+        if (!hasRole(ROLE_ESCROW_CONTRACT, _msgSender())) {
+            revert NotAuthorized(_msgSender());
+        }
+        
+        // Verify escrowContract is the caller
+        if (_msgSender() != escrowContract) revert NotAuthorized(escrowContract);
+
         // Check if Aave is enabled
         if (!aaveEnabled) {
             return (true, 0); // Aave not enabled, skip deposit (not an error)
@@ -177,10 +192,10 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
             revert AavePoolNotConfigured();
         }
 
-        // Check exposure caps before depositing (Phase 4)
-        _checkAndAccrueExposure(token, amount);
+        // Check and accrue exposure (Phase 4)
+        _checkAndAccrueExposure(escrowContract, token, amount);
 
-        // Handle two cases:
+        // Track aggregate principal deposited (Phase 4)
         // 1. EscrowVault: Escrow contract approved this module, module pulls tokens and supplies to pool
         // 2. EscrowableERC20: Escrow contract IS the token, it approves pool directly, module just calls pool.supply
         // Check if escrow contract approved this module (for EscrowVault)
@@ -252,6 +267,11 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         uint256 originalAmount,
         address escrowContract
     ) external override returns (bool success, uint256 actualAmount, uint256 yieldAmount) {
+        // HIGH-2: Authorization checks
+        if (!hasRole(ROLE_ESCROW_CONTRACT, _msgSender())) {
+            revert NotAuthorized(_msgSender());
+        }
+
         if (escrowContract == address(0)) {
             // No escrow tracked for this workflowId, return original amount
             return (true, originalAmount, 0);
@@ -295,7 +315,7 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         // Withdraw from Aave FIRST (interaction), then clear state (effect)
         // Use low-level call for error handling
         (bool callSuccess, bytes memory returnData) = address(aavePool).call(
-            abi.encodeWithSelector(IAavePool.withdraw.selector, token, withdrawalAmount, escrowContract)
+            abi.encodeWithSelector(IAavePool.withdraw.selector, token, withdrawalAmount, _msgSender())
         );
 
         if (!callSuccess) {
@@ -321,7 +341,8 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         }
 
         // Reduce exposure (Phase 4)
-        _reduceExposure(token, originalAmount);
+        // HIGH-3: Reduce by actual amount to account for losses
+        _reduceExposure(escrowContract, token, actualAmount);
 
         // Dust & Yield Handling
         // Dust is defined as rounding discrepancies <= 5 wei
@@ -734,47 +755,65 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
     // ============ Guardian Emergency Controls (Phase 4) ============
 
     /**
-     * @notice Guardian emergency function: Lower token-specific cap (down-only)
-     * @param token Token address
-     * @param newCap New cap value (must be <= current cap)
-     * @dev Guardian can only lower caps, not raise them. This is a down-only control.
+     * @notice Lower per-escrow cap in emergency (guardian only)
+     * @param escrowContract Address of the vault
+     * @param token Underlying token address
+     * @param newCap New lower cap
      */
-    function guardianLowerTokenCap(address token, uint256 newCap) public onlyRole(ROLE_GUARDIAN) {
-        uint256 currentCap = tokenCap[token];
-        if (newCap > currentCap) revert CapCannotBeRaised(newCap, currentCap);
-        tokenCap[token] = newCap;
-        emit TokenCapLowered(token, currentCap, newCap);
+    function guardianLowerEscrowCap(address escrowContract, address token, uint256 newCap) external onlyRole(ROLE_GUARDIAN) {
+        uint256 current = escrowCap[escrowContract][token];
+        if (newCap > current) revert CapCannotBeRaised(newCap, current);
+        
+        escrowCap[escrowContract][token] = newCap;
+        emit EscrowCapSet(escrowContract, token, current, newCap);
     }
 
     /**
-     * @notice Guardian emergency function: Lower global cap (down-only)
-     * @param token Token address
-     * @param newCap New cap value (must be <= current cap)
-     * @dev Guardian can only lower caps, not raise them. This is a down-only control.
+     * @notice Lower global cap in emergency (guardian only)
+     * @param token Underlying token address
+     * @param newCap New lower cap
      */
     function guardianLowerGlobalCap(address token, uint256 newCap) public onlyRole(ROLE_GUARDIAN) {
         uint256 currentCap = globalCap[token];
         if (newCap > currentCap) revert CapCannotBeRaised(newCap, currentCap);
         globalCap[token] = newCap;
-        emit GlobalCapLowered(token, currentCap, newCap);
+        emit GlobalCapSet(token, currentCap, newCap);
+    }
+
+    /**
+     * @notice DEPRECATED - Use guardianLowerGlobalCap
+     */
+    function guardianLowerTokenCap(address token, uint256 newCap) external onlyRole(ROLE_GUARDIAN) {
+        uint256 current = tokenCap[token];
+        if (newCap > current) revert CapCannotBeRaised(newCap, current);
+        tokenCap[token] = newCap;
+        globalCap[token] = newCap; // Sync with globalCap
+        emit TokenCapSet(token, current, newCap);
     }
 
     // ============ Timelock Cap Management (Phase 4) ============
 
     /**
-     * @notice Set token-specific exposure cap
-     * @param token Token address
-     * @param newCap New cap value (in raw token units, 0 = disabled)
-     * @dev Timelock can set caps within bounds. Guardian can only lower via guardianLowerTokenCap().
-     *      Caps are enforced at deposit time. cap=0 disables deposits for that token.
-     *      Maximum cap is type(uint128).max to prevent overflow.
+     * @notice Set per-escrow fairness cap (timelock only)
+     * @param escrowContract Address of the vault
+     * @param token Underlying token address
+     * @param newCap Maximum exposure allowed for this vault
+     */
+    function setEscrowCap(address escrowContract, address token, uint256 newCap) public onlyRole(ROLE_TIMELOCK) {
+        if (newCap > CAP_MAX) revert CapExceeded(token, newCap, CAP_MAX);
+        uint256 oldCap = escrowCap[escrowContract][token];
+        escrowCap[escrowContract][token] = newCap;
+        emit EscrowCapSet(escrowContract, token, oldCap, newCap);
+    }
+
+    /**
+     * @notice DEPRECATED - Use setGlobalCap
      */
     function setTokenCap(address token, uint256 newCap) public onlyRole(ROLE_TIMELOCK) {
-        if (newCap > CAP_MAX) {
-            revert CapExceeded(token, newCap, CAP_MAX);
-        }
+        if (newCap > CAP_MAX) revert CapExceeded(token, newCap, CAP_MAX);
         uint256 oldCap = tokenCap[token];
         tokenCap[token] = newCap;
+        globalCap[token] = newCap; // Sync with globalCap
         emit TokenCapSet(token, oldCap, newCap);
     }
 
@@ -797,42 +836,53 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
 
     /**
      * @notice Internal function to check and update exposure
+     * @param escrowContract Address of the calling vault
      * @param token Token address
      * @param amount Amount to add to exposure
      * @dev Reverts if caps would be exceeded
      */
-    function _checkAndAccrueExposure(address token, uint256 amount) internal {
+    function _checkAndAccrueExposure(address escrowContract, address token, uint256 amount) internal {
         uint256 newExposure = currentExposure[token] + amount;
 
-        // Check token-specific cap
-        uint256 tokenCapValue = tokenCap[token];
-        if (tokenCapValue > 0 && newExposure > tokenCapValue) {
-            revert CapExceeded(token, newExposure, tokenCapValue);
-        }
-
-        // Check global cap
+        // 1. System Safety: Global Cap
         uint256 globalCapValue = globalCap[token];
         if (globalCapValue > 0 && newExposure > globalCapValue) {
             revert CapExceeded(token, newExposure, globalCapValue);
         }
 
+        // 2. Tenant Fairness: Per-Escrow Cap
+        uint256 eCap = escrowCap[escrowContract][token];
+        uint256 newEscrowTotal = currentEscrowExposure[escrowContract][token] + amount;
+        if (eCap > 0 && newEscrowTotal > eCap) {
+            revert EscrowCapExceeded(escrowContract, token, newEscrowTotal, eCap);
+        }
+
         uint256 oldExposure = currentExposure[token];
         currentExposure[token] = newExposure;
+        currentEscrowExposure[escrowContract][token] = newEscrowTotal;
         emit ExposureUpdated(token, oldExposure, newExposure);
     }
 
     /**
      * @notice Internal function to reduce exposure on withdrawal
+     * @param escrowContract Address of the calling vault
      * @param token Token address
      * @param amount Amount to subtract from exposure
      */
-    function _reduceExposure(address token, uint256 amount) internal {
+    function _reduceExposure(address escrowContract, address token, uint256 amount) internal {
         uint256 oldExposure = currentExposure[token];
         if (amount > oldExposure) {
             currentExposure[token] = 0;
         } else {
             currentExposure[token] = oldExposure - amount;
         }
+
+        if (amount > currentEscrowExposure[escrowContract][token]) {
+            currentEscrowExposure[escrowContract][token] = 0;
+        } else {
+            currentEscrowExposure[escrowContract][token] -= amount;
+        }
+
         emit ExposureUpdated(token, oldExposure, currentExposure[token]);
     }
 
@@ -897,6 +947,7 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         address asset,
         uint256 assets
     ) external returns (uint256 shares) {
+        address escrowContract = _msgSender();
         // Ensure Aave is enabled
         if (!aaveEnabled) {
             revert("Aave not enabled");
@@ -909,7 +960,7 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         }
 
         // Transfer assets from caller to this module
-        IERC20(asset).safeTransferFrom(_msgSender(), address(this), assets);
+        IERC20(asset).safeTransferFrom(escrowContract, address(this), assets);
 
         // Calculate shares to mint (1:1 for first deposit, then use conversion)
         if (totalSupply() == 0) {
@@ -922,8 +973,8 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         _mint(address(this), shares);
 
         // Track escrow-specific data
-        escrowShares[workflowId] += shares;
-        escrowPrincipal[workflowId] += assets;
+        escrowShares[escrowContract][workflowId] += shares;
+        escrowPrincipal[escrowContract][workflowId] += assets;
 
         // Approve pool and deposit to Aave
         uint256 currentAllowance = IERC20(asset).allowance(address(this), address(aavePool));
@@ -952,8 +1003,9 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         address asset,
         uint256 shares
     ) external returns (uint256 assets) {
+        address escrowContract = _msgSender();
         // Ensure workflow has shares to redeem
-        if (escrowShares[workflowId] < shares) {
+        if (escrowShares[escrowContract][workflowId] < shares) {
             revert("Insufficient shares for escrow");
         }
 
@@ -964,50 +1016,53 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         _burn(address(this), shares);
 
         // Update escrow tracking
-        escrowShares[workflowId] -= shares;
-        uint256 principal = escrowPrincipal[workflowId];
+        escrowShares[escrowContract][workflowId] -= shares;
+        uint256 principal = escrowPrincipal[escrowContract][workflowId];
         if (principal >= assets) {
-            escrowPrincipal[workflowId] -= assets;
+            escrowPrincipal[escrowContract][workflowId] -= assets;
         } else {
-            escrowPrincipal[workflowId] = 0;
+            escrowPrincipal[escrowContract][workflowId] = 0;
         }
 
         // Withdraw from Aave
         uint256 withdrawn = aavePool.withdraw(asset, assets, address(this));
 
         // Transfer assets to caller
-        IERC20(asset).safeTransfer(_msgSender(), withdrawn);
+        IERC20(asset).safeTransfer(escrowContract, withdrawn);
 
         return withdrawn;
     }
 
     /**
      * @notice Get shares allocated to an escrow
+     * @param escrowContract Address of the escrow contract
      * @param workflowId The escrow workflow ID
      * @return shares Amount of shares for this escrow
      */
-    function sharesOfEscrow(uint256 workflowId) external view returns (uint256) {
-        return escrowShares[workflowId];
+    function sharesOfEscrow(address escrowContract, uint256 workflowId) external view returns (uint256) {
+        return escrowShares[escrowContract][workflowId];
     }
 
     /**
-     * @notice Get principal amount for an escrow
+     * @notice Get principal deposited for an escrow
+     * @param escrowContract Address of the escrow contract
      * @param workflowId The escrow workflow ID
-     * @return principal Amount of principal deposited for this escrow
+     * @return principal Amount of principal for this escrow
      */
-    function principalOfEscrow(uint256 workflowId) external view returns (uint256) {
-        return escrowPrincipal[workflowId];
+    function principalOfEscrow(address escrowContract, uint256 workflowId) external view returns (uint256) {
+        return escrowPrincipal[escrowContract][workflowId];
     }
 
     /**
      * @notice Calculate yield earned for an escrow
      * @dev yield = currentValue - principal
+     * @param escrowContract Address of the escrow contract
      * @param workflowId The escrow workflow ID
      * @return yield Amount of yield earned
      */
-    function yieldOfEscrow(uint256 workflowId) external view returns (uint256) {
-        uint256 shares = escrowShares[workflowId];
-        uint256 principal = escrowPrincipal[workflowId];
+    function yieldOfEscrow(address escrowContract, uint256 workflowId) external view returns (uint256) {
+        uint256 shares = escrowShares[escrowContract][workflowId];
+        uint256 principal = escrowPrincipal[escrowContract][workflowId];
 
         if (shares == 0 || totalSupply() == 0) {
             return 0;
@@ -1103,7 +1158,7 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         }
         
         // Reduce exposure tracking
-        _reduceExposure(token, originalDeposit);
+        _reduceExposure(escrowContract, token, unwoundAmount);
 
         // Dust handling (5 wei threshold)
         uint256 finalUnwound = unwoundAmount;

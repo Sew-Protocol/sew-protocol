@@ -91,7 +91,7 @@ contract MockAaveConfigModule is ERC165, IYieldGenerationModule {
     }
 
     // Used in direct module pattern tests
-    function depositForYield(uint256, address token, uint256 amount) external override returns (bool, uint256) {
+    function depositForYield(uint256, address token, uint256 amount, address) external override returns (bool, uint256) {
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
         IERC20(token).approve(pool, amount);
         MockAavePoolNormalizedIncome(pool).supply(token, amount, address(this), 0);

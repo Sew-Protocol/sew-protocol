@@ -2,7 +2,7 @@
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/decentralized-resolution-module/BondValuationLibrary.sol';
+import '../../../contracts/modules/decentralized-resolution-module/BondValuationLibrary.sol';
 
 /**
  * @title BondValuationInvariantsTest

@@ -2,8 +2,8 @@
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol';
-import '../../../contracts/decentralized-resolution-module/DecentralizedResolverStructs.sol';
+import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol';
+import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
 import '@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol';
 
 /**

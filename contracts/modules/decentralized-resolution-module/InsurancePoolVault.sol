@@ -94,10 +94,6 @@ contract InsurancePoolVault is AccessControl, ReentrancyGuard {
 
     event PayoutCancelled(uint256 indexed payoutId);
 
-    // ============ Modifiers ============
-
-    // Custom modifiers removed in favor of onlyRole(ROLE_...) to match project consistency
-
     // ============ Initialization ============
 
     /**
@@ -119,16 +115,11 @@ contract InsurancePoolVault is AccessControl, ReentrancyGuard {
 
     // ============ Core Functions ============
 
-    /**
-     * @notice Deposit funds to insurance pool (called by slashing module)
-     * @param amount Amount to deposit
-     * @param source Source of funds (timeout, reversal, fraud)
-     * @param workflowId Related dispute ID (0 if not applicable)
-     */
     function deposit(
         uint256 amount,
         ISlashingModule.SlashReason source,
-        uint256 workflowId
+        uint256 workflowId,
+        address /* escrowContract */
     ) external onlyRole(ROLE_SLASHING_MODULE) nonReentrant {
         if (amount == 0) revert ZeroAmount();
 
@@ -147,36 +138,24 @@ contract InsurancePoolVault is AccessControl, ReentrancyGuard {
     function recordDeposit(
         uint256 amount,
         ISlashingModule.SlashReason source,
-        uint256 workflowId
-    ) external onlyRole(ROLE_SLASHING_MODULE) nonReentrant {
-        if (amount == 0) revert ZeroAmount();
+        uint256 workflowId,
+        address /* escrowContract */
+    ) external onlyRole(ROLE_SLASHING_MODULE) {
         _recordDeposit(amount, source, workflowId);
     }
 
-    /**
-     * @notice Internal function to record deposit
-     */
     function _recordDeposit(
         uint256 amount,
         ISlashingModule.SlashReason source,
         uint256 workflowId
     ) internal {
-        // Update source-tagged accounting
-        if (
-            source == ISlashingModule.SlashReason.TIMEOUT_ACCEPT ||
-            source == ISlashingModule.SlashReason.TIMEOUT_RESOLVE
-        ) {
+        if (source == ISlashingModule.SlashReason.TIMEOUT_ACCEPT || source == ISlashingModule.SlashReason.TIMEOUT_RESOLVE) {
             sourceBalance.timeout += amount;
         } else if (source == ISlashingModule.SlashReason.REVERSAL) {
             sourceBalance.reversal += amount;
-        } else if (
-            source == ISlashingModule.SlashReason.FRAUD ||
-            source == ISlashingModule.SlashReason.COLLUSION ||
-            source == ISlashingModule.SlashReason.BRIBERY
-        ) {
+        } else {
             sourceBalance.fraud += amount;
         }
-
         sourceBalance.total += amount;
 
         emit InsuranceFunded(amount, source, workflowId, sourceBalance.total);
@@ -194,6 +173,7 @@ contract InsurancePoolVault is AccessControl, ReentrancyGuard {
         address to,
         uint256 amount,
         uint256 workflowId,
+        address /* escrowContract */,
         string memory reason
     ) external onlyRole(ROLE_TIMELOCK) returns (uint256 payoutId) {
         if (to == address(0)) revert ZeroAddress();

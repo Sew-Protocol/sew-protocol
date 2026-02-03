@@ -51,7 +51,7 @@ contract AaveYieldInterTemporalBug is Test {
         vm.prank(escrow);
         token.approve(address(module), amount);
         vm.prank(escrow);
-        module.depositForYield(1, address(token), amount);
+        module.depositForYield(1, address(token), amount, address(this));
 
         // 2. Index increases to 2.0 (100% yield)
         pool.simulateYield(address(token), 100); // This mock increases index by YIELD_RATE (1e25 = 1%) per block
@@ -68,7 +68,7 @@ contract AaveYieldInterTemporalBug is Test {
         vm.prank(escrow);
         token.approve(address(module), amount);
         vm.prank(escrow);
-        module.depositForYield(2, address(token), amount);
+        module.depositForYield(2, address(token), amount, address(this));
 
         // Total underlying in module should be 300e18 (200 from E1, 100 from E2)
         assertEq(aToken.balanceOf(address(module)), 300e18);

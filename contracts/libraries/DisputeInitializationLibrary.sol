@@ -32,8 +32,9 @@ library DisputeInitializationLibrary {
         // Try initializeDisputeWithCategory first
         (bool success1, ) = disputeResolutionModule.call(
             abi.encodeWithSignature(
-                'initializeDisputeWithCategory(uint256,bytes)',
+                'initializeDisputeWithCategory(uint256,address,bytes)',
                 workflowId,
+                address(this),
                 escrowData
             )
         );
@@ -43,6 +44,7 @@ library DisputeInitializationLibrary {
             try
                 IResolutionModule(disputeResolutionModule).getDisputeResolver(
                     workflowId,
+                    address(this),
                     escrowData
                 )
             returns (address moduleDisputeResolver, uint8) {
@@ -56,8 +58,9 @@ library DisputeInitializationLibrary {
         // Fallback: try initializeDispute
         (bool success2, ) = disputeResolutionModule.call(
             abi.encodeWithSignature(
-                'initializeDispute(uint256,address,bytes32)',
+                'initializeDispute(uint256,address,address,bytes32)',
                 workflowId,
+                address(this),
                 disputeResolver,
                 bytes32(0)
             )
@@ -67,6 +70,7 @@ library DisputeInitializationLibrary {
             try
                 IResolutionModule(disputeResolutionModule).getDisputeResolver(
                     workflowId,
+                    address(this),
                     escrowData
                 )
             returns (address moduleDisputeResolver, uint8) {

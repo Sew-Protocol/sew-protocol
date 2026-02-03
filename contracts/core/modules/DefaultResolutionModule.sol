@@ -34,14 +34,36 @@ contract DefaultResolutionModule is AccessControl, IResolutionModule {
     }
 
     /**
+     * @notice Initialize a new dispute in the module
+     */
+    function initializeDispute(
+        uint256 /* workflowId */,
+        address /* escrowContract */,
+        address /* initialResolver */,
+        bytes32 /* categoryKey */
+    ) external virtual override {}
+
+    /**
+     * @notice Record a resolution outcome
+     */
+    function recordResolution(
+        uint256 /* workflowId */,
+        address /* escrowContract */,
+        address /* resolver */,
+        ResolutionOutcome /* outcome */,
+        uint256 /* resolutionTime */
+    ) external virtual override {}
+
+    /**
      * @notice Check if address is authorized dispute resolver
      * @dev In default implementation, checks against stored resolver
      */
     function isAuthorizedDisputeResolver(
         uint256 /* workflowId */,
+        address /* escrowContract */,
         address checkDisputeResolver,
         bytes calldata /* escrowData */
-    ) external view override returns (bool authorized, uint8 role) {
+    ) external view virtual override returns (bool authorized, uint8 role) {
         // Check if the dispute resolver matches the stored resolver
         authorized = (checkDisputeResolver == resolver);
         role = 0;
@@ -53,8 +75,9 @@ contract DefaultResolutionModule is AccessControl, IResolutionModule {
      */
     function getDisputeResolver(
         uint256 /* workflowId */,
+        address /* escrowContract */,
         bytes calldata /* escrowData */
-    ) external view override returns (address disputeResolver, uint8 escalationLevel) {
+    ) external view virtual override returns (address disputeResolver, uint8 escalationLevel) {
         return (resolver, 0);
     }
 
@@ -63,9 +86,10 @@ contract DefaultResolutionModule is AccessControl, IResolutionModule {
      */
     function canEscalate(
         uint256 /* workflowId */,
+        address /* escrowContract */,
         uint8 /* currentLevel */,
         bytes calldata /* escrowData */
-    ) external pure override returns (bool allowed, address nextResolver, uint256 escalationFee) {
+    ) external pure virtual override returns (bool allowed, address nextResolver, uint256 escalationFee) {
         return (false, address(0), 0);
     }
 
@@ -74,8 +98,9 @@ contract DefaultResolutionModule is AccessControl, IResolutionModule {
      */
     function executeEscalation(
         uint256 /* workflowId */,
+        address /* escrowContract */,
         bytes calldata /* escrowData */
-    ) external pure override returns (bool success, address newResolver, uint8 newLevel) {
+    ) external pure virtual override returns (bool success, address newResolver, uint8 newLevel) {
         return (false, address(0), 0);
     }
 
@@ -85,11 +110,39 @@ contract DefaultResolutionModule is AccessControl, IResolutionModule {
      */
     function getRequiredAppealBond(
         uint256 /* workflowId */,
+        address /* escrowContract */,
         uint8 /* currentLevel */,
         bytes calldata /* escrowData */
-    ) external pure override returns (uint256 amount, address token) {
+    ) external pure virtual override returns (uint256 amount, address token) {
         return (0, address(0));
     }
+
+    /**
+     * @notice Get decision at a specific round
+     */
+    function getDecisionAtRound(uint256 /* workflowId */, address /* escrowContract */, uint8 /* round */) external view virtual override returns (uint8 decision) {
+        return 0; // ResolutionOutcome.NONE
+    }
+
+    /**
+     * @notice Get appeal deadline and current round
+     */
+    function getAppealDeadlineAndRound(
+        uint256 /* workflowId */,
+        address /* escrowContract */
+    ) external view virtual override returns (uint256 appealDeadline, uint8 currentRound, bool isFinalRound) {
+        return (0, 0, true);
+    }
+
+    /**
+     * @notice Record a reversal
+     */
+    function recordReversal(uint256 /* workflowId */, address /* escrowContract */, uint8 /* priorRound */) external virtual override {}
+
+    /**
+     * @notice Finalize a dispute
+     */
+    function finalizeDispute(uint256 /* workflowId */, address /* escrowContract */) external virtual override {}
 
     /**
      * @notice Get incentive module address (optional interface)
@@ -104,7 +157,7 @@ contract DefaultResolutionModule is AccessControl, IResolutionModule {
     /**
      * @notice Get module name
      */
-    function moduleName() external pure override returns (string memory) {
+    function moduleName() external pure virtual override returns (string memory) {
         return 'DefaultSingleResolver';
     }
 
@@ -112,7 +165,7 @@ contract DefaultResolutionModule is AccessControl, IResolutionModule {
      * @notice Get the module version
      * @return version The module version (semantic versioning)
      */
-    function moduleVersion() external pure override returns (string memory version) {
+    function moduleVersion() external pure virtual override returns (string memory version) {
         return '1.0.0';
     }
 

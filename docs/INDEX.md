@@ -15,6 +15,10 @@ Complete index of all documentation in this repository.
 - **[Production Readiness Checklist](./PRODUCTION_READY_CHECKLIST.md)** - Mainnet requirements and status
 - **[Production Hardening Status](./PRODUCTION_HARDENING_STATUS.md)** - Summary of hardening efforts
 
+### Contract Architecture (NEW)
+- **[Contract Dependency Map](./CONTRACT_DEPENDENCY_MAP.md)** - Complete contract map showing which contracts use which others, call flows, and relationships
+- **[Contract Quick Reference](./CONTRACT_QUICK_REFERENCE.md)** - Visual reference for contract layers, call chains, and governance flows
+
 ### Security & Audits
 - **[DeFi Expert Review](./DEFI_EXPERT_REVIEW.md)** - Comprehensive security approval
 - **[Security Model](./reviews/SECURITY_MODEL.md)** - Security model and threat analysis
@@ -204,6 +208,8 @@ Historical, superseded, or completed documentation moved to `more/` or `archived
 - [Technical Overview](./architecture/TECHNICAL_OVERVIEW.md)
 - [Architectural Principles](./architecture/ARCHITECTURAL_PRINCIPLES.md)
 - [Contracts Summary](./architecture/CONTRACTS_SUMMARY.md)
+- [Contract Dependency Map](./CONTRACT_DEPENDENCY_MAP.md) ⭐ NEW - Shows which contracts use/call which
+- [Contract Quick Reference](./CONTRACT_QUICK_REFERENCE.md) ⭐ NEW - Visual layers, call chains, governance flows
 
 **Governance:**
 - [Governance Process](./governance/GOVERNANCE_PROCESS.md)

@@ -71,6 +71,7 @@ library YieldHandlingLibrary {
     function distributeYield(
         IYieldDistributionModule distModule,
         uint256 workflowId,
+        address escrowContract,
         address token,
         uint256 yieldAmount
     ) internal {
@@ -86,6 +87,7 @@ library YieldHandlingLibrary {
         bytes memory distributionData = '';
         (bool success, ) = distModule.distributeYield(
             workflowId,
+            escrowContract,
             token,
             yieldAmount,
             distributionData

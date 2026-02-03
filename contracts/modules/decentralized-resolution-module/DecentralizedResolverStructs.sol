@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
+import '../../types/EscrowTypes.sol';
+
 /**
  * @title DecentralizedResolverStructs
  * @notice Shared structs and enums for Decentralized Resolution Module
@@ -15,11 +17,7 @@ interface DecentralizedResolverStructs {
         EXTERNAL // 3 - External resolver (e.g., Kleros)
     }
 
-    enum ResolutionOutcome {
-        NONE, // 0 - No resolution yet
-        RELEASE, // 1 - Funds released to recipient
-        CANCEL // 2 - Funds refunded to sender
-    }
+    // ResolutionOutcome enum moved to EscrowTypes.sol for central use
 
     enum DisputeStatus {
         Open, // 0 - Awaiting resolver decision

@@ -34,13 +34,13 @@ contract ModulesCoverageTest is Test {
     // ============ DefaultYieldDistributionModule Tests ============
 
     function test_DefaultDist_distributeYield_ZeroAmount() public {
-        (bool success, uint256 distributed) = distModule.distributeYield(1, address(token), 0, "");
+        (bool success, uint256 distributed) = distModule.distributeYield(1, address(this), address(token), 0, "");
         assertTrue(success);
         assertEq(distributed, 0);
     }
 
     function test_DefaultDist_distributeYield_EmptyData() public {
-        (bool success, uint256 distributed) = distModule.distributeYield(1, address(token), 100, "");
+        (bool success, uint256 distributed) = distModule.distributeYield(1, address(this), address(token), 100, "");
         assertTrue(success);
         assertEq(distributed, 0);
     }
@@ -56,7 +56,7 @@ contract ModulesCoverageTest is Test {
 
         token.mint(address(distModule), 100);
 
-        (bool success, uint256 distributed) = distModule.distributeYield(1, address(token), 100, data);
+        (bool success, uint256 distributed) = distModule.distributeYield(1, address(this), address(token), 100, data);
         assertTrue(success);
         assertEq(distributed, 100);
         assertEq(token.balanceOf(address(0x1)), 50);
@@ -68,7 +68,7 @@ contract ModulesCoverageTest is Test {
         uint256[] memory percentages = new uint256[](0);
         bytes memory data = abi.encode(recipients, percentages);
 
-        (bool success, uint256 distributed) = distModule.distributeYield(1, address(token), 100, data);
+        (bool success, uint256 distributed) = distModule.distributeYield(1, address(this), address(token), 100, data);
         assertFalse(success);
         assertEq(distributed, 0);
     }
@@ -80,7 +80,7 @@ contract ModulesCoverageTest is Test {
         percentages[0] = 9999;
         bytes memory data = abi.encode(recipients, percentages);
 
-        (bool success, uint256 distributed) = distModule.distributeYield(1, address(token), 100, data);
+        (bool success, uint256 distributed) = distModule.distributeYield(1, address(this), address(token), 100, data);
         assertFalse(success);
         assertEq(distributed, 0);
     }
@@ -90,7 +90,7 @@ contract ModulesCoverageTest is Test {
         uint256[] memory percentages = new uint256[](1);
         bytes memory data = abi.encode(recipients, percentages);
 
-        (bool success, uint256 distributed) = distModule.distributeYield(1, address(token), 100, data);
+        (bool success, uint256 distributed) = distModule.distributeYield(1, address(this), address(token), 100, data);
         assertFalse(success);
         assertEq(distributed, 0);
     }
@@ -113,7 +113,7 @@ contract ModulesCoverageTest is Test {
 
         token.mint(address(distModule), 100);
 
-        (bool success, uint256 distributed) = distModule.distributeYield(1, address(token), 100, data);
+        (bool success, uint256 distributed) = distModule.distributeYield(1, address(this), address(token), 100, data);
         assertTrue(success);
         assertEq(distributed, 50);
         assertEq(token.balanceOf(address(0x2)), 50);
@@ -144,7 +144,7 @@ contract ModulesCoverageTest is Test {
         bytes memory data2 = abi.encode(r2, p2);
         
         token.mint(address(distModule), smallYield);
-        (bool success, uint256 distributed) = distModule.distributeYield(1, address(token), smallYield, data2);
+        (bool success, uint256 distributed) = distModule.distributeYield(1, address(this), address(token), smallYield, data2);
         assertTrue(success);
         // share0 = 1 * 1 / 10000 = 0
         // share1 = 1 * 9999 / 10000 = 0
@@ -154,13 +154,13 @@ contract ModulesCoverageTest is Test {
     // ============ DefaultReleaseStrategy Tests ============
 
     function test_DefaultRelease_canRelease() public {
-        (bool allowed, string memory reason) = relStrategy.canRelease(1, address(0), "");
+        (bool allowed, string memory reason) = relStrategy.canRelease(1, address(this), address(0), "");
         assertTrue(allowed);
         assertEq(reason, "");
     }
 
     function test_DefaultRelease_executeRelease() public {
-        (bool success, address recipient, uint256 amount) = relStrategy.executeRelease(1, "");
+        (bool success, address recipient, uint256 amount) = relStrategy.executeRelease(1, address(this), "");
         assertTrue(success);
         assertEq(recipient, address(0));
         assertEq(amount, 0);
@@ -195,27 +195,27 @@ contract ModulesCoverageTest is Test {
     }
 
     function test_DefaultRes_isAuthorized() public {
-        (bool auth, uint8 role) = resModule.isAuthorizedDisputeResolver(1, resolver, "");
+        (bool auth, uint8 role) = resModule.isAuthorizedDisputeResolver(1, address(this), resolver, "");
         assertTrue(auth);
         assertEq(role, 0);
 
-        (auth, role) = resModule.isAuthorizedDisputeResolver(1, address(0x999), "");
+        (auth, role) = resModule.isAuthorizedDisputeResolver(1, address(this), address(0x999), "");
         assertFalse(auth);
     }
 
     function test_DefaultRes_getDisputeResolver() public {
-        (address r, uint8 l) = resModule.getDisputeResolver(1, "");
+        (address r, uint8 l) = resModule.getDisputeResolver(1, address(this), "");
         assertEq(r, resolver);
         assertEq(l, 0);
     }
 
     function test_DefaultRes_Escalation() public {
-        (bool can, address next, uint256 fee) = resModule.canEscalate(1, 0, "");
+        (bool can, address next, uint256 fee) = resModule.canEscalate(1, address(this), 0, "");
         assertFalse(can);
         assertEq(next, address(0));
         assertEq(fee, 0);
 
-        (bool success, address newR, uint8 newL) = resModule.executeEscalation(1, "");
+        (bool success, address newR, uint8 newL) = resModule.executeEscalation(1, address(this), "");
         assertFalse(success);
         assertEq(newR, address(0));
         assertEq(newL, 0);
@@ -229,7 +229,7 @@ contract ModulesCoverageTest is Test {
     }
 
     function test_DefaultRes_AdditionalFunctions() public {
-        (uint256 amount, address bondToken) = resModule.getRequiredAppealBond(1, 0, "");
+        (uint256 amount, address bondToken) = resModule.getRequiredAppealBond(1, address(this), 0, "");
         assertEq(amount, 0);
         assertEq(bondToken, address(0));
 

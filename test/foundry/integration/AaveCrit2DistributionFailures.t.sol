@@ -8,7 +8,6 @@ import "../../../contracts/core/ModuleManagementContract.sol";
 import "../../../contracts/core/modules/DefaultResolutionModule.sol";
 import "../../../contracts/modules/AaveYieldGenerationModule.sol";
 import "../../../contracts/modules/DefaultYieldDistributionModule.sol";
-import "../../../contracts/modules/TestYieldDistributionModule.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
 import "../../../contracts/mocks/MockAavePool.sol";
 import "../../../contracts/YieldOps.sol";

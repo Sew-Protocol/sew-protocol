@@ -2,10 +2,10 @@
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/decentralized-resolution-module/ResolverSlashingModuleV1.sol';
-import '../../../contracts/decentralized-resolution-module/ResolverStakingModuleV1.sol';
-import '../../../contracts/decentralized-resolution-module/InsurancePoolVault.sol';
-import '../../../contracts/decentralized-resolution-module/ISlashingModule.sol';
+import '../../../contracts/modules/decentralized-resolution-module/ResolverSlashingModuleV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/ResolverStakingModuleV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/InsurancePoolVault.sol';
+import '../../../contracts/modules/decentralized-resolution-module/ISlashingModule.sol';
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol';
 
@@ -140,7 +140,7 @@ contract SlashingModuleUnitTest is Test {
         uint8 timeoutType = 0; // Accept timeout
 
         vm.prank(resolutionModule);
-        uint256 slashId = slashingModule.slashForTimeout(workflowId, resolver1, timeoutType);
+        uint256 slashId = slashingModule.slashForTimeout(workflowId, address(this), resolver1, timeoutType);
 
         assertGt(slashId, 0, 'Should return slash ID');
         ISlashingModule.SlashEvent memory event_ = slashingModule.getSlashEvent(slashId);
@@ -154,7 +154,7 @@ contract SlashingModuleUnitTest is Test {
         uint8 timeoutType = 1; // Resolve timeout
 
         vm.prank(resolutionModule);
-        uint256 slashId = slashingModule.slashForTimeout(workflowId, resolver1, timeoutType);
+        uint256 slashId = slashingModule.slashForTimeout(workflowId, address(this), resolver1, timeoutType);
 
         ISlashingModule.SlashEvent memory event_ = slashingModule.getSlashEvent(slashId);
         assertEq(uint8(event_.reason), uint8(ISlashingModule.SlashReason.TIMEOUT_RESOLVE), 'Should be timeout resolve');
@@ -167,7 +167,7 @@ contract SlashingModuleUnitTest is Test {
         bytes memory evidence = 'Fraud evidence: collusion detected';
 
         vm.prank(timelock);
-        uint256 slashId = slashingModule.slashForFraud(workflowId, resolver1, evidence);
+        uint256 slashId = slashingModule.slashForFraud(workflowId, address(this), resolver1, evidence);
 
         assertGt(slashId, 0, 'Should return slash ID');
         ISlashingModule.SlashEvent memory event_ = slashingModule.getSlashEvent(slashId);
@@ -184,7 +184,7 @@ contract SlashingModuleUnitTest is Test {
 
         vm.prank(resolutionModule);
         vm.expectRevert();
-        slashingModule.slashForFraud(workflowId, resolver1, evidence);
+        slashingModule.slashForFraud(workflowId, address(this), resolver1, evidence);
     }
 
     function test_slashForFraud_RequiresFraudSlashEnabled() public {
@@ -197,7 +197,7 @@ contract SlashingModuleUnitTest is Test {
 
         vm.prank(timelock);
         vm.expectRevert(ResolverSlashingModuleV1.FraudSlashingNotEnabled.selector);
-        slashingModule.slashForFraud(workflowId, resolver1, evidence);
+        slashingModule.slashForFraud(workflowId, address(this), resolver1, evidence);
     }
 
     function test_slashForFraud_NoDoubleSlashing() public {
@@ -205,11 +205,11 @@ contract SlashingModuleUnitTest is Test {
         bytes memory evidence = 'Evidence';
 
         vm.startPrank(timelock);
-        uint256 slashId1 = slashingModule.slashForFraud(workflowId, resolver1, evidence);
+        uint256 slashId1 = slashingModule.slashForFraud(workflowId, address(this), resolver1, evidence);
         assertGt(slashId1, 0, 'First slash should succeed');
 
         // Attempt second slash for same workflow/resolver
-        uint256 slashId2 = slashingModule.slashForFraud(workflowId, resolver1, evidence);
+        uint256 slashId2 = slashingModule.slashForFraud(workflowId, address(this), resolver1, evidence);
         assertEq(slashId2, 0, 'Second slash should return 0 (already slashed)');
         vm.stopPrank();
     }
@@ -223,7 +223,7 @@ contract SlashingModuleUnitTest is Test {
         bytes memory evidence = 'Evidence';
 
         vm.prank(timelock);
-        uint256 slashId = slashingModule.slashForFraud(workflowId, resolver1, evidence);
+        uint256 slashId = slashingModule.slashForFraud(workflowId, address(this), resolver1, evidence);
         assertEq(slashId, 0, 'Should return 0 when circuit breaker active');
     }
 
@@ -234,11 +234,11 @@ contract SlashingModuleUnitTest is Test {
 
         // Slash multiple times to hit period cap
         vm.startPrank(timelock);
-        uint256 slashId1 = slashingModule.slashForFraud(workflowId, resolver1, evidence);
+        uint256 slashId1 = slashingModule.slashForFraud(workflowId, address(this), resolver1, evidence);
         assertGt(slashId1, 0, 'First slash should succeed');
 
         // Second slash for different workflow should respect period cap
-        uint256 slashId2 = slashingModule.slashForFraud(2, resolver1, evidence);
+        uint256 slashId2 = slashingModule.slashForFraud(2, address(this), resolver1, evidence);
         // Should either succeed (if under cap) or return 0 (if cap reached)
         assertTrue(slashId2 >= 0, 'Second slash should handle cap correctly');
         vm.stopPrank();
@@ -249,7 +249,7 @@ contract SlashingModuleUnitTest is Test {
         bytes memory evidence = 'Evidence';
 
         vm.prank(timelock);
-        slashingModule.slashForFraud(workflowId, resolver1, evidence);
+        slashingModule.slashForFraud(workflowId, address(this), resolver1, evidence);
 
         // Check resolver is frozen
         uint256 frozenUntil = slashingModule.frozenUntil(resolver1);
@@ -263,7 +263,7 @@ contract SlashingModuleUnitTest is Test {
         uint256 poolBalanceBefore = stableToken.balanceOf(address(insurancePool));
 
         vm.prank(timelock);
-        slashingModule.slashForFraud(workflowId, resolver1, evidence);
+        slashingModule.slashForFraud(workflowId, address(this), resolver1, evidence);
 
         uint256 poolBalanceAfter = stableToken.balanceOf(address(insurancePool));
         assertGt(poolBalanceAfter, poolBalanceBefore, 'Insurance pool should receive funds');
@@ -274,7 +274,7 @@ contract SlashingModuleUnitTest is Test {
         bytes memory evidence = 'Evidence';
 
         vm.prank(timelock);
-        uint256 slashId = slashingModule.slashForFraud(workflowId, resolver1, evidence);
+        uint256 slashId = slashingModule.slashForFraud(workflowId, address(this), resolver1, evidence);
 
         ISlashingModule.SlashEvent memory event_ = slashingModule.getSlashEvent(slashId);
         assertGt(event_.appealDeadline, block.timestamp, 'Should have appeal deadline');
@@ -289,8 +289,8 @@ contract SlashingModuleUnitTest is Test {
         bytes memory evidence2 = 'Different evidence';
 
         vm.startPrank(timelock);
-        uint256 slashId1 = slashingModule.slashForFraud(workflowId, resolver1, evidence1);
-        uint256 slashId2 = slashingModule.slashForFraud(2, resolver1, evidence2);
+        uint256 slashId1 = slashingModule.slashForFraud(workflowId, address(this), resolver1, evidence1);
+        uint256 slashId2 = slashingModule.slashForFraud(2, address(this), resolver1, evidence2);
         vm.stopPrank();
 
         // First slash should succeed
@@ -313,7 +313,7 @@ contract SlashingModuleUnitTest is Test {
         bytes memory evidence = 'Evidence';
 
         vm.prank(timelock);
-        uint256 slashId = slashingModule.slashForFraud(workflowId, resolver1, evidence);
+        uint256 slashId = slashingModule.slashForFraud(workflowId, address(this), resolver1, evidence);
 
         // Verify slash completed successfully
         assertGt(slashId, 0, 'Should create slash event');
@@ -329,7 +329,7 @@ contract SlashingModuleUnitTest is Test {
         uint8 priorRound = 0;
 
         vm.prank(resolutionModule);
-        uint256 slashId = slashingModule.slashForReversal(workflowId, resolver1, priorRound);
+        uint256 slashId = slashingModule.slashForReversal(workflowId, address(this), resolver1, priorRound);
 
         assertEq(slashId, 0, 'Should return 0 (disabled)');
     }
@@ -366,7 +366,7 @@ contract SlashingModuleUnitTest is Test {
         assertGt(sewAmount, 0, 'Resolver should have SEW staked');
 
         vm.prank(resolutionModule);
-        uint256 slashId = slashingModule.slashForTimeout(workflowId, resolver1, timeoutType);
+        uint256 slashId = slashingModule.slashForTimeout(workflowId, address(this), resolver1, timeoutType);
 
         assertGt(slashId, 0, 'Should create slash event');
 
@@ -393,7 +393,7 @@ contract SlashingModuleUnitTest is Test {
         uint256 totalSupplyBefore = sewToken.totalSupply();
 
         vm.prank(timelock);
-        uint256 slashId = slashingModule.slashForFraud(workflowId, resolver1, evidence);
+        uint256 slashId = slashingModule.slashForFraud(workflowId, address(this), resolver1, evidence);
 
         assertGt(slashId, 0, 'Should create slash event');
 
@@ -419,7 +419,7 @@ contract SlashingModuleUnitTest is Test {
         uint256 insurancePoolStableBefore = stableToken.balanceOf(address(insurancePool));
 
         vm.prank(resolutionModule);
-        uint256 slashId = slashingModule.slashForTimeout(workflowId, resolver1, timeoutType);
+        uint256 slashId = slashingModule.slashForTimeout(workflowId, address(this), resolver1, timeoutType);
 
         assertGt(slashId, 0, 'Should create slash event');
 
@@ -442,7 +442,7 @@ contract SlashingModuleUnitTest is Test {
         uint256 slashingModuleSewBefore = sewToken.balanceOf(address(slashingModule));
 
         vm.prank(resolutionModule);
-        uint256 slashId = slashingModule.slashForTimeout(workflowId, resolver1, timeoutType);
+        uint256 slashId = slashingModule.slashForTimeout(workflowId, address(this), resolver1, timeoutType);
 
         assertGt(slashId, 0, 'Should create slash event');
 
@@ -473,7 +473,7 @@ contract SlashingModuleUnitTest is Test {
         uint8 timeoutType = 1;
 
         vm.prank(resolutionModule);
-        slashingModule.slashForTimeout(workflowId, resolver1, timeoutType);
+        slashingModule.slashForTimeout(workflowId, address(this), resolver1, timeoutType);
 
         // Verify SEW was burned
         uint256 totalSupplyAfter = sewToken.totalSupply();

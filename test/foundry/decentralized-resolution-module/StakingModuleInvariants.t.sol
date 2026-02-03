@@ -2,8 +2,8 @@
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/decentralized-resolution-module/ResolverStakingModuleV1.sol';
-import '../../../contracts/decentralized-resolution-module/BondValuationLibrary.sol';
+import '../../../contracts/modules/decentralized-resolution-module/ResolverStakingModuleV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/BondValuationLibrary.sol';
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol';
 
@@ -537,7 +537,7 @@ contract StakingModuleInvariantsTest is Test {
 
         // Lock stake (simulate dispute assignment)
         vm.prank(resolutionModule);
-        stakingModule.onResolverAssigned(1, resolver1, 0);
+        stakingModule.onResolverAssigned(1, address(0), resolver1, 0);
 
         // Try to unbond
         uint256 lockedAmount = stakingModule.totalLockedStake(resolver1);
@@ -553,7 +553,7 @@ contract StakingModuleInvariantsTest is Test {
 
         // Unlock stake
         vm.prank(resolutionModule);
-        stakingModule.onResolutionFinalized(1, resolver1, true);
+        stakingModule.onResolutionFinalized(1, address(0), resolver1, true);
 
         // Now can unbond
         vm.prank(resolver1);
@@ -702,7 +702,7 @@ contract StakingModuleInvariantsTest is Test {
 
         // 2. Lock (dispute assignment)
         vm.prank(resolutionModule);
-        stakingModule.onResolverAssigned(1, resolver1, 0);
+        stakingModule.onResolverAssigned(1, address(0), resolver1, 0);
 
         info = stakingModule.getStakeInfo(resolver1);
         assertEq(info.lockedStake, 250e18); // Minimum stake locked (v3: $250 for resolver)
@@ -710,7 +710,7 @@ contract StakingModuleInvariantsTest is Test {
 
         // 3. Unlock (resolution finalized)
         vm.prank(resolutionModule);
-        stakingModule.onResolutionFinalized(1, resolver1, true);
+        stakingModule.onResolutionFinalized(1, address(0), resolver1, true);
 
         info = stakingModule.getStakeInfo(resolver1);
         assertEq(info.lockedStake, 0);

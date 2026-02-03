@@ -3,7 +3,7 @@ pragma solidity ^0.8.33;
 
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
-import '../decentralized-resolution-module/IIncentiveModule.sol';
+import '../modules/decentralized-resolution-module/IIncentiveModule.sol';
 import '../core/BondCollector.sol';
 
 library BondHandlingLibrary {
@@ -71,6 +71,7 @@ library BondHandlingLibrary {
         // Record bond (depositor MUST equal escalatedBy for ETH bonds)
         incentiveMod.recordAppealBond{value: bondToRecord}(
             workflowId,
+            address(this),
             escalatedBy, // depositor
             escalatedBy, // escalatedBy
             bondToRecord,
@@ -114,6 +115,7 @@ library BondHandlingLibrary {
         bondCollector.approveBondSpender(bondToken, address(incentiveMod), bondToRecord);
         incentiveMod.recordAppealBond(
             workflowId,
+            address(this),
             address(bondCollector), // depositor (custodian)
             escalatedBy, // escalatedBy
             bondToRecord,

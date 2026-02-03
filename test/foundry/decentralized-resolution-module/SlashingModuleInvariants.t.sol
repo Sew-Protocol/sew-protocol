@@ -2,8 +2,8 @@
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/decentralized-resolution-module/ResolverSlashingModuleV1.sol';
-import '../../../contracts/decentralized-resolution-module/ResolverStakingModuleV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/ResolverSlashingModuleV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/ResolverStakingModuleV1.sol';
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol';
 
@@ -129,7 +129,7 @@ contract SlashingModuleInvariantsTest is Test {
 
         // Slash for timeout
         vm.prank(resolutionModule);
-        uint256 slashId = slashingModule.slashForTimeout(1, resolver1, 1);
+        uint256 slashId = slashingModule.slashForTimeout(1, address(this), resolver1, 1);
 
         // Get slash event
         ISlashingModule.SlashEvent memory slashEvent = slashingModule.getSlashEvent(slashId);
@@ -154,7 +154,7 @@ contract SlashingModuleInvariantsTest is Test {
         uint256 totalSlashed = 0;
         for (uint256 i = 0; i < 50; i++) {
             vm.prank(resolutionModule);
-            uint256 slashId = slashingModule.slashForTimeout(i + 1, resolver1, 1);
+            uint256 slashId = slashingModule.slashForTimeout(i + 1, address(this), resolver1, 1);
 
             if (slashId > 0) {
                 ISlashingModule.SlashEvent memory slashEvent = slashingModule.getSlashEvent(
@@ -185,7 +185,7 @@ contract SlashingModuleInvariantsTest is Test {
 
         // Test missed accept (25 bps = 0.25%)
         vm.prank(resolutionModule);
-        uint256 slashId1 = slashingModule.slashForTimeout(1, resolver1, 0);
+        uint256 slashId1 = slashingModule.slashForTimeout(1, address(this), resolver1, 0);
         ISlashingModule.SlashEvent memory slash1 = slashingModule.getSlashEvent(slashId1);
 
         uint256 expectedMissedAccept = (stake * 25) / BASIS_POINTS; // 0.25% (v3)
@@ -196,7 +196,7 @@ contract SlashingModuleInvariantsTest is Test {
         stakingModule.stakeWithMix(10000e6, 0);
 
         vm.prank(resolutionModule);
-        uint256 slashId2 = slashingModule.slashForTimeout(2, resolver2, 1);
+        uint256 slashId2 = slashingModule.slashForTimeout(2, address(this), resolver2, 1);
         ISlashingModule.SlashEvent memory slash2 = slashingModule.getSlashEvent(slashId2);
 
         uint256 expectedMissedResolve = (stake * 200) / BASIS_POINTS; // 2% (v3)
@@ -215,12 +215,12 @@ contract SlashingModuleInvariantsTest is Test {
 
         // First slash
         vm.prank(resolutionModule);
-        uint256 slashId1 = slashingModule.slashForTimeout(1, resolver1, 1);
+        uint256 slashId1 = slashingModule.slashForTimeout(1, address(this), resolver1, 1);
         assertTrue(slashId1 > 0, 'First slash failed');
 
         // Try to slash again for same workflow
         vm.prank(resolutionModule);
-        uint256 slashId2 = slashingModule.slashForTimeout(1, resolver1, 1);
+        uint256 slashId2 = slashingModule.slashForTimeout(1, address(this), resolver1, 1);
 
         // INVARIANT: Second slash returns 0 (already slashed)
         assertEq(slashId2, 0, 'Double slash allowed');
@@ -236,12 +236,12 @@ contract SlashingModuleInvariantsTest is Test {
 
         // Slash for workflow 1
         vm.prank(resolutionModule);
-        uint256 slashId1 = slashingModule.slashForTimeout(1, resolver1, 1);
+        uint256 slashId1 = slashingModule.slashForTimeout(1, address(this), resolver1, 1);
         assertTrue(slashId1 > 0, 'First slash failed');
 
         // Slash for workflow 2 (different workflow)
         vm.prank(resolutionModule);
-        uint256 slashId2 = slashingModule.slashForTimeout(2, resolver1, 1);
+        uint256 slashId2 = slashingModule.slashForTimeout(2, address(this), resolver1, 1);
 
         // INVARIANT: Second slash succeeds (different workflow)
         assertTrue(slashId2 > 0, 'Second slash failed');
@@ -264,7 +264,7 @@ contract SlashingModuleInvariantsTest is Test {
 
         // Slash
         vm.prank(resolutionModule);
-        slashingModule.slashForTimeout(1, resolver1, 1);
+        slashingModule.slashForTimeout(1, address(this), resolver1, 1);
 
         // INVARIANT: Resolver is frozen after slash
         (bool frozenAfter, uint256 frozenUntil) = slashingModule.isResolverFrozen(resolver1);
@@ -284,7 +284,7 @@ contract SlashingModuleInvariantsTest is Test {
 
         // Slash (first offense)
         vm.prank(resolutionModule);
-        slashingModule.slashForTimeout(1, resolver1, 1);
+        slashingModule.slashForTimeout(1, address(this), resolver1, 1);
 
         // Check freeze duration
         (, uint256 frozenUntil) = slashingModule.isResolverFrozen(resolver1);
@@ -305,7 +305,7 @@ contract SlashingModuleInvariantsTest is Test {
 
         // First slash (severe event - 72 hours)
         vm.prank(resolutionModule);
-        slashingModule.slashForTimeout(1, resolver1, 1);
+        slashingModule.slashForTimeout(1, address(this), resolver1, 1);
 
         (, uint256 frozenUntil1) = slashingModule.isResolverFrozen(resolver1);
         assertEq(frozenUntil1, slashTime + 72 hours, 'First freeze should be 72 hours');
@@ -313,7 +313,7 @@ contract SlashingModuleInvariantsTest is Test {
         // Second slash in same epoch (repeated severe event - 7 days)
         vm.warp(block.timestamp + 1 days); // Move forward but stay in same epoch (7 days)
         vm.prank(resolutionModule);
-        slashingModule.slashForTimeout(2, resolver1, 1);
+        slashingModule.slashForTimeout(2, address(this), resolver1, 1);
 
         (, uint256 frozenUntil2) = slashingModule.isResolverFrozen(resolver1);
         uint256 expectedFreeze = block.timestamp + 7 days;
@@ -332,7 +332,7 @@ contract SlashingModuleInvariantsTest is Test {
 
         // Slash
         vm.prank(resolutionModule);
-        slashingModule.slashForTimeout(1, resolver1, 1);
+        slashingModule.slashForTimeout(1, address(this), resolver1, 1);
 
         // Check frozen
         (bool frozen1, ) = slashingModule.isResolverFrozen(resolver1);
@@ -379,7 +379,7 @@ contract SlashingModuleInvariantsTest is Test {
 
         // Slash junior (small slash, covered by junior's own stake)
         vm.prank(resolutionModule);
-        uint256 slashId = slashingModule.slashForTimeout(1, resolver1, 1);
+        uint256 slashId = slashingModule.slashForTimeout(1, address(this), resolver1, 1);
 
         ISlashingModule.SlashEvent memory slashEvent = slashingModule.getSlashEvent(slashId);
 
@@ -414,7 +414,7 @@ contract SlashingModuleInvariantsTest is Test {
 
         // Try to slash
         vm.prank(resolutionModule);
-        uint256 slashId = slashingModule.slashForTimeout(1, resolver1, 1);
+        uint256 slashId = slashingModule.slashForTimeout(1, address(this), resolver1, 1);
 
         // INVARIANT: Slash returns 0 (circuit breaker active)
         assertEq(slashId, 0, 'Slash should be blocked by circuit breaker');
@@ -487,7 +487,7 @@ contract SlashingModuleInvariantsTest is Test {
 
         // Try to slash for reversal
         vm.prank(resolutionModule);
-        uint256 slashId = slashingModule.slashForReversal(1, resolver1, 0);
+        uint256 slashId = slashingModule.slashForReversal(1, address(this), resolver1, 0);
 
         // INVARIANT: Reversal slashing returns 0 (disabled)
         assertEq(slashId, 0, 'Reversal slashing should be disabled');
@@ -535,7 +535,7 @@ contract SlashingModuleInvariantsTest is Test {
         stakingModule.stakeWithMix(10000e6, 0);
 
         vm.prank(resolutionModule);
-        slashingModule.slashForTimeout(1, resolver1, 1);
+        slashingModule.slashForTimeout(1, address(this), resolver1, 1);
 
         // Check frozen
         (bool frozen1, ) = slashingModule.isResolverFrozen(resolver1);
@@ -560,7 +560,7 @@ contract SlashingModuleInvariantsTest is Test {
 
         // Slash in period 1
         vm.prank(resolutionModule);
-        slashingModule.slashForTimeout(1, resolver1, 1);
+        slashingModule.slashForTimeout(1, address(this), resolver1, 1);
 
         uint256 slashedPeriod1 = slashingModule.getSlashedInPeriod(resolver1);
         assertGt(slashedPeriod1, 0, 'Should have slashed in period 1');
@@ -570,7 +570,7 @@ contract SlashingModuleInvariantsTest is Test {
 
         // Slash in period 2
         vm.prank(resolutionModule);
-        slashingModule.slashForTimeout(2, resolver1, 1);
+        slashingModule.slashForTimeout(2, address(this), resolver1, 1);
 
         uint256 slashedPeriod2 = slashingModule.getSlashedInPeriod(resolver1);
 
@@ -601,7 +601,7 @@ contract SlashingModuleInvariantsTest is Test {
         // Keep slashing until we hit the epoch cap
         while (totalSlashed < maxSlashPerEpoch) {
             vm.prank(resolutionModule);
-            uint256 slashId = slashingModule.slashForTimeout(workflowId, resolver1, 1);
+            uint256 slashId = slashingModule.slashForTimeout(workflowId, address(this), resolver1, 1);
             
             if (slashId > 0) {
                 ISlashingModule.SlashEvent memory event_ = slashingModule.getSlashEvent(slashId);
@@ -641,7 +641,7 @@ contract SlashingModuleInvariantsTest is Test {
 
         while (totalSlashed < maxSlashPerEpoch) {
             vm.prank(admin);
-            uint256 slashId = slashingModule.slashForFraud(workflowId, senior1, evidence);
+            uint256 slashId = slashingModule.slashForFraud(workflowId, address(this), senior1, evidence);
             
             if (slashId > 0) {
                 ISlashingModule.SlashEvent memory event_ = slashingModule.getSlashEvent(slashId);
@@ -669,7 +669,7 @@ contract SlashingModuleInvariantsTest is Test {
 
         // First slash (200 bps = 2%)
         vm.prank(resolutionModule);
-        uint256 slashId1 = slashingModule.slashForTimeout(1, resolver1, 1);
+        uint256 slashId1 = slashingModule.slashForTimeout(1, address(this), resolver1, 1);
         ISlashingModule.SlashEvent memory slash1 = slashingModule.getSlashEvent(slashId1);
         uint256 expectedFirst = (stake * 200) / BASIS_POINTS;
         assertEq(slash1.amount, expectedFirst, 'First slash should be 200 bps');
@@ -678,7 +678,7 @@ contract SlashingModuleInvariantsTest is Test {
         // Note: Epoch is 7 days, so we stay within same epoch
         vm.warp(block.timestamp + 1 days);
         vm.prank(resolutionModule);
-        uint256 slashId2 = slashingModule.slashForTimeout(2, resolver1, 1);
+        uint256 slashId2 = slashingModule.slashForTimeout(2, address(this), resolver1, 1);
         ISlashingModule.SlashEvent memory slash2 = slashingModule.getSlashEvent(slashId2);
         
         // The repeat penalty is 500 bps, but epoch cap enforcement may reduce it
@@ -702,7 +702,7 @@ contract SlashingModuleInvariantsTest is Test {
 
         // Slash in epoch 1
         vm.prank(resolutionModule);
-        slashingModule.slashForTimeout(1, resolver1, 1);
+        slashingModule.slashForTimeout(1, address(this), resolver1, 1);
 
         uint256 slashedEpoch1 = slashingModule.getSlashedInPeriod(resolver1);
         assertGt(slashedEpoch1, 0, 'Should have slashed in epoch 1');
@@ -712,7 +712,7 @@ contract SlashingModuleInvariantsTest is Test {
 
         // Slash in epoch 2
         vm.prank(resolutionModule);
-        slashingModule.slashForTimeout(2, resolver1, 1);
+        slashingModule.slashForTimeout(2, address(this), resolver1, 1);
 
         // INVARIANT: Epoch counter reset - can slash again
         uint256 slashedEpoch2 = slashingModule.getSlashedInPeriod(resolver1);

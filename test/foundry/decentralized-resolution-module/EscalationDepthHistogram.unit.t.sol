@@ -2,8 +2,8 @@
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/decentralized-resolution-module/ResolverIncentiveModuleV2.sol';
-import '../../../contracts/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV2.sol';
+import '../../../contracts/modules/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/YieldOps.sol';
@@ -126,9 +126,9 @@ contract EscalationDepthHistogramTest is Test {
         assertEq(round2, 0, "Round 2 should remain 0");
 
         // Verify each bond is recorded correctly
-        assertTrue(incentiveModule.hasAppealBond(WORKFLOW_ID_1, 1), "Workflow 1 should have bond");
-        assertTrue(incentiveModule.hasAppealBond(WORKFLOW_ID_2, 1), "Workflow 2 should have bond");
-        assertTrue(incentiveModule.hasAppealBond(WORKFLOW_ID_3, 1), "Workflow 3 should have bond");
+        assertTrue(incentiveModule.hasAppealBond(WORKFLOW_ID_1, address(this), 1), "Workflow 1 should have bond");
+        assertTrue(incentiveModule.hasAppealBond(WORKFLOW_ID_2, address(this), 1), "Workflow 2 should have bond");
+        assertTrue(incentiveModule.hasAppealBond(WORKFLOW_ID_3, address(this), 1), "Workflow 3 should have bond");
     }
 
     /**
@@ -164,6 +164,7 @@ contract EscalationDepthHistogramTest is Test {
         vm.expectRevert("Invalid round");
         incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
             WORKFLOW_ID_1,
+            address(this),
             depositor,
             depositor,
             BOND_AMOUNT,
@@ -188,6 +189,7 @@ contract EscalationDepthHistogramTest is Test {
         vm.expectRevert("Invalid round");
         incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
             WORKFLOW_ID_1,
+            address(this),
             depositor,
             depositor,
             BOND_AMOUNT,
@@ -213,6 +215,7 @@ contract EscalationDepthHistogramTest is Test {
         vm.expectRevert("Invalid round");
         incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
             WORKFLOW_ID_1,
+            address(this),
             depositor,
             depositor,
             BOND_AMOUNT,
@@ -242,7 +245,7 @@ contract EscalationDepthHistogramTest is Test {
 
         // Distribute bond (refund)
         vm.prank(address(this));
-        incentiveModule.distributeAppealBond(WORKFLOW_ID_1, 0, true); // outcomeFlipped = true (refund)
+        incentiveModule.distributeAppealBond(WORKFLOW_ID_1, address(this), 0, true); // outcomeFlipped = true (refund)
 
         // Verify histogram unchanged (histogram is cumulative, doesn't decrease)
         (round0, round1, round2) = incentiveModule.getEscalationDepthHistogram();
@@ -318,6 +321,7 @@ contract EscalationDepthHistogramTest is Test {
         vm.prank(address(this));
         incentiveModule.recordAppealBond(
             WORKFLOW_ID_1,
+            address(this),
             depositor,
             depositor,
             BOND_AMOUNT,
@@ -346,7 +350,7 @@ contract EscalationDepthHistogramTest is Test {
         assertEq(round1, 1, "Round 1 should increment even with max workflow ID");
         
         // Verify bond exists
-        assertTrue(incentiveModule.hasAppealBond(maxWorkflowId, 1), "Bond should exist at max workflow ID");
+        assertTrue(incentiveModule.hasAppealBond(maxWorkflowId, address(this), 1), "Bond should exist at max workflow ID");
     }
 
     /**
@@ -378,6 +382,7 @@ contract EscalationDepthHistogramTest is Test {
         vm.expectRevert("Invalid amount");
         incentiveModule.recordAppealBond{value: 0}(
             WORKFLOW_ID_1,
+            address(this),
             depositor,
             depositor,
             0, // Invalid: zero amount
@@ -399,6 +404,7 @@ contract EscalationDepthHistogramTest is Test {
         vm.expectRevert("Bond already exists");
         incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
             WORKFLOW_ID_1,
+            address(this),
             depositor,
             depositor,
             BOND_AMOUNT,
@@ -434,6 +440,7 @@ contract EscalationDepthHistogramTest is Test {
             vm.prank(address(this));
             incentiveModule.recordAppealBond{value: amount}(
                 workflowId,
+                address(this),
                 depositorAddr,
                 depositorAddr,
                 amount,
@@ -449,6 +456,7 @@ contract EscalationDepthHistogramTest is Test {
             vm.prank(address(this));
             incentiveModule.recordAppealBond(
                 workflowId,
+                address(this),
                 depositorAddr,
                 depositorAddr,
                 amount,

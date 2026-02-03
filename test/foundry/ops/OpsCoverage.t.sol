@@ -1197,6 +1197,7 @@ contract OpsCoverageTest is Test {
         yieldOps._distributeYieldInternal(
             IYieldDistributionModule(address(0)),
             1,
+            address(this),
             address(token),
             100,
             ""
@@ -1354,7 +1355,7 @@ contract MockYieldGenerationModule is IYieldGenerationModule {
         return (success, actual, yield);
     }
 
-    function depositForYield(uint256, address, uint256) external pure returns (bool, uint256) { return (true, 0); }
+    function depositForYield(uint256, address, uint256, address) external pure returns (bool, uint256) { return (true, 0); }
     function getPosition(uint256, address, address) external pure returns (IYieldGenerationModule.YieldPosition memory) {
         return IYieldGenerationModule.YieldPosition(false, 0, 0, 0);
     }
@@ -1383,7 +1384,7 @@ contract MockYieldDistributionModule is IYieldDistributionModule {
         distributed = _d;
     }
 
-    function distributeYield(uint256, address, uint256, bytes calldata) external view returns (bool, uint256) {
+    function distributeYield(uint256, address, address, uint256, bytes calldata) external view returns (bool, uint256) {
         if (shouldRevert) revert("Dist Fail");
         return (success, distributed);
     }

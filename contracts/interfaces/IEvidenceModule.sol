@@ -22,6 +22,7 @@ interface IEvidenceModule is IERC165 {
      */
     function submitEvidence(
         uint256 workflowId,
+        address escrowContract,
         bytes32 evidenceHash,
         string calldata metadata
     ) external returns (uint256 evidenceId);
@@ -29,13 +30,15 @@ interface IEvidenceModule is IERC165 {
     /**
      * @notice Get all evidence hashes for a dispute
      * @param workflowId The escrow workflow ID
+     * @param escrowContract Address of the vault
      * @return hashes Array of evidence hashes
      * @return submitters Array of submitter addresses
      * @return timestamps Array of submission timestamps
      * @return metadata Array of metadata strings (if stored, otherwise empty)
      */
     function getEvidence(
-        uint256 workflowId
+        uint256 workflowId,
+        address escrowContract
     )
         external
         view
@@ -49,13 +52,15 @@ interface IEvidenceModule is IERC165 {
     /**
      * @notice Get evidence count for a dispute
      * @param workflowId The escrow workflow ID
+     * @param escrowContract Address of the vault
      * @return count Number of evidence submissions
      */
-    function getEvidenceCount(uint256 workflowId) external view returns (uint256 count);
+    function getEvidenceCount(uint256 workflowId, address escrowContract) external view returns (uint256 count);
 
     /**
      * @notice Get a specific evidence record
      * @param workflowId The escrow workflow ID
+     * @param escrowContract Address of the vault
      * @param evidenceId The evidence ID (0-indexed)
      * @return hash Evidence hash
      * @return submitter Address that submitted
@@ -64,6 +69,7 @@ interface IEvidenceModule is IERC165 {
      */
     function getEvidenceRecord(
         uint256 workflowId,
+        address escrowContract,
         uint256 evidenceId
     )
         external
@@ -73,6 +79,7 @@ interface IEvidenceModule is IERC165 {
     /**
      * @notice Check if evidence submission is allowed
      * @param workflowId The escrow workflow ID
+     * @param escrowContract Address of the vault
      * @param submitter Address attempting to submit
      * @param escrowData Encoded escrow data (from, to, etc.)
      * @return allowed True if submission allowed
@@ -80,6 +87,7 @@ interface IEvidenceModule is IERC165 {
      */
     function canSubmitEvidence(
         uint256 workflowId,
+        address escrowContract,
         address submitter,
         bytes calldata escrowData
     ) external view returns (bool allowed, string memory reason);
@@ -87,10 +95,11 @@ interface IEvidenceModule is IERC165 {
     /**
      * @notice Callback when dispute is opened (optional)
      * @param workflowId The escrow workflow ID
+     * @param escrowContract Address of the vault
      * @dev Called by escrow contract when dispute is raised
      *      Allows evidence module to initialize dispute-specific state
      */
-    function onDisputeOpened(uint256 workflowId) external;
+    function onDisputeOpened(uint256 workflowId, address escrowContract) external;
 
     /**
      * @notice Get the module name/identifier

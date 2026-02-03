@@ -98,7 +98,7 @@ contract AaveVaultAdapter is IVaultLike {
         }
         
         // Deposit to Aave via the module
-        try aaveModule.depositForYield(workflowId, underlyingAsset, assets) {
+        try aaveModule.depositForYield(workflowId, underlyingAsset, assets, address(this)) {
             // Success - update share accounting
             _shares[receiver] += shares;
             _totalShares += shares;

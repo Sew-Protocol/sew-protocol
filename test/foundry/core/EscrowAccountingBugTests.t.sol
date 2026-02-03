@@ -23,7 +23,7 @@ contract MockLossyYieldModule is IYieldGenerationModule {
         lossAmount = _loss;
     }
 
-    function depositForYield(uint256, address token, uint256 amount) external returns (bool, uint256) {
+    function depositForYield(uint256, address token, uint256 amount, address) external override returns (bool, uint256) {
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
         return (true, 0);
     }

@@ -26,6 +26,7 @@ contract ReleaseStrategyMockS1 is ERC165, IReleaseStrategy {
     function canRelease(
         uint256,
         address,
+        address,
         bytes calldata
     ) external pure override returns (bool allowed, string memory reason) {
         return (true, "ok:S1");
@@ -33,6 +34,7 @@ contract ReleaseStrategyMockS1 is ERC165, IReleaseStrategy {
 
     function executeRelease(
         uint256,
+        address,
         bytes calldata
     ) external pure override returns (bool success, address recipient, uint256 amount) {
         // Not used by current EscrowVault flows; return a sentinel.
@@ -60,6 +62,7 @@ contract ReleaseStrategyMockS2 is ERC165, IReleaseStrategy {
     function canRelease(
         uint256,
         address,
+        address,
         bytes calldata
     ) external pure override returns (bool allowed, string memory reason) {
         return (true, "ok:S2");
@@ -67,6 +70,7 @@ contract ReleaseStrategyMockS2 is ERC165, IReleaseStrategy {
 
     function executeRelease(
         uint256,
+        address,
         bytes calldata
     ) external pure override returns (bool success, address recipient, uint256 amount) {
         return (true, address(0x2222), 456);

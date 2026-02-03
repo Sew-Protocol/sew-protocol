@@ -2,8 +2,8 @@
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol';
-import '../../../contracts/decentralized-resolution-module/DecentralizedResolverStructs.sol';
+import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol';
+import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 
@@ -195,7 +195,7 @@ contract BondTokenWhitelistTest is Test {
         // SECURITY: bond token is enforced to match escrow token.
         // Provide escrowData encoded as (token, from, to, amount).
         bytes memory escrowData = abi.encode(address(0), owner, owner, uint256(1));
-        (uint256 amount, address token) = resolutionModule.getRequiredAppealBond(0, 0, escrowData);
+        (uint256 amount, address token) = resolutionModule.getRequiredAppealBond(0, address(0), 0, escrowData);
 
         assertGt(amount, 0, 'Bond amount should be > 0');
         assertEq(token, address(0), 'Token should be ETH');
@@ -223,7 +223,7 @@ contract BondTokenWhitelistTest is Test {
 
         // Get required bond: token is enforced to match escrow token (not default token)
         bytes memory escrowData = abi.encode(address(usdcToken), owner, owner, uint256(1));
-        (uint256 amount, address token) = resolutionModule.getRequiredAppealBond(0, 0, escrowData);
+        (uint256 amount, address token) = resolutionModule.getRequiredAppealBond(0, address(0), 0, escrowData);
 
         assertGt(amount, 0, 'Bond amount should be > 0');
         assertEq(token, address(usdcToken), 'Token should match escrow token');
@@ -367,7 +367,7 @@ contract BondTokenWhitelistTest is Test {
 
         // SECURITY: getRequiredAppealBond enforces bond token matches escrow token.
         bytes memory escrowData = abi.encode(address(usdcToken), owner, owner, uint256(1));
-        (, address token) = resolutionModule.getRequiredAppealBond(0, 0, escrowData);
+        (, address token) = resolutionModule.getRequiredAppealBond(0, address(0), 0, escrowData);
         assertEq(token, address(usdcToken), 'Token should match escrow token');
     }
 }

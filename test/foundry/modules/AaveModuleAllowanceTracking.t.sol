@@ -78,7 +78,7 @@ contract AaveModuleAllowanceTrackingTest is Test {
         
         // Deposit
         vm.prank(escrowContract);
-        (bool success, ) = module.depositForYield(workflowId, address(token), amount);
+        (bool success, ) = module.depositForYield(workflowId, address(token), amount, escrowContract);
         assertTrue(success, "Deposit should succeed");
         
         // Check remaining allowance after deposit (should be 0)
@@ -139,7 +139,7 @@ contract AaveModuleAllowanceTrackingTest is Test {
         
         // First deposit
         vm.prank(escrowContract);
-        (bool success1, ) = module.depositForYield(workflowId1, address(token), amount1);
+        (bool success1, ) = module.depositForYield(workflowId1, address(token), amount1, escrowContract);
         assertTrue(success1, "First deposit should succeed");
         
         uint256 allowanceAfterFirst = token.allowance(address(module), address(pool));
@@ -147,7 +147,7 @@ contract AaveModuleAllowanceTrackingTest is Test {
         
         // Second deposit
         vm.prank(escrowContract);
-        (bool success2, ) = module.depositForYield(workflowId2, address(token), amount2);
+        (bool success2, ) = module.depositForYield(workflowId2, address(token), amount2, escrowContract);
         assertTrue(success2, "Second deposit should succeed");
         
         uint256 allowanceAfterSecond = token.allowance(address(module), address(pool));
@@ -177,7 +177,7 @@ contract AaveModuleAllowanceTrackingTest is Test {
         
         // Deposit - should reset existing allowance and set new one
         vm.prank(escrowContract);
-        (bool success, ) = module.depositForYield(workflowId, address(token), amount);
+        (bool success, ) = module.depositForYield(workflowId, address(token), amount, escrowContract);
         assertTrue(success, "Deposit should succeed");
         
         // Check remaining allowance - should be reset to 0
@@ -208,7 +208,7 @@ contract AaveModuleAllowanceTrackingTest is Test {
         // Marking it to expect failure
         vm.expectRevert(); // Expect revert due to insufficient allowance
         vm.prank(escrowContract);
-        module.depositForYield(workflowId, address(token), amount);
+        module.depositForYield(workflowId, address(token), amount, escrowContract);
     }
 
     // ============ Test 6: Edge Case - Zero Remaining Allowance ============
@@ -224,7 +224,7 @@ contract AaveModuleAllowanceTrackingTest is Test {
         
         // Deposit (pool will consume all approval in normal case)
         vm.prank(escrowContract);
-        (bool success, ) = module.depositForYield(workflowId, address(token), amount);
+        (bool success, ) = module.depositForYield(workflowId, address(token), amount, escrowContract);
         assertTrue(success, "Deposit should succeed");
         
         // Check remaining allowance - should be 0 (module resets it)
@@ -251,7 +251,7 @@ contract AaveModuleAllowanceTrackingTest is Test {
         
         // Deposit
         vm.prank(escrowContract);
-        (bool success, ) = module.depositForYield(workflowId, address(token), amount);
+        (bool success, ) = module.depositForYield(workflowId, address(token), amount, escrowContract);
         assertTrue(success, "Deposit should succeed");
         
         // Check remaining allowance - should always be 0
@@ -276,7 +276,7 @@ contract AaveModuleAllowanceTrackingTest is Test {
         
         // Deposit - module pulls tokens, approves pool, supplies, resets allowance
         vm.prank(escrowContract);
-        (bool success, ) = module.depositForYield(workflowId, address(token), amount);
+        (bool success, ) = module.depositForYield(workflowId, address(token), amount, escrowContract);
         assertTrue(success, "Deposit should succeed");
         
         // Verify module's allowance to pool is reset

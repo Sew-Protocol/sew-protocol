@@ -2,9 +2,9 @@
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/decentralized-resolution-module/ResolverIncentiveModuleV2.sol';
-import '../../../contracts/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
-import '../../../contracts/decentralized-resolution-module/DecentralizedResolverStructs.sol';
+import '../../../contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV2.sol';
+import '../../../contracts/modules/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/YieldOps.sol';
@@ -71,7 +71,7 @@ contract BondRoundingTest is Test {
     function _recordResolvers(uint256 workflowId, uint8 round, uint256 resolverCount) internal {
         for (uint256 i = 0; i < resolverCount; i++) {
             vm.prank(address(this));
-            incentiveModule.recordResolver(workflowId, resolvers[i], round);
+            incentiveModule.recordResolver(workflowId, address(escrow), resolvers[i], round);
         }
     }
 
@@ -92,19 +92,19 @@ contract BondRoundingTest is Test {
         token.approve(address(incentiveModule), bondAmount);
 
         vm.prank(address(this));
-        incentiveModule.recordAppealBond(workflowId, depositor, depositor, bondAmount, address(token), 1);
+        incentiveModule.recordAppealBond(workflowId, address(escrow), depositor, depositor, bondAmount, address(token), 1);
 
         // Record resolvers at round 0
         _recordResolvers(workflowId, 0, 3);
 
         // Distribute bond on failed appeal
         vm.prank(address(this));
-        incentiveModule.distributeAppealBond(workflowId, 0, false);
+        incentiveModule.distributeAppealBond(workflowId, address(escrow), 0, false);
 
         // Verify no rounding loss
-        uint256 resolver1Payment = incentiveModule.getClaimablePayment(workflowId, resolvers[0]);
-        uint256 resolver2Payment = incentiveModule.getClaimablePayment(workflowId, resolvers[1]);
-        uint256 resolver3Payment = incentiveModule.getClaimablePayment(workflowId, resolvers[2]);
+        uint256 resolver1Payment = incentiveModule.getClaimablePayment(workflowId, address(escrow), resolvers[0]);
+        uint256 resolver2Payment = incentiveModule.getClaimablePayment(workflowId, address(escrow), resolvers[1]);
+        uint256 resolver3Payment = incentiveModule.getClaimablePayment(workflowId, address(escrow), resolvers[2]);
 
         uint256 total = resolver1Payment + resolver2Payment + resolver3Payment;
         assertEq(total, bondAmount, 'Total distributed should equal 100');
@@ -135,19 +135,19 @@ contract BondRoundingTest is Test {
         token.approve(address(incentiveModule), bondAmount);
 
         vm.prank(address(this));
-        incentiveModule.recordAppealBond(workflowId, depositor, depositor, bondAmount, address(token), 1);
+        incentiveModule.recordAppealBond(workflowId, address(escrow), depositor, depositor, bondAmount, address(token), 1);
 
         // Record resolvers at round 0
         _recordResolvers(workflowId, 0, 5);
 
         // Distribute bond
         vm.prank(address(this));
-        incentiveModule.distributeAppealBond(workflowId, 0, false);
+        incentiveModule.distributeAppealBond(workflowId, address(escrow), 0, false);
 
         // Verify no rounding loss
         uint256 total = 0;
         for (uint256 i = 0; i < 5; i++) {
-            uint256 payment = incentiveModule.getClaimablePayment(workflowId, resolvers[i]);
+            uint256 payment = incentiveModule.getClaimablePayment(workflowId, address(escrow), resolvers[i]);
             total += payment;
             assertGe(payment, 19, 'Min payment should be 19');
             assertLe(payment, 20, 'Max payment should be 20');
@@ -173,18 +173,18 @@ contract BondRoundingTest is Test {
         token.approve(address(incentiveModule), bondAmount);
 
         vm.prank(address(this));
-        incentiveModule.recordAppealBond(workflowId, depositor, depositor, bondAmount, address(token), 1);
+        incentiveModule.recordAppealBond(workflowId, address(escrow), depositor, depositor, bondAmount, address(token), 1);
 
         // Record resolvers at round 0
         _recordResolvers(workflowId, 0, 2);
 
         // Distribute bond
         vm.prank(address(this));
-        incentiveModule.distributeAppealBond(workflowId, 0, false);
+        incentiveModule.distributeAppealBond(workflowId, address(escrow), 0, false);
 
         // Verify equal split
-        uint256 resolver1Payment = incentiveModule.getClaimablePayment(workflowId, resolvers[0]);
-        uint256 resolver2Payment = incentiveModule.getClaimablePayment(workflowId, resolvers[1]);
+        uint256 resolver1Payment = incentiveModule.getClaimablePayment(workflowId, address(escrow), resolvers[0]);
+        uint256 resolver2Payment = incentiveModule.getClaimablePayment(workflowId, address(escrow), resolvers[1]);
 
         assertEq(resolver1Payment, 50, 'Resolver 1 should get 50');
         assertEq(resolver2Payment, 50, 'Resolver 2 should get 50');
@@ -207,17 +207,17 @@ contract BondRoundingTest is Test {
         token.approve(address(incentiveModule), bondAmount);
 
         vm.prank(address(this));
-        incentiveModule.recordAppealBond(workflowId, depositor, depositor, bondAmount, address(token), 1);
+        incentiveModule.recordAppealBond(workflowId, address(escrow), depositor, depositor, bondAmount, address(token), 1);
 
         // Record resolver at round 0
         _recordResolvers(workflowId, 0, 1);
 
         // Distribute bond
         vm.prank(address(this));
-        incentiveModule.distributeAppealBond(workflowId, 0, false);
+        incentiveModule.distributeAppealBond(workflowId, address(escrow), 0, false);
 
         // Verify resolver gets entire bond
-        uint256 resolverPayment = incentiveModule.getClaimablePayment(workflowId, resolvers[0]);
+        uint256 resolverPayment = incentiveModule.getClaimablePayment(workflowId, address(escrow), resolvers[0]);
         assertEq(resolverPayment, bondAmount, 'Single resolver should get entire bond');
     }
 
@@ -244,22 +244,22 @@ contract BondRoundingTest is Test {
         token.approve(address(incentiveModule), bondAmount);
 
         vm.prank(address(this));
-        incentiveModule.recordAppealBond(workflowId, depositor, depositor, bondAmount, address(token), 1);
+        incentiveModule.recordAppealBond(workflowId, address(escrow), depositor, depositor, bondAmount, address(token), 1);
 
         // Record resolvers
         for (uint8 i = 0; i < resolverCount; i++) {
             vm.prank(address(this));
-            incentiveModule.recordResolver(workflowId, resolvers[i], 0);
+            incentiveModule.recordResolver(workflowId, address(escrow), resolvers[i], 0);
         }
 
         // Distribute bond
         vm.prank(address(this));
-        incentiveModule.distributeAppealBond(workflowId, 0, false);
+        incentiveModule.distributeAppealBond(workflowId, address(escrow), 0, false);
 
         // Verify no rounding loss
         uint256 total = 0;
         for (uint8 i = 0; i < resolverCount; i++) {
-            uint256 payment = incentiveModule.getClaimablePayment(workflowId, resolvers[i]);
+            uint256 payment = incentiveModule.getClaimablePayment(workflowId, address(escrow), resolvers[i]);
             total += payment;
         }
 

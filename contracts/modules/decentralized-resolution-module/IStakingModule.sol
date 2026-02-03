@@ -136,11 +136,13 @@ interface IStakingModule {
     /**
      * @notice Called when a resolver is assigned to a dispute
      * @param workflowId Dispute ID
+     * @param escrowContract Address of the vault
      * @param resolver Resolver address
      * @param stakeRequired Amount of stake required for this dispute
      */
     function onResolverAssigned(
         uint256 workflowId,
+        address escrowContract,
         address resolver,
         uint256 stakeRequired
     ) external;
@@ -148,27 +150,36 @@ interface IStakingModule {
     /**
      * @notice Called when a resolver's decision is finalized
      * @param workflowId Dispute ID
+     * @param escrowContract Address of the vault
      * @param resolver Resolver address
      * @param outcome Was the decision upheld (true) or reversed (false)
      */
-    function onResolutionFinalized(uint256 workflowId, address resolver, bool outcome) external;
+    function onResolutionFinalized(
+        uint256 workflowId,
+        address escrowContract,
+        address resolver,
+        bool outcome
+    ) external;
 
     /**
      * @notice Called when a dispute is escalated (unlock stake from prior round)
      * @param workflowId Dispute ID
+     * @param escrowContract Address of the vault
      * @param resolver Resolver from prior round
      */
-    function onDisputeEscalated(uint256 workflowId, address resolver) external;
+    function onDisputeEscalated(uint256 workflowId, address escrowContract, address resolver) external;
 
     /**
      * @notice Called when stake needs to be locked (e.g., during appeal period)
      * @param workflowId Dispute ID
+     * @param escrowContract Address of the vault
      * @param resolver Resolver address
      * @param amount Amount to lock
      * @param duration How long to lock (0 = until manually unlocked)
      */
     function lockStake(
         uint256 workflowId,
+        address escrowContract,
         address resolver,
         uint256 amount,
         uint256 duration
@@ -177,9 +188,10 @@ interface IStakingModule {
     /**
      * @notice Called when stake should be unlocked
      * @param workflowId Dispute ID
+     * @param escrowContract Address of the vault
      * @param resolver Resolver address
      */
-    function unlockStake(uint256 workflowId, address resolver) external;
+    function unlockStake(uint256 workflowId, address escrowContract, address resolver) external;
 
     // ============ Query Functions ============
 

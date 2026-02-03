@@ -44,8 +44,8 @@ library ResolutionAnalytics {
     event ResolutionReversed(
         uint256 indexed workflowId,
         address indexed resolver,
-        DecentralizedResolverStructs.ResolutionOutcome originalOutcome,
-        DecentralizedResolverStructs.ResolutionOutcome newOutcome,
+        ResolutionOutcome originalOutcome,
+        ResolutionOutcome newOutcome,
         uint8 fromRound,
         uint8 toRound
     );
@@ -147,8 +147,8 @@ library ResolutionAnalytics {
         DecentralizedResolverStructs.ResolverStats storage stats,
         address resolver,
         uint256 workflowId,
-        DecentralizedResolverStructs.ResolutionOutcome originalOutcome,
-        DecentralizedResolverStructs.ResolutionOutcome newOutcome,
+        ResolutionOutcome originalOutcome,
+        ResolutionOutcome newOutcome,
         uint8 fromRound,
         uint8 toRound,
         uint256 alphaBps

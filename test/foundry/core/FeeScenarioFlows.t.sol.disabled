@@ -17,29 +17,28 @@ import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/core/ModuleManagementContract.sol";
 import "../../../contracts/admin/EscrowAdminContract.sol";
 
-import "../../../contracts/modules/decentralized-resolution-module/IIncentiveModule.sol";
+import "../../../contracts/decentralized-resolution-module/IIncentiveModule.sol";
 
 contract MockIncentiveModule is IIncentiveModule {
-    event AppealBondRecorded(uint256 workflowId, address escrowContract, address depositor, address escalatedBy, uint256 amount, address token, uint8 newLevel);
+    event AppealBondRecorded(uint256 workflowId, address depositor, address escalatedBy, uint256 amount, address token, uint8 newLevel);
 
     // ---- Core lifecycle hooks (no-op for tests) ----
-    function onDisputeOpened(uint256, address, address, uint256, uint256, uint8) external override {}
-    function onResolverAssigned(uint256, address, address, uint8) external override {}
+    function onDisputeOpened(uint256, address, uint256, uint256, uint8) external override {}
+    function onResolverAssigned(uint256, address, uint8) external override {}
     function onDecisionSubmitted(
         uint256,
-        address,
         address,
         uint8,
         ResolutionOutcome,
         uint256
     ) external override {}
-    function onEscalated(uint256, address, uint8, uint8, address) external override {}
-    function onDisputeFinalized(uint256, address, uint8, ResolutionOutcome) external override {}
-    function onResolverTimeout(uint256, address, address, uint8, uint8) external override {}
+    function onEscalated(uint256, uint8, uint8, address) external override {}
+    function onDisputeFinalized(uint256, uint8, ResolutionOutcome) external override {}
+    function onResolverTimeout(uint256, address, uint8, uint8) external override {}
 
     // ---- Payment distribution (no-op for tests) ----
-    function distributePayments(uint256, address, address, uint256) external override {}
-    function getClaimablePayment(uint256, address, address) external pure override returns (uint256 amount) {
+    function distributePayments(uint256, address, uint256) external override {}
+    function getClaimablePayment(uint256, address) external pure override returns (uint256 amount) {
         return 0;
     }
 
@@ -50,7 +49,6 @@ contract MockIncentiveModule is IIncentiveModule {
 
     function getRequiredAppealBond(
         uint256,
-        address,
         uint8,
         uint8
     ) external pure override returns (uint256 bondAmount, address token) {
@@ -59,7 +57,6 @@ contract MockIncentiveModule is IIncentiveModule {
 
     function recordAppealBond(
         uint256 workflowId,
-        address escrowContract,
         address depositor,
         address escalatedBy,
         uint256 amount,
@@ -67,10 +64,10 @@ contract MockIncentiveModule is IIncentiveModule {
         uint8 newLevel
     ) external payable override {
         // Accept ETH if token == address(0) (BondCollector uses low-level call with value)
-        emit AppealBondRecorded(workflowId, escrowContract, depositor, escalatedBy, amount, token, newLevel);
+        emit AppealBondRecorded(workflowId, depositor, escalatedBy, amount, token, newLevel);
     }
 
-    function distributeAppealBond(uint256, address, uint8, bool) external override {}
+    function distributeAppealBond(uint256, uint8, bool) external override {}
 }
 
 /**

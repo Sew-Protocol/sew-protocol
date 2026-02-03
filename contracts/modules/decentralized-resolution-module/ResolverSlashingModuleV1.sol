@@ -30,7 +30,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
 
     // ============ Custom Errors ============
     error ZeroAddress(string field);
-    error AlreadySlashedForWorkflow(uint256 workflowId, address resolver);
+    error AlreadySlashedForWorkflow(address escrowContract, uint256 workflowId, address resolver);
     error SlashNotPending(uint256 slashId, SlashStatus currentStatus);
     error AppealWindowOpen(uint256 slashId, uint256 appealDeadline, uint256 currentTime);
     error AppealWindowClosed(uint256 slashId, uint256 appealDeadline, uint256 currentTime);
@@ -41,6 +41,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
     error InvalidBps(uint256 bps, uint256 maxBps);
     error CooldownNotPassed(uint256 availableAt, uint256 currentTime);
     error ZeroAmount();
+    error SlashNotFound(uint256 slashId);
 
     // ============ Constants ============
 
@@ -86,11 +87,11 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
 
     // Slash tracking
     uint256 private _nextSlashId;
-    mapping(uint256 => SlashEvent) public slashEvents;
-    mapping(uint256 => SlashAppeal) public slashAppeals;
+    mapping(uint256 => SlashEvent) public slashEvents; // slashId => SlashEvent
+    mapping(uint256 => SlashAppeal) public slashAppeals; // slashId => SlashAppeal
 
     // Prevent double slashing
-    mapping(uint256 => mapping(address => bool)) public workflowSlashed; // workflowId => resolver => slashed
+    mapping(address => mapping(uint256 => mapping(address => bool))) public workflowSlashed; // escrowContract => workflowId => resolver => slashed
 
     // Per-resolver slash tracking (for caps)
     struct SlashPeriodTracker {
@@ -201,11 +202,14 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
      */
     function proposeSlash(
         uint256 workflowId,
+        address escrowContract,
         address resolver,
         SlashReason reason,
-        bytes calldata /* evidence */
-    ) external onlyRole(ROLE_TIMELOCK) returns (uint256 slashId) {
-        if (workflowSlashed[workflowId][resolver]) revert AlreadySlashedForWorkflow(workflowId, resolver);
+        bytes calldata evidence
+    ) external override onlyRole(ROLE_TIMELOCK) returns (uint256 slashId) {
+        if (workflowSlashed[escrowContract][workflowId][resolver]) {
+            revert AlreadySlashedForWorkflow(escrowContract, workflowId, resolver);
+        }
 
         slashId = _nextSlashId++;
 
@@ -214,6 +218,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         slashEvents[slashId] = SlashEvent({
             slashId: slashId,
             workflowId: workflowId,
+            escrowContract: escrowContract,
             resolver: resolver,
             reason: reason,
             amount: slashAmount,
@@ -222,17 +227,19 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
             appealDeadline: block.timestamp + slashConfig.appealWindow,
             status: SlashStatus.PENDING,
             proposer: _msgSender(),
-            evidence: ''
+            evidence: evidence
         });
 
         emit SlashProposed(slashId, workflowId, resolver, reason, slashAmount, _msgSender());
+        return slashId;
     }
 
     /**
      * @notice Execute a slash (with waterfall: resolver → senior)
      */
-    function executeSlash(uint256 slashId) external nonReentrant onlyRole(ROLE_TIMELOCK) {
+    function executeSlash(uint256 slashId) external override nonReentrant onlyRole(ROLE_TIMELOCK) {
         SlashEvent storage slashEvent = slashEvents[slashId];
+        if (slashEvent.slashId == 0) revert SlashNotFound(slashId);
 
         if (slashEvent.status != SlashStatus.PENDING) revert SlashNotPending(slashId, slashEvent.status);
         if (block.timestamp <= slashEvent.appealDeadline) {
@@ -259,7 +266,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         slashEvent.executedAt = block.timestamp;
 
         // Mark as slashed
-        workflowSlashed[slashEvent.workflowId][resolver] = true;
+        workflowSlashed[slashEvent.escrowContract][slashEvent.workflowId][resolver] = true;
 
         // Freeze resolver
         _freezeResolver(resolver);
@@ -292,16 +299,19 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
     function appealSlash(
         uint256 slashId,
         string calldata reason,
-        bytes calldata /* evidence */
-    ) external nonReentrant {
+        bytes calldata evidence
+    ) external override nonReentrant {
         SlashEvent storage slashEvent = slashEvents[slashId];
+        if (slashEvent.slashId == 0) revert SlashNotFound(slashId);
 
         if (slashEvent.status != SlashStatus.PENDING) revert SlashNotPending(slashId, slashEvent.status);
         if (block.timestamp > slashEvent.appealDeadline) {
             revert AppealWindowClosed(slashId, slashEvent.appealDeadline, block.timestamp);
         }
         if (_msgSender() != slashEvent.resolver) revert NotResolver(_msgSender(), slashEvent.resolver);
-        if (slashAppeals[slashId].resolved) revert AlreadyAppealed(slashId);
+        if (slashAppeals[slashId].slashId != 0 && slashAppeals[slashId].slashId != 0 && slashAppeals[slashId].resolved) {
+            revert AlreadyAppealed(slashId);
+        }
 
         // Record appeal
         slashAppeals[slashId] = SlashAppeal({
@@ -310,7 +320,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
             appealBond: slashConfig.appealBond,
             appealedAt: block.timestamp,
             reason: reason,
-            evidence: '',
+            evidence: evidence,
             resolved: false,
             upheld: false
         });
@@ -321,9 +331,10 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
     /**
      * @notice Resolve an appeal
      */
-    function resolveAppeal(uint256 slashId, bool upheld) external onlyRole(ROLE_TIMELOCK) {
+    function resolveAppeal(uint256 slashId, bool upheld) external override onlyRole(ROLE_TIMELOCK) {
         SlashAppeal storage appeal = slashAppeals[slashId];
         SlashEvent storage slashEvent = slashEvents[slashId];
+        if (slashEvent.slashId == 0) revert SlashNotFound(slashId);
 
         if (appeal.resolved) revert AppealAlreadyResolved(slashId);
         if (slashEvent.status != SlashStatus.PENDING) revert SlashNotPending(slashId, slashEvent.status);
@@ -331,14 +342,14 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         appeal.resolved = true;
         appeal.upheld = upheld;
 
-        if (upheld) {
+        if (!upheld) {
             // Appeal rejected, slash proceeds
-            emit SlashAppealResolved(slashId, true, address(0), 0);
+            emit SlashAppealResolved(slashId, false, address(0), 0);
         } else {
             // Appeal accepted, cancel slash
-            slashEvent.status = SlashStatus.APPEALED;
+            slashEvent.status = SlashStatus.REVERSED;
             emit SlashReversed(slashId, slashEvent.resolver, slashEvent.amount);
-            emit SlashAppealResolved(slashId, false, slashEvent.resolver, slashEvent.amount);
+            emit SlashAppealResolved(slashId, true, slashEvent.resolver, slashEvent.amount);
         }
     }
 
@@ -347,20 +358,22 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
     /**
      * @notice Slash for timeout (missed accept or missed resolve)
      * @param workflowId Dispute ID
+     * @param escrowContract Related escrow contract
      * @param resolver Resolver who timed out
      * @param timeoutType 0 = accept, 1 = resolve
      */
     function slashForTimeout(
         uint256 workflowId,
+        address escrowContract,
         address resolver,
         uint8 timeoutType
-    ) external onlyRole(ROLE_RESOLUTION_MODULE) returns (uint256 slashId) {
+    ) external override onlyRole(ROLE_RESOLUTION_MODULE) returns (uint256 slashId) {
         // Reset tracking before slash
         _currentSlashStableAmount = 0;
         _currentSlashSewAmount = 0;
 
         // Check if already slashed for this workflow
-        if (workflowSlashed[workflowId][resolver]) {
+        if (workflowSlashed[escrowContract][workflowId][resolver]) {
             return 0; // Already slashed, skip
         }
 
@@ -390,6 +403,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         slashEvents[slashId] = SlashEvent({
             slashId: slashId,
             workflowId: workflowId,
+            escrowContract: escrowContract,
             resolver: resolver,
             reason: reason,
             amount: slashAmount,
@@ -410,7 +424,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         uint256 totalSlashed = resolverSlashed + seniorSlashed;
 
         // Mark as slashed
-        workflowSlashed[workflowId][resolver] = true;
+        workflowSlashed[escrowContract][workflowId][resolver] = true;
 
         // Freeze resolver
         _freezeResolver(resolver);
@@ -439,40 +453,116 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
             seniorSlashed,
             totalSlashed
         );
+        return slashId;
     }
 
     /**
-     * @notice Slash for reversal (disabled initially)
+     * @notice Slash for reversal
      */
     function slashForReversal(
-        uint256 /* workflowId */,
-        address /* resolver */,
-        uint8 /* priorRound */
-    ) external view onlyRole(ROLE_RESOLUTION_MODULE) returns (uint256 slashId) {
-        // Reversal slashing disabled initially (too harsh for early rollout)
-        return 0;
-    }
-
-    /**
-     * @notice Slash for fraud (provable malicious behavior)
-     * @param workflowId Dispute ID
-     * @param resolver Resolver who committed fraud
-     * @param evidence Proof of fraud (on-chain or off-chain evidence)
-     * @dev Requires TIMELOCK role for manual fraud verification
-     *      Fraud slashing uses fraudSlashBps from slash config (typically 50-100%)
-     *      Evidence should be provided for audit trail
-     */
-    function slashForFraud(
         uint256 workflowId,
+        address escrowContract,
         address resolver,
-        bytes calldata evidence
-    ) external onlyRole(ROLE_TIMELOCK) returns (uint256 slashId) {
+        uint8 priorRound
+    ) external override onlyRole(ROLE_RESOLUTION_MODULE) returns (uint256 slashId) {
+        priorRound;
         // Reset tracking before slash
         _currentSlashStableAmount = 0;
         _currentSlashSewAmount = 0;
 
         // Check if already slashed for this workflow
-        if (workflowSlashed[workflowId][resolver]) {
+        if (workflowSlashed[escrowContract][workflowId][resolver]) {
+            return 0; // Already slashed, skip
+        }
+
+        // Check circuit breaker
+        if (circuitBreakerActive) {
+            emit SlashCapEnforced(resolver, 0, 0, 'Circuit breaker active');
+            return 0;
+        }
+
+        // Determine slash reason and amount
+        SlashReason reason = SlashReason.REVERSAL;
+        uint256 slashAmount = _calculateSlashAmount(resolver, reason);
+
+        // Check if slash would exceed caps
+        slashAmount = _enforceSlashCaps(resolver, slashAmount);
+
+        if (slashAmount == 0) {
+            return 0; // Cap reached, skip slash
+        }
+
+        // Create slash event
+        slashId = _nextSlashId++;
+
+        slashEvents[slashId] = SlashEvent({
+            slashId: slashId,
+            workflowId: workflowId,
+            escrowContract: escrowContract,
+            resolver: resolver,
+            reason: reason,
+            amount: slashAmount,
+            proposedAt: block.timestamp,
+            executedAt: block.timestamp, // Auto-execute
+            appealDeadline: 0, // No appeal for automated slashes
+            status: SlashStatus.EXECUTED,
+            proposer: _msgSender(),
+            evidence: ''
+        });
+
+        // Execute waterfall slash immediately
+        (uint256 resolverSlashed, uint256 seniorSlashed, address senior) = _executeWaterfallSlash(
+            resolver,
+            slashAmount
+        );
+
+        uint256 totalSlashed = resolverSlashed + seniorSlashed;
+
+        // Mark as slashed
+        workflowSlashed[escrowContract][workflowId][resolver] = true;
+
+        // Freeze resolver
+        _freezeResolver(resolver);
+
+        // Distribute slashed funds
+        SlashDistribution memory distribution = _distributeSlashedFunds(
+            _currentSlashStableAmount,
+            reason,
+            workflowId
+        );
+
+        // Reset tracking after distribution
+        _currentSlashStableAmount = 0;
+        _currentSlashSewAmount = 0;
+
+        emit SlashProposed(slashId, workflowId, resolver, reason, slashAmount, _msgSender());
+        emit SlashExecuted(slashId, resolver, totalSlashed, distribution);
+        emit SlashExecutedWithWaterfall(
+            slashId,
+            resolver,
+            senior,
+            resolverSlashed,
+            seniorSlashed,
+            totalSlashed
+        );
+        return slashId;
+    }
+
+    /**
+     * @notice Slash for fraud (provable malicious behavior)
+     */
+    function slashForFraud(
+        uint256 workflowId,
+        address escrowContract,
+        address resolver,
+        bytes calldata evidence
+    ) external override onlyRole(ROLE_TIMELOCK) returns (uint256 slashId) {
+        // Reset tracking before slash
+        _currentSlashStableAmount = 0;
+        _currentSlashSewAmount = 0;
+
+        // Check if already slashed for this workflow
+        if (workflowSlashed[escrowContract][workflowId][resolver]) {
             return 0; // Already slashed, skip
         }
 
@@ -502,6 +592,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         slashEvents[slashId] = SlashEvent({
             slashId: slashId,
             workflowId: workflowId,
+            escrowContract: escrowContract,
             resolver: resolver,
             reason: reason,
             amount: slashAmount,
@@ -522,12 +613,12 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         uint256 totalSlashed = resolverSlashed + seniorSlashed;
 
         // Mark as slashed
-        workflowSlashed[workflowId][resolver] = true;
+        workflowSlashed[escrowContract][workflowId][resolver] = true;
 
         // Freeze resolver (fraud is severe)
         _freezeResolver(resolver);
 
-        // Distribute slashed funds (using actual token amounts received from staking module)
+        // Distribute slashed funds
         SlashDistribution memory distribution = _distributeSlashedFunds(
             _currentSlashStableAmount,
             reason,
@@ -576,8 +667,6 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
 
         if (tier == 0) {
             // Junior resolver - check for delegation
-            // We need to iterate through potential seniors (simplified: assume one senior per junior)
-            // In production, would need better tracking
             delegation = _findDelegation(resolver);
         }
 
@@ -608,7 +697,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
                 }
 
                 // Slash senior's coverage
-                _slashSeniorCoverage(senior, seniorSlashed);
+                _slashSeniorCoverage(senior, seniorSlashed, resolver);
             } else {
                 // No senior coverage, slash only what's available
                 if (resolverSlashed > 0) {
@@ -646,11 +735,10 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
                 penaltyBps = PENALTY_MISSED_RESOLVE; // 200 bps (2%) for first offense
             }
         } else if (reason == SlashReason.REVERSAL) {
-            penaltyBps = PENALTY_REVERSAL; // 0 bps initially (disabled)
+            penaltyBps = slashConfig.reversalSlashBps;
         } else if (reason == SlashReason.FRAUD) {
-            penaltyBps = slashConfig.fraudSlashBps; // 0% initially
+            penaltyBps = slashConfig.fraudSlashBps;
         } else {
-            // COLLUSION, BRIBERY, or custom
             penaltyBps = PENALTY_REPEAT_RESOLVE; // Use repeat penalty as fallback
         }
 
@@ -748,14 +836,14 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
     /**
      * @notice Slash senior's coverage (real implementation)
      */
-    function _slashSeniorCoverage(address senior, uint256 amount) internal {
+    function _slashSeniorCoverage(address senior, uint256 amount, address slashedFor) internal {
         if (amount == 0) return;
 
         // Call staking module to slash senior's coverage
         (uint256 stableSlashed, uint256 sewSlashed) = stakingModule.slashCoverage(
             senior,
             amount,
-            address(0)
+            slashedFor
         );
 
         // Track amounts for distribution
@@ -765,14 +853,11 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
 
     /**
      * @notice Find delegation for a resolver
-     * @dev Accesses the public delegations mapping in staking module
-     *      Uses a low-level call to access the public mapping since it's not in the interface
      */
     function _findDelegation(
         address resolver
     ) internal view returns (IStakingModule.DelegationInfo memory) {
         // Access the public delegations mapping via low-level call
-        // delegations(junior) returns (address senior, uint256 coverageAmount, uint256 delegatedAt, bool active)
         (bool success, bytes memory data) = address(stakingModule).staticcall(
             abi.encodeWithSignature('delegations(address)', resolver)
         );
@@ -814,27 +899,16 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         SlashReason reason,
         uint256 workflowId
     ) internal returns (SlashDistribution memory distribution) {
-        // Conservative stable-token distribution:
-        // - 50% to insurance pool (protect users)
-        // - 30% to protocol treasury (currently retained here until treasury integration)
-        // Note: SEW (protocol token) slashed from bonds is handled separately (burned).
-
         distribution.toInsurancePool = (amount * 5000) / BASIS_POINTS;
         distribution.toProtocol = (amount * 3000) / BASIS_POINTS;
-        distribution.toCounterParty = 0; // Not implemented yet
-        distribution.toSlashProposer = 0; // Not implemented yet
+        distribution.toCounterParty = 0;
+        distribution.toSlashProposer = 0;
 
-        // Transfer insurance pool portion to vault (with source tag)
+        // Transfer insurance pool portion to vault
         if (amount > 0 && distribution.toInsurancePool > 0 && address(insurancePoolVault) != address(0)) {
-            // Transfer funds directly to vault (they're already in this contract from staking module)
             stableToken.safeTransfer(address(insurancePoolVault), distribution.toInsurancePool);
-
-            // Record the deposit in vault accounting
-            insurancePoolVault.recordDeposit(distribution.toInsurancePool, reason, workflowId);
+            insurancePoolVault.recordDeposit(distribution.toInsurancePool, reason, workflowId, address(0));
         }
-
-        // TODO: Transfer protocol portion to treasury (when treasury contract exists)
-        // For now, protocol portion remains in this contract
 
         // Burn any slashed SEW received from the staking module for this slash
         _handleSlashedSEW(workflowId);
@@ -844,14 +918,12 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
 
     /**
      * @notice Handle slashed SEW from the staking module (burn)
-     * @dev If SEW token supports ERC20Burnable.burn(uint256), supply is reduced.
-     *      Otherwise, SEW is transferred to a dead address (effective burn).
      */
     function _handleSlashedSEW(uint256 workflowId) internal {
         uint256 amount = _currentSlashSewAmount;
         if (amount == 0) return;
 
-        IERC20 sew = IERC20(address(stakingModule.sewToken()));
+        IERC20 sew = IERC20(stakingModule.sewToken());
 
         // Try to burn (preferred: reduces totalSupply)
         (bool ok, ) = address(sew).call(abi.encodeWithSignature('burn(uint256)', amount));
@@ -867,10 +939,6 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
 
     /**
      * @notice Freeze resolver (prevents withdrawal during slash processing)
-     * @dev v3: Uses different freeze durations based on severity
-     *      - Severe event: 72 hours
-     *      - Repeated severe event within epoch: 7 days
-     *      - Insufficient bond: until topped up (minimum 72 hours)
      */
     function _freezeResolver(address resolver) internal {
         EpochSlashTracker storage epochTracker = epochSlashTrackers[resolver];
@@ -881,10 +949,8 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         
         // Check if this is a repeated offense in the same epoch
         if (epochTracker.epochStart == currentEpochStart && epochTracker.slashCount > 1) {
-            // Repeated severe event within epoch
             freezeDuration = FREEZE_DURATION_REPEATED; // 7 days
         } else {
-            // First or new epoch - severe event
             freezeDuration = FREEZE_DURATION_SEVERE; // 72 hours
         }
         
@@ -893,32 +959,16 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
     }
 
     /**
-     * @notice Freeze resolver due to insufficient bond (v3)
-     * @dev Freeze until topped up, minimum 72 hours
-     */
-    function _freezeResolverInsufficientBond(address resolver) internal {
-        uint256 minFreezeUntil = block.timestamp + FREEZE_DURATION_SEVERE; // Minimum 72 hours
-        if (freezeUntil[resolver] < minFreezeUntil) {
-            freezeUntil[resolver] = minFreezeUntil;
-        }
-        // Note: This is separate from frozenUntil - can be checked separately
-    }
-
-    /**
      * @notice Update unavailability stats (for circuit breaker)
      */
     function _updateUnavailabilityStats(address /* resolver */, bool unavailable) internal {
         UnavailabilityStats storage stats = unavailabilityStats;
-
-        // Update timestamp
         stats.lastUpdate = block.timestamp;
 
-        // Increment counters (simplified - in production would track per resolver)
         if (unavailable) {
             stats.unavailableCount++;
         }
 
-        // Check for mass unavailability
         if (stats.totalResolvers > 0) {
             uint256 unavailablePercentage = (stats.unavailableCount * BASIS_POINTS) /
                 stats.totalResolvers;
@@ -947,49 +997,49 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
 
     // ============ Query Functions ============
 
-    function getSlashEvent(uint256 slashId) external view returns (SlashEvent memory slashEvent) {
+    function getSlashEvent(uint256 slashId) external view override returns (SlashEvent memory) {
         return slashEvents[slashId];
     }
 
-    function getSlashAppeal(uint256 slashId) external view returns (SlashAppeal memory) {
+    function getSlashAppeal(uint256 slashId) external view override returns (SlashAppeal memory) {
         return slashAppeals[slashId];
     }
 
     function calculateSlashAmount(
         address resolver,
         SlashReason reason
-    ) external view returns (uint256 amount) {
+    ) external view override returns (uint256) {
         return _calculateSlashAmount(resolver, reason);
     }
 
-    function getSlashableStake(address resolver) external view returns (uint256 slashable) {
+    function getSlashableStake(address resolver) external view override returns (uint256) {
         IStakingModule.StakeInfo memory stakeInfo = stakingModule.getStakeInfo(resolver);
         return stakeInfo.availableStake;
     }
 
-    function getSlashedInPeriod(address resolver) external view returns (uint256 slashed) {
+    function getSlashedInPeriod(address resolver) external view override returns (uint256) {
         return slashTrackers[resolver].totalSlashedInPeriod;
     }
 
-    function getSlashConfig() external view returns (SlashConfig memory config) {
+    function getSlashConfig() external view override returns (SlashConfig memory) {
         return slashConfig;
     }
 
-    function canAppeal(uint256 slashId) external view returns (bool) {
+    function canAppeal(uint256 slashId) external view override returns (bool) {
         SlashEvent storage slashEvent = slashEvents[slashId];
         return
             slashEvent.status == SlashStatus.PENDING &&
             block.timestamp <= slashEvent.appealDeadline &&
-            !slashAppeals[slashId].resolved;
+            slashAppeals[slashId].slashId == 0;
     }
 
-    function canExecute(uint256 slashId) external view returns (bool) {
+    function canExecute(uint256 slashId) external view override returns (bool) {
         SlashEvent storage slashEvent = slashEvents[slashId];
         return
             slashEvent.status == SlashStatus.PENDING && block.timestamp > slashEvent.appealDeadline;
     }
 
-    function getInsurancePoolBalance() external view returns (uint256 balance) {
+    function getInsurancePoolBalance() external view override returns (uint256) {
         if (address(insurancePoolVault) != address(0)) {
             return insurancePoolVault.getTotalBalance();
         }
@@ -1006,26 +1056,26 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
     function calculateDistribution(
         uint256 amount,
         SlashReason /* reason */
-    ) external pure returns (SlashDistribution memory distribution) {
-        distribution.toInsurancePool = (amount * 5000) / BASIS_POINTS;
-        distribution.toProtocol = (amount * 3000) / BASIS_POINTS;
-        distribution.toCounterParty = 0;
-        distribution.toSlashProposer = 0;
+    ) external pure override returns (SlashDistribution memory) {
+        return SlashDistribution({
+            toProtocol: (amount * 3000) / BASIS_POINTS,
+            toCounterParty: 0,
+            toInsurancePool: (amount * 5000) / BASIS_POINTS,
+            toSlashProposer: 0
+        });
     }
 
     function claimInsurancePayout(
         uint256 /* workflowId */,
         address /* to */,
         uint256 /* amount */
-    ) external view onlyRole(ROLE_TIMELOCK) {
-        // This function is deprecated - use InsurancePoolVault.proposePayout() instead
-        // Kept for backward compatibility, but should route through vault
+    ) external pure override {
         revert('Use InsurancePoolVault.proposePayout() instead');
     }
 
     // ============ Admin Functions ============
 
-    function setSlashPercentage(SlashReason reason, uint256 bps) external onlyRole(ROLE_TIMELOCK) {
+    function setSlashPercentage(SlashReason reason, uint256 bps) external override onlyRole(ROLE_TIMELOCK) {
         if (bps > BASIS_POINTS) revert InvalidBps(bps, BASIS_POINTS);
 
         uint256 oldBps;
@@ -1044,59 +1094,39 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         emit SlashConfigUpdated(reason, oldBps, bps);
     }
 
-    function setMaxSlashPerPeriod(uint256 max, uint256 period) external onlyRole(ROLE_TIMELOCK) {
+    function setMaxSlashPerPeriod(uint256 max, uint256 period) external override onlyRole(ROLE_TIMELOCK) {
         slashConfig.maxSlashPerPeriod = max;
         slashConfig.slashPeriod = period;
     }
 
-    function setAppealWindow(uint256 window) external onlyRole(ROLE_TIMELOCK) {
+    function setAppealWindow(uint256 window) external override onlyRole(ROLE_TIMELOCK) {
         slashConfig.appealWindow = window;
     }
 
-    function setAppealBond(uint256 bond) external onlyRole(ROLE_TIMELOCK) {
+    function setAppealBond(uint256 bond) external override onlyRole(ROLE_TIMELOCK) {
         slashConfig.appealBond = bond;
     }
 
-    function fundInsurancePool(uint256 amount) external {
-        // This function is deprecated - use InsurancePoolVault.deposit() directly
-        // Kept for backward compatibility
+    function fundInsurancePool(uint256 amount) external override {
         if (address(insurancePoolVault) != address(0)) {
             stableToken.safeTransferFrom(_msgSender(), address(this), amount);
             stableToken.safeTransfer(address(insurancePoolVault), amount);
-            insurancePoolVault.recordDeposit(amount, SlashReason.TIMEOUT_ACCEPT, 0);
+            insurancePoolVault.recordDeposit(amount, SlashReason.TIMEOUT_ACCEPT, 0, address(0));
         }
     }
 
     /**
      * @notice Set insurance pool vault (governance)
-     * @param vault New vault address
      */
     function setInsurancePoolVault(address vault) external onlyRole(ROLE_TIMELOCK) {
-        address oldVault = address(insurancePoolVault);
         insurancePoolVault = InsurancePoolVault(vault);
-
-        if (vault != address(0)) {
-            // Grant role to this contract
-            InsurancePoolVault(vault).grantRole(
-                InsurancePoolVault(vault).ROLE_SLASHING_MODULE(),
-                address(this)
-            );
-        }
-
-        if (oldVault != address(0)) {
-            // Revoke role from old vault
-            InsurancePoolVault(oldVault).revokeRole(
-                InsurancePoolVault(oldVault).ROLE_SLASHING_MODULE(),
-                address(this)
-            );
-        }
     }
 
-    function triggerCircuitBreaker(string memory reason) external onlyRole(ROLE_TIMELOCK) {
+    function triggerCircuitBreaker(string memory reason) external override onlyRole(ROLE_TIMELOCK) {
         _triggerCircuitBreaker(reason);
     }
 
-    function resetCircuitBreaker() external onlyRole(ROLE_TIMELOCK) {
+    function resetCircuitBreaker() external override onlyRole(ROLE_TIMELOCK) {
         uint256 availableAt = lastCircuitBreakerTrigger + CIRCUIT_BREAKER_COOLDOWN;
         if (block.timestamp < availableAt) {
             revert CooldownNotPassed(availableAt, block.timestamp);

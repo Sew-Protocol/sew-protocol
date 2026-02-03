@@ -193,7 +193,7 @@ contract Phase2AaveYieldGenerationModuleTest is Test {
         vm.startPrank(escrowContract);
         token.approve(address(pool), depositAmount);
         token.approve(address(module), depositAmount);
-        (bool ok, uint256 yBal) = module.depositForYield(workflowId, address(token), depositAmount);
+        (bool ok, uint256 yBal) = module.depositForYield(workflowId, address(token), depositAmount, escrowContract);
         vm.stopPrank();
 
         assertTrue(ok, "deposit should succeed");
@@ -246,7 +246,7 @@ contract Phase2AaveYieldGenerationModuleTest is Test {
         vm.startPrank(escrowContract);
         token.approve(address(pool), 100e18);
         vm.expectRevert();
-        module.depositForYield(1, address(token), 100e18);
+        module.depositForYield(1, address(token), 100e18, address(this));
         vm.stopPrank();
     }
 
@@ -278,7 +278,7 @@ contract Phase2AaveYieldGenerationModuleTest is Test {
         vm.startPrank(escrowContract);
         token.approve(address(pool), depositAmount);
         vm.expectRevert(); // CapExceeded
-        module.depositForYield(workflowId, address(token), depositAmount);
+        module.depositForYield(workflowId, address(token), depositAmount, escrowContract);
         vm.stopPrank();
     }
 
@@ -292,7 +292,7 @@ contract Phase2AaveYieldGenerationModuleTest is Test {
 
         // Aave not enabled and no token registered → deposit returns (true, 0)
         vm.prank(escrowContract);
-        (bool ok, uint256 yBal) = module.depositForYield(1, address(token), 100e18);
+        (bool ok, uint256 yBal) = module.depositForYield(1, address(token), 100e18, escrowContract);
         assertTrue(ok, "deposit should be non-blocking");
         assertEq(yBal, 0, "expected zero aToken balance");
     }

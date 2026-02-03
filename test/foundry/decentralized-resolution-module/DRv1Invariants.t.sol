@@ -3,11 +3,11 @@ pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
 import 'forge-std/StdInvariant.sol';
-import '../../../contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol';
-import '../../../contracts/decentralized-resolution-module/ResolverIncentiveModuleV1.sol';
-import '../../../contracts/decentralized-resolution-module/DecentralizedResolverStructs.sol';
-import '../../../contracts/decentralized-resolution-module/ResolutionAnalytics.sol';
-import '../../../contracts/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol';
+import '../../../contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
+import '../../../contracts/modules/decentralized-resolution-module/ResolutionAnalytics.sol';
+import '../../../contracts/modules/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
 
 /**
  * @title DRv1InvariantsTest
@@ -329,14 +329,15 @@ contract DRv1FuzzTest is Test {
 
         // Initialize resolver with specific score
         vm.prank(escrowContract);
-        resolutionModule.initializeDispute(1, resolver1, bytes32(0));
+        resolutionModule.initializeDispute(1, escrowContract, resolver1, bytes32(0));
 
         // Record successful resolution
         vm.prank(escrowContract);
         resolutionModule.recordResolution(
             1,
+            escrowContract,
             resolver1,
-            DecentralizedResolverStructs.ResolutionOutcome.RELEASE,
+            ResolutionOutcome.RELEASE,
             1 hours
         );
 
@@ -360,13 +361,13 @@ contract DRv1FuzzTest is Test {
         // Initialize multiple disputes
         for (uint256 i = 0; i < numTimeouts; i++) {
             vm.prank(escrowContract);
-            resolutionModule.initializeDispute(i + 1, resolver1, bytes32(0));
+            resolutionModule.initializeDispute(i + 1, escrowContract, resolver1, bytes32(0));
 
             // Warp past deadline
             vm.warp(block.timestamp + 4 days);
 
             // Try to force progress (may or may not timeout depending on resolver availability)
-            try resolutionModule.forceProgress(i + 1) {
+            try resolutionModule.forceProgress(i + 1, escrowContract) {
                 timeoutCount++;
             } catch {
                 // May fail if no alternative resolver available
@@ -404,34 +405,30 @@ contract DRv1FuzzTest is Test {
 
             // Initialize dispute
             vm.prank(escrowContract);
-            resolutionModule.initializeDispute(workflowId, resolver1, bytes32(0));
+            resolutionModule.initializeDispute(workflowId, escrowContract, resolver1, bytes32(0));
 
             // Resolver decides
-            DecentralizedResolverStructs.ResolutionOutcome outcome1 = DecentralizedResolverStructs
-                .ResolutionOutcome
-                .RELEASE;
+            ResolutionOutcome outcome1 = ResolutionOutcome.RELEASE;
 
             vm.prank(escrowContract);
-            resolutionModule.recordResolution(workflowId, resolver1, outcome1, 1 hours);
+            resolutionModule.recordResolution(workflowId, escrowContract, resolver1, outcome1, 1 hours);
 
             // Randomly escalate some disputes
             uint256 rand = uint256(keccak256(abi.encodePacked(seed, i))) % 2;
             if (rand == 1) {
                 // Escalate to senior resolver
                 vm.prank(escrowContract);
-                resolutionModule.executeEscalation(workflowId, '');
+                resolutionModule.executeEscalation(workflowId, escrowContract, '');
 
                 // Senior decides differently (reversal)
-                DecentralizedResolverStructs.ResolutionOutcome outcome2 = DecentralizedResolverStructs
-                        .ResolutionOutcome
-                        .CANCEL;
+                ResolutionOutcome outcome2 = ResolutionOutcome.CANCEL;
 
                 vm.prank(escrowContract);
-                resolutionModule.recordResolution(workflowId, seniorResolver, outcome2, 2 hours);
+                resolutionModule.recordResolution(workflowId, escrowContract, seniorResolver, outcome2, 2 hours);
 
                 // Record reversal
                 vm.prank(escrowContract);
-                resolutionModule.recordReversal(workflowId, 0);
+                resolutionModule.recordReversal(workflowId, escrowContract, 0);
 
                 expectedReversals++;
             }
@@ -497,11 +494,11 @@ contract DRv1FuzzTest is Test {
 
             // Initialize at round 0
             vm.prank(escrowContract);
-            resolutionModule.initializeDispute(workflowId, resolver1, bytes32(0));
+            resolutionModule.initializeDispute(workflowId, escrowContract, resolver1, bytes32(0));
 
             // Get dispute metadata
             DecentralizedResolverStructs.DisputeMetadata memory dm = resolutionModule
-                .getDisputeMetadata(workflowId);
+                .getDisputeMetadata(workflowId, escrowContract);
 
             uint8 currentRound = dm.currentRound;
             DecentralizedResolverStructs.DisputeStatus status = dm.status;
@@ -521,8 +518,9 @@ contract DRv1FuzzTest is Test {
                 vm.prank(escrowContract);
                 resolutionModule.recordResolution(
                     workflowId,
+                    escrowContract,
                     resolver1,
-                    DecentralizedResolverStructs.ResolutionOutcome.RELEASE,
+                    ResolutionOutcome.RELEASE,
                     1 hours
                 );
             } else if (rand == 1) {
@@ -530,22 +528,23 @@ contract DRv1FuzzTest is Test {
                 vm.prank(escrowContract);
                 resolutionModule.recordResolution(
                     workflowId,
+                    escrowContract,
                     resolver1,
-                    DecentralizedResolverStructs.ResolutionOutcome.RELEASE,
+                    ResolutionOutcome.RELEASE,
                     1 hours
                 );
 
                 vm.prank(escrowContract);
-                resolutionModule.executeEscalation(workflowId, '');
+                resolutionModule.executeEscalation(workflowId, escrowContract, '');
 
-                dm = resolutionModule.getDisputeMetadata(workflowId);
+                dm = resolutionModule.getDisputeMetadata(workflowId, escrowContract);
                 currentRound = dm.currentRound;
                 assertEq(currentRound, 1, 'Should be at round 1');
             } else {
                 // Timeout and force progress
                 vm.warp(block.timestamp + 4 days);
                 vm.prank(escrowContract);
-                resolutionModule.forceProgress(workflowId);
+                resolutionModule.forceProgress(workflowId, escrowContract);
             }
         }
 
@@ -581,13 +580,14 @@ contract DRv1FuzzTest is Test {
 
         // Initialize and resolve a dispute
         vm.prank(escrowContract);
-        resolutionModule.initializeDispute(1, resolver1, bytes32(0));
+        resolutionModule.initializeDispute(1, escrowContract, resolver1, bytes32(0));
 
         vm.prank(escrowContract);
         resolutionModule.recordResolution(
             1,
+            escrowContract,
             resolver1,
-            DecentralizedResolverStructs.ResolutionOutcome.RELEASE,
+            ResolutionOutcome.RELEASE,
             1 hours
         );
 
@@ -632,7 +632,7 @@ contract DRv1FuzzTest is Test {
                 address resolver = testResolvers[j];
 
                 vm.prank(escrowContract);
-                resolutionModule.initializeDispute(workflowId, resolver, bytes32(0));
+                resolutionModule.initializeDispute(workflowId, escrowContract, resolver, bytes32(0));
 
                 // Randomly resolve or timeout
                 uint256 rand = uint256(keccak256(abi.encodePacked(seed, i, j))) % 2;
@@ -641,14 +641,15 @@ contract DRv1FuzzTest is Test {
                     vm.prank(escrowContract);
                     resolutionModule.recordResolution(
                         workflowId,
+                        escrowContract,
                         resolver,
-                        DecentralizedResolverStructs.ResolutionOutcome.RELEASE,
+                        ResolutionOutcome.RELEASE,
                         1 hours
                     );
                 } else {
                     vm.warp(block.timestamp + 4 days);
                     vm.prank(escrowContract);
-                    resolutionModule.forceProgress(workflowId);
+                    resolutionModule.forceProgress(workflowId, escrowContract);
                 }
 
                 workflowId++;

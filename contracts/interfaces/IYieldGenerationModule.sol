@@ -20,7 +20,8 @@ interface IYieldGenerationModule is IERC165 {
     function depositForYield(
         uint256 workflowId,
         address token,
-        uint256 amount
+        uint256 amount,
+        address escrowContract
     ) external returns (bool success, uint256 yieldTokenBalance);
 
     /**

@@ -31,7 +31,8 @@ contract DefaultYieldModuleTest is Test {
         (bool success, uint256 yieldTokenBalance) = yieldModule.depositForYield(
             1,
             address(token),
-            AMOUNT
+            AMOUNT,
+            address(this)
         );
         
         assertTrue(success);
@@ -42,7 +43,8 @@ contract DefaultYieldModuleTest is Test {
         (bool success, uint256 yieldTokenBalance) = yieldModule.depositForYield(
             1,
             address(token),
-            0
+            0,
+            address(this)
         );
         
         assertTrue(success);

@@ -37,6 +37,7 @@ interface ISlashingModule {
     struct SlashEvent {
         uint256 slashId; // Unique slash ID
         uint256 workflowId; // Related dispute ID
+        address escrowContract; // Related escrow contract
         address resolver; // Resolver being slashed
         SlashReason reason; // Reason for slash
         uint256 amount; // Amount slashed
@@ -127,6 +128,7 @@ interface ISlashingModule {
     /**
      * @notice Propose a slash for a resolver
      * @param workflowId Related dispute ID
+     * @param escrowContract Related escrow contract
      * @param resolver Resolver to slash
      * @param reason Reason for slash
      * @param evidence Evidence supporting slash (fraud proofs, etc.)
@@ -134,6 +136,7 @@ interface ISlashingModule {
      */
     function proposeSlash(
         uint256 workflowId,
+        address escrowContract,
         address resolver,
         SlashReason reason,
         bytes calldata evidence
@@ -165,11 +168,13 @@ interface ISlashingModule {
     /**
      * @notice Automatically slash for timeout
      * @param workflowId Dispute ID
+     * @param escrowContract Related escrow contract
      * @param resolver Resolver who timed out
      * @param timeoutType Type of timeout (accept vs resolve)
      */
     function slashForTimeout(
         uint256 workflowId,
+        address escrowContract,
         address resolver,
         uint8 timeoutType
     ) external returns (uint256 slashId);
@@ -177,11 +182,13 @@ interface ISlashingModule {
     /**
      * @notice Automatically slash for reversal
      * @param workflowId Dispute ID
+     * @param escrowContract Related escrow contract
      * @param resolver Resolver whose decision was reversed
      * @param priorRound Round at which decision was made
      */
     function slashForReversal(
         uint256 workflowId,
+        address escrowContract,
         address resolver,
         uint8 priorRound
     ) external returns (uint256 slashId);
@@ -189,11 +196,13 @@ interface ISlashingModule {
     /**
      * @notice Slash for proven fraud
      * @param workflowId Dispute ID (may be 0 for off-chain fraud)
+     * @param escrowContract Related escrow contract
      * @param resolver Resolver who committed fraud
      * @param evidence Fraud proof
      */
     function slashForFraud(
         uint256 workflowId,
+        address escrowContract,
         address resolver,
         bytes calldata evidence
     ) external returns (uint256 slashId);

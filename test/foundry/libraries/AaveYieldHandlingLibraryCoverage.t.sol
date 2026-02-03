@@ -57,7 +57,7 @@ contract MockYieldGen is IYieldGenerationModule {
     function setAToken(address _a) external { aToken = _a; }
     function setSupported(bool _s) external { supported = _s; }
 
-    function depositForYield(uint256, address, uint256) external pure returns (bool, uint256) { return (true, 0); }
+    function depositForYield(uint256, address, uint256, address) external pure returns (bool, uint256) { return (true, 0); }
     function withdrawWithYield(uint256, address, uint256, address) external pure returns (bool, uint256, uint256) { return (true, 0, 0); }
     function getPosition(uint256, address, address) external pure returns (IYieldGenerationModule.YieldPosition memory) {
         return IYieldGenerationModule.YieldPosition(false, 0, 0, 0);

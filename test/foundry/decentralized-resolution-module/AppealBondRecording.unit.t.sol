@@ -2,10 +2,10 @@
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/decentralized-resolution-module/ResolverIncentiveModuleV2.sol';
-import '../../../contracts/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
-import '../../../contracts/decentralized-resolution-module/DecentralizedResolverStructs.sol';
-import '../../../contracts/decentralized-resolution-module/ResolverIncentiveModuleV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV2.sol';
+import '../../../contracts/modules/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
+import '../../../contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV1.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/YieldOps.sol';
@@ -75,11 +75,12 @@ contract AppealBondRecordingTest is Test {
 
         // Record bond - incentive module will pull tokens from depositor
         vm.prank(address(this));
-        incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, depositor, amount, address(token), round);
+        incentiveModule.recordAppealBond(WORKFLOW_ID, address(this), depositor, depositor, amount, address(token), round);
 
         // Verify bond recorded
         ResolverIncentiveModuleV2.AppealBondRecord memory bond = incentiveModule.getAppealBond(
             WORKFLOW_ID,
+            address(this),
             round
         );
         uint256 bondAmount = bond.amount;
@@ -100,6 +101,7 @@ contract AppealBondRecordingTest is Test {
         vm.prank(address(this));
         incentiveModule.recordAppealBond{value: amount}(
             WORKFLOW_ID,
+            address(this),
             depositor,
             depositor,
             amount,
@@ -110,6 +112,7 @@ contract AppealBondRecordingTest is Test {
         // Verify bond recorded
         ResolverIncentiveModuleV2.AppealBondRecord memory bond = incentiveModule.getAppealBond(
             WORKFLOW_ID,
+            address(this),
             round
         );
         uint256 bondAmount = bond.amount;
@@ -129,11 +132,12 @@ contract AppealBondRecordingTest is Test {
 
         // Record bond - incentive module will pull tokens from depositor
         vm.prank(address(this));
-        incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, depositor, amount, address(token), round);
+        incentiveModule.recordAppealBond(WORKFLOW_ID, address(this), depositor, depositor, amount, address(token), round);
 
         // Verify bond recorded
         ResolverIncentiveModuleV2.AppealBondRecord memory bond = incentiveModule.getAppealBond(
             WORKFLOW_ID,
+            address(this),
             round
         );
         uint256 bondAmount = bond.amount;
@@ -153,12 +157,12 @@ contract AppealBondRecordingTest is Test {
 
         // Record first bond
         vm.prank(address(this));
-        incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, depositor, amount, address(token), round);
+        incentiveModule.recordAppealBond(WORKFLOW_ID, address(this), depositor, depositor, amount, address(token), round);
 
         // Try to record duplicate (should revert)
         vm.prank(address(this));
         vm.expectRevert('Bond already exists');
-        incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, depositor, amount, address(token), round);
+        incentiveModule.recordAppealBond(WORKFLOW_ID, address(this), depositor, depositor, amount, address(token), round);
     }
 
     /**
@@ -169,7 +173,7 @@ contract AppealBondRecordingTest is Test {
         uint8 round = 0;
         vm.prank(address(this));
         vm.expectRevert('Invalid round');
-        incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, depositor, amount, address(token), round);
+        incentiveModule.recordAppealBond(WORKFLOW_ID, address(this), depositor, depositor, amount, address(token), round);
     }
 
     /**
@@ -181,7 +185,7 @@ contract AppealBondRecordingTest is Test {
 
         vm.prank(address(this));
         vm.expectRevert('Invalid round');
-        incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, depositor, amount, address(token), round);
+        incentiveModule.recordAppealBond(WORKFLOW_ID, address(this), depositor, depositor, amount, address(token), round);
     }
 
     /**
@@ -193,7 +197,7 @@ contract AppealBondRecordingTest is Test {
 
         vm.prank(address(this));
         vm.expectRevert('Invalid amount');
-        incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, depositor, amount, address(token), round);
+        incentiveModule.recordAppealBond(WORKFLOW_ID, address(this), depositor, depositor, amount, address(token), round);
     }
 
     /**
@@ -206,7 +210,7 @@ contract AppealBondRecordingTest is Test {
         // Call from non-escrow address
         vm.prank(address(this));
         vm.expectRevert('Invalid depositor');
-        incentiveModule.recordAppealBond(WORKFLOW_ID, address(0), address(0), amount, address(token), round);
+        incentiveModule.recordAppealBond(WORKFLOW_ID, address(this), address(0), address(0), amount, address(token), round);
     }
 
     /**
@@ -228,7 +232,7 @@ contract AppealBondRecordingTest is Test {
                 nonEscrow
             )
         );
-        incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, depositor, amount, address(token), round);
+        incentiveModule.recordAppealBond(WORKFLOW_ID, address(this), depositor, depositor, amount, address(token), round);
     }
 
     /**
@@ -245,7 +249,7 @@ contract AppealBondRecordingTest is Test {
         vm.expectEmit(true, true, true, true);
         emit AppealBondRecorded(WORKFLOW_ID, round, depositor, amount, address(token));
 
-        incentiveModule.recordAppealBond(WORKFLOW_ID, depositor, depositor, amount, address(token), round);
+        incentiveModule.recordAppealBond(WORKFLOW_ID, address(this), depositor, depositor, amount, address(token), round);
     }
 
     event AppealBondRecorded(

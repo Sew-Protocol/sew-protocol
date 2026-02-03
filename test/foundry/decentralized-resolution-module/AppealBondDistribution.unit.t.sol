@@ -2,15 +2,15 @@
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/decentralized-resolution-module/ResolverIncentiveModuleV2.sol';
-import '../../../contracts/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
-import '../../../contracts/decentralized-resolution-module/DecentralizedResolverStructs.sol';
+import '../../../contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV2.sol';
+import '../../../contracts/modules/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/YieldOps.sol';
 import '../../../contracts/DisputeOps.sol';
 import '../../../contracts/core/ModuleManagementContract.sol';
-import '../../../contracts/decentralized-resolution-module/ResolverIncentiveModuleV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV1.sol';
 /**
  * @title AppealBondDistributionTest
  * @notice Unit tests for distributeAppealBond functionality
@@ -76,7 +76,7 @@ contract AppealBondDistributionTest is Test {
 
         // Record bond - incentive module will pull tokens from depositor
         vm.prank(address(this));
-        incentiveModule.recordAppealBond(workflowId, depositor, depositor, BOND_AMOUNT, address(token), round);
+        incentiveModule.recordAppealBond(workflowId, address(this), depositor, depositor, BOND_AMOUNT, address(token), round);
     }
 
     /**
@@ -90,7 +90,7 @@ contract AppealBondDistributionTest is Test {
 
         // Distribute bond on successful appeal (outcomeFlipped = true)
         vm.prank(address(this));
-        incentiveModule.distributeAppealBond(WORKFLOW_ID, 0, true);
+        incentiveModule.distributeAppealBond(WORKFLOW_ID, address(this), 0, true);
 
         // Verify bond refunded to depositor
         uint256 depositBalanceAfter = token.balanceOf(depositor);
@@ -109,18 +109,18 @@ contract AppealBondDistributionTest is Test {
 
         // Record resolvers at round 0 (prior to appeal)
         vm.prank(address(this));
-        incentiveModule.recordResolver(WORKFLOW_ID, resolver1, 0);
+        incentiveModule.recordResolver(WORKFLOW_ID, address(this), resolver1, 0);
 
         vm.prank(address(this));
-        incentiveModule.recordResolver(WORKFLOW_ID, resolver2, 0);
+        incentiveModule.recordResolver(WORKFLOW_ID, address(this), resolver2, 0);
 
         // Distribute bond on failed appeal (outcomeFlipped = false)
         vm.prank(address(this));
-        incentiveModule.distributeAppealBond(WORKFLOW_ID, 0, false);
+        incentiveModule.distributeAppealBond(WORKFLOW_ID, address(this), 0, false);
 
         // Verify resolvers have claimable payments
-        uint256 resolver1Payment = incentiveModule.getClaimablePayment(WORKFLOW_ID, resolver1);
-        uint256 resolver2Payment = incentiveModule.getClaimablePayment(WORKFLOW_ID, resolver2);
+        uint256 resolver1Payment = incentiveModule.getClaimablePayment(WORKFLOW_ID, address(this), resolver1);
+        uint256 resolver2Payment = incentiveModule.getClaimablePayment(WORKFLOW_ID, address(this), resolver2);
 
         // Should be split equally (or with proper rounding)
         assertGt(resolver1Payment, 0, 'Resolver1 should have claimable payment');
@@ -137,7 +137,7 @@ contract AppealBondDistributionTest is Test {
     function test_distributeAppealBond_NoBondRecorded() public {
         vm.prank(address(this));
         vm.expectRevert('No bond recorded');
-        incentiveModule.distributeAppealBond(WORKFLOW_ID, 0, true);
+        incentiveModule.distributeAppealBond(WORKFLOW_ID, address(this), 0, true);
     }
 
     /**
@@ -149,13 +149,13 @@ contract AppealBondDistributionTest is Test {
 
         // Distribute once
         vm.prank(address(this));
-        incentiveModule.distributeAppealBond(WORKFLOW_ID, 0, true);
+        incentiveModule.distributeAppealBond(WORKFLOW_ID, address(this), 0, true);
 
         // Try to distribute again
         // Note: The contract zeros bond.amount after distribution, so second call fails on "No bond recorded"
         vm.prank(address(this));
         vm.expectRevert('No bond recorded');
-        incentiveModule.distributeAppealBond(WORKFLOW_ID, 0, true);
+        incentiveModule.distributeAppealBond(WORKFLOW_ID, address(this), 0, true);
     }
 
     /**
@@ -168,11 +168,11 @@ contract AppealBondDistributionTest is Test {
 
         // Distribute bond
         vm.prank(address(this));
-        incentiveModule.distributeAppealBond(WORKFLOW_ID, 0, false);
+        incentiveModule.distributeAppealBond(WORKFLOW_ID, address(this), 0, false);
 
         // Bond should be forfeited (remains in protocol)
         // Verify no payment to any resolver
-        uint256 resolver1Payment = incentiveModule.getClaimablePayment(WORKFLOW_ID, resolver1);
+        uint256 resolver1Payment = incentiveModule.getClaimablePayment(WORKFLOW_ID, address(this), resolver1);
         assertEq(resolver1Payment, 0, 'No payment to unrecorded resolver');
     }
 
@@ -186,7 +186,7 @@ contract AppealBondDistributionTest is Test {
         vm.expectEmit(true, true, true, true);
         emit AppealBondRefunded(WORKFLOW_ID, 1, depositor, BOND_AMOUNT, address(token));
 
-        incentiveModule.distributeAppealBond(WORKFLOW_ID, 0, true);
+        incentiveModule.distributeAppealBond(WORKFLOW_ID, address(this), 0, true);
     }
 
     /**
@@ -197,7 +197,7 @@ contract AppealBondDistributionTest is Test {
 
         // Record resolver
         vm.prank(address(this));
-        incentiveModule.recordResolver(WORKFLOW_ID, resolver1, 0);
+        incentiveModule.recordResolver(WORKFLOW_ID, address(this), resolver1, 0);
 
         address[] memory resolvers = new address[](1);
         resolvers[0] = resolver1;
@@ -206,7 +206,7 @@ contract AppealBondDistributionTest is Test {
         vm.expectEmit(true, true, true, true);
         emit AppealBondPaidToResolvers(WORKFLOW_ID, 0, resolvers, BOND_AMOUNT, address(token));
 
-        incentiveModule.distributeAppealBond(WORKFLOW_ID, 0, false);
+        incentiveModule.distributeAppealBond(WORKFLOW_ID, address(this), 0, false);
     }
 
     // Event declarations for testing (matching ResolverIncentiveModuleV2)

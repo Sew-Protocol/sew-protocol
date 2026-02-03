@@ -77,6 +77,7 @@ contract StakingModuleNoOp is IStakingModule, AccessControl {
 
     function onResolverAssigned(
         uint256 workflowId,
+        address /* escrowContract */,
         address resolver,
         uint256 stakeRequired
     ) external override onlyRole(ROLE_RESOLUTION_MODULE) {
@@ -86,6 +87,7 @@ contract StakingModuleNoOp is IStakingModule, AccessControl {
 
     function onResolutionFinalized(
         uint256 workflowId,
+        address /* escrowContract */,
         address resolver,
         bool /* outcome */
     ) external override onlyRole(ROLE_RESOLUTION_MODULE) {
@@ -95,6 +97,7 @@ contract StakingModuleNoOp is IStakingModule, AccessControl {
 
     function onDisputeEscalated(
         uint256 workflowId,
+        address /* escrowContract */,
         address resolver
     ) external override onlyRole(ROLE_RESOLUTION_MODULE) {
         // No-op: In real implementation, would unlock stake from prior round
@@ -103,6 +106,7 @@ contract StakingModuleNoOp is IStakingModule, AccessControl {
 
     function lockStake(
         uint256 workflowId,
+        address /* escrowContract */,
         address resolver,
         uint256 amount,
         uint256 /* duration */
@@ -112,6 +116,7 @@ contract StakingModuleNoOp is IStakingModule, AccessControl {
 
     function unlockStake(
         uint256 workflowId,
+        address /* escrowContract */,
         address resolver
     ) external override onlyRole(ROLE_RESOLUTION_MODULE) {
         emit StakeUnlocked(resolver, 0, workflowId);

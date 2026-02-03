@@ -111,7 +111,7 @@ contract DisputeOps is AccessControl {
         bytes memory escrowData = abi.encode(token, from, to, amountAfterFee);
 
         // Get current level from module
-        try IResolutionModule(resolutionModule).getDisputeResolver(workflowId, escrowData) returns (
+        try IResolutionModule(resolutionModule).getDisputeResolver(workflowId, _msgSender(), escrowData) returns (
             address /* currentResolver */,
             uint8 currentLevel
         ) {
@@ -126,7 +126,7 @@ contract DisputeOps is AccessControl {
         // For DecentralizedResolutionModule, we can call getDecisionAtRound
         // Use low-level call since this function is not in IResolutionModule interface
         (bool decisionSuccess, bytes memory decisionData) = resolutionModule.staticcall(
-            abi.encodeWithSignature('getDecisionAtRound(uint256,uint8)', workflowId, result.currentLevel)
+            abi.encodeWithSignature('getDecisionAtRound(uint256,address,uint8)', workflowId, _msgSender(), result.currentLevel)
         );
         
         if (decisionSuccess && decisionData.length >= 32) {
@@ -165,6 +165,7 @@ contract DisputeOps is AccessControl {
         try
             IResolutionModule(resolutionModule).canEscalate(
                 workflowId,
+                _msgSender(),
                 result.currentLevel,
                 escrowData
             )
@@ -180,7 +181,7 @@ contract DisputeOps is AccessControl {
         }
 
         // Execute escalation in module (module may update its state)
-        try IResolutionModule(resolutionModule).executeEscalation(workflowId, escrowData) returns (
+        try IResolutionModule(resolutionModule).executeEscalation(workflowId, _msgSender(), escrowData) returns (
             bool escalationSuccess,
             address newResolver,
             uint8 newLevel

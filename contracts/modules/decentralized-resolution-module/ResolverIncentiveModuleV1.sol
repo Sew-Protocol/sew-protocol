@@ -8,8 +8,8 @@ import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/utils/introspection/IERC165.sol';
-import '../governance/SlowLaneQueueActivate.sol';
-import '../types/EscrowTypes.sol'; // For ArrayLengthMismatch error
+import '../../governance/SlowLaneQueueActivate.sol';
+import '../../types/EscrowTypes.sol'; // For ArrayLengthMismatch error
 
 // Custom errors for gas efficiency
 error BalanceMismatch(uint256 expected, uint256 actual);
@@ -95,14 +95,14 @@ contract ResolverIncentiveModuleV1 is
     PendingAddress private _pendingPaymentLibrary;
 
     // Resolver tracking per dispute
-    mapping(uint256 => ResolverRecord[]) public disputeResolvers;
-    mapping(uint256 => uint256) public disputeEscrowFees;
-    mapping(uint256 => uint256) public disputeEscalationFees;
-    mapping(uint256 => bool) public disputePaymentsDistributed;
+    mapping(address => mapping(uint256 => ResolverRecord[])) public disputeResolvers;
+    mapping(address => mapping(uint256 => uint256)) public disputeEscrowFees;
+    mapping(address => mapping(uint256 => uint256)) public disputeEscalationFees;
+    mapping(address => mapping(uint256 => bool)) public disputePaymentsDistributed;
 
     // Pull pattern: claimable payments per resolver per dispute
-    mapping(uint256 => mapping(address => uint256)) public claimablePayments;
-    mapping(uint256 => bool) public paymentsCalculated;
+    mapping(address => mapping(uint256 => mapping(address => uint256))) public claimablePayments;
+    mapping(address => mapping(uint256 => bool)) public paymentsCalculated;
 
     // Configuration (governance-controlled)
     uint256 public resolverSharePercentage;
@@ -115,11 +115,11 @@ contract ResolverIncentiveModuleV1 is
     mapping(address => bool) public registeredEscrowContracts;
 
     // CRIT-2/CRIT-3: Track expected token balance per dispute to validate transfers
-    mapping(uint256 => uint256) public disputeExpectedTokenBalance; // workflowId => expected balance
+    mapping(address => mapping(uint256 => uint256)) public disputeExpectedTokenBalance; // escrowContract => workflowId => expected balance
     // HIGH-2: Track resolver recording to prevent duplicates (same resolver at any level)
-    mapping(uint256 => mapping(address => bool)) public resolverRecorded; // workflowId => resolver => recorded
+    mapping(address => mapping(uint256 => mapping(address => bool))) public resolverRecorded; // escrowContract => workflowId => resolver => recorded
     // HIGH-2: Track when fees were recorded to detect stale recordings
-    mapping(uint256 => uint256) public feeRecordedTimestamp; // workflowId => timestamp when fee was recorded
+    mapping(address => mapping(uint256 => uint256)) public feeRecordedTimestamp; // escrowContract => workflowId => timestamp when fee was recorded
     /// @notice Per-escrow rate limiting and tracking
     struct EscrowRateLimit {
         uint256 disputesToday; // Disputes recorded in current window
@@ -130,7 +130,7 @@ contract ResolverIncentiveModuleV1 is
     mapping(address => EscrowRateLimit) public escrowRateLimits; // escrow => rate limit data
 
     // CRIT-FIX: Enforce single payout token per dispute to prevent token-mixing in claimablePayments
-    mapping(uint256 => address) public payoutToken;
+    mapping(address => mapping(uint256 => address)) public payoutToken;
 
     // ============ Events ============
 
@@ -276,23 +276,24 @@ contract ResolverIncentiveModuleV1 is
      */
     function recordResolver(
         uint256 workflowId,
+        address escrowContract,
         address resolver,
         uint8 level
     ) external onlyEscrowContract {
-        _recordResolver(workflowId, resolver, level);
+        _recordResolver(workflowId, escrowContract, resolver, level);
     }
 
-    function _recordResolver(uint256 workflowId, address resolver, uint8 level) internal {
+    function _recordResolver(uint256 workflowId, address escrowContract, address resolver, uint8 level) internal {
         if (resolver == address(0)) revert ZeroResolver();
         if (level > 2) revert InvalidLevel(level, 2);
 
         // Prevent duplicate resolver recording (same resolver at any level)
-        if (resolverRecorded[workflowId][resolver]) {
+        if (resolverRecorded[escrowContract][workflowId][resolver]) {
             revert ResolverAlreadyRecorded(resolver);
         }
 
         // Prevent gas DoS with too many resolvers
-        ResolverRecord[] storage resolvers = disputeResolvers[workflowId];
+        ResolverRecord[] storage resolvers = disputeResolvers[escrowContract][workflowId];
         if (resolvers.length >= MAX_RESOLVERS_PER_DISPUTE) {
             revert TooManyResolvers(resolvers.length, MAX_RESOLVERS_PER_DISPUTE);
         }
@@ -303,7 +304,7 @@ contract ResolverIncentiveModuleV1 is
         );
         
         // Mark resolver as recorded
-        resolverRecorded[workflowId][resolver] = true;
+        resolverRecorded[escrowContract][workflowId][resolver] = true;
 
         emit ResolverRecorded(workflowId, resolver, level, block.timestamp);
     }
@@ -322,36 +323,33 @@ contract ResolverIncentiveModuleV1 is
      */
     function recordEscrowFee(
         uint256 workflowId,
+        address escrowContract,
         address token,
         uint256 amount
     ) external onlyEscrowContract {
-        _recordEscrowFee(workflowId, token, amount);
+        _recordEscrowFee(workflowId, escrowContract, token, amount);
     }
 
-    function _recordEscrowFee(uint256 workflowId, address token, uint256 amount) internal {
-        address escrow = _msgSender();
+    function _recordEscrowFee(uint256 workflowId, address escrowContract, address token, uint256 amount) internal {
         if (token == address(0)) revert ZeroToken();
         if (amount == 0) revert ZeroAmount();
         
         // Check and update rate limits
-        _checkAndUpdateRateLimits(escrow, 1, amount);
+        _checkAndUpdateRateLimits(escrowContract, 1, amount);
         
         // MED-1: Prevent duplicate escrow fee recording
-        if (disputeEscrowFees[workflowId] != 0) {
+        if (disputeEscrowFees[escrowContract][workflowId] != 0) {
             revert EscrowFeeAlreadyRecorded(workflowId);
         }
-        
-        // Maximum fee limit per dispute
-        if (amount > MAX_ESCROW_FEE_PER_DISPUTE) {
-            revert AmountExceedsMaximum(amount, MAX_ESCROW_FEE_PER_DISPUTE);
-        }
 
-        // CRIT-2: Track expected balance
-        disputeEscrowFees[workflowId] = amount;
-        disputeExpectedTokenBalance[workflowId] += amount;
-        // Track timestamp for stale detection
-        feeRecordedTimestamp[workflowId] = block.timestamp;
+        // CRIT-FIX: Enforce single payout token per dispute
+        _enforceSinglePayoutToken(escrowContract, workflowId, token);
         
+        disputeEscrowFees[escrowContract][workflowId] = amount;
+        disputeExpectedTokenBalance[escrowContract][workflowId] += amount;
+        
+        feeRecordedTimestamp[escrowContract][workflowId] = block.timestamp;
+
         emit EscrowFeeRecorded(workflowId, token, amount);
     }
 
@@ -364,26 +362,26 @@ contract ResolverIncentiveModuleV1 is
      */
     function recordEscalationFee(
         uint256 workflowId,
+        address escrowContract,
         address token,
         uint256 amount
     ) external onlyEscrowContract {
-        _recordEscalationFee(workflowId, token, amount);
+        _recordEscalationFee(workflowId, escrowContract, token, amount);
     }
 
-    function _recordEscalationFee(uint256 workflowId, address token, uint256 amount) internal {
-        address escrow = _msgSender();
+    function _recordEscalationFee(uint256 workflowId, address escrowContract, address token, uint256 amount) internal {
         if (token == address(0)) revert ZeroToken();
         if (amount == 0) revert ZeroAmount();
         if (amount >= type(uint256).max / 2) revert AmountTooLarge(amount); // Prevent overflow
 
         // Check if dispute exists
-        if (disputeResolvers[workflowId].length == 0) revert DisputeNotInitialized(workflowId);
+        if (disputeResolvers[escrowContract][workflowId].length == 0) revert DisputeNotInitialized(workflowId);
 
         // Check and update rate limits (only count fees, not additional dispute)
-        _checkAndUpdateRateLimits(escrow, 0, amount);
+        _checkAndUpdateRateLimits(escrowContract, 0, amount);
 
         // HIGH-1: Maximum escalation fee limit per dispute (check after accumulation)
-        uint256 newTotal = disputeEscalationFees[workflowId] + amount;
+        uint256 newTotal = disputeEscalationFees[escrowContract][workflowId] + amount;
         if (amount > MAX_ESCALATION_FEE_PER_DISPUTE) {
             revert AmountExceedsMaximum(amount, MAX_ESCALATION_FEE_PER_DISPUTE);
         }
@@ -392,11 +390,11 @@ contract ResolverIncentiveModuleV1 is
         }
 
         // CRIT-2: Track expected balance
-        disputeEscalationFees[workflowId] = newTotal;
-        disputeExpectedTokenBalance[workflowId] += amount;
+        disputeEscalationFees[escrowContract][workflowId] = newTotal;
+        disputeExpectedTokenBalance[escrowContract][workflowId] += amount;
         // Update timestamp if not already set
-        if (feeRecordedTimestamp[workflowId] == 0) {
-            feeRecordedTimestamp[workflowId] = block.timestamp;
+        if (feeRecordedTimestamp[escrowContract][workflowId] == 0) {
+            feeRecordedTimestamp[escrowContract][workflowId] = block.timestamp;
         }
         
         emit EscalationFeeRecorded(workflowId, token, amount);
@@ -410,133 +408,142 @@ contract ResolverIncentiveModuleV1 is
      */
     function onDisputeOpened(
         uint256 workflowId,
+        address escrowContract,
         address token,
-        uint256 /* amount */,
+        uint256 amount,
         uint256 escrowFee,
         uint8 /* round */
     ) external override onlyEscrowContract {
-        // Record escrow fee (V1 tracks fees separately)
-        if (escrowFee > 0) {
-            _recordEscrowFee(workflowId, token, escrowFee);
-        }
+        _recordEscrowFee(workflowId, escrowContract, token, escrowFee);
     }
 
     /**
-     * @notice Called when a resolver is assigned (IIncentiveModule interface)
-     * @dev Records resolver involvement
+     * @notice Called when a resolver is assigned to a dispute
+     * @param workflowId Unique identifier for the dispute
+     * @param escrowContract Address of the vault
+     * @param resolver Address of assigned resolver
+     * @param level Current round/level
      */
     function onResolverAssigned(
         uint256 workflowId,
+        address escrowContract,
         address resolver,
-        uint8 round
+        uint8 level
     ) external override onlyEscrowContract {
-        _recordResolver(workflowId, resolver, round);
+        _recordResolver(workflowId, escrowContract, resolver, level);
     }
 
     /**
      * @notice Called when a resolver submits a decision (IIncentiveModule interface)
      * @dev V1 doesn't track individual decisions, but can be extended
      */
-    function onDecisionSubmitted(
-        uint256 workflowId,
-        address resolver,
-        uint8 round,
-        DecentralizedResolverStructs.ResolutionOutcome decision,
-        uint256 responseTime
-    ) external override onlyEscrowContract {
-        // V1 doesn't need to track individual decisions
-        // This hook is for V2+ appeal bond logic
-    }
-
-    /**
-     * @notice Called when a dispute is escalated (IIncentiveModule interface)
-     * @dev V1 tracks escalation fees separately
-     */
-    function onEscalated(
-        uint256 workflowId,
-        uint8 fromRound,
-        uint8 toRound,
-        address escalatedBy
-    ) external override onlyEscrowContract {
-        // V1 tracks escalation fees via recordEscalationFee
-        // This hook is for V2+ appeal bond logic
-    }
-
-    /**
-     * @notice Called when a dispute is finalized (IIncentiveModule interface)
-     * @dev V1 can trigger payment distribution if not already done
-     */
-    function onDisputeFinalized(
-        uint256 /* workflowId */,
-        uint8 /* finalRound */,
-        DecentralizedResolverStructs.ResolutionOutcome /* finalDecision */
-    ) external override onlyEscrowContract {
-        // V1 payments are calculated via onDisputeResolved
-        // This hook is informational for V2+ appeal bond distribution
-    }
-
-    /**
-     * @notice Called when a resolver times out (IIncentiveModule interface)
-     * @dev V1 doesn't track timeouts in incentive module
-     */
-    function onResolverTimeout(
-        uint256 workflowId,
-        address resolver,
-        uint8 round,
-        uint8 timeoutType
-    ) external override onlyEscrowContract {
-        // V1 doesn't track timeouts in incentive module
-        // This hook is for V2+ appeal bond logic
-    }
-
-    // ============ V2+ Functions (Stub Implementations) ============
-
-    /**
-     * @notice Get required appeal bond for escalation (V2+)
-     * @dev V1 doesn't support appeal bonds - returns zero
-     */
-    function getRequiredAppealBond(
-        uint256 /* workflowId */,
-        uint8 /* fromRound */,
-        uint8 /* toRound */
-    ) external view virtual override returns (uint256 bondAmount, address token) {
-        return (0, address(0));
-    }
-
-    /**
-     * @notice Check if module supports a specific feature
-     * @return supported Whether the feature is supported (V1 returns false for all features)
-     */
-    function supportsFeature(bytes4 /* featureId */) external pure virtual returns (bool supported) {
-        return false; // V1 doesn't support any V2+ features
-    }
-
-    /**
-     * @notice Record appeal bond payment (V2+)
-     * @dev V1 doesn't support appeal bonds - reverts
-     */
-    function recordAppealBond(
-        uint256 /* workflowId */,
-        address /* depositor */,
-        address /* escalatedBy */,
-        uint256 /* amount */,
-        address /* token */,
-        uint8 /* round */
-    ) external payable virtual override {
-        revert('V1 does not support appeal bonds');
-    }
-
-    /**
-     * @notice Distribute appeal bond based on outcome (V2+)
-     * @dev V1 doesn't support appeal bonds - reverts
-     */
-    function distributeAppealBond(
-        uint256 /* workflowId */,
-        uint8 /* round */,
-        bool /* outcomeFlipped */
-    ) external virtual override {
-        revert('V1 does not support appeal bonds');
-    }
+        function onDecisionSubmitted(
+            uint256 workflowId,
+            address escrowContract,
+            address resolver,
+            uint8 round,
+            ResolutionOutcome decision,
+            uint256 responseTime
+        ) external override onlyEscrowContract {
+            // V1 doesn't need to track individual decisions
+            // This hook is for V2+ appeal bond logic
+        }
+    
+        /**
+         * @notice Called when a dispute is escalated (IIncentiveModule interface)
+         * @dev V1 tracks escalation fees separately
+         */
+        function onEscalated(
+            uint256 workflowId,
+            address escrowContract,
+            uint8 fromRound,
+            uint8 toRound,
+            address escalatedBy
+        ) external override onlyEscrowContract {
+            // V1 tracks escalation fees via recordEscalationFee
+            // This hook is for V2+ appeal bond logic
+        }
+    
+        /**
+         * @notice Called when a dispute is finalized (IIncentiveModule interface)
+         * @dev V1 can trigger payment distribution if not already done
+         */
+        function onDisputeFinalized(
+            uint256 /* workflowId */,
+            address /* escrowContract */,
+            uint8 /* finalRound */,
+            ResolutionOutcome /* finalDecision */
+        ) external override onlyEscrowContract {
+            // V1 payments are calculated via onDisputeResolved
+            // This hook is informational for V2+ appeal bond distribution
+        }
+    
+        /**
+         * @notice Called when a resolver times out (IIncentiveModule interface)
+         * @dev V1 doesn't track timeouts in incentive module
+         */
+        function onResolverTimeout(
+            uint256 workflowId,
+            address escrowContract,
+            address resolver,
+            uint8 round,
+            uint8 timeoutType
+        ) external override onlyEscrowContract {
+            // V1 doesn't track timeouts in incentive module
+            // This hook is for V2+ appeal bond logic
+        }
+    
+        // ============ V2+ Functions (Stub Implementations) ============
+    
+        /**
+         * @notice Get required appeal bond for escalation (V2+)
+         * @dev V1 doesn't support appeal bonds - returns zero
+         */
+        function getRequiredAppealBond(
+            uint256 /* workflowId */,
+            address /* escrowContract */,
+            uint8 /* fromRound */,
+            uint8 /* toRound */
+        ) external view virtual override returns (uint256 bondAmount, address token) {
+            return (0, address(0));
+        }
+    
+        /**
+         * @notice Check if module supports a specific feature
+         * @return supported Whether the feature is supported (V1 returns false for all features)
+         */
+        function supportsFeature(bytes4 /* featureId */) external pure virtual returns (bool supported) {
+            return false; // V1 doesn't support any V2+ features
+        }
+    
+        /**
+         * @notice Record appeal bond payment (V2+)
+         * @dev V1 doesn't support appeal bonds - reverts
+         */
+        function recordAppealBond(
+            uint256 /* workflowId */,
+            address /* escrowContract */,
+            address /* depositor */,
+            address /* escalatedBy */,
+            uint256 /* amount */,
+            address /* token */,
+            uint8 /* round */
+        ) external payable virtual override {
+            revert('V1 does not support appeal bonds');
+        }
+    
+        /**
+         * @notice Distribute appeal bond based on outcome (V2+)
+         * @dev V1 doesn't support appeal bonds - reverts
+         */
+        function distributeAppealBond(
+            uint256 /* workflowId */,
+            address /* escrowContract */,
+            uint8 /* round */,
+            bool /* outcomeFlipped */
+        ) external virtual override {
+            revert('V1 does not support appeal bonds');
+        }
 
     /**
      * @notice Calculate and distribute resolver payments for a finalized dispute (IIncentiveModule interface)
@@ -547,17 +554,19 @@ contract ResolverIncentiveModuleV1 is
      */
     function distributePayments(
         uint256 workflowId,
+        address escrowContract,
         address token,
         uint256 /* totalFees */
     ) external virtual override onlyEscrowContract {
         // Delegate to onDisputeResolved for backward compatibility
         // Note: totalFees parameter is ignored as fees are already recorded via recordEscrowFee/recordEscalationFee
-        onDisputeResolved(workflowId, token);
+        onDisputeResolved(workflowId, escrowContract, token);
     }
 
     /**
      * @notice Calculate payments when dispute is resolved (pull pattern)
      * @param workflowId The escrow transfer ID
+     * @param escrowContract Address of the vault
      * @param token Token address for payments
      * @dev Called by escrow contract when dispute is resolved
      *      Calculates payments and makes them claimable (pull pattern)
@@ -568,24 +577,25 @@ contract ResolverIncentiveModuleV1 is
      */
     function onDisputeResolved(
         uint256 workflowId,
+        address escrowContract,
         address token
     ) public onlyEscrowContract nonReentrant {
         if (token == address(0)) revert ZeroToken();
-        if (paymentsCalculated[workflowId]) revert PaymentsAlreadyCalculated(workflowId);
+        if (paymentsCalculated[escrowContract][workflowId]) revert PaymentsAlreadyCalculated(workflowId);
 
         // CRIT-FIX: Enforce single payout token per dispute
-        _requirePayoutToken(workflowId, token);
+        _requirePayoutToken(escrowContract, workflowId, token);
 
         // Gather data (imperative - state reads)
-        ResolverRecord[] memory resolvers = disputeResolvers[workflowId];
+        ResolverRecord[] memory resolvers = disputeResolvers[escrowContract][workflowId];
         if (resolvers.length == 0) revert NoResolvers(workflowId);
 
-        uint256 escrowFee = disputeEscrowFees[workflowId];
-        uint256 escalationFees = disputeEscalationFees[workflowId];
+        uint256 escrowFee = disputeEscrowFees[escrowContract][workflowId];
+        uint256 escalationFees = disputeEscalationFees[escrowContract][workflowId];
         uint256 totalRecordedFees = escrowFee + escalationFees;
 
         // Check for stale fee recording (fees recorded too long ago)
-        uint256 feeRecordedAt = feeRecordedTimestamp[workflowId];
+        uint256 feeRecordedAt = feeRecordedTimestamp[escrowContract][workflowId];
         if (feeRecordedAt > 0 && block.timestamp > feeRecordedAt + MAX_FEE_RECORDING_AGE) {
             emit StaleFeeRecordingDetected(workflowId, feeRecordedAt, block.timestamp);
             // Continue anyway - escrow may have valid reason for delay
@@ -595,7 +605,7 @@ contract ResolverIncentiveModuleV1 is
         // CRIT-1/CRIT-3: Validate balance matches recorded fees (with tolerance for rounding)
         IERC20 tokenContract = IERC20(token);
         uint256 contractBalance = tokenContract.balanceOf(address(this));
-        uint256 expectedBalance = disputeExpectedTokenBalance[workflowId];
+        uint256 expectedBalance = disputeExpectedTokenBalance[escrowContract][workflowId];
         
         // Check that balance is sufficient for recorded fees
         if (contractBalance < totalRecordedFees) {
@@ -614,7 +624,7 @@ contract ResolverIncentiveModuleV1 is
         }
         
         // Clear expected balance tracking after validation
-        delete disputeExpectedTokenBalance[workflowId];
+        delete disputeExpectedTokenBalance[escrowContract][workflowId];
 
         // Prepare input (functional data structure)
         PaymentInput memory input = PaymentInput({
@@ -693,13 +703,13 @@ contract ResolverIncentiveModuleV1 is
         // Store claimable amounts (pull pattern - resolvers claim their payments)
         for (uint256 i = 0; i < output.resolvers.length; i++) {
             if (output.resolvers[i] != address(0) && output.payments[i] > 0) {
-                claimablePayments[workflowId][output.resolvers[i]] = output.payments[i];
+                claimablePayments[escrowContract][workflowId][output.resolvers[i]] = output.payments[i];
             }
         }
 
         // Mark as calculated (allows resolvers to claim)
-        paymentsCalculated[workflowId] = true;
-        disputePaymentsDistributed[workflowId] = true; // For backward compatibility
+        paymentsCalculated[escrowContract][workflowId] = true;
+        disputePaymentsDistributed[escrowContract][workflowId] = true; // For backward compatibility
         
         // CRIT-2/CRIT-3: Clear fee tracking after successful payment calculation
         // Note: Keep fees in storage for view functions, but clear expected balance (already cleared above)
@@ -715,21 +725,21 @@ contract ResolverIncentiveModuleV1 is
      * @dev Resolvers call this to claim their payment
      *      Allows retry if initial transfer fails
      */
-    function claimPayment(uint256 workflowId, address token) external nonReentrant {
+    function claimPayment(uint256 workflowId, address escrowContract, address token) external nonReentrant {
         if (token == address(0)) revert ZeroToken();
-        if (!paymentsCalculated[workflowId]) revert PaymentsNotCalculated(workflowId);
+        if (!paymentsCalculated[escrowContract][workflowId]) revert PaymentsNotCalculated(workflowId);
 
         // CRIT-FIX: Validate token matches payout token
-        address expectedToken = payoutToken[workflowId];
+        address expectedToken = payoutToken[escrowContract][workflowId];
         if (expectedToken != address(0) && token != expectedToken) {
             revert InvalidPayoutToken(expectedToken, token);
         }
 
-        uint256 amount = claimablePayments[workflowId][_msgSender()];
+        uint256 amount = claimablePayments[escrowContract][workflowId][_msgSender()];
         if (amount == 0) revert NothingToClaim(workflowId, _msgSender());
 
         // Clear claimable amount before transfer (prevent reentrancy)
-        delete claimablePayments[workflowId][_msgSender()];
+        delete claimablePayments[escrowContract][workflowId][_msgSender()];
 
         // Transfer payment (safeTransfer will revert on failure, restoring claimable amount is not needed
         // since the delete above will be reverted by the transaction revert)
@@ -745,14 +755,12 @@ contract ResolverIncentiveModuleV1 is
      * @param token Token address to check/enforce
      * @dev Sets payout token on first payment source (fee or bond), subsequent payments must match
      */
-    function _requirePayoutToken(uint256 workflowId, address token) internal {
-        address p = payoutToken[workflowId];
+    function _enforceSinglePayoutToken(address escrowContract, uint256 workflowId, address token) internal {
+        address p = payoutToken[escrowContract][workflowId];
         if (p == address(0)) {
-            // First payment source - set the payout token
-            payoutToken[workflowId] = token;
-        } else {
-            // Subsequent payment - must match
-            if (p != token) revert InvalidPayoutToken(p, token);
+            payoutToken[escrowContract][workflowId] = token;
+        } else if (p != token) {
+            revert InvalidPayoutToken(p, token);
         }
     }
 
@@ -1035,9 +1043,9 @@ contract ResolverIncentiveModuleV1 is
      * @dev Only timelock can clear fee recordings. Use when escrow fails to transfer tokens
      *      and dispute needs to be reset or cancelled.
      */
-    function clearFeeRecording(uint256 workflowId, string memory reason) external onlyRole(ROLE_TIMELOCK) {
-        delete disputeExpectedTokenBalance[workflowId];
-        delete feeRecordedTimestamp[workflowId];
+    function clearFeeRecording(uint256 workflowId, address escrow, string memory reason) external onlyRole(ROLE_TIMELOCK) {
+        delete disputeExpectedTokenBalance[escrow][workflowId];
+        delete feeRecordedTimestamp[escrow][workflowId];
         // Note: Keep disputeEscrowFees and disputeEscalationFees for historical record
         emit FeeRecordingCleared(workflowId, reason);
     }
@@ -1147,9 +1155,10 @@ contract ResolverIncentiveModuleV1 is
      * @return resolvers Array of resolver records
      */
     function getDisputeResolvers(
-        uint256 workflowId
+        uint256 workflowId,
+        address escrowContract
     ) external view returns (ResolverRecord[] memory) {
-        return disputeResolvers[workflowId];
+        return disputeResolvers[escrowContract][workflowId];
     }
 
     /**
@@ -1159,40 +1168,52 @@ contract ResolverIncentiveModuleV1 is
      * @return escalationFees Total escalation fees
      */
     function getDisputeFees(
-        uint256 workflowId
+        uint256 workflowId,
+        address escrowContract
     ) external view returns (uint256 escrowFee, uint256 escalationFees) {
-        return (disputeEscrowFees[workflowId], disputeEscalationFees[workflowId]);
+        return (disputeEscrowFees[escrowContract][workflowId], disputeEscalationFees[escrowContract][workflowId]);
     }
 
     /**
      * @notice Check if payments have been distributed for a dispute
      * @param workflowId The escrow transfer ID
+     * @param escrowContract Address of the vault
      * @return distributed True if payments have been distributed
      */
-    function arePaymentsDistributed(uint256 workflowId) external view returns (bool) {
-        return disputePaymentsDistributed[workflowId];
+    function arePaymentsDistributed(uint256 workflowId, address escrowContract) external view returns (bool) {
+        return disputePaymentsDistributed[escrowContract][workflowId];
     }
 
     /**
      * @notice Check if payments have been calculated for a dispute
      * @param workflowId The escrow transfer ID
+     * @param escrowContract Address of the vault
      * @return calculated True if payments have been calculated (claimable)
      */
-    function arePaymentsCalculated(uint256 workflowId) external view returns (bool) {
-        return paymentsCalculated[workflowId];
+    function arePaymentsCalculated(uint256 workflowId, address escrowContract) external view returns (bool) {
+        return paymentsCalculated[escrowContract][workflowId];
     }
 
     /**
      * @notice Get claimable payment amount for a resolver
-     * @param workflowId The escrow transfer ID
+     * @param workflowId Unique identifier for the dispute
+     * @param escrowContract Address of the vault
      * @param resolver Resolver address
      * @return amount Claimable amount (0 if nothing to claim)
      */
     function getClaimablePayment(
         uint256 workflowId,
+        address escrowContract,
         address resolver
-    ) external view returns (uint256) {
-        return claimablePayments[workflowId][resolver];
+    ) external view override returns (uint256) {
+        return claimablePayments[escrowContract][workflowId][resolver];
+    }
+
+    function _requirePayoutToken(address escrowContract, uint256 workflowId, address token) internal view {
+        address p = payoutToken[escrowContract][workflowId];
+        if (p != address(0) && p != token) {
+            revert InvalidPayoutToken(p, token);
+        }
     }
 
     /**

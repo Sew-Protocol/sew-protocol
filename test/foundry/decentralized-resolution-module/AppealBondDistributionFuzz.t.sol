@@ -2,9 +2,9 @@
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/decentralized-resolution-module/ResolverIncentiveModuleV2.sol';
-import '../../../contracts/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
-import '../../../contracts/decentralized-resolution-module/DecentralizedResolverStructs.sol';
+import '../../../contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV2.sol';
+import '../../../contracts/modules/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/YieldOps.sol';
 import '../../../contracts/DisputeOps.sol';
@@ -58,7 +58,7 @@ contract AppealBondDistributionFuzzTest is Test {
     function _recordResolvers(uint256 workflowId, uint8 resolverCount, uint8 priorRound) internal {
         vm.startPrank(escrowContract);
         for (uint256 i = 0; i < resolverCount; i++) {
-            incentiveModule.recordResolver(workflowId, resolverAddresses[i], priorRound);
+            incentiveModule.recordResolver(workflowId, escrowContract, resolverAddresses[i], priorRound);
         }
         vm.stopPrank();
     }
@@ -74,7 +74,7 @@ contract AppealBondDistributionFuzzTest is Test {
         
         // Record bond - escrow contract calls, but depositor is the one who approved
         vm.prank(escrowContract);
-        incentiveModule.recordAppealBond(workflowId, depositor, depositor, bondAmount, address(token), round);
+        incentiveModule.recordAppealBond(workflowId, escrowContract, depositor, depositor, bondAmount, address(token), round);
         
         return bondAmount;
     }
@@ -107,7 +107,7 @@ contract AppealBondDistributionFuzzTest is Test {
         // round = priorRound (the round whose resolvers get paid)
         // bondRound = priorRound + 1 (the round the bond was posted for)
         vm.startPrank(escrowContract);
-        incentiveModule.distributeAppealBond(workflowId, priorRound, false); // false = appeal failed
+        incentiveModule.distributeAppealBond(workflowId, escrowContract, priorRound, false); // false = appeal failed
         vm.stopPrank();
 
         // Calculate expected per-resolver amount
@@ -118,7 +118,7 @@ contract AppealBondDistributionFuzzTest is Test {
         // Note: Remainder is distributed to first resolver(s)
         uint256 totalClaimable = 0;
         for (uint256 i = 0; i < resolverCount; i++) {
-            uint256 claimable = incentiveModule.claimablePayments(workflowId, resolverAddresses[i]);
+            uint256 claimable = incentiveModule.claimablePayments(escrowContract, workflowId, resolverAddresses[i]);
             totalClaimable += claimable;
 
             // Each resolver should get at least expectedPerResolver
@@ -143,11 +143,11 @@ contract AppealBondDistributionFuzzTest is Test {
         _recordAppealBond(workflowId, bondAmount, bondRound);
 
         vm.startPrank(escrowContract);
-        incentiveModule.distributeAppealBond(workflowId, priorRound, false);
+        incentiveModule.distributeAppealBond(workflowId, escrowContract, priorRound, false);
         vm.stopPrank();
 
         // Single resolver should get entire bond
-        uint256 claimable = incentiveModule.claimablePayments(workflowId, resolverAddresses[0]);
+        uint256 claimable = incentiveModule.claimablePayments(escrowContract, workflowId, resolverAddresses[0]);
         assertEq(claimable, bondAmount, 'Single resolver should get full bond');
     }
 
@@ -169,7 +169,7 @@ contract AppealBondDistributionFuzzTest is Test {
         _recordAppealBond(workflowId, bondAmount, bondRound);
 
         vm.startPrank(escrowContract);
-        incentiveModule.distributeAppealBond(workflowId, priorRound, false);
+        incentiveModule.distributeAppealBond(workflowId, escrowContract, priorRound, false);
         vm.stopPrank();
 
         // Calculate remainder
@@ -179,7 +179,7 @@ contract AppealBondDistributionFuzzTest is Test {
         // Verify remainder is distributed to first resolver(s)
         uint256 totalClaimable = 0;
         for (uint256 i = 0; i < resolverCount; i++) {
-            uint256 claimable = incentiveModule.claimablePayments(workflowId, resolverAddresses[i]);
+            uint256 claimable = incentiveModule.claimablePayments(escrowContract, workflowId, resolverAddresses[i]);
             totalClaimable += claimable;
 
             // First resolver(s) should get extra for remainder
@@ -208,18 +208,18 @@ contract AppealBondDistributionFuzzTest is Test {
         _recordAppealBond(workflowId, bondAmount, bondRound);
 
         vm.startPrank(escrowContract);
-        incentiveModule.distributeAppealBond(workflowId, priorRound, false);
+        incentiveModule.distributeAppealBond(workflowId, escrowContract, priorRound, false);
         vm.stopPrank();
 
         // Each resolver should get at least 1 wei
         for (uint256 i = 0; i < resolverCount; i++) {
-            uint256 claimable = incentiveModule.claimablePayments(workflowId, resolverAddresses[i]);
+            uint256 claimable = incentiveModule.claimablePayments(escrowContract, workflowId, resolverAddresses[i]);
             assertGe(claimable, 1, 'Resolver should get at least 1 wei');
         }
 
         uint256 totalClaimable = 0;
         for (uint256 i = 0; i < resolverCount; i++) {
-            totalClaimable += incentiveModule.claimablePayments(workflowId, resolverAddresses[i]);
+            totalClaimable += incentiveModule.claimablePayments(escrowContract, workflowId, resolverAddresses[i]);
         }
         assertEq(totalClaimable, bondAmount, 'Total should equal bond');
     }
@@ -240,13 +240,13 @@ contract AppealBondDistributionFuzzTest is Test {
 
         // Should not revert due to overflow
         vm.startPrank(escrowContract);
-        incentiveModule.distributeAppealBond(workflowId, priorRound, false);
+        incentiveModule.distributeAppealBond(workflowId, escrowContract, priorRound, false);
         vm.stopPrank();
 
         // Verify distribution is correct
         uint256 totalClaimable = 0;
         for (uint256 i = 0; i < resolverCount; i++) {
-            uint256 claimable = incentiveModule.claimablePayments(workflowId, resolverAddresses[i]);
+            uint256 claimable = incentiveModule.claimablePayments(escrowContract, workflowId, resolverAddresses[i]);
             totalClaimable += claimable;
         }
 
@@ -271,12 +271,12 @@ contract AppealBondDistributionFuzzTest is Test {
         token.approve(address(incentiveModule), bondAmount);
         
         vm.prank(escrowContract);
-        incentiveModule.recordAppealBond(workflowId, depositor, depositor, bondAmount, address(token), bondRound);
+        incentiveModule.recordAppealBond(workflowId, escrowContract, depositor, depositor, bondAmount, address(token), bondRound);
 
         // Distribute bond (simulating successful appeal - refund)
         uint256 depositorBalanceBefore = token.balanceOf(depositor);
         vm.startPrank(escrowContract);
-        incentiveModule.distributeAppealBond(workflowId, 0, true); // true = appeal succeeded
+        incentiveModule.distributeAppealBond(workflowId, escrowContract, 0, true); // true = appeal succeeded
         vm.stopPrank();
 
         // Verify depositor received refund
@@ -288,7 +288,7 @@ contract AppealBondDistributionFuzzTest is Test {
         );
 
         // Verify bond marked as refunded
-        (address depositorAddr, address escalatedBy, uint256 amount, address tokenAddr, uint256 depositedAt, bool distributed, bool refunded) = incentiveModule.appealBonds(workflowId, bondRound);
+        (address depositorAddr, address escalatedBy, uint256 amount, address tokenAddr, uint256 depositedAt, bool distributed, bool refunded) = incentiveModule.appealBonds(escrowContract, workflowId, bondRound);
         assertTrue(distributed, 'Bond should be marked as distributed');
         assertTrue(refunded, 'Bond should be marked as refunded');
     }
@@ -311,7 +311,7 @@ contract AppealBondDistributionFuzzTest is Test {
         uint256 contractBalanceBefore = token.balanceOf(address(incentiveModule));
 
         vm.startPrank(escrowContract);
-        incentiveModule.distributeAppealBond(workflowId, priorRound, false);
+        incentiveModule.distributeAppealBond(workflowId, escrowContract, priorRound, false);
         vm.stopPrank();
 
         // Bond should remain in contract (retained by protocol)
@@ -321,7 +321,7 @@ contract AppealBondDistributionFuzzTest is Test {
         // Verify metrics: should not increment totalBondsPaidToResolvers
         // (This is checked by verifying no resolvers have claimable payments)
         for (uint256 i = 0; i < MAX_RESOLVERS; i++) {
-            uint256 claimable = incentiveModule.claimablePayments(workflowId, resolverAddresses[i]);
+            uint256 claimable = incentiveModule.claimablePayments(escrowContract, workflowId, resolverAddresses[i]);
             assertEq(claimable, 0, 'No resolver should have claimable payment');
         }
     }
@@ -349,27 +349,27 @@ contract AppealBondDistributionFuzzTest is Test {
         // Record resolvers at otherRound (should NOT receive bond)
         vm.startPrank(escrowContract);
         for (uint256 i = 0; i < otherRoundCount; i++) {
-            incentiveModule.recordResolver(workflowId, resolverAddresses[priorRoundCount + i], otherRound);
+            incentiveModule.recordResolver(workflowId, escrowContract, resolverAddresses[priorRoundCount + i], otherRound);
         }
         vm.stopPrank();
 
         _recordAppealBond(workflowId, bondAmount, bondRound);
 
         vm.startPrank(escrowContract);
-        incentiveModule.distributeAppealBond(workflowId, priorRound, false);
+        incentiveModule.distributeAppealBond(workflowId, escrowContract, priorRound, false);
         vm.stopPrank();
 
         // Only priorRound resolvers should have claimable payments
         uint256 totalClaimable = 0;
         for (uint256 i = 0; i < priorRoundCount; i++) {
-            uint256 claimable = incentiveModule.claimablePayments(workflowId, resolverAddresses[i]);
+            uint256 claimable = incentiveModule.claimablePayments(escrowContract, workflowId, resolverAddresses[i]);
             assertGt(claimable, 0, 'Prior round resolver should have payment');
             totalClaimable += claimable;
         }
 
         // Other round resolvers should not have payments
         for (uint256 i = priorRoundCount; i < priorRoundCount + otherRoundCount; i++) {
-            uint256 claimable = incentiveModule.claimablePayments(workflowId, resolverAddresses[i]);
+            uint256 claimable = incentiveModule.claimablePayments(escrowContract, workflowId, resolverAddresses[i]);
             assertEq(claimable, 0, 'Other round resolver should not have payment');
         }
 
@@ -395,13 +395,13 @@ contract AppealBondDistributionFuzzTest is Test {
 
         // Distribute once
         vm.startPrank(escrowContract);
-        incentiveModule.distributeAppealBond(workflowId, priorRound, false);
+        incentiveModule.distributeAppealBond(workflowId, escrowContract, priorRound, false);
         vm.stopPrank();
 
         // Attempt to distribute again - should revert
         vm.startPrank(escrowContract);
         vm.expectRevert();
-        incentiveModule.distributeAppealBond(workflowId, priorRound, false);
+        incentiveModule.distributeAppealBond(workflowId, escrowContract, priorRound, false);
         vm.stopPrank();
     }
 }

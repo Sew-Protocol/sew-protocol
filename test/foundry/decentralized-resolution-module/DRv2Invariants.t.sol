@@ -3,10 +3,10 @@ pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
 import 'forge-std/StdInvariant.sol';
-import '../../../contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol';
-import '../../../contracts/decentralized-resolution-module/ResolverIncentiveModuleV2.sol';
-import '../../../contracts/decentralized-resolution-module/DecentralizedResolverStructs.sol';
-import '../../../contracts/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol';
+import '../../../contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV2.sol';
+import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
+import '../../../contracts/modules/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 
 contract MockERC20 is ERC20 {
@@ -97,7 +97,7 @@ contract DRv2InvariantsTest is StdInvariant, Test {
         for (uint256 workflowId = 0; workflowId < 1000; workflowId++) {
             for (uint8 round = 1; round <= 2; round++) {
                 ResolverIncentiveModuleV2.AppealBondRecord memory bond = incentiveModuleV2
-                    .getAppealBond(workflowId, round);
+                    .getAppealBond(workflowId, escrowContract, round);
                 if (bond.amount > 0 && !bond.distributed) {
                     undistributed += bond.amount;
                 }
@@ -145,7 +145,7 @@ contract DRv2InvariantsTest is StdInvariant, Test {
         for (uint256 workflowId = 0; workflowId < 1000; workflowId++) {
             for (uint8 round = 1; round <= 2; round++) {
                 ResolverIncentiveModuleV2.AppealBondRecord memory bond = incentiveModuleV2
-                    .getAppealBond(workflowId, round);
+                    .getAppealBond(workflowId, escrowContract, round);
 
                 // If bond exists and is distributed, verify it's properly marked
                 if (bond.amount > 0 && bond.distributed) {
@@ -170,7 +170,7 @@ contract DRv2InvariantsTest is StdInvariant, Test {
         for (uint256 workflowId = 0; workflowId < 1000; workflowId++) {
             for (uint8 round = 1; round <= 2; round++) {
                 ResolverIncentiveModuleV2.AppealBondRecord memory bond = incentiveModuleV2
-                    .getAppealBond(workflowId, round);
+                    .getAppealBond(workflowId, escrowContract, round);
 
                 if (bond.depositor != address(0)) {
                     assertTrue(bond.amount > 0, 'Bond amount must be positive');
@@ -194,8 +194,8 @@ contract DRv2InvariantsTest is StdInvariant, Test {
         uint256 actualRound2 = 0;
 
         for (uint256 workflowId = 0; workflowId < 1000; workflowId++) {
-            if (incentiveModuleV2.hasAppealBond(workflowId, 1)) actualRound1++;
-            if (incentiveModuleV2.hasAppealBond(workflowId, 2)) actualRound2++;
+            if (incentiveModuleV2.hasAppealBond(workflowId, escrowContract, 1)) actualRound1++;
+            if (incentiveModuleV2.hasAppealBond(workflowId, escrowContract, 2)) actualRound2++;
         }
 
         // Histogram should match or exceed actual (may have entries beyond our scan range)
@@ -233,9 +233,9 @@ contract DRv2InvariantsTest is StdInvariant, Test {
         bytes memory escrowData = abi.encode(address(token), address(this), address(this), uint256(1));
 
         // Test costs for rounds 0, 1, 2
-        (uint256 cost0, ) = resolutionModule.getRequiredAppealBond(0, 0, escrowData);
-        (uint256 cost1, ) = resolutionModule.getRequiredAppealBond(0, 1, escrowData);
-        (uint256 cost2, ) = resolutionModule.getRequiredAppealBond(0, 2, escrowData);
+        (uint256 cost0, ) = resolutionModule.getRequiredAppealBond(0, escrowContract, 0, escrowData);
+        (uint256 cost1, ) = resolutionModule.getRequiredAppealBond(0, escrowContract, 1, escrowData);
+        (uint256 cost2, ) = resolutionModule.getRequiredAppealBond(0, escrowContract, 2, escrowData);
 
         if (cost0 > 0) {
             // Only test if cost curve is enabled
@@ -258,7 +258,7 @@ contract DRv2InvariantsTest is StdInvariant, Test {
         for (uint256 workflowId = 0; workflowId < 1000; workflowId++) {
             for (uint8 round = 1; round <= 2; round++) {
                 ResolverIncentiveModuleV2.AppealBondRecord memory bond = incentiveModuleV2
-                    .getAppealBond(workflowId, round);
+                    .getAppealBond(workflowId, escrowContract, round);
                 if (bond.amount > 0 && !bond.distributed && bond.token == address(token)) {
                     undistributed += bond.amount;
                 }
@@ -344,11 +344,12 @@ contract DRv2FuzzTest is Test {
 
         // Record bond - incentive module will pull tokens from depositor
         vm.prank(escrowContract);
-        incentiveModuleV2.recordAppealBond(workflowId, depositor, depositor, amount, address(token), round);
+        incentiveModuleV2.recordAppealBond(workflowId, escrowContract, depositor, depositor, amount, address(token), round);
 
         // Verify bond recorded correctly
         ResolverIncentiveModuleV2.AppealBondRecord memory bond = incentiveModuleV2.getAppealBond(
             workflowId,
+            escrowContract,
             round
         );
 
@@ -394,7 +395,7 @@ contract DRv2FuzzTest is Test {
         uint256 expectedCost = baseCost + (stepSize * kSquared);
 
         bytes memory escrowData = abi.encode(address(token), address(this), address(this), uint256(1));
-        (uint256 actualCost, ) = resolutionModule.getRequiredAppealBond(0, escalationCount, escrowData);
+        (uint256 actualCost, ) = resolutionModule.getRequiredAppealBond(0, escrowContract, escalationCount, escrowData);
 
         assertEq(actualCost, expectedCost, 'Quadratic cost calculation mismatch');
 
@@ -402,6 +403,7 @@ contract DRv2FuzzTest is Test {
         if (escalationCount < 10) {
             (uint256 nextCost, ) = resolutionModule.getRequiredAppealBond(
                 0,
+                escrowContract,
                 escalationCount + 1,
                 escrowData
             );
@@ -437,7 +439,7 @@ contract DRv2FuzzTest is Test {
         uint256 expectedCost = baseCost + (stepSize * uint256(escalationCount));
 
         bytes memory escrowData = abi.encode(address(token), address(this), address(this), uint256(1));
-        (uint256 actualCost, ) = resolutionModule.getRequiredAppealBond(0, escalationCount, escrowData);
+        (uint256 actualCost, ) = resolutionModule.getRequiredAppealBond(0, escrowContract, escalationCount, escrowData);
 
         assertEq(actualCost, expectedCost, 'Linear cost calculation mismatch');
     }
@@ -467,7 +469,7 @@ contract DRv2FuzzTest is Test {
         vm.stopPrank();
 
         bytes memory escrowData = abi.encode(address(token), address(this), address(this), uint256(1));
-        (uint256 actualCost, ) = resolutionModule.getRequiredAppealBond(0, escalationCount, escrowData);
+        (uint256 actualCost, ) = resolutionModule.getRequiredAppealBond(0, escrowContract, escalationCount, escrowData);
 
         // For geometric, we can't easily calculate expected value due to division,
         // but we can verify it's in a reasonable range
@@ -510,13 +512,13 @@ contract DRv2FuzzTest is Test {
 
         // Record bond - incentive module will pull tokens from depositor
         vm.prank(escrowContract);
-        incentiveModuleV2.recordAppealBond(workflowId, depositor, depositor, amount, address(token), 1);
+        incentiveModuleV2.recordAppealBond(workflowId, escrowContract, depositor, depositor, amount, address(token), 1);
 
         uint256 depositorBalanceBefore = token.balanceOf(depositor);
 
         // Refund bond
         vm.prank(escrowContract);
-        incentiveModuleV2.distributeAppealBond(workflowId, 0, true); // outcomeFlipped = true
+        incentiveModuleV2.distributeAppealBond(workflowId, escrowContract, 0, true); // outcomeFlipped = true
 
         uint256 depositorBalanceAfter = token.balanceOf(depositor);
 
@@ -570,30 +572,30 @@ contract DRv2FuzzTest is Test {
 
             // Record bond - incentive module will pull tokens from depositor
             vm.prank(escrowContract);
-            incentiveModuleV2.recordAppealBond(workflowId, depositor, depositor, amount, address(token), 1);
+            incentiveModuleV2.recordAppealBond(workflowId, escrowContract, depositor, depositor, amount, address(token), 1);
             expectedPosted += amount;
             
             // For payment operations, record a resolver so the bond can be paid
             if (opType == 1) {
                 vm.prank(escrowContract);
-                incentiveModuleV2.recordResolver(workflowId, mockResolver, 0); // Record resolver at round 0
+                incentiveModuleV2.recordResolver(workflowId, escrowContract, mockResolver, 0); // Record resolver at round 0
             }
 
             // Distribute based on operation type
             if (opType == 0) {
                 // Refund
                 vm.prank(escrowContract);
-                incentiveModuleV2.distributeAppealBond(workflowId, 0, true);
+                incentiveModuleV2.distributeAppealBond(workflowId, escrowContract, 0, true);
                 expectedRefunded += amount;
             } else if (opType == 1) {
                 // Pay to resolvers
                 vm.prank(escrowContract);
-                incentiveModuleV2.distributeAppealBond(workflowId, 0, false);
+                incentiveModuleV2.distributeAppealBond(workflowId, escrowContract, 0, false);
                 expectedPaid += amount;
             } else {
                 // Forfeit
                 vm.prank(escrowContract);
-                incentiveModuleV2.forfeitAppealBond(workflowId, 1, 'Test');
+                incentiveModuleV2.forfeitAppealBond(workflowId, escrowContract, 1, 'Test');
                 expectedForfeited += amount;
             }
         }

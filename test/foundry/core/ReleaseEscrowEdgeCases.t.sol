@@ -410,10 +410,10 @@ contract MockYieldGenForEdgeCases is IYieldGenerationModule {
     function depositForYield(
         uint256 workflowId,
         address token,
-        uint256 amount
+        uint256 amount,
+        address escrowContract
     ) external override returns (bool, uint256) {
         // Simulate deposit: transfer tokens from escrow to this module (like Aave)
-        address escrowContract = msg.sender;
         IERC20(token).safeTransferFrom(escrowContract, address(this), amount);
         deposits[escrowContract][workflowId] = amount;
         workflowToEscrow[workflowId] = escrowContract; // Track escrow contract for this workflow

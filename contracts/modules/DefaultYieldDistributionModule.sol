@@ -31,6 +31,7 @@ contract DefaultYieldDistributionModule is IYieldDistributionModule, ERC165 {
      */
     function distributeYield(
         uint256 workflowId,
+        address /* escrowContract */,
         address token,
         uint256 yieldAmount,
         bytes calldata distributionData

@@ -17,6 +17,7 @@ interface IIncentiveModule {
     /**
      * @notice Called when a dispute is opened
      * @param workflowId Unique identifier for the dispute
+     * @param escrowContract Address of the vault
      * @param token Token address for escrow
      * @param amount Escrow amount
      * @param escrowFee Fee collected from escrow
@@ -24,6 +25,7 @@ interface IIncentiveModule {
      */
     function onDisputeOpened(
         uint256 workflowId,
+        address escrowContract,
         address token,
         uint256 amount,
         uint256 escrowFee,
@@ -33,14 +35,21 @@ interface IIncentiveModule {
     /**
      * @notice Called when a resolver is assigned to a dispute
      * @param workflowId Unique identifier for the dispute
+     * @param escrowContract Address of the vault
      * @param resolver Address of assigned resolver
      * @param round Current round
      */
-    function onResolverAssigned(uint256 workflowId, address resolver, uint8 round) external;
+    function onResolverAssigned(
+        uint256 workflowId,
+        address escrowContract,
+        address resolver,
+        uint8 round
+    ) external;
 
     /**
      * @notice Called when a resolver submits a decision
      * @param workflowId Unique identifier for the dispute
+     * @param escrowContract Address of the vault
      * @param resolver Address of resolver
      * @param round Current round
      * @param decision Resolution outcome
@@ -48,21 +57,24 @@ interface IIncentiveModule {
      */
     function onDecisionSubmitted(
         uint256 workflowId,
+        address escrowContract,
         address resolver,
         uint8 round,
-        DecentralizedResolverStructs.ResolutionOutcome decision,
+        ResolutionOutcome decision,
         uint256 responseTime
     ) external;
 
     /**
      * @notice Called when a dispute is escalated to the next round
      * @param workflowId Unique identifier for the dispute
+     * @param escrowContract Address of the vault
      * @param fromRound Previous round
      * @param toRound Next round
      * @param escalatedBy Address that initiated escalation
      */
     function onEscalated(
         uint256 workflowId,
+        address escrowContract,
         uint8 fromRound,
         uint8 toRound,
         address escalatedBy
@@ -71,24 +83,28 @@ interface IIncentiveModule {
     /**
      * @notice Called when a dispute is finalized (no more appeals)
      * @param workflowId Unique identifier for the dispute
+     * @param escrowContract Address of the vault
      * @param finalRound Final round that decided the outcome
      * @param finalDecision Final resolution outcome
      */
     function onDisputeFinalized(
         uint256 workflowId,
+        address escrowContract,
         uint8 finalRound,
-        DecentralizedResolverStructs.ResolutionOutcome finalDecision
+        ResolutionOutcome finalDecision
     ) external;
 
     /**
      * @notice Called when a resolver times out
      * @param workflowId Unique identifier for the dispute
+     * @param escrowContract Address of the vault
      * @param resolver Address of resolver that timed out
      * @param round Round where timeout occurred
      * @param timeoutType Type of timeout (accept=0, resolve=1)
      */
     function onResolverTimeout(
         uint256 workflowId,
+        address escrowContract,
         address resolver,
         uint8 round,
         uint8 timeoutType
@@ -99,19 +115,27 @@ interface IIncentiveModule {
     /**
      * @notice Calculate and distribute resolver payments for a finalized dispute
      * @param workflowId Unique identifier for the dispute
+     * @param escrowContract Address of the vault
      * @param token Token address for payment
      * @param totalFees Total fees available for distribution
      */
-    function distributePayments(uint256 workflowId, address token, uint256 totalFees) external;
+    function distributePayments(
+        uint256 workflowId,
+        address escrowContract,
+        address token,
+        uint256 totalFees
+    ) external;
 
     /**
      * @notice Get claimable payment for a resolver
      * @param workflowId Unique identifier for the dispute
+     * @param escrowContract Address of the vault
      * @param resolver Resolver address
      * @return amount Claimable amount
      */
     function getClaimablePayment(
         uint256 workflowId,
+        address escrowContract,
         address resolver
     ) external view returns (uint256 amount);
 
@@ -134,6 +158,7 @@ interface IIncentiveModule {
     /**
      * @notice Get required appeal bond for escalation (V2+)
      * @param workflowId Unique identifier for the dispute
+     * @param escrowContract Address of the vault
      * @param fromRound Current round
      * @param toRound Next round
      * @return bondAmount Required bond amount
@@ -142,6 +167,7 @@ interface IIncentiveModule {
      */
     function getRequiredAppealBond(
         uint256 workflowId,
+        address escrowContract,
         uint8 fromRound,
         uint8 toRound
     ) external view returns (uint256 bondAmount, address token);
@@ -149,6 +175,7 @@ interface IIncentiveModule {
     /**
      * @notice Record appeal bond payment (V2+)
      * @param workflowId Unique identifier for the dispute
+     * @param escrowContract Address of the vault
      * @param depositor Address that deposited bond (for ERC20: escrow contract, for ETH: user/escalator)
      * @param escalatedBy Address that initiated the escalation (always the user/escalator)
      * @param amount Bond amount
@@ -164,6 +191,7 @@ interface IIncentiveModule {
      */
     function recordAppealBond(
         uint256 workflowId,
+        address escrowContract,
         address depositor,
         address escalatedBy,
         uint256 amount,
@@ -174,9 +202,15 @@ interface IIncentiveModule {
     /**
      * @notice Distribute appeal bond based on outcome (V2+)
      * @param workflowId Unique identifier for the dispute
+     * @param escrowContract Address of the vault
      * @param round Round that was appealed
      * @param outcomeFlipped Whether the appeal succeeded
      * @dev V1 implementations should revert
      */
-    function distributeAppealBond(uint256 workflowId, uint8 round, bool outcomeFlipped) external;
+    function distributeAppealBond(
+        uint256 workflowId,
+        address escrowContract,
+        uint8 round,
+        bool outcomeFlipped
+    ) external;
 }

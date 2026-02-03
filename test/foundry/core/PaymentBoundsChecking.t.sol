@@ -3,9 +3,9 @@ import "../../../contracts/types/YieldPresets.sol";
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/decentralized-resolution-module/ResolverIncentiveModuleV1.sol';
-import '../../../contracts/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
-import '../../../contracts/decentralized-resolution-module/IPaymentCalculationLibrary.sol';
+import '../../../contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/IPaymentCalculationLibrary.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 
 contract PaymentBoundsCheckingTest is Test {
@@ -53,27 +53,27 @@ contract PaymentBoundsCheckingTest is Test {
 
         // Record resolvers
         vm.prank(escrow);
-        incentiveModule.recordResolver(workflowId, resolver1, 0);
+        incentiveModule.recordResolver(workflowId, escrow, resolver1, 0);
         vm.prank(escrow);
-        incentiveModule.recordResolver(workflowId, resolver2, 1);
+        incentiveModule.recordResolver(workflowId, escrow, resolver2, 1);
 
         // Record fees
         vm.prank(escrow);
-        incentiveModule.recordEscrowFee(workflowId, address(token), escrowFee);
+        incentiveModule.recordEscrowFee(workflowId, escrow, address(token), escrowFee);
         vm.prank(escrow);
-        incentiveModule.recordEscalationFee(workflowId, address(token), escalationFees);
+        incentiveModule.recordEscalationFee(workflowId, escrow, address(token), escalationFees);
 
         // Transfer tokens to incentive module
         token.mint(address(incentiveModule), escrowFee + escalationFees);
 
         // Calculate payments - should succeed
         vm.prank(escrow);
-        incentiveModule.onDisputeResolved(workflowId, address(token));
+        incentiveModule.onDisputeResolved(workflowId, escrow, address(token));
 
         // Verify payments were calculated
-        assertTrue(incentiveModule.arePaymentsCalculated(workflowId));
-        assertTrue(incentiveModule.getClaimablePayment(workflowId, resolver1) > 0);
-        assertTrue(incentiveModule.getClaimablePayment(workflowId, resolver2) > 0);
+        assertTrue(incentiveModule.arePaymentsCalculated(workflowId, escrow));
+        assertTrue(incentiveModule.getClaimablePayment(workflowId, escrow, resolver1) > 0);
+        assertTrue(incentiveModule.getClaimablePayment(workflowId, escrow, resolver2) > 0);
     }
 
     function test_RejectsPaymentExceedingTotalFees() public {
@@ -81,13 +81,13 @@ contract PaymentBoundsCheckingTest is Test {
 
         // Record resolvers
         vm.prank(escrow);
-        incentiveModule.recordResolver(workflowId, resolver1, 0);
+        incentiveModule.recordResolver(workflowId, escrow, resolver1, 0);
 
         // Record fees
         vm.prank(escrow);
-        incentiveModule.recordEscrowFee(workflowId, address(token), 1000 ether);
+        incentiveModule.recordEscrowFee(workflowId, escrow, address(token), 1000 ether);
         vm.prank(escrow);
-        incentiveModule.recordEscalationFee(workflowId, address(token), 500 ether);
+        incentiveModule.recordEscalationFee(workflowId, escrow, address(token), 500 ether);
 
         // Transfer tokens
         token.mint(address(incentiveModule), 1500 ether);
@@ -106,7 +106,7 @@ contract PaymentBoundsCheckingTest is Test {
         // Malicious library returns (escrowFee + escalationFees) * 2 = 3000 ether, but total fees = 1500 ether
         vm.prank(escrow);
         vm.expectRevert(abi.encodeWithSignature("ResolverShareExceedsTotalFees(uint256,uint256)", 3000 ether, 1500 ether));
-        incentiveModule.onDisputeResolved(workflowId, address(token));
+        incentiveModule.onDisputeResolved(workflowId, escrow, address(token));
     }
 
     function test_RejectsPaymentSumMismatch() public {
@@ -114,13 +114,13 @@ contract PaymentBoundsCheckingTest is Test {
 
         // Record resolvers
         vm.prank(escrow);
-        incentiveModule.recordResolver(workflowId, resolver1, 0);
+        incentiveModule.recordResolver(workflowId, escrow, resolver1, 0);
         vm.prank(escrow);
-        incentiveModule.recordResolver(workflowId, resolver2, 1);
+        incentiveModule.recordResolver(workflowId, escrow, resolver2, 1);
 
         // Record fees
         vm.prank(escrow);
-        incentiveModule.recordEscrowFee(workflowId, address(token), 1000 ether);
+        incentiveModule.recordEscrowFee(workflowId, escrow, address(token), 1000 ether);
 
         token.mint(address(incentiveModule), 1000 ether);
 
@@ -140,7 +140,7 @@ contract PaymentBoundsCheckingTest is Test {
         // Actual error: calculatedTotal = 500 ether, expectedTotal = 500 ether + 1 wei
         vm.prank(escrow);
         vm.expectRevert(abi.encodeWithSignature("PaymentSumMismatch(uint256,uint256)", 500 ether, 500 ether + 1));
-        incentiveModule.onDisputeResolved(workflowId, address(token));
+        incentiveModule.onDisputeResolved(workflowId, escrow, address(token));
     }
 
     function test_RejectsZeroResolverAddress() public {
@@ -157,14 +157,14 @@ contract PaymentBoundsCheckingTest is Test {
         incentiveModule.activatePaymentCalculationLibrary();
 
         vm.prank(escrow);
-        incentiveModule.recordResolver(workflowId, resolver1, 0);
+        incentiveModule.recordResolver(workflowId, escrow, resolver1, 0);
         vm.prank(escrow);
-        incentiveModule.recordEscrowFee(workflowId, address(token), 1000 ether);
+        incentiveModule.recordEscrowFee(workflowId, escrow, address(token), 1000 ether);
         token.mint(address(incentiveModule), 1000 ether);
 
         vm.prank(escrow);
         vm.expectRevert(abi.encodeWithSignature("ZeroResolverAddress(uint256)", 0));
-        incentiveModule.onDisputeResolved(workflowId, address(token));
+        incentiveModule.onDisputeResolved(workflowId, escrow, address(token));
     }
 
     function test_RejectsPaymentExceedingMaximumSinglePayment() public {
@@ -172,12 +172,12 @@ contract PaymentBoundsCheckingTest is Test {
 
         // Record resolvers
         vm.prank(escrow);
-        incentiveModule.recordResolver(workflowId, resolver1, 0);
+        incentiveModule.recordResolver(workflowId, escrow, resolver1, 0);
         vm.prank(escrow);
-        incentiveModule.recordResolver(workflowId, resolver2, 1);
+        incentiveModule.recordResolver(workflowId, escrow, resolver2, 1);
 
         vm.prank(escrow);
-        incentiveModule.recordEscrowFee(workflowId, address(token), 1000 ether);
+        incentiveModule.recordEscrowFee(workflowId, escrow, address(token), 1000 ether);
         token.mint(address(incentiveModule), 1000 ether);
 
         // Create library that gives one resolver >90% of total
@@ -193,16 +193,16 @@ contract PaymentBoundsCheckingTest is Test {
         // First resolver gets 95% = 475 ether, max is 90% = 450 ether
         vm.prank(escrow);
         vm.expectRevert(abi.encodeWithSignature("PaymentExceedsMaximumAllowed(uint256,uint256)", 475 ether, 450 ether));
-        incentiveModule.onDisputeResolved(workflowId, address(token));
+        incentiveModule.onDisputeResolved(workflowId, escrow, address(token));
     }
 
     function test_RejectsArrayLengthMismatch() public {
         uint256 workflowId = 6;
 
         vm.prank(escrow);
-        incentiveModule.recordResolver(workflowId, resolver1, 0);
+        incentiveModule.recordResolver(workflowId, escrow, resolver1, 0);
         vm.prank(escrow);
-        incentiveModule.recordEscrowFee(workflowId, address(token), 1000 ether);
+        incentiveModule.recordEscrowFee(workflowId, escrow, address(token), 1000 ether);
         token.mint(address(incentiveModule), 1000 ether);
 
         ArrayMismatchLibrary arrayLib = new ArrayMismatchLibrary();
@@ -216,16 +216,16 @@ contract PaymentBoundsCheckingTest is Test {
         // ArrayMismatchLibrary returns resolvers.length=1, payments.length=2
         vm.prank(escrow);
         vm.expectRevert(abi.encodeWithSignature("ArrayLengthMismatch(uint256,uint256)", 1, 2));
-        incentiveModule.onDisputeResolved(workflowId, address(token));
+        incentiveModule.onDisputeResolved(workflowId, escrow, address(token));
     }
 
     function test_ValidatesOverflowProtection() public {
         uint256 workflowId = 7;
 
         vm.prank(escrow);
-        incentiveModule.recordResolver(workflowId, resolver1, 0);
+        incentiveModule.recordResolver(workflowId, escrow, resolver1, 0);
         vm.prank(escrow);
-        incentiveModule.recordEscrowFee(workflowId, address(token), 1000 ether);
+        incentiveModule.recordEscrowFee(workflowId, escrow, address(token), 1000 ether);
         token.mint(address(incentiveModule), 1000 ether);
 
         // This test would require a library that causes overflow

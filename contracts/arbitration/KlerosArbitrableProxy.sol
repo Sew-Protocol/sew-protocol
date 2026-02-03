@@ -19,17 +19,17 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
 
     IArbitrator public arbitrator;
 
-    // Mapping: workflowId => klerosDisputeID + 1 (0 means no dispute)
-    mapping(uint256 => uint256) public workflowToKlerosDispute;
+    // Mapping: escrowContract => workflowId => klerosDisputeID + 1 (0 means no dispute)
+    mapping(address => mapping(uint256 => uint256)) public workflowToKlerosDispute;
 
     // Mapping: klerosDisputeID => workflowId
     mapping(uint256 => uint256) public klerosDisputeToWorkflow;
+    
+    // Mapping: klerosDisputeID => escrowContract
+    mapping(uint256 => address) public klerosDisputeToEscrow;
 
-    // Mapping: workflowId => escrow contract address
-    mapping(uint256 => address) public workflowToEscrow;
-
-    // Mapping: workflowId => dispute metadata
-    mapping(uint256 => DisputeMetadata) public disputes;
+    // Mapping: escrowContract => workflowId => dispute metadata
+    mapping(address => mapping(uint256 => DisputeMetadata)) public disputes;
 
     struct DisputeMetadata {
         address arbitrable;
@@ -86,6 +86,7 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
      */
     function createDispute(
         uint256 workflowId,
+        address escrowContract,
         uint256 choices,
         bytes calldata extraData,
         bytes calldata escrowData
@@ -96,7 +97,7 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
         nonReentrant
         returns (uint256 klerosDisputeId)
     {
-        require(workflowToKlerosDispute[workflowId] == 0, 'Dispute already exists');
+        require(workflowToKlerosDispute[escrowContract][workflowId] == 0, 'Dispute already exists');
 
         // Decode escrow data
         (, address from, address to, uint256 amount, ) = abi.decode(
@@ -112,12 +113,12 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
         klerosDisputeId = arbitrator.createDispute{value: cost}(choices, extraData);
 
         // Store mappings (add 1 to klerosDisputeId for storage to distinguish from "no dispute")
-        workflowToKlerosDispute[workflowId] = klerosDisputeId + 1;
+        workflowToKlerosDispute[escrowContract][workflowId] = klerosDisputeId + 1;
         klerosDisputeToWorkflow[klerosDisputeId] = workflowId;
-        workflowToEscrow[workflowId] = _msgSender();
+        klerosDisputeToEscrow[klerosDisputeId] = escrowContract;
 
         // Store dispute metadata
-        disputes[workflowId] = DisputeMetadata({
+        disputes[escrowContract][workflowId] = DisputeMetadata({
             arbitrable: address(this),
             klerosDisputeId: klerosDisputeId,
             choices: choices,
@@ -143,11 +144,12 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
     /**
      * @notice Submit evidence for a dispute
      * @param workflowId The escrow workflow ID
+     * @param escrowContract Address of the escrow contract
      * @param evidence Evidence string (typically IPFS hash or URL)
      */
-    function submitEvidence(uint256 workflowId, string calldata evidence) external {
-        require(workflowToKlerosDispute[workflowId] != 0, 'Dispute does not exist');
-        DisputeMetadata storage dispute = disputes[workflowId];
+    function submitEvidence(uint256 workflowId, address escrowContract, string calldata evidence) external {
+        require(workflowToKlerosDispute[escrowContract][workflowId] != 0, 'Dispute does not exist');
+        DisputeMetadata storage dispute = disputes[escrowContract][workflowId];
         require(!dispute.resolved, 'Dispute already resolved');
 
         // Anyone can submit evidence (sender, recipient, or others)
@@ -163,9 +165,10 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
         require(_msgSender() == address(arbitrator), 'Only arbitrator can rule');
 
         uint256 workflowId = klerosDisputeToWorkflow[_disputeID];
-        require(workflowId != 0, 'Unknown dispute');
+        address escrowContract = klerosDisputeToEscrow[_disputeID];
+        require(workflowId != 0 && escrowContract != address(0), 'Unknown dispute');
 
-        DisputeMetadata storage dispute = disputes[workflowId];
+        DisputeMetadata storage dispute = disputes[escrowContract][workflowId];
         require(!dispute.resolved, 'Already resolved');
 
         dispute.resolved = true;
@@ -178,14 +181,15 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
     /**
      * @notice Get the current ruling for a workflow
      * @param workflowId The escrow workflow ID
+     * @param escrowContract Address of the escrow contract
      */
-    function getRuling(uint256 workflowId) external view returns (bool resolved, uint256 ruling) {
+    function getRuling(uint256 workflowId, address escrowContract) external view returns (bool resolved, uint256 ruling) {
         // Check if dispute exists
-        if (workflowToKlerosDispute[workflowId] == 0) {
+        if (workflowToKlerosDispute[escrowContract][workflowId] == 0) {
             return (false, 0);
         }
 
-        DisputeMetadata storage dispute = disputes[workflowId];
+        DisputeMetadata storage dispute = disputes[escrowContract][workflowId];
 
         // Check if Kleros has a ruling
         if (dispute.resolved) {
@@ -212,10 +216,36 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
     // ========== IResolutionModule Implementation ==========
 
     /**
+     * @notice Initialize a new dispute in the module
+     */
+    function initializeDispute(
+        uint256,
+        address,
+        address,
+        bytes32
+    ) external pure override {
+        // No-op: Kleros disputes are created explicitly
+    }
+
+    /**
+     * @notice Record a resolution outcome
+     */
+    function recordResolution(
+        uint256,
+        address,
+        address,
+        ResolutionOutcome,
+        uint256
+    ) external pure override {
+        // No-op: Kleros resolution is handled via rule() callback
+    }
+
+    /**
      * @notice Check if an address is authorized to resolve a dispute
      */
     function isAuthorizedDisputeResolver(
         uint256,
+        address,
         address disputeResolver,
         bytes calldata
     ) external view override returns (bool authorized, uint8 role) {
@@ -228,6 +258,7 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
      */
     function getDisputeResolver(
         uint256,
+        address,
         bytes calldata
     ) external view override returns (address resolver, uint8 level) {
         return (address(this), 2); // Level 2 = external resolver
@@ -238,6 +269,7 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
      */
     function canEscalate(
         uint256,
+        address,
         uint8,
         bytes calldata
     ) external pure override returns (bool, address, uint256) {
@@ -249,6 +281,7 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
      */
     function executeEscalation(
         uint256,
+        address,
         bytes calldata
     ) external pure override returns (bool, address, uint8) {
         revert('No escalation from Kleros');
@@ -260,11 +293,44 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
      */
     function getRequiredAppealBond(
         uint256,
+        address,
         uint8,
         bytes calldata
     ) external pure override returns (uint256 amount, address token) {
         return (0, address(0));
     }
+
+    /**
+     * @notice Get decision at a specific round
+     */
+    function getDecisionAtRound(uint256 workflowId, address escrowContract, uint8 round) external view override returns (uint8 decision) {
+        DisputeMetadata storage dispute = disputes[escrowContract][workflowId];
+        if (dispute.resolved) {
+            // Ruling 1 = RELEASE (enum 1), Ruling 2 = CANCEL (enum 2)
+            return uint8(dispute.ruling);
+        }
+        return 0; // ResolutionOutcome.NONE
+    }
+
+    /**
+     * @notice Get appeal deadline and current round
+     */
+    function getAppealDeadlineAndRound(
+        uint256 /* workflowId */,
+        address /* escrowContract */
+    ) external pure override returns (uint256 appealDeadline, uint8 currentRound, bool isFinalRound) {
+        return (0, 2, true); // Level 2 is final
+    }
+
+    /**
+     * @notice Record a reversal
+     */
+    function recordReversal(uint256 /* workflowId */, address /* escrowContract */, uint8 /* priorRound */) external override {}
+
+    /**
+     * @notice Finalize a dispute
+     */
+    function finalizeDispute(uint256 /* workflowId */, address /* escrowContract */) external override {}
 
     /**
      * @notice Module metadata

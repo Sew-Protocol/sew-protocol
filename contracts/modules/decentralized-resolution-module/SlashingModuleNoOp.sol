@@ -53,6 +53,7 @@ contract SlashingModuleNoOp is ISlashingModule, AccessControl {
 
     function proposeSlash(
         uint256 workflowId,
+        address escrowContract,
         address resolver,
         SlashReason reason,
         bytes calldata /* evidence */
@@ -105,6 +106,7 @@ contract SlashingModuleNoOp is ISlashingModule, AccessControl {
 
     function slashForTimeout(
         uint256 workflowId,
+        address escrowContract,
         address resolver,
         uint8 timeoutType
     ) external override onlyRole(ROLE_RESOLUTION_MODULE) returns (uint256 slashId) {
@@ -128,6 +130,7 @@ contract SlashingModuleNoOp is ISlashingModule, AccessControl {
 
     function slashForReversal(
         uint256 workflowId,
+        address escrowContract,
         address resolver,
         uint8 /* priorRound */
     ) external override onlyRole(ROLE_RESOLUTION_MODULE) returns (uint256 slashId) {
@@ -147,6 +150,7 @@ contract SlashingModuleNoOp is ISlashingModule, AccessControl {
 
     function slashForFraud(
         uint256 workflowId,
+        address escrowContract,
         address resolver,
         bytes calldata /* evidence */
     ) external override returns (uint256 slashId) {
@@ -171,6 +175,7 @@ contract SlashingModuleNoOp is ISlashingModule, AccessControl {
             SlashEvent({
                 slashId: slashId,
                 workflowId: 0,
+                escrowContract: address(0),
                 resolver: address(0),
                 reason: SlashReason.TIMEOUT_RESOLVE,
                 amount: 0,

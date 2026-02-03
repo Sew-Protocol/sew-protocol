@@ -58,6 +58,7 @@ contract YieldDistributionValidationTest is Test {
         // Distribute yield
         (bool success, uint256 distributed) = module.distributeYield(
             1, // workflowId
+            address(this),
             address(token),
             1000 ether,
             distributionData
@@ -93,6 +94,7 @@ contract YieldDistributionValidationTest is Test {
 
         (bool success, uint256 distributed) = module.distributeYield(
             1,
+            address(this),
             address(token),
             1000 ether,
             distributionData
@@ -125,6 +127,7 @@ contract YieldDistributionValidationTest is Test {
 
         (bool success, uint256 distributed) = module.distributeYield(
             1,
+            address(this),
             address(token),
             1000 ether,
             distributionData
@@ -147,7 +150,7 @@ contract YieldDistributionValidationTest is Test {
 
         token.mint(address(module), 1000 ether);
 
-        (bool success, ) = module.distributeYield(1, address(token), 1000 ether, distributionData);
+        (bool success, ) = module.distributeYield(1, address(this), address(token), 1000 ether, distributionData);
 
         assertFalse(success, 'Should reject 0 recipients');
     }
@@ -164,7 +167,7 @@ contract YieldDistributionValidationTest is Test {
 
         token.mint(address(module), 1000 ether);
 
-        (bool success, ) = module.distributeYield(1, address(token), 1000 ether, distributionData);
+        (bool success, ) = module.distributeYield(1, address(this), address(token), 1000 ether, distributionData);
 
         assertFalse(success, 'Should reject mismatched array lengths');
     }
@@ -182,7 +185,7 @@ contract YieldDistributionValidationTest is Test {
 
         token.mint(address(module), 1000 ether);
 
-        (bool success, ) = module.distributeYield(1, address(token), 1000 ether, distributionData);
+        (bool success, ) = module.distributeYield(1, address(this), address(token), 1000 ether, distributionData);
 
         assertFalse(success, 'Should reject sum != 10000');
     }
@@ -200,7 +203,7 @@ contract YieldDistributionValidationTest is Test {
 
         token.mint(address(module), 1000 ether);
 
-        (bool success, ) = module.distributeYield(1, address(token), 1000 ether, distributionData);
+        (bool success, ) = module.distributeYield(1, address(this), address(token), 1000 ether, distributionData);
 
         assertFalse(success, 'Should reject sum > 10000');
     }
@@ -221,6 +224,7 @@ contract YieldDistributionValidationTest is Test {
 
         (bool success, uint256 distributed) = module.distributeYield(
             1,
+            address(this),
             address(token),
             1000 ether,
             distributionData
@@ -248,6 +252,7 @@ contract YieldDistributionValidationTest is Test {
 
         (bool success, uint256 distributed) = module.distributeYield(
             1,
+            address(this),
             address(token),
             1000 ether,
             distributionData
@@ -272,6 +277,7 @@ contract YieldDistributionValidationTest is Test {
 
         (bool success, uint256 distributed) = module.distributeYield(
             1,
+            address(this),
             address(token),
             0, // Zero yield
             distributionData
@@ -286,6 +292,7 @@ contract YieldDistributionValidationTest is Test {
 
         (bool success, uint256 distributed) = module.distributeYield(
             1,
+            address(this),
             address(token),
             1000 ether,
             '' // Empty distribution data
@@ -313,6 +320,7 @@ contract YieldDistributionValidationTest is Test {
 
         (bool success, uint256 distributed) = module.distributeYield(
             1,
+            address(this),
             address(token),
             1001 ether,
             distributionData
@@ -351,7 +359,7 @@ contract YieldDistributionValidationTest is Test {
         vm.expectEmit(true, true, false, true);
         emit DefaultYieldDistributionModule.YieldDistributed(1, recipient2, 400 ether);
 
-        module.distributeYield(1, address(token), 1000 ether, distributionData);
+        module.distributeYield(1, address(this), address(token), 1000 ether, distributionData);
     }
 
     // ============ Module Metadata Tests ============

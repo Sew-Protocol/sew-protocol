@@ -15,30 +15,30 @@ contract Test_DefaultResolutionModule is Test {
     }
 
     function test_authorization_and_getter() public {
-        (bool auth, uint8 role) = rm.isAuthorizedDisputeResolver(0, resolver, '');
+        (bool auth, uint8 role) = rm.isAuthorizedDisputeResolver(0, address(this), resolver, '');
         assertTrue(auth);
         assertEq(role, 0);
 
-        (bool auth2, ) = rm.isAuthorizedDisputeResolver(0, address(0x456), '');
+        (bool auth2, ) = rm.isAuthorizedDisputeResolver(0, address(this), address(0x456), '');
         assertFalse(auth2);
 
-        (address d, uint8 lvl) = rm.getDisputeResolver(0, '');
+        (address d, uint8 lvl) = rm.getDisputeResolver(0, address(this), '');
         assertEq(d, resolver);
         assertEq(lvl, 0);
     }
 
     function test_escalation_and_bond() public {
-        (bool can, address next, uint256 fee) = rm.canEscalate(0, 0, '');
+        (bool can, address next, uint256 fee) = rm.canEscalate(0, address(this), 0, '');
         assertFalse(can);
         assertEq(next, address(0));
         assertEq(fee, 0);
 
-        (bool success, address newRes, uint8 newLevel) = rm.executeEscalation(0, '');
+        (bool success, address newRes, uint8 newLevel) = rm.executeEscalation(0, address(this), '');
         assertFalse(success);
         assertEq(newRes, address(0));
         assertEq(newLevel, 0);
 
-        (uint256 amt, address tok) = rm.getRequiredAppealBond(0, 0, '');
+        (uint256 amt, address tok) = rm.getRequiredAppealBond(0, address(this), 0, '');
         assertEq(amt, 0);
         assertEq(tok, address(0));
     }

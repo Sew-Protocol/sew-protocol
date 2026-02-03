@@ -2,8 +2,8 @@
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/decentralized-resolution-module/ResolverIncentiveModuleV2.sol';
-import '../../../contracts/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV2.sol';
+import '../../../contracts/modules/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/YieldOps.sol';
@@ -104,8 +104,8 @@ contract EscalationDepthHistogramInvariantsTest is Test {
 
         // Scan up to 1000 workflow IDs (adjust if needed)
         for (uint256 i = 0; i < 1000; i++) {
-            if (incentiveModule.hasAppealBond(i, 1)) actualRound1++;
-            if (incentiveModule.hasAppealBond(i, 2)) actualRound2++;
+            if (incentiveModule.hasAppealBond(i, address(this), 1)) actualRound1++;
+            if (incentiveModule.hasAppealBond(i, address(this), 2)) actualRound2++;
         }
 
         // Histogram should match or exceed actual (may have entries beyond scan range)
@@ -137,9 +137,10 @@ contract EscalationDepthHistogramInvariantsTest is Test {
             uint8 round = uint8((rounds[i] % 2) + 1); // Bound to 1-2
 
             // Only record if bond doesn't already exist (to avoid reverts)
-            if (!incentiveModule.hasAppealBond(workflowId, round)) {
+            if (!incentiveModule.hasAppealBond(workflowId, address(this), round)) {
                 try incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
                     workflowId,
+                    address(this),
                     depositor,
                     depositor,
                     BOND_AMOUNT,
@@ -163,8 +164,8 @@ contract EscalationDepthHistogramInvariantsTest is Test {
         uint256 actualRound2 = 0;
 
         for (uint256 i = 0; i < 100; i++) {
-            if (incentiveModule.hasAppealBond(i, 1)) actualRound1++;
-            if (incentiveModule.hasAppealBond(i, 2)) actualRound2++;
+            if (incentiveModule.hasAppealBond(i, address(this), 1)) actualRound1++;
+            if (incentiveModule.hasAppealBond(i, address(this), 2)) actualRound2++;
         }
 
         // Histogram should match or exceed actual
@@ -191,6 +192,7 @@ contract EscalationDepthHistogramInvariantsTest is Test {
             vm.expectRevert();
             incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
                 1,
+                address(this),
                 depositor,
                 depositor,
                 BOND_AMOUNT,
@@ -225,6 +227,7 @@ contract EscalationDepthHistogramInvariantsTest is Test {
         for (uint256 i = 0; i < numBondsBounded; i++) {
             incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
                 i,
+                address(this),
                 depositor,
                 depositor,
                 BOND_AMOUNT,
@@ -245,7 +248,7 @@ contract EscalationDepthHistogramInvariantsTest is Test {
         // Verify actual bond count matches
         uint256 actualRound1 = 0;
         for (uint256 i = 0; i < 100; i++) {
-            if (incentiveModule.hasAppealBond(i, 1)) actualRound1++;
+            if (incentiveModule.hasAppealBond(i, address(this), 1)) actualRound1++;
         }
 
         assertEq(round1, actualRound1, 'Histogram should match actual bond count');
@@ -265,6 +268,7 @@ contract EscalationDepthHistogramInvariantsTest is Test {
         for (uint256 i = 0; i < numBondsBounded; i++) {
             incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
                 i,
+                address(this),
                 depositor,
                 depositor,
                 BOND_AMOUNT,
@@ -283,10 +287,10 @@ contract EscalationDepthHistogramInvariantsTest is Test {
         for (uint256 i = 0; i < numBondsBounded; i++) {
             if (i % 2 == 0) {
                 // Refund (outcome flipped)
-                try incentiveModule.distributeAppealBond(i, 0, true) {} catch {}
+                try incentiveModule.distributeAppealBond(i, address(this), 0, true) {} catch {}
             } else {
                 // Pay to resolvers (outcome not flipped)
-                try incentiveModule.distributeAppealBond(i, 0, false) {} catch {}
+                try incentiveModule.distributeAppealBond(i, address(this), 0, false) {} catch {}
             }
         }
         vm.stopPrank();

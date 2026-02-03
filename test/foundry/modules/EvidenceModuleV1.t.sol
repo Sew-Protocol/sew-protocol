@@ -108,12 +108,12 @@ contract EvidenceModuleV1Test is Test {
         escrowContract.setEscrowState(WORKFLOW_ID, EscrowState.DISPUTED);
         
         vm.prank(participant1);
-        uint256 evidenceId = evidenceModule.submitEvidence(WORKFLOW_ID, EVIDENCE_HASH, "metadata");
+        uint256 evidenceId = evidenceModule.submitEvidence(WORKFLOW_ID, address(this), EVIDENCE_HASH, "metadata");
         
         assertEq(evidenceId, 0);
-        assertEq(evidenceModule.getEvidenceCount(WORKFLOW_ID), 1);
+        assertEq(evidenceModule.getEvidenceCount(WORKFLOW_ID, address(this)), 1);
         
-        (bytes32 hash, address submitter, uint256 timestamp, ) = evidenceModule.getEvidenceRecord(WORKFLOW_ID, 0);
+        (bytes32 hash, address submitter, uint256 timestamp, ) = evidenceModule.getEvidenceRecord(WORKFLOW_ID, address(this), 0);
         assertEq(hash, EVIDENCE_HASH);
         assertEq(submitter, participant1);
         assertGt(timestamp, 0);
@@ -132,14 +132,14 @@ contract EvidenceModuleV1Test is Test {
         escrowContract.setEscrowState(WORKFLOW_ID, EscrowState.DISPUTED);
         
         vm.prank(resolver);
-        uint256 evidenceId = evidenceModule.submitEvidence(WORKFLOW_ID, EVIDENCE_HASH, "resolver evidence");
+        uint256 evidenceId = evidenceModule.submitEvidence(WORKFLOW_ID, address(this), EVIDENCE_HASH, "resolver evidence");
         
         assertEq(evidenceId, 0);
     }
 
     function test_canSubmitEvidence_resolver_EmptyData() public {
         vm.prank(resolver);
-        (bool allowed, ) = evidenceModule.canSubmitEvidence(WORKFLOW_ID, resolver, "");
+        (bool allowed, ) = evidenceModule.canSubmitEvidence(WORKFLOW_ID, address(this), resolver, "");
         assertTrue(allowed);
     }
 
@@ -148,7 +148,7 @@ contract EvidenceModuleV1Test is Test {
         vm.prank(timelock);
         evidenceModule.setResolutionModule(address(revertingRes));
 
-        (bool allowed, string memory reason) = evidenceModule.canSubmitEvidence(WORKFLOW_ID, unauthorized, "");
+        (bool allowed, string memory reason) = evidenceModule.canSubmitEvidence(WORKFLOW_ID, address(this), unauthorized, "");
         assertFalse(allowed);
         assertEq(reason, "Not authorized to submit evidence");
     }
@@ -162,7 +162,7 @@ contract EvidenceModuleV1Test is Test {
         
         vm.prank(unauthorized);
         vm.expectRevert("Not authorized to submit evidence");
-        evidenceModule.submitEvidence(WORKFLOW_ID, EVIDENCE_HASH, "fail");
+        evidenceModule.submitEvidence(WORKFLOW_ID, address(this), EVIDENCE_HASH, "fail");
     }
 
     function test_setAllowPostResolution_Success() public {
@@ -175,7 +175,7 @@ contract EvidenceModuleV1Test is Test {
         vm.prank(timelock);
         evidenceModule.setResolutionModule(address(0));
 
-        (bool allowed, ) = evidenceModule.canSubmitEvidence(WORKFLOW_ID, unauthorized, "");
+        (bool allowed, ) = evidenceModule.canSubmitEvidence(WORKFLOW_ID, address(this), unauthorized, "");
         assertFalse(allowed);
     }
 
@@ -187,7 +187,7 @@ contract EvidenceModuleV1Test is Test {
         
         vm.prank(unauthorized);
         vm.expectRevert("Not authorized to submit evidence");
-        evidenceModule.submitEvidence(WORKFLOW_ID, EVIDENCE_HASH, "fail");
+        evidenceModule.submitEvidence(WORKFLOW_ID, address(this), EVIDENCE_HASH, "fail");
     }
     
     function test_submitEvidence_allowAnyoneSubmit() public {
@@ -197,7 +197,7 @@ contract EvidenceModuleV1Test is Test {
         escrowContract.setEscrowState(WORKFLOW_ID, EscrowState.DISPUTED);
         
         vm.prank(unauthorized);
-        uint256 evidenceId = evidenceModule.submitEvidence(WORKFLOW_ID, EVIDENCE_HASH, "anyone");
+        uint256 evidenceId = evidenceModule.submitEvidence(WORKFLOW_ID, address(this), EVIDENCE_HASH, "anyone");
         
         assertEq(evidenceId, 0);
     }
@@ -216,7 +216,7 @@ contract EvidenceModuleV1Test is Test {
         
         vm.prank(unauthorized);
         vm.expectRevert("Not authorized to submit evidence");
-        evidenceModule.submitEvidence(WORKFLOW_ID, EVIDENCE_HASH, "unauthorized");
+        evidenceModule.submitEvidence(WORKFLOW_ID, address(this), EVIDENCE_HASH, "unauthorized");
     }
     
     function test_submitEvidence_limitReached_reverts() public {
@@ -227,13 +227,13 @@ contract EvidenceModuleV1Test is Test {
         // Submit max evidence
         for (uint256 i = 0; i < 20; i++) {
             vm.prank(unauthorized);
-            evidenceModule.submitEvidence(WORKFLOW_ID, keccak256(abi.encode(i)), "evidence");
+            evidenceModule.submitEvidence(WORKFLOW_ID, address(this), keccak256(abi.encode(i)), "evidence");
         }
         
         // Next one should fail
         vm.prank(unauthorized);
         vm.expectRevert("Evidence limit reached");
-        evidenceModule.submitEvidence(WORKFLOW_ID, keccak256("new"), "evidence");
+        evidenceModule.submitEvidence(WORKFLOW_ID, address(this), keccak256("new"), "evidence");
     }
     
     function test_submitEvidence_duplicate_reverts() public {
@@ -242,11 +242,11 @@ contract EvidenceModuleV1Test is Test {
         evidenceModule.setAllowAnyoneSubmit(true);
         
         vm.prank(participant1);
-        evidenceModule.submitEvidence(WORKFLOW_ID, EVIDENCE_HASH, "first");
+        evidenceModule.submitEvidence(WORKFLOW_ID, address(this), EVIDENCE_HASH, "first");
         
         vm.prank(participant1);
         vm.expectRevert("Duplicate evidence");
-        evidenceModule.submitEvidence(WORKFLOW_ID, EVIDENCE_HASH, "duplicate");
+        evidenceModule.submitEvidence(WORKFLOW_ID, address(this), EVIDENCE_HASH, "duplicate");
     }
     
     function test_submitEvidence_sameHashDifferentSubmitter_success() public {
@@ -255,10 +255,10 @@ contract EvidenceModuleV1Test is Test {
         evidenceModule.setAllowAnyoneSubmit(true);
         
         vm.prank(participant1);
-        evidenceModule.submitEvidence(WORKFLOW_ID, EVIDENCE_HASH, "first");
+        evidenceModule.submitEvidence(WORKFLOW_ID, address(this), EVIDENCE_HASH, "first");
         
         vm.prank(participant2);
-        uint256 evidenceId = evidenceModule.submitEvidence(WORKFLOW_ID, EVIDENCE_HASH, "same hash");
+        uint256 evidenceId = evidenceModule.submitEvidence(WORKFLOW_ID, address(this), EVIDENCE_HASH, "same hash");
         
         assertEq(evidenceId, 1); // Different submitter, allowed
     }
@@ -274,20 +274,20 @@ contract EvidenceModuleV1Test is Test {
         bytes32 hash2 = keccak256("evidence2");
         
         vm.prank(participant1);
-        evidenceModule.submitEvidence(WORKFLOW_ID, hash1, "evidence1");
+        evidenceModule.submitEvidence(WORKFLOW_ID, address(this), hash1, "evidence1");
         
         // Add small delay to ensure different timestamps
         vm.warp(block.timestamp + 1);
         
         vm.prank(participant2);
-        evidenceModule.submitEvidence(WORKFLOW_ID, hash2, "evidence2");
+        evidenceModule.submitEvidence(WORKFLOW_ID, address(this), hash2, "evidence2");
         
         (
             bytes32[] memory hashes,
             address[] memory submitters,
             uint256[] memory timestamps,
             string[] memory metadata
-        ) = evidenceModule.getEvidence(WORKFLOW_ID);
+        ) = evidenceModule.getEvidence(WORKFLOW_ID, address(this));
         
         assertEq(hashes.length, 2);
         assertEq(hashes[0], hash1);
@@ -305,7 +305,7 @@ contract EvidenceModuleV1Test is Test {
             address[] memory submitters,
             uint256[] memory timestamps,
             string[] memory metadata
-        ) = evidenceModule.getEvidence(WORKFLOW_ID);
+        ) = evidenceModule.getEvidence(WORKFLOW_ID, address(this));
         
         assertEq(hashes.length, 0);
         assertEq(submitters.length, 0);
@@ -320,12 +320,12 @@ contract EvidenceModuleV1Test is Test {
         vm.prank(timelock);
         evidenceModule.setAllowAnyoneSubmit(true);
         
-        assertEq(evidenceModule.getEvidenceCount(WORKFLOW_ID), 0);
+        assertEq(evidenceModule.getEvidenceCount(WORKFLOW_ID, address(this)), 0);
         
         vm.prank(participant1);
-        evidenceModule.submitEvidence(WORKFLOW_ID, EVIDENCE_HASH, "evidence");
+        evidenceModule.submitEvidence(WORKFLOW_ID, address(this), EVIDENCE_HASH, "evidence");
         
-        assertEq(evidenceModule.getEvidenceCount(WORKFLOW_ID), 1);
+        assertEq(evidenceModule.getEvidenceCount(WORKFLOW_ID, address(this)), 1);
     }
     
     // ============ getEvidenceRecord Tests ============
@@ -336,10 +336,10 @@ contract EvidenceModuleV1Test is Test {
         evidenceModule.setAllowAnyoneSubmit(true);
         
         vm.prank(participant1);
-        evidenceModule.submitEvidence(WORKFLOW_ID, EVIDENCE_HASH, "evidence");
+        evidenceModule.submitEvidence(WORKFLOW_ID, address(this), EVIDENCE_HASH, "evidence");
         
         (bytes32 hash, address submitter, uint256 timestamp, string memory metadata) = 
-            evidenceModule.getEvidenceRecord(WORKFLOW_ID, 0);
+            evidenceModule.getEvidenceRecord(WORKFLOW_ID, address(this), 0);
         
         assertEq(hash, EVIDENCE_HASH);
         assertEq(submitter, participant1);
@@ -349,7 +349,7 @@ contract EvidenceModuleV1Test is Test {
     
     function test_getEvidenceRecord_invalidId_reverts() public {
         vm.expectRevert("Invalid evidence ID");
-        evidenceModule.getEvidenceRecord(WORKFLOW_ID, 0);
+        evidenceModule.getEvidenceRecord(WORKFLOW_ID, address(this), 0);
     }
     
     // ============ canSubmitEvidence Tests ============
@@ -363,10 +363,10 @@ contract EvidenceModuleV1Test is Test {
             uint256(1000)
         );
         
-        (bool allowed, ) = evidenceModule.canSubmitEvidence(WORKFLOW_ID, participant1, escrowData);
+        (bool allowed, ) = evidenceModule.canSubmitEvidence(WORKFLOW_ID, address(this), participant1, escrowData);
         assertTrue(allowed);
         
-        (allowed, ) = evidenceModule.canSubmitEvidence(WORKFLOW_ID, participant2, escrowData);
+        (allowed, ) = evidenceModule.canSubmitEvidence(WORKFLOW_ID, address(this), participant2, escrowData);
         assertTrue(allowed);
     }
     
@@ -379,7 +379,7 @@ contract EvidenceModuleV1Test is Test {
             uint256(1000)
         );
         
-        (bool allowed, ) = evidenceModule.canSubmitEvidence(WORKFLOW_ID, resolver, escrowData);
+        (bool allowed, ) = evidenceModule.canSubmitEvidence(WORKFLOW_ID, address(this), resolver, escrowData);
         assertTrue(allowed);
     }
     
@@ -395,7 +395,7 @@ contract EvidenceModuleV1Test is Test {
             uint256(1000)
         );
         
-        (bool allowed, ) = evidenceModule.canSubmitEvidence(WORKFLOW_ID, unauthorized, escrowData);
+        (bool allowed, ) = evidenceModule.canSubmitEvidence(WORKFLOW_ID, address(this), unauthorized, escrowData);
         assertTrue(allowed);
     }
     
@@ -408,7 +408,7 @@ contract EvidenceModuleV1Test is Test {
             uint256(1000)
         );
         
-        (bool allowed, string memory reason) = evidenceModule.canSubmitEvidence(WORKFLOW_ID, unauthorized, escrowData);
+        (bool allowed, string memory reason) = evidenceModule.canSubmitEvidence(WORKFLOW_ID, address(this), unauthorized, escrowData);
         assertFalse(allowed);
         assertEq(reason, "Not authorized to submit evidence");
     }
@@ -417,14 +417,14 @@ contract EvidenceModuleV1Test is Test {
     
     function test_onDisputeOpened_success() public {
         vm.prank(address(escrowContract));
-        evidenceModule.onDisputeOpened(WORKFLOW_ID);
+        evidenceModule.onDisputeOpened(WORKFLOW_ID, address(this));
         
         // Should not revert (no-op for now)
     }
     
     function test_onDisputeOpened_notEscrowContract_reverts() public {
         vm.expectRevert("Not escrow contract");
-        evidenceModule.onDisputeOpened(WORKFLOW_ID);
+        evidenceModule.onDisputeOpened(WORKFLOW_ID, address(this));
     }
     
     // ============ Admin Functions Tests ============

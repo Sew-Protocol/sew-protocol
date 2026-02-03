@@ -2,13 +2,13 @@
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/decentralized-resolution-module/ResolverIncentiveModuleV2.sol';
-import '../../../contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol';
-import '../../../contracts/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV2.sol';
+import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol';
+import '../../../contracts/modules/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/core/BaseEscrow.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
-import '../../../contracts/decentralized-resolution-module/DecentralizedResolverStructs.sol';
+import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
 import '../../../contracts/YieldOps.sol';
 import '../../../contracts/DisputeOps.sol';
 import '../../../contracts/CreateOps.sol';
@@ -203,6 +203,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
         vm.prank(address(this));
         incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
             workflowId,
+            address(this),
             user1,
             user1,
             BOND_AMOUNT,
@@ -235,6 +236,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
         vm.prank(address(this));
         incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
             workflowId,
+            address(this),
             user1,
             user1,
             BOND_AMOUNT,
@@ -250,6 +252,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
         vm.prank(address(this));
         incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
             workflowId,
+            address(this),
             user1,
             user1,
             BOND_AMOUNT,
@@ -285,6 +288,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
             vm.prank(address(this));
             incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
                 workflowId,
+                address(this),
                 user1,
                 user1,
                 BOND_AMOUNT,
@@ -304,6 +308,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
         vm.prank(address(this));
         incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
             1, // workflowId 1
+            address(this),
             user1,
             user1,
             BOND_AMOUNT,
@@ -330,6 +335,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
         vm.expectRevert();
         incentiveModule.recordAppealBond{value: 0}(
             1,
+            address(this),
             user1,
             user1,
             0,
@@ -347,6 +353,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
         vm.expectRevert();
         incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
             1,
+            address(this),
             user1,
             user1,
             BOND_AMOUNT,
@@ -374,6 +381,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
             workflowIds[i] = i;
             incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
                 i,
+                address(this),
                 user1,
                 user1,
                 BOND_AMOUNT,
@@ -387,6 +395,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
             workflowIds[i] = i;
             incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
                 i,
+                address(this),
                 user1,
                 user1,
                 BOND_AMOUNT,
@@ -400,6 +409,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
             workflowIds[i] = i;
             incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
                 i,
+                address(this),
                 user1,
                 user1,
                 BOND_AMOUNT,
@@ -417,8 +427,8 @@ contract EscalationDepthHistogramIntegrationTest is Test {
         uint256 actualRound2 = 0;
 
         for (uint256 i = 0; i < 100; i++) { // Scan reasonable range
-            if (incentiveModule.hasAppealBond(i, 1)) actualRound1++;
-            if (incentiveModule.hasAppealBond(i, 2)) actualRound2++;
+            if (incentiveModule.hasAppealBond(i, address(this), 1)) actualRound1++;
+            if (incentiveModule.hasAppealBond(i, address(this), 2)) actualRound2++;
         }
 
         // Verify histogram matches actual counts

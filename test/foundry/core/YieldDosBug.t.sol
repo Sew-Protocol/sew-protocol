@@ -15,7 +15,7 @@ import "../../../contracts/CreateOps.sol";
 import "../../../contracts/interfaces/IYieldGenerationModule.sol";
 
 contract OverreportingModule is IYieldGenerationModule {
-    function depositForYield(uint256, address token, uint256 amount) external override returns (bool, uint256) {
+    function depositForYield(uint256, address token, uint256 amount, address) external override returns (bool, uint256) {
         // Actually pull tokens so createEscrow succeeds
         IERC20(token).transferFrom(msg.sender, address(this), amount);
         return (true, amount);

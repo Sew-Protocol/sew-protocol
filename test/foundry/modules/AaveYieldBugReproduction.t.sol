@@ -52,14 +52,14 @@ contract AaveYieldBugReproduction is Test {
         vm.prank(escrow);
         token.approve(address(module), amount1);
         vm.prank(escrow);
-        module.depositForYield(1, address(token), amount1);
+        module.depositForYield(1, address(token), amount1, escrow);
 
         // Escrow 2 deposits
         token.mint(escrow, amount2);
         vm.prank(escrow);
         token.approve(address(module), amount2);
         vm.prank(escrow);
-        module.depositForYield(2, address(token), amount2);
+        module.depositForYield(2, address(token), amount2, escrow);
 
         // No interest accrued yet. Yield for both should be 0.
         vm.prank(escrow);
@@ -87,14 +87,14 @@ contract AaveYieldBugReproduction is Test {
         vm.prank(escrow);
         token.approve(address(module), amount);
         vm.prank(escrow);
-        module.depositForYield(wid, address(token), amount);
+        module.depositForYield(wid, address(token), amount, escrow);
 
         // Escrow 2 deposits with same ID
         token.mint(escrow2, amount);
         vm.prank(escrow2);
         token.approve(address(module), amount);
         vm.prank(escrow2);
-        module.depositForYield(wid, address(token), amount);
+        module.depositForYield(wid, address(token), amount, escrow);
 
         // Now if Escrow 1 tries to withdraw, it will use escrowContract parameter correctly.
         

@@ -4,7 +4,7 @@ pragma solidity ^0.8.33;
 import '../shared/interfaces/IResolutionModule.sol';
 import '../libraries/EscrowEncodingLibrary.sol';
 import '../libraries/BondHandlingLibrary.sol';
-import '../decentralized-resolution-module/IIncentiveModule.sol';
+import '../modules/decentralized-resolution-module/IIncentiveModule.sol';
 import '../core/BondCollector.sol';
 import '../types/EscrowTypes.sol';
 
@@ -25,15 +25,16 @@ library DisputeEscalationLibrary {
      * @return bondToken Bond token address (address(0) for ETH)
      */
     function queryAppealBond(
-        IResolutionModule resolutionModule,
+        address resolutionModule,
         uint256 workflowId,
         uint8 currentLevel,
         bytes memory escrowData
     ) internal view returns (bool success, uint256 bondAmount, address bondToken) {
-        (bool bondCheckSuccess, bytes memory bondData) = address(resolutionModule).staticcall(
+        (bool bondCheckSuccess, bytes memory bondData) = resolutionModule.staticcall(
             abi.encodeWithSelector(
                 IResolutionModule.getRequiredAppealBond.selector,
                 workflowId,
+                address(this),
                 currentLevel,
                 escrowData
             )

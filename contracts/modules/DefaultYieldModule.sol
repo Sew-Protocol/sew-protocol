@@ -9,7 +9,27 @@ import '@openzeppelin/contracts/utils/introspection/ERC165.sol';
 /**
  * @title DefaultYieldModule
  * @notice Default yield generation module: no yield generation
- * @dev Implements IYieldGenerationModule with no-op functions (no actual yield generation)
+ * @dev Implements IYieldGenerationModule with no-op functions (no actual yield generation).
+ *      This contract serves three critical purposes:
+ *
+ *      1. **Fallback for no-yield escrows**: Escrows can operate without yield generation.
+ *         When no yield module is configured or activated, this contract allows the system
+ *         to gracefully handle deposits/withdrawals with zero yield.
+ *
+ *      2. **Safe placeholder**: Acts as a default during development and testing before
+ *         external yield sources (Aave, Compound, etc.) are configured.
+ *
+ *      3. **Graceful degradation**: If an active yield module (e.g., AaveYieldGenerationModule)
+ *         fails or is paused, this contract can serve as a fallback to keep the escrow operational.
+ *
+ *      Architecture:
+ *      - Generation and distribution are separate concerns (see IYieldDistributionModule)
+ *      - This module only handles the "generation" side (earning yield)
+ *      - DefaultYieldDistributionModule handles routing yield to recipients
+ *      - Swapping yield sources (Default → Aave) only requires changing the generation module
+ *      - Distribution logic remains unchanged and works with any generation module
+ *
+ *      Do NOT delete this contract: it is intentional and necessary for the system design.
  */
 contract DefaultYieldModule is IYieldGenerationModule, ERC165 {
     using SafeERC20 for IERC20;
@@ -20,7 +40,8 @@ contract DefaultYieldModule is IYieldGenerationModule, ERC165 {
     function depositForYield(
         uint256 /* workflowId */,
         address /* token */,
-        uint256 /* amount */
+        uint256 /* amount */,
+        address /* escrowContract */
     ) external pure override returns (bool success, uint256 yieldTokenBalance) {
         return (true, 0);
     }

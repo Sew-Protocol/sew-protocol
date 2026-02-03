@@ -15,7 +15,7 @@ import "../../../contracts/CreateOps.sol";
 import "../../../contracts/interfaces/IYieldGenerationModule.sol";
 
 contract SilentFailureModule is IYieldGenerationModule {
-    function depositForYield(uint256, address, uint256) external pure override returns (bool success, uint256 yieldTokenBalance) {
+    function depositForYield(uint256, address, uint256, address) external pure override returns (bool success, uint256 yieldTokenBalance) {
         return (false, 0); // SILENT FAILURE
     }
     function withdrawWithYield(uint256, address, uint256, address) external pure override returns (bool success, uint256 actualAmount, uint256 yieldAmount) {

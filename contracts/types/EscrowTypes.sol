@@ -81,6 +81,12 @@ enum RecipientStatus {
     RAISE_DISPUTE
 }
 
+enum ResolutionOutcome {
+    NONE,
+    RELEASE,
+    CANCEL
+}
+
 // EscrowTransfer struct (shared across contracts)
 // Note: workflowId is redundant - use array index (escrowTransfers[index]) instead
 struct EscrowTransfer {
