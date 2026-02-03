@@ -70,10 +70,14 @@ contract YieldAccountingTest is Test {
 
         // Setup Core
         yieldOps = new YieldOps(address(this));
+        aaveModule.grantRole(aaveModule.ROLE_YIELD_OPS(), address(yieldOps));
         disputeOps = new DisputeOps(address(this));
         mm = new ModuleManagementContract(address(this));
         
         vault = new EscrowVault(ESCROW_FEE_BPS, feeAddress, address(yieldOps), address(disputeOps), address(mm));
+        
+        // Register vault with Aave module
+        aaveModule.registerEscrowContract(address(vault));
         
         // Wiring
         yieldOps.registerEscrowContract(address(vault));

@@ -71,6 +71,10 @@ contract VaultBehaviorBasicTest is Test {
         adapter = new AaveVaultAdapter(aaveModule, address(underlying));
         vault = IVaultLike(address(adapter));
         
+        // Register adapter with Aave module
+        vm.prank(admin);
+        aaveModule.grantRole(aaveModule.ROLE_ESCROW_CONTRACT(), address(adapter));
+        
         // Transfer tokens to users
         vm.prank(admin);
         underlying.transfer(userA, 1_000_000e18);

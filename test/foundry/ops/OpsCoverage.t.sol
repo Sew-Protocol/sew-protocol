@@ -1429,6 +1429,7 @@ contract MockResolutionModule {
     // IResolutionModule implementation
     function canEscalate(
         uint256,
+        address,
         uint8,
         bytes calldata
     ) external view returns (bool, address, uint256) {
@@ -1438,6 +1439,7 @@ contract MockResolutionModule {
 
     function executeEscalation(
         uint256,
+        address,
         bytes calldata
     ) external view returns (bool, address, uint8) {
         if (shouldRevert) revert("Revert");
@@ -1446,22 +1448,23 @@ contract MockResolutionModule {
 
     function getDisputeResolver(
         uint256,
+        address,
         bytes calldata
     ) external view returns (address, uint8) {
         if (shouldRevert) revert("Revert");
         return (address(0x123), 0);
     }
 
-    function getDecisionAtRound(uint256, uint8) external view returns (uint8) {
+    function getDecisionAtRound(uint256, address, uint8) external view returns (uint8) {
         if (shouldRevert) revert("Revert");
         return decision;
     }
 
-    function isAuthorizedDisputeResolver(uint256, address, bytes calldata) external pure returns (bool, uint8) {
+    function isAuthorizedDisputeResolver(uint256, address, address, bytes calldata) external pure returns (bool, uint8) {
         return (true, 0);
     }
 
-    function getRequiredAppealBond(uint256, uint8, bytes calldata) external pure returns (uint256, address) {
+    function getRequiredAppealBond(uint256, address, uint8, bytes calldata) external pure returns (uint256, address) {
         return (0, address(0));
     }
 
@@ -1477,19 +1480,19 @@ contract MockResolutionModuleCanEscalateFails {
         decision = _decision;
     }
 
-    function canEscalate(uint256, uint8, bytes calldata) external pure returns (bool, address, uint256) {
+    function canEscalate(uint256, address, uint8, bytes calldata) external pure returns (bool, address, uint256) {
         revert("canEscalate failed");
     }
 
-    function getDisputeResolver(uint256, bytes calldata) external pure returns (address, uint8) {
+    function getDisputeResolver(uint256, address, bytes calldata) external pure returns (address, uint8) {
         return (address(0x123), 0);
     }
 
-    function getDecisionAtRound(uint256, uint8) external view returns (uint8) {
+    function getDecisionAtRound(uint256, address, uint8) external view returns (uint8) {
         return decision;
     }
 
-    function executeEscalation(uint256, bytes calldata) external pure returns (bool, address, uint8) {
+    function executeEscalation(uint256, address, bytes calldata) external pure returns (bool, address, uint8) {
         return (true, address(0x999), 1);
     }
 
@@ -1497,7 +1500,7 @@ contract MockResolutionModuleCanEscalateFails {
         return (true, 0);
     }
 
-    function getRequiredAppealBond(uint256, uint8, bytes calldata) external pure returns (uint256, address) {
+    function getRequiredAppealBond(uint256, address, uint8, bytes calldata) external pure returns (uint256, address) {
         return (0, address(0));
     }
 
@@ -1522,19 +1525,19 @@ contract MockResolutionModuleExecuteFails {
         escalationFee = _fee;
     }
 
-    function canEscalate(uint256, uint8, bytes calldata) external view returns (bool, address, uint256) {
+    function canEscalate(uint256, address, uint8, bytes calldata) external view returns (bool, address, uint256) {
         return (shouldEscalate, nextResolver, escalationFee);
     }
 
-    function getDisputeResolver(uint256, bytes calldata) external pure returns (address, uint8) {
+    function getDisputeResolver(uint256, address, bytes calldata) external pure returns (address, uint8) {
         return (address(0x123), 0);
     }
 
-    function getDecisionAtRound(uint256, uint8) external view returns (uint8) {
+    function getDecisionAtRound(uint256, address, uint8) external view returns (uint8) {
         return decision;
     }
 
-    function executeEscalation(uint256, bytes calldata) external pure returns (bool, address, uint8) {
+    function executeEscalation(uint256, address, bytes calldata) external pure returns (bool, address, uint8) {
         revert("executeEscalation failed");
     }
 
@@ -1542,7 +1545,7 @@ contract MockResolutionModuleExecuteFails {
         return (true, 0);
     }
 
-    function getRequiredAppealBond(uint256, uint8, bytes calldata) external pure returns (uint256, address) {
+    function getRequiredAppealBond(uint256, address, uint8, bytes calldata) external pure returns (uint256, address) {
         return (0, address(0));
     }
 

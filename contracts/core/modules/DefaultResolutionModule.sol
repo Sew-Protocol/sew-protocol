@@ -131,7 +131,7 @@ contract DefaultResolutionModule is AccessControl, IResolutionModule {
         uint256 /* workflowId */,
         address /* escrowContract */
     ) external view virtual override returns (uint256 appealDeadline, uint8 currentRound, bool isFinalRound) {
-        return (0, 0, true);
+        return (0, 0, false);
     }
 
     /**

@@ -38,10 +38,14 @@ contract AaveStatefulFuzz is Test {
         aaveModule.queueAavePoolProvider(address(provider));
         
         YieldOps yieldOps = new YieldOps(address(this));
+        aaveModule.grantRole(aaveModule.ROLE_YIELD_OPS(), address(yieldOps));
         DisputeOps disputeOps = new DisputeOps(address(this));
         mm = new ModuleManagementContract(address(this));
         
         vault = new EscrowVault(100, address(0xFEE), address(yieldOps), address(disputeOps), address(mm));
+        
+        // Register vault with Aave module
+        aaveModule.registerEscrowContract(address(vault));
         
         yieldOps.registerEscrowContract(address(vault));
         disputeOps.registerEscrowContract(address(vault));

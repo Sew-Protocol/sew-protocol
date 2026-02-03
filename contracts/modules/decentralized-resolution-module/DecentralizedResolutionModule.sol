@@ -568,7 +568,7 @@ contract DecentralizedResolutionModule is
 
         if (address(incentiveModule) != address(0)) {
             try
-                incentiveModule.onResolverAssigned(workflowId, address(this), nextRes, toRound)
+                incentiveModule.onResolverAssigned(workflowId, escrowContract, nextRes, toRound)
             {} catch {
                 emit IncentiveModuleCallFailed(workflowId, 'onResolverAssigned', 'FAILED');
             }
@@ -576,7 +576,7 @@ contract DecentralizedResolutionModule is
 
         // DR v3: Lock stake for new resolver
         if (address(stakingModule) != address(0)) {
-            try stakingModule.onResolverAssigned(workflowId, address(this), nextRes, toRound) {
+            try stakingModule.onResolverAssigned(workflowId, escrowContract, nextRes, toRound) {
                 // Success - stake locked for this dispute
             } catch {
                 // Non-critical: Continue even if lock fails
@@ -888,14 +888,14 @@ contract DecentralizedResolutionModule is
 
         // Call incentive module hooks
         if (address(incentiveModule) != address(0)) {
-            try incentiveModule.onResolverAssigned(workflowId, address(this), resolver, 0) {} catch {
+            try incentiveModule.onResolverAssigned(workflowId, escrowContract, resolver, 0) {} catch {
                 emit IncentiveModuleCallFailed(workflowId, 'onResolverAssigned', 'FAILED');
             }
         }
 
         // DR v3: Call staking module hook (if enabled)
         if (address(stakingModule) != address(0)) {
-            try stakingModule.onResolverAssigned(workflowId, address(this), resolver, 0) {
+            try stakingModule.onResolverAssigned(workflowId, escrowContract, resolver, 0) {
                 // Success - stake locked for this dispute
             } catch {
                 // Non-critical: Continue even if staking hook fails
@@ -1011,7 +1011,7 @@ contract DecentralizedResolutionModule is
 
         // DR v3: Call slashing module hook for timeout (if enabled)
         if (address(slashingModule) != address(0)) {
-            try slashingModule.slashForTimeout(workflowId, address(this), timedOutResolver, 1) {
+            try slashingModule.slashForTimeout(workflowId, escrowContract, timedOutResolver, 1) {
                 // Success - timeout recorded for potential slashing
             } catch {
                 // Non-critical: Continue even if slashing hook fails
@@ -1033,7 +1033,7 @@ contract DecentralizedResolutionModule is
         if (newResolver != address(0) && newResolver != timedOutResolver) {
             // DR v3: Unlock old resolver's stake when reassigning
             if (address(stakingModule) != address(0)) {
-                try stakingModule.unlockStake(workflowId, address(this), timedOutResolver) {
+                try stakingModule.unlockStake(workflowId, escrowContract, timedOutResolver) {
                     // Success - old resolver's stake unlocked
                 } catch {
                     // Non-critical: Continue even if unlock fails
@@ -1059,7 +1059,7 @@ contract DecentralizedResolutionModule is
 
             // DR v3: Lock stake for new resolver
             if (address(stakingModule) != address(0)) {
-                try stakingModule.onResolverAssigned(workflowId, address(this), newResolver, currentRound) {
+                try stakingModule.onResolverAssigned(workflowId, escrowContract, newResolver, currentRound) {
                     // Success - new resolver's stake locked
                 } catch {
                     // Non-critical: Continue even if lock fails
@@ -1069,7 +1069,7 @@ contract DecentralizedResolutionModule is
             // No suitable replacement, mark as timed out
             // DR v3: Unlock timed out resolver's stake
             if (address(stakingModule) != address(0)) {
-                try stakingModule.unlockStake(workflowId, address(this), timedOutResolver) {
+                try stakingModule.unlockStake(workflowId, escrowContract, timedOutResolver) {
                     // Success - resolver's stake unlocked
                 } catch {
                     // Non-critical: Continue even if unlock fails
@@ -1137,7 +1137,7 @@ contract DecentralizedResolutionModule is
 
         // DR v3: Call staking module hook (if enabled)
         if (address(stakingModule) != address(0)) {
-            try stakingModule.onResolutionFinalized(workflowId, address(this), resolver, true) {
+            try stakingModule.onResolutionFinalized(workflowId, escrowContract, resolver, true) {
                 // Success - stake unlocked
             } catch {
                 // Non-critical: Continue even if staking hook fails
@@ -1300,7 +1300,7 @@ contract DecentralizedResolutionModule is
 
             // DR v2: Distribute appeal bond if reversal occurred (appeal succeeded)
             if (address(incentiveModule) != address(0)) {
-                try incentiveModule.distributeAppealBond(workflowId, address(this), priorRound, true) {
+                try incentiveModule.distributeAppealBond(workflowId, escrowContract, priorRound, true) {
                     // Success - bond refunded to depositor
                 } catch {
                     // Non-critical: Continue even if bond distribution fails
@@ -1309,7 +1309,7 @@ contract DecentralizedResolutionModule is
 
             // DR v3: Call slashing module hook for reversal (if enabled)
             if (address(slashingModule) != address(0)) {
-                try slashingModule.slashForReversal(workflowId, address(this), priorResolver, priorRound) {
+                try slashingModule.slashForReversal(workflowId, escrowContract, priorResolver, priorRound) {
                     // Success - reversal recorded for potential slashing
                 } catch {
                     // Non-critical: Continue even if slashing hook fails

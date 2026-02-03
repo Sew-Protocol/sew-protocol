@@ -52,6 +52,7 @@ contract AaveModuleAllowanceTrackingTest is Test {
         module = new AaveYieldGenerationModule(timelock);
         module.grantRole(ROLE_TIMELOCK, timelock);
         module.grantRole(ROLE_GUARDIAN, guardian);
+        module.grantRole(module.ROLE_ESCROW_CONTRACT(), escrowContract);
         
         // Configure module
         module.queueAavePoolProvider(address(provider));

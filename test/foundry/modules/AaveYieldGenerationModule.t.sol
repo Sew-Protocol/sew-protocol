@@ -177,7 +177,7 @@ contract AaveYieldGenerationModuleTest is Test {
         vm.prank(escrow);
         token.approve(address(module), amount);
         vm.prank(escrow);
-        module.depositForYield(1, address(token), amount, address(this));
+        module.depositForYield(1, address(token), amount, escrow);
 
         // Replace pool with reverting one
         MockAavePoolReverting revertingPool = new MockAavePoolReverting();
@@ -210,7 +210,7 @@ contract AaveYieldGenerationModuleTest is Test {
         vm.prank(escrow);
         token.approve(address(module), amount);
         vm.prank(escrow);
-        module.depositForYield(1, address(token), amount, address(this));
+        module.depositForYield(1, address(token), amount, escrow);
 
         // Mock pool that returns less than principal
         MockAavePoolSlippage slippagePool = new MockAavePoolSlippage();
@@ -243,7 +243,7 @@ contract AaveYieldGenerationModuleTest is Test {
 
         // Deposit 0
         vm.prank(escrow);
-        module.depositForYield(1, address(token), 0, address(this));
+        module.depositForYield(1, address(token), 0, escrow);
 
         assertTrue(module.escrowInAave(escrow, 1));
         assertEq(module.escrowScaledBalance(escrow, 1), 0);
@@ -313,7 +313,7 @@ contract AaveYieldGenerationModuleTest is Test {
         emit EscrowDepositedToAave(1, address(token), amount, amount);
 
         vm.prank(escrow);
-        (bool success, uint256 balance) = module.depositForYield(1, address(token), amount, address(this));
+        (bool success, uint256 balance) = module.depositForYield(1, address(token), amount, escrow);
         
         assertTrue(success);
         assertEq(balance, amount);
@@ -335,7 +335,7 @@ contract AaveYieldGenerationModuleTest is Test {
 
     function test_Deposit_Disabled() public {
         vm.prank(escrow);
-        (bool success, uint256 balance) = module.depositForYield(1, address(token), 100, address(this));
+        (bool success, uint256 balance) = module.depositForYield(1, address(token), 100, escrow);
         assertTrue(success);
         assertEq(balance, 0);
     }
@@ -344,7 +344,7 @@ contract AaveYieldGenerationModuleTest is Test {
         _configureAave();
         // Don't register token
         vm.prank(escrow);
-        (bool success, uint256 balance) = module.depositForYield(1, address(token), 100, address(this));
+        (bool success, uint256 balance) = module.depositForYield(1, address(token), 100, escrow);
         assertTrue(success);
         assertEq(balance, 0);
     }
@@ -362,7 +362,7 @@ contract AaveYieldGenerationModuleTest is Test {
         token.approve(address(module), amount);
 
         vm.prank(escrow);
-        (bool success, ) = module.depositForYield(1, address(token), amount, address(this));
+        (bool success, ) = module.depositForYield(1, address(token), amount, escrow);
         
         assertTrue(success);
         assertTrue(module.escrowInAave(escrow, 1));
@@ -377,7 +377,7 @@ contract AaveYieldGenerationModuleTest is Test {
         vm.prank(escrow);
         token.approve(address(module), amount);
         vm.prank(escrow);
-        module.depositForYield(1, address(token), amount, address(this));
+        module.depositForYield(1, address(token), amount, escrow);
 
         // Fund pool for withdrawal
         token.mint(address(pool), amount);
@@ -416,7 +416,7 @@ contract AaveYieldGenerationModuleTest is Test {
 
         vm.prank(escrow);
         vm.expectRevert(abi.encodeWithSelector(CapExceeded.selector, address(token), amount, 50e18));
-        module.depositForYield(1, address(token), amount, address(this));
+        module.depositForYield(1, address(token), amount, escrow);
     }
 
     function test_Withdraw_LostTokenMapping() public {
@@ -428,7 +428,7 @@ contract AaveYieldGenerationModuleTest is Test {
         vm.prank(escrow);
         token.approve(address(module), amount);
         vm.prank(escrow);
-        module.depositForYield(1, address(token), amount, address(this));
+        module.depositForYield(1, address(token), amount, escrow);
 
         // Manually remove token registration (not possible via public API, but we simulate it)
         // Since we can't unregister, we'll use a different token for withdrawal
@@ -460,7 +460,7 @@ contract AaveYieldGenerationModuleTest is Test {
         vm.prank(escrow);
         token.approve(address(module), amount);
         vm.prank(escrow);
-        module.depositForYield(1, address(token), amount, address(this));
+        module.depositForYield(1, address(token), amount, escrow);
 
         (uint256 totalGenerated, uint256 totalWithdrawn, uint256 totalDeposited) = module.getYieldStatistics(address(token));
         assertEq(totalGenerated, 0);
@@ -537,7 +537,7 @@ contract AaveYieldGenerationModuleTest is Test {
         vm.prank(escrow);
         token.approve(address(module), 60e18);
         vm.prank(escrow);
-        module.depositForYield(1, address(token), 60e18, address(this));
+        module.depositForYield(1, address(token), 60e18, escrow);
 
         // Escrow 2 tries to use 50e18, should fail (60 + 50 > 100)
         token.mint(escrow2, 50e18);
@@ -545,7 +545,7 @@ contract AaveYieldGenerationModuleTest is Test {
         token.approve(address(module), 50e18);
         vm.prank(escrow2);
         vm.expectRevert(abi.encodeWithSelector(CapExceeded.selector, address(token), 110e18, 100e18));
-        module.depositForYield(1, address(token), 50e18, address(this));
+        module.depositForYield(1, address(token), 50e18, escrow2);
     }
 
     function test_ExposureTracking() public {
@@ -570,7 +570,7 @@ contract AaveYieldGenerationModuleTest is Test {
 
             vm.prank(escrow);
 
-            module.depositForYield(1, address(token), amount, address(this));
+            module.depositForYield(1, address(token), amount, escrow);
 
             assertEq(module.currentExposure(address(token)), amount);
 
@@ -656,7 +656,7 @@ contract AaveYieldGenerationModuleTest is Test {
         
         vm.prank(escrow);
         vm.expectRevert(abi.encodeWithSelector(CapExceeded.selector, address(token), amount, 50e18));
-        module.depositForYield(1, address(token), amount, address(this));
+        module.depositForYield(1, address(token), amount, escrow);
     }
 
     function test_Deposit_EscrowCapExceeded() public {
@@ -671,7 +671,7 @@ contract AaveYieldGenerationModuleTest is Test {
         
         vm.prank(escrow);
         vm.expectRevert(abi.encodeWithSelector(AaveYieldGenerationModule.EscrowCapExceeded.selector, escrow, address(token), amount, 10e18));
-        module.depositForYield(1, address(token), amount, address(this));
+        module.depositForYield(1, address(token), amount, escrow);
     }
 
     // ============ Withdraw Tests ============
@@ -685,7 +685,7 @@ contract AaveYieldGenerationModuleTest is Test {
         vm.prank(escrow);
         token.approve(address(module), amount);
         vm.prank(escrow);
-        module.depositForYield(1, address(token), amount, address(this));
+        module.depositForYield(1, address(token), amount, escrow);
 
         vm.prank(escrow);
         aToken.approve(address(module), type(uint256).max);
@@ -713,7 +713,7 @@ contract AaveYieldGenerationModuleTest is Test {
         vm.prank(escrow);
         token.approve(address(module), amount);
         vm.prank(escrow);
-        module.depositForYield(1, address(token), amount, address(this));
+        module.depositForYield(1, address(token), amount, escrow);
 
         pool.simulateYield(address(token), 10);
         
@@ -747,7 +747,7 @@ contract AaveYieldGenerationModuleTest is Test {
         vm.prank(escrow);
         token.approve(address(module), amount);
         vm.prank(escrow);
-        module.depositForYield(1, address(token), amount, address(this));
+        module.depositForYield(1, address(token), amount, escrow);
 
         vm.prank(escrow);
         uint256 yield = module.calculateYield(1, address(token), escrow);

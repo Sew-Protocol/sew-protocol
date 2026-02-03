@@ -94,11 +94,11 @@ contract AaveYieldBugReproduction is Test {
         vm.prank(escrow2);
         token.approve(address(module), amount);
         vm.prank(escrow2);
-        module.depositForYield(wid, address(token), amount, escrow);
+        module.depositForYield(wid, address(token), amount, escrow2);
 
         // Now if Escrow 1 tries to withdraw, it will use escrowContract parameter correctly.
         
-        vm.prank(address(0x999)); // Some other address (e.g. YieldOps)
+        vm.prank(escrow);
         (, uint256 actual, ) = module.withdrawWithYield(wid, address(token), amount, escrow);
         
         // It should have withdrawn for escrow 1, but it might have withdrawn for escrow 2

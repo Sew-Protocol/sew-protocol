@@ -437,7 +437,7 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
             address resolver = eligibleResolvers[i];
             if (resolver != address(0)) {
                 uint256 payment = amountPerResolver;
-                if (i == 0) payment += remainder; // Add remainder to first resolver
+                if (i < remainder) payment += 1; // Distribute remainder 1-wei each to first 'remainder' resolvers
 
                 claimablePayments[escrowContract][workflowId][resolver] += payment;
             }

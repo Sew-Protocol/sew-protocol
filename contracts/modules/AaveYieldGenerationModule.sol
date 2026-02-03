@@ -41,9 +41,10 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
     error AavePoolNotConfigured();
 
     // Role constants for governance
-    bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');
     bytes32 public constant ROLE_GUARDIAN = keccak256('ROLE_GUARDIAN');
+    bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');
     bytes32 public constant ROLE_ESCROW_CONTRACT = keccak256('ROLE_ESCROW_CONTRACT');
+    bytes32 public constant ROLE_YIELD_OPS = keccak256('ROLE_YIELD_OPS');
     using SafeERC20 for IERC20;
 
     // Aave configuration
@@ -169,12 +170,14 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         if (escrowContract == address(0)) revert EscrowContractCannotBeZero();
         
         // HIGH-1: Authorization check
-        if (!hasRole(ROLE_ESCROW_CONTRACT, _msgSender())) {
+        if (!hasRole(ROLE_ESCROW_CONTRACT, _msgSender()) && !hasRole(ROLE_YIELD_OPS, _msgSender())) {
             revert NotAuthorized(_msgSender());
         }
         
-        // Verify escrowContract is the caller
-        if (_msgSender() != escrowContract) revert NotAuthorized(escrowContract);
+        // Verify escrowContract is the caller, OR caller is a trusted Ops contract
+        if (_msgSender() != escrowContract && !hasRole(ROLE_YIELD_OPS, _msgSender())) {
+            revert NotAuthorized(escrowContract);
+        }
 
         // Check if Aave is enabled
         if (!aaveEnabled) {
@@ -241,8 +244,8 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
 
         // Track deposit
         escrowInAave[escrowContract][workflowId] = true;
-        escrowScaledBalance[escrowContract][workflowId] = mintedShares;
-        escrowOriginalDeposit[escrowContract][workflowId] = amount;
+        escrowScaledBalance[escrowContract][workflowId] += mintedShares;
+        escrowOriginalDeposit[escrowContract][workflowId] += amount;
         totalDepositedToAave[token] += amount;
         totalScaledBalance[token] += mintedShares;
 
@@ -268,8 +271,13 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         address escrowContract
     ) external override returns (bool success, uint256 actualAmount, uint256 yieldAmount) {
         // HIGH-2: Authorization checks
-        if (!hasRole(ROLE_ESCROW_CONTRACT, _msgSender())) {
+        if (!hasRole(ROLE_ESCROW_CONTRACT, _msgSender()) && !hasRole(ROLE_YIELD_OPS, _msgSender())) {
             revert NotAuthorized(_msgSender());
+        }
+
+        // Verify escrowContract is the caller, OR caller is a trusted Ops contract
+        if (_msgSender() != escrowContract && !hasRole(ROLE_YIELD_OPS, _msgSender())) {
+            revert NotAuthorized(escrowContract);
         }
 
         if (escrowContract == address(0)) {
@@ -333,8 +341,8 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         escrowOriginalDeposit[escrowContract][workflowId] = 0;
 
         // Update total deposited and total scaled balance
-        if (totalDepositedToAave[token] >= originalAmount) {
-            totalDepositedToAave[token] -= originalAmount;
+        if (totalDepositedToAave[token] >= originalDeposit) {
+            totalDepositedToAave[token] -= originalDeposit;
         }
         if (totalScaledBalance[token] >= trackedScaledBalance) {
             totalScaledBalance[token] -= trackedScaledBalance;
@@ -348,17 +356,17 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         // Dust is defined as rounding discrepancies <= 5 wei
         uint256 dustThreshold = 5;
 
-        if (actualAmount >= originalAmount) {
-            yieldAmount = actualAmount - originalAmount;
+        if (actualAmount >= originalDeposit) {
+            yieldAmount = actualAmount - originalDeposit;
             // If yield is extremely tiny, it might be dust rather than actual yield
             if (yieldAmount > 0 && yieldAmount <= dustThreshold) {
                 protocolDust[token] += yieldAmount;
                 emit DustAccumulated(token, yieldAmount);
                 yieldAmount = 0;
-                actualAmount = originalAmount;
+                actualAmount = originalDeposit;
             }
         } else {
-            uint256 shortfall = originalAmount - actualAmount;
+            uint256 shortfall = originalDeposit - actualAmount;
             if (shortfall <= dustThreshold) {
                 // Shortfall is within dust bounds. Try to cover with accumulated dust first.
                 if (protocolDust[token] >= shortfall) {
@@ -369,7 +377,7 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
                     protocolDeficit[token] += remainingShortfall;
                     emit DeficitAccumulated(token, remainingShortfall);
                 }
-                actualAmount = originalAmount;
+                actualAmount = originalDeposit;
                 yieldAmount = 0;
             } else {
                 yieldAmount = 0;
@@ -384,7 +392,7 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
             emit TotalYieldGeneratedUpdated(token, totalYieldGenerated[token]);
         }
 
-        emit EscrowWithdrawnFromAave(workflowId, token, originalAmount, actualAmount, yieldAmount);
+        emit EscrowWithdrawnFromAave(workflowId, token, originalDeposit, actualAmount, yieldAmount);
 
         return (true, actualAmount, yieldAmount);
     }

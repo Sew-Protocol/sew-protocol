@@ -119,7 +119,7 @@ contract SettlementOps is AccessControl {
         // Try to get appeal deadline and current round from module
         // Use staticcall to query view function
         (bool success, bytes memory data) = resolutionModule.staticcall(
-            abi.encodeWithSignature('getAppealDeadlineAndRound(uint256)', workflowId)
+            abi.encodeWithSignature('getAppealDeadlineAndRound(uint256,address)', workflowId, _msgSender())
         );
 
         if (success && data.length > 0) {
@@ -131,8 +131,14 @@ contract SettlementOps is AccessControl {
         }
 
         // If final round (MAX_ROUND), execute immediately (no appeal window)
-        if (result.isFinalRound || result.appealDeadline == 0) {
+        if (result.isFinalRound) {
             result.shouldExecute = true;
+        } else if (result.appealDeadline == 0) {
+            // If not final and no deadline provided, use global config
+            result.appealDeadline = block.timestamp + timeoutConfig.appealWindowDuration;
+            if (result.appealDeadline == 0) {
+                result.shouldExecute = true;
+            }
         }
 
         return result;

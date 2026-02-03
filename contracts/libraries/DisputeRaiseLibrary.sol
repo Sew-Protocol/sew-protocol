@@ -45,6 +45,7 @@ library DisputeRaiseLibrary {
             abi.encodeWithSelector(
                 IIncentiveModule.onDisputeOpened.selector,
                 workflowId,
+                address(this),
                 token,
                 originalAmount,
                 escrowFeeAmount,

@@ -127,6 +127,7 @@ contract BondCollector is AccessControl {
                 abi.encodeWithSelector(
                     IIncentiveModule.recordAppealBond.selector,
                     workflowId,
+                    _msgSender(),
                     depositor,
                     escalatedBy,
                     ethToSend,
@@ -169,7 +170,7 @@ contract BondCollector is AccessControl {
         
         if (bondToRecord > 0) {
             IERC20(bondToken).safeIncreaseAllowance(address(incentiveMod), bondToRecord);
-            try incentiveMod.recordAppealBond(workflowId, address(this), depositor, escalatedBy, bondToRecord, bondToken, newLevel) {
+            try incentiveMod.recordAppealBond(workflowId, _msgSender(), depositor, escalatedBy, bondToRecord, bondToken, newLevel) {
                 IERC20(bondToken).approve(address(incentiveMod), 0);
                 return true;
             } catch {

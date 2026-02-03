@@ -175,6 +175,9 @@ contract Phase2AaveYieldGenerationModuleTest is Test {
         AaveYieldGenerationModule module = new AaveYieldGenerationModule(timelock);
         module.grantRole(ROLE_TIMELOCK, timelock);
         module.grantRole(ROLE_GUARDIAN, guardian);
+        
+        // Register escrow contract
+        module.registerEscrowContract(escrowContract);
 
         // Configure provider via slow lane queue/activate
         module.queueAavePoolProvider(address(provider));
@@ -237,6 +240,7 @@ contract Phase2AaveYieldGenerationModuleTest is Test {
 
         AaveYieldGenerationModule module = new AaveYieldGenerationModule(timelock);
         module.grantRole(ROLE_TIMELOCK, timelock);
+        module.registerEscrowContract(escrowContract);
         module.queueAavePoolProvider(address(provider));
         vm.warp(block.timestamp + 7 days + 1);
         module.activateAavePoolProvider();
@@ -246,7 +250,7 @@ contract Phase2AaveYieldGenerationModuleTest is Test {
         vm.startPrank(escrowContract);
         token.approve(address(pool), 100e18);
         vm.expectRevert();
-        module.depositForYield(1, address(token), 100e18, address(this));
+        module.depositForYield(1, address(token), 100e18, escrowContract);
         vm.stopPrank();
     }
 
@@ -262,6 +266,7 @@ contract Phase2AaveYieldGenerationModuleTest is Test {
 
         AaveYieldGenerationModule module = new AaveYieldGenerationModule(timelock);
         module.grantRole(ROLE_TIMELOCK, timelock);
+        module.registerEscrowContract(escrowContract);
 
         module.queueAavePoolProvider(address(provider));
         vm.warp(block.timestamp + 7 days + 1);
@@ -285,10 +290,11 @@ contract Phase2AaveYieldGenerationModuleTest is Test {
     function test_phase2_disabled_or_unregistered_token_is_non_blocking() public {
         address timelock = address(this);
         address escrowContract = makeAddr("escrowContract");
+        address token = address(0x123);
 
-        ERC20Mock token = new ERC20Mock("Aave Sim Token", "AST", escrowContract, 1_000_000e18);
         AaveYieldGenerationModule module = new AaveYieldGenerationModule(timelock);
         module.grantRole(ROLE_TIMELOCK, timelock);
+        module.registerEscrowContract(escrowContract);
 
         // Aave not enabled and no token registered → deposit returns (true, 0)
         vm.prank(escrowContract);

@@ -1,103 +1,94 @@
-# Documentation
+# Escrow Protocol (Hardhat Deploy + Foundry)
 
-Welcome to the protocol documentation. This directory contains comprehensive documentation for the escrow protocol, including technical specifications, implementation guides, and operational procedures.
+This repository contains the smart contracts, deployment scripts, governance tooling, and documentation for the escrow protocol.
 
-## Core Documents (Start Here)
+It uses:
+- **Hardhat + hardhat-deploy** for deployments, verification, and TypeScript tooling
+- **Foundry** for fast Solidity unit tests, fuzzing, and invariants
 
-- **[README.md](./README.md)** - This file - overview of documentation structure
-- **[WHITEPAPER.md](./WHITEPAPER.md)** - Comprehensive protocol whitepaper
+## Documentation
 
-## Quick Access to Important Documents
+- **Start here**: `docs/INDEX.md`
+- **Deployment**: `docs/deployment/`
+  - Base Sepolia core testnet guide: `docs/deployment/BASE_SEPOLIA_CORE_TESTNET_GUIDE.md`
+  - Release tracking: `docs/deployment/RELEASES.md`
+- **Governance**: `docs/governance/` and `governance/runbooks/`
+- **Security**:
+  - Responsible disclosure: `SECURITY.md`
+  - Security model: `docs/reviews/SECURITY_MODEL.md`
 
-- **[Document Index](./INDEX.md)** - Complete index of all documents
-- **[Technical Overview](./architecture/TECHNICAL_OVERVIEW.md)** - High-level technical overview
-- **[Security Model](./reviews/SECURITY_MODEL.md)** - Security model and threat analysis
-- **[Contributing Guide](./guides/CONTRIBUTING.md)** - Contributing guidelines
-- **[Coding Standards](./guides/CODING_STANDARDS.md)** - Code style and standards
+## Quick start (local)
 
-## Documentation Structure
+```bash
+pnpm i
+cp .env.example .env
+pnpm compile
+pnpm test
+```
 
-### `/architecture/` - System Architecture
-- Architecture overview
-- Technical overview (canonical)
-- Contracts summary (canonical)
-- Escrow creation and settings
-- Protocol fees and yield distribution
+## Tests
 
-### `/dispute-resolution/` - Dispute Resolution System
-- Decentralized resolution module documentation
-- Resolver economics and incentives
-- Dispute resolution workflows
+```bash
+pnpm test                 # hardhat + foundry
+pnpm test:hardhat
+pnpm test:foundry
+pnpm lint
+pnpm typecheck
+```
 
-### `/governance/` - Governance Documentation
-- Governance processes and procedures
-- Governance surface mapping
-- Governance structure & quorum analyses
+## Deploy
 
-### `/deployment/` - Deployment & Configuration
-- Chain configuration
-- Deployment checklists
-- Verification procedures
+Local:
 
-### `/reviews/` - Reviews & Audits
-- Security reviews
-- Contract reviews
-- Audit reports
+```bash
+pnpm deploy:local
+```
 
-### `/security/` - Security Notes & Reviews
-- Security reviews and tracking docs (in addition to `/reviews/`)
+Base Sepolia (example):
 
-### `/optimization/` - Contract size + gas optimization notes
-- Bytecode size investigations and mitigation plans
+```bash
+pnpm deploy --network baseSepolia
+```
 
-### `/test/` - Testing Documentation
-- Test plans and strategies
-- Test coverage reports
-- Testing guidelines
+Verification and release workflow docs:
+- `docs/deployment/BASE_SEPOLIA_CORE_TESTNET_GUIDE.md`
+- `docs/deployment/RELEASES.md`
 
-### `/reference/` - Reference Materials
-- API references
-- Standards and conventions
-- Technical references
+## Production safety notes (high level)
 
-### `/guides/` - User Guides
-- User-facing guides
-- Developer guides
-- Operational guides
+- Gate upgrades behind **Safe + Timelock**.
+- Require **storage layout checks** on every upgrade.
+- Never leave upgrade authority on an EOA.
 
-### `/policies/` - Policies
-- Upgrade policies
-- Emergency policies
-- Operational policies
+## Governance
 
-### `/token/` - Token Documentation
-- Tokenomics
-- Token specifications
-- Token-related documentation
+The protocol uses onchain governance with `TimelockController` and OpenZeppelin Governor.
 
-## Quick Links
+- [Governance Model](docs/governance/governance.md) - Overview of governance structure
+- [Governance Surface Map](docs/governance/GOVERNANCE_SURFACE_MAP.md) - Complete function → role → lane mapping
+- [Module Map](docs/reference/MODULE_MAP.md) - Module interface → implementation mapping
+- [Operational Runbooks](governance/runbooks/) - Step-by-step procedures for operations
+- [Upgrade Policy](docs/policies/UPGRADE_POLICY.md) - Upgrade procedures and ossification plan
+- [Emergency Policy](docs/policies/EMERGENCY_POLICY.md) - Emergency controls and procedures
+- [Governance Process](docs/governance/GOVERNANCE_PROCESS.md) - Step-by-step governance workflow
 
-- [Document Index](./INDEX.md) - Complete index of all documents
-- [Contributing Guide](./guides/CONTRIBUTING.md) - How to contribute
-- [Coding Standards](./guides/CODING_STANDARDS.md) - Code style guide
+### Governance Tooling
 
-## Document Organization
+```bash
+# Build a proposal
+pnpm gov:build governance/payloads/0001_set_token_cap.ts
 
-### Current Documentation
-Important, actively maintained documentation is organized in top-level directories:
-- `architecture/` - System architecture and design
-- `dispute-resolution/` - Dispute resolution system
-- `governance/` - Governance processes
-- `policies/` - Protocol policies
-- `deployment/` - Deployment guides
-- `reference/` - Technical references
-- `guides/` - User and developer guides
-- `reviews/` - Security reviews and audits
-- `token/` - Token documentation
+# Simulate on fork
+pnpm gov:sim governance/proposals/0001_set_token_cap.json --fork-url=$BASE_RPC
 
-### Historical Documentation
-Completed, superseded, or historical documentation is organized in:
-- `more/` - Additional historical documents (implementation notes, plans, status reports, test plans, etc.)
-- `archived/` - Archived or superseded documentation
+# Stage on testnet/mainnet
+pnpm gov:stage governance/proposals/0001_set_token_cap.json --stage=propose --network baseSepolia
 
-For a complete list of all documents, see the [Document Index](./INDEX.md).
+# Check execution
+pnpm gov:check governance/proposals/0001_set_token_cap.json --network baseMainnet
+
+# Emergency actions (Guardian only)
+pnpm gov:emergency pause --contract EscrowableERC20 --network baseMainnet
+```
+
+See [Governance Documentation](docs/governance/) for complete tooling overview.

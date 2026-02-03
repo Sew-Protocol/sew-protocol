@@ -241,7 +241,7 @@ contract IncentiveModuleIntegrationTest is Test {
         // Verify dispute was opened (check resolution module state)
         (address currentResolver, uint8 currentRound) = resolutionModule.getDisputeResolver(
             workflowId,
-            address(this),
+            address(escrow),
             ''
         );
         assertTrue(currentResolver != address(0), 'Resolver should be assigned');
@@ -296,7 +296,7 @@ contract IncentiveModuleIntegrationTest is Test {
 
         // DisputeOps enforces "decision exists before appeal"
         vm.prank(address(this));
-        resolutionModule.recordResolution(workflowId, address(this),
+        resolutionModule.recordResolution(workflowId, address(escrow),
             resolver1,
             // RELEASE → recipient wins, so sender (user1) can appeal
             ResolutionOutcome.RELEASE,
@@ -304,7 +304,7 @@ contract IncentiveModuleIntegrationTest is Test {
         );
 
         // Get required bond amount
-        (uint256 bondAmount, address bondToken) = resolutionModule.getRequiredAppealBond(workflowId, address(this),
+        (uint256 bondAmount, address bondToken) = resolutionModule.getRequiredAppealBond(workflowId, address(escrow),
             0,
             abi.encode(
                 address(token),
@@ -324,7 +324,7 @@ contract IncentiveModuleIntegrationTest is Test {
         // Verify bond was recorded
         ResolverIncentiveModuleV2.AppealBondRecord memory bond = incentiveModuleV2.getAppealBond(
             workflowId,
-            address(this),
+            address(escrow),
             1
         );
         assertEq(bond.amount, bondAmount, 'Bond amount should match');
@@ -379,7 +379,7 @@ contract IncentiveModuleIntegrationTest is Test {
 
         // DisputeOps enforces "decision exists before appeal"
         vm.prank(address(this));
-        resolutionModule.recordResolution(workflowId, address(this),
+        resolutionModule.recordResolution(workflowId, address(escrow),
             resolver1,
             // RELEASE → recipient wins, so sender (user1) can appeal
             ResolutionOutcome.RELEASE,
@@ -387,7 +387,7 @@ contract IncentiveModuleIntegrationTest is Test {
         );
 
         // Record bond first time via escalation flow
-        (uint256 bondAmount, ) = resolutionModule.getRequiredAppealBond(workflowId, address(this),
+        (uint256 bondAmount, ) = resolutionModule.getRequiredAppealBond(workflowId, address(escrow),
             0,
             abi.encode(
                 address(token),
@@ -407,8 +407,8 @@ contract IncentiveModuleIntegrationTest is Test {
         vm.expectRevert('Bond already exists');
         incentiveModuleV2.recordAppealBond(
             workflowId,
-            address(this),
             address(escrow),
+            address(bondCollector),
             user1,
             bondAmount,
             address(token),
@@ -463,14 +463,14 @@ contract IncentiveModuleIntegrationTest is Test {
 
         // Simulate decision at round 0 (CANCEL)
         vm.prank(address(this));
-        resolutionModule.recordResolution(workflowId, address(this),
+        resolutionModule.recordResolution(workflowId, address(escrow),
             resolver1,
             ResolutionOutcome.CANCEL,
             1 days
         );
 
         // Escalate to round 1 (bond token is enforced to match escrow token)
-        (uint256 bondAmount, ) = resolutionModule.getRequiredAppealBond(workflowId, address(this),
+        (uint256 bondAmount, ) = resolutionModule.getRequiredAppealBond(workflowId, address(escrow),
             0,
             abi.encode(
                 address(token),
@@ -487,7 +487,7 @@ contract IncentiveModuleIntegrationTest is Test {
 
         // Simulate decision at round 1 (RELEASE) - reversal!
         vm.prank(address(this));
-        resolutionModule.recordResolution(workflowId, address(this),
+        resolutionModule.recordResolution(workflowId, address(escrow),
             seniorResolver,
             ResolutionOutcome.RELEASE,
             1 days
@@ -496,12 +496,12 @@ contract IncentiveModuleIntegrationTest is Test {
         // Record reversal - should trigger bond distribution
         uint256 balanceBefore = user1.balance;
         vm.prank(address(this));
-        resolutionModule.recordReversal(workflowId, address(this), 0);
+        resolutionModule.recordReversal(workflowId, address(escrow), 0);
 
         // Verify bond was refunded (outcomeFlipped = true)
         ResolverIncentiveModuleV2.AppealBondRecord memory bond = incentiveModuleV2.getAppealBond(
             workflowId,
-            address(this),
+            address(escrow),
             1
         );
         assertTrue(bond.distributed, 'Bond should be distributed');
@@ -556,14 +556,14 @@ contract IncentiveModuleIntegrationTest is Test {
 
         // Simulate decision at round 0 (CANCEL)
         vm.prank(address(this));
-        resolutionModule.recordResolution(workflowId, address(this),
+        resolutionModule.recordResolution(workflowId, address(escrow),
             resolver1,
             ResolutionOutcome.CANCEL,
             1 days
         );
 
         // Escalate to round 1 (bond token is enforced to match escrow token)
-        (uint256 bondAmount, ) = resolutionModule.getRequiredAppealBond(workflowId, address(this),
+        (uint256 bondAmount, ) = resolutionModule.getRequiredAppealBond(workflowId, address(escrow),
             0,
             abi.encode(
                 address(token),
@@ -580,7 +580,7 @@ contract IncentiveModuleIntegrationTest is Test {
 
         // Simulate decision at round 1 (CANCEL) - same as round 0, appeal failed
         vm.prank(address(this));
-        resolutionModule.recordResolution(workflowId, address(this),
+        resolutionModule.recordResolution(workflowId, address(escrow),
             seniorResolver,
             ResolutionOutcome.CANCEL,
             1 days
@@ -588,19 +588,19 @@ contract IncentiveModuleIntegrationTest is Test {
 
         // Distribute bond directly (appeal failed)
         vm.prank(address(this));
-        incentiveModuleV2.distributeAppealBond(workflowId, address(this), 0, false);
+        incentiveModuleV2.distributeAppealBond(workflowId, address(escrow), 0, false);
 
         // Verify bond was paid to resolvers (not refunded)
         ResolverIncentiveModuleV2.AppealBondRecord memory bond = incentiveModuleV2.getAppealBond(
             workflowId,
-            address(this),
+            address(escrow),
             1
         );
         assertTrue(bond.distributed, 'Bond should be distributed');
         assertFalse(bond.refunded, 'Bond should not be refunded');
 
         // Verify resolver can claim payment
-        uint256 claimable = incentiveModuleV2.getClaimablePayment(workflowId, address(this), resolver1);
+        uint256 claimable = incentiveModuleV2.getClaimablePayment(workflowId, address(escrow), resolver1);
         assertTrue(claimable > 0, 'Resolver should have claimable payment from bond');
     }
 
@@ -651,16 +651,16 @@ contract IncentiveModuleIntegrationTest is Test {
 
         // Record 3 resolvers at round 0
         vm.prank(address(this));
-        try incentiveModuleV2.recordResolver(workflowId, address(this), resolver1, 0) {} catch {}
+        try incentiveModuleV2.recordResolver(workflowId, address(escrow), resolver1, 0) {} catch {}
         vm.prank(address(this));
-        incentiveModuleV2.recordResolver(workflowId, address(this), resolver2, 0);
+        incentiveModuleV2.recordResolver(workflowId, address(escrow), resolver2, 0);
         address resolver3 = makeAddr('resolver3');
         vm.prank(address(this));
-        incentiveModuleV2.recordResolver(workflowId, address(this), resolver3, 0);
+        incentiveModuleV2.recordResolver(workflowId, address(escrow), resolver3, 0);
 
         // Simulate decision at round 0 (CANCEL) - required before appeal can be filed
         vm.prank(address(this));
-        resolutionModule.recordResolution(workflowId, address(this),
+        resolutionModule.recordResolution(workflowId, address(escrow),
             resolver1,
             ResolutionOutcome.CANCEL,
             1 days
@@ -674,7 +674,7 @@ contract IncentiveModuleIntegrationTest is Test {
         vm.stopPrank();
 
         vm.prank(address(this));
-        resolutionModule.recordResolution(workflowId, address(this),
+        resolutionModule.recordResolution(workflowId, address(escrow),
             seniorResolver,
             ResolutionOutcome.CANCEL,
             1 days
@@ -682,18 +682,18 @@ contract IncentiveModuleIntegrationTest is Test {
 
         // Distribute bond (appeal failed)
         vm.prank(address(this));
-        incentiveModuleV2.distributeAppealBond(workflowId, address(this), 0, false);
+        incentiveModuleV2.distributeAppealBond(workflowId, address(escrow), 0, false);
 
         // Verify all 100 wei is distributed (no remainder lost)
-        uint256 totalClaimable = incentiveModuleV2.getClaimablePayment(workflowId, address(this), resolver1) +
-            incentiveModuleV2.getClaimablePayment(workflowId, address(this), resolver2) +
-            incentiveModuleV2.getClaimablePayment(workflowId, address(this), resolver3);
+        uint256 totalClaimable = incentiveModuleV2.getClaimablePayment(workflowId, address(escrow), resolver1) +
+            incentiveModuleV2.getClaimablePayment(workflowId, address(escrow), resolver2) +
+            incentiveModuleV2.getClaimablePayment(workflowId, address(escrow), resolver3);
         assertEq(totalClaimable, 100, 'Total claimable should equal bond amount');
 
         // Verify remainder distributed to first resolver(s)
-        uint256 claimable1 = incentiveModuleV2.getClaimablePayment(workflowId, address(this), resolver1);
-        uint256 claimable2 = incentiveModuleV2.getClaimablePayment(workflowId, address(this), resolver2);
-        uint256 claimable3 = incentiveModuleV2.getClaimablePayment(workflowId, address(this), resolver3);
+        uint256 claimable1 = incentiveModuleV2.getClaimablePayment(workflowId, address(escrow), resolver1);
+        uint256 claimable2 = incentiveModuleV2.getClaimablePayment(workflowId, address(escrow), resolver2);
+        uint256 claimable3 = incentiveModuleV2.getClaimablePayment(workflowId, address(escrow), resolver3);
 
         // One resolver should get 34, others get 33 (or similar distribution)
         assertTrue(claimable1 >= 33 && claimable1 <= 34, 'Resolver1 should get 33-34');
@@ -731,16 +731,16 @@ contract IncentiveModuleIntegrationTest is Test {
 
         // Call distributePayments via interface
         vm.prank(address(this));
-        incentiveModuleV1.distributePayments(workflowId, address(this), address(token), 50 ether);
+        incentiveModuleV1.distributePayments(workflowId, address(escrow), address(token), 50 ether);
 
         // Verify payments were calculated
         assertTrue(
-            incentiveModuleV1.arePaymentsCalculated(workflowId, address(this)),
+            incentiveModuleV1.arePaymentsCalculated(workflowId, address(escrow)),
             'Payments should be calculated'
         );
 
         // Verify resolver can claim
-        uint256 claimable = incentiveModuleV1.getClaimablePayment(workflowId, address(this), resolver1);
+        uint256 claimable = incentiveModuleV1.getClaimablePayment(workflowId, address(escrow), resolver1);
         assertTrue(claimable > 0, 'Resolver should have claimable payment');
     }
 }
