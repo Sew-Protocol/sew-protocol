@@ -29,8 +29,8 @@ const PRIVATE_KEY = process.env.PRIVATE_KEY || '';
 const SEPOLIA_DEPLOY_KEY = process.env.SEPOLIA_DEPLOY_KEY || '';
 const DEPLOY_CONFIRM = (process.env.DEPLOY_CONFIRM || 'NO').toUpperCase();
 // Keep runs low to minimize deployed bytecode size (EIP-170).
-// Higher runs often increase runtime bytecode size (optimize for gas instead).
-const SOLC_RUNS = parseInt(process.env.SOLC_RUNS || '200', 10);
+// With viaIR enabled, runs=10 optimizes for contract size over gas costs.
+const SOLC_RUNS = parseInt(process.env.SOLC_RUNS || '10', 10);
 
 function rpc(envKey: string) {
   return process.env[envKey] || '';

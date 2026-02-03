@@ -24,8 +24,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
     using SafeERC20 for IERC20;
     uint256 public constant INITIAL_SUPPLY = 1000000000000000000000000; // 1,000,000 tokens with 18 decimals
     
-    
-    // Single token tracking (not per-token like EscrowVault)
+    // Single token
     uint256 public totalHeldInEscrow = 0;
     uint256 public totalFees = 0;
     
@@ -33,7 +32,6 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
     ModuleManagementContract public immutable moduleManagement;
 
     event FeesWithdrawn(uint256 amount);
-    event WiringConfigured(address indexed yieldOps, address indexed disputeOps, address indexed moduleManagement);
 
     /// @notice Compact error for zero address validation (saves bytecode vs string-based errors)
     error ZeroAddress(uint8 which); // 1=fee, 2=yieldOps, 3=disputeOps, 4=moduleMgmt
@@ -77,8 +75,6 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         timeoutConfig.appealWindowDuration = 2 days;
         // Note: defaultAutoReleaseTime and defaultAutoCancelTime are zero by default
         
-        emit WiringConfigured(yieldOpsAddress, disputeOpsAddress, moduleManagementAddress);
-        
         // Mint initial supply to deployer
         _mint(_msgSender(), INITIAL_SUPPLY);
     }
@@ -92,7 +88,6 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
      * @param autoReleaseTime Timestamp for automatic release (0 = no auto-release)
      * @param autoCancelTime Timestamp for automatic cancel (0 = no auto-cancel)
      * @return workflowId The ID of the created escrow transfer
-     * @dev Convenience function - calls BaseEscrow.createEscrow with address(this) as token
      */
     function createEscrow(
         address seller,
@@ -106,48 +101,30 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         return createEscrow(address(this), seller, amount, settings);
     }
 
-    /**
-     * @notice Create a new escrow with default settings
-     * @param seller Recipient address (seller)
-     * @param amount Total amount to escrow (after fee deduction)
-     * @return workflowId The ID of the created escrow transfer
-     * @dev Convenience function - calls BaseEscrow.createEscrow with address(this) as token
-     */
-    function createEscrow(address seller, uint256 amount) public whenNotPaused returns (uint256) {
-        return createEscrow(address(this), seller, amount, SettingsValidationLibrary.getDefaultSettings());
-    }
+        // ============ BaseEscrow Hook Implementations ============
 
-    function releaseEscrowTransfer(uint256 workflowId) public nonReentrant whenNotPaused {
-        _requirePending(workflowId);
-        if (escrowTransfers[workflowId].from != _msgSender()) revert NotSender(workflowId, _msgSender(), escrowTransfers[workflowId].from);
-        _releaseEscrowTransfer(workflowId);
+    /// @dev Token must be address(this)
+    modifier onlyThisToken(address token) {
+        if (token != address(this)) revert InvalidAddress(ADDR_TOKEN, token);
+        _;
     }
-
-    // ============ BaseEscrow Hook Implementations ============
 
     /**
      * @dev Transfer tokens from sender to contract using ERC20's internal _transfer
      * @param token Token address (must be address(this) for EscrowableERC20)
      * @param from Sender address
      * @param amount Amount to transfer
-     * @dev Overrides BaseEscrow._pullTokens. For EscrowableERC20, token must always be address(this).
      */
-    function _pullTokens(address token, address from, uint256 amount) internal override {
-        if (token != address(this)) revert InvalidAddress(ADDR_TOKEN, token);
-        // Transfer from sender to contract using ERC20's internal _transfer
+    function _pullTokens(address token, address from, uint256 amount) internal override onlyThisToken(token) {
         _transfer(from, address(this), amount);
     }
 
     /**
-     * @dev Record fee in totalFees (single token tracking)
-     * @param token Token address (must be address(this) for EscrowableERC20)
-     * @param amount Fee amount to record
-     * @dev Overrides BaseEscrow._recordFee. Tracks fees in single totalFees variable.
+     * @dev Record fee in totalFees
+     * @param token Must be address(this)
+     * @param amount Fee amount
      */
-    function _recordFee(address token, uint256 amount) internal override {
-        if (token != address(this)) revert InvalidAddress(ADDR_TOKEN, token);
-        // MED-4: Prevent overflow when accumulating fees
-        // currentFees is the current total accumulated fees before adding the new fee
+    function _recordFee(address token, uint256 amount) internal override onlyThisToken(token) {
         uint256 currentFees = totalFees;
         if (amount > type(uint256).max - currentFees) {
             revert FeeOverflow();
@@ -160,24 +137,18 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
      * @param token Token address (must be address(this) for EscrowableERC20)
      * @param to Recipient address
      * @param amount Amount to transfer
-     * @dev Overrides BaseEscrow._transferTokens. For EscrowableERC20, token must always be address(this).
      */
-    function _transferTokens(address token, address to, uint256 amount) internal override {
-        if (token != address(this)) revert InvalidAddress(ADDR_TOKEN, token);
+    function _transferTokens(address token, address to, uint256 amount) internal override onlyThisToken(token) {
         _transfer(address(this), to, amount);
     }
 
     /**
      * @dev Update escrow balance tracking
-     * @param token Token address (must be address(this) for EscrowableERC20)
-     * @param amount Amount to add or subtract
-     * @param add True to add to totalHeldInEscrow, false to subtract
-     * @dev Overrides BaseEscrow._updateEscrowBalance. Tracks total escrowed amount across all escrows.
+     * @param token Must be address(this)
+     * @param amount Amount to add/subtract
+     * @param add True to add, false to subtract
      */
-    function _updateEscrowBalance(address token, uint256 amount, bool add) internal override {
-        // MED-3: Input validation
-        if (token != address(this)) revert InvalidAddress(ADDR_TOKEN, token);
-        
+    function _updateEscrowBalance(address token, uint256 amount, bool add) internal override onlyThisToken(token) {
         if (add) {
             totalHeldInEscrow += amount;
         } else {
@@ -191,12 +162,6 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
 
     /**
      * @dev Emit EscrowTransferCreated event (without token parameter)
-     * @param workflowId The escrow transfer ID
-     * @param token Token address (must be address(this))
-     * @param from Sender address
-     * @param to Recipient address
-     * @param amount Original escrow amount
-     * @dev Overrides BaseEscrow._emitEscrowTransferCreated. Emits event without token parameter.
      */
     function _emitEscrowTransferCreated(
         uint256 workflowId,
@@ -205,21 +170,11 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         address to,
         uint256 amount
     ) internal pure override {
-        // EscrowCreated already provides this information (token is always address(this))
-        workflowId;
-        token;
-        from;
-        to;
-        amount;
+        workflowId; token; from; to; amount;
     }
 
     /**
      * @dev Emit EscrowTransferCancelled event (without token parameter)
-     * @param workflowId The escrow transfer ID
-     * @param token Token address (must be address(this))
-     * @param from Sender address
-     * @param amount Original escrow amount
-     * @dev Overrides BaseEscrow._emitEscrowTransferCancelled. Emits event without token parameter.
      */
     function _emitEscrowTransferCancelled(
         uint256 workflowId,
@@ -227,20 +182,11 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         address from,
         uint256 amount
     ) internal pure override {
-        // EscrowStateChanged already provides this information
-        workflowId;
-        token;
-        from;
-        amount;
+        workflowId; token; from; amount;
     }
 
     /**
      * @dev Emit EscrowTransferReleased event (without token parameter)
-     * @param workflowId The escrow transfer ID
-     * @param token Token address (must be address(this))
-     * @param to Recipient address
-     * @param amount Original escrow amount
-     * @dev Overrides BaseEscrow._emitEscrowTransferReleased. Emits event without token parameter.
      */
     function _emitEscrowTransferReleased(
         uint256 workflowId,
@@ -248,20 +194,11 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         address to,
         uint256 amount
     ) internal pure override {
-        // EscrowStateChanged already provides this information
-        workflowId;
-        token;
-        to;
-        amount;
+        workflowId; token; to; amount;
     }
 
     /**
      * @dev Delegate yield deposit to module
-     * @param generationModule Yield generation module
-     * @param workflowId The escrow transfer ID
-     * @param token Token address (must be address(this))
-     * @param amount Amount to deposit
-     * @dev Overrides BaseEscrow._depositForYield. Delegates to generationModule's depositForYield().
      */
     function _depositForYield(
         IYieldGenerationModule generationModule,
@@ -286,35 +223,32 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
 
     // ============ Module Getters ============
 
-    // Consolidated module getters to reduce bytecode (mirrors EscrowVault)
-    function _getModuleAddress(uint256 workflowId, ModuleType moduleType) internal view returns (address) {
-        return ModuleGetterLibrary.getModuleAddress(
-            workflowId,
-            moduleType,
-            moduleSnapshots,
-            moduleManagement,
-            address(this)
-        );
-    }
-
-    // ============ Module swapping (escrow-originated calls) ============
-    // Removed wrappers as ModuleManagementContract now allows direct ROLE_TIMELOCK calls
-
     function _getReleaseStrategy(uint256 workflowId) internal view override returns (IReleaseStrategy) {
-        return ModuleGetterConsolidationLibrary.getReleaseStrategy(_getModuleAddress(workflowId, ModuleType.RELEASE));
+        address moduleAddr = ModuleGetterLibrary.getModuleAddress(
+            workflowId, ModuleType.RELEASE, moduleSnapshots, moduleManagement, address(this)
+        );
+        return ModuleGetterConsolidationLibrary.getReleaseStrategy(moduleAddr);
     }
 
     function _getResolutionModule(uint256 workflowId) internal view override returns (IResolutionModule) {
-        return ModuleGetterConsolidationLibrary.getResolutionModule(_getModuleAddress(workflowId, ModuleType.RESOLUTION), disputeResolutionModule);
+        address moduleAddr = ModuleGetterLibrary.getModuleAddress(
+            workflowId, ModuleType.RESOLUTION, moduleSnapshots, moduleManagement, address(this)
+        );
+        return ModuleGetterConsolidationLibrary.getResolutionModule(moduleAddr, disputeResolutionModule);
     }
 
-
     function _getYieldGenerationModule(uint256 workflowId) internal view override returns (IYieldGenerationModule) {
-        return ModuleGetterConsolidationLibrary.getYieldGenerationModule(_getModuleAddress(workflowId, ModuleType.YIELD_GEN));
+        address moduleAddr = ModuleGetterLibrary.getModuleAddress(
+            workflowId, ModuleType.YIELD_GEN, moduleSnapshots, moduleManagement, address(this)
+        );
+        return ModuleGetterConsolidationLibrary.getYieldGenerationModule(moduleAddr);
     }
 
     function _getYieldDistributionModule(uint256 workflowId) internal view override returns (IYieldDistributionModule) {
-        return ModuleGetterConsolidationLibrary.getYieldDistributionModule(_getModuleAddress(workflowId, ModuleType.YIELD_DIST));
+        address moduleAddr = ModuleGetterLibrary.getModuleAddress(
+            workflowId, ModuleType.YIELD_DIST, moduleSnapshots, moduleManagement, address(this)
+        );
+        return ModuleGetterConsolidationLibrary.getYieldDistributionModule(moduleAddr);
     }
 
     // ============ Fee Management ============
@@ -347,48 +281,6 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         emit FeesWithdrawn(feeAmount);
         return true;
     }
-
-    function recoverERC20(
-        address token,
-        address recipient,
-        uint256 amount
-    ) external override onlyRole(ROLE_TIMELOCK) nonReentrant {
-        if (recipient == address(0)) revert InvalidAddress(ADDR_RECIPIENT, recipient);
-        
-        if (token == address(this)) {
-            uint256 balance = balanceOf(address(this));
-            uint256 escrowBalance = totalHeldInEscrow;
-            uint256 feeBalance = totalFees;
-            uint256 claimableBalance = totalClaimableAssets[address(this)];
-            
-            // Calculate available excess (balance minus escrow, fees and claimable)
-            uint256 available = balance > escrowBalance + feeBalance + claimableBalance ? balance - escrowBalance - feeBalance - claimableBalance : 0;
-            
-            // CRIT-2: Determine recovery amount - if amount == 0, recover all available excess
-            uint256 recoveryAmount = amount == 0 ? available : amount;
-            
-            // CRIT-2: Critical validation - ensure requested amount doesn't exceed available excess
-            if (recoveryAmount > available) {
-                revert AmountExceedsAvailable(token, recoveryAmount, available);
-            }
-            if (recoveryAmount == 0) {
-                revert NoTokensToRecover();
-            }
-
-            // Token is address(this): use ERC20 internal transfer directly
-            _transfer(address(this), recipient, recoveryAmount);
-            emit ERC20Recovered(token, recipient, recoveryAmount);
-        } else {
-            // CRIT-2: Support recovery of external ERC20 tokens
-            uint256 balance = IERC20(token).balanceOf(address(this));
-            uint256 recoveryAmount = amount == 0 ? balance : amount;
-            if (recoveryAmount > balance) revert AmountExceedsAvailable(token, recoveryAmount, balance);
-            if (recoveryAmount == 0) revert NoTokensToRecover();
-            
-            IERC20(token).safeTransfer(recipient, recoveryAmount);
-            emit ERC20Recovered(token, recipient, recoveryAmount);
-        }
-    }
 }
 
 /**
@@ -397,16 +289,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
  * @dev Allows deployment of new EscrowableERC20 tokens with custom parameters
  */
 contract EscrowableERC20Factory {
-    /**
-     * @notice Create a new EscrowableERC20 token contract
-     * @param name Token name
-     * @param symbol Token symbol
-     * @param escrowFee Escrow fee in basis points (e.g., 100 = 1%)
-     * @param escrowFeeAddress Address to receive escrow fees
-     * @param yieldOps Address of YieldOps contract
-     * @param disputeOps Address of DisputeOps contract
-     * @return Address of the newly deployed EscrowableERC20 contract
-     */
+    /// @notice Create a new EscrowableERC20 token contract
     function createEscrowableERC20(
         string memory name,
         string memory symbol,

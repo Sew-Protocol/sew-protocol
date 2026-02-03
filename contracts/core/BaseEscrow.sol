@@ -194,7 +194,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     );
     event ResolutionModuleActivated(address indexed oldModule, address indexed newModule);
     event EscrowSettingsUpdated(uint256 indexed workflowId, EscrowSettings settings);
-    event ERC20Recovered(address indexed token, address indexed recipient, uint256 amount);
     event ClaimableBalanceSet(
         uint256 indexed workflowId,
         address indexed recipient,
@@ -884,20 +883,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         return amount;
     }
 
-
-    function recoverERC20(
-        address token,
-        address recipient,
-        uint256 amount
-    ) external virtual onlyRole(ROLE_TIMELOCK) nonReentrant {
-        uint256 rec = RecoveryLibrary.recoverERC20(
-            token,
-            recipient,
-            amount,
-            IERC20(token).balanceOf(address(this))
-        );
-        emit ERC20Recovered(token, recipient, rec);
-    }
 
     function _validateWorkflowId(uint256 workflowId) internal view {
         if (workflowId >= escrowTransfers.length) {

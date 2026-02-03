@@ -150,20 +150,4 @@ contract EscrowVault is BaseEscrow {
         emit FeesWithdrawn(token, feeAmount);
     }
 
-    function recoverERC20(
-        address token,
-        address recipient,
-        uint256 amount
-    ) external override onlyRole(ROLE_TIMELOCK) nonReentrant {
-        (bool success, uint256 recoveryAmount, uint256 available) = TokenRecoveryLibrary.recoverERC20(
-            totalHeldInEscrowPerToken,
-            totalFeesPerToken,
-            totalClaimableAssets,
-            token,
-            recipient,
-            amount
-        );
-        if (!success) revert AmountExceedsAvailable(token, recoveryAmount, available);
-        emit ERC20Recovered(token, recipient, recoveryAmount);
-    }
 }
