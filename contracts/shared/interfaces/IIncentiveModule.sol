@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
-import './DecentralizedResolverStructs.sol';
+import '../../modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
 
 /**
  * @title IIncentiveModule

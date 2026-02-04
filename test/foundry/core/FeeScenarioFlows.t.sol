@@ -17,7 +17,7 @@ import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/core/ModuleManagementContract.sol";
 import "../../../contracts/admin/EscrowAdminContract.sol";
 
-import "../../../contracts/modules/decentralized-resolution-module/IIncentiveModule.sol";
+import "../../../contracts/shared/interfaces/IIncentiveModule.sol";
 
 contract MockIncentiveModule is IIncentiveModule {
     event AppealBondRecorded(uint256 workflowId, address escrowContract, address depositor, address escalatedBy, uint256 amount, address token, uint8 newLevel);

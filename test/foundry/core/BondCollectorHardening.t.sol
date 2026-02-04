@@ -4,7 +4,7 @@ pragma solidity ^0.8.33;
 import "forge-std/Test.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
-import "../../../contracts/modules/decentralized-resolution-module/IIncentiveModule.sol";
+import "../../../contracts/shared/interfaces/IIncentiveModule.sol";
 
 contract BondCollectorHardeningTest is Test {
     BondCollector public collector;

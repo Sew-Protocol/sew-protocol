@@ -31,7 +31,7 @@ import '../YieldOps.sol';
 import '../DisputeOps.sol';
 import '../SettlementOps.sol';
 import '../CreateOps.sol';
-import '../modules/decentralized-resolution-module/IIncentiveModule.sol';
+import '../shared/interfaces/IIncentiveModule.sol';
 import './BondCollector.sol';
 import '../libraries/ModuleSnapshotLibrary.sol';
 import '../libraries/BondHandlingLibrary.sol';

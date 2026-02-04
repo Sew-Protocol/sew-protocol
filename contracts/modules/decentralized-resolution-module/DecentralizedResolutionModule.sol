@@ -5,7 +5,7 @@ import '../../shared/interfaces/IResolutionModule.sol';
 import '@openzeppelin/contracts/access/AccessControl.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 import '../../governance/SlowLaneQueueActivate.sol';
-import './IIncentiveModule.sol';
+import '../../shared/interfaces/IIncentiveModule.sol';
 import './IStakingModule.sol';
 import './ISlashingModule.sol';
 import './DecentralizedResolverStructs.sol';

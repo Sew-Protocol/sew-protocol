@@ -15,7 +15,7 @@ import 'contracts/libraries/SettingsValidationLibrary.sol';
 import 'contracts/mocks/ERC20Mock.sol';
 import 'contracts/core/modules/DefaultResolutionModule.sol';
 import 'contracts/modules/DefaultReleaseStrategy.sol';
-import 'contracts/modules/decentralized-resolution-module/IIncentiveModule.sol';
+import 'contracts/shared/interfaces/IIncentiveModule.sol';
 
 /**
  * @title Phase1RefactorRiskTests
