@@ -2,6 +2,7 @@
 pragma solidity ^0.8.33;
 
 import "forge-std/Test.sol";
+import "../../../contracts/core/BaseEscrow.sol";
 import "../../../contracts/core/EscrowVault.sol";
 import "../../../contracts/core/EscrowViewContract.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
@@ -201,6 +202,32 @@ contract EscrowDisputeTest is Test {
         assertTrue(exists, "pending settlement should exist for customResolver decision");
         assertTrue(isRelease, "pending settlement from customResolver should be a release");
         assertGt(appealDeadline, block.timestamp, "appeal deadline should be in the future");
+    }
+
+    function test_escalateDispute_v1_reverts_AppealsNotEnabledInV1() public {
+        // V1 launch: Appeals are disabled. Even if someone tries to escalate, they hit the
+        // resolution module check first (DefaultResolutionModule.computeEscalation returns false),
+        // which reverts with EscalationNotAllowed.
+        // 
+        // The AppealsNotEnabledInV1() check in escalateDispute() provides an additional safety
+        // layer that will be enforced in Phase 2 when the resolution module supports escalation
+        // but the incentive module is null.
+        
+        uint256 amount = 1000e18;
+        token.mint(buyer, amount);
+        
+        vm.startPrank(buyer);
+        token.approve(address(vault), amount);
+        uint256 wid = vault.createEscrow(address(token), seller, amount, SettingsValidationLibrary.getDefaultSettings());
+        
+        // Enter disputed state
+        vault.raiseDispute(wid);
+        vm.stopPrank();
+        
+        // Attempt to escalate - reverts because DefaultResolutionModule does not support escalation
+        vm.prank(buyer);
+        vm.expectRevert(abi.encodeWithSignature("EscalationNotAllowed()"));
+        vault.escalateDispute(wid);
     }
 }
 
