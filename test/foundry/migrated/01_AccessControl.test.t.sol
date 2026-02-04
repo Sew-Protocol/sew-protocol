@@ -8,7 +8,7 @@ import 'contracts/DisputeOps.sol';
 import 'contracts/core/ModuleManagementContract.sol';
 import 'contracts/core/EscrowableERC20.sol';
 import 'contracts/core/EscrowVault.sol';
-import 'contracts/admin/EscrowAdminContract.sol';
+import 'contracts/admin/EscrowGovernanceTimelock.sol';
 import 'contracts/types/EscrowTypes.sol';
 
 contract Test_01_AccessControl_test is Test {
@@ -17,7 +17,7 @@ contract Test_01_AccessControl_test is Test {
     DisputeOps public disputeOps;
     ModuleManagementContract public moduleManagement;
     EscrowVault escrowVault;
-    EscrowAdminContract public adminContract;
+    EscrowGovernanceTimelock public adminContract;
     address timelock = address(0x1);
     address guardian = address(0x2);
     address unauthorized = address(0x3);
@@ -37,7 +37,7 @@ contract Test_01_AccessControl_test is Test {
             address(moduleManagement)
         );
         escrowVault = new EscrowVault(100, feeAddr, address(yieldOps), address(disputeOps), address(moduleManagement));
-        adminContract = new EscrowAdminContract(address(this));
+        adminContract = new EscrowGovernanceTimelock(address(this));
         adminContract.grantRole(adminContract.ROLE_TIMELOCK(), timelock);
         escrowable.grantRole(escrowable.ROLE_ADMIN_CONTRACT(), address(adminContract));
     }

@@ -7,7 +7,7 @@ import 'contracts/YieldOps.sol';
 import 'contracts/DisputeOps.sol';
 import 'contracts/core/ModuleManagementContract.sol';
 import 'contracts/core/EscrowVault.sol';
-import 'contracts/admin/EscrowAdminContract.sol';
+import 'contracts/admin/EscrowGovernanceTimelock.sol';
 import 'contracts/types/EscrowTypes.sol';
 
 contract Test_03_BoundsEnforcement_test is Test {
@@ -15,7 +15,7 @@ contract Test_03_BoundsEnforcement_test is Test {
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
     ModuleManagementContract public moduleManagement;
-    EscrowAdminContract public adminContract;
+    EscrowGovernanceTimelock public adminContract;
     address timelock = address(0x1);
 
     function setUp() public {
@@ -24,7 +24,7 @@ contract Test_03_BoundsEnforcement_test is Test {
         moduleManagement = new ModuleManagementContract(address(this));
         vault = new EscrowVault(100, address(this), address(yieldOps), address(disputeOps), address(moduleManagement));
         vault.grantRole(vault.ROLE_TIMELOCK(), timelock);
-        adminContract = new EscrowAdminContract(address(this));
+        adminContract = new EscrowGovernanceTimelock(address(this));
         adminContract.grantRole(adminContract.ROLE_TIMELOCK(), timelock);
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(adminContract));
     }

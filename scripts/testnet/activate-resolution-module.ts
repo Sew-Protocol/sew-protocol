@@ -19,15 +19,15 @@ async function main() {
   const deployer = new ethers.Wallet(deployerPk, provider);
 
   const escrowVaultAddr = (await deployments.get('EscrowVault')).address;
-  const escrowAdminAddr = (await deployments.get('EscrowAdminContract')).address;
+  const escrowAdminAddr = (await deployments.get('EscrowGovernanceTimelock')).address;
 
-  const admin: any = await hre.ethers.getContractAt('EscrowAdminContract', escrowAdminAddr, deployer);
+  const admin: any = await hre.ethers.getContractAt('EscrowGovernanceTimelock', escrowAdminAddr, deployer);
   const escrow: any = await hre.ethers.getContractAt('EscrowVault', escrowVaultAddr);
 
   console.log(`\n⏳ Activate queued resolution module (Base Sepolia)`);
   console.log(`- EscrowVault: ${escrowVaultAddr}`);
   console.log(`  - ${basescanAddressLink(escrowVaultAddr)}`);
-  console.log(`- EscrowAdminContract: ${escrowAdminAddr}`);
+  console.log(`- EscrowGovernanceTimelock: ${escrowAdminAddr}`);
   console.log(`  - ${basescanAddressLink(escrowAdminAddr)}`);
 
   const pending = await admin.getPendingResolutionModule(escrowVaultAddr);

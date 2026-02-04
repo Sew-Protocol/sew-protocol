@@ -4,7 +4,7 @@ pragma solidity 0.8.33;
 import 'forge-std/Test.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/core/BaseEscrow.sol';
-import '../../../contracts/admin/EscrowAdminContract.sol';
+import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
 import '../../../contracts/core/ModuleManagementContract.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/core/modules/DefaultResolutionModule.sol';
@@ -26,7 +26,7 @@ import '../../../contracts/core/EscrowViewContract.sol';
  */
 contract BaseEscrowComprehensive is Test {
     EscrowVault public vault;
-    EscrowAdminContract public adminContract;
+    EscrowGovernanceTimelock public adminContract;
     ModuleManagementContract public moduleManagement;
     EscrowViewContract public escrowView;
     ERC20Mock public token;
@@ -109,7 +109,7 @@ contract BaseEscrowComprehensive is Test {
         settlementOps = new SettlementOps(owner);
         createOps = new CreateOps(owner);
         bondCollector = new BondCollector(owner);
-        adminContract = new EscrowAdminContract(owner);
+        adminContract = new EscrowGovernanceTimelock(owner);
         moduleManagement = new ModuleManagementContract(owner);
         vault = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
 

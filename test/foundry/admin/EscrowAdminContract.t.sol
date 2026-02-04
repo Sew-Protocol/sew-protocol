@@ -3,7 +3,7 @@ pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
-import '../../../contracts/admin/EscrowAdminContract.sol';
+import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/core/modules/DefaultResolutionModule.sol';
 import '../../../contracts/types/EscrowTypes.sol';
@@ -13,9 +13,9 @@ import '../../../contracts/DisputeOps.sol';
 import '../../../contracts/core/ModuleManagementContract.sol';
 
 /**
- * @title EscrowAdminContractTest
- * @notice Comprehensive tests for EscrowAdminContract covering all functions and code paths
- * @dev Goal: 99% coverage for EscrowAdminContract.sol
+ * @title EscrowGovernanceTimelockTest
+ * @notice Comprehensive tests for EscrowGovernanceTimelock covering all functions and code paths
+ * @dev Goal: 99% coverage for EscrowGovernanceTimelock.sol
  * 
  * Following strategy from 99_PERCENT_TEST_COVERAGE_STRATEGY.md:
  * - All queue/activate functions for each admin setting
@@ -25,8 +25,8 @@ import '../../../contracts/core/ModuleManagementContract.sol';
  * - Getter functions
  * - Edge cases (zero addresses, no pending, premature activation)
  */
-contract EscrowAdminContractTest is Test {
-    EscrowAdminContract public adminContract;
+contract EscrowGovernanceTimelockTest is Test {
+    EscrowGovernanceTimelock public adminContract;
     EscrowVault public vault;
     DefaultResolutionModule public resolutionModule1;
     DefaultResolutionModule public resolutionModule2;
@@ -59,7 +59,7 @@ contract EscrowAdminContractTest is Test {
         resolutionModule1 = new DefaultResolutionModule(owner, address(0x2222));
         resolutionModule2 = new DefaultResolutionModule(owner, address(0x3333));
         
-        adminContract = new EscrowAdminContract(owner);
+        adminContract = new EscrowGovernanceTimelock(owner);
         
         // Setup roles
         adminContract.grantRole(adminContract.ROLE_TIMELOCK(), timelock);
@@ -73,7 +73,7 @@ contract EscrowAdminContractTest is Test {
     // ============ Constructor Tests ============
     
     function test_constructor_setsOwner() public {
-        EscrowAdminContract newContract = new EscrowAdminContract(owner);
+        EscrowGovernanceTimelock newContract = new EscrowGovernanceTimelock(owner);
         assertTrue(newContract.hasRole(newContract.DEFAULT_ADMIN_ROLE(), owner));
         assertTrue(newContract.hasRole(newContract.ROLE_TIMELOCK(), owner));
     }
@@ -546,7 +546,7 @@ contract EscrowAdminContractTest is Test {
     
     function test_queueFeeRecipient_emitsEvent() public {
         vm.expectEmit(true, true, true, true);
-        emit EscrowAdminContract.FeeRecipientQueued(
+        emit EscrowGovernanceTimelock.FeeRecipientQueued(
             address(vault),
             feeAddress1,
             feeAddress2,
@@ -564,7 +564,7 @@ contract EscrowAdminContractTest is Test {
         vm.warp(block.timestamp + 7 days + 1);
         
         vm.expectEmit(true, true, true, true);
-        emit EscrowAdminContract.FeeRecipientActivated(
+        emit EscrowGovernanceTimelock.FeeRecipientActivated(
             address(vault),
             feeAddress1,
             feeAddress2

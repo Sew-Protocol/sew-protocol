@@ -15,7 +15,7 @@ import "../../../contracts/SettlementOps.sol";
 import "../../../contracts/CreateOps.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/core/ModuleManagementContract.sol";
-import "../../../contracts/admin/EscrowAdminContract.sol";
+import "../../../contracts/admin/EscrowGovernanceTimelock.sol";
 
 import "../../../contracts/shared/interfaces/IIncentiveModule.sol";
 
@@ -93,7 +93,7 @@ contract FeeScenarioFlowsTest is Test {
     CreateOps public createOps;
     BondCollector public bondCollector;
     ModuleManagementContract public moduleManagement;
-    EscrowAdminContract public adminContract;
+    EscrowGovernanceTimelock public adminContract;
 
     address public owner;
     address public timelock;
@@ -126,7 +126,7 @@ contract FeeScenarioFlowsTest is Test {
         createOps = new CreateOps(owner);
         bondCollector = new BondCollector(owner);
         moduleManagement = new ModuleManagementContract(owner);
-        adminContract = new EscrowAdminContract(owner);
+        adminContract = new EscrowGovernanceTimelock(owner);
 
         // Vault starts with 0% fee; we'll slow-lane set to 1% in tests.
         vault = new EscrowVault(INITIAL_ESCROW_FEE_BPS, treasury, address(yieldOps), address(disputeOps), address(moduleManagement));
@@ -147,7 +147,7 @@ contract FeeScenarioFlowsTest is Test {
         // Fee withdraw role is separate from the recipient address.
         vault.grantRole(vault.ROLE_FEE_RECIPIENT(), dao);
 
-        // EscrowAdminContract slow-lane operator
+        // EscrowGovernanceTimelock slow-lane operator
         adminContract.grantRole(adminContract.ROLE_TIMELOCK(), timelock);
 
         // Ops wiring (timelock-gated on the vault)

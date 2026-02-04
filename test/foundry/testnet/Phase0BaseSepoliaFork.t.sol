@@ -89,7 +89,7 @@ contract Phase0BaseSepoliaForkTest is Test {
         createOps = _dep("CreateOps");
         bondCollector = _dep("BondCollector");
         moduleManagement = _dep("ModuleManagementContract");
-        escrowAdmin = _dep("EscrowAdminContract");
+        escrowAdmin = _dep("EscrowGovernanceTimelock");
         escrowVault = _dep("EscrowVault");
     }
 
@@ -108,7 +108,7 @@ contract Phase0BaseSepoliaForkTest is Test {
         _requireCode("CreateOps", createOps);
         _requireCode("BondCollector", bondCollector);
         _requireCode("ModuleManagementContract", moduleManagement);
-        _requireCode("EscrowAdminContract", escrowAdmin);
+        _requireCode("EscrowGovernanceTimelock", escrowAdmin);
         _requireCode("EscrowVault", escrowVault);
 
         // 2) Core wiring
@@ -129,9 +129,9 @@ contract Phase0BaseSepoliaForkTest is Test {
         assertTrue(IAccessControlMinimal(yieldOps).hasRole(ROLE_ESCROW_CONTRACT, escrowVault), "YieldOps missing ROLE_ESCROW_CONTRACT");
         assertTrue(IAccessControlMinimal(bondCollector).hasRole(ROLE_ESCROW_CONTRACT, escrowVault), "BondCollector missing ROLE_ESCROW_CONTRACT");
 
-        // 4) Slow lane admin wiring: EscrowAdminContract authorized on EscrowVault
+        // 4) Slow lane admin wiring: EscrowGovernanceTimelock authorized on EscrowVault
         bytes32 ROLE_ADMIN_CONTRACT = ev.ROLE_ADMIN_CONTRACT();
-        assertTrue(ev.hasRole(ROLE_ADMIN_CONTRACT, escrowAdmin), "EscrowAdminContract missing ROLE_ADMIN_CONTRACT on EscrowVault");
+        assertTrue(ev.hasRole(ROLE_ADMIN_CONTRACT, escrowAdmin), "EscrowGovernanceTimelock missing ROLE_ADMIN_CONTRACT on EscrowVault");
 
         // 5) Timelock wiring (minimum): governor is proposer/canceller
         ITimelockControllerMinimal tl = ITimelockControllerMinimal(timelock);

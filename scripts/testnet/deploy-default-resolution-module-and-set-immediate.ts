@@ -35,14 +35,14 @@ async function main() {
   const deployerAddr = await deployer.getAddress();
 
   const escrowVaultAddr = (await deployments.get('EscrowVault')).address;
-  const escrowAdminAddr = (await deployments.get('EscrowAdminContract')).address;
+  const escrowAdminAddr = (await deployments.get('EscrowGovernanceTimelock')).address;
   const timelockAddr = (await deployments.get('TimelockController')).address;
 
   console.log(`\n⚡ Deploy + set DefaultResolutionModule immediately (Base Sepolia)`);
   console.log(`- deployer: ${deployerAddr}`);
   console.log(`- EscrowVault: ${escrowVaultAddr}`);
   console.log(`  - ${basescanAddressLink(escrowVaultAddr)}`);
-  console.log(`- EscrowAdminContract: ${escrowAdminAddr}`);
+  console.log(`- EscrowGovernanceTimelock: ${escrowAdminAddr}`);
   console.log(`- TimelockController: ${timelockAddr}`);
   console.log(`- INITIAL_RESOLVER: ${initialResolver}`);
   console.log(
@@ -67,7 +67,7 @@ async function main() {
 
   // Grant ROLE_TIMELOCK on the module so governance/admin can rotate resolver later.
   const ROLE_TIMELOCK = ethers.keccak256(ethers.toUtf8Bytes('ROLE_TIMELOCK'));
-  console.log(`\nGranting DefaultResolutionModule.ROLE_TIMELOCK to EscrowAdminContract and TimelockController...`);
+  console.log(`\nGranting DefaultResolutionModule.ROLE_TIMELOCK to EscrowGovernanceTimelock and TimelockController...`);
   await (await module.grantRole(ROLE_TIMELOCK, escrowAdminAddr)).wait();
   await (await module.grantRole(ROLE_TIMELOCK, timelockAddr)).wait();
 

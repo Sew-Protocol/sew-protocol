@@ -9,7 +9,7 @@ import 'contracts/core/EscrowVault.sol';
 import 'contracts/mocks/ERC20Mock.sol';
 import 'contracts/core/modules/DefaultResolutionModule.sol';
 import 'contracts/types/YieldPresets.sol';
-import 'contracts/admin/EscrowAdminContract.sol';
+import 'contracts/admin/EscrowGovernanceTimelock.sol';
 import 'contracts/types/EscrowTypes.sol';
 import 'contracts/CreateOps.sol';
 import 'contracts/SettlementOps.sol';
@@ -17,7 +17,7 @@ import 'contracts/core/BondCollector.sol';
 
 contract Test_05_ModuleSnapshotting_test is Test {
     EscrowVault vault;
-    EscrowAdminContract adminContract;
+    EscrowGovernanceTimelock adminContract;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
     ModuleManagementContract public moduleManagement;
@@ -32,7 +32,7 @@ contract Test_05_ModuleSnapshotting_test is Test {
         disputeOps = new DisputeOps(address(this));
         moduleManagement = new ModuleManagementContract(address(this));
         vault = new EscrowVault(100, address(this), address(yieldOps), address(disputeOps), address(moduleManagement));
-        adminContract = new EscrowAdminContract(address(this));
+        adminContract = new EscrowGovernanceTimelock(address(this));
         vault.grantRole(vault.ROLE_TIMELOCK(), timelock);
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(adminContract));
         adminContract.grantRole(adminContract.ROLE_TIMELOCK(), timelock);

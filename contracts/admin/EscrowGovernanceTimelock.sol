@@ -11,8 +11,8 @@ import '../libraries/SettingsValidationLibrary.sol';
 error InvalidValue();
 
 /**
- * @title EscrowAdminContract
- * @notice Centralized admin contract for time-delayed configuration of escrow contracts.
+ * @title EscrowGovernanceTimelock
+ * @notice Time-delayed governance contract for escrow configuration changes.
  * @dev This contract is the "slow lane" state holder for protocol configuration.
  *
  * Design / responsibilities:
@@ -25,12 +25,12 @@ error InvalidValue();
  * - After the slow delay elapses, governance calls `activateX(escrowContract)`.
  * - The escrow contract must be compatible with `BaseEscrow` and expose the relevant setters.
  *
- * Important: role wiring prerequisite
+ * Important: role wiring prerequisite:
  * - The target escrow contract must authorize this admin contract to call its setter functions.
  * - In this codebase that is typically done via a dedicated role like `ROLE_ADMIN_CONTRACT`.
  * - If the escrow contract has NOT granted the required role(s) to this contract, activate calls will revert.
  */
-contract EscrowAdminContract is AccessControl, SlowLaneQueueActivate {
+contract EscrowGovernanceTimelock is AccessControl, SlowLaneQueueActivate {
     /// @notice Governance role (intended to be held by TimelockController).
     bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');
     /// @notice Role granted to registered escrow contracts (metadata/allowlisting).
@@ -73,7 +73,7 @@ contract EscrowAdminContract is AccessControl, SlowLaneQueueActivate {
     event ResolutionModuleActivated(address indexed escrowContract, address indexed oldModule, address indexed newModule);
 
     /**
-     * @notice Deploy the EscrowAdminContract.
+     * @notice Deploy the EscrowGovernanceTimelock.
      * @param initialOwner Initial admin for bootstrap (expected to be replaced/managed by governance wiring).
      * @dev Grants `DEFAULT_ADMIN_ROLE` and `ROLE_TIMELOCK` to `initialOwner` for initial setup.
      *      In production, `ROLE_TIMELOCK` should be granted to the TimelockController and

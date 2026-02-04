@@ -35,14 +35,14 @@ async function main() {
   const deployerAddr = await deployer.getAddress();
 
   const escrowVaultAddr = (await deployments.get('EscrowVault')).address;
-  const escrowAdminAddr = (await deployments.get('EscrowAdminContract')).address;
+  const escrowAdminAddr = (await deployments.get('EscrowGovernanceTimelock')).address;
   const timelockAddr = (await deployments.get('TimelockController')).address;
 
   console.log(`\n🚀 Deploy + queue DefaultResolutionModule (Base Sepolia)`);
   console.log(`- deployer: ${deployerAddr}`);
   console.log(`- EscrowVault: ${escrowVaultAddr}`);
   console.log(`  - ${basescanAddressLink(escrowVaultAddr)}`);
-  console.log(`- EscrowAdminContract: ${escrowAdminAddr}`);
+  console.log(`- EscrowGovernanceTimelock: ${escrowAdminAddr}`);
   console.log(`  - ${basescanAddressLink(escrowAdminAddr)}`);
   console.log(`- TimelockController: ${timelockAddr}`);
   console.log(`- INITIAL_RESOLVER: ${initialResolver}`);
@@ -66,16 +66,16 @@ async function main() {
 
   // Grant ROLE_TIMELOCK on the module so governance/admin can rotate resolver later.
   const ROLE_TIMELOCK = ethers.keccak256(ethers.toUtf8Bytes('ROLE_TIMELOCK'));
-  console.log(`\nGranting DefaultResolutionModule.ROLE_TIMELOCK to EscrowAdminContract and TimelockController...`);
+  console.log(`\nGranting DefaultResolutionModule.ROLE_TIMELOCK to EscrowGovernanceTimelock and TimelockController...`);
   const grant1 = await module.grantRole(ROLE_TIMELOCK, escrowAdminAddr);
-  console.log(`  grant EscrowAdminContract tx: ${grant1.hash}`);
+  console.log(`  grant EscrowGovernanceTimelock tx: ${grant1.hash}`);
   await grant1.wait();
   const grant2 = await module.grantRole(ROLE_TIMELOCK, timelockAddr);
   console.log(`  grant TimelockController tx: ${grant2.hash}`);
   await grant2.wait();
 
-  // Queue the new module in EscrowAdminContract (slow lane). Activation requires waiting SLOW_DELAY (~7 days).
-  const admin: any = await hre.ethers.getContractAt('EscrowAdminContract', escrowAdminAddr, deployer);
+  // Queue the new module in EscrowGovernanceTimelock (slow lane). Activation requires waiting SLOW_DELAY (~7 days).
+  const admin: any = await hre.ethers.getContractAt('EscrowGovernanceTimelock', escrowAdminAddr, deployer);
   console.log(`\nQueueing resolution module on EscrowVault (slow lane)...`);
   const q = await admin.queueResolutionModule(escrowVaultAddr, moduleAddr);
   console.log(`  queue tx: ${q.hash}`);

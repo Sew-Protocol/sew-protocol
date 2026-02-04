@@ -4,7 +4,7 @@
  *
  * Behavior:
  * - If caller has ROLE_ADMIN_CONTRACT on EscrowVault -> call setEscrowFeeBps(100) immediately.
- * - Else -> queue via EscrowAdminContract.queueEscrowFee(), then print ETA (7 days slow-lane).
+ * - Else -> queue via EscrowGovernanceTimelock.queueEscrowFee(), then print ETA (7 days slow-lane).
  *
  * Run:
  *   pnpm hardhat run --network baseSepolia scripts/testnet/set-escrow-fee-100.ts
@@ -24,17 +24,17 @@ async function main() {
   const signer = await hre.ethers.getSigner(deployer);
 
   const vaultAddr = (await deployments.get('EscrowVault')).address;
-  const adminAddr = (await deployments.get('EscrowAdminContract')).address;
+  const adminAddr = (await deployments.get('EscrowGovernanceTimelock')).address;
 
   const vault = await hre.ethers.getContractAt('EscrowVault', vaultAddr, signer);
-  const admin = await hre.ethers.getContractAt('EscrowAdminContract', adminAddr, signer);
+  const admin = await hre.ethers.getContractAt('EscrowGovernanceTimelock', adminAddr, signer);
 
   const currentFee: bigint = await vault.escrowFee();
   const roleAdminContract: string = await vault.ROLE_ADMIN_CONTRACT();
   const roleAdminTimelock: string = await admin.ROLE_TIMELOCK();
 
   console.log(`EscrowVault: ${vaultAddr}`);
-  console.log(`EscrowAdminContract: ${adminAddr}`);
+  console.log(`EscrowGovernanceTimelock: ${adminAddr}`);
   console.log(`Caller: ${deployer}`);
   console.log(`Current escrowFee (bps): ${currentFee.toString()}`);
 
@@ -61,13 +61,13 @@ async function main() {
 
   if (!hasAdminTimelockRole) {
     throw new Error(
-      `Caller ${deployer} does not have EscrowAdminContract.ROLE_TIMELOCK; cannot queueEscrowFee(). ` +
-        `Use the original admin/timelock EOA (the one that deployed EscrowAdminContract) or grant ROLE_TIMELOCK to this EOA.`
+      `Caller ${deployer} does not have EscrowGovernanceTimelock.ROLE_TIMELOCK; cannot queueEscrowFee(). ` +
+        `Use the original admin/timelock EOA (the one that deployed EscrowGovernanceTimelock) or grant ROLE_TIMELOCK to this EOA.`
     );
   }
 
   console.log(
-    `\n⏳ Caller does NOT have ROLE_ADMIN_CONTRACT; queueing via EscrowAdminContract (slow lane)...`
+    `\n⏳ Caller does NOT have ROLE_ADMIN_CONTRACT; queueing via EscrowGovernanceTimelock (slow lane)...`
   );
   const txQ = await admin.queueEscrowFee(vaultAddr, ESCROW_FEE_BPS);
   console.log(`  queue tx: ${txQ.hash}`);

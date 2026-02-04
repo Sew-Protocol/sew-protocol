@@ -14,7 +14,7 @@ import '../../../contracts/SettlementOps.sol';
 import '../../../contracts/CreateOps.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/core/ModuleManagementContract.sol';
-import '../../../contracts/admin/EscrowAdminContract.sol';
+import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
 
 /**
  * @title ProtocolFeeCalculation
@@ -32,7 +32,7 @@ contract ProtocolFeeCalculationTest is Test {
     CreateOps public createOps;
     BondCollector public bondCollector;
     ModuleManagementContract public moduleManagement;
-    EscrowAdminContract public adminContract;
+    EscrowGovernanceTimelock public adminContract;
 
     address public owner;
     address public escrowFeeAddress;
@@ -66,7 +66,7 @@ contract ProtocolFeeCalculationTest is Test {
 
         // Deploy vault
         moduleManagement = new ModuleManagementContract(address(this));
-        adminContract = new EscrowAdminContract(address(this));
+        adminContract = new EscrowGovernanceTimelock(address(this));
         vault = new EscrowVault(ESCROW_FEE_BPS, escrowFeeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
         moduleManagement.registerEscrowContract(address(vault));
 
@@ -80,7 +80,7 @@ contract ProtocolFeeCalculationTest is Test {
         // Setup vault roles
         vault.grantRole(ROLE_TIMELOCK, owner);
         vault.grantRole(ROLE_GUARDIAN, owner);
-        // Allow EscrowAdminContract to apply queued changes on the vault
+        // Allow EscrowGovernanceTimelock to apply queued changes on the vault
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(adminContract));
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), owner);
         adminContract.grantRole(adminContract.ROLE_TIMELOCK(), owner);

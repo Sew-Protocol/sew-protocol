@@ -9,14 +9,14 @@ import 'contracts/core/ModuleManagementContract.sol';
 import 'contracts/core/EscrowVault.sol';
 import 'contracts/core/EscrowableERC20.sol';
 import 'contracts/types/EscrowTypes.sol';
-import 'contracts/admin/EscrowAdminContract.sol';
+import 'contracts/admin/EscrowGovernanceTimelock.sol';
 
 contract Test_06_TimelockIntegration_test is Test {
     EscrowableERC20 token;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
     ModuleManagementContract public moduleManagement;
-    EscrowAdminContract public adminContract;
+    EscrowGovernanceTimelock public adminContract;
     EscrowVault vault;
     address deployer = address(this);
     address timelock = address(0x10);
@@ -35,7 +35,7 @@ contract Test_06_TimelockIntegration_test is Test {
             address(disputeOps),
             address(moduleManagement)
         );
-        adminContract = new EscrowAdminContract(address(this));
+        adminContract = new EscrowGovernanceTimelock(address(this));
         vault = new EscrowVault(100, address(this), address(yieldOps), address(disputeOps), address(moduleManagement));
         token.grantRole(token.ROLE_TIMELOCK(), timelock);
         token.grantRole(token.ROLE_ADMIN_CONTRACT(), address(adminContract));

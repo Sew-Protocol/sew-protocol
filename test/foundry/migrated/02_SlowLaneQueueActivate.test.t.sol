@@ -6,7 +6,7 @@ import 'forge-std/Test.sol';
 import 'contracts/YieldOps.sol';
 import 'contracts/DisputeOps.sol';
 import 'contracts/core/ModuleManagementContract.sol';
-import 'contracts/admin/EscrowAdminContract.sol';
+import 'contracts/admin/EscrowGovernanceTimelock.sol';
 import 'contracts/core/EscrowVault.sol';
 
 contract Test_02_SlowLaneQueueActivate_test is Test {
@@ -14,7 +14,7 @@ contract Test_02_SlowLaneQueueActivate_test is Test {
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
     ModuleManagementContract public moduleManagement;
-    EscrowAdminContract public adminContract;
+    EscrowGovernanceTimelock public adminContract;
     address timelock = address(0x1);
     address newFeeAddr = address(0x9);
 
@@ -22,7 +22,7 @@ contract Test_02_SlowLaneQueueActivate_test is Test {
         yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps(address(this));
         moduleManagement = new ModuleManagementContract(address(this));
-        adminContract = new EscrowAdminContract(address(this));
+        adminContract = new EscrowGovernanceTimelock(address(this));
         vault = new EscrowVault(100, address(this), address(yieldOps), address(disputeOps), address(moduleManagement));
         // grant timelock role to timelock address
         vault.grantRole(vault.ROLE_TIMELOCK(), timelock);

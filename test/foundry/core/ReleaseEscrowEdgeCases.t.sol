@@ -14,7 +14,7 @@ import 'contracts/SettlementOps.sol';
 import 'contracts/CreateOps.sol';
 import 'contracts/core/BondCollector.sol';
 import 'contracts/core/ModuleManagementContract.sol';
-import 'contracts/admin/EscrowAdminContract.sol';
+import 'contracts/admin/EscrowGovernanceTimelock.sol';
 import 'contracts/libraries/SettingsValidationLibrary.sol';
 import 'contracts/interfaces/IYieldGenerationModule.sol';
 import 'contracts/interfaces/IYieldDistributionModule.sol';
@@ -34,7 +34,7 @@ contract ReleaseEscrowEdgeCasesTest is Test {
     CreateOps createOps;
     BondCollector bondCollector;
     ModuleManagementContract moduleManagement;
-    EscrowAdminContract adminContract;
+    EscrowGovernanceTimelock adminContract;
 
     address sender = address(0x10);
     address recipient = address(0x20);
@@ -54,7 +54,7 @@ contract ReleaseEscrowEdgeCasesTest is Test {
         createOps = new CreateOps(address(this));
         bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleManagementContract(address(this));
-        adminContract = new EscrowAdminContract(address(this));
+        adminContract = new EscrowGovernanceTimelock(address(this));
         vault = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
         // Register escrow contract (requires ROLE_TIMELOCK, which address(this) has from constructor)
         vm.prank(address(this));

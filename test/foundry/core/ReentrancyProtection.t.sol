@@ -16,7 +16,7 @@ import '../../../contracts/core/ModuleManagementContract.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/types/YieldPresets.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
-import '../../../contracts/admin/EscrowAdminContract.sol';
+import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
 
 /**
  * @title ReentrancyProtectionTest
@@ -38,7 +38,7 @@ contract ReentrancyProtectionTest is Test {
     CreateOps public createOps;
     BondCollector public bondCollector;
     ModuleManagementContract public moduleManagement;
-    EscrowAdminContract public adminContract;
+    EscrowGovernanceTimelock public adminContract;
 
     address public deployer;
     address public timelock;
@@ -64,7 +64,7 @@ contract ReentrancyProtectionTest is Test {
         createOps = new CreateOps(address(this));
         bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleManagementContract(address(this));
-        adminContract = new EscrowAdminContract(address(this));
+        adminContract = new EscrowGovernanceTimelock(address(this));
         escrow = new EscrowVault(100, makeAddr('feeAddress'), address(yieldOps), address(disputeOps), address(moduleManagement));
         moduleManagement.registerEscrowContract(address(escrow));
 

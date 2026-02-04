@@ -15,7 +15,7 @@ import '../../../contracts/SettlementOps.sol';
 import '../../../contracts/CreateOps.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/core/ModuleManagementContract.sol';
-import '../../../contracts/admin/EscrowAdminContract.sol';
+import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
 
 /**
  * @title AppealWindowEnforcementTest
@@ -34,7 +34,7 @@ contract AppealWindowEnforcementTest is Test {
     CreateOps public createOps;
     BondCollector public bondCollector;
     ModuleManagementContract public moduleManagement;
-    EscrowAdminContract public adminContract;
+    EscrowGovernanceTimelock public adminContract;
 
     address public deployer;
     address public timelock;
@@ -79,7 +79,7 @@ contract AppealWindowEnforcementTest is Test {
         createOps = new CreateOps(address(this));
         bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleManagementContract(deployer);
-        adminContract = new EscrowAdminContract(deployer);
+        adminContract = new EscrowGovernanceTimelock(deployer);
         escrow = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
         moduleManagement.registerEscrowContract(address(escrow));
 

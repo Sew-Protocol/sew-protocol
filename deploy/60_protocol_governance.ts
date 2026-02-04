@@ -42,7 +42,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const contractsToGovern = [
     'EscrowableERC20',
     'EscrowVault',
-    'EscrowAdminContract',
+    'EscrowGovernanceTimelock',
     'AaveYieldGenerationModule',
     'DefaultResolutionModule',
     // Ops contracts

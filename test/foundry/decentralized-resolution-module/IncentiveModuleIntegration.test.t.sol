@@ -15,7 +15,7 @@ import '../../../contracts/DisputeOps.sol';
 import '../../../contracts/CreateOps.sol';
 import '../../../contracts/SettlementOps.sol';
 import '../../../contracts/core/ModuleManagementContract.sol';
-import '../../../contracts/admin/EscrowAdminContract.sol';
+import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
 import '../../../contracts/core/BondCollector.sol';
 /**
  * @title IncentiveModuleIntegrationTest
@@ -35,7 +35,7 @@ contract IncentiveModuleIntegrationTest is Test {
     SettlementOps public settlementOps;
     BondCollector public bondCollector;
     ModuleManagementContract public moduleManagement;
-    EscrowAdminContract public adminContract;
+    EscrowGovernanceTimelock public adminContract;
 
     address public deployer;
     address public timelock;
@@ -80,7 +80,7 @@ contract IncentiveModuleIntegrationTest is Test {
         yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps(address(this));
         moduleManagement = new ModuleManagementContract(address(this));
-        adminContract = new EscrowAdminContract(address(this));
+        adminContract = new EscrowGovernanceTimelock(address(this));
         escrow = new EscrowVault(
             100,
             makeAddr('feeAddress'),
@@ -101,7 +101,7 @@ contract IncentiveModuleIntegrationTest is Test {
         bondCollector.registerEscrowContract(address(escrow));
 
         // Grant admin-contract role so this test can configure ops,
-        // and so EscrowAdminContract can activate modules without attempting to grant itself.
+        // and so EscrowGovernanceTimelock can activate modules without attempting to grant itself.
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(this));
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(adminContract));
         escrow.setCreateOps(address(createOps));
