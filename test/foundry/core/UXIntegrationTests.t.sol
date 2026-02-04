@@ -9,7 +9,7 @@ import "../../../contracts/CreateOps.sol";
 import "../../../contracts/YieldOps.sol";
 import "../../../contracts/DisputeOps.sol";
 import "../../../contracts/SettlementOps.sol";
-import "../../../contracts/core/ModuleManagementContract.sol";
+import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
 import "../../../contracts/core/modules/DefaultResolutionModule.sol";
@@ -23,7 +23,7 @@ contract UXIntegrationTests is Test {
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
     SettlementOps public settlementOps;
-    ModuleManagementContract public moduleManagement;
+    ModuleSnapshotRegistry public moduleManagement;
     ERC20Mock public token;
     DefaultResolutionModule public resolutionModule;
 
@@ -47,7 +47,7 @@ contract UXIntegrationTests is Test {
         yieldOps = new YieldOps(owner);
         disputeOps = new DisputeOps(owner);
         settlementOps = new SettlementOps(owner);
-        moduleManagement = new ModuleManagementContract(owner);
+        moduleManagement = new ModuleSnapshotRegistry(owner);
         
         vault = new EscrowVault(100, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
         vault.setCreateOps(address(createOps));

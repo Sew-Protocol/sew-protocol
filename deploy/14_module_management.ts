@@ -1,5 +1,5 @@
 /**
- * Deploy ModuleManagementContract
+ * Deploy ModuleSnapshotRegistry
  *
  * This contract centralizes module management for escrow contracts.
  * It handles queue/activate pattern for default modules with slow lane activation.
@@ -19,10 +19,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployer } = await getNamedAccounts();
   const chainConfig = getChainConfig(hre);
 
-  console.log(`\n📦 Deploying ModuleManagementContract...`);
+  console.log(`\n📦 Deploying ModuleSnapshotRegistry...`);
 
-  const moduleManagementDeployment = await deploy('ModuleManagementContract', {
-    contract: 'ModuleManagementContract',
+  const moduleManagementDeployment = await deploy('ModuleSnapshotRegistry', {
+    contract: 'ModuleSnapshotRegistry',
     from: deployer,
     args: [deployer], // initialAdmin
     log: true,
@@ -30,13 +30,13 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   if (moduleManagementDeployment.newlyDeployed) {
     const explorerUrl = getBlockExplorerUrl(hre, moduleManagementDeployment.address);
-    console.log(`   ✅ ModuleManagementContract deployed at: ${moduleManagementDeployment.address}`);
+    console.log(`   ✅ ModuleSnapshotRegistry deployed at: ${moduleManagementDeployment.address}`);
     if (explorerUrl) {
       console.log(`      📊 View on ${chainConfig.blockExplorer.name}: ${explorerUrl}`);
     }
 
     if (moduleManagementDeployment.receipt) {
-      await registerDeployment(hre, 'ModuleManagementContract', {
+      await registerDeployment(hre, 'ModuleSnapshotRegistry', {
         address: moduleManagementDeployment.address,
         txHash: moduleManagementDeployment.receipt.hash,
         blockNumber: moduleManagementDeployment.receipt.blockNumber,
@@ -45,7 +45,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       });
     }
   } else {
-    console.log(`   ✅ ModuleManagementContract already deployed at: ${moduleManagementDeployment.address}`);
+    console.log(`   ✅ ModuleSnapshotRegistry already deployed at: ${moduleManagementDeployment.address}`);
   }
 };
 

@@ -4,7 +4,7 @@ pragma solidity ^0.8.33;
 import "forge-std/Test.sol";
 
 import "../../../contracts/core/EscrowVault.sol";
-import "../../../contracts/core/ModuleManagementContract.sol";
+import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/core/modules/DefaultResolutionModule.sol";
 import "../../../contracts/modules/AaveYieldGenerationModule.sol";
 import "../../../contracts/modules/DefaultYieldDistributionModule.sol";
@@ -35,7 +35,7 @@ contract AavePauseSemantics is Test {
     AaveYieldGenerationModule internal aaveModule;
 
     EscrowVault internal vault;
-    ModuleManagementContract internal mm;
+    ModuleSnapshotRegistry internal mm;
     YieldOps internal yieldOps;
     DisputeOps internal disputeOps;
     CreateOps internal createOps;
@@ -75,7 +75,7 @@ contract AavePauseSemantics is Test {
         yieldOps = new YieldOps(address(this));
         aaveModule.grantRole(aaveModule.ROLE_YIELD_OPS(), address(yieldOps));
         disputeOps = new DisputeOps(address(this));
-        mm = new ModuleManagementContract(address(this));
+        mm = new ModuleSnapshotRegistry(address(this));
 
         vault = new EscrowVault(ESCROW_FEE_BPS, feeAddress, address(yieldOps), address(disputeOps), address(mm));
 

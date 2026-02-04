@@ -15,7 +15,7 @@ import {YieldOps} from "../../../contracts/YieldOps.sol";
 import {DisputeOps} from "../../../contracts/DisputeOps.sol";
 import {CreateOps} from "../../../contracts/CreateOps.sol";
 import {SettlementOps} from "../../../contracts/SettlementOps.sol";
-import {ModuleManagementContract} from "../../../contracts/core/ModuleManagementContract.sol";
+import {ModuleSnapshotRegistry} from "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import {GuardianOps} from "../../../contracts/ops/GuardianOps.sol";
 
 import {DefaultYieldDistributionModule} from "../../../contracts/modules/DefaultYieldDistributionModule.sol";
@@ -75,7 +75,7 @@ contract AaveForkTests is Test {
     DisputeOps public disputeOps;
     CreateOps public createOps;
     SettlementOps public settlementOps;
-    ModuleManagementContract public moduleManagement;
+    ModuleSnapshotRegistry public moduleManagement;
     
     address public user = address(0x1234);
     address public recipient = address(0x5678);
@@ -122,7 +122,7 @@ contract AaveForkTests is Test {
         disputeOps = new DisputeOps(address(this));
         createOps = new CreateOps(address(this));
         settlementOps = new SettlementOps(address(this));
-        moduleManagement = new ModuleManagementContract(address(this));
+        moduleManagement = new ModuleSnapshotRegistry(address(this));
         
         escrowVault = new EscrowVault(100, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
         

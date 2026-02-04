@@ -14,7 +14,7 @@ import 'contracts/DisputeOps.sol';
 import 'contracts/SettlementOps.sol';
 import 'contracts/CreateOps.sol';
 import 'contracts/core/BondCollector.sol';
-import 'contracts/core/ModuleManagementContract.sol';
+import 'contracts/core/ModuleSnapshotRegistry.sol';
 import 'contracts/admin/EscrowGovernanceTimelock.sol';
 import 'contracts/libraries/SettingsValidationLibrary.sol';
 import '../../mocks/RevertingReceiver.sol';
@@ -35,7 +35,7 @@ contract AutoTransferTest is Test {
     SettlementOps settlementOps;
     CreateOps createOps;
     BondCollector bondCollector;
-    ModuleManagementContract moduleManagement;
+    ModuleSnapshotRegistry moduleManagement;
     EscrowGovernanceTimelock adminContract;
 
     address sender = address(0x10);
@@ -56,7 +56,7 @@ contract AutoTransferTest is Test {
         settlementOps = new SettlementOps(address(this));
         createOps = new CreateOps(address(this));
         bondCollector = new BondCollector(address(this));
-        moduleManagement = new ModuleManagementContract(address(this));
+        moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));
         vault = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
         moduleManagement.registerEscrowContract(address(vault));

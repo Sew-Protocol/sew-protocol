@@ -9,7 +9,7 @@ import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/YieldOps.sol';
 import '../../../contracts/DisputeOps.sol';
 import '../../../contracts/core/modules/DefaultResolutionModule.sol';
-import '../../../contracts/core/ModuleManagementContract.sol';
+import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
 import '../../../contracts/CreateOps.sol';
 import '../../../contracts/SettlementOps.sol';
@@ -33,7 +33,7 @@ contract AaveAccountingUnit is Test {
     AaveYieldGenerationModule public aaveModule;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
-    ModuleManagementContract public mm;
+    ModuleSnapshotRegistry public mm;
     CreateOps public createOps;
     SettlementOps public settlementOps;
     BondCollector public bondCollector;
@@ -74,7 +74,7 @@ contract AaveAccountingUnit is Test {
         yieldOps = new YieldOps(address(this));
         aaveModule.grantRole(aaveModule.ROLE_YIELD_OPS(), address(yieldOps));
         disputeOps = new DisputeOps(address(this));
-        mm = new ModuleManagementContract(address(this));
+        mm = new ModuleSnapshotRegistry(address(this));
 
         vault = new EscrowVault(ESCROW_FEE_BPS, feeAddress, address(yieldOps), address(disputeOps), address(mm));
 

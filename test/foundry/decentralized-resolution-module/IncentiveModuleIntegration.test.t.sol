@@ -14,7 +14,7 @@ import '../../../contracts/YieldOps.sol';
 import '../../../contracts/DisputeOps.sol';
 import '../../../contracts/CreateOps.sol';
 import '../../../contracts/SettlementOps.sol';
-import '../../../contracts/core/ModuleManagementContract.sol';
+import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
 import '../../../contracts/core/BondCollector.sol';
 /**
@@ -34,7 +34,7 @@ contract IncentiveModuleIntegrationTest is Test {
     CreateOps public createOps;
     SettlementOps public settlementOps;
     BondCollector public bondCollector;
-    ModuleManagementContract public moduleManagement;
+    ModuleSnapshotRegistry public moduleManagement;
     EscrowGovernanceTimelock public adminContract;
 
     address public deployer;
@@ -79,7 +79,7 @@ contract IncentiveModuleIntegrationTest is Test {
         // Deploy escrow
         yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps(address(this));
-        moduleManagement = new ModuleManagementContract(address(this));
+        moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));
         escrow = new EscrowVault(
             100,

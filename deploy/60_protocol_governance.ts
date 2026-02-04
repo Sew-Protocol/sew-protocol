@@ -51,7 +51,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     'DisputeOps',
     'YieldOps', // Has ROLE_TIMELOCK and ROLE_GUARDIAN
     'BondCollector',
-    'ModuleManagementContract',
+    'ModuleSnapshotRegistry',
     // DecentralizedResolutionModule is in separate package
     // Add other AccessControl contracts as they are deployed
   ];

@@ -14,7 +14,7 @@ import { DisputeOps } from "../../../contracts/DisputeOps.sol";
 import { SettlementOps } from "../../../contracts/SettlementOps.sol";
 import { CreateOps } from "../../../contracts/CreateOps.sol";
 import { BondCollector } from "../../../contracts/core/BondCollector.sol";
-import { ModuleManagementContract } from "../../../contracts/core/ModuleManagementContract.sol";
+import { ModuleSnapshotRegistry } from "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import { EscrowGovernanceTimelock } from "../../../contracts/admin/EscrowGovernanceTimelock.sol";
 import { SettingsValidationLibrary } from "../../../contracts/libraries/SettingsValidationLibrary.sol";
 
@@ -32,7 +32,7 @@ contract EscrowStateMachineTest is Test {
     SettlementOps internal settlementOps;
     CreateOps internal createOps;
     BondCollector internal bondCollector;
-    ModuleManagementContract internal moduleManagement;
+    ModuleSnapshotRegistry internal moduleManagement;
     EscrowGovernanceTimelock internal adminContract;
 
     address internal sender = address(0x10);
@@ -49,7 +49,7 @@ contract EscrowStateMachineTest is Test {
         settlementOps = new SettlementOps(address(this));
         createOps = new CreateOps(address(this));
         bondCollector = new BondCollector(address(this));
-        moduleManagement = new ModuleManagementContract(address(this));
+        moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));
 
         vault = new EscrowVault(ESCROW_FEE_BPS, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));

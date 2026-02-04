@@ -8,7 +8,7 @@ import '../interfaces/IReleaseStrategy.sol';
 import '../shared/interfaces/IResolutionModule.sol';
 import '../interfaces/IYieldGenerationModule.sol';
 import '../interfaces/IYieldDistributionModule.sol';
-import './ModuleManagementContract.sol';
+import './ModuleSnapshotRegistry.sol';
 import '../libraries/ModuleGetterLibrary.sol';
 import '../libraries/ModuleGetterConsolidationLibrary.sol';
 
@@ -29,7 +29,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
     uint256 public totalFees = 0;
     
     // Module management contract (stores module state externally to reduce contract size)
-    ModuleManagementContract public immutable moduleManagement;
+    ModuleSnapshotRegistry public immutable moduleManagement;
 
     event FeesWithdrawn(uint256 amount);
 
@@ -59,7 +59,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         escrowFeeAddress = feeAddress;
         yieldOps = YieldOps(yieldOpsAddress);
         disputeOps = DisputeOps(disputeOpsAddress);
-        moduleManagement = ModuleManagementContract(moduleManagementAddress);
+        moduleManagement = ModuleSnapshotRegistry(moduleManagementAddress);
         
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _grantRole(ROLE_TIMELOCK, _msgSender());

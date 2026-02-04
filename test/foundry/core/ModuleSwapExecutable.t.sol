@@ -4,12 +4,12 @@ pragma solidity ^0.8.33;
 import "forge-std/Test.sol";
 
 import "../../../contracts/core/EscrowVault.sol";
-import "../../../contracts/core/ModuleManagementContract.sol";
+import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/modules/DefaultReleaseStrategy.sol";
 
 contract ModuleSwapExecutableTest is Test {
     EscrowVault public vault;
-    ModuleManagementContract public moduleManagement;
+    ModuleSnapshotRegistry public moduleManagement;
     DefaultReleaseStrategy public releaseV1;
     DefaultReleaseStrategy public releaseV2;
 
@@ -19,7 +19,7 @@ contract ModuleSwapExecutableTest is Test {
     function setUp() public {
         owner = address(this);
 
-        moduleManagement = new ModuleManagementContract(owner);
+        moduleManagement = new ModuleSnapshotRegistry(owner);
 
         // release strategies (distinct addresses; both implement IReleaseStrategy)
         releaseV1 = new DefaultReleaseStrategy();
@@ -35,7 +35,7 @@ contract ModuleSwapExecutableTest is Test {
             address(moduleManagement)
         );
 
-        // Allow the escrow to call ModuleManagementContract (ROLE_ESCROW_CONTRACT).
+        // Allow the escrow to call ModuleSnapshotRegistry (ROLE_ESCROW_CONTRACT).
         moduleManagement.registerEscrowContract(address(vault));
 
         // Ensure our test has timelock role on the escrow (constructor grants it to deployer).

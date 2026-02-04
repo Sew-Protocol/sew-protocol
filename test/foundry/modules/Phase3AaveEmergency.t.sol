@@ -9,7 +9,7 @@ import 'contracts/mocks/ERC20Mock.sol';
 import 'contracts/mocks/MockAavePool.sol';
 import 'contracts/YieldOps.sol';
 import 'contracts/DisputeOps.sol';
-import 'contracts/core/ModuleManagementContract.sol';
+import 'contracts/core/ModuleSnapshotRegistry.sol';
 import 'contracts/CreateOps.sol';
 import 'contracts/types/EscrowTypes.sol';
 import 'contracts/types/YieldPresets.sol';
@@ -31,7 +31,7 @@ contract Phase3AaveEmergencyTest is Test {
     
     YieldOps yieldOps;
     DisputeOps disputeOps;
-    ModuleManagementContract mm;
+    ModuleSnapshotRegistry mm;
     CreateOps createOps;
     
     address timelock = address(0x1);
@@ -67,7 +67,7 @@ contract Phase3AaveEmergencyTest is Test {
         // Setup Core Contracts
         yieldOps = new YieldOps(timelock);
         disputeOps = new DisputeOps(timelock);
-        mm = new ModuleManagementContract(timelock);
+        mm = new ModuleSnapshotRegistry(timelock);
         createOps = new CreateOps(timelock);
         
         // Setup Vault

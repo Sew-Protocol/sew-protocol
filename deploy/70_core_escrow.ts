@@ -33,7 +33,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const settlementOpsDeployment = await get('SettlementOps');
   const createOpsDeployment = await get('CreateOps');
   const bondCollectorDeployment = await get('BondCollector');
-  const moduleManagementDeployment = await get('ModuleManagementContract');
+  const moduleManagementDeployment = await get('ModuleSnapshotRegistry');
   const escrowAdminDeployment = await get('EscrowGovernanceTimelock');
 
   // Get fee configuration from environment or use defaults

@@ -5,7 +5,7 @@ pragma solidity ^0.8.33;
 import 'forge-std/Test.sol';
 import 'contracts/YieldOps.sol';
 import 'contracts/DisputeOps.sol';
-import 'contracts/core/ModuleManagementContract.sol';
+import 'contracts/core/ModuleSnapshotRegistry.sol';
 import 'contracts/core/EscrowableERC20.sol';
 import 'contracts/core/EscrowVault.sol';
 import 'contracts/admin/EscrowGovernanceTimelock.sol';
@@ -15,7 +15,7 @@ contract Test_01_AccessControl_test is Test {
     EscrowableERC20 escrowable;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
-    ModuleManagementContract public moduleManagement;
+    ModuleSnapshotRegistry public moduleManagement;
     EscrowVault escrowVault;
     EscrowGovernanceTimelock public adminContract;
     address timelock = address(0x1);
@@ -26,7 +26,7 @@ contract Test_01_AccessControl_test is Test {
     function setUp() public {
         yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps(address(this));
-        moduleManagement = new ModuleManagementContract(address(this));
+        moduleManagement = new ModuleSnapshotRegistry(address(this));
         escrowable = new EscrowableERC20(
             'Test Token',
             'TEST',

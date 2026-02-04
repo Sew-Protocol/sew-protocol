@@ -25,7 +25,7 @@ async function main() {
 
   const escrowVaultAddr = (await deployments.get('EscrowVault')).address;
   const escrowAdminAddr = (await deployments.get('EscrowGovernanceTimelock')).address;
-  const mmAddr = (await deployments.get('ModuleManagementContract')).address;
+  const mmAddr = (await deployments.get('ModuleSnapshotRegistry')).address;
 
   console.log(`\n🔐 Deploy key permissions (Base Sepolia)`);
   console.log(`- chainId: ${net.chainId.toString()}`);
@@ -34,7 +34,7 @@ async function main() {
   console.log(`  - ${basescanAddressLink(escrowVaultAddr)}`);
   console.log(`- EscrowGovernanceTimelock: ${escrowAdminAddr}`);
   console.log(`  - ${basescanAddressLink(escrowAdminAddr)}`);
-  console.log(`- ModuleManagementContract: ${mmAddr}`);
+  console.log(`- ModuleSnapshotRegistry: ${mmAddr}`);
   console.log(`  - ${basescanAddressLink(mmAddr)}`);
 
   async function inspectAccessControl(label: string, addr: string, extraRoles?: { name: string; value: string }[]) {
@@ -86,10 +86,10 @@ async function main() {
     { name: 'ROLE_TIMELOCK', value: ADMIN_ROLE_TIMELOCK },
   ]);
 
-  // ModuleManagementContract: ROLE_TIMELOCK gates registerEscrowContract in that contract
+  // ModuleSnapshotRegistry: ROLE_TIMELOCK gates registerEscrowContract in that contract
   const mm = await hre.ethers.getContractAt(['function ROLE_TIMELOCK() view returns (bytes32)'], mmAddr);
   const MM_ROLE_TIMELOCK = await mm.ROLE_TIMELOCK();
-  await inspectAccessControl('ModuleManagementContract roles', mmAddr, [{ name: 'ROLE_TIMELOCK', value: MM_ROLE_TIMELOCK }]);
+  await inspectAccessControl('ModuleSnapshotRegistry roles', mmAddr, [{ name: 'ROLE_TIMELOCK', value: MM_ROLE_TIMELOCK }]);
 
   console.log(`\nInterpretation`);
   console.log(

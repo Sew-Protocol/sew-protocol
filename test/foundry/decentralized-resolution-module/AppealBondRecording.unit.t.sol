@@ -11,7 +11,7 @@ import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/YieldOps.sol';
 import '../../../contracts/DisputeOps.sol';
 
-import '../../../contracts/core/ModuleManagementContract.sol';
+import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 /**
  * @title AppealBondRecordingTest
  * @notice Unit tests for recordAppealBond functionality
@@ -24,7 +24,7 @@ contract AppealBondRecordingTest is Test {
     ERC20Mock public token;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
-    ModuleManagementContract public moduleManagement;
+    ModuleSnapshotRegistry public moduleManagement;
 
     address public deployer;
     address public depositor;
@@ -48,7 +48,7 @@ contract AppealBondRecordingTest is Test {
         incentiveModule.registerEscrowContract(address(this));
         yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps(address(this));
-        moduleManagement = new ModuleManagementContract(address(this));
+        moduleManagement = new ModuleSnapshotRegistry(address(this));
         escrow = new EscrowVault(100, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
 
         // Setup tokens

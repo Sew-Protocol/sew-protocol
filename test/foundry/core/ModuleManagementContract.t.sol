@@ -2,7 +2,7 @@
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/core/ModuleManagementContract.sol';
+import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/core/BaseEscrow.sol';
 import '../../../contracts/modules/DefaultReleaseStrategy.sol';
 import '../../../contracts/modules/DefaultYieldModule.sol';
@@ -11,9 +11,9 @@ import '../../../contracts/core/modules/DefaultResolutionModule.sol';
 import '../../../contracts/governance/SlowLaneQueueActivate.sol';
 
 /**
- * @title ModuleManagementContractTest
- * @notice Comprehensive tests for ModuleManagementContract covering all functions and code paths
- * @dev Goal: 99% coverage for ModuleManagementContract.sol
+ * @title ModuleSnapshotRegistryTest
+ * @notice Comprehensive tests for ModuleSnapshotRegistry covering all functions and code paths
+ * @dev Goal: 99% coverage for ModuleSnapshotRegistry.sol
  * 
  * Following strategy from 99_PERCENT_TEST_COVERAGE_STRATEGY.md:
  * - All queue/activate functions for each module type
@@ -22,8 +22,8 @@ import '../../../contracts/governance/SlowLaneQueueActivate.sol';
  * - Getter functions
  * - Edge cases (zero addresses, no pending, premature activation)
  */
-contract ModuleManagementContractTest is Test {
-    ModuleManagementContract public moduleManagement;
+contract ModuleSnapshotRegistryTest is Test {
+    ModuleSnapshotRegistry public moduleManagement;
     MockEscrowContract public escrowContract;
     
     DefaultReleaseStrategy public releaseStrategy1;
@@ -44,7 +44,7 @@ contract ModuleManagementContractTest is Test {
         timelock = address(0x1111);
         unauthorized = address(0x9999);
         
-        moduleManagement = new ModuleManagementContract(owner);
+        moduleManagement = new ModuleSnapshotRegistry(owner);
         escrowContract = new MockEscrowContract();
         
         releaseStrategy1 = new DefaultReleaseStrategy();
@@ -70,14 +70,14 @@ contract ModuleManagementContractTest is Test {
     // ============ Constructor Tests ============
     
     function test_constructor_setsOwner() public {
-        ModuleManagementContract newContract = new ModuleManagementContract(owner);
+        ModuleSnapshotRegistry newContract = new ModuleSnapshotRegistry(owner);
         assertTrue(newContract.hasRole(newContract.DEFAULT_ADMIN_ROLE(), owner));
         assertTrue(newContract.hasRole(newContract.ROLE_TIMELOCK(), owner));
     }
     
     function test_constructor_zeroOwner_reverts() public {
         vm.expectRevert(SlowLaneQueueActivate.InvalidValue.selector);
-        new ModuleManagementContract(address(0));
+        new ModuleSnapshotRegistry(address(0));
     }
     
     // ============ registerEscrowContract Tests ============
@@ -194,7 +194,7 @@ contract ModuleManagementContractTest is Test {
     
     function test_queueModule_differentEscrowContract_reverts() public {
         vm.prank(timelock);
-        vm.expectRevert(abi.encodeWithSelector(ModuleManagementContract.EscrowNotRegistered.selector, address(0x4444)));
+        vm.expectRevert(abi.encodeWithSelector(ModuleSnapshotRegistry.EscrowNotRegistered.selector, address(0x4444)));
         moduleManagement.queueModule(
             address(0x4444), // Different escrow
             BaseEscrow.ModuleType.RELEASE,
@@ -631,7 +631,7 @@ contract ModuleManagementContractTest is Test {
     
     function test_queueModule_emitsEvent_RELEASE() public {
         vm.expectEmit(true, true, true, true);
-        emit ModuleManagementContract.DefaultReleaseStrategyQueued(
+        emit ModuleSnapshotRegistry.DefaultReleaseStrategyQueued(
             address(escrowContract),
             address(0),
             address(releaseStrategy1),
@@ -657,7 +657,7 @@ contract ModuleManagementContractTest is Test {
         vm.warp(block.timestamp + 7 days + 1);
         
         vm.expectEmit(true, true, true, true);
-        emit ModuleManagementContract.DefaultReleaseStrategyActivated(
+        emit ModuleSnapshotRegistry.DefaultReleaseStrategyActivated(
             address(escrowContract),
             address(0),
             address(releaseStrategy1)

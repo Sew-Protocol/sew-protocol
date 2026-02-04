@@ -4,7 +4,7 @@ pragma solidity ^0.8.33;
 import "forge-std/Test.sol";
 import "../../../contracts/core/EscrowVault.sol";
 import "../../../contracts/core/BaseEscrow.sol";
-import "../../../contracts/core/ModuleManagementContract.sol";
+import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/modules/DefaultReleaseStrategy.sol";
 import "../../../contracts/modules/DefaultYieldModule.sol";
 import "../../../contracts/modules/DefaultYieldDistributionModule.sol";
@@ -43,7 +43,7 @@ contract PerEscrowSettingsHarness is EscrowVault {
 
 contract PerEscrowSettingsTest is Test {
     PerEscrowSettingsHarness public vault;
-    ModuleManagementContract public moduleManagement;
+    ModuleSnapshotRegistry public moduleManagement;
     ERC20Mock public token;
     
     DefaultReleaseStrategy public releaseV1;
@@ -66,7 +66,7 @@ contract PerEscrowSettingsTest is Test {
         resolver = address(0xD);
 
         token = new ERC20Mock("Test", "TEST", buyer, 1000e18);
-        moduleManagement = new ModuleManagementContract(owner);
+        moduleManagement = new ModuleSnapshotRegistry(owner);
         
         releaseV1 = new DefaultReleaseStrategy();
         releaseV2 = new DefaultReleaseStrategy();

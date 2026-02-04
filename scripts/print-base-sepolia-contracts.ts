@@ -69,7 +69,7 @@ async function main() {
     CreateOps: 'Create ops router (escrow creation orchestration)',
     BondCollector: 'Bond/fee collector helper (as configured)',
 
-    ModuleManagementContract: 'Slow-lane module default management',
+    ModuleSnapshotRegistry: 'Slow-lane module default management',
     EscrowGovernanceTimelock: 'Slow-lane admin helper (holds minimal admin role)',
 
     EscrowVault: 'Core escrow contract (multi-token)',
@@ -100,7 +100,7 @@ async function main() {
     },
     {
       title: 'Admin & module management',
-      names: ['EscrowGovernanceTimelock', 'ModuleManagementContract'],
+      names: ['EscrowGovernanceTimelock', 'ModuleSnapshotRegistry'],
     },
     {
       title: 'IEO modules (optional)',

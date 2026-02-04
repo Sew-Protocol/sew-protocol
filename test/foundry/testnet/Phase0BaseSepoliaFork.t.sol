@@ -88,7 +88,7 @@ contract Phase0BaseSepoliaForkTest is Test {
         settlementOps = _dep("SettlementOps");
         createOps = _dep("CreateOps");
         bondCollector = _dep("BondCollector");
-        moduleManagement = _dep("ModuleManagementContract");
+        moduleManagement = _dep("ModuleSnapshotRegistry");
         escrowAdmin = _dep("EscrowGovernanceTimelock");
         escrowVault = _dep("EscrowVault");
     }
@@ -107,7 +107,7 @@ contract Phase0BaseSepoliaForkTest is Test {
         _requireCode("SettlementOps", settlementOps);
         _requireCode("CreateOps", createOps);
         _requireCode("BondCollector", bondCollector);
-        _requireCode("ModuleManagementContract", moduleManagement);
+        _requireCode("ModuleSnapshotRegistry", moduleManagement);
         _requireCode("EscrowGovernanceTimelock", escrowAdmin);
         _requireCode("EscrowVault", escrowVault);
 

@@ -10,7 +10,7 @@ import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/governance/SlowLaneQueueActivate.sol';
 import '../../../contracts/YieldOps.sol';
 import '../../../contracts/DisputeOps.sol';
-import '../../../contracts/core/ModuleManagementContract.sol';
+import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 
 /**
  * @title EscrowGovernanceTimelockTest
@@ -33,7 +33,7 @@ contract EscrowGovernanceTimelockTest is Test {
     
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
-    ModuleManagementContract public moduleManagement;
+    ModuleSnapshotRegistry public moduleManagement;
     
     address public owner;
     address public timelock;
@@ -52,7 +52,7 @@ contract EscrowGovernanceTimelockTest is Test {
         
         yieldOps = new YieldOps(owner);
         disputeOps = new DisputeOps(owner);
-        moduleManagement = new ModuleManagementContract(owner);
+        moduleManagement = new ModuleSnapshotRegistry(owner);
         
         vault = new EscrowVault(ESCROW_FEE, feeAddress1, address(yieldOps), address(disputeOps), address(moduleManagement));
         

@@ -13,7 +13,7 @@ import '../../../contracts/DisputeOps.sol';
 import '../../../contracts/SettlementOps.sol';
 import '../../../contracts/CreateOps.sol';
 import '../../../contracts/core/BondCollector.sol';
-import '../../../contracts/core/ModuleManagementContract.sol';
+import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
 
@@ -31,7 +31,7 @@ contract EscrowEdgeCasesTest is Test {
     SettlementOps public settlementOps;
     CreateOps public createOps;
     BondCollector public bondCollector;
-    ModuleManagementContract public moduleManagement;
+    ModuleSnapshotRegistry public moduleManagement;
     EscrowGovernanceTimelock public adminContract;
 
     address public owner;
@@ -61,7 +61,7 @@ contract EscrowEdgeCasesTest is Test {
         settlementOps = new SettlementOps(address(this));
         createOps = new CreateOps(address(this));
         bondCollector = new BondCollector(address(this));
-        moduleManagement = new ModuleManagementContract(address(this));
+        moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));
         vault = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
         moduleManagement.registerEscrowContract(address(vault));

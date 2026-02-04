@@ -8,7 +8,7 @@ import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/YieldOps.sol';
 import '../../../contracts/DisputeOps.sol';
-import '../../../contracts/core/ModuleManagementContract.sol';
+import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 
@@ -24,7 +24,7 @@ contract EscalationDepthHistogramInvariantsTest is Test {
     EscrowVault public escrow;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
-    ModuleManagementContract public moduleManagement;
+    ModuleSnapshotRegistry public moduleManagement;
     EscrowGovernanceTimelock public adminContract;
 
     address public deployer;
@@ -50,7 +50,7 @@ contract EscalationDepthHistogramInvariantsTest is Test {
         token = new ERC20Mock('Test Token', 'TEST', address(this), 0);
         yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps(address(this));
-        moduleManagement = new ModuleManagementContract(address(this));
+        moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));
         escrow = new EscrowVault(100, makeAddr('feeAddress'), address(yieldOps), address(disputeOps), address(moduleManagement));
 

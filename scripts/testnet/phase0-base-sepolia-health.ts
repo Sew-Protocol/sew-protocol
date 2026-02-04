@@ -118,7 +118,7 @@ async function run() {
     'SettlementOps',
     'CreateOps',
     'BondCollector',
-    'ModuleManagementContract',
+    'ModuleSnapshotRegistry',
     'EscrowGovernanceTimelock',
     'EscrowVault',
   ] as const;
@@ -147,7 +147,7 @@ async function run() {
     ['EscrowVault.createOps', () => escrowVault.createOps(), d.CreateOps.address],
     ['EscrowVault.settlementOps', () => escrowVault.settlementOps(), d.SettlementOps.address],
     ['EscrowVault.bondCollector', () => escrowVault.bondCollector(), d.BondCollector.address],
-    ['EscrowVault.moduleManagement', () => escrowVault.moduleManagement(), d.ModuleManagementContract.address],
+    ['EscrowVault.moduleManagement', () => escrowVault.moduleManagement(), d.ModuleSnapshotRegistry.address],
   ];
 
   for (const [label, getter, expected] of wiringPairs) {

@@ -5,7 +5,7 @@ pragma solidity ^0.8.33;
 import 'forge-std/Test.sol';
 import 'contracts/YieldOps.sol';
 import 'contracts/DisputeOps.sol';
-import 'contracts/core/ModuleManagementContract.sol';
+import 'contracts/core/ModuleSnapshotRegistry.sol';
 import 'contracts/token/SewToken.sol';
 import 'contracts/core/EscrowableERC20.sol';
 import 'contracts/core/EscrowVault.sol';
@@ -17,7 +17,7 @@ contract Test_MainnetReleaseSequence_test is Test {
     SewToken public governanceToken;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
-    ModuleManagementContract public moduleManagement;
+    ModuleSnapshotRegistry public moduleManagement;
     EscrowableERC20 public escrowable;
     EscrowVault public vault;
     DefaultReleaseStrategy public relStrat;
@@ -34,7 +34,7 @@ contract Test_MainnetReleaseSequence_test is Test {
     function setUp() public {
         yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps(address(this));
-        moduleManagement = new ModuleManagementContract(address(this));
+        moduleManagement = new ModuleSnapshotRegistry(address(this));
         // Deploy governance token
         governanceToken = new SewToken('Sew Token', 'SEW', deployer, INITIAL_TOKEN_SUPPLY);
 

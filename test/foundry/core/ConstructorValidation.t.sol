@@ -5,7 +5,7 @@ import 'forge-std/Test.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/core/EscrowableERC20.sol';
 import '../../../contracts/core/BaseEscrow.sol';
-import '../../../contracts/core/ModuleManagementContract.sol';
+import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/YieldOps.sol';
 import '../../../contracts/DisputeOps.sol';
 
@@ -18,7 +18,7 @@ contract ConstructorValidation is Test {
     address public feeAddress;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
-    ModuleManagementContract public moduleManagement;
+    ModuleSnapshotRegistry public moduleManagement;
 
     uint256 public constant MAX_ESCROW_FEE_BPS = 200; // 2% maximum
     uint256 public constant MAX_PROTOCOL_FEE_BPS = 3000; // 30% maximum
@@ -28,7 +28,7 @@ contract ConstructorValidation is Test {
         feeAddress = address(0xFEE);
         yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps(address(this));
-        moduleManagement = new ModuleManagementContract(address(this));
+        moduleManagement = new ModuleSnapshotRegistry(address(this));
     }
 
     // ============ EscrowVault Constructor Tests ============

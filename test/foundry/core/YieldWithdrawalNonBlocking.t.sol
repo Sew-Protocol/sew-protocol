@@ -4,7 +4,7 @@ pragma solidity ^0.8.33;
 import "forge-std/Test.sol";
 
 import "contracts/core/EscrowVault.sol";
-import "contracts/core/ModuleManagementContract.sol";
+import "contracts/core/ModuleSnapshotRegistry.sol";
 import "contracts/admin/EscrowGovernanceTimelock.sol";
 import "contracts/core/modules/DefaultResolutionModule.sol";
 import "contracts/DisputeOps.sol";
@@ -43,7 +43,7 @@ contract BadYieldOps {
 
 contract YieldWithdrawalNonBlockingTest is Test {
     EscrowVault vault;
-    ModuleManagementContract moduleManagement;
+    ModuleSnapshotRegistry moduleManagement;
     EscrowGovernanceTimelock adminContract;
     DefaultResolutionModule rm;
     DisputeOps disputeOps;
@@ -66,7 +66,7 @@ contract YieldWithdrawalNonBlockingTest is Test {
         settlementOps = new SettlementOps(address(this));
         createOps = new CreateOps(address(this));
         bondCollector = new BondCollector(address(this));
-        moduleManagement = new ModuleManagementContract(address(this));
+        moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));
 
         badYieldOps = new BadYieldOps();

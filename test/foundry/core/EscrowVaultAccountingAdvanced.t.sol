@@ -7,7 +7,7 @@ import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/YieldOps.sol';
 import '../../../contracts/DisputeOps.sol';
 import '../../../contracts/core/modules/DefaultResolutionModule.sol';
-import '../../../contracts/core/ModuleManagementContract.sol';
+import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
 import '../../../contracts/CreateOps.sol';
 import '../../../contracts/SettlementOps.sol';
@@ -17,7 +17,7 @@ contract EscrowVaultAccountingAdvancedTest is Test {
     EscrowVault public vault;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
-    ModuleManagementContract public mm;
+    ModuleSnapshotRegistry public mm;
     CreateOps public createOps;
     SettlementOps public settlementOps;
     BondCollector public bondCollector;
@@ -38,7 +38,7 @@ contract EscrowVaultAccountingAdvancedTest is Test {
 
         yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps(address(this));
-        mm = new ModuleManagementContract(address(this));
+        mm = new ModuleSnapshotRegistry(address(this));
         createOps = new CreateOps(address(this));
         settlementOps = new SettlementOps(address(this));
         bondCollector = new BondCollector(address(this));

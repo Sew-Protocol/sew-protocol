@@ -4,7 +4,7 @@ pragma solidity ^0.8.33;
 import 'forge-std/Test.sol';
 import 'contracts/YieldOps.sol';
 import 'contracts/DisputeOps.sol';
-import 'contracts/core/ModuleManagementContract.sol';
+import 'contracts/core/ModuleSnapshotRegistry.sol';
 import 'contracts/core/EscrowVault.sol';
 import 'contracts/mocks/ERC20Mock.sol';
 import 'contracts/core/modules/DefaultResolutionModule.sol';
@@ -20,7 +20,7 @@ contract Test_05_ModuleSnapshotting_test is Test {
     EscrowGovernanceTimelock adminContract;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
-    ModuleManagementContract public moduleManagement;
+    ModuleSnapshotRegistry public moduleManagement;
     CreateOps public createOps;
     SettlementOps public settlementOps;
     BondCollector public bondCollector;
@@ -30,7 +30,7 @@ contract Test_05_ModuleSnapshotting_test is Test {
     function setUp() public {
         yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps(address(this));
-        moduleManagement = new ModuleManagementContract(address(this));
+        moduleManagement = new ModuleSnapshotRegistry(address(this));
         vault = new EscrowVault(100, address(this), address(yieldOps), address(disputeOps), address(moduleManagement));
         adminContract = new EscrowGovernanceTimelock(address(this));
         vault.grantRole(vault.ROLE_TIMELOCK(), timelock);

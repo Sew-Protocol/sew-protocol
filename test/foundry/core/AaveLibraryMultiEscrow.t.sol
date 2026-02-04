@@ -5,7 +5,7 @@ import "../../../lib/forge-std/src/Test.sol";
 
 import {EscrowVault} from "../../../contracts/core/EscrowVault.sol";
 import {BaseEscrow} from "../../../contracts/core/BaseEscrow.sol";
-import {ModuleManagementContract} from "../../../contracts/core/ModuleManagementContract.sol";
+import {ModuleSnapshotRegistry} from "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import {DefaultResolutionModule} from "../../../contracts/core/modules/DefaultResolutionModule.sol";
 import {DefaultYieldDistributionModule} from "../../../contracts/modules/DefaultYieldDistributionModule.sol";
 import {YieldOps} from "../../../contracts/YieldOps.sol";
@@ -167,7 +167,7 @@ contract AaveLibraryMultiEscrowTest is Test {
     uint256 internal constant RAY = 1e27;
 
     EscrowVault internal vault;
-    ModuleManagementContract internal mm;
+    ModuleSnapshotRegistry internal mm;
     YieldOps internal yieldOps;
     DisputeOps internal disputeOps;
     CreateOps internal createOps;
@@ -204,7 +204,7 @@ contract AaveLibraryMultiEscrowTest is Test {
         createOps = new CreateOps(address(this));
         settlementOps = new SettlementOps(address(this));
         bondCollector = new BondCollector(address(this));
-        mm = new ModuleManagementContract(address(this));
+        mm = new ModuleSnapshotRegistry(address(this));
         yieldDist = new DefaultYieldDistributionModule();
 
         vault = new EscrowVault(100, feeAddress, address(yieldOps), address(disputeOps), address(mm));

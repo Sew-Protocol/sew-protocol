@@ -8,7 +8,7 @@ import 'contracts/YieldOps.sol';
 import 'contracts/DisputeOps.sol';
 import 'contracts/SettlementOps.sol';
 import 'contracts/CreateOps.sol';
-import 'contracts/core/ModuleManagementContract.sol';
+import 'contracts/core/ModuleSnapshotRegistry.sol';
 import 'contracts/types/EscrowTypes.sol';
 import 'contracts/types/YieldPresets.sol';
 import 'contracts/libraries/SettingsValidationLibrary.sol';
@@ -29,7 +29,7 @@ contract Phase1RefactorRiskTests is Test {
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
     SettlementOps public settlementOps;
-    ModuleManagementContract public moduleManagement;
+    ModuleSnapshotRegistry public moduleManagement;
     
     DefaultResolutionModule public resolutionModule;
     DefaultReleaseStrategy public releaseStrategy;
@@ -57,7 +57,7 @@ contract Phase1RefactorRiskTests is Test {
         yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps(address(this));
         settlementOps = new SettlementOps(address(this));
-        moduleManagement = new ModuleManagementContract(address(this));
+        moduleManagement = new ModuleSnapshotRegistry(address(this));
         
         // Deploy vault
         vault = new EscrowVault(

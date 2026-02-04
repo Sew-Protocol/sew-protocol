@@ -10,12 +10,12 @@ import '../shared/interfaces/IResolutionModule.sol';
 import './BaseEscrow.sol';
 
 /**
- * @title ModuleManagementContract
- * @notice Centralized module management for escrow contracts
+ * @title ModuleSnapshotRegistry
+ * @notice Registry for module snapshots frozen at escrow creation time.
  * @dev Extracted from EscrowVault/EscrowableERC20 to reduce contract size.
  *      Handles queue/activate pattern for default modules with slow lane activation.
  */
-contract ModuleManagementContract is AccessControl, SlowLaneQueueActivate {
+contract ModuleSnapshotRegistry is AccessControl, SlowLaneQueueActivate {
     bytes32 public constant ROLE_ESCROW_CONTRACT = keccak256('ROLE_ESCROW_CONTRACT');
     bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');
 
@@ -81,7 +81,7 @@ contract ModuleManagementContract is AccessControl, SlowLaneQueueActivate {
     error EscrowNotRegistered(address escrowContract);
 
     /**
-     * @notice Deploy the ModuleManagementContract.
+     * @notice Deploy the ModuleSnapshotRegistry.
      * @param initialAdmin Initial admin for bootstrap (expected to be replaced/managed by governance wiring).
      * @dev Grants `DEFAULT_ADMIN_ROLE` and `ROLE_TIMELOCK` to `initialAdmin` for initial setup.
      *      In production, `ROLE_TIMELOCK` should be held by the TimelockController.

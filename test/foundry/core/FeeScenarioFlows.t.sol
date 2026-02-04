@@ -14,7 +14,7 @@ import "../../../contracts/DisputeOps.sol";
 import "../../../contracts/SettlementOps.sol";
 import "../../../contracts/CreateOps.sol";
 import "../../../contracts/core/BondCollector.sol";
-import "../../../contracts/core/ModuleManagementContract.sol";
+import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/admin/EscrowGovernanceTimelock.sol";
 
 import "../../../contracts/shared/interfaces/IIncentiveModule.sol";
@@ -92,7 +92,7 @@ contract FeeScenarioFlowsTest is Test {
     SettlementOps public settlementOps;
     CreateOps public createOps;
     BondCollector public bondCollector;
-    ModuleManagementContract public moduleManagement;
+    ModuleSnapshotRegistry public moduleManagement;
     EscrowGovernanceTimelock public adminContract;
 
     address public owner;
@@ -125,7 +125,7 @@ contract FeeScenarioFlowsTest is Test {
         settlementOps = new SettlementOps(owner);
         createOps = new CreateOps(owner);
         bondCollector = new BondCollector(owner);
-        moduleManagement = new ModuleManagementContract(owner);
+        moduleManagement = new ModuleSnapshotRegistry(owner);
         adminContract = new EscrowGovernanceTimelock(owner);
 
         // Vault starts with 0% fee; we'll slow-lane set to 1% in tests.
