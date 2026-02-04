@@ -8,8 +8,8 @@ import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/core/modules/DefaultResolutionModule.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/governance/SlowLaneQueueActivate.sol';
-import '../../../contracts/YieldOps.sol';
-import '../../../contracts/DisputeOps.sol';
+import '../../../contracts/ops/YieldOps.sol';
+import '../../../contracts/ops/DisputeOps.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 
 /**

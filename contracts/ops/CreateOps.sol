@@ -2,13 +2,13 @@
 pragma solidity ^0.8.33;
 
 import '@openzeppelin/contracts/access/AccessControl.sol';
-import './types/EscrowTypes.sol';
-import './types/YieldPresets.sol';
-import './libraries/SettingsValidationLibrary.sol';
-import './libraries/YieldPresetLibrary.sol';
-import './libraries/EscrowEncodingLibrary.sol';
-import './shared/interfaces/IResolutionModule.sol';
-import './interfaces/IYieldGenerationModule.sol';
+import '../types/EscrowTypes.sol';
+import '../types/YieldPresets.sol';
+import '../libraries/SettingsValidationLibrary.sol';
+import '../libraries/YieldPresetLibrary.sol';
+import '../libraries/EscrowEncodingLibrary.sol';
+import '../shared/interfaces/IResolutionModule.sol';
+import '../interfaces/IYieldGenerationModule.sol';
 
 /**
  * @title CreateOps

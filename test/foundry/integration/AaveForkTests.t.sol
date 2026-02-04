@@ -11,10 +11,10 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ERC20Mock} from "../../../contracts/mocks/ERC20Mock.sol";
 import {EscrowSettings, YieldPreset} from "../../../contracts/types/EscrowTypes.sol";
-import {YieldOps} from "../../../contracts/YieldOps.sol";
-import {DisputeOps} from "../../../contracts/DisputeOps.sol";
-import {CreateOps} from "../../../contracts/CreateOps.sol";
-import {SettlementOps} from "../../../contracts/SettlementOps.sol";
+import {YieldOps} from "../../../contracts/ops/YieldOps.sol";
+import {DisputeOps} from "../../../contracts/ops/DisputeOps.sol";
+import {CreateOps} from "../../../contracts/ops/CreateOps.sol";
+import {SettlementOps} from "../../../contracts/ops/SettlementOps.sol";
 import {ModuleSnapshotRegistry} from "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import {GuardianOps} from "../../../contracts/ops/GuardianOps.sol";
 

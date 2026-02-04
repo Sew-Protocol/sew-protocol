@@ -3,8 +3,8 @@ import "../../../contracts/types/YieldPresets.sol";
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
-import 'contracts/YieldOps.sol';
-import 'contracts/DisputeOps.sol';
+import 'contracts/ops/YieldOps.sol';
+import 'contracts/ops/DisputeOps.sol';
 import 'contracts/core/ModuleSnapshotRegistry.sol';
 import 'contracts/admin/EscrowGovernanceTimelock.sol';
 import 'contracts/core/EscrowVault.sol';

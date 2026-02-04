@@ -7,10 +7,10 @@ import 'contracts/core/EscrowVault.sol';
 import 'contracts/core/EscrowableERC20.sol';
 import 'contracts/mocks/ERC20Mock.sol';
 import 'contracts/mocks/MockAavePool.sol';
-import 'contracts/YieldOps.sol';
-import 'contracts/DisputeOps.sol';
+import 'contracts/ops/YieldOps.sol';
+import 'contracts/ops/DisputeOps.sol';
 import 'contracts/core/ModuleSnapshotRegistry.sol';
-import 'contracts/CreateOps.sol';
+import 'contracts/ops/CreateOps.sol';
 import 'contracts/types/EscrowTypes.sol';
 import 'contracts/types/YieldPresets.sol';
 

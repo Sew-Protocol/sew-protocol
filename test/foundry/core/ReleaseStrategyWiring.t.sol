@@ -6,10 +6,10 @@ import "forge-std/console.sol";
 
 import { EscrowVault } from "../../../contracts/core/EscrowVault.sol";
 import { ModuleSnapshotRegistry } from "../../../contracts/core/ModuleSnapshotRegistry.sol";
-import { YieldOps } from "../../../contracts/YieldOps.sol";
-import { DisputeOps } from "../../../contracts/DisputeOps.sol";
-import { CreateOps } from "../../../contracts/CreateOps.sol";
-import { SettlementOps } from "../../../contracts/SettlementOps.sol";
+import { YieldOps } from "../../../contracts/ops/YieldOps.sol";
+import { DisputeOps } from "../../../contracts/ops/DisputeOps.sol";
+import { CreateOps } from "../../../contracts/ops/CreateOps.sol";
+import { SettlementOps } from "../../../contracts/ops/SettlementOps.sol";
 import { BondCollector } from "../../../contracts/core/BondCollector.sol";
 import { DefaultResolutionModule } from "../../../contracts/core/modules/DefaultResolutionModule.sol";
 import { ERC20Mock } from "../../../contracts/mocks/ERC20Mock.sol";
