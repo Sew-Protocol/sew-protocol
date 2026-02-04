@@ -78,6 +78,7 @@ error ZeroBondCollector();
 error EscalationNotAllowed();
 error AppealBondQueryFailed(uint256 workflowId);
 error InvalidBondMsgValue(uint256 workflowId, uint256 required, uint256 provided);
+error AppealsNotEnabledInV1();
 
 // Errors used by child contracts (EscrowVault, EscrowableERC20)
 error BalanceUnderflow(address token, uint256 currentBalance, uint256 requestedAmount);
@@ -257,13 +258,24 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         uint8 reasonCode
     );
 
+    // Monitoring & Safety Events (v1)
+    event IncidentPauseTriggered(
+        string reason,
+        uint256 timestamp
+    );
+    event SystemResumed(
+        uint256 timestamp
+    );
+
     // ============ Pause/Unpause ============
-    function pause() external onlyRole(ROLE_GUARDIAN) {
+    function pause(string calldata reason) external onlyRole(ROLE_GUARDIAN) {
         _pause();
+        emit IncidentPauseTriggered(reason, block.timestamp);
     }
 
     function unpause() external onlyRole(ROLE_TIMELOCK) {
         _unpause();
+        emit SystemResumed(block.timestamp);
     }
 
     function setFeeRecipient(address newAddr) external onlyRole(ROLE_ADMIN_CONTRACT) {
@@ -583,6 +595,20 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     // DEPRECATED: _collectEscalationBond removed - use BondCollector instead
 
 
+    /**
+     * @notice Escalate a dispute to the next resolution level
+     * @dev V1: Appeals are disabled. This function will revert if called for v1 escrows
+     *      (incentiveModule snapshot is null). Appeals are enabled in Phase 2 via
+     *      resolution module + incentive module swap through governance.
+     *      
+     *      For Phase 2: Requires payment of appeal bond (amount/token determined by resolution module).
+     *      Bonds are recorded in the snapshotted incentive module for later distribution.
+     *      
+     * @param workflowId The escrow workflow ID to escalate
+     * @return success True if escalation succeeded
+     * @return newDisputeResolver Address of the resolver assigned to the next level
+     * @return newLevel New escalation level
+     */
     function escalateDispute(
         uint256 workflowId
     )
@@ -627,6 +653,12 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
 
         if (bondAmount > 0) {
             address incentiveModAddr = moduleSnapshots[workflowId].incentiveModule;
+            
+            // V1: Appeals disabled. Enabled in Phase 2 via resolution module + incentive module swap.
+            if (incentiveModAddr == address(0)) {
+                revert AppealsNotEnabledInV1();
+            }
+            
             uint256 snapshottedBondFee = moduleSnapshots[workflowId].appealBondProtocolFeeBps;
 
             (BondHandlingLibrary.BondProcessingResult memory bondResult, IIncentiveModule incentiveMod) = 

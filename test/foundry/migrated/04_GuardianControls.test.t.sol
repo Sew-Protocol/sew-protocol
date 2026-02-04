@@ -29,7 +29,7 @@ contract Test_04_GuardianControls_test is Test {
     function test_guardian_pause_unpause_rules() public {
         // Guardian can pause
         vm.prank(guardian);
-        vault.pause();
+        vault.pause("test pause");
         assertTrue(vault.paused());
 
         // Guardian cannot unpause
@@ -45,6 +45,6 @@ contract Test_04_GuardianControls_test is Test {
         // Unauthorized cannot pause
         vm.prank(unauthorized);
         vm.expectRevert();
-        vault.pause();
+        vault.pause("test pause");
     }
 }

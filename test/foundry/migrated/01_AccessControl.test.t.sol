@@ -84,7 +84,7 @@ contract Test_01_AccessControl_test is Test {
         escrowable.grantRole(ROLE_GUARDIAN, guardian);
 
         vm.prank(guardian);
-        escrowable.pause();
+        escrowable.pause("test pause");
         assertTrue(escrowable.paused());
 
         // Guardian cannot unpause
@@ -95,6 +95,6 @@ contract Test_01_AccessControl_test is Test {
         // Unauthorized cannot pause
         vm.prank(unauthorized);
         vm.expectRevert();
-        escrowable.pause();
+        escrowable.pause("test pause");
     }
 }

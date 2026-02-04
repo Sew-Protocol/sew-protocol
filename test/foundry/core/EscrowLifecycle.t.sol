@@ -71,7 +71,7 @@ contract EscrowLifecycleTest is Test {
 
     function test_PauseUnpause_AccessControl() public {
         vm.prank(guardian);
-        vault.pause();
+        vault.pause("test pause");
         assertTrue(vault.paused());
 
         vm.prank(guardian);

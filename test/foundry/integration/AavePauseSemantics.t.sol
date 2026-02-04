@@ -164,7 +164,7 @@ contract AavePauseSemantics is Test {
 
         // Pause the vault
         vm.prank(guardian);
-        vault.pause();
+        vault.pause("test pause");
 
         // Verify pause state
         assertTrue(vault.paused(), "Vault should be paused");
@@ -194,7 +194,7 @@ contract AavePauseSemantics is Test {
     function test_pause_newEscrows_cannotEnterYield() public {
         // Pause first
         vm.prank(guardian);
-        vault.pause();
+        vault.pause("test pause");
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
@@ -235,7 +235,7 @@ contract AavePauseSemantics is Test {
 
         // Pause
         vm.prank(guardian);
-        vault.pause();
+        vault.pause("test pause");
 
         // Release should be blocked by whenNotPaused modifier
         vm.prank(sender);
@@ -249,7 +249,7 @@ contract AavePauseSemantics is Test {
     function test_unpause_allowsEnterYield() public {
         // Pause first
         vm.prank(guardian);
-        vault.pause();
+        vault.pause("test pause");
 
         // Unpause (requires ROLE_TIMELOCK, not ROLE_GUARDIAN)
         vault.unpause(); // This contract has ROLE_TIMELOCK
@@ -304,7 +304,7 @@ contract AavePauseSemantics is Test {
 
         // Pause (guardian can pause)
         vm.prank(guardian);
-        vault.pause();
+        vault.pause("test pause");
 
         // Emergency unwind should work via GuardianOps
         // Use this contract (which has ROLE_GUARDIAN) instead of guardian address
