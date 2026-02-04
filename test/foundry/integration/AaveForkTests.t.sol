@@ -277,7 +277,7 @@ contract AaveForkTests is Test {
         );
         vm.stopPrank();
         
-        escrowVault.pause();
+        escrowVault.pause("test pause");
         uint256 tokenBalanceBefore = token.balanceOf(address(escrowVault));
         
         uint256 unwound = guardianOps.emergencyUnwindAavePosition(address(token), workflowId, address(escrowVault));

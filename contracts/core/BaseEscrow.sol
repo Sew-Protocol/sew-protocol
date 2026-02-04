@@ -258,13 +258,24 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         uint8 reasonCode
     );
 
+    // Monitoring & Safety Events (v1)
+    event IncidentPauseTriggered(
+        string reason,
+        uint256 timestamp
+    );
+    event SystemResumed(
+        uint256 timestamp
+    );
+
     // ============ Pause/Unpause ============
-    function pause() external onlyRole(ROLE_GUARDIAN) {
+    function pause(string calldata reason) external onlyRole(ROLE_GUARDIAN) {
         _pause();
+        emit IncidentPauseTriggered(reason, block.timestamp);
     }
 
     function unpause() external onlyRole(ROLE_TIMELOCK) {
         _unpause();
+        emit SystemResumed(block.timestamp);
     }
 
     function setFeeRecipient(address newAddr) external onlyRole(ROLE_ADMIN_CONTRACT) {

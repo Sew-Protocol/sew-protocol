@@ -260,13 +260,13 @@ contract BaseEscrowComprehensive is Test {
 
     function test_pause() public {
         vm.prank(guardian);
-        vault.pause();
+        vault.pause("test pause");
         assertTrue(vault.paused());
     }
 
     function test_unpause() public {
         vm.prank(guardian);
-        vault.pause();
+        vault.pause("test pause");
         vm.prank(timelock);
         vault.unpause();
         assertFalse(vault.paused());
