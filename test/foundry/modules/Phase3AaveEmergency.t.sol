@@ -191,7 +191,7 @@ contract Phase3AaveEmergencyTest is Test {
         
         // Pause vault
         vm.startPrank(guardian);
-        vault.pause();
+        vault.pause("Emergency scenario testing");
         vm.stopPrank();
         
         // Verify paused
