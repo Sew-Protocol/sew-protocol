@@ -5,7 +5,7 @@ import 'forge-std/Test.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/core/BaseEscrow.sol';
 import '../../../contracts/modules/DefaultReleaseStrategy.sol';
-import '../../../contracts/modules/DefaultYieldModule.sol';
+import '../../../contracts/modules/DefaultYieldGenerationModule.sol';
 import '../../../contracts/modules/DefaultYieldDistributionModule.sol';
 import '../../../contracts/core/modules/DefaultResolutionModule.sol';
 import '../../../contracts/governance/SlowLaneQueueActivate.sol';
@@ -28,8 +28,8 @@ contract ModuleSnapshotRegistryTest is Test {
     
     DefaultReleaseStrategy public releaseStrategy1;
     DefaultReleaseStrategy public releaseStrategy2;
-    DefaultYieldModule public yieldGenModule1;
-    DefaultYieldModule public yieldGenModule2;
+    DefaultYieldGenerationModule public yieldGenModule1;
+    DefaultYieldGenerationModule public yieldGenModule2;
     DefaultYieldDistributionModule public yieldDistModule1;
     DefaultYieldDistributionModule public yieldDistModule2;
     DefaultResolutionModule public resolutionModule1;
@@ -49,8 +49,8 @@ contract ModuleSnapshotRegistryTest is Test {
         
         releaseStrategy1 = new DefaultReleaseStrategy();
         releaseStrategy2 = new DefaultReleaseStrategy();
-        yieldGenModule1 = new DefaultYieldModule();
-        yieldGenModule2 = new DefaultYieldModule();
+        yieldGenModule1 = new DefaultYieldGenerationModule();
+        yieldGenModule2 = new DefaultYieldGenerationModule();
         yieldDistModule1 = new DefaultYieldDistributionModule();
         yieldDistModule2 = new DefaultYieldDistributionModule();
         resolutionModule1 = new DefaultResolutionModule(owner, address(0x2222));

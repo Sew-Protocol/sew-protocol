@@ -2,26 +2,26 @@
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/modules/DefaultYieldModule.sol';
+import '../../../contracts/modules/DefaultYieldGenerationModule.sol';
 import '../../../contracts/interfaces/IYieldGenerationModule.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 
 /**
- * @title DefaultYieldModuleTest
- * @notice Comprehensive tests for DefaultYieldModule
- * @dev Goal: 99% coverage for DefaultYieldModule.sol
+ * @title DefaultYieldGenerationModuleTest
+ * @notice Comprehensive tests for DefaultYieldGenerationModule
+ * @dev Goal: 99% coverage for DefaultYieldGenerationModule.sol
  * 
- * DefaultYieldModule is a no-op implementation that returns original amounts
+ * DefaultYieldGenerationModule is a no-op implementation that returns original amounts
  * with zero yield. Tests verify all interface functions work correctly.
  */
-contract DefaultYieldModuleTest is Test {
-    DefaultYieldModule public yieldModule;
+contract DefaultYieldGenerationModuleTest is Test {
+    DefaultYieldGenerationModule public yieldModule;
     ERC20Mock public token;
     
     uint256 public constant AMOUNT = 1000e18;
     
     function setUp() public {
-        yieldModule = new DefaultYieldModule();
+        yieldModule = new DefaultYieldGenerationModule();
         token = new ERC20Mock('Test Token', 'TEST', address(this), 10000000e18);
     }
     

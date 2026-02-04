@@ -7,7 +7,7 @@ import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/utils/introspection/ERC165.sol';
 
 /**
- * @title DefaultYieldModule
+ * @title DefaultYieldGenerationModule
  * @notice Default yield generation module: no yield generation
  * @dev Implements IYieldGenerationModule with no-op functions (no actual yield generation).
  *      This contract serves three critical purposes:
@@ -31,7 +31,7 @@ import '@openzeppelin/contracts/utils/introspection/ERC165.sol';
  *
  *      Do NOT delete this contract: it is intentional and necessary for the system design.
  */
-contract DefaultYieldModule is IYieldGenerationModule, ERC165 {
+contract DefaultYieldGenerationModule is IYieldGenerationModule, ERC165 {
     using SafeERC20 for IERC20;
 
     /**
