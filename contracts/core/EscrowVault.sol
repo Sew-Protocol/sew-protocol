@@ -9,7 +9,7 @@ import '../interfaces/IReleaseStrategy.sol';
 import '../shared/interfaces/IResolutionModule.sol';
 import '../interfaces/IYieldGenerationModule.sol';
 import '../interfaces/IYieldDistributionModule.sol';
-import './ModuleManagementContract.sol';
+import './ModuleSnapshotRegistry.sol';
 import '../libraries/ModuleGetterLibrary.sol';
 import '../libraries/FeeRecordingLibrary.sol';
 import '../libraries/BalanceUpdateLibrary.sol';
@@ -24,12 +24,10 @@ contract EscrowVault is BaseEscrow {
     mapping(address => uint256) public totalFeesPerToken;
     mapping(address => uint256) public totalHeldInEscrowPerToken;
 
-    ModuleManagementContract public immutable moduleManagement;
+    ModuleSnapshotRegistry public immutable moduleManagement;
 
     event FeesWithdrawn(address indexed token, uint256 amount);
     event WiringConfigured(address indexed yieldOps, address indexed disputeOps, address indexed moduleManagement);
-
-    error ZeroAddress(uint8 which);
 
     constructor(
         uint256 escrowFeeBps,
@@ -51,7 +49,7 @@ contract EscrowVault is BaseEscrow {
         if (moduleManagementAddress.code.length == 0) revert ZeroAddress(4);
         escrowFee = escrowFeeBps;
         escrowFeeAddress = feeAddress;
-        moduleManagement = ModuleManagementContract(moduleManagementAddress);
+        moduleManagement = ModuleSnapshotRegistry(moduleManagementAddress);
         yieldOps = YieldOps(yieldOpsAddress);
         disputeOps = DisputeOps(disputeOpsAddress);
         yieldProtocolFeeBps = DEFAULT_YIELD_PROTOCOL_FEE_BPS;

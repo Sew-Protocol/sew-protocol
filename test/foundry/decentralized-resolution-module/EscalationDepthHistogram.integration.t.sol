@@ -9,11 +9,11 @@ import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/core/BaseEscrow.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
-import '../../../contracts/YieldOps.sol';
-import '../../../contracts/DisputeOps.sol';
-import '../../../contracts/CreateOps.sol';
-import '../../../contracts/SettlementOps.sol';
-import '../../../contracts/core/ModuleManagementContract.sol';
+import '../../../contracts/ops/YieldOps.sol';
+import '../../../contracts/ops/DisputeOps.sol';
+import '../../../contracts/ops/CreateOps.sol';
+import '../../../contracts/ops/SettlementOps.sol';
+import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
 import '../../../contracts/types/EscrowTypes.sol';
@@ -33,7 +33,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
     CreateOps public createOps;
     SettlementOps public settlementOps;
     BondCollector public bondCollector;
-    ModuleManagementContract public moduleManagement;
+    ModuleSnapshotRegistry public moduleManagement;
 
     address public deployer;
     address public timelock;
@@ -75,7 +75,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
         // Deploy escrow
         yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps(address(this));
-        moduleManagement = new ModuleManagementContract(address(this));
+        moduleManagement = new ModuleSnapshotRegistry(address(this));
         escrow = new EscrowVault(100, makeAddr('feeAddress'), address(yieldOps), address(disputeOps), address(moduleManagement));
 
         // Deploy and wire required ops (BaseEscrow now requires these)

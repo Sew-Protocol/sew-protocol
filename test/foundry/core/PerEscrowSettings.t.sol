@@ -3,20 +3,21 @@ pragma solidity ^0.8.33;
 
 import "forge-std/Test.sol";
 import "../../../contracts/core/EscrowVault.sol";
+import '../../../contracts/core/EscrowVaultAnalytics.sol';
 import "../../../contracts/core/BaseEscrow.sol";
-import "../../../contracts/core/ModuleManagementContract.sol";
+import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/modules/DefaultReleaseStrategy.sol";
-import "../../../contracts/modules/DefaultYieldModule.sol";
+import "../../../contracts/modules/DefaultYieldGenerationModule.sol";
 import "../../../contracts/modules/DefaultYieldDistributionModule.sol";
 import "../../../contracts/core/modules/DefaultResolutionModule.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
 import "../../../contracts/types/EscrowTypes.sol";
 import "../../../contracts/types/YieldPresets.sol";
 import "../../../contracts/libraries/SettingsValidationLibrary.sol";
-import "../../../contracts/YieldOps.sol";
-import "../../../contracts/DisputeOps.sol";
-import "../../../contracts/CreateOps.sol";
-import "../../../contracts/SettlementOps.sol";
+import "../../../contracts/ops/YieldOps.sol";
+import "../../../contracts/ops/DisputeOps.sol";
+import "../../../contracts/ops/CreateOps.sol";
+import "../../../contracts/ops/SettlementOps.sol";
 import "../../../contracts/core/BondCollector.sol";
 
 contract PerEscrowSettingsHarness is EscrowVault {
@@ -43,7 +44,7 @@ contract PerEscrowSettingsHarness is EscrowVault {
 
 contract PerEscrowSettingsTest is Test {
     PerEscrowSettingsHarness public vault;
-    ModuleManagementContract public moduleManagement;
+    ModuleSnapshotRegistry public moduleManagement;
     ERC20Mock public token;
     
     DefaultReleaseStrategy public releaseV1;
@@ -66,7 +67,7 @@ contract PerEscrowSettingsTest is Test {
         resolver = address(0xD);
 
         token = new ERC20Mock("Test", "TEST", buyer, 1000e18);
-        moduleManagement = new ModuleManagementContract(owner);
+        moduleManagement = new ModuleSnapshotRegistry(owner);
         
         releaseV1 = new DefaultReleaseStrategy();
         releaseV2 = new DefaultReleaseStrategy();
@@ -194,7 +195,7 @@ contract PerEscrowSettingsTest is Test {
 
         // Baseline accounting before creating escrow
         (uint256 principalBefore, uint256 feesBefore, uint256 balanceBefore, ) =
-            vault.getAccountingBreakdown(address(token));
+            EscrowVaultAnalytics(address(vault)).getAccountingBreakdown(address(token));
 
         EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
         settings.customResolver = address(resolutionV2); // non-zero contract address
@@ -222,7 +223,7 @@ contract PerEscrowSettingsTest is Test {
 
         // Verify accounting delta is independent of per-escrow settings values
         (uint256 principalAfter, uint256 feesAfter, uint256 balanceAfter, ) =
-            vault.getAccountingBreakdown(address(token));
+            EscrowVaultAnalytics(address(vault)).getAccountingBreakdown(address(token));
 
         uint256 feeBps = vault.escrowFee();
         uint256 expectedFee = (amount * feeBps) / 10_000;

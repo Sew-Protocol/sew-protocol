@@ -7,9 +7,9 @@ import '../../../contracts/modules/decentralized-resolution-module/PaymentCalcul
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
-import '../../../contracts/YieldOps.sol';
-import '../../../contracts/DisputeOps.sol';
-import '../../../contracts/core/ModuleManagementContract.sol';
+import '../../../contracts/ops/YieldOps.sol';
+import '../../../contracts/ops/DisputeOps.sol';
+import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV1.sol';
 /**
  * @title AppealBondDistributionTest
@@ -23,7 +23,7 @@ contract AppealBondDistributionTest is Test {
     ERC20Mock public token;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
-    ModuleManagementContract public moduleManagement;
+    ModuleSnapshotRegistry public moduleManagement;
 
     address public deployer;
     address public depositor;
@@ -52,7 +52,7 @@ contract AppealBondDistributionTest is Test {
         incentiveModule.registerEscrowContract(address(this));
         yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps(address(this));
-        moduleManagement = new ModuleManagementContract(address(this));
+        moduleManagement = new ModuleSnapshotRegistry(address(this));
         escrow = new EscrowVault(100, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
 
         // Setup tokens

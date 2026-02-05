@@ -7,11 +7,11 @@ import "../../../contracts/mocks/ERC20Mock.sol";
 import "../../../contracts/mocks/MockAavePool.sol";
 import "../../../contracts/modules/AaveYieldGenerationModule.sol";
 import "../../../contracts/modules/DefaultYieldDistributionModule.sol";
-import "../../../contracts/core/ModuleManagementContract.sol";
-import "../../../contracts/YieldOps.sol";
-import "../../../contracts/DisputeOps.sol";
-import "../../../contracts/CreateOps.sol";
-import "../../../contracts/SettlementOps.sol";
+import "../../../contracts/core/ModuleSnapshotRegistry.sol";
+import "../../../contracts/ops/YieldOps.sol";
+import "../../../contracts/ops/DisputeOps.sol";
+import "../../../contracts/ops/CreateOps.sol";
+import "../../../contracts/ops/SettlementOps.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/types/EscrowTypes.sol";
 import "../../../contracts/types/YieldPresets.sol";
@@ -32,7 +32,7 @@ contract YieldAccountingTest is Test {
     AaveYieldGenerationModule internal aaveModule;
     DefaultYieldDistributionModule internal yieldDistModule;
     
-    ModuleManagementContract internal mm;
+    ModuleSnapshotRegistry internal mm;
     YieldOps internal yieldOps;
     DisputeOps internal disputeOps;
     CreateOps internal createOps;
@@ -72,7 +72,7 @@ contract YieldAccountingTest is Test {
         yieldOps = new YieldOps(address(this));
         aaveModule.grantRole(aaveModule.ROLE_YIELD_OPS(), address(yieldOps));
         disputeOps = new DisputeOps(address(this));
-        mm = new ModuleManagementContract(address(this));
+        mm = new ModuleSnapshotRegistry(address(this));
         
         vault = new EscrowVault(ESCROW_FEE_BPS, feeAddress, address(yieldOps), address(disputeOps), address(mm));
         

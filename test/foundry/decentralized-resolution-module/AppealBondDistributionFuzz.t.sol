@@ -6,8 +6,8 @@ import '../../../contracts/modules/decentralized-resolution-module/ResolverIncen
 import '../../../contracts/modules/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
-import '../../../contracts/YieldOps.sol';
-import '../../../contracts/DisputeOps.sol';
+import '../../../contracts/ops/YieldOps.sol';
+import '../../../contracts/ops/DisputeOps.sol';
 
 /**
  * @title AppealBondDistributionFuzzTest

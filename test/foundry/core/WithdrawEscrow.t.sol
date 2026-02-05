@@ -8,13 +8,13 @@ import 'contracts/core/BaseEscrow.sol';
 import 'contracts/mocks/ERC20Mock.sol';
 import 'contracts/core/modules/DefaultResolutionModule.sol';
 import 'contracts/types/EscrowTypes.sol';
-import 'contracts/YieldOps.sol';
-import 'contracts/DisputeOps.sol';
-import 'contracts/SettlementOps.sol';
-import 'contracts/CreateOps.sol';
+import 'contracts/ops/YieldOps.sol';
+import 'contracts/ops/DisputeOps.sol';
+import 'contracts/ops/SettlementOps.sol';
+import 'contracts/ops/CreateOps.sol';
 import 'contracts/core/BondCollector.sol';
-import 'contracts/core/ModuleManagementContract.sol';
-import 'contracts/admin/EscrowAdminContract.sol';
+import 'contracts/core/ModuleSnapshotRegistry.sol';
+import 'contracts/admin/EscrowGovernanceTimelock.sol';
 import 'contracts/libraries/SettingsValidationLibrary.sol';
 
 contract WithdrawEscrowTest is Test {
@@ -26,8 +26,8 @@ contract WithdrawEscrowTest is Test {
     SettlementOps settlementOps;
     CreateOps createOps;
     BondCollector bondCollector;
-    ModuleManagementContract moduleManagement;
-    EscrowAdminContract adminContract;
+    ModuleSnapshotRegistry moduleManagement;
+    EscrowGovernanceTimelock adminContract;
 
     address sender = address(0x10);
     address recipient = address(0x20);
@@ -43,8 +43,8 @@ contract WithdrawEscrowTest is Test {
         settlementOps = new SettlementOps(address(this));
         createOps = new CreateOps(address(this));
         bondCollector = new BondCollector(address(this));
-        moduleManagement = new ModuleManagementContract(address(this));
-        adminContract = new EscrowAdminContract(address(this));
+        moduleManagement = new ModuleSnapshotRegistry(address(this));
+        adminContract = new EscrowGovernanceTimelock(address(this));
         vault = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
         moduleManagement.registerEscrowContract(address(vault));
 
@@ -57,7 +57,7 @@ contract WithdrawEscrowTest is Test {
 
         // Wire ops contracts on the vault
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
-        // Allow EscrowAdminContract to apply queued changes on the vault
+        // Allow EscrowGovernanceTimelock to apply queued changes on the vault
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(adminContract));
         vault.setCreateOps(address(createOps));
         vault.setSettlementOps(address(settlementOps));

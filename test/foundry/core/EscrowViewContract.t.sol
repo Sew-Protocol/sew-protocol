@@ -5,18 +5,18 @@ import 'forge-std/Test.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/core/EscrowViewContract.sol';
 import '../../../contracts/core/BaseEscrow.sol';
-import '../../../contracts/admin/EscrowAdminContract.sol';
-import '../../../contracts/core/ModuleManagementContract.sol';
+import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
+import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/core/modules/DefaultResolutionModule.sol';
 import '../../../contracts/modules/DefaultReleaseStrategy.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/types/YieldPresets.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
-import '../../../contracts/YieldOps.sol';
-import '../../../contracts/DisputeOps.sol';
-import '../../../contracts/SettlementOps.sol';
-import '../../../contracts/CreateOps.sol';
+import '../../../contracts/ops/YieldOps.sol';
+import '../../../contracts/ops/DisputeOps.sol';
+import '../../../contracts/ops/SettlementOps.sol';
+import '../../../contracts/ops/CreateOps.sol';
 import '../../../contracts/core/BondCollector.sol';
 
 /**
@@ -31,8 +31,8 @@ import '../../../contracts/core/BondCollector.sol';
  */
 contract EscrowViewContractTest is Test {
     EscrowVault public vault;
-    EscrowAdminContract public adminContract;
-    ModuleManagementContract public moduleManagement;
+    EscrowGovernanceTimelock public adminContract;
+    ModuleSnapshotRegistry public moduleManagement;
     EscrowViewContract public escrowView;
     ERC20Mock public token;
     DefaultResolutionModule public resolutionModule;
@@ -72,8 +72,8 @@ contract EscrowViewContractTest is Test {
         settlementOps = new SettlementOps(owner);
         createOps = new CreateOps(owner);
         bondCollector = new BondCollector(owner);
-        adminContract = new EscrowAdminContract(owner);
-        moduleManagement = new ModuleManagementContract(owner);
+        adminContract = new EscrowGovernanceTimelock(owner);
+        moduleManagement = new ModuleSnapshotRegistry(owner);
         vault = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
 
         // Allow the dedicated timelock address to operate the admin contract in tests

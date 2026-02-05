@@ -5,11 +5,11 @@ import "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import { EscrowVault } from "../../../contracts/core/EscrowVault.sol";
-import { ModuleManagementContract } from "../../../contracts/core/ModuleManagementContract.sol";
-import { YieldOps } from "../../../contracts/YieldOps.sol";
-import { DisputeOps } from "../../../contracts/DisputeOps.sol";
-import { CreateOps } from "../../../contracts/CreateOps.sol";
-import { SettlementOps } from "../../../contracts/SettlementOps.sol";
+import { ModuleSnapshotRegistry } from "../../../contracts/core/ModuleSnapshotRegistry.sol";
+import { YieldOps } from "../../../contracts/ops/YieldOps.sol";
+import { DisputeOps } from "../../../contracts/ops/DisputeOps.sol";
+import { CreateOps } from "../../../contracts/ops/CreateOps.sol";
+import { SettlementOps } from "../../../contracts/ops/SettlementOps.sol";
 import { BondCollector } from "../../../contracts/core/BondCollector.sol";
 import { DefaultResolutionModule } from "../../../contracts/core/modules/DefaultResolutionModule.sol";
 import { ERC20Mock } from "../../../contracts/mocks/ERC20Mock.sol";
@@ -112,7 +112,7 @@ contract EscrowVaultReleaseStrategyHarness is EscrowVault {
 }
 
 contract ReleaseStrategyWiringTest is Test {
-    ModuleManagementContract internal mm;
+    ModuleSnapshotRegistry internal mm;
     EscrowVaultReleaseStrategyHarness internal vault;
     YieldOps internal yieldOps;
     DisputeOps internal disputeOps;
@@ -128,7 +128,7 @@ contract ReleaseStrategyWiringTest is Test {
     function setUp() public {
         yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps(address(this));
-        mm = new ModuleManagementContract(address(this));
+        mm = new ModuleSnapshotRegistry(address(this));
 
         vault = new EscrowVaultReleaseStrategyHarness(0, FEE, address(yieldOps), address(disputeOps), address(mm));
 

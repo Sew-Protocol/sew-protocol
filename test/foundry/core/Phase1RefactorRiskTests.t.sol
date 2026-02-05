@@ -4,18 +4,18 @@ pragma solidity ^0.8.33;
 import 'forge-std/Test.sol';
 import 'contracts/core/EscrowVault.sol';
 import 'contracts/core/BaseEscrow.sol';
-import 'contracts/YieldOps.sol';
-import 'contracts/DisputeOps.sol';
-import 'contracts/SettlementOps.sol';
-import 'contracts/CreateOps.sol';
-import 'contracts/core/ModuleManagementContract.sol';
+import 'contracts/ops/YieldOps.sol';
+import 'contracts/ops/DisputeOps.sol';
+import 'contracts/ops/SettlementOps.sol';
+import 'contracts/ops/CreateOps.sol';
+import 'contracts/core/ModuleSnapshotRegistry.sol';
 import 'contracts/types/EscrowTypes.sol';
 import 'contracts/types/YieldPresets.sol';
 import 'contracts/libraries/SettingsValidationLibrary.sol';
 import 'contracts/mocks/ERC20Mock.sol';
 import 'contracts/core/modules/DefaultResolutionModule.sol';
 import 'contracts/modules/DefaultReleaseStrategy.sol';
-import 'contracts/modules/decentralized-resolution-module/IIncentiveModule.sol';
+import 'contracts/shared/interfaces/IIncentiveModule.sol';
 
 /**
  * @title Phase1RefactorRiskTests
@@ -29,7 +29,7 @@ contract Phase1RefactorRiskTests is Test {
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
     SettlementOps public settlementOps;
-    ModuleManagementContract public moduleManagement;
+    ModuleSnapshotRegistry public moduleManagement;
     
     DefaultResolutionModule public resolutionModule;
     DefaultReleaseStrategy public releaseStrategy;
@@ -57,7 +57,7 @@ contract Phase1RefactorRiskTests is Test {
         yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps(address(this));
         settlementOps = new SettlementOps(address(this));
-        moduleManagement = new ModuleManagementContract(address(this));
+        moduleManagement = new ModuleSnapshotRegistry(address(this));
         
         // Deploy vault
         vault = new EscrowVault(

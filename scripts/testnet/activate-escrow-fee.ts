@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 /**
- * Activate queued escrow fee for EscrowVault via EscrowAdminContract (slow lane).
+ * Activate queued escrow fee for EscrowVault via EscrowGovernanceTimelock (slow lane).
  *
  * Run:
  *   pnpm hardhat run --network baseSepolia scripts/testnet/activate-escrow-fee.ts
@@ -18,10 +18,10 @@ async function main() {
   const signer = await hre.ethers.getSigner(deployer);
 
   const vaultAddr = (await deployments.get('EscrowVault')).address;
-  const adminAddr = (await deployments.get('EscrowAdminContract')).address;
+  const adminAddr = (await deployments.get('EscrowGovernanceTimelock')).address;
 
   const vault = await hre.ethers.getContractAt('EscrowVault', vaultAddr, signer);
-  const admin = await hre.ethers.getContractAt('EscrowAdminContract', adminAddr, signer);
+  const admin = await hre.ethers.getContractAt('EscrowGovernanceTimelock', adminAddr, signer);
 
   const pending = await admin.getPendingEscrowFee(vaultAddr);
   const value = pending[0] as bigint;
@@ -29,7 +29,7 @@ async function main() {
   const exists = pending[2] as boolean;
 
   console.log(`EscrowVault: ${vaultAddr}`);
-  console.log(`EscrowAdminContract: ${adminAddr}`);
+  console.log(`EscrowGovernanceTimelock: ${adminAddr}`);
   console.log(`Pending escrow fee: value=${value.toString()} eta=${eta.toString()} exists=${exists}`);
 
   if (!exists) {

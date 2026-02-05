@@ -4,7 +4,7 @@ pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
 import {DefaultResolutionModule} from '../../../contracts/core/modules/DefaultResolutionModule.sol';
-import {DefaultYieldModule} from '../../../contracts/modules/DefaultYieldModule.sol';
+import {DefaultYieldGenerationModule} from '../../../contracts/modules/DefaultYieldGenerationModule.sol';
 import {DefaultReleaseStrategy} from '../../../contracts/modules/DefaultReleaseStrategy.sol';
 import {DefaultYieldDistributionModule} from '../../../contracts/modules/DefaultYieldDistributionModule.sol';
 import {IResolutionModule} from '../../../contracts/shared/interfaces/IResolutionModule.sol';
@@ -25,8 +25,8 @@ contract ModuleMetadataSimple is Test {
         assertTrue(mod.supportsInterface(iid));
     }
 
-    function test_DefaultYieldModule_metadataAndInterface() public {
-        DefaultYieldModule mod = new DefaultYieldModule();
+    function test_DefaultYieldGenerationModule_metadataAndInterface() public {
+        DefaultYieldGenerationModule mod = new DefaultYieldGenerationModule();
         string memory name = mod.moduleName();
         string memory version = mod.moduleVersion();
         assertEq(name, 'DefaultNoYield');

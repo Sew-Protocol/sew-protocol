@@ -10,7 +10,7 @@ import '../libraries/AaveYieldLibrary.sol';
 import '../libraries/YieldPresetLibrary.sol';
 import '../types/EscrowTypes.sol';
 import '../types/YieldPresets.sol';
-import '../YieldOps.sol';
+import '../ops/YieldOps.sol';
 
 /**
  * @title AaveYieldHandlingLibrary

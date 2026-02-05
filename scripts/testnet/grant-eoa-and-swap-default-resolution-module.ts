@@ -43,13 +43,13 @@ async function main() {
   const eoaAddr = await eoa.getAddress();
 
   const escrowVaultAddr = (await deployments.get('EscrowVault')).address;
-  const escrowAdminAddr = (await deployments.get('EscrowAdminContract')).address;
+  const escrowAdminAddr = (await deployments.get('EscrowGovernanceTimelock')).address;
   const timelockAddr = (await deployments.get('TimelockController')).address;
 
   console.log(`\n🧷 Grant EOA + swap in DefaultResolutionModule (Base Sepolia)`);
   console.log(`- EscrowVault: ${escrowVaultAddr}`);
   console.log(`  - ${basescanAddressLink(escrowVaultAddr)}`);
-  console.log(`- EscrowAdminContract: ${escrowAdminAddr}`);
+  console.log(`- EscrowGovernanceTimelock: ${escrowAdminAddr}`);
   console.log(`- TimelockController: ${timelockAddr}`);
   console.log(`- ADMIN (role granter): ${adminAddr}`);
   console.log(`- EOA (module setter):  ${eoaAddr}`);
@@ -72,8 +72,8 @@ async function main() {
   console.log(`✅ DefaultResolutionModule deployed: ${moduleAddr}`);
   console.log(`  - ${basescanAddressLink(moduleAddr)}`);
 
-  // Grant module ROLE_TIMELOCK to EscrowAdminContract + TimelockController (so resolver can be rotated later)
-  console.log(`\nGranting DefaultResolutionModule.ROLE_TIMELOCK to EscrowAdminContract and TimelockController...`);
+  // Grant module ROLE_TIMELOCK to EscrowGovernanceTimelock + TimelockController (so resolver can be rotated later)
+  console.log(`\nGranting DefaultResolutionModule.ROLE_TIMELOCK to EscrowGovernanceTimelock and TimelockController...`);
   const ROLE_TIMELOCK = ethers.keccak256(ethers.toUtf8Bytes('ROLE_TIMELOCK'));
   await (await module.grantRole(ROLE_TIMELOCK, escrowAdminAddr)).wait();
   await (await module.grantRole(ROLE_TIMELOCK, timelockAddr)).wait();

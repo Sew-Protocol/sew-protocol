@@ -3,21 +3,21 @@ import "../../../contracts/types/YieldPresets.sol";
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
-import 'contracts/YieldOps.sol';
-import 'contracts/DisputeOps.sol';
-import 'contracts/core/ModuleManagementContract.sol';
+import 'contracts/ops/YieldOps.sol';
+import 'contracts/ops/DisputeOps.sol';
+import 'contracts/core/ModuleSnapshotRegistry.sol';
 import 'contracts/core/EscrowableERC20.sol';
 import 'contracts/core/EscrowVault.sol';
-import 'contracts/admin/EscrowAdminContract.sol';
+import 'contracts/admin/EscrowGovernanceTimelock.sol';
 import 'contracts/types/EscrowTypes.sol';
 
 contract Test_01_AccessControl_test is Test {
     EscrowableERC20 escrowable;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
-    ModuleManagementContract public moduleManagement;
+    ModuleSnapshotRegistry public moduleManagement;
     EscrowVault escrowVault;
-    EscrowAdminContract public adminContract;
+    EscrowGovernanceTimelock public adminContract;
     address timelock = address(0x1);
     address guardian = address(0x2);
     address unauthorized = address(0x3);
@@ -26,7 +26,7 @@ contract Test_01_AccessControl_test is Test {
     function setUp() public {
         yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps(address(this));
-        moduleManagement = new ModuleManagementContract(address(this));
+        moduleManagement = new ModuleSnapshotRegistry(address(this));
         escrowable = new EscrowableERC20(
             'Test Token',
             'TEST',
@@ -37,7 +37,7 @@ contract Test_01_AccessControl_test is Test {
             address(moduleManagement)
         );
         escrowVault = new EscrowVault(100, feeAddr, address(yieldOps), address(disputeOps), address(moduleManagement));
-        adminContract = new EscrowAdminContract(address(this));
+        adminContract = new EscrowGovernanceTimelock(address(this));
         adminContract.grantRole(adminContract.ROLE_TIMELOCK(), timelock);
         escrowable.grantRole(escrowable.ROLE_ADMIN_CONTRACT(), address(adminContract));
     }

@@ -2,8 +2,8 @@
 pragma solidity ^0.8.33;
 
 import '@openzeppelin/contracts/access/AccessControl.sol';
-import './shared/interfaces/IResolutionModule.sol';
-import './types/EscrowTypes.sol';
+import '../shared/interfaces/IResolutionModule.sol';
+import '../types/EscrowTypes.sol';
 
 /**
  * @title DisputeOps

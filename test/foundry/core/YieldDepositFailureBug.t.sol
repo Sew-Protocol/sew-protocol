@@ -5,13 +5,13 @@ import "forge-std/Test.sol";
 import "../../../contracts/core/EscrowVault.sol";
 import "../../../contracts/core/modules/DefaultResolutionModule.sol";
 import "../../../contracts/types/EscrowTypes.sol";
-import "../../../contracts/YieldOps.sol";
-import "../../../contracts/DisputeOps.sol";
-import "../../../contracts/SettlementOps.sol";
+import "../../../contracts/ops/YieldOps.sol";
+import "../../../contracts/ops/DisputeOps.sol";
+import "../../../contracts/ops/SettlementOps.sol";
 import "../../../contracts/core/BondCollector.sol";
-import "../../../contracts/core/ModuleManagementContract.sol";
+import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
-import "../../../contracts/CreateOps.sol";
+import "../../../contracts/ops/CreateOps.sol";
 import "../../../contracts/interfaces/IYieldGenerationModule.sol";
 
 contract SilentFailureModule is IYieldGenerationModule {
@@ -45,7 +45,7 @@ contract YieldDepositFailureBugTest is Test {
     SettlementOps public settlementOps;
     CreateOps public createOps;
     BondCollector public bondCollector;
-    ModuleManagementContract public moduleManagement;
+    ModuleSnapshotRegistry public moduleManagement;
     SilentFailureModule public silentModule;
 
     address public owner;
@@ -59,7 +59,7 @@ contract YieldDepositFailureBugTest is Test {
         token = new ERC20Mock("Token", "TKN", owner, 0);
         yieldOps = new YieldOps(owner);
         disputeOps = new DisputeOps(owner);
-        moduleManagement = new ModuleManagementContract(owner);
+        moduleManagement = new ModuleSnapshotRegistry(owner);
         createOps = new CreateOps(owner);
         settlementOps = new SettlementOps(owner);
         bondCollector = new BondCollector(owner);

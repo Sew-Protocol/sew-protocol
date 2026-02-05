@@ -11,13 +11,13 @@ async function main() {
   const net = await provider.getNetwork();
 
   const escrowVaultAddr = (await deployments.get('EscrowVault')).address;
-  const moduleMgmtAddr = (await deployments.get('ModuleManagementContract')).address;
-  const escrowAdminAddr = (await deployments.get('EscrowAdminContract')).address;
+  const moduleMgmtAddr = (await deployments.get('ModuleSnapshotRegistry')).address;
+  const escrowAdminAddr = (await deployments.get('EscrowGovernanceTimelock')).address;
   const timelockAddr = (await deployments.get('TimelockController')).address;
 
   const escrow: any = await hre.ethers.getContractAt('EscrowVault', escrowVaultAddr);
-  const mm: any = await hre.ethers.getContractAt('ModuleManagementContract', moduleMgmtAddr);
-  const admin: any = await hre.ethers.getContractAt('EscrowAdminContract', escrowAdminAddr);
+  const mm: any = await hre.ethers.getContractAt('ModuleSnapshotRegistry', moduleMgmtAddr);
+  const admin: any = await hre.ethers.getContractAt('EscrowGovernanceTimelock', escrowAdminAddr);
 
   const resolutionModule = await escrow.disputeResolutionModule();
   const defaultResolutionModule = await mm.getModule(escrowVaultAddr, 0); // ModuleType.RESOLUTION = 0
@@ -26,9 +26,9 @@ async function main() {
   console.log(`- chainId: ${net.chainId.toString()}`);
   console.log(`- EscrowVault: ${escrowVaultAddr}`);
   console.log(`  - ${basescanAddressLink(escrowVaultAddr)}`);
-  console.log(`- ModuleManagementContract: ${moduleMgmtAddr}`);
+  console.log(`- ModuleSnapshotRegistry: ${moduleMgmtAddr}`);
   console.log(`  - ${basescanAddressLink(moduleMgmtAddr)}`);
-  console.log(`- EscrowAdminContract: ${escrowAdminAddr}`);
+  console.log(`- EscrowGovernanceTimelock: ${escrowAdminAddr}`);
   console.log(`  - ${basescanAddressLink(escrowAdminAddr)}`);
   console.log(`- TimelockController: ${timelockAddr}`);
   console.log(`  - ${basescanAddressLink(timelockAddr)}`);
@@ -39,9 +39,9 @@ async function main() {
 
   try {
     const pending = await admin.getPendingResolutionModule(escrowVaultAddr);
-    console.log(`- EscrowAdminContract pending resolution module:`, pending);
+    console.log(`- EscrowGovernanceTimelock pending resolution module:`, pending);
   } catch (e: any) {
-    console.log(`- Could not read EscrowAdminContract.getPendingResolutionModule: ${e?.message || e}`);
+    console.log(`- Could not read EscrowGovernanceTimelock.getPendingResolutionModule: ${e?.message || e}`);
   }
 
   // Role wiring checks (best-effort; some contracts may not expose the role constants)
@@ -49,7 +49,7 @@ async function main() {
     const roleAdminContract = await escrow.ROLE_ADMIN_CONTRACT();
     const hasAdminContract = await escrow.hasRole(roleAdminContract, escrowAdminAddr);
     console.log(`\nRole wiring`);
-    console.log(`- EscrowAdminContract has EscrowVault.ROLE_ADMIN_CONTRACT: ${hasAdminContract}`);
+    console.log(`- EscrowGovernanceTimelock has EscrowVault.ROLE_ADMIN_CONTRACT: ${hasAdminContract}`);
   } catch (e: any) {
     console.log(`\nRole wiring`);
     console.log(`- Could not read EscrowVault.ROLE_ADMIN_CONTRACT/hasRole: ${e?.message || e}`);
@@ -63,8 +63,8 @@ async function main() {
     const adminHas = await admin.hasRole(adminRoleTimelock, signerAddr);
     const mmHas = await mm.hasRole(mmRoleTimelock, signerAddr);
     console.log(`- Current signer: ${signerAddr}`);
-    console.log(`- Signer has EscrowAdminContract.ROLE_TIMELOCK: ${adminHas}`);
-    console.log(`- Signer has ModuleManagementContract.ROLE_TIMELOCK: ${mmHas}`);
+    console.log(`- Signer has EscrowGovernanceTimelock.ROLE_TIMELOCK: ${adminHas}`);
+    console.log(`- Signer has ModuleSnapshotRegistry.ROLE_TIMELOCK: ${mmHas}`);
   } catch (e: any) {
     console.log(`- Could not check ROLE_TIMELOCK for current signer: ${e?.message || e}`);
   }

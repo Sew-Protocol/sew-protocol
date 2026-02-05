@@ -33,8 +33,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const settlementOpsDeployment = await get('SettlementOps');
   const createOpsDeployment = await get('CreateOps');
   const bondCollectorDeployment = await get('BondCollector');
-  const moduleManagementDeployment = await get('ModuleManagementContract');
-  const escrowAdminDeployment = await get('EscrowAdminContract');
+  const moduleManagementDeployment = await get('ModuleSnapshotRegistry');
+  const escrowAdminDeployment = await get('EscrowGovernanceTimelock');
 
   // Get fee configuration from environment or use defaults
   const escrowFeeBps = parseInt(process.env.ESCROW_FEE_BPS || '0', 10); // 0% default (0-10000 bps)
@@ -54,7 +54,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   console.log(`      CreateOps: ${createOpsDeployment.address}`);
   console.log(`      BondCollector: ${bondCollectorDeployment.address}`);
   console.log(`      ModuleManagement: ${moduleManagementDeployment.address}`);
-  console.log(`      EscrowAdminContract: ${escrowAdminDeployment.address}`);
+  console.log(`      EscrowGovernanceTimelock: ${escrowAdminDeployment.address}`);
 
   // Deploy EscrowVault
   console.log(`\n   Deploying EscrowVault...`);
@@ -173,17 +173,17 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     }
   }
 
-  // Grant EscrowAdminContract the minimal admin role on EscrowVault (for slow-lane apply).
-  console.log(`\n   Granting ROLE_ADMIN_CONTRACT to EscrowAdminContract...`);
+  // Grant EscrowGovernanceTimelock the minimal admin role on EscrowVault (for slow-lane apply).
+  console.log(`\n   Granting ROLE_ADMIN_CONTRACT to EscrowGovernanceTimelock...`);
   try {
     const ADMIN_CONTRACT_ROLE = await escrowVaultContract.ROLE_ADMIN_CONTRACT();
     const hasRole = await escrowVaultContract.hasRole(ADMIN_CONTRACT_ROLE, escrowAdminDeployment.address);
     if (!hasRole) {
       const grantTx = await escrowVaultContract.grantRole(ADMIN_CONTRACT_ROLE, escrowAdminDeployment.address);
       await grantTx.wait();
-      console.log(`   ✅ ROLE_ADMIN_CONTRACT granted to EscrowAdminContract`);
+      console.log(`   ✅ ROLE_ADMIN_CONTRACT granted to EscrowGovernanceTimelock`);
     } else {
-      console.log(`   ✅ EscrowAdminContract already has ROLE_ADMIN_CONTRACT`);
+      console.log(`   ✅ EscrowGovernanceTimelock already has ROLE_ADMIN_CONTRACT`);
     }
   } catch (error: any) {
     console.log(`   ⚠️  Could not grant ROLE_ADMIN_CONTRACT (non-fatal): ${error.message}`);
@@ -372,11 +372,11 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
         await setBondCollectorTx.wait();
         console.log(`   ✅ Set BondCollector in EscrowableERC20`);
       } else {
-        console.log(`   ℹ️  Deployer does not have ROLE_ADMIN_CONTRACT. Ops contracts must be set via EscrowAdminContract.`);
+        console.log(`   ℹ️  Deployer does not have ROLE_ADMIN_CONTRACT. Ops contracts must be set via EscrowGovernanceTimelock.`);
       }
     } catch (error: any) {
       if (error.message?.includes('AccessControlUnauthorizedAccount')) {
-        console.log(`   ℹ️  Deployer does not have permission to set ops contracts. Must be set via EscrowAdminContract.`);
+        console.log(`   ℹ️  Deployer does not have permission to set ops contracts. Must be set via EscrowGovernanceTimelock.`);
       } else {
         throw error;
       }

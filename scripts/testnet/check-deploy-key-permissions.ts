@@ -24,17 +24,17 @@ async function main() {
   const signerAddr = await signer.getAddress();
 
   const escrowVaultAddr = (await deployments.get('EscrowVault')).address;
-  const escrowAdminAddr = (await deployments.get('EscrowAdminContract')).address;
-  const mmAddr = (await deployments.get('ModuleManagementContract')).address;
+  const escrowAdminAddr = (await deployments.get('EscrowGovernanceTimelock')).address;
+  const mmAddr = (await deployments.get('ModuleSnapshotRegistry')).address;
 
   console.log(`\n🔐 Deploy key permissions (Base Sepolia)`);
   console.log(`- chainId: ${net.chainId.toString()}`);
   console.log(`- signer: ${signerAddr}`);
   console.log(`- EscrowVault: ${escrowVaultAddr}`);
   console.log(`  - ${basescanAddressLink(escrowVaultAddr)}`);
-  console.log(`- EscrowAdminContract: ${escrowAdminAddr}`);
+  console.log(`- EscrowGovernanceTimelock: ${escrowAdminAddr}`);
   console.log(`  - ${basescanAddressLink(escrowAdminAddr)}`);
-  console.log(`- ModuleManagementContract: ${mmAddr}`);
+  console.log(`- ModuleSnapshotRegistry: ${mmAddr}`);
   console.log(`  - ${basescanAddressLink(mmAddr)}`);
 
   async function inspectAccessControl(label: string, addr: string, extraRoles?: { name: string; value: string }[]) {
@@ -79,24 +79,24 @@ async function main() {
     { name: 'ROLE_TIMELOCK', value: ROLE_TIMELOCK },
   ]);
 
-  // EscrowAdminContract: ROLE_TIMELOCK gates queue/activate, but does NOT need grantRole on EscrowVault
+  // EscrowGovernanceTimelock: ROLE_TIMELOCK gates queue/activate, but does NOT need grantRole on EscrowVault
   const escrowAdmin = await hre.ethers.getContractAt(['function ROLE_TIMELOCK() view returns (bytes32)'], escrowAdminAddr);
   const ADMIN_ROLE_TIMELOCK = await escrowAdmin.ROLE_TIMELOCK();
-  await inspectAccessControl('EscrowAdminContract roles', escrowAdminAddr, [
+  await inspectAccessControl('EscrowGovernanceTimelock roles', escrowAdminAddr, [
     { name: 'ROLE_TIMELOCK', value: ADMIN_ROLE_TIMELOCK },
   ]);
 
-  // ModuleManagementContract: ROLE_TIMELOCK gates registerEscrowContract in that contract
+  // ModuleSnapshotRegistry: ROLE_TIMELOCK gates registerEscrowContract in that contract
   const mm = await hre.ethers.getContractAt(['function ROLE_TIMELOCK() view returns (bytes32)'], mmAddr);
   const MM_ROLE_TIMELOCK = await mm.ROLE_TIMELOCK();
-  await inspectAccessControl('ModuleManagementContract roles', mmAddr, [{ name: 'ROLE_TIMELOCK', value: MM_ROLE_TIMELOCK }]);
+  await inspectAccessControl('ModuleSnapshotRegistry roles', mmAddr, [{ name: 'ROLE_TIMELOCK', value: MM_ROLE_TIMELOCK }]);
 
   console.log(`\nInterpretation`);
   console.log(
     `- If signer can grant EscrowVault.ROLE_ADMIN_CONTRACT, then it can authorize an EOA to call EscrowVault.setResolutionModule().`
   );
   console.log(
-    `- If signer has EscrowAdminContract.ROLE_TIMELOCK, it can queue slow-lane changes, but still must wait SLOW_DELAY on-chain.`
+    `- If signer has EscrowGovernanceTimelock.ROLE_TIMELOCK, it can queue slow-lane changes, but still must wait SLOW_DELAY on-chain.`
   );
 }
 

@@ -9,15 +9,15 @@ import "../../../contracts/core/modules/DefaultResolutionModule.sol";
 import "../../../contracts/types/EscrowTypes.sol";
 import "../../../contracts/libraries/SettingsValidationLibrary.sol";
 
-import "../../../contracts/YieldOps.sol";
-import "../../../contracts/DisputeOps.sol";
-import "../../../contracts/SettlementOps.sol";
-import "../../../contracts/CreateOps.sol";
+import "../../../contracts/ops/YieldOps.sol";
+import "../../../contracts/ops/DisputeOps.sol";
+import "../../../contracts/ops/SettlementOps.sol";
+import "../../../contracts/ops/CreateOps.sol";
 import "../../../contracts/core/BondCollector.sol";
-import "../../../contracts/core/ModuleManagementContract.sol";
-import "../../../contracts/admin/EscrowAdminContract.sol";
+import "../../../contracts/core/ModuleSnapshotRegistry.sol";
+import "../../../contracts/admin/EscrowGovernanceTimelock.sol";
 
-import "../../../contracts/modules/decentralized-resolution-module/IIncentiveModule.sol";
+import "../../../contracts/shared/interfaces/IIncentiveModule.sol";
 
 contract MockIncentiveModule is IIncentiveModule {
     event AppealBondRecorded(uint256 workflowId, address escrowContract, address depositor, address escalatedBy, uint256 amount, address token, uint8 newLevel);
@@ -92,8 +92,8 @@ contract FeeScenarioFlowsTest is Test {
     SettlementOps public settlementOps;
     CreateOps public createOps;
     BondCollector public bondCollector;
-    ModuleManagementContract public moduleManagement;
-    EscrowAdminContract public adminContract;
+    ModuleSnapshotRegistry public moduleManagement;
+    EscrowGovernanceTimelock public adminContract;
 
     address public owner;
     address public timelock;
@@ -125,8 +125,8 @@ contract FeeScenarioFlowsTest is Test {
         settlementOps = new SettlementOps(owner);
         createOps = new CreateOps(owner);
         bondCollector = new BondCollector(owner);
-        moduleManagement = new ModuleManagementContract(owner);
-        adminContract = new EscrowAdminContract(owner);
+        moduleManagement = new ModuleSnapshotRegistry(owner);
+        adminContract = new EscrowGovernanceTimelock(owner);
 
         // Vault starts with 0% fee; we'll slow-lane set to 1% in tests.
         vault = new EscrowVault(INITIAL_ESCROW_FEE_BPS, treasury, address(yieldOps), address(disputeOps), address(moduleManagement));
@@ -147,7 +147,7 @@ contract FeeScenarioFlowsTest is Test {
         // Fee withdraw role is separate from the recipient address.
         vault.grantRole(vault.ROLE_FEE_RECIPIENT(), dao);
 
-        // EscrowAdminContract slow-lane operator
+        // EscrowGovernanceTimelock slow-lane operator
         adminContract.grantRole(adminContract.ROLE_TIMELOCK(), timelock);
 
         // Ops wiring (timelock-gated on the vault)

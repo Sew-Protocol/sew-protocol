@@ -8,12 +8,12 @@ import "../../../contracts/mocks/ERC20Mock.sol";
 import "../../../contracts/core/modules/DefaultResolutionModule.sol";
 import "../../../contracts/types/EscrowTypes.sol";
 import "../../../contracts/types/YieldPresets.sol";
-import "../../../contracts/YieldOps.sol";
-import "../../../contracts/DisputeOps.sol";
-import "../../../contracts/SettlementOps.sol";
-import "../../../contracts/CreateOps.sol";
+import "../../../contracts/ops/YieldOps.sol";
+import "../../../contracts/ops/DisputeOps.sol";
+import "../../../contracts/ops/SettlementOps.sol";
+import "../../../contracts/ops/CreateOps.sol";
 import "../../../contracts/core/BondCollector.sol";
-import "../../../contracts/core/ModuleManagementContract.sol";
+import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/libraries/SettingsValidationLibrary.sol";
 
 contract EscrowLifecycleTest is Test {
@@ -25,7 +25,7 @@ contract EscrowLifecycleTest is Test {
     SettlementOps public settlementOps;
     CreateOps public createOps;
     BondCollector public bondCollector;
-    ModuleManagementContract public moduleManagement;
+    ModuleSnapshotRegistry public moduleManagement;
 
     address public owner;
     address public timelock;
@@ -44,7 +44,7 @@ contract EscrowLifecycleTest is Test {
         token = new ERC20Mock("Test", "TEST", owner, 10000e18);
         yieldOps = new YieldOps(owner);
         disputeOps = new DisputeOps(owner);
-        moduleManagement = new ModuleManagementContract(owner);
+        moduleManagement = new ModuleSnapshotRegistry(owner);
         createOps = new CreateOps(owner);
         settlementOps = new SettlementOps(owner);
         bondCollector = new BondCollector(owner);

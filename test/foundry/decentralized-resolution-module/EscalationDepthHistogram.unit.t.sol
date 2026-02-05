@@ -6,10 +6,10 @@ import '../../../contracts/modules/decentralized-resolution-module/ResolverIncen
 import '../../../contracts/modules/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
-import '../../../contracts/YieldOps.sol';
-import '../../../contracts/DisputeOps.sol';
-import '../../../contracts/core/ModuleManagementContract.sol';
-import '../../../contracts/admin/EscrowAdminContract.sol';
+import '../../../contracts/ops/YieldOps.sol';
+import '../../../contracts/ops/DisputeOps.sol';
+import '../../../contracts/core/ModuleSnapshotRegistry.sol';
+import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 
 /**
@@ -24,8 +24,8 @@ contract EscalationDepthHistogramTest is Test {
     EscrowVault public escrow;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
-    ModuleManagementContract public moduleManagement;
-    EscrowAdminContract public adminContract;
+    ModuleSnapshotRegistry public moduleManagement;
+    EscrowGovernanceTimelock public adminContract;
 
     address public deployer;
     address public depositor;
@@ -52,8 +52,8 @@ contract EscalationDepthHistogramTest is Test {
         incentiveModule.registerEscrowContract(address(this));
         yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps(address(this));
-        moduleManagement = new ModuleManagementContract(address(this));
-        adminContract = new EscrowAdminContract(address(this));
+        moduleManagement = new ModuleSnapshotRegistry(address(this));
+        adminContract = new EscrowGovernanceTimelock(address(this));
         escrow = new EscrowVault(100, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
 
         // Setup tokens
