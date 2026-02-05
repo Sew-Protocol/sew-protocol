@@ -3,6 +3,7 @@ pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
 import '../../../contracts/core/EscrowVault.sol';
+import '../../../contracts/core/EscrowVaultAnalytics.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/ops/YieldOps.sol';
 import '../../../contracts/ops/DisputeOps.sol';
@@ -162,7 +163,7 @@ contract EscrowAccountingBugTests is Test {
         // With the fix, heldAfter MUST be 0 because we reduce by the full principal 'amountAfterFee' (990e18)
         assertEq(heldAfter, 0, "totalHeldInEscrowPerToken should be 0 after full release even with loss");
 
-        (uint256 principalHeld, uint256 feesCollected, uint256 contractBalance, ) = vault.getAccountingBreakdown(address(token));
+        (uint256 principalHeld, uint256 feesCollected, uint256 contractBalance, ) = EscrowVaultAnalytics(address(vault)).getAccountingBreakdown(address(token));
         
         // Delta should be 0 because:
         // actual (10e18 fees) == expected (0 principal + 10e18 fees)

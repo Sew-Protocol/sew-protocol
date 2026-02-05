@@ -87,6 +87,7 @@ error NoFeesToWithdraw(address token, uint256 availableFees);
 error InsufficientContractBalance(address token, uint256 required, uint256 available);
 error AmountExceedsAvailable(address token, uint256 requestedAmount, uint256 availableAmount);
 error AccountingDeficit(address token, uint256 deficit);
+error ZeroAddress(uint8 which);
 
 abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;

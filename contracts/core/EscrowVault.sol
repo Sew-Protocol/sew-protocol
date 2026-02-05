@@ -29,8 +29,6 @@ contract EscrowVault is BaseEscrow {
     event FeesWithdrawn(address indexed token, uint256 amount);
     event WiringConfigured(address indexed yieldOps, address indexed disputeOps, address indexed moduleManagement);
 
-    error ZeroAddress(uint8 which);
-
     constructor(
         uint256 escrowFeeBps,
         address feeAddress,

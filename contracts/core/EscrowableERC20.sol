@@ -33,9 +33,6 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
 
     event FeesWithdrawn(uint256 amount);
 
-    /// @notice Compact error for zero address validation (saves bytecode vs string-based errors)
-    error ZeroAddress(uint8 which); // 1=fee, 2=yieldOps, 3=disputeOps, 4=moduleMgmt
-
     constructor(
         string memory name,
         string memory symbol,

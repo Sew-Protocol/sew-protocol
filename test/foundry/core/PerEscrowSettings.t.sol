@@ -3,6 +3,7 @@ pragma solidity ^0.8.33;
 
 import "forge-std/Test.sol";
 import "../../../contracts/core/EscrowVault.sol";
+import '../../../contracts/core/EscrowVaultAnalytics.sol';
 import "../../../contracts/core/BaseEscrow.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/modules/DefaultReleaseStrategy.sol";
@@ -194,7 +195,7 @@ contract PerEscrowSettingsTest is Test {
 
         // Baseline accounting before creating escrow
         (uint256 principalBefore, uint256 feesBefore, uint256 balanceBefore, ) =
-            vault.getAccountingBreakdown(address(token));
+            EscrowVaultAnalytics(address(vault)).getAccountingBreakdown(address(token));
 
         EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
         settings.customResolver = address(resolutionV2); // non-zero contract address
@@ -222,7 +223,7 @@ contract PerEscrowSettingsTest is Test {
 
         // Verify accounting delta is independent of per-escrow settings values
         (uint256 principalAfter, uint256 feesAfter, uint256 balanceAfter, ) =
-            vault.getAccountingBreakdown(address(token));
+            EscrowVaultAnalytics(address(vault)).getAccountingBreakdown(address(token));
 
         uint256 feeBps = vault.escrowFee();
         uint256 expectedFee = (amount * feeBps) / 10_000;

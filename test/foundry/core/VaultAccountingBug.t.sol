@@ -3,6 +3,7 @@ pragma solidity ^0.8.33;
 
 import "forge-std/Test.sol";
 import "../../../contracts/core/EscrowVault.sol";
+import '../../../contracts/core/EscrowVaultAnalytics.sol';
 import "../../../contracts/core/modules/DefaultResolutionModule.sol";
 import "../../../contracts/types/EscrowTypes.sol";
 import "../../../contracts/ops/YieldOps.sol";
@@ -89,7 +90,7 @@ contract VaultAccountingBugTest is Test {
         vm.stopPrank();
 
         // Check initial accounting
-        (uint256 principal, uint256 fees, uint256 bal, uint256 yield) = escrow.getAccountingBreakdown(address(token));
+        (uint256 principal, uint256 fees, uint256 bal, uint256 yield) = EscrowVaultAnalytics(address(escrow)).getAccountingBreakdown(address(token));
         assertEq(principal, 100 ether);
         assertEq(fees, 0);
         assertEq(bal, 100 ether);
@@ -106,7 +107,7 @@ contract VaultAccountingBugTest is Test {
         assertEq(token.balanceOf(address(escrow)), 100 ether);
 
         // 3. Check accounting breakdown - SHOULD BE principal=0, fees=0, bal=100, yield=0
-        (principal, fees, bal, yield) = escrow.getAccountingBreakdown(address(token));
+        (principal, fees, bal, yield) = EscrowVaultAnalytics(address(escrow)).getAccountingBreakdown(address(token));
         
         assertEq(principal, 0);
         assertEq(yield, 0, "Yield should be zero, claimable funds are correctly tracked now");

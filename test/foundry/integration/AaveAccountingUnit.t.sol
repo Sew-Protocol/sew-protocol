@@ -3,6 +3,7 @@ pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
 import '../../../contracts/core/EscrowVault.sol';
+import '../../../contracts/core/EscrowVaultAnalytics.sol';
 import '../../../contracts/modules/AaveYieldGenerationModule.sol';
 import '../../../contracts/mocks/MockAavePool.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
@@ -187,7 +188,7 @@ contract AaveAccountingUnit is Test {
         vm.stopPrank();
 
         (uint256 principal, uint256 fees, uint256 contractBalance, uint256 yieldInBalance) =
-            vault.getAccountingBreakdown(address(token));
+            EscrowVaultAnalytics(address(vault)).getAccountingBreakdown(address(token));
 
         assertEq(principal, expectedPrincipal, 'Principal in breakdown correct');
         assertEq(fees, expectedFee, 'Fees in breakdown correct');
@@ -210,7 +211,7 @@ contract AaveAccountingUnit is Test {
         token.mint(address(vault), yieldAmount);
 
         (uint256 principal, uint256 fees, uint256 contractBalance, uint256 yieldInBalance) =
-            vault.getAccountingBreakdown(address(token));
+            EscrowVaultAnalytics(address(vault)).getAccountingBreakdown(address(token));
 
         assertEq(principal, expectedPrincipal, 'Principal unchanged with yield');
         assertEq(fees, expectedFee, 'Fees unchanged with yield');
@@ -231,7 +232,7 @@ contract AaveAccountingUnit is Test {
         vault.withdrawFees(address(token));
 
         (uint256 principal, uint256 fees, uint256 contractBalance, uint256 yieldInBalance) =
-            vault.getAccountingBreakdown(address(token));
+            EscrowVaultAnalytics(address(vault)).getAccountingBreakdown(address(token));
 
         assertEq(principal, expectedPrincipal, 'Principal unchanged after fee withdrawal');
         assertEq(fees, 0, 'Fees zero after withdrawal');
@@ -306,7 +307,7 @@ contract AaveAccountingUnit is Test {
         assertEq(vault.totalFeesPerToken(address(token)), feesBefore, 'Fees unchanged');
 
         (uint256 principal, uint256 fees, uint256 contractBalance, uint256 yieldInBalance) =
-            vault.getAccountingBreakdown(address(token));
+            EscrowVaultAnalytics(address(vault)).getAccountingBreakdown(address(token));
 
         assertEq(principal, expectedPrincipal, 'Principal in breakdown correct');
         assertEq(fees, expectedFee, 'Fees in breakdown correct');
@@ -327,7 +328,7 @@ contract AaveAccountingUnit is Test {
         vm.stopPrank();
 
         (uint256 principal, uint256 fees, uint256 contractBalance, uint256 yieldInBalance) =
-            vault.getAccountingBreakdown(address(token));
+            EscrowVaultAnalytics(address(vault)).getAccountingBreakdown(address(token));
 
         assertEq(principal, expectedPrincipal, 'Principal correct for large amounts');
         assertEq(fees, expectedFee, 'Fees correct for large amounts');
