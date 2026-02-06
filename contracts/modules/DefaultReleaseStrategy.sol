@@ -6,36 +6,56 @@ import '@openzeppelin/contracts/utils/introspection/ERC165.sol';
 
 /**
  * @title DefaultReleaseStrategy
- * @notice Default release strategy: buyer-initiated release
- * @dev This matches the current behavior of EscrowableERC20
+ * @notice Default release strategy: buyer-initiated release only
+ * @dev Implements: only the sender (buyer) who created the escrow can release it
+ * @dev Uses canonical escrowData encoding: abi.encode(token, sender, recipient, amountAfterFee)
  */
 contract DefaultReleaseStrategy is IReleaseStrategy, ERC165 {
+    // Reason codes (match IReleaseStrategy documentation)
+    uint8 private constant REASON_ALLOWED = 0;
+    uint8 private constant REASON_NOT_AUTHORIZED = 1;
+
     /**
-     * @notice Check if release is allowed (only sender can release)
+     * @notice Check if release is allowed (only sender/buyer can release)
+     * @param workflowId The escrow workflow ID
+     * @param escrowContract The escrow contract address (unused, for interface compatibility)
+     * @param caller The address attempting to release
+     * @param escrowData Encoded as: abi.encode(token, sender, recipient, amountAfterFee)
+     * @return allowed True if caller is the sender (buyer)
+     * @return reasonCode 0 if allowed, 1 if caller is not the sender
      */
     function canRelease(
-        uint256 /* workflowId */,
-        address /* escrowContract */,
-        address /* caller */,
-        bytes calldata /* escrowData */
-    ) external pure override returns (bool allowed, string memory reason) {
-        // Decode escrow data to get sender address
-        // For now, we'll use a simple check - in full implementation, decode the struct
-        // This is a placeholder that always allows (actual validation in main contract)
-        return (true, '');
+        uint256 workflowId,
+        address escrowContract,
+        address caller,
+        bytes calldata escrowData
+    ) external pure override returns (bool allowed, uint8 reasonCode) {
+        // Decode escrowData to get sender address
+        // Expected format: abi.encode(token, sender, recipient, amountAfterFee)
+        (address token, address sender, address recipient, uint256 amountAfterFee) = abi.decode(
+            escrowData,
+            (address, address, address, uint256)
+        );
+
+        // Only the sender (buyer) can release
+        if (caller == sender) {
+            return (true, REASON_ALLOWED);
+        } else {
+            return (false, REASON_NOT_AUTHORIZED);
+        }
     }
 
     /**
-     * @notice Execute release (returns recipient and amount)
+     * @notice Execute release (not used in v1, reserved for v2)
+     * @dev In v1, BaseEscrow handles all release logic directly
+     * @dev Reverts to prevent reliance on unimplemented behavior
      */
     function executeRelease(
-        uint256 /* workflowId */,
-        address /* escrowContract */,
-        bytes calldata /* escrowData */
-    ) external pure override returns (bool success, address recipient, uint256 amount) {
-        // This is a placeholder - actual release logic handled by main contract
-        // In full implementation, would decode escrowData and return recipient/amount
-        return (true, address(0), 0);
+        uint256 workflowId,
+        address escrowContract,
+        bytes calldata escrowData
+    ) external pure override returns (bool success) {
+        revert('DefaultReleaseStrategy: executeRelease not implemented in v1');
     }
 
     /**

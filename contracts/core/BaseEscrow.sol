@@ -148,6 +148,13 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         YIELD_DIST
     }
 
+    /// @notice Resolution mode for dispute handling (how disputes are handled)
+    enum ResolutionMode {
+        CUSTOM_RESOLVER,     // Uses custom resolver set in EscrowSettings
+        RESOLUTION_MODULE,   // Uses default resolution module
+        DIRECT               // No resolver configured (fallback)
+    }
+
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
     SettlementOps public settlementOps;
@@ -417,14 +424,14 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         address from,
         address to,
         uint256 amount
-    ) internal virtual;
+    ) internal virtual {}
 
     function _snapshotModulesForEscrow(uint256 workflowId) internal {
         address resModule = address(_getResolutionModule(workflowId));
         address incentiveMod = ModuleSnapshotLibrary.getIncentiveModule(resModule);
         moduleSnapshots[workflowId] = ModuleSnapshot({
             resolutionModule: resModule,
-            releaseStrategy: address(_getReleaseStrategy(workflowId)),
+            releaseStrategy: address(_getDefaultReleaseStrategy()),
             yieldGenerationModule: address(_getYieldGenerationModule(workflowId)),
             yieldDistributionModule: address(_getYieldDistributionModule(workflowId)),
             incentiveModule: incentiveMod,
@@ -893,6 +900,60 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     }
 
 
+    /// @notice Release escrow to recipient (core settlement action)
+    /// @param workflowId Unique escrow identifier
+    /// @dev Consults the release strategy to determine eligibility
+    /// @dev Transitions PENDING → RELEASED
+    /// @dev May transfer funds immediately (push) or create claimable balance (fallback)
+    /// @dev Part of IEscrowCore interface for wallet adoption
+    function release(uint256 workflowId) external nonReentrant whenNotPaused {
+        _validateWorkflowId(workflowId);
+        EscrowTransfer storage et = escrowTransfers[workflowId];
+
+        // Only PENDING escrows can be released
+        if (et.escrowState != EscrowState.PENDING) {
+            revert TransferNotPending(workflowId, et.escrowState);
+        }
+
+        // Encode escrow data once (canonical format: token, sender, recipient, amountAfterFee)
+        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(
+            et.token,
+            et.from,
+            et.to,
+            et.amountAfterFee
+        );
+
+        // Load release strategy from snapshot
+        IReleaseStrategy strategy = _getReleaseStrategy(workflowId);
+        
+        // Check strategy is configured (revert if not; don't silently bypass policy)
+        if (address(strategy) == address(0)) {
+            revert('BaseEscrow: release strategy not configured');
+        }
+
+        // Consult strategy for eligibility
+        (bool allowed, uint8 reasonCode) = strategy.canRelease(
+            workflowId,
+            address(this),
+            _msgSender(),
+            escrowData
+        );
+
+        // Require strategy allows the release
+        if (!allowed) {
+            // reasonCode 1 = not authorized, 2 = wrong state, etc.
+            // For wallet-friendly error, use a compact error that maps to the code
+            if (reasonCode == 1) {
+                revert NotSender(workflowId, _msgSender(), et.from);
+            } else {
+                revert('BaseEscrow: release not allowed by strategy');
+            }
+        }
+
+        // Release the escrow (handles push/fallback internally)
+        _releaseEscrowTransfer(workflowId);
+    }
+
     function withdrawEscrow(uint256 workflowId) external nonReentrant returns (uint256) {
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
@@ -930,6 +991,221 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
      */
     function getEscrowCount() external view returns (uint256 count) {
         return escrowTransfers.length;
+    }
+
+    /**
+     * @notice Query the current state of an escrow workflow
+     * @param workflowId Unique escrow identifier
+     * @return state Current EscrowState (NONE, PENDING, RELEASED, REFUNDED, DISPUTED, RESOLVED)
+     * @dev Part of IEscrowCore interface for integrator discovery
+     */
+    function getEscrowState(uint256 workflowId) external view returns (EscrowState state) {
+        _validateWorkflowId(workflowId);
+        return escrowTransfers[workflowId].escrowState;
+    }
+
+    /**
+     * @notice Query the resolution mode for an escrow
+     * @param workflowId Unique escrow identifier
+     * @return mode ResolutionMode enum describing resolution strategy
+     * @dev Critical for integrators: determines who can resolve disputes
+     * @dev Returns appropriate mode based on escrow settings:
+     *      - CUSTOM_RESOLVER if custom resolver is set in settings
+     *      - RESOLUTION_MODULE if default module is configured
+     *      - DIRECT if neither (fallback to direct dispute handling)
+     */
+    function getResolutionMode(uint256 workflowId) external view returns (ResolutionMode mode) {
+        _validateWorkflowId(workflowId);
+        EscrowSettings memory settings = escrowSettings[workflowId];
+        
+        if (settings.customResolver != address(0)) {
+            return ResolutionMode.CUSTOM_RESOLVER;
+        } else if (disputeResolutionModule != address(0)) {
+            return ResolutionMode.RESOLUTION_MODULE;
+        } else {
+            return ResolutionMode.DIRECT;
+        }
+    }
+
+    /**
+     * @notice Query the active dispute handler for a workflow
+     * @param workflowId Unique escrow identifier
+     * @return handler Address of the resolver/module handling the dispute, or address(0) if not disputed
+     * @dev Part of IEscrowCore interface for integrator discovery
+     * @dev Returns address(0) if escrow is not in DISPUTED state
+     * @dev May return either a custom resolver or the default dispute resolution module
+     */
+    function getActiveDisputeHandler(uint256 workflowId) external view returns (address handler) {
+        _validateWorkflowId(workflowId);
+        EscrowTransfer memory et = escrowTransfers[workflowId];
+        
+        // Only return handler if escrow is in DISPUTED state
+        if (et.escrowState == EscrowState.DISPUTED) {
+            return et.disputeResolver;
+        }
+        return address(0);
+    }
+
+    /**
+     * @notice Query wallet-friendly action eligibility (IEscrowCore interface)
+     * @param workflowId Unique escrow identifier
+     * @return actionMask Bitmask of available actions (0=release, 1=senderCancel, 2=recipientCancel, 3=raiseDispute, 4=withdrawEscrow)
+     * @return nextUpdateTime Unix timestamp when action eligibility may change (e.g., timed release)
+     * @dev Used by wallets to determine available actions
+     * @dev Bitmask encoding: bit 0 = release, bit 1 = sender cancel, bit 2 = recipient cancel, bit 3 = raise dispute, bit 4 = withdraw claimable
+     * @dev Consults release strategy via best-effort staticcall; if call fails, release is marked unavailable
+     * @dev This keeps UIs robust when strategies are misconfigured or unavailable
+     */
+    function getActionStatus(uint256 workflowId) external view returns (uint256 actionMask, uint256 nextUpdateTime) {
+        _validateWorkflowId(workflowId);
+        EscrowTransfer storage et = escrowTransfers[workflowId];
+        address caller = _msgSender();
+        
+        // Determine available actions based on current state and caller's role
+        if (et.escrowState == EscrowState.PENDING) {
+            // Sender (buyer) can cancel
+            if (caller == et.from) {
+                actionMask |= (1 << 1); // bit 1: senderCancel
+            }
+            
+            // Recipient (seller) can request cancel
+            if (caller == et.to) {
+                actionMask |= (1 << 2); // bit 2: recipientCancel
+            }
+            
+            // Either party can raise dispute
+            if (caller == et.from || caller == et.to) {
+                actionMask |= (1 << 3); // bit 3: raiseDispute
+            }
+
+            // Release: consult strategy via best-effort staticcall
+            // Only caller == sender should even be checked, but strategy is authoritative
+            if (caller == et.from) {
+                bool canRelease = _checkStrategyCanRelease(workflowId, et);
+                if (canRelease) {
+                    actionMask |= (1 << 0); // bit 0: release
+                }
+                // If strategy call fails, release bit stays unset (safe default)
+            }
+        } else if (et.escrowState == EscrowState.DISPUTED) {
+            // When disputed, either party can interact with dispute
+            if (caller == et.from || caller == et.to) {
+                actionMask |= (1 << 3); // bit 3: raiseDispute (or dispute resolution actions)
+            }
+        } else if (et.escrowState == EscrowState.RELEASED || 
+                  et.escrowState == EscrowState.RESOLVED || 
+                  et.escrowState == EscrowState.REFUNDED) {
+            // Withdraw claimable is available if caller has claimable balance
+            if (claimableBalances[workflowId][caller] > 0) {
+                actionMask |= (1 << 4); // bit 4: withdrawEscrow
+            }
+        }
+        
+        // nextUpdateTime would be set if there are timed actions (e.g., auto-release deadline)
+        // For now, return 0 as escrows don't have built-in time-based transitions in PENDING
+        nextUpdateTime = 0;
+    }
+
+    /**
+     * @notice Best-effort check if strategy allows release (used by getActionStatus)
+     * @dev Uses staticcall to safely query strategy without reverting
+     * @return canRelease True if strategy returns allowed=true, false if call fails or not allowed
+     */
+    function _checkStrategyCanRelease(uint256 workflowId, EscrowTransfer storage et) internal view returns (bool canRelease) {
+        IReleaseStrategy strategy = _getReleaseStrategy(workflowId);
+        if (address(strategy) == address(0)) {
+            return false;
+        }
+
+        try this._staticCanRelease(
+            workflowId,
+            et.token,
+            et.from,
+            et.to,
+            et.amountAfterFee
+        ) returns (bool allowed) {
+            return allowed;
+        } catch {
+            // If strategy call fails, report as unavailable (safe default for UI)
+            return false;
+        }
+    }
+
+    /**
+     * @notice Wrapper for staticcall to strategy (internal helper for getActionStatus)
+     * @dev Takes individual escrow fields instead of storage pointer (required for external function)
+     */
+    function _staticCanRelease(
+        uint256 workflowId,
+        address token,
+        address sender,
+        address recipient,
+        uint256 amountAfterFee
+    ) external view returns (bool) {
+        IReleaseStrategy strategy = _getReleaseStrategy(workflowId);
+        if (address(strategy) == address(0)) {
+            return false;
+        }
+
+        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(
+            token,
+            sender,
+            recipient,
+            amountAfterFee
+        );
+
+        (bool allowed, ) = strategy.canRelease(workflowId, address(this), _msgSender(), escrowData);
+        return allowed;
+    }
+
+    /**
+     * @notice Query escrow data for wallet rendering (IEscrowCore interface)
+     * @param workflowId Unique escrow identifier
+     * @return sender Address that initiated the escrow
+     * @return recipient Address that receives the funds
+     * @return amount Principal amount escrowed (before any fees)
+     * @return token ERC20 token address
+     * @return state Current EscrowState
+     * @dev Used by wallets to render escrow details without parsing logs
+     */
+    function getEscrowData(uint256 workflowId) 
+        external 
+        view 
+        returns (
+            address sender,
+            address recipient,
+            uint256 amount,
+            address token,
+            EscrowState state
+        ) 
+    {
+        _validateWorkflowId(workflowId);
+        EscrowTransfer storage et = escrowTransfers[workflowId];
+        
+        return (
+            et.from,
+            et.to,
+            et.amountAfterFee, // Amount actually escrowed (accounting for fees)
+            et.token,
+            et.escrowState
+        );
+    }
+
+    /**
+     * @notice Query claimable balance for an account (IEscrowCore interface)
+     * @param workflowId Unique escrow identifier
+     * @param account Address to query
+     * @return balance Claimable balance that can be withdrawn via withdrawEscrow()
+     * @dev Returns 0 if no claimable balance exists (either not yet available or already withdrawn)
+     * @dev Used by wallets to show "You have X to withdraw" fallback CTA
+     */
+    function getClaimableBalance(uint256 workflowId, address account) 
+        external 
+        view 
+        returns (uint256 balance) 
+    {
+        _validateWorkflowId(workflowId);
+        return claimableBalances[workflowId][account];
     }
 
     function _requirePending(uint256 workflowId) internal view {
@@ -1117,22 +1393,39 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         address token,
         address from,
         uint256 amount
-    ) internal virtual;
+    ) internal virtual {}
+    
     function _emitEscrowTransferReleased(
         uint256 workflowId,
         address token,
         address to,
         uint256 amount
-    ) internal virtual;
+    ) internal virtual {}
     function _getYieldGenerationModule(
         uint256 workflowId
-    ) internal view virtual returns (IYieldGenerationModule);
+    ) internal view virtual returns (IYieldGenerationModule) {
+        return IYieldGenerationModule(moduleSnapshots[workflowId].yieldGenerationModule);
+    }
+
     function _getYieldDistributionModule(
         uint256 workflowId
-    ) internal view virtual returns (IYieldDistributionModule);
+    ) internal view virtual returns (IYieldDistributionModule) {
+        return IYieldDistributionModule(moduleSnapshots[workflowId].yieldDistributionModule);
+    }
+
     function _getReleaseStrategy(
         uint256 workflowId
-    ) internal view virtual returns (IReleaseStrategy);
+    ) internal view virtual returns (IReleaseStrategy) {
+        address snap = moduleSnapshots[workflowId].releaseStrategy;
+        if (snap != address(0)) {
+            return IReleaseStrategy(snap);
+        }
+        return _getDefaultReleaseStrategy();
+    }
+
+    function _getDefaultReleaseStrategy() internal view virtual returns (IReleaseStrategy) {
+        return IReleaseStrategy(address(0));
+    }
     function _getResolutionModule(
         uint256 workflowId
     ) internal view virtual returns (IResolutionModule) {

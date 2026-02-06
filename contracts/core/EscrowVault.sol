@@ -10,12 +10,9 @@ import '../shared/interfaces/IResolutionModule.sol';
 import '../interfaces/IYieldGenerationModule.sol';
 import '../interfaces/IYieldDistributionModule.sol';
 import './ModuleSnapshotRegistry.sol';
-import '../libraries/ModuleGetterLibrary.sol';
 import '../libraries/FeeRecordingLibrary.sol';
 import '../libraries/BalanceUpdateLibrary.sol';
-import '../libraries/ModuleGetterConsolidationLibrary.sol';
 import '../libraries/FeeWithdrawalLibrary.sol';
-import '../libraries/TokenRecoveryLibrary.sol';
 
 contract EscrowVault is BaseEscrow {
     using SafeERC20 for IERC20;
@@ -27,7 +24,6 @@ contract EscrowVault is BaseEscrow {
     ModuleSnapshotRegistry public immutable moduleManagement;
 
     event FeesWithdrawn(address indexed token, uint256 amount);
-    event WiringConfigured(address indexed yieldOps, address indexed disputeOps, address indexed moduleManagement);
 
     constructor(
         uint256 escrowFeeBps,
@@ -58,7 +54,6 @@ contract EscrowVault is BaseEscrow {
         timeoutConfig.defaultAutoCancelDelay = 0;
         timeoutConfig.maxDisputeDuration = 90 days;
         timeoutConfig.appealWindowDuration = 2 days;
-        emit WiringConfigured(yieldOpsAddress, disputeOpsAddress, moduleManagementAddress);
     }
 
     function releaseEscrowTransfer(uint256 workflowId) public nonReentrant whenNotPaused {
@@ -73,27 +68,15 @@ contract EscrowVault is BaseEscrow {
     function _recordFee(address token, uint256 amount) internal override {
         FeeRecordingLibrary.recordFee(totalFeesPerToken, token, amount);
     }
-    function _depositForYield(
-        IYieldGenerationModule generationModule,
-        uint256 workflowId,
-        address token,
-        uint256 amount
-    ) internal override {
-        address moduleAddress = address(generationModule);
-        uint256 currentAllowance = IERC20(token).allowance(address(this), moduleAddress);
-        if (currentAllowance < amount) {
-            IERC20(token).safeIncreaseAllowance(moduleAddress, type(uint256).max);
+    function _depositForYield(IYieldGenerationModule generationModule, uint256 workflowId, address token, uint256 amount) internal override {
+        address m = address(generationModule);
+        if (IERC20(token).allowance(address(this), m) < amount) {
+            IERC20(token).safeIncreaseAllowance(m, type(uint256).max);
         }
-        
-        uint256 balBefore = IERC20(token).balanceOf(address(this));
-        (bool success, ) = generationModule.depositForYield(workflowId, token, amount, address(this));
-        uint256 balAfter = IERC20(token).balanceOf(address(this));
-
-        if (!success || balBefore - balAfter < amount) {
-            revert AccountingDeficit(token, amount);
-        }
+        uint256 b = IERC20(token).balanceOf(address(this));
+        (bool s, ) = generationModule.depositForYield(workflowId, token, amount, address(this));
+        if (!s || b - IERC20(token).balanceOf(address(this)) < amount) revert AccountingDeficit(token, amount);
     }
-    function _emitEscrowTransferCreated(uint256, address, address, address, uint256) internal pure override {}
     function _transferTokens(address token, address to, uint256 amount) internal override {
         IERC20(token).safeTransfer(to, amount);
     }
@@ -118,34 +101,15 @@ contract EscrowVault is BaseEscrow {
         }
     }
 
-    function _getModuleAddress(uint256 workflowId, ModuleType moduleType) internal view returns (address) {
-        return ModuleGetterLibrary.getModuleAddress(
-            workflowId,
-            moduleType,
-            moduleSnapshots,
-            moduleManagement,
-            address(this)
-        );
-    }
-
-    function _getReleaseStrategy(uint256 workflowId) internal view override returns (IReleaseStrategy) {
-        return ModuleGetterConsolidationLibrary.getReleaseStrategy(_getModuleAddress(workflowId, ModuleType.RELEASE));
-    }
-    function _getResolutionModule(uint256 workflowId) internal view override returns (IResolutionModule) {
-        return ModuleGetterConsolidationLibrary.getResolutionModule(_getModuleAddress(workflowId, ModuleType.RESOLUTION), disputeResolutionModule);
-    }
-    function _getYieldGenerationModule(uint256 workflowId) internal view override returns (IYieldGenerationModule) {
-        return ModuleGetterConsolidationLibrary.getYieldGenerationModule(_getModuleAddress(workflowId, ModuleType.YIELD_GEN));
-    }
-    function _getYieldDistributionModule(uint256 workflowId) internal view override returns (IYieldDistributionModule) {
-        return ModuleGetterConsolidationLibrary.getYieldDistributionModule(_getModuleAddress(workflowId, ModuleType.YIELD_DIST));
-    }
-
     bytes32 public constant ROLE_FEE_RECIPIENT = keccak256('ROLE_FEE_RECIPIENT');
 
     function withdrawFees(address token) external onlyRole(ROLE_FEE_RECIPIENT) nonReentrant {
         uint256 feeAmount = FeeWithdrawalLibrary.withdrawFees(totalFeesPerToken, token, escrowFeeAddress);
         emit FeesWithdrawn(token, feeAmount);
+    }
+
+    function _getDefaultReleaseStrategy() internal view override returns (IReleaseStrategy) {
+        return moduleManagement.getDefaultReleaseStrategy(address(this));
     }
 
 }

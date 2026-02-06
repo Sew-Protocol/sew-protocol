@@ -6,6 +6,7 @@ import '../../../contracts/modules/DefaultYieldDistributionModule.sol';
 import '../../../contracts/modules/DefaultReleaseStrategy.sol';
 import '../../../contracts/core/modules/DefaultResolutionModule.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
+import '../../../contracts/libraries/EscrowEncodingLibrary.sol';
 
 contract ModulesCoverageTest is Test {
     DefaultYieldDistributionModule public distModule;
@@ -154,16 +155,30 @@ contract ModulesCoverageTest is Test {
     // ============ DefaultReleaseStrategy Tests ============
 
     function test_DefaultRelease_canRelease() public {
-        (bool allowed, string memory reason) = relStrategy.canRelease(1, address(this), address(0), "");
+        address sender = address(0x123);
+        address recipient = address(0x456);
+        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(
+            address(token),
+            sender,
+            recipient,
+            1000e18
+        );
+        
+        // Non-sender (address(0)) should not be allowed
+        (bool allowed, uint8 reasonCode) = relStrategy.canRelease(1, address(this), address(0), escrowData);
+        assertFalse(allowed);  // address(0) is not the sender
+        assertEq(reasonCode, 1);  // REASON_NOT_AUTHORIZED
+        
+        // Sender should be allowed
+        (allowed, reasonCode) = relStrategy.canRelease(1, address(this), sender, escrowData);
         assertTrue(allowed);
-        assertEq(reason, "");
+        assertEq(reasonCode, 0);  // REASON_ALLOWED
     }
 
     function test_DefaultRelease_executeRelease() public {
-        (bool success, address recipient, uint256 amount) = relStrategy.executeRelease(1, address(this), "");
-        assertTrue(success);
-        assertEq(recipient, address(0));
-        assertEq(amount, 0);
+        // executeRelease is not implemented in v1, should revert
+        vm.expectRevert();
+        relStrategy.executeRelease(1, address(this), "");
     }
 
     function test_DefaultRelease_Metadata() public {

@@ -8,37 +8,43 @@ import '@openzeppelin/contracts/utils/introspection/IERC165.sol';
  * @notice Interface for escrow release strategies
  * @dev Different release strategies can be implemented (buyer release, multi-party, oracle-based, etc.)
  *      All release strategies must implement ERC-165 for interface detection
+ * 
+ * @dev Reason codes (append-only):
+ *      0 = allowed
+ *      1 = not authorized (caller not eligible)
+ *      2 = wrong state
+ *      3 = missing data
+ *      4-255 = reserved for future use
  */
 interface IReleaseStrategy is IERC165 {
     /**
      * @notice Check if a release is allowed for the given escrow
      * @param workflowId The escrow transfer ID
+     * @param escrowContract Address of the escrow contract
      * @param caller The address attempting to release
-     * @param escrowData Encoded escrow data (struct EscrowTransfer)
+     * @param escrowData Encoded escrow data (token, sender, recipient, amountAfterFee)
      * @return allowed True if release is allowed
-     * @return reason Revert reason if not allowed (empty if allowed)
+     * @return reasonCode Compact reason code if not allowed (0 = allowed, see contract for codes)
+     * @dev escrowData MUST be encoded as: abi.encode(token, sender, recipient, amountAfterFee)
+     * @dev reasonCode is append-only; implementers should document their codes
      */
     function canRelease(
         uint256 workflowId,
         address escrowContract,
         address caller,
         bytes calldata escrowData
-    ) external view returns (bool allowed, string memory reason);
+    ) external view returns (bool allowed, uint8 reasonCode);
 
     /**
-     * @notice Execute the release logic
-     * @param workflowId The escrow transfer ID
-     * @param escrowContract Address of the vault
-     * @param escrowData Encoded escrow data
-     * @return success True if release was successful
-     * @return recipient Address to receive the funds
-     * @return amount Amount to release
+     * @notice Execute the release logic (reserved for future use in v2)
+     * @dev For v1, release() is handled entirely by BaseEscrow
+     * @dev Implementers should revert to prevent reliance on this unimplemented method
      */
     function executeRelease(
         uint256 workflowId,
         address escrowContract,
         bytes calldata escrowData
-    ) external returns (bool success, address recipient, uint256 amount);
+    ) external view returns (bool success);
 
     /**
      * @notice Get the strategy name/identifier

@@ -139,10 +139,11 @@ contract AaveMultiTenantTest is Test {
         vm.prank(buyer);
         token.approve(address(escrowERC20), amountERC20);
         
-        // Call createEscrow on escrowERC20 but use the regular token
-        // (simulate passing token through the escrow)
+        // Call createEscrow on escrowERC20 using the parent class signature
+        // EscrowableERC20 always uses itself as the token
         vm.prank(buyer);
-        uint256 e_wid = escrowERC20.createEscrow(seller, amountERC20, 0, 0);
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
+        uint256 e_wid = escrowERC20.createEscrow(address(escrowERC20), seller, amountERC20, settings);
         
         // Verify both are in Aave independently
         assertTrue(module.escrowInAave(address(vault), v_wid), "Vault escrow should be in Aave");

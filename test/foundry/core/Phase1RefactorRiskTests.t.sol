@@ -105,6 +105,9 @@ contract Phase1RefactorRiskTests is Test {
         moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
         // YIELD_GEN and YIELD_DIST not needed for basic refactor risk tests
         
+        // Set the resolution module as default
+        vault.setResolutionModule(address(resolutionModule));
+        
         // Setup resolution module (DefaultResolutionModule uses constructor resolver)
         // For testing, we'll use the resolver address directly
         
