@@ -1,6 +1,6 @@
 before(function () {
   this.skip();
-}); // migrated to forge-std
+}); // Migrated to Forge: test/foundry/migrated/CoreContractsCoverage.test.t.sol
 /**
  * @title CoreContractsCoverage
  * @notice Comprehensive Hardhat tests to achieve 100% coverage for core contracts

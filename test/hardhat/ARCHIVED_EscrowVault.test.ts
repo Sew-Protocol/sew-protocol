@@ -1,6 +1,12 @@
 before(function () {
   this.skip();
-}); // migrated to forge-std
+}); // ARCHIVED: Batch operations not implemented in SettlementOps.
+    // The original assumption was that batch release/cancel operations would be
+    // in the EscrowOps (now SettlementOps) contract. However, SettlementOps
+    // implements a "compute-only" pattern: it returns settlement parameters to
+    // BaseEscrow for state application. Batching at the settlement level was
+    // never designed into this architecture.
+    // See: contracts/ops/SettlementOps.sol
 import { expect } from 'chai';
 import { ethers } from 'hardhat';
 import { time } from '@nomicfoundation/hardhat-network-helpers';

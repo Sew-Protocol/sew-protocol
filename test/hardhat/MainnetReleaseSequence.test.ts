@@ -1,6 +1,6 @@
 before(function () {
   this.skip();
-}); // migrated to forge-std
+}); // Migrated to Forge: test/foundry/migrated/MainnetReleaseSequence.test.t.sol
 /**
  * Mainnet Release Sequence Integration Tests
  *

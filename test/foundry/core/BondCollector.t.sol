@@ -14,13 +14,6 @@ import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
  * @title BondCollectorTest
  * @notice Comprehensive tests for BondCollector covering all functions and code paths
  * @dev Goal: 99% coverage for BondCollector.sol
- * 
- * Following strategy from 99_PERCENT_TEST_COVERAGE_STRATEGY.md:
- * - All public/external functions (success + key reverts)
- * - ETH bond collection with protocol fee
- * - ERC20 bond collection with protocol fee
- * - Access control (ROLE_ESCROW_CONTRACT, ROLE_TIMELOCK)
- * - Edge cases (zero amounts, zero fees, failed transfers)
  */
 contract BondCollectorTest is Test {
     BondCollector public bondCollector;
@@ -501,14 +494,14 @@ contract MockIncentiveModule is IIncentiveModule {
     }
     
     function recordAppealBond(
-        uint256 workflowId,
-        address escrowContract,
+        uint256,
+        address,
         address depositor,
-        address escalatedBy,
+        address,
         uint256 amount,
         address token,
-        uint8 round
-    ) external payable override {
+        uint8
+    ) external payable {
         if (shouldRevert) revert("Mock revert");
         // Accept ETH (received via msg.value) or pull ERC20 tokens
         if (token != address(0)) {
@@ -521,29 +514,20 @@ contract MockIncentiveModule is IIncentiveModule {
     // Required interface functions (stubs)
     function onDisputeOpened(uint256, address, address, uint256, uint256, uint8) external override {}
     function onResolverAssigned(uint256, address, address, uint8) external override {}
-    function onDecisionSubmitted(
-        uint256,
-        address,
-        address,
-        uint8,
-        ResolutionOutcome,
-        uint256
-    ) external override {}
+    function onDecisionSubmitted(uint256, address, address, uint8, ResolutionOutcome, uint256) external override {}
     function onEscalated(uint256, address, uint8, uint8, address) external override {}
-    function onDisputeFinalized(
-        uint256,
-        address,
-        uint8,
-        ResolutionOutcome
-    ) external override {}
+    function onDisputeFinalized(uint256, address, uint8, ResolutionOutcome) external override {}
     function onResolverTimeout(uint256, address, address, uint8, uint8) external override {}
     function distributePayments(uint256, address, address, uint256) external override {}
     function getClaimablePayment(uint256, address, address) external pure override returns (uint256) {
         return 0;
     }
-    
-    function supportsFeature(bytes4) external pure override returns (bool) { return true; }
-    function getRequiredAppealBond(uint256, address, uint8, uint8) external pure override returns (uint256, address) { return (0, address(0)); }
+    function supportsFeature(bytes4) external pure override returns (bool) {
+        return false;
+    }
+    function getRequiredAppealBond(uint256, address, uint8, uint8) external pure override returns (uint256, address) {
+        return (0, address(0));
+    }
     function distributeAppealBond(uint256, address, uint8, bool) external override {}
 }
 

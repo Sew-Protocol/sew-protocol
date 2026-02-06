@@ -1,6 +1,6 @@
 before(function () {
   this.skip();
-}); // migrated to forge-std
+}); // Migrated to Forge: test/foundry/migrated/02_SlowLaneQueueActivate.test.t.sol
 /**
  * Slow Lane Queue/Activate Tests
  *

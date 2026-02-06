@@ -1,6 +1,6 @@
 before(function () {
   this.skip();
-}); // migrated to forge-std
+}); // Migrated to Forge: test/foundry/migrated/ModuleMetadata.test.t.sol
 /**
  * Module Metadata Tests
  *

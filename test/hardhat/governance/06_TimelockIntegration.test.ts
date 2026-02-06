@@ -1,6 +1,6 @@
 before(function () {
   this.skip();
-}); // migrated to forge-std
+}); // Migrated to Forge: test/foundry/migrated/06_TimelockIntegration.test.t.sol
 /**
  * Timelock Integration Tests
  *
