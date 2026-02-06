@@ -1,260 +1,189 @@
-# Documentation Index
+# Multi-Escrow Documentation Index
 
-Complete index of all documentation in this repository.
+Welcome to the Multi-Escrow protocol documentation. This index helps you navigate the comprehensive documentation organized by topic and use case.
 
-**Last Updated:** 2026-01-27
+## 🚀 Quick Start
 
----
+**First time here?** Start with these documents:
+- [README.md](./README.md) - Overview and getting started
+- [WHITEPAPER.md](./WHITEPAPER.md) - Protocol design and vision
+- [SECURITY.md](./SECURITY.md) - Security policies and best practices
 
-## 🎯 Start Here
+## 📚 Documentation Structure
 
-### Essential Reading
-- **[WHITEPAPER.md](./WHITEPAPER.md)** - Complete protocol whitepaper
-- **[README.md](./README.md)** - Documentation overview and structure
-- **[Technical Overview](./architecture/TECHNICAL_OVERVIEW.md)** - High-level technical architecture
-- **[Production Readiness Checklist](./PRODUCTION_READY_CHECKLIST.md)** - Mainnet requirements and status
-- **[Production Hardening Status](./PRODUCTION_HARDENING_STATUS.md)** - Summary of hardening efforts
+### 📋 Overview & System Architecture
+**Understanding the protocol and its design**
 
-### Contract Architecture (NEW)
-- **[Contract Dependency Map](./CONTRACT_DEPENDENCY_MAP.md)** - Complete contract map showing which contracts use which others, call flows, and relationships
-- **[Contract Quick Reference](./CONTRACT_QUICK_REFERENCE.md)** - Visual reference for contract layers, call chains, and governance flows
+- [overview/COMPLETE_SYSTEM_SUMMARY.md](./overview/COMPLETE_SYSTEM_SUMMARY.md) - Full system architecture and design
+- [overview/MULTI_VAULT_ARCHITECTURE.md](./overview/MULTI_VAULT_ARCHITECTURE.md) - Multi-vault system design
+- [overview/MULTI_VAULT_USER_BENEFITS.md](./overview/MULTI_VAULT_USER_BENEFITS.md) - Benefits and use cases
+- [overview/CONTRACT_REFERENCE_GUIDE.md](./overview/CONTRACT_REFERENCE_GUIDE.md) - Contract reference and interfaces
 
-### Security & Audits
-- **[DeFi Expert Review](./DEFI_EXPERT_REVIEW.md)** - Comprehensive security approval
-- **[Security Model](./reviews/SECURITY_MODEL.md)** - Security model and threat analysis
-- **[Audit Documentation](./reviews/AUDIT.md)** - Audit status and reports
+### 🏗️ System Architecture Details
+**Deep dives into architecture, design, and contract organization**
 
----
+- [architecture/README.md](./architecture/README.md) - Architecture guides overview
+- [architecture/TECHNICAL_OVERVIEW.md](./architecture/TECHNICAL_OVERVIEW.md) - Technical architecture
+- [architecture/ARCHITECTURE_OVERVIEW.md](./architecture/ARCHITECTURE_OVERVIEW.md) - System architecture details
+- [architecture/CONTRACT_DEPENDENCY_MAP.md](./architecture/CONTRACT_DEPENDENCY_MAP.md) - Contract dependencies
+- [architecture/DIRECTORY_REORG_PROPOSAL.md](./architecture/DIRECTORY_REORG_PROPOSAL.md) - Directory organization
+- [architecture/DIRECTORY_BEFORE_AFTER.md](./architecture/DIRECTORY_BEFORE_AFTER.md) - Directory changes
+- [architecture/CONTRACT_NAMES_DESCRIPTIONS.md](./architecture/CONTRACT_NAMES_DESCRIPTIONS.md) - Contract naming conventions
+- [architecture/CONTRACT_NAMING_REVIEW.md](./architecture/CONTRACT_NAMING_REVIEW.md) - Naming review for auditors
+- [architecture/CONTRACT_QUICK_REFERENCE.md](./architecture/CONTRACT_QUICK_REFERENCE.md) - Quick contract reference
+- [architecture/ESCROW_CREATION_AND_SETTINGS.md](./architecture/ESCROW_CREATION_AND_SETTINGS.md) - Escrow creation flow
+- [architecture/PROTOCOL_FEES.md](./architecture/PROTOCOL_FEES.md) - Fee structures and calculations
+- [architecture/YIELD_DISTRIBUTION.md](./architecture/YIELD_DISTRIBUTION.md) - Yield distribution mechanisms
 
-## 🛡️ Production Hardening (Critical Fixes)
+### 🔧 Setup & Deployment
+**Instructions for setting up and deploying the protocol**
 
-Documentation of critical security and correctness fixes required for mainnet.
+- [setup/PREREQUISITES_FOR_MULTIL2.md](./setup/PREREQUISITES_FOR_MULTIL2.md) - Prerequisites for multi-L2
+- [setup/PHASE1_PREREQUISITES_GUIDE.md](./setup/PHASE1_PREREQUISITES_GUIDE.md) - Phase 1 setup
+- [setup/PHASE2_INFRASTRUCTURE_GUIDE.md](./setup/PHASE2_INFRASTRUCTURE_GUIDE.md) - Phase 2 infrastructure
+- [setup/SEPOLIA_DEPLOY_CHECKLIST.md](./setup/SEPOLIA_DEPLOY_CHECKLIST.md) - Sepolia testnet deployment
+- [setup/SEPOLIA_RELEASE_TEST_STRATEGY.md](./setup/SEPOLIA_RELEASE_TEST_STRATEGY.md) - Testing strategy
 
-| Document | Description | Status |
-|----------|-------------|--------|
-| [CRIT1_FIXES.md](./CRIT1_FIXES.md) | Scaled shares accounting & precision fixes | ✅ FIXED |
-| [CRIT1_TESTING](./CRIT1_TESTING_SUMMARY.md) | Unit & Fuzz tests for scaled shares | ✅ COMPLETE |
-| [CRIT2_FIXES.md](./CRIT2_FIXES.md) | Yield distribution PUSH model implementation | ✅ FIXED |
-| [CRIT2_TESTING](./CRIT2_TESTING_SUMMARY.md) | Unit tests for distribution failures | ✅ COMPLETE |
-| [CRIT3_FIXES.md](./CRIT3_FIXES.md) | Aave failure mode transparency & events | ✅ FIXED |
-| [CRIT3_TESTING](./test/CRIT3_TESTING_SUMMARY.md) | Verification of failure communication layer | ✅ COMPLETE |
-| [AAVE_INTEGRATION_STATUS](./test/AAVE_INTEGRATION_CHECKLIST_STATUS.md) | Full Aave test coverage status | ✅ COMPLETE |
-| [TEST_FAILURE_ANALYSIS](./test/REMAINING_TEST_FAILURES_ANALYSIS.md) | Final resolution of all test failures | ✅ COMPLETE |
+### ⚙️ Operations & Deployment
+**Running, monitoring, and operating the protocol**
 
----
+- [operations/DEPLOYMENT.md](./operations/DEPLOYMENT.md) - Deployment procedures
+- [operations/OP_STACK_L2_GUIDE.md](./operations/OP_STACK_L2_GUIDE.md) - OP Stack L2 operations
+- [operations/MONITOR_SETUP.md](./operations/MONITOR_SETUP.md) - Monitoring and alerts setup
+- [operations/PHASE2_MONITORING_ALERTING.md](./operations/PHASE2_MONITORING_ALERTING.md) - Monitoring systems
+- [operations/PHASE4_RUNBOOKS_COMMUNICATION.md](./operations/PHASE4_RUNBOOKS_COMMUNICATION.md) - Operational runbooks
 
-## 📚 Documentation by Category
+### 🔌 Integration & Wallet Guides
+**Integrating with wallets, frontend, and user experience**
 
-### Architecture (`architecture/`)
-Core system architecture and design principles.
+- [guides/WALLET_UX_README.md](./guides/WALLET_UX_README.md) - Wallet UX overview
+- [guides/WALLET_UX_QUICK_START.md](./guides/WALLET_UX_QUICK_START.md) - Quick start for wallet integration
+- [guides/WALLET_UX_SUMMARY.md](./guides/WALLET_UX_SUMMARY.md) - Wallet integration summary
+- [guides/WALLET_UX_MULTICHAIN_GUIDE.md](./guides/WALLET_UX_MULTICHAIN_GUIDE.md) - Multi-chain wallet guide
+- [guides/UX_AND_WALLET_INTEGRATION_PLAN.md](./guides/UX_AND_WALLET_INTEGRATION_PLAN.md) - Integration planning
+- [guides/VIEM_WAGMI_QUICK_START.md](./guides/VIEM_WAGMI_QUICK_START.md) - Viem/Wagmi quick start
+- [guides/EXPO_INTEGRATION_GUIDE.md](./guides/EXPO_INTEGRATION_GUIDE.md) - Expo mobile app integration
+- [guides/EXPO_APP_QUICK_REFERENCE.md](./guides/EXPO_APP_QUICK_REFERENCE.md) - Expo quick reference
+- [guides/ACCOUNT_ABSTRACTION_GUIDE.md](./guides/ACCOUNT_ABSTRACTION_GUIDE.md) - Account abstraction integration
 
-| Document | Description | Status |
-|----------|-------------|--------|
-| [ARCHITECTURE_OVERVIEW.md](./architecture/ARCHITECTURE_OVERVIEW.md) | High-level architectural overview | ✅ Current |
-| [ESCROW_CREATION_AND_SETTINGS.md](./architecture/ESCROW_CREATION_AND_SETTINGS.md) | Escrow creation flow and settings | ✅ Current |
-| [PROTOCOL_FEES.md](./architecture/PROTOCOL_FEES.md) | Protocol fee design and governance | ✅ Current |
-| [YIELD_DISTRIBUTION.md](./architecture/YIELD_DISTRIBUTION.md) | Yield generation and distribution | ✅ Current |
+### 📊 Phase Delivery Documentation
+**Phase-specific implementation and deliverables**
 
-### Dispute Resolution (`dispute-resolution/`)
-Decentralized dispute resolution system documentation.
+- [phase-delivery/PHASE3_SUMMARY.md](./phase-delivery/PHASE3_SUMMARY.md) - Phase 3 summary
+- [phase-delivery/PHASE3_BALANCE_AGGREGATOR.md](./phase-delivery/PHASE3_BALANCE_AGGREGATOR.md) - Balance aggregator
+- [phase-delivery/PHASE3_RECOVERY_FRAMEWORK.md](./phase-delivery/PHASE3_RECOVERY_FRAMEWORK.md) - Recovery framework
 
-| Document | Description | Status |
-|----------|-------------|--------|
-| [RESOLVER_ECONOMICS.md](./dispute-resolution/RESOLVER_ECONOMICS.md) | Resolver incentives and economics | ✅ Current |
-| [DR_V3_COMPLETE_SUMMARY.md](./dispute-resolution/DR_V3_COMPLETE_SUMMARY.md) | Complete DR v3 implementation summary | ✅ Current |
-| [DR_V3_LAUNCH_SAFE_DEFAULTS.md](./dispute-resolution/DR_V3_LAUNCH_SAFE_DEFAULTS.md) | Safe default parameters for launch | ✅ Current |
-| [CURRENCY_MANAGEMENT.md](./dispute-resolution/CURRENCY_MANAGEMENT.md) | Currency and bond management | ✅ Current |
-| [INCENTIVE_DOCS_INDEX.md](./dispute-resolution/INCENTIVE_DOCS_INDEX.md) | Index of incentive module docs | ✅ Current |
+### 📈 Analysis & Reviews
+**Security reviews, audits, and system analysis**
 
-### Governance (`governance/`)
-Governance processes, policies, and procedures.
+- [analysis/PRODUCTION_READY_CHECKLIST.md](./analysis/PRODUCTION_READY_CHECKLIST.md) - Production readiness
+- [analysis/PRODUCTION_HARDENING_STATUS.md](./analysis/PRODUCTION_HARDENING_STATUS.md) - Hardening status
+- [analysis/MULTI_ESCROW_REFACTOR_STATUS.md](./analysis/MULTI_ESCROW_REFACTOR_STATUS.md) - Refactor status
+- [analysis/GUARDIAN_PAUSE_SUMMARY.md](./analysis/GUARDIAN_PAUSE_SUMMARY.md) - Guardian controls
+- [analysis/IMMUTABILITY_ANALYSIS.md](./analysis/IMMUTABILITY_ANALYSIS.md) - Immutability analysis
+- [analysis/IMMUTABLE_SWAPPABLE_IMPACT.md](./analysis/IMMUTABLE_SWAPPABLE_IMPACT.md) - Swappable impact
+- [analysis/MIN_DEPOSIT_AMOUNT_REVIEW.md](./analysis/MIN_DEPOSIT_AMOUNT_REVIEW.md) - Minimum deposit review
+- [analysis/MODULE_MANAGEMENT_SECURITY_ANALYSIS.md](./analysis/MODULE_MANAGEMENT_SECURITY_ANALYSIS.md) - Module security
+- [analysis/MODULE_REGISTRY_YIELD_PRESET_ANALYSIS.md](./analysis/MODULE_REGISTRY_YIELD_PRESET_ANALYSIS.md) - Module registry analysis
+- [analysis/REPOSITORY_FIXES_AND_PROPOSALS.md](./analysis/REPOSITORY_FIXES_AND_PROPOSALS.md) - Fixes and proposals
 
-| Document | Description | Status |
-|----------|-------------|--------|
-| [GOVERNANCE_PROCESS.md](./governance/GOVERNANCE_PROCESS.md) | Step-by-step governance workflow | ✅ Current |
-| [GOVERNANCE_SURFACE_MAP.md](./governance/GOVERNANCE_SURFACE_MAP.md) | Complete governance surface mapping | ✅ Current |
+### 🔍 Security & Reviews
+**External reviews, DeFi analysis, and security documentation**
 
-### Policies (`policies/`)
-Protocol policies and procedures.
+- [reviews/DEFI_EXPERT_REVIEW.md](./reviews/DEFI_EXPERT_REVIEW.md) - DeFi expert review
+- [reviews/REPOSITORY_HOLISTIC_REVIEW.md](./reviews/REPOSITORY_HOLISTIC_REVIEW.md) - Full review
+- [reviews/REVIEW_STATUS_AND_YIELD_LAUNCH.md](./reviews/REVIEW_STATUS_AND_YIELD_LAUNCH.md) - Launch status
 
-| Document | Description | Status |
-|----------|-------------|--------|
-| [EMERGENCY_POLICY.md](./policies/EMERGENCY_POLICY.md) | Emergency controls and procedures | ✅ Current |
-| [UPGRADE_POLICY.md](./policies/UPGRADE_POLICY.md) | Upgrade procedures and ossification | ✅ Current |
+### 🐛 Bug Fixes & Testing
+**Critical fixes and test summaries**
 
-### Deployment (`deployment/`)
-Deployment guides, checklists, and configuration.
+- [CRIT1_FIXES.md](./CRIT1_FIXES.md) - Critical issue 1 fixes
+- [CRIT1_TESTING_SUMMARY.md](./CRIT1_TESTING_SUMMARY.md) - Critical 1 test summary
+- [CRIT2_FIXES.md](./CRIT2_FIXES.md) - Critical issue 2 fixes
+- [CRIT2_TESTING_SUMMARY.md](./CRIT2_TESTING_SUMMARY.md) - Critical 2 test summary
+- [CRIT3_FIXES.md](./CRIT3_FIXES.md) - Critical issue 3 fixes
 
-| Document | Description | Status |
-|----------|-------------|--------|
-| [MAINNET_DEPLOYMENT_PLAN.md](./deployment/MAINNET_DEPLOYMENT_PLAN.md) | Mainnet deployment plan | ✅ Current |
-| [VERIFICATION.md](./deployment/VERIFICATION.md) | Contract verification procedures | ✅ Current |
+### 📖 Reference & Technical Details
+**Technical references and additional resources**
 
-### Reference (`reference/`)
-Technical references, standards, and guides.
+- [reference/invariants_suite_vaults.md](./reference/invariants_suite_vaults.md) - Vault invariants
+- [reference/coverage-verification.md](./reference/coverage-verification.md) - Coverage verification
+- [reference/YIELD_PRESET_EXTENSIBILITY_GUIDE.md](./reference/YIELD_PRESET_EXTENSIBILITY_GUIDE.md) - Yield presets
 
-| Document | Description | Status |
-|----------|-------------|--------|
-| [MODULE_MAP.md](./reference/MODULE_MAP.md) | Module interface → implementation mapping | ✅ Current |
-| [MODULE_DEVELOPMENT_GUIDE.md](./reference/MODULE_DEVELOPMENT_GUIDE.md) | Guide for developing modules | ✅ Current |
-| [MODULE_UPGRADE_STRATEGY.md](./reference/MODULE_UPGRADE_STRATEGY.md) | Module upgrade strategies | ✅ Current |
-| [INTERFACE_VERSIONING.md](./reference/INTERFACE_VERSIONING.md) | Interface versioning strategy | ✅ Current |
-| [ERROR_STANDARDIZATION.md](./reference/ERROR_STANDARDIZATION.md) | Error code standardization | ✅ Current |
+### 🔨 Implementation & Procedures
+**Implementation guides and operational procedures**
 
-### Guides (`guides/`)
-User and developer guides.
+- [procedures/IMPLEMENTATION_STATUS.md](./procedures/IMPLEMENTATION_STATUS.md) - Implementation status
+- [procedures/FIX_FAILING_TESTS_PROMPT.md](./procedures/FIX_FAILING_TESTS_PROMPT.md) - Test fixing guide
 
-| Document | Description | Status |
-|----------|-------------|--------|
-| [CONTRIBUTING.md](./guides/CONTRIBUTING.md) | Contributing guidelines | ✅ Current |
-| [CODING_STANDARDS.md](./guides/CODING_STANDARDS.md) | Code style and standards | ✅ Current |
+### 📁 Additional Documentation Directories
 
-### Reviews (`reviews/`)
-Security reviews, audits, and assessments.
+- [architecture/](./architecture/) - Architecture and design docs
+- [deployment/](./deployment/) - Deployment guides
+- [development/](./development/) - Development setup
+- [dispute-resolution/](./dispute-resolution/) - Dispute resolution system
+- [governance/](./governance/) - Governance documentation
+- [implementation/](./implementation/) - Implementation details
+- [modules/](./modules/) - Module documentation
+- [optimization/](./optimization/) - Performance optimization
+- [policies/](./policies/) - Policies and procedures
+- [proposals/](./proposals/) - Protocol proposals
+- [security/](./security/) - Security documentation
+- [test/](./test/) - Test documentation
+- [testing/](./testing/) - Testing guides
+- [token/](./token/) - Token documentation
+- [archive/](./archive/) - Archived documentation
+- [archived/](./archived/) - Legacy documentation
 
-| Document | Description | Status |
-|----------|-------------|--------|
-| [SECURITY_MODEL.md](./reviews/SECURITY_MODEL.md) | Security model and threat analysis | ✅ Current |
-| [AUDIT.md](./reviews/AUDIT.md) | Audit status and reports | ✅ Current |
-| [CORE_CONTRACTS_REVIEW.md](./reviews/CORE_CONTRACTS_REVIEW.md) | Core contracts review | ✅ Current |
-| [SMART_CONTRACT_REVIEW.md](./reviews/SMART_CONTRACT_REVIEW.md) | Smart contract review | ✅ Current |
+## 🎯 By Use Case
 
-### Token (`token/`)
-Token documentation and tokenomics.
+### "I want to deploy the protocol"
+1. Read [setup/PREREQUISITES_FOR_MULTIL2.md](./setup/PREREQUISITES_FOR_MULTIL2.md)
+2. Follow [setup/SEPOLIA_DEPLOY_CHECKLIST.md](./setup/SEPOLIA_DEPLOY_CHECKLIST.md)
+3. Review [operations/DEPLOYMENT.md](./operations/DEPLOYMENT.md)
 
-| Document | Description | Status |
-|----------|-------------|--------|
-| [SEW_TOKENOMICS_EXCHANGE_DRAFT.md](./token/SEW_TOKENOMICS_EXCHANGE_DRAFT.md) | Tokenomics exchange draft | ✅ Current |
-| [SEW_TOKENOMICS_RECONCILIATION_MATRIX.md](./token/SEW_TOKENOMICS_RECONCILIATION_MATRIX.md) | Tokenomics reconciliation | ✅ Current |
+### "I want to integrate a wallet"
+1. Start with [guides/WALLET_UX_QUICK_START.md](./guides/WALLET_UX_QUICK_START.md)
+2. Read [guides/VIEM_WAGMI_QUICK_START.md](./guides/VIEM_WAGMI_QUICK_START.md) for web3 libraries
+3. Check [guides/EXPO_INTEGRATION_GUIDE.md](./guides/EXPO_INTEGRATION_GUIDE.md) for mobile
 
----
+### "I want to understand the architecture"
+1. Read [overview/COMPLETE_SYSTEM_SUMMARY.md](./overview/COMPLETE_SYSTEM_SUMMARY.md)
+2. Review [architecture/TECHNICAL_OVERVIEW.md](./architecture/TECHNICAL_OVERVIEW.md)
+3. Check [architecture/CONTRACT_DEPENDENCY_MAP.md](./architecture/CONTRACT_DEPENDENCY_MAP.md)
 
-## 📦 Additional Documentation
+### "I want to audit the protocol"
+1. Read [SECURITY.md](./SECURITY.md) first
+2. Review [analysis/PRODUCTION_READY_CHECKLIST.md](./analysis/PRODUCTION_READY_CHECKLIST.md)
+3. Check [reviews/REPOSITORY_HOLISTIC_REVIEW.md](./reviews/REPOSITORY_HOLISTIC_REVIEW.md)
+4. Examine [architecture/CONTRACT_NAMING_REVIEW.md](./architecture/CONTRACT_NAMING_REVIEW.md)
 
-Historical, superseded, or completed documentation moved to `more/` or `archived/` for reference.
+### "I want to set up monitoring"
+1. Follow [operations/MONITOR_SETUP.md](./operations/MONITOR_SETUP.md)
+2. Read [operations/PHASE2_MONITORING_ALERTING.md](./operations/PHASE2_MONITORING_ALERTING.md)
+3. Review [operations/PHASE4_RUNBOOKS_COMMUNICATION.md](./operations/PHASE4_RUNBOOKS_COMMUNICATION.md)
 
-### Implementation Status (`more/implementation/`)
-- Implementation summaries and status reports
-- Completed implementation tasks
-- Historical implementation notes
+## 📝 Document Organization
 
-### Development Plans (`more/plans/`)
-- Completed development plans
-- Historical planning documents
-- Superseded roadmap items
+All documents are organized by:
+- **Purpose** (overview, architecture, operations, etc.)
+- **Audience** (developers, auditors, operators, integrators)
+- **Topic** (deployment, integration, analysis, etc.)
 
-### Status Reports (`more/status/`)
-- Historical status reports
-- Completed phase summaries
-- Progress tracking documents
-- Root-level status reports
+Use the directory structure to quickly find documentation relevant to your needs.
 
-### Test Documentation (`more/test/`)
-- Historical test plans and strategies
-- Test coverage reports
-- Test implementation tasks
-- Testing assessments and status reports
-- **[Initial Simulation Testing Plan (Base Sepolia)](./more/test/INITIAL_SIMULATION_TESTING_PLAN.md)** - Phased simulation plan (Phase 0–3, DR1→DR3) and pass criteria
+## 🔄 Changelog
 
-### Proposals (`more/proposals/`)
-- Completed proposals
-- Historical design proposals
-- Superseded feature proposals
+See [CHANGELOG.md](./CHANGELOG.md) for recent updates and changes to documentation.
 
-### Summaries (`more/summaries/`)
-- Feature summaries
-- Review responses
-- Implementation summaries
+## ❓ Questions?
 
-### Investigations (`more/investigations/`)
-- Technical investigations
-- Issue analysis
-- Research documents
-
-### Communications (`more/comms/`)
-- Ethereum Magicians posts
-- EIP discussions
-- Community communications
-
-### Audits (`more/audits/`)
-- Historical audit reports
-- Code audits
-- Security audits
-
-### Setup (`more/setup/`)
-- Historical setup guides
-- Setup checklists and assessments
-
-### Migrations (`more/migrations/`)
-- Migration procedures
-- Historical migration notes
-
-### Priorities (`more/priorities/`)
-- Historical priority documents
-- Priority lists and assessments
+- Check [README.md](./README.md) for general information
+- Review [SECURITY.md](./SECURITY.md) for security concerns
+- Look in the appropriate directory for your topic
+- Check [architecture/](./architecture/) for technical details
 
 ---
 
-## 🔍 Quick Reference
-
-### By Topic
-
-**Security:**
-- [Security Model](./reviews/SECURITY_MODEL.md)
-- [Audit Documentation](./reviews/AUDIT.md)
-- [Emergency Policy](./policies/EMERGENCY_POLICY.md)
-
-**Architecture:**
-- [Technical Overview](./architecture/TECHNICAL_OVERVIEW.md)
-- [Architectural Principles](./architecture/ARCHITECTURAL_PRINCIPLES.md)
-- [Contracts Summary](./architecture/CONTRACTS_SUMMARY.md)
-- [Contract Dependency Map](./CONTRACT_DEPENDENCY_MAP.md) ⭐ NEW - Shows which contracts use/call which
-- [Contract Quick Reference](./CONTRACT_QUICK_REFERENCE.md) ⭐ NEW - Visual layers, call chains, governance flows
-
-**Governance:**
-- [Governance Process](./governance/GOVERNANCE_PROCESS.md)
-- [Governance Surface Map](./governance/GOVERNANCE_SURFACE_MAP.md)
-- [Upgrade Policy](./policies/UPGRADE_POLICY.md)
-
-**Dispute Resolution:**
-- [Resolver Economics](./dispute-resolution/RESOLVER_ECONOMICS.md)
-- [DR v3 Summary](./dispute-resolution/DR_V3_COMPLETE_SUMMARY.md)
-- [Currency Management](./dispute-resolution/CURRENCY_MANAGEMENT.md)
-
-**Development:**
-- [Contributing Guide](./guides/CONTRIBUTING.md)
-- [Coding Standards](./guides/CODING_STANDARDS.md)
-- [Module Development Guide](./reference/MODULE_DEVELOPMENT_GUIDE.md)
-
-**Deployment:**
-- [Mainnet Deployment Plan](./deployment/MAINNET_DEPLOYMENT_PLAN.md)
-- [Base Sepolia Core Testnet Guide](./deployment/BASE_SEPOLIA_CORE_TESTNET_GUIDE.md)
-- [Base Sepolia Deployment Guide](./deployment/BASE_SEPOLIA_DEPLOYMENT_GUIDE.md)
-- [IEO Release Guide](./deployment/ieo/IEO_RELEASE_GUIDE.md)
-- [Verification Guide](./deployment/VERIFICATION.md)
-
----
-
-## 📝 Document Status Legend
-
-- ✅ **Current** - Actively maintained and up-to-date
-- ⚠️ **Needs Review** - May need updates
-- 📦 **Archived** - Historical reference, not actively maintained
-- 🔄 **In Progress** - Currently being updated
-
----
-
-## 🔗 External Links
-
-- [Repository README](../README.md)
-- [Security Policy](../SECURITY.md)
-- [Governance Runbooks](../governance/runbooks/)
-
----
-
-## 📧 Questions?
-
-For questions about documentation:
-- Open an issue in the repository
-- Check the [Contributing Guide](./guides/CONTRIBUTING.md)
-- Review the [README](./README.md) for structure
+**Last Updated**: February 2026  
+**Status**: Production Ready
