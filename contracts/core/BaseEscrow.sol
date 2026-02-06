@@ -1401,16 +1401,32 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         address to,
         uint256 amount
     ) internal virtual {}
+    function _getDefaultYieldGenerationModule(uint256 workflowId) internal view virtual returns (IYieldGenerationModule) {
+        return IYieldGenerationModule(address(0));
+    }
+
+    function _getDefaultYieldDistributionModule(uint256 workflowId) internal view virtual returns (IYieldDistributionModule) {
+        return IYieldDistributionModule(address(0));
+    }
+
     function _getYieldGenerationModule(
         uint256 workflowId
     ) internal view virtual returns (IYieldGenerationModule) {
-        return IYieldGenerationModule(moduleSnapshots[workflowId].yieldGenerationModule);
+        address snap = moduleSnapshots[workflowId].yieldGenerationModule;
+        if (snap != address(0)) {
+            return IYieldGenerationModule(snap);
+        }
+        return _getDefaultYieldGenerationModule(workflowId);
     }
 
     function _getYieldDistributionModule(
         uint256 workflowId
     ) internal view virtual returns (IYieldDistributionModule) {
-        return IYieldDistributionModule(moduleSnapshots[workflowId].yieldDistributionModule);
+        address snap = moduleSnapshots[workflowId].yieldDistributionModule;
+        if (snap != address(0)) {
+            return IYieldDistributionModule(snap);
+        }
+        return _getDefaultYieldDistributionModule(workflowId);
     }
 
     function _getReleaseStrategy(

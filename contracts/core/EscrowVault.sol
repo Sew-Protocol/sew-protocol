@@ -112,4 +112,12 @@ contract EscrowVault is BaseEscrow {
         return moduleManagement.getDefaultReleaseStrategy(address(this));
     }
 
+    function _getDefaultYieldGenerationModule(uint256 workflowId) internal view override returns (IYieldGenerationModule) {
+        return IYieldGenerationModule(moduleManagement.getDefaultYieldGenerationModule(address(this)));
+    }
+
+    function _getDefaultYieldDistributionModule(uint256 workflowId) internal view override returns (IYieldDistributionModule) {
+        return IYieldDistributionModule(moduleManagement.getDefaultYieldDistributionModule(address(this)));
+    }
+
 }
