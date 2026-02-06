@@ -2,7 +2,7 @@
 pragma solidity ^0.8.33;
 
 import '../types/EscrowTypes.sol';
-import '../core/ModuleManagementContract.sol';
+import '../core/ModuleSnapshotRegistry.sol';
 import '../core/BaseEscrow.sol'; // For ModuleType enum
 
 /**
@@ -12,12 +12,12 @@ import '../core/BaseEscrow.sol'; // For ModuleType enum
  */
 library ModuleGetterLibrary {
     /**
-     * @notice Get module address from snapshot or default from ModuleManagementContract
+     * @notice Get module address from snapshot or default from ModuleSnapshotRegistry
      * @param workflowId The escrow ID
      * @param moduleType Type of module to retrieve
      * @param moduleSnapshots Storage reference to moduleSnapshots mapping
-     * @param moduleManagement ModuleManagementContract instance
-     * @param escrowContract Address of the escrow contract (msg.sender for ModuleManagementContract)
+     * @param moduleManagement ModuleSnapshotRegistry instance
+     * @param escrowContract Address of the escrow contract (msg.sender for ModuleSnapshotRegistry)
      * @return moduleAddress The module address
      * @dev Uses assembly for optimized storage reads and switch pattern
      */
@@ -25,7 +25,7 @@ library ModuleGetterLibrary {
         uint256 workflowId,
         BaseEscrow.ModuleType moduleType,
         mapping(uint256 => BaseEscrow.ModuleSnapshot) storage moduleSnapshots,
-        ModuleManagementContract moduleManagement,
+        ModuleSnapshotRegistry moduleManagement,
         address escrowContract
     ) internal view returns (address moduleAddress) {
         address snapshotModule;
@@ -61,7 +61,7 @@ library ModuleGetterLibrary {
             return snapshotModule;
         }
 
-        // Query ModuleManagementContract for module
+        // Query ModuleSnapshotRegistry for module
         return moduleManagement.getModule(escrowContract, moduleType);
     }
 }

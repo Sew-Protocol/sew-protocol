@@ -3,26 +3,26 @@ import "../../../contracts/types/YieldPresets.sol";
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
-import 'contracts/YieldOps.sol';
-import 'contracts/DisputeOps.sol';
-import 'contracts/core/ModuleManagementContract.sol';
-import 'contracts/admin/EscrowAdminContract.sol';
+import 'contracts/ops/YieldOps.sol';
+import 'contracts/ops/DisputeOps.sol';
+import 'contracts/core/ModuleSnapshotRegistry.sol';
+import 'contracts/admin/EscrowGovernanceTimelock.sol';
 import 'contracts/core/EscrowVault.sol';
 
 contract Test_02_SlowLaneQueueActivate_test is Test {
     EscrowVault vault;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
-    ModuleManagementContract public moduleManagement;
-    EscrowAdminContract public adminContract;
+    ModuleSnapshotRegistry public moduleManagement;
+    EscrowGovernanceTimelock public adminContract;
     address timelock = address(0x1);
     address newFeeAddr = address(0x9);
 
     function setUp() public {
         yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps(address(this));
-        moduleManagement = new ModuleManagementContract(address(this));
-        adminContract = new EscrowAdminContract(address(this));
+        moduleManagement = new ModuleSnapshotRegistry(address(this));
+        adminContract = new EscrowGovernanceTimelock(address(this));
         vault = new EscrowVault(100, address(this), address(yieldOps), address(disputeOps), address(moduleManagement));
         // grant timelock role to timelock address
         vault.grantRole(vault.ROLE_TIMELOCK(), timelock);

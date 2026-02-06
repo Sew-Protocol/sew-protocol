@@ -4,15 +4,15 @@ pragma solidity ^0.8.33;
 import "forge-std/Test.sol";
 import "./AaveHandler.t.sol";
 import "../../../contracts/core/EscrowVault.sol";
-import "../../../contracts/core/ModuleManagementContract.sol";
+import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/modules/AaveYieldGenerationModule.sol";
 import "../../../contracts/modules/DefaultYieldDistributionModule.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
 import "../../../contracts/mocks/MockAavePool.sol";
-import "../../../contracts/YieldOps.sol";
-import "../../../contracts/DisputeOps.sol";
-import "../../../contracts/CreateOps.sol";
-import "../../../contracts/SettlementOps.sol";
+import "../../../contracts/ops/YieldOps.sol";
+import "../../../contracts/ops/DisputeOps.sol";
+import "../../../contracts/ops/CreateOps.sol";
+import "../../../contracts/ops/SettlementOps.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/core/modules/DefaultResolutionModule.sol";
 
@@ -22,7 +22,7 @@ contract AaveStatefulFuzz is Test {
     AaveYieldGenerationModule public aaveModule;
     MockAavePool public aavePool;
     ERC20Mock public token;
-    ModuleManagementContract public mm;
+    ModuleSnapshotRegistry public mm;
     
     function setUp() public {
         token = new ERC20Mock("Mock Token", "MOCK", address(this), 0);
@@ -40,7 +40,7 @@ contract AaveStatefulFuzz is Test {
         YieldOps yieldOps = new YieldOps(address(this));
         aaveModule.grantRole(aaveModule.ROLE_YIELD_OPS(), address(yieldOps));
         DisputeOps disputeOps = new DisputeOps(address(this));
-        mm = new ModuleManagementContract(address(this));
+        mm = new ModuleSnapshotRegistry(address(this));
         
         vault = new EscrowVault(100, address(0xFEE), address(yieldOps), address(disputeOps), address(mm));
         

@@ -1,6 +1,6 @@
 before(function () {
   this.skip();
-}); // migrated to forge-std
+}); // Migrated to Forge: test/foundry/migrated/EscalationFee.test.t.sol
 import { expect } from 'chai';
 import { ethers } from 'hardhat';
 import { time } from '@nomicfoundation/hardhat-network-helpers';

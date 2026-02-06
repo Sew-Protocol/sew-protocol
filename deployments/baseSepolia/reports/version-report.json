@@ -262,8 +262,8 @@
       },
       "metadata": {}
     },
-    "EscrowAdminContract": {
-      "name": "EscrowAdminContract",
+    "EscrowGovernanceTimelock": {
+      "name": "EscrowGovernanceTimelock",
       "address": "0x34fF47Ee2f95C35ec1e012DdD2D7394D7C644931",
       "runtimeCodeSizeBytes": 7198,
       "runtimeCodeHash": "0x6adf598eb2d970d30ef80fee4240ec04b072d7da1183f91e6afabaa6d6b2378f",
@@ -494,8 +494,8 @@
       },
       "metadata": {}
     },
-    "ModuleManagementContract": {
-      "name": "ModuleManagementContract",
+    "ModuleSnapshotRegistry": {
+      "name": "ModuleSnapshotRegistry",
       "address": "0xaa0Fa9C11af77E7f2BF14f86C17C8436370F0a86",
       "runtimeCodeSizeBytes": 3505,
       "runtimeCodeHash": "0x46ae811faf6da290156e9ee44656071bc9fd2ccaf2f83a212fd0c22ba6623adf",

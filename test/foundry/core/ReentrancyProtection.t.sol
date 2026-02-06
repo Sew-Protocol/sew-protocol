@@ -7,16 +7,16 @@ import '../../../contracts/modules/decentralized-resolution-module/ResolverIncen
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol';
 import '../../../contracts/modules/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
-import '../../../contracts/YieldOps.sol';
-import '../../../contracts/DisputeOps.sol';
-import '../../../contracts/SettlementOps.sol';
-import '../../../contracts/CreateOps.sol';
+import '../../../contracts/ops/YieldOps.sol';
+import '../../../contracts/ops/DisputeOps.sol';
+import '../../../contracts/ops/SettlementOps.sol';
+import '../../../contracts/ops/CreateOps.sol';
 import '../../../contracts/core/BondCollector.sol';
-import '../../../contracts/core/ModuleManagementContract.sol';
+import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/types/YieldPresets.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
-import '../../../contracts/admin/EscrowAdminContract.sol';
+import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
 
 /**
  * @title ReentrancyProtectionTest
@@ -37,8 +37,8 @@ contract ReentrancyProtectionTest is Test {
     SettlementOps public settlementOps;
     CreateOps public createOps;
     BondCollector public bondCollector;
-    ModuleManagementContract public moduleManagement;
-    EscrowAdminContract public adminContract;
+    ModuleSnapshotRegistry public moduleManagement;
+    EscrowGovernanceTimelock public adminContract;
 
     address public deployer;
     address public timelock;
@@ -63,8 +63,8 @@ contract ReentrancyProtectionTest is Test {
         settlementOps = new SettlementOps(address(this));
         createOps = new CreateOps(address(this));
         bondCollector = new BondCollector(address(this));
-        moduleManagement = new ModuleManagementContract(address(this));
-        adminContract = new EscrowAdminContract(address(this));
+        moduleManagement = new ModuleSnapshotRegistry(address(this));
+        adminContract = new EscrowGovernanceTimelock(address(this));
         escrow = new EscrowVault(100, makeAddr('feeAddress'), address(yieldOps), address(disputeOps), address(moduleManagement));
         moduleManagement.registerEscrowContract(address(escrow));
 

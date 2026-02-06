@@ -1,6 +1,6 @@
 before(function () {
   this.skip();
-}); // migrated to forge-std
+}); // Kleros integration not yet complete - see contracts/arbitration/
 import { expect } from 'chai';
 import { ethers } from 'hardhat';
 import { KlerosArbitrableProxy, MockKlerosArbitrator } from '../../typechain-types';
@@ -9,6 +9,8 @@ import { KlerosArbitrableProxy, MockKlerosArbitrator } from '../../typechain-typ
  * NOTE: These tests are for Kleros integration (new arbitration feature).
  * Kleros contracts are in contracts/arbitration/ but not yet fully integrated into the escrow system.
  * Will be properly implemented once Kleros integration is complete.
+ *
+ * Forge equivalent: test/foundry/arbitration/KlerosIntegration.t.sol (comprehensive test suite)
  */
 describe.skip('Kleros Integration Tests', function () {
   let klerosProxy: KlerosArbitrableProxy;

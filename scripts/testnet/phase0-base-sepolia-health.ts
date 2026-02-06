@@ -118,8 +118,8 @@ async function run() {
     'SettlementOps',
     'CreateOps',
     'BondCollector',
-    'ModuleManagementContract',
-    'EscrowAdminContract',
+    'ModuleSnapshotRegistry',
+    'EscrowGovernanceTimelock',
     'EscrowVault',
   ] as const;
 
@@ -147,7 +147,7 @@ async function run() {
     ['EscrowVault.createOps', () => escrowVault.createOps(), d.CreateOps.address],
     ['EscrowVault.settlementOps', () => escrowVault.settlementOps(), d.SettlementOps.address],
     ['EscrowVault.bondCollector', () => escrowVault.bondCollector(), d.BondCollector.address],
-    ['EscrowVault.moduleManagement', () => escrowVault.moduleManagement(), d.ModuleManagementContract.address],
+    ['EscrowVault.moduleManagement', () => escrowVault.moduleManagement(), d.ModuleSnapshotRegistry.address],
   ];
 
   for (const [label, getter, expected] of wiringPairs) {
@@ -185,14 +185,14 @@ async function run() {
     });
   }
 
-  // 4) EscrowAdminContract must be authorized on EscrowVault (ROLE_ADMIN_CONTRACT)
-  console.log(`\n4) Slow-lane admin wiring (EscrowAdminContract)`);
+  // 4) EscrowGovernanceTimelock must be authorized on EscrowVault (ROLE_ADMIN_CONTRACT)
+  console.log(`\n4) Slow-lane admin wiring (EscrowGovernanceTimelock)`);
   const ROLE_ADMIN_CONTRACT = await escrowVault.ROLE_ADMIN_CONTRACT();
-  const adminOk = await escrowVault.hasRole(ROLE_ADMIN_CONTRACT, d.EscrowAdminContract.address);
+  const adminOk = await escrowVault.hasRole(ROLE_ADMIN_CONTRACT, d.EscrowGovernanceTimelock.address);
   results.push({
     ok: adminOk,
-    name: 'EscrowVault.hasRole(ROLE_ADMIN_CONTRACT, EscrowAdminContract)',
-    detail: `admin=${d.EscrowAdminContract.address}`,
+    name: 'EscrowVault.hasRole(ROLE_ADMIN_CONTRACT, EscrowGovernanceTimelock)',
+    detail: `admin=${d.EscrowGovernanceTimelock.address}`,
   });
 
   // 5) Timelock wiring (minimum): Governor proposer/canceller

@@ -3,14 +3,15 @@ pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
 import '../../../contracts/core/EscrowVault.sol';
+import '../../../contracts/core/EscrowVaultAnalytics.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
-import '../../../contracts/YieldOps.sol';
-import '../../../contracts/DisputeOps.sol';
+import '../../../contracts/ops/YieldOps.sol';
+import '../../../contracts/ops/DisputeOps.sol';
 import '../../../contracts/core/modules/DefaultResolutionModule.sol';
-import '../../../contracts/core/ModuleManagementContract.sol';
+import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
-import '../../../contracts/CreateOps.sol';
-import '../../../contracts/SettlementOps.sol';
+import '../../../contracts/ops/CreateOps.sol';
+import '../../../contracts/ops/SettlementOps.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/interfaces/IYieldGenerationModule.sol';
 
@@ -74,7 +75,7 @@ contract EscrowAccountingBugTests is Test {
     EscrowVault public vault;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
-    ModuleManagementContract public mm;
+    ModuleSnapshotRegistry public mm;
     CreateOps public createOps;
     SettlementOps public settlementOps;
     BondCollector public bondCollector;
@@ -95,7 +96,7 @@ contract EscrowAccountingBugTests is Test {
 
         yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps(address(this));
-        mm = new ModuleManagementContract(address(this));
+        mm = new ModuleSnapshotRegistry(address(this));
         createOps = new CreateOps(address(this));
         settlementOps = new SettlementOps(address(this));
         bondCollector = new BondCollector(address(this));
@@ -162,7 +163,7 @@ contract EscrowAccountingBugTests is Test {
         // With the fix, heldAfter MUST be 0 because we reduce by the full principal 'amountAfterFee' (990e18)
         assertEq(heldAfter, 0, "totalHeldInEscrowPerToken should be 0 after full release even with loss");
 
-        (uint256 principalHeld, uint256 feesCollected, uint256 contractBalance, ) = vault.getAccountingBreakdown(address(token));
+        (uint256 principalHeld, uint256 feesCollected, uint256 contractBalance, ) = EscrowVaultAnalytics(address(vault)).getAccountingBreakdown(address(token));
         
         // Delta should be 0 because:
         // actual (10e18 fees) == expected (0 principal + 10e18 fees)

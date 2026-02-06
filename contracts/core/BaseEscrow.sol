@@ -27,11 +27,11 @@ import '../libraries/DisputeEscalationLibrary.sol';
 import '../types/EscrowTypes.sol';
 import '../types/YieldPresets.sol';
 import '../libraries/YieldPresetLibrary.sol';
-import '../YieldOps.sol';
-import '../DisputeOps.sol';
-import '../SettlementOps.sol';
-import '../CreateOps.sol';
-import '../modules/decentralized-resolution-module/IIncentiveModule.sol';
+import '../ops/YieldOps.sol';
+import '../ops/DisputeOps.sol';
+import '../ops/SettlementOps.sol';
+import '../ops/CreateOps.sol';
+import '../shared/interfaces/IIncentiveModule.sol';
 import './BondCollector.sol';
 import '../libraries/ModuleSnapshotLibrary.sol';
 import '../libraries/BondHandlingLibrary.sol';
@@ -87,6 +87,7 @@ error NoFeesToWithdraw(address token, uint256 availableFees);
 error InsufficientContractBalance(address token, uint256 required, uint256 available);
 error AmountExceedsAvailable(address token, uint256 requestedAmount, uint256 availableAmount);
 error AccountingDeficit(address token, uint256 deficit);
+error ZeroAddress(uint8 which);
 
 abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;

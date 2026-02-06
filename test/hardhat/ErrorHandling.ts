@@ -1,6 +1,6 @@
 before(function () {
   this.skip();
-}); // migrated to forge-std
+}); // Migrated to Forge: test/foundry/migrated/ErrorHandling.t.sol
 import { expect } from 'chai';
 import { ethers } from 'hardhat';
 import { EscrowableERC20 } from '../typechain-types';

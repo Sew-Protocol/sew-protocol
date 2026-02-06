@@ -3,21 +3,22 @@ pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
 import '../../../contracts/core/EscrowVault.sol';
+import '../../../contracts/core/EscrowVaultAnalytics.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
-import '../../../contracts/YieldOps.sol';
-import '../../../contracts/DisputeOps.sol';
+import '../../../contracts/ops/YieldOps.sol';
+import '../../../contracts/ops/DisputeOps.sol';
 import '../../../contracts/core/modules/DefaultResolutionModule.sol';
-import '../../../contracts/core/ModuleManagementContract.sol';
+import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
-import '../../../contracts/CreateOps.sol';
-import '../../../contracts/SettlementOps.sol';
+import '../../../contracts/ops/CreateOps.sol';
+import '../../../contracts/ops/SettlementOps.sol';
 import '../../../contracts/core/BondCollector.sol';
 
 contract EscrowVaultAccountingAdvancedTest is Test {
     EscrowVault public vault;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
-    ModuleManagementContract public mm;
+    ModuleSnapshotRegistry public mm;
     CreateOps public createOps;
     SettlementOps public settlementOps;
     BondCollector public bondCollector;
@@ -38,7 +39,7 @@ contract EscrowVaultAccountingAdvancedTest is Test {
 
         yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps(address(this));
-        mm = new ModuleManagementContract(address(this));
+        mm = new ModuleSnapshotRegistry(address(this));
         createOps = new CreateOps(address(this));
         settlementOps = new SettlementOps(address(this));
         bondCollector = new BondCollector(address(this));
@@ -89,7 +90,7 @@ contract EscrowVaultAccountingAdvancedTest is Test {
         assertEq(vault.totalFeesPerToken(address(token)), expectedFee1 + expectedFee2);
 
         // Verify escrow 1 principal is still based on 1% fee
-        (uint256 principal, , , ) = vault.getAccountingBreakdown(address(token));
+        (uint256 principal, , , ) = EscrowVaultAnalytics(address(vault)).getAccountingBreakdown(address(token));
         // Total principal = (amount1 - fee1) + (amount2 - fee2)
         uint256 expectedTotalPrincipal = (amount1 - expectedFee1) + (amount2 - expectedFee2);
         assertEq(principal, expectedTotalPrincipal);

@@ -3,14 +3,15 @@ pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
 import '../../../contracts/core/EscrowVault.sol';
+import '../../../contracts/core/EscrowVaultAnalytics.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
-import '../../../contracts/YieldOps.sol';
-import '../../../contracts/DisputeOps.sol';
+import '../../../contracts/ops/YieldOps.sol';
+import '../../../contracts/ops/DisputeOps.sol';
 import '../../../contracts/core/modules/DefaultResolutionModule.sol';
-import '../../../contracts/core/ModuleManagementContract.sol';
+import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
-import '../../../contracts/CreateOps.sol';
-import '../../../contracts/SettlementOps.sol';
+import '../../../contracts/ops/CreateOps.sol';
+import '../../../contracts/ops/SettlementOps.sol';
 import '../../../contracts/core/BondCollector.sol';
 
 contract AccountingHandler is Test {
@@ -71,7 +72,7 @@ contract AccountingInvariants is Test {
     EscrowVault public vault;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
-    ModuleManagementContract public mm;
+    ModuleSnapshotRegistry public mm;
     CreateOps public createOps;
     SettlementOps public settlementOps;
     BondCollector public bondCollector;
@@ -91,7 +92,7 @@ contract AccountingInvariants is Test {
 
         yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps(address(this));
-        mm = new ModuleManagementContract(address(this));
+        mm = new ModuleSnapshotRegistry(address(this));
         createOps = new CreateOps(address(this));
         settlementOps = new SettlementOps(address(this));
         bondCollector = new BondCollector(address(this));
@@ -138,7 +139,7 @@ contract AccountingInvariants is Test {
         // If there is no yield generation, `yieldInBalance` effectively represents `claimableBalances` + any other untracked funds.
         // So `yieldInBalance` should simply be non-negative.
         
-        (uint256 principal, uint256 fees, uint256 contractBalance, uint256 yieldInBalance) = vault.getAccountingBreakdown(address(token));
+        (uint256 principal, uint256 fees, uint256 contractBalance, uint256 yieldInBalance) = EscrowVaultAnalytics(address(vault)).getAccountingBreakdown(address(token));
         
         assertGe(contractBalance, principal + fees, "Balance must cover principal and fees");
         assertEq(yieldInBalance, contractBalance - (principal + fees), "Yield in balance calc");

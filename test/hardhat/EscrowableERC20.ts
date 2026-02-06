@@ -1,6 +1,6 @@
 before(function () {
   this.skip();
-}); // migrated to forge-std
+}); // Migrated to Forge: test/foundry/migrated/EscrowableERC20.t.sol
 import { expect } from 'chai';
 import { ethers } from 'hardhat';
 import { time } from '@nomicfoundation/hardhat-network-helpers';

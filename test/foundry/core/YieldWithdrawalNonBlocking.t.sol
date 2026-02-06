@@ -4,12 +4,12 @@ pragma solidity ^0.8.33;
 import "forge-std/Test.sol";
 
 import "contracts/core/EscrowVault.sol";
-import "contracts/core/ModuleManagementContract.sol";
-import "contracts/admin/EscrowAdminContract.sol";
+import "contracts/core/ModuleSnapshotRegistry.sol";
+import "contracts/admin/EscrowGovernanceTimelock.sol";
 import "contracts/core/modules/DefaultResolutionModule.sol";
-import "contracts/DisputeOps.sol";
-import "contracts/SettlementOps.sol";
-import "contracts/CreateOps.sol";
+import "contracts/ops/DisputeOps.sol";
+import "contracts/ops/SettlementOps.sol";
+import "contracts/ops/CreateOps.sol";
 import "contracts/core/BondCollector.sol";
 import "contracts/mocks/ERC20Mock.sol";
 import "contracts/libraries/SettingsValidationLibrary.sol";
@@ -43,8 +43,8 @@ contract BadYieldOps {
 
 contract YieldWithdrawalNonBlockingTest is Test {
     EscrowVault vault;
-    ModuleManagementContract moduleManagement;
-    EscrowAdminContract adminContract;
+    ModuleSnapshotRegistry moduleManagement;
+    EscrowGovernanceTimelock adminContract;
     DefaultResolutionModule rm;
     DisputeOps disputeOps;
     SettlementOps settlementOps;
@@ -66,8 +66,8 @@ contract YieldWithdrawalNonBlockingTest is Test {
         settlementOps = new SettlementOps(address(this));
         createOps = new CreateOps(address(this));
         bondCollector = new BondCollector(address(this));
-        moduleManagement = new ModuleManagementContract(address(this));
-        adminContract = new EscrowAdminContract(address(this));
+        moduleManagement = new ModuleSnapshotRegistry(address(this));
+        adminContract = new EscrowGovernanceTimelock(address(this));
 
         badYieldOps = new BadYieldOps();
         vault = new EscrowVault(ESCROW_FEE, feeAddress, address(badYieldOps), address(disputeOps), address(moduleManagement));

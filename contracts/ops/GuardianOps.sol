@@ -8,7 +8,7 @@ import '@openzeppelin/contracts/utils/Context.sol';
 import '../interfaces/IYieldGenerationModule.sol';
 import '../interfaces/aave/AaveV3Interfaces.sol';
 import '../core/BaseEscrow.sol';
-import '../core/ModuleManagementContract.sol';
+import '../core/ModuleSnapshotRegistry.sol';
 import '../modules/AaveYieldGenerationModule.sol';
 
 /**
@@ -116,7 +116,7 @@ contract GuardianOps is Context {
         if (success && data.length >= 32) {
             address moduleMgmtAddr = abi.decode(data, (address));
             if (moduleMgmtAddr != address(0) && moduleMgmtAddr.code.length > 0) {
-                ModuleManagementContract mm = ModuleManagementContract(moduleMgmtAddr);
+                ModuleSnapshotRegistry mm = ModuleSnapshotRegistry(moduleMgmtAddr);
                 genModule = IYieldGenerationModule(mm.getModule(targetEscrow, BaseEscrow.ModuleType.YIELD_GEN));
             }
         }
