@@ -80,6 +80,9 @@ contract AaveEdgeCases is Test {
     address internal recipient = address(0x1002);
 
     uint256 internal constant ESCROW_FEE_BPS = 100;
+    uint256 internal constant RAY = 1e27;
+    uint256 internal constant MIN_NORMALIZED_INCOME = 1e24; // 0.1% of RAY
+    uint256 internal constant MIN_DEPOSIT_AMOUNT = 1e15; // 0.001 tokens for 18-decimal
 
     function setUp() public {
         token = new ERC20Mock("Mock Token", "MOCK", address(this), 10_000_000 ether);
@@ -163,6 +166,7 @@ contract AaveEdgeCases is Test {
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.TO_SENDER,
             autoReleaseTime: 0,
             autoCancelTime: 0
@@ -191,6 +195,7 @@ contract AaveEdgeCases is Test {
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.TO_SENDER,
             autoReleaseTime: 0,
             autoCancelTime: 0
@@ -218,6 +223,7 @@ contract AaveEdgeCases is Test {
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.TO_SENDER,
             autoReleaseTime: 0,
             autoCancelTime: 0
@@ -245,6 +251,7 @@ contract AaveEdgeCases is Test {
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.TO_SENDER,
             autoReleaseTime: 0,
             autoCancelTime: 0
@@ -279,6 +286,7 @@ contract AaveEdgeCases is Test {
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.TO_SENDER,
             autoReleaseTime: 0,
             autoCancelTime: 0
@@ -307,6 +315,7 @@ contract AaveEdgeCases is Test {
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.TO_SENDER,
             autoReleaseTime: 0,
             autoCancelTime: 0
@@ -349,6 +358,7 @@ contract AaveEdgeCases is Test {
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.TO_SENDER,
             autoReleaseTime: 0,
             autoCancelTime: 0
@@ -401,6 +411,7 @@ contract AaveEdgeCases is Test {
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.TO_SENDER,
             autoReleaseTime: 0,
             autoCancelTime: 0

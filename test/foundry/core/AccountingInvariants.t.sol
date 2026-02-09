@@ -119,7 +119,7 @@ contract AccountingInvariants is Test {
         // Let's grant the role to ANY address for simplicity in the handler or just the handler itself.
         
         handler = new AccountingHandler(vault, token, buyer, seller);
-        vault.grantRole(vault.ROLE_FEE_RECIPIENT(), address(handler));
+        vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(handler));
 
         targetContract(address(handler));
     }

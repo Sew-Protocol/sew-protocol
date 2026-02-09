@@ -13,15 +13,17 @@ library EscrowEncodingLibrary {
      * @param from Sender address (buyer)
      * @param to Recipient address (seller)
      * @param amountAfterFee Amount after fee deduction (what's actually held in escrow)
+     * @param releaseAddress Address authorized to release (optional)
      * @return Encoded data as bytes
      */
     function encodeEscrowTransferData(
         address token,
         address from,
         address to,
-        uint256 amountAfterFee
+        uint256 amountAfterFee,
+        address releaseAddress
     ) internal pure returns (bytes memory) {
-        return abi.encode(token, from, to, amountAfterFee);
+        return abi.encode(token, from, to, amountAfterFee, releaseAddress);
     }
 
     /**
@@ -31,10 +33,11 @@ library EscrowEncodingLibrary {
      * @return from Sender address (buyer)
      * @return to Recipient address (seller)
      * @return amountAfterFee Amount after fee deduction
+     * @return releaseAddress Address authorized to release
      */
     function decodeEscrowTransferData(
         bytes memory data
-    ) internal pure returns (address token, address from, address to, uint256 amountAfterFee) {
-        return abi.decode(data, (address, address, address, uint256));
+    ) internal pure returns (address token, address from, address to, uint256 amountAfterFee, address releaseAddress) {
+        return abi.decode(data, (address, address, address, uint256, address));
     }
 }

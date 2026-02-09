@@ -144,7 +144,7 @@ contract FeeScenarioFlowsTest is Test {
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(adminContract));
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), owner);
 
-        // Fee withdraw role is separate from the recipient address.
+        // Fee withdraw role for DAO
         vault.grantRole(vault.ROLE_FEE_RECIPIENT(), dao);
 
         // EscrowGovernanceTimelock slow-lane operator

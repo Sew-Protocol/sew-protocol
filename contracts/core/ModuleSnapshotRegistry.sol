@@ -220,7 +220,7 @@ contract ModuleSnapshotRegistry is AccessControl, SlowLaneQueueActivate {
      */
     function getDefaultReleaseStrategy(
         address escrowContract
-    ) external view returns (IReleaseStrategy) {
+    ) external view virtual returns (IReleaseStrategy) {
         return escrowModuleStates[escrowContract].defaultReleaseStrategy;
     }
 
@@ -231,7 +231,7 @@ contract ModuleSnapshotRegistry is AccessControl, SlowLaneQueueActivate {
      */
     function getDefaultYieldGenerationModule(
         address escrowContract
-    ) external view returns (IYieldGenerationModule) {
+    ) external view virtual returns (IYieldGenerationModule) {
         return escrowModuleStates[escrowContract].defaultYieldGenerationModule;
     }
 
@@ -242,7 +242,7 @@ contract ModuleSnapshotRegistry is AccessControl, SlowLaneQueueActivate {
      */
     function getDefaultYieldDistributionModule(
         address escrowContract
-    ) external view returns (IYieldDistributionModule) {
+    ) external view virtual returns (IYieldDistributionModule) {
         return escrowModuleStates[escrowContract].defaultYieldDistributionModule;
     }
 
@@ -253,7 +253,7 @@ contract ModuleSnapshotRegistry is AccessControl, SlowLaneQueueActivate {
      */
     function getDefaultResolutionModule(
         address escrowContract
-    ) external view returns (IResolutionModule) {
+    ) external view virtual returns (IResolutionModule) {
         return escrowModuleStates[escrowContract].defaultResolutionModule;
     }
 

@@ -105,6 +105,9 @@ contract Phase1RefactorRiskTests is Test {
         moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
         // YIELD_GEN and YIELD_DIST not needed for basic refactor risk tests
         
+        // Set the resolution module as default
+        vault.setResolutionModule(address(resolutionModule));
+        
         // Setup resolution module (DefaultResolutionModule uses constructor resolver)
         // For testing, we'll use the resolver address directly
         
@@ -160,7 +163,7 @@ contract Phase1RefactorRiskTests is Test {
         uint256 workflowId = vault.createEscrow(address(token), seller, AMOUNT, settings);
         
         // Verify settings were applied (public mapping getter returns tuple)
-        (address customResolver, YieldPreset yieldPreset, uint256 autoReleaseTime, uint256 autoCancelTime) = vault.escrowSettings(workflowId);
+        (address customResolver, address releaseAddress, YieldPreset yieldPreset, uint256 autoReleaseTime, uint256 autoCancelTime) = vault.escrowSettings(workflowId);
         assertEq(autoReleaseTime, futureTime, "autoReleaseTime should be applied");
         assertEq(autoCancelTime, 0, "autoCancelTime should be 0");
         

@@ -6,6 +6,9 @@ import "forge-std/StdJson.sol";
 
 import { EscrowSettings, EscrowState } from "../../../contracts/types/EscrowTypes.sol";
 import { YieldPreset } from "../../../contracts/types/YieldPresets.sol";
+import { CreateOps } from "../../../contracts/ops/CreateOps.sol";
+import { EscrowVault } from "../../../contracts/core/EscrowVault.sol";
+import { BaseEscrow } from "../../../contracts/core/BaseEscrow.sol";
 
 interface IEscrowVaultAttackTarget {
     function escrowFee() external view returns (uint256);
@@ -146,6 +149,20 @@ contract SecurityAttackSimBaseSepoliaForkTest is Test {
 
         escrowVaultAddr = _dep("EscrowVault");
         escrow = IEscrowVaultAttackTarget(escrowVaultAddr);
+
+        // --- UPGRADE CORE ON FORK ---
+        address yieldOps = _dep("YieldOps");
+        address disputeOps = _dep("DisputeOps");
+        address moduleManagement = _dep("ModuleSnapshotRegistry");
+        address safeMultisig = _dep("Safe_Multisig");
+        address createOps = _dep("CreateOps");
+        address timelock = _dep("TimelockController");
+
+        // --- UPGRADE CORE ON FORK ---
+        // NOTE: Skipping contract upgrades on fork to preserve existing state.
+        // The fork already has deployed and configured contracts. Etching would replace
+        // the code but keep the old storage, causing state mismatches. In production, 
+        // proper upgrade patterns (proxy, etc) should be used.
     }
 
     // ============
@@ -181,6 +198,7 @@ contract SecurityAttackSimBaseSepoliaForkTest is Test {
         tkn.approve(escrowVaultAddr, type(uint256).max);
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
             autoCancelTime: 0
@@ -215,6 +233,7 @@ contract SecurityAttackSimBaseSepoliaForkTest is Test {
         tkn.approve(escrowVaultAddr, type(uint256).max);
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
             autoCancelTime: 0
@@ -248,6 +267,7 @@ contract SecurityAttackSimBaseSepoliaForkTest is Test {
         tkn.approve(escrowVaultAddr, type(uint256).max);
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
             autoCancelTime: 0
@@ -287,4 +307,3 @@ contract SecurityAttackSimBaseSepoliaForkTest is Test {
         return addr;
     }
 }
-

@@ -159,7 +159,7 @@ contract CreateOps is AccessControl {
         if (token == address(0)) revert InvalidAddress(ADDR_TOKEN, token);
         if (amount == 0) revert AmountZero();
         SettingsValidationLibrary.validateEscrowAmount(amount);
-        SettingsValidationLibrary.validateRecipient(to, from);
+        SettingsValidationLibrary.validateRecipient(to, from, settings.releaseAddress);
         
         // Use explicit validation time (always block.timestamp in production)
         uint256 validationTime = block.timestamp;
@@ -224,7 +224,7 @@ contract CreateOps is AccessControl {
         }
 
         // Use low-level staticcall to query module
-        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(token, from, to, amount);
+        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(token, from, to, amount, address(0)); // Pass address(0) for releaseAddress as it's not relevant for resolver lookup
         (bool success, bytes memory data) = resolutionModule.staticcall(
             abi.encodeWithSelector(
                 IResolutionModule.getDisputeResolver.selector,
