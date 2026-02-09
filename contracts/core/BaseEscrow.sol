@@ -559,7 +559,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
             snap.resolutionModule,
             workflowId,
             et.disputeResolver,
-            EscrowEncodingLibrary.encodeEscrowTransferData(et.token, et.from, et.to, et.amountAfterFee)
+            EscrowEncodingLibrary.encodeEscrowTransferData(et.token, et.from, et.to, et.amountAfterFee, escrowSettings[workflowId].releaseAddress)
         );
         DisputeInitializationLibrary.callResolverCallback(et.disputeResolver, workflowId);
 
@@ -689,7 +689,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         }
 
         // Execute escalation in module (modifies module state)
-        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(et.token, et.from, et.to, et.amountAfterFee);
+        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(et.token, et.from, et.to, et.amountAfterFee, escrowSettings[workflowId].releaseAddress);
         (bool escSuccess, bytes memory escData) = address(resolutionModule).call(
             abi.encodeWithSelector(IResolutionModule.executeEscalation.selector, workflowId, _msgSender(), escrowData)
         );
@@ -784,6 +784,60 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         emit PendingSettlementExecuted(workflowId, isRelease);
     }
 
+    /// @notice Release escrow to recipient (core settlement action)
+    /// @param workflowId Unique escrow identifier
+    /// @dev Consults the release strategy to determine eligibility
+    /// @dev Transitions PENDING → RELEASED
+    /// @dev May transfer funds immediately (push) or create claimable balance (fallback)
+    /// @dev Part of IEscrowCore interface for wallet adoption
+    function release(uint256 workflowId) external nonReentrant whenNotPaused {
+        _validateWorkflowId(workflowId);
+        EscrowTransfer storage et = escrowTransfers[workflowId];
+
+        // Only PENDING escrows can be released
+        if (et.escrowState != EscrowState.PENDING) {
+            revert TransferNotPending(workflowId, et.escrowState);
+        }
+
+        // Encode escrow data once (canonical format: token, sender, recipient, amountAfterFee, releaseAddress)
+        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(
+            et.token,
+            et.from,
+            et.to,
+            et.amountAfterFee,
+            escrowSettings[workflowId].releaseAddress
+        );
+
+        // Load release strategy from snapshot
+        IReleaseStrategy strategy = _getReleaseStrategy(workflowId);
+        
+        // Check strategy is configured (revert if not; don't silently bypass policy)
+        if (address(strategy) == address(0)) {
+            revert('BaseEscrow: release strategy not configured');
+        }
+
+        // Consult strategy for eligibility
+        (bool allowed, uint8 reasonCode) = strategy.canRelease(
+            workflowId,
+            address(this),
+            _msgSender(),
+            escrowData
+        );
+
+        // Require strategy allows the release
+        if (!allowed) {
+            // reasonCode 1 = not authorized, 2 = wrong state, etc.
+            // For wallet-friendly error, use a compact error that maps to the code
+            if (reasonCode == 1) {
+                revert NotSender(workflowId, _msgSender(), et.from);
+            } else {
+                revert('BaseEscrow: release not allowed by strategy');
+            }
+        }
+
+        // Release the escrow (handles push/fallback internally)
+        _releaseEscrowTransfer(workflowId);
+    }
 
     function cancelAsDisputeResolver(uint256 workflowId, bytes32 resolutionHash) public nonReentrant returns (bool) {
         return _executeResolution(workflowId, false, resolutionHash);
@@ -1062,6 +1116,62 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         // Auto-transfer: Attempt automatic transfer, fallback to claimable if fails
         _attemptAutoTransfer(workflowId, from, token, actualAmount);
         _emitEscrowTransferCancelled(workflowId, token, from, amount);
+    }
+
+    /**
+     * @notice Best-effort check if strategy allows release (used by getActionStatus)
+     * @dev Uses staticcall to safely query strategy without reverting
+     * @return canRelease True if strategy returns allowed=true, false if call fails or not allowed
+     */
+    function _checkStrategyCanRelease(uint256 workflowId, EscrowTransfer storage et) internal view returns (bool canRelease) {
+        IReleaseStrategy strategy = _getReleaseStrategy(workflowId);
+        if (address(strategy) == address(0)) {
+            return false;
+        }
+
+        try this._staticCanRelease(
+            workflowId,
+            et.token,
+            et.from,
+            et.to,
+            et.amountAfterFee
+        ) returns (bool allowed) {
+            return allowed;
+        } catch {
+            // If strategy call fails, report as unavailable (safe default for UI)
+            return false;
+        }
+    }
+
+    /**
+     * @notice Wrapper for staticcall to strategy (internal helper for getActionStatus)
+     * @dev Takes individual escrow fields instead of storage pointer (required for external function)
+     */
+    function _staticCanRelease(
+        uint256 workflowId,
+        address token,
+        address sender,
+        address recipient,
+        uint256 amountAfterFee
+    ) external view returns (bool) {
+        IReleaseStrategy strategy = _getReleaseStrategy(workflowId);
+        if (address(strategy) == address(0)) {
+            return false;
+        }
+
+        // Get releaseAddress from escrow settings
+        address releaseAddr = escrowSettings[workflowId].releaseAddress;
+
+        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(
+            token,
+            sender,
+            recipient,
+            amountAfterFee,
+            releaseAddr
+        );
+
+        (bool allowed, ) = strategy.canRelease(workflowId, address(this), _msgSender(), escrowData);
+        return allowed;
     }
 
     function _releaseEscrowTransfer(uint256 workflowId) internal {
