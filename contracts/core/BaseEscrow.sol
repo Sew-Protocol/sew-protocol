@@ -528,43 +528,52 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     function raiseDispute(uint256 workflowId) external nonReentrant {
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
-        if (et.escrowState != EscrowState.PENDING)
-            revert TransferNotPending(workflowId, et.escrowState);
-        address disputeResolver = et.disputeResolver;
-        bool isSender = (et.from == _msgSender());
-        if (!isSender && et.to != _msgSender())
-            revert NotParticipant(workflowId, _msgSender(), et.from, et.to);
-        StateManagementLibrary.transitionToDisputed(et, workflowId, isSender);
-        disputeRaisedTimestamp[workflowId] = block.timestamp;
-        emit EscrowStateChanged(workflowId, EscrowState.PENDING, EscrowState.DISPUTED);
-        emit DisputeOpened(workflowId, _msgSender(), disputeResolver);
-        address updated = DisputeInitializationLibrary.initializeInModule(
-            address(_getResolutionModule(workflowId)),
-            workflowId,
-            disputeResolver,
-            EscrowEncodingLibrary.encodeEscrowTransferData(
-                et.token,
-                et.from,
-                et.to,
-                et.amountAfterFee
-            )
-        );
-        if (updated != disputeResolver) {
-            et.disputeResolver = updated;
-            disputeResolver = updated;
-        }
-        DisputeInitializationLibrary.callResolverCallback(disputeResolver, workflowId);
+        ModuleSnapshot storage snap = moduleSnapshots[workflowId];
 
-        address incentiveModAddr = moduleSnapshots[workflowId].incentiveModule;
-        if (DisputeRaiseLibrary.callIncentiveModuleHook(
-            incentiveModAddr,
+        DisputeOps.DisputeOpeningResult memory result = disputeOps.computeDisputeOpening(
+            address(_getResolutionModule(workflowId)),
+            snap.incentiveModule,
             workflowId,
+            _msgSender(),
+            et.from,
+            et.to,
             et.token,
             et.amountAfterFee,
-            escrowFee,
-            ESCROW_FEE_DENOMINATOR
-        )) {
-            emit OperationFailure(3, workflowId, incentiveModAddr, IIncentiveModule.onDisputeOpened.selector, uint8(FailureReason.CALL_FAILED));
+            et.escrowState,
+            et.disputeResolver
+        );
+        
+        if (!result.success) revert TransferNotPending(workflowId, et.escrowState);
+
+        StateManagementLibrary.transitionToDisputed(et, workflowId, (_msgSender() == et.from));
+        disputeRaisedTimestamp[workflowId] = block.timestamp;
+        
+        emit EscrowStateChanged(workflowId, EscrowState.PENDING, EscrowState.DISPUTED);
+        emit DisputeOpened(workflowId, _msgSender(), result.updatedResolver);
+
+        if (result.updatedResolver != et.disputeResolver) {
+            et.disputeResolver = result.updatedResolver;
+        }
+
+        DisputeInitializationLibrary.initializeInModule(
+            snap.resolutionModule,
+            workflowId,
+            et.disputeResolver,
+            EscrowEncodingLibrary.encodeEscrowTransferData(et.token, et.from, et.to, et.amountAfterFee)
+        );
+        DisputeInitializationLibrary.callResolverCallback(et.disputeResolver, workflowId);
+
+        if (result.callIncentiveHook) {
+            if (DisputeRaiseLibrary.callIncentiveModuleHook(
+                result.incentiveModule,
+                workflowId,
+                et.token,
+                et.amountAfterFee,
+                escrowFee,
+                ESCROW_FEE_DENOMINATOR
+            )) {
+                emit OperationFailure(3, workflowId, result.incentiveModule, IIncentiveModule.onDisputeOpened.selector, uint8(FailureReason.CALL_FAILED));
+            }
         }
     }
 
@@ -619,9 +628,13 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         returns (bool success, address newDisputeResolver, uint8 newLevel)
     {
         (EscrowTransfer storage et, IResolutionModule resolutionModule) = _validateAndPrepareEscalation(workflowId);
+        ModuleSnapshot storage snap = moduleSnapshots[workflowId];
 
         DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
             address(resolutionModule),
+            snap.incentiveModule,
+            snap.appealBondProtocolFeeBps,
+            escrowFeeAddress,
             workflowId,
             _msgSender(),
             et.from,
@@ -632,104 +645,69 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         );
         if (!result.success) revert EscalationNotAllowed();
 
-        // Get required appeal bond from resolution module
-        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(
-            et.token,
-            et.from,
-            et.to,
-            et.amountAfterFee
-        );
-        (bool bondQuerySuccess, uint256 bondAmount, address bondToken) = DisputeEscalationLibrary.queryAppealBond(
-            address(resolutionModule),
-            workflowId,
-            result.currentLevel,
-            escrowData
-        );
-        if (!bondQuerySuccess) revert AppealBondQueryFailed(workflowId);
+        // Validate bond payment
+        (bool msgValueValid, ) = DisputeEscalationLibrary.validateBondMsgValue(result.bondToken, result.bondAmount, msg.value);
+        if (!msgValueValid) revert InvalidBondMsgValue(workflowId, result.bondAmount, msg.value);
 
-        (bool msgValueValid, ) = DisputeEscalationLibrary.validateBondMsgValue(bondToken, bondAmount, msg.value);
-        if (!msgValueValid) {
-            revert InvalidBondMsgValue(workflowId, bondAmount, msg.value);
-        }
-
-        if (bondAmount > 0) {
-            address incentiveModAddr = moduleSnapshots[workflowId].incentiveModule;
-            
-            // V1: Appeals disabled. Enabled in Phase 2 via resolution module + incentive module swap.
-            if (incentiveModAddr == address(0)) {
-                revert AppealsNotEnabledInV1();
+        if (result.bondAmount > 0) {
+            if (result.protocolFeeAmount > 0) {
+                emit ProtocolFeeCollected(1, workflowId, result.bondToken, result.bondAmount, snap.appealBondProtocolFeeBps, result.protocolFeeAmount);
             }
-            
-            uint256 snapshottedBondFee = moduleSnapshots[workflowId].appealBondProtocolFeeBps;
 
-            (BondHandlingLibrary.BondProcessingResult memory bondResult, IIncentiveModule incentiveMod) = 
-                DisputeEscalationLibrary.processBondWithFeeCalculation(
-                    bondAmount,
-                    bondToken,
-                    incentiveModAddr,
-                    snapshottedBondFee,
-                    escrowFeeAddress
+            IIncentiveModule incentiveMod = IIncentiveModule(result.incentiveModule);
+            if (result.bondToken == address(0)) {
+                BondHandlingLibrary.handleETHBond(
+                    incentiveMod,
+                    workflowId,
+                    _msgSender(),
+                    result.bondToRecord,
+                    result.bondToken,
+                    result.newLevel,
+                    escrowFeeAddress,
+                    result.protocolFeeAmount
                 );
+            } else {
+                if (address(bondCollector) == address(0)) revert ZeroBondCollector();
+                
+                uint256 balBefore = IERC20(result.bondToken).balanceOf(address(this));
+                _pullTokens(result.bondToken, _msgSender(), result.bondAmount);
+                uint256 received = IERC20(result.bondToken).balanceOf(address(this)) - balBefore;
+                if (received < result.bondAmount) revert AccountingDeficit(result.bondToken, result.bondAmount - received);
 
-            if (bondResult.protocolFeeAmount > 0) {
-                emit ProtocolFeeCollected(1, workflowId, bondToken, bondAmount, snapshottedBondFee, bondResult.protocolFeeAmount);
-            }
-
-            if (address(incentiveMod) != address(0)) {
-                if (bondToken == address(0)) {
-                    BondHandlingLibrary.handleETHBond(
-                        incentiveMod,
-                        workflowId,
-                        _msgSender(),
-                        bondResult.bondToRecord,
-                        bondToken,
-                        result.newLevel,
-                        escrowFeeAddress,
-                        bondResult.protocolFeeAmount
-                    );
-                } else {
-                    if (address(bondCollector) == address(0)) revert ZeroBondCollector();
-                    
-                    // CRIT-3: Verify received amount to handle fee-on-transfer tokens
-                    uint256 balBefore = IERC20(bondToken).balanceOf(address(this));
-                    _pullTokens(bondToken, _msgSender(), bondAmount);
-                    uint256 received = IERC20(bondToken).balanceOf(address(this)) - balBefore;
-                    if (received < bondAmount) revert AccountingDeficit(bondToken, bondAmount - received);
-
-                    BondHandlingLibrary.handleERC20BondAfterPull(
-                        incentiveMod,
-                        bondCollector,
-                        workflowId,
-                        _msgSender(),
-                        bondToken,
-                        bondResult.bondToRecord,
-                        result.newLevel,
-                        escrowFeeAddress,
-                        bondResult.protocolFeeAmount
-                    );
-                }
+                BondHandlingLibrary.handleERC20BondAfterPull(
+                    incentiveMod,
+                    bondCollector,
+                    workflowId,
+                    _msgSender(),
+                    result.bondToken,
+                    result.bondToRecord,
+                    result.newLevel,
+                    escrowFeeAddress,
+                    result.protocolFeeAmount
+                );
             }
         }
 
-        address newResolver = result.newResolver;
-        uint8 newLevel_ = result.newLevel;
-        et.disputeResolver = newResolver;
-        
-        if (bondToken == address(0) && msg.value > bondAmount) {
-            uint256 excess = msg.value - bondAmount;
-            if (excess > 0) {
-                (bool s, ) = payable(_msgSender()).call{value: excess}('');
-                if (!s) revert ExcessRefundTransferFailed(workflowId, _msgSender(), excess);
-            }
-        }
-        emit DisputeEscalated(
-            workflowId,
-            result.currentLevel,
-            newLevel_,
-            newResolver,
-            _msgSender()
+        // Execute escalation in module (modifies module state)
+        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(et.token, et.from, et.to, et.amountAfterFee);
+        (bool escSuccess, bytes memory escData) = address(resolutionModule).call(
+            abi.encodeWithSelector(IResolutionModule.executeEscalation.selector, workflowId, _msgSender(), escrowData)
         );
-        return (true, newResolver, newLevel_);
+        if (!escSuccess) revert EscalationNotAllowed();
+        
+        (bool modSuccess, address newRes, uint8 newLvl) = abi.decode(escData, (bool, address, uint8));
+        if (!modSuccess || newRes == address(0)) revert EscalationNotAllowed();
+
+        et.disputeResolver = newRes;
+        
+        if (result.bondToken == address(0) && msg.value > result.bondAmount) {
+            uint256 excess = msg.value - result.bondAmount;
+            (bool s, ) = payable(_msgSender()).call{value: excess}('');
+            if (!s) revert ExcessRefundTransferFailed(workflowId, _msgSender(), excess);
+        }
+
+        emit DisputeEscalated(workflowId, result.currentLevel, newLvl, newRes, _msgSender());
+        return (true, newRes, newLvl);
     }
 
     // ============ Resolution ============

@@ -4,18 +4,18 @@ pragma solidity 0.8.33;
 import 'forge-std/Test.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/core/BaseEscrow.sol';
-import '../../../contracts/admin/EscrowAdminContract.sol';
-import '../../../contracts/core/ModuleManagementContract.sol';
+import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
+import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/core/modules/DefaultResolutionModule.sol';
 import '../../../contracts/modules/DefaultReleaseStrategy.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/types/YieldPresets.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
-import '../../../contracts/YieldOps.sol';
-import '../../../contracts/DisputeOps.sol';
-import '../../../contracts/SettlementOps.sol';
-import '../../../contracts/CreateOps.sol';
+import '../../../contracts/ops/YieldOps.sol';
+import '../../../contracts/ops/DisputeOps.sol';
+import '../../../contracts/ops/SettlementOps.sol';
+import '../../../contracts/ops/CreateOps.sol';
 import '../../../contracts/ops/GuardianOps.sol';
 import '../../../contracts/governance/EmergencyRecoveryProposal.sol';
 
@@ -26,8 +26,8 @@ import '../../../contracts/governance/EmergencyRecoveryProposal.sol';
  */
 contract EmergencyRecoveryProposalTest is Test {
     EscrowVault public vault;
-    EscrowAdminContract public adminContract;
-    ModuleManagementContract public moduleManagement;
+    EscrowGovernanceTimelock public adminContract;
+    ModuleSnapshotRegistry public moduleManagement;
     ERC20Mock public token;
     DefaultResolutionModule public resolutionModule;
     DefaultReleaseStrategy public releaseStrategy;
@@ -74,13 +74,13 @@ contract EmergencyRecoveryProposalTest is Test {
         disputeOps = new DisputeOps(owner);
         settlementOps = new SettlementOps(owner);
         createOps = new CreateOps(owner);
-        moduleManagement = new ModuleManagementContract(owner);
+        moduleManagement = new ModuleSnapshotRegistry(owner);
 
         // Deploy vault
         vault = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
 
         // Deploy admin contract
-        adminContract = new EscrowAdminContract(owner);
+        adminContract = new EscrowGovernanceTimelock(owner);
         adminContract.grantRole(adminContract.ROLE_TIMELOCK(), timelock);
 
         // Grant roles
@@ -101,6 +101,7 @@ contract EmergencyRecoveryProposalTest is Test {
         vault.setSettlementOps(address(settlementOps));
 
         moduleManagement.registerEscrowContract(address(vault));
+        adminContract.registerEscrowContract(address(vault));
 
         // Queue and activate modules
         adminContract.queueResolutionModule(address(vault), address(resolutionModule));

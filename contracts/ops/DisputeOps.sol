@@ -50,6 +50,72 @@ contract DisputeOps is AccessControl {
     }
 
     /**
+     * @dev Result of dispute opening computation
+     */
+    struct DisputeOpeningResult {
+        bool success;
+        address updatedResolver;
+        bool callIncentiveHook;
+        address incentiveModule;
+        string failureReason;
+    }
+
+    /**
+     * @notice Compute dispute opening parameters
+     * @param resolutionModule Resolution module address
+     * @param incentiveModule Snapshotted incentive module address
+     * @param workflowId Escrow workflow ID
+     * @param caller Address initiating the dispute
+     * @param from Escrow sender
+     * @param to Escrow recipient
+     * @param token Escrow token
+     * @param amountAfterFee Amount in escrow
+     * @param escrowState Current escrow state
+     * @param currentResolver Current resolver address
+     * @return result Dispute opening computation result
+     */
+    function computeDisputeOpening(
+        address resolutionModule,
+        address incentiveModule,
+        uint256 workflowId,
+        address caller,
+        address from,
+        address to,
+        address token,
+        uint256 amountAfterFee,
+        EscrowState escrowState,
+        address currentResolver
+    ) external view onlyRole(ROLE_ESCROW_CONTRACT) returns (DisputeOpeningResult memory result) {
+        result.success = false;
+
+        if (escrowState != EscrowState.PENDING) {
+            result.failureReason = 'Transfer not pending';
+            return result;
+        }
+
+        if (caller != from && caller != to) {
+            result.failureReason = 'Caller not participant';
+            return result;
+        }
+
+        result.updatedResolver = currentResolver;
+        if (resolutionModule != address(0) && resolutionModule.code.length > 0) {
+            bytes memory escrowData = abi.encode(token, from, to, amountAfterFee);
+            try IResolutionModule(resolutionModule).getDisputeResolver(workflowId, address(this), escrowData) returns (
+                address updated,
+                uint8 /* level */
+            ) {
+                if (updated != address(0)) result.updatedResolver = updated;
+            } catch {}
+        }
+
+        result.incentiveModule = incentiveModule;
+        result.callIncentiveHook = (incentiveModule != address(0));
+        result.success = true;
+        return result;
+    }
+
+    /**
      * @dev Result of escalation computation
      */
     struct EscalationResult {
@@ -57,13 +123,20 @@ contract DisputeOps is AccessControl {
         address newResolver; // New dispute resolver address
         uint8 newLevel; // New escalation level
         uint8 currentLevel; // Current escalation level (for event)
-        uint256 escalationFee; // Fee required for escalation
+        uint256 bondAmount; // Total bond amount required
+        address bondToken; // Token for the bond (address(0) for ETH)
+        address incentiveModule; // Incentive module for this escrow
+        uint256 bondToRecord; // Net bond amount after fee
+        uint256 protocolFeeAmount; // Fee collected by protocol
         string failureReason; // Reason if escalation not allowed
     }
 
     /**
      * @notice Compute escalation for a disputed escrow
      * @param resolutionModule Address of the resolution module
+     * @param incentiveModule Snapshotted incentive module address
+     * @param bondFeeBps Snapshotted protocol fee for bonds in basis points
+     * @param feeRecipient Protocol fee recipient address
      * @param workflowId Escrow workflow ID
      * @param caller Address initiating the escalation (msg.sender from BaseEscrow)
      * @param from Escrow sender address
@@ -72,13 +145,12 @@ contract DisputeOps is AccessControl {
      * @param amountAfterFee Amount after fee deduction (what's actually held in escrow)
      * @param escrowState Current escrow state
      * @return result Escalation computation result
-     * @dev This function is "compute-only" - it does NOT modify BaseEscrow state.
-     *      It may call the resolution module which might update its own counters.
-     *      BaseEscrow will apply the result after receiving it.
-     *      Only authorized escrow contracts can call this function
      */
     function computeEscalation(
         address resolutionModule,
+        address incentiveModule,
+        uint256 bondFeeBps,
+        address feeRecipient,
         uint256 workflowId,
         address caller,
         address from,
@@ -86,10 +158,10 @@ contract DisputeOps is AccessControl {
         address token,
         uint256 amountAfterFee,
         EscrowState escrowState
-    ) external onlyRole(ROLE_ESCROW_CONTRACT) returns (EscalationResult memory result) {
+    ) external view onlyRole(ROLE_ESCROW_CONTRACT) returns (EscalationResult memory result) {
         result.success = false;
 
-        // Validate caller is participant (BaseEscrow should have checked this, but double-check)
+        // Validate caller is participant
         if (caller != from && caller != to) {
             result.failureReason = 'Caller not participant';
             return result;
@@ -111,7 +183,7 @@ contract DisputeOps is AccessControl {
         bytes memory escrowData = abi.encode(token, from, to, amountAfterFee);
 
         // Get current level from module
-        try IResolutionModule(resolutionModule).getDisputeResolver(workflowId, _msgSender(), escrowData) returns (
+        try IResolutionModule(resolutionModule).getDisputeResolver(workflowId, address(this), escrowData) returns (
             address /* currentResolver */,
             uint8 currentLevel
         ) {
@@ -122,89 +194,70 @@ contract DisputeOps is AccessControl {
         }
 
         // Validate only the disagreed-with participant can appeal
-        // Try to get decision at current round from module (if supported)
-        // For DecentralizedResolutionModule, we can call getDecisionAtRound
-        // Use low-level call since this function is not in IResolutionModule interface
         (bool decisionSuccess, bytes memory decisionData) = resolutionModule.staticcall(
-            abi.encodeWithSignature('getDecisionAtRound(uint256,address,uint8)', workflowId, _msgSender(), result.currentLevel)
+            abi.encodeWithSignature('getDecisionAtRound(uint256,address,uint8)', workflowId, address(this), result.currentLevel)
         );
         
         if (decisionSuccess && decisionData.length >= 32) {
-            // Decode the uint8 return value
             uint8 decision;
             assembly {
-                decision := mload(add(decisionData, 0x20))
-                // Mask to get only the first byte (uint8)
-                decision := and(decision, 0xff)
+                decision := and(mload(add(decisionData, 0x20)), 0xff)
             }
             
-            // decision: 0 = NONE, 1 = RELEASE, 2 = CANCEL (matching ResolutionOutcome enum)
-            if (decision == 1) {
-                // RELEASE means recipient wins, so only sender (from) can appeal
-                if (caller != from) {
-                    result.failureReason = 'Only sender can appeal RELEASE decision';
-                    return result;
-                }
-            } else if (decision == 2) {
-                // CANCEL means sender wins, so only recipient (to) can appeal
-                if (caller != to) {
-                    result.failureReason = 'Only recipient can appeal CANCEL decision';
-                    return result;
-                }
+            if (decision == 1 && caller != from) { // RELEASE -> Recipient wins, Sender must appeal
+                result.failureReason = 'Only sender can appeal RELEASE decision';
+                return result;
+            } else if (decision == 2 && caller != to) { // CANCEL -> Sender wins, Recipient must appeal
+                result.failureReason = 'Only recipient can appeal CANCEL decision';
+                return result;
             } else if (decision == 0) {
-                // NONE - no decision yet, can't appeal
                 result.failureReason = 'No decision to appeal';
                 return result;
             }
-            // If decision is valid and caller matches, continue
         }
-        // If we can't get decision (e.g., module doesn't support it), allow escalation
-        // This maintains backward compatibility with modules that don't track decisions
 
-        // Check if escalation is allowed and get fee
-        try
-            IResolutionModule(resolutionModule).canEscalate(
-                workflowId,
-                _msgSender(),
-                result.currentLevel,
-                escrowData
-            )
-        returns (bool canEscalate, address /* nextResolver */, uint256 fee) {
+        // Check if escalation is allowed and get next resolver/bond
+        try IResolutionModule(resolutionModule).canEscalate(workflowId, address(this), result.currentLevel, escrowData)
+        returns (bool canEscalate, address nextResolver, uint256 /* dummyFee */) {
             if (!canEscalate) {
-                result.failureReason = 'Escalation not allowed';
+                result.failureReason = 'Escalation not allowed by module';
                 return result;
             }
-            result.escalationFee = fee;
+            result.newResolver = nextResolver;
+            result.newLevel = result.currentLevel + 1;
         } catch {
             result.failureReason = 'Failed to check escalation eligibility';
             return result;
         }
 
-        // Execute escalation in module (module may update its state)
-        try IResolutionModule(resolutionModule).executeEscalation(workflowId, _msgSender(), escrowData) returns (
-            bool escalationSuccess,
-            address newResolver,
-            uint8 newLevel
-        ) {
-            if (!escalationSuccess) {
-                result.failureReason = 'Module rejected escalation';
-                return result;
-            }
-
-            // Validate returned values
-            if (newResolver == address(0)) {
-                result.failureReason = 'Module returned zero address';
-                return result;
-            }
-
-            result.success = true;
-            result.newResolver = newResolver;
-            result.newLevel = newLevel;
-            return result;
+        // Get required appeal bond
+        try IResolutionModule(resolutionModule).getRequiredAppealBond(workflowId, address(this), result.currentLevel, escrowData)
+        returns (uint256 bondAmount, address bondToken) {
+            result.bondAmount = bondAmount;
+            result.bondToken = bondToken;
         } catch {
-            result.failureReason = 'Module escalation call failed';
+            result.failureReason = 'Failed to query appeal bond';
             return result;
         }
+
+        // Calculate fees if bond is required
+        if (result.bondAmount > 0) {
+            if (incentiveModule == address(0)) {
+                result.failureReason = 'Appeals not enabled in V1';
+                return result;
+            }
+            result.incentiveModule = incentiveModule;
+            
+            if (bondFeeBps > 0 && feeRecipient != address(0)) {
+                result.protocolFeeAmount = (result.bondAmount * bondFeeBps) / 10000;
+                result.bondToRecord = result.bondAmount - result.protocolFeeAmount;
+            } else {
+                result.bondToRecord = result.bondAmount;
+            }
+        }
+
+        result.success = true;
+        return result;
     }
 
     /**

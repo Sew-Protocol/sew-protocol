@@ -1147,6 +1147,7 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
         uint256 scaledBalanceBefore = IAaveAToken(aToken).scaledBalanceOf(address(this));
 
         // Withdraw from Aave - funds go STRICTLY back to the escrow vault
+        // This 're-collateralizes' the vault so the user can eventually recover via standard release/cancel.
         unwoundAmount = aavePool.withdraw(token, withdrawalAmount, escrowContract);
         
         uint256 scaledBalanceAfter = IAaveAToken(aToken).scaledBalanceOf(address(this));

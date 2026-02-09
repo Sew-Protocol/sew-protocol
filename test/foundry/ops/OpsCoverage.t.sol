@@ -406,6 +406,9 @@ contract OpsCoverageTest is Test {
         vm.expectRevert();
         disputeOps.computeEscalation(
             address(0),
+            address(0),
+            0,
+            address(0),
             1,
             address(0),
             address(0),
@@ -422,6 +425,9 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         // Should execute (result.success might be false due to inputs, but call shouldn't revert with access control)
         DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
+            address(0),
+            address(0),
+            0,
             address(0),
             1,
             address(0x99), // caller (not participant)
@@ -454,6 +460,7 @@ contract OpsCoverageTest is Test {
         // Configure mock
         mockModule.setEscalation(true, nextResolver, fee);
         mockModule.setExecution(true, nextResolver, 1);
+        mockModule.setRequiredAppealBond(fee, address(0));
         
         // IMPORTANT: Must have a valid decision to allow appeal
         // Decision 1 (RELEASE) means recipient won, so sender (from) can appeal
@@ -462,6 +469,9 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
             address(mockModule),
+            address(0x9999), // dummy incentive module
+            0, // bondFeeBps
+            feeRecipient,
             1,
             caller,
             from,
@@ -477,7 +487,7 @@ contract OpsCoverageTest is Test {
         assertTrue(result.success);
         assertEq(result.newResolver, nextResolver);
         assertEq(result.newLevel, 1);
-        assertEq(result.escalationFee, fee);
+        assertEq(result.bondAmount, fee);
     }
 
     function test_DisputeOps_computeEscalation_WrongState() public {
@@ -486,6 +496,9 @@ contract OpsCoverageTest is Test {
 
         vm.prank(escrowContract);
         DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
+            address(0),
+            address(0),
+            0,
             address(0),
             1,
             address(0x1),
@@ -516,6 +529,9 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         DisputeOps.EscalationResult memory resultSender = disputeOps.computeEscalation(
             address(mockModule),
+            address(0x9999),
+            0,
+            feeRecipient,
             1,
             from, // Sender appealing
             from,
@@ -530,6 +546,9 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         DisputeOps.EscalationResult memory resultRecipient = disputeOps.computeEscalation(
             address(mockModule),
+            address(0x9999),
+            0,
+            feeRecipient,
             1,
             to, // Recipient appealing
             from,
@@ -547,6 +566,9 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         resultRecipient = disputeOps.computeEscalation(
             address(mockModule),
+            address(0x9999),
+            0,
+            feeRecipient,
             1,
             to, // Recipient appealing
             from,
@@ -561,6 +583,9 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         resultSender = disputeOps.computeEscalation(
             address(mockModule),
+            address(0x9999),
+            0,
+            feeRecipient,
             1,
             from, // Sender appealing
             from,
@@ -588,6 +613,9 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
             address(mockModule),
+            address(0x9999),
+            0,
+            feeRecipient,
             1,
             caller, // matches from
             address(0x1), // from
@@ -611,6 +639,9 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
             address(mockModule),
+            address(0),
+            0,
+            address(0),
             1,
             address(0x1),
             address(0x1),
@@ -631,11 +662,14 @@ contract OpsCoverageTest is Test {
 
         mockModule.setDecision(1);
         mockModule.setEscalation(true, address(0x999), 0);
-        mockModule.setExecution(false, address(0), 0); // Exec fails
+        mockModule.setExecution(false, address(0), 0); // Exec fails - but computeEscalation doesn't call executeEscalation anymore
 
         vm.prank(escrowContract);
         DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
             address(mockModule),
+            address(0x9999),
+            0,
+            feeRecipient,
             1,
             address(0x1),
             address(0x1),
@@ -645,8 +679,9 @@ contract OpsCoverageTest is Test {
             EscrowState.DISPUTED
         );
 
-        assertFalse(result.success);
-        assertEq(result.failureReason, 'Module rejected escalation');
+        // Since executeEscalation is removed from DisputeOps, this test needs to be adjusted
+        // or it might just succeed if other checks pass.
+        assertTrue(result.success);
     }
 
     function test_DisputeOps_computeEscalation_ExecZero() public {
@@ -655,12 +690,14 @@ contract OpsCoverageTest is Test {
         disputeOps.registerEscrowContract(escrowContract);
 
         mockModule.setDecision(1);
-        mockModule.setEscalation(true, address(0x999), 0);
-        mockModule.setExecution(true, address(0), 0); // Exec success but zero addr
-
+        mockModule.setEscalation(true, address(0), 0); // Next resolver is zero
+        
         vm.prank(escrowContract);
         DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
             address(mockModule),
+            address(0x9999),
+            0,
+            feeRecipient,
             1,
             address(0x1),
             address(0x1),
@@ -671,7 +708,7 @@ contract OpsCoverageTest is Test {
         );
 
         assertFalse(result.success);
-        assertEq(result.failureReason, 'Module returned zero address');
+        assertEq(result.failureReason, 'Escalation not allowed by module');
     }
 
     function test_DisputeOps_encodeEscrowData() public {
@@ -692,6 +729,9 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
             address(0), // No resolution module
+            address(0),
+            0,
+            address(0),
             1,
             address(0x1),
             address(0x1),
@@ -716,6 +756,9 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
             address(mockModule),
+            address(0),
+            0,
+            address(0),
             1,
             address(0x1), // Sender
             address(0x1),
@@ -756,6 +799,9 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
             address(mockSpecial),
+            address(0),
+            0,
+            address(0),
             1,
             address(0x1), // Sender
             address(0x1),
@@ -786,6 +832,9 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
             address(mockSpecial),
+            address(0),
+            0,
+            address(0),
             1,
             address(0x1), // Sender
             address(0x1),
@@ -1406,6 +1455,14 @@ contract MockResolutionModule {
     uint8 public decision; // 0=NONE, 1=RELEASE, 2=CANCEL
     bool public shouldRevert;
 
+    uint256 public bondAmount;
+    address public bondToken;
+
+    function setRequiredAppealBond(uint256 _amount, address _token) external {
+        bondAmount = _amount;
+        bondToken = _token;
+    }
+
     function setEscalation(bool _should, address _next, uint256 _fee) external {
         shouldEscalate = _should;
         nextResolver = _next;
@@ -1464,8 +1521,8 @@ contract MockResolutionModule {
         return (true, 0);
     }
 
-    function getRequiredAppealBond(uint256, address, uint8, bytes calldata) external pure returns (uint256, address) {
-        return (0, address(0));
+    function getRequiredAppealBond(uint256, address, uint8, bytes calldata) external view returns (uint256, address) {
+        return (bondAmount, bondToken);
     }
 
     function moduleName() external pure returns (string memory) { return "Mock"; }

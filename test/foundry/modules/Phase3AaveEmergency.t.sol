@@ -216,9 +216,9 @@ contract Phase3AaveEmergencyTest is Test {
         // Verify unpaused
         assertFalse(vault.paused(), "Vault not unpaused");
         
-        // Funds should be in vault now
-        uint256 vaultBalance = token.balanceOf(address(vault));
-        assertGt(vaultBalance, 0, "Vault did not receive funds");
+        // Funds should be in yieldOps now
+        uint256 yoBalance = token.balanceOf(address(yieldOps));
+        assertGt(yoBalance, 0, "YieldOps did not receive funds");
     }
 
     /**
@@ -343,9 +343,9 @@ contract Phase3AaveEmergencyTest is Test {
         // Should get at least original amount
         assertGe(unwoundAmount, originalDeposit, "Unwind returned less than original");
         
-        // Vault receives unwound funds
-        uint256 vaultBalance = token.balanceOf(address(vault));
-        assertGt(vaultBalance, 0, "Vault did not receive unwound funds");
+        // YieldOps receives unwound funds
+        uint256 yoBalance = token.balanceOf(address(yieldOps));
+        assertGt(yoBalance, 0, "YieldOps did not receive unwound funds");
     }
 
     /**
@@ -380,9 +380,9 @@ contract Phase3AaveEmergencyTest is Test {
         assertEq(module.escrowScaledBalance(address(vault), workflowId), 0, "Shares not cleared");
         assertEq(module.escrowOriginalDeposit(address(vault), workflowId), 0, "Deposit not cleared");
         
-        // Verify funds in vault
-        uint256 vaultBalance = token.balanceOf(address(vault));
-        assertGt(vaultBalance, 0, "No funds in vault");
+        // Verify funds in yieldOps
+        uint256 yoBalance = token.balanceOf(address(yieldOps));
+        assertGt(yoBalance, 0, "No funds in yieldOps");
     }
 
     /**

@@ -98,7 +98,13 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         return createEscrow(address(this), seller, amount, settings);
     }
 
-        // ============ BaseEscrow Hook Implementations ============
+    function releaseEscrowTransfer(uint256 workflowId) public nonReentrant whenNotPaused {
+        _requirePending(workflowId);
+        if (escrowTransfers[workflowId].from != _msgSender()) revert NotSender(workflowId, _msgSender(), escrowTransfers[workflowId].from);
+        _releaseEscrowTransfer(workflowId);
+    }
+
+    // ============ BaseEscrow Hook Implementations ============
 
     /// @dev Token must be address(this)
     modifier onlyThisToken(address token) {
