@@ -75,6 +75,7 @@ contract Test_05_ModuleSnapshotting_test is Test {
         // create escrow
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0),
             releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,

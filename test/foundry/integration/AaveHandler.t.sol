@@ -60,6 +60,7 @@ contract AaveHandler is CommonBase, StdCheats, StdUtils {
             amount,
             EscrowSettings({
                 customResolver: address(0),
+            releaseAddress: address(0),
                 releaseAddress: address(0), // Added default releaseAddress
                 yieldPreset: YieldPreset.TO_SENDER,
                 autoReleaseTime: 0,

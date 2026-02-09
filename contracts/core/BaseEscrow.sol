@@ -79,6 +79,7 @@ error EscalationNotAllowed();
 error AppealBondQueryFailed(uint256 workflowId);
 error InvalidBondMsgValue(uint256 workflowId, uint256 required, uint256 provided);
 error AppealsNotEnabledInV1();
+error AlreadyPausedCannotRepause();
 
 // Errors used by child contracts (EscrowVault, EscrowableERC20)
 error BalanceUnderflow(address token, uint256 currentBalance, uint256 requestedAmount);
@@ -96,6 +97,14 @@ enum ResolutionMode {
     DIRECT               // No resolver configured (fallback)
 }
 
+/// @notice Pause state tracking for guardian pause constraints
+struct PauseState {
+    uint256 pausedAt;              // Timestamp when contract was paused
+    uint256 unpausedAt;            // Timestamp when contract was unpaused
+    uint256 pauseCycleCount;       // Number of pauses in current window
+    uint256 lastResetAt;           // Timestamp when cycle counter was reset
+}
+
 abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;
 
@@ -103,6 +112,13 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');
     bytes32 public constant ROLE_GUARDIAN = keccak256('ROLE_GUARDIAN');
     bytes32 public constant ROLE_ADMIN_CONTRACT = keccak256('ROLE_ADMIN_CONTRACT');
+
+    // Pause constraints (auto-expiring pause with cycle limit)
+    uint256 public constant MAX_PAUSE_DURATION = 7 days;
+    uint256 public constant MAX_PAUSE_CYCLES = 3;      // 3 pauses per PAUSE_WINDOW
+    uint256 public constant PAUSE_WINDOW = 90 days;    // Rolling 90-day window
+    
+    PauseState public pauseState;
 
 
     uint256 public escrowFee;
@@ -269,21 +285,63 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     // Monitoring & Safety Events (v1)
     event IncidentPauseTriggered(
         string reason,
-        uint256 timestamp
+        uint256 timestamp,
+        uint256 pauseCycleCount
     );
     event SystemResumed(
         uint256 timestamp
     );
+    event MaxPauseCyclesExceeded(
+        uint256 pauseCycleCount,
+        uint256 maxCycles
+    );
+    event PauseDurationExceeded(
+        uint256 pausedDuration,
+        uint256 maxDuration
+    );
 
     // ============ Pause/Unpause ============
     function pause(string calldata reason) external onlyRole(ROLE_GUARDIAN) {
+        // Prevent re-pausing while already paused (forces governance coordination)
+        if (paused()) {
+            revert AlreadyPausedCannotRepause();
+        }
+        
+        // Check pause cycle count in rolling window
+        uint256 elapsedWindow = block.timestamp - pauseState.lastResetAt;
+        if (elapsedWindow >= PAUSE_WINDOW) {
+            // Window expired - reset counter
+            pauseState.pauseCycleCount = 0;
+            pauseState.lastResetAt = block.timestamp;
+        }
+        
+        // Check if max cycles reached in current window
+        if (pauseState.pauseCycleCount >= MAX_PAUSE_CYCLES) {
+            revert MaxPauseCyclesExceeded(pauseState.pauseCycleCount, MAX_PAUSE_CYCLES);
+        }
+        
+        // Execute pause
         _pause();
-        emit IncidentPauseTriggered(reason, block.timestamp);
+        pauseState.pausedAt = block.timestamp;
+        pauseState.pauseCycleCount++;
+        emit IncidentPauseTriggered(reason, block.timestamp, pauseState.pauseCycleCount);
     }
 
     function unpause() external onlyRole(ROLE_TIMELOCK) {
         _unpause();
+        pauseState.unpausedAt = block.timestamp;
         emit SystemResumed(block.timestamp);
+    }
+
+    /// @notice Enforce maximum pause duration on operations
+    /// @dev Called in critical functions to prevent indefinite pauses
+    function _enforceMaxPauseDuration() internal view {
+        if (paused()) {
+            uint256 pausedDuration = block.timestamp - pauseState.pausedAt;
+            if (pausedDuration > MAX_PAUSE_DURATION) {
+                revert PauseDurationExceeded(pausedDuration, MAX_PAUSE_DURATION);
+            }
+        }
     }
 
     function setFeeRecipient(address newAddr) external onlyRole(ROLE_ADMIN_CONTRACT) {
@@ -356,6 +414,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         uint256 amount,
         EscrowSettings memory settings
     ) public nonReentrant whenNotPaused returns (uint256) {
+        _enforceMaxPauseDuration();
         uint256 workflowId = escrowTransfers.length; // Array index IS the workflowId
         
         // CreateOps is mandatory (removed inline fallback to save >1KB bytecode)
@@ -486,6 +545,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     }
 
     function recipientCancel(uint256 workflowId) external nonReentrant whenNotPaused returns (bool) {
+        _enforceMaxPauseDuration();
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
         if (et.to != _msgSender()) revert NotRecipient(workflowId, _msgSender(), et.to);
@@ -495,6 +555,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     }
 
     function senderCancel(uint256 workflowId) external nonReentrant whenNotPaused returns (bool) {
+        _enforceMaxPauseDuration();
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
         if (et.from != _msgSender()) revert NotSender(workflowId, _msgSender(), et.from);
@@ -505,6 +566,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
 
     // slither-disable-next-line reentrancy-no-eth
     function autoCancelDisputedEscrow(uint256 workflowId) external nonReentrant {
+        _enforceMaxPauseDuration();
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
         if (et.escrowState != EscrowState.DISPUTED) {
@@ -533,6 +595,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
 
     // slither-disable-next-line reentrancy-no-eth
     function raiseDispute(uint256 workflowId) external nonReentrant {
+        _enforceMaxPauseDuration();
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
         ModuleSnapshot storage snap = moduleSnapshots[workflowId];
@@ -770,6 +833,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     }
 
     function executePendingSettlement(uint256 workflowId) external nonReentrant {
+        _enforceMaxPauseDuration();
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
         PendingSettlement storage pending = pendingSettlements[workflowId];
@@ -798,6 +862,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     /// @dev May transfer funds immediately (push) or create claimable balance (fallback)
     /// @dev Part of IEscrowCore interface for wallet adoption
     function release(uint256 workflowId) external nonReentrant whenNotPaused {
+        _enforceMaxPauseDuration();
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
 

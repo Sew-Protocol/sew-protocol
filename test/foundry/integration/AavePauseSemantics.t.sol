@@ -146,6 +146,7 @@ contract AavePauseSemantics is Test {
     function test_pause_blocksEnterYield_blocksExitYield() public {
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0),
             releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.TO_SENDER,
             autoReleaseTime: 0,
@@ -199,6 +200,7 @@ contract AavePauseSemantics is Test {
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0),
             releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.TO_SENDER,
             autoReleaseTime: 0,
@@ -223,6 +225,7 @@ contract AavePauseSemantics is Test {
     function test_pause_existingEscrows_cannotExitYield() public {
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0),
             releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.TO_SENDER,
             autoReleaseTime: 0,
@@ -263,6 +266,7 @@ contract AavePauseSemantics is Test {
         // Should be able to create escrow now
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0),
             releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.TO_SENDER,
             autoReleaseTime: 0,
@@ -286,6 +290,7 @@ contract AavePauseSemantics is Test {
     function test_pause_emergencyUnwind_stillWorks() public {
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0),
             releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.TO_SENDER,
             autoReleaseTime: 0,

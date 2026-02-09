@@ -90,6 +90,7 @@ contract BaseEscrowComprehensive is Test {
         ) = vault.escrowSettings(workflowId);
         settings = EscrowSettings({
             customResolver: customResolver,
+            releaseAddress: address(0),
             releaseAddress: releaseAddress, // NEW
             yieldPreset: yieldPreset,
             autoReleaseTime: autoReleaseTime,
@@ -654,6 +655,7 @@ contract BaseEscrowComprehensive is Test {
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0),
             releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
@@ -675,6 +677,7 @@ contract BaseEscrowComprehensive is Test {
 
         EscrowSettings memory newSettings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0),
             releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: block.timestamp + 7 days,

@@ -128,6 +128,7 @@ contract ReleaseFlexibilityTest is Test {
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0),
             releaseAddress: authorizedReleaser,
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
@@ -145,6 +146,7 @@ contract ReleaseFlexibilityTest is Test {
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0),
             releaseAddress: authorizedReleaser,
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
@@ -162,6 +164,7 @@ contract ReleaseFlexibilityTest is Test {
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0),
             releaseAddress: authorizedReleaser,
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
@@ -180,6 +183,7 @@ contract ReleaseFlexibilityTest is Test {
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0),
             releaseAddress: authorizedReleaser,
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
@@ -207,6 +211,7 @@ contract ReleaseFlexibilityTest is Test {
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0),
             releaseAddress: address(0), // No specific release address
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
@@ -233,6 +238,7 @@ contract ReleaseFlexibilityTest is Test {
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0),
             releaseAddress: recipient, // Invalid: recipient is also releaseAddress
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
@@ -259,6 +265,7 @@ contract ReleaseFlexibilityTest is Test {
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
             releaseAddress: address(0),
+            releaseAddress: address(0),
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
             autoCancelTime: 0
@@ -281,6 +288,7 @@ contract ReleaseFlexibilityTest is Test {
         mockToken.approve(address(escrowVault), 100 ether);
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0),
             releaseAddress: address(0),
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
@@ -311,6 +319,7 @@ contract ReleaseFlexibilityTest is Test {
         mockToken.approve(address(escrowVault), 100 ether);
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0),
             releaseAddress: address(0),
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
@@ -344,6 +353,7 @@ contract ReleaseFlexibilityTest is Test {
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
             releaseAddress: address(0),
+            releaseAddress: address(0),
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
             autoCancelTime: 0
@@ -359,6 +369,7 @@ contract ReleaseFlexibilityTest is Test {
         mockToken.approve(address(escrowVault), 100 ether);
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0),
             releaseAddress: authorizedReleaser,
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
@@ -379,6 +390,7 @@ contract ReleaseFlexibilityTest is Test {
         mockToken.approve(address(escrowVault), 100 ether);
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0),
             releaseAddress: address(0),
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
@@ -401,6 +413,7 @@ contract ReleaseFlexibilityTest is Test {
         mockToken.approve(address(escrowVault), 100 ether);
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0),
             releaseAddress: address(0),
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,

@@ -134,6 +134,8 @@ contract OpsCoverageTest is Test {
         // Prepare input data
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0),
+            releaseAddress: address(0),
             yieldPreset: YieldPreset.TO_SENDER, // User wants yield
             autoReleaseTime: 0,
             autoCancelTime: 0
@@ -163,6 +165,8 @@ contract OpsCoverageTest is Test {
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0),
+            releaseAddress: address(0),
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
             autoCancelTime: 0
@@ -191,6 +195,8 @@ contract OpsCoverageTest is Test {
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0),
+            releaseAddress: address(0),
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
             autoCancelTime: 0
@@ -220,6 +226,8 @@ contract OpsCoverageTest is Test {
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0),
+            releaseAddress: address(0),
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
             autoCancelTime: 0
@@ -857,6 +865,8 @@ contract OpsCoverageTest is Test {
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0),
+            releaseAddress: address(0),
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
             autoCancelTime: 0
@@ -897,6 +907,8 @@ contract OpsCoverageTest is Test {
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0),
+            releaseAddress: address(0),
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
             autoCancelTime: 0

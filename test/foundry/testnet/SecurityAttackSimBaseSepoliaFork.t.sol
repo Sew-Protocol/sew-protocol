@@ -198,7 +198,7 @@ contract SecurityAttackSimBaseSepoliaForkTest is Test {
         tkn.approve(escrowVaultAddr, type(uint256).max);
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
-            releaseAddress: address(0), // Added default releaseAddress
+            releaseAddress: address(0),
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
             autoCancelTime: 0
@@ -233,7 +233,7 @@ contract SecurityAttackSimBaseSepoliaForkTest is Test {
         tkn.approve(escrowVaultAddr, type(uint256).max);
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
-            releaseAddress: address(0), // Added default releaseAddress
+            releaseAddress: address(0),
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
             autoCancelTime: 0
@@ -267,7 +267,7 @@ contract SecurityAttackSimBaseSepoliaForkTest is Test {
         tkn.approve(escrowVaultAddr, type(uint256).max);
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
-            releaseAddress: address(0), // Added default releaseAddress
+            releaseAddress: address(0),
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
             autoCancelTime: 0

@@ -156,6 +156,7 @@ contract EscrowViewContractTest is Test {
         // Use address(0) for customResolver to avoid InvalidAddressKey error
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0), // Use default resolver
+            releaseAddress: address(0),
             releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.TO_SENDER,
             autoReleaseTime: block.timestamp + 7 days,
@@ -217,6 +218,7 @@ contract EscrowViewContractTest is Test {
         // (customResolver must be a contract if non-zero)
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0), // Use default resolver
+            releaseAddress: address(0),
             releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.TO_SENDER,
             autoReleaseTime: block.timestamp + 5 days,
@@ -711,6 +713,7 @@ contract EscrowViewContractTest is Test {
         for (uint256 i = 0; i < presets.length; i++) {
             EscrowSettings memory settings = EscrowSettings({
                 customResolver: address(0),
+            releaseAddress: address(0),
                 releaseAddress: address(0), // Added default releaseAddress
                 yieldPreset: presets[i],
                 autoReleaseTime: 0,

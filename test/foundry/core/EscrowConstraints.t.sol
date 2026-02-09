@@ -105,6 +105,7 @@ contract EscrowConstraints is Test {
     function getDefaultSettings() internal view returns (EscrowSettings memory) {
         return EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0),
             releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,

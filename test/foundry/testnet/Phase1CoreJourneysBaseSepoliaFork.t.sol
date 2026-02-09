@@ -111,7 +111,7 @@ contract Phase1CoreJourneysBaseSepoliaForkTest is Test {
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: resolver,
-            releaseAddress: address(0), // Added default releaseAddress
+            releaseAddress: address(0),
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
             autoCancelTime: 0
@@ -195,7 +195,7 @@ contract Phase1CoreJourneysBaseSepoliaForkTest is Test {
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: resolver,
-            releaseAddress: address(0), // Added default releaseAddress
+            releaseAddress: address(0),
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
             autoCancelTime: 0
