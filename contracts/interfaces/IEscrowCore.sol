@@ -26,15 +26,7 @@ import '../types/EscrowTypes.sol';
 interface IEscrowCore {
     // ============ Core Data Structures ============
 
-    /// @notice The current state of an escrow transfer
-    enum EscrowState {
-        NONE,           // Workflow does not exist
-        PENDING,        // Escrow created, awaiting release/cancel/dispute
-        RELEASED,       // Recipient released (final)
-        REFUNDED,       // Sender refunded (final)
-        DISPUTED,       // Active dispute, awaiting resolution
-        RESOLVED        // Dispute resolved, awaiting settlement execution
-    }
+
 
     /// @notice Resolution mode for an escrow (how disputes are handled)
     enum ResolutionMode {
@@ -150,6 +142,12 @@ interface IEscrowCore {
     /// @return claimable Amount available to withdraw via withdrawEscrow()
     /// @dev Used by wallets to show "You have X to withdraw"
     function getClaimableBalance(uint256 workflowId, address account) external view returns (uint256 claimable);
+
+    /// @notice Check if a release is allowed for the given escrow and caller
+    /// @param workflowId The escrow transfer ID
+    /// @param caller The address attempting to release
+    /// @return allowed True if release is allowed
+    function canRelease(uint256 workflowId, address caller) external view returns (bool allowed);
 
     // ============ Events: Core Lifecycle ============
 

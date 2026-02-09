@@ -182,6 +182,7 @@ contract PerEscrowSettingsTest is Test {
         address customResolver = address(resolutionV2);
         EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
         settings.customResolver = customResolver;
+        settings.releaseAddress = address(0); // Explicitly set to 0 for this test
         
         vm.prank(buyer);
         uint256 wid = vault.createEscrow(address(token), seller, 100e18, settings);
@@ -199,6 +200,7 @@ contract PerEscrowSettingsTest is Test {
 
         EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
         settings.customResolver = address(resolutionV2); // non-zero contract address
+        settings.releaseAddress = address(0); // Added default releaseAddress
         settings.yieldPreset = YieldPreset.TO_SENDER;
         settings.autoReleaseTime = block.timestamp + 10 days;
         // autoCancelTime must remain 0 when autoReleaseTime is set
@@ -207,9 +209,10 @@ contract PerEscrowSettingsTest is Test {
         uint256 wid = vault.createEscrow(address(token), seller, amount, settings);
 
         // Verify settings snapshot in mapping
-        (address customResolverRet, YieldPreset yieldPresetRet, uint256 autoReleaseTimeRet, uint256 autoCancelTimeRet) =
+        (address customResolverRet, address releaseAddressRet, YieldPreset yieldPresetRet, uint256 autoReleaseTimeRet, uint256 autoCancelTimeRet) =
             vault.escrowSettings(wid);
         assertEq(customResolverRet, settings.customResolver);
+        assertEq(releaseAddressRet, settings.releaseAddress);
         assertEq(uint256(yieldPresetRet), uint256(settings.yieldPreset));
         assertEq(autoReleaseTimeRet, settings.autoReleaseTime);
         assertEq(autoCancelTimeRet, 0);
@@ -253,7 +256,7 @@ contract PerEscrowSettingsTest is Test {
         uint256 wid = vault.createEscrow(address(token), seller, amount, settings);
 
         // Mapping snapshot keeps raw settings (zeros for times)
-        ( , , uint256 autoReleaseTimeSnap, uint256 autoCancelTimeSnap) = vault.escrowSettings(wid);
+        ( , , , uint256 autoReleaseTimeSnap, uint256 autoCancelTimeSnap) = vault.escrowSettings(wid);
         assertEq(autoReleaseTimeSnap, 0);
         assertEq(autoCancelTimeSnap, 0);
 

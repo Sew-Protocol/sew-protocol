@@ -81,10 +81,16 @@ contract BaseEscrowComprehensive is Test {
     }
 
     function _loadSettings(uint256 workflowId) internal view returns (EscrowSettings memory settings) {
-        (address customResolver, YieldPreset yieldPreset, uint256 autoReleaseTime, uint256 autoCancelTime) = vault
-            .escrowSettings(workflowId);
+        (
+            address customResolver,
+            address releaseAddress, // NEW
+            YieldPreset yieldPreset,
+            uint256 autoReleaseTime,
+            uint256 autoCancelTime
+        ) = vault.escrowSettings(workflowId);
         settings = EscrowSettings({
             customResolver: customResolver,
+            releaseAddress: releaseAddress, // NEW
             yieldPreset: yieldPreset,
             autoReleaseTime: autoReleaseTime,
             autoCancelTime: autoCancelTime
@@ -648,6 +654,7 @@ contract BaseEscrowComprehensive is Test {
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
             autoCancelTime: 0
@@ -668,6 +675,7 @@ contract BaseEscrowComprehensive is Test {
 
         EscrowSettings memory newSettings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: block.timestamp + 7 days,
             autoCancelTime: 0

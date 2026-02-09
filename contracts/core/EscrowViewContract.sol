@@ -94,12 +94,14 @@ contract EscrowViewContract {
         // Note: yieldPreset is stored as YieldPreset enum in storage, but public getter returns as uint8
         (
             address customResolver,
+            address releaseAddress,
             YieldPreset yieldPreset,
             uint256 autoReleaseTime,
             uint256 autoCancelTime
         ) = escrowContract.escrowSettings(workflowId);
         settings = EscrowSettings({
             customResolver: customResolver,
+            releaseAddress: releaseAddress,
             yieldPreset: yieldPreset,
             autoReleaseTime: autoReleaseTime,
             autoCancelTime: autoCancelTime

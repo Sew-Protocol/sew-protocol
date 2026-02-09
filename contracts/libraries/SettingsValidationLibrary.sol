@@ -108,8 +108,11 @@ library SettingsValidationLibrary {
             // or any other critical protocol address could be added here if needed
         }
 
-        // DEPRECATED: Per-escrow yield distribution has been removed in favor of yield presets.
-        // Distribution is derived at runtime from `settings.yieldPreset` and participant addresses.
+        // Validate releaseAddress if set
+        if (settings.releaseAddress != address(0)) {
+            // releaseAddress cannot be any critical protocol address if needed,
+            // but primarily it just shouldn't be the same as recipient (checked in validateRecipient)
+        }
     }
     
     /**
@@ -127,14 +130,18 @@ library SettingsValidationLibrary {
      * @notice Validate recipient address
      * @param recipient The recipient address
      * @param sender The sender address
-     * @dev Reverts if recipient is zero address or same as sender
+     * @param releaseAddress The release address (if any)
+     * @dev Reverts if recipient is zero address, same as sender, or same as releaseAddress
      */
-    function validateRecipient(address recipient, address sender) internal pure {
+    function validateRecipient(address recipient, address sender, address releaseAddress) internal pure {
         if (recipient == address(0)) {
             revert InvalidAddress(ADDR_RECIPIENT, address(0));
         }
         if (recipient == sender) {
             revert InvalidAddress(ADDR_GENERIC, recipient); // ADDR_GENERIC for same address
+        }
+        if (releaseAddress != address(0) && recipient == releaseAddress) {
+            revert InvalidAddress(ADDR_RECIPIENT, recipient);
         }
     }
     
@@ -158,6 +165,7 @@ library SettingsValidationLibrary {
         return
             EscrowSettings({
                 customResolver: address(0),
+                releaseAddress: address(0),
                 yieldPreset: YieldPreset.OFF, // Default: yield off
                 autoReleaseTime: 0,
                 autoCancelTime: 0

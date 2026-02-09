@@ -75,9 +75,9 @@ contract LibraryHarness {
 
     }
 
-    function validateRecipient(address recipient, address sender) external pure {
+        function validateRecipient(address recipient, address sender) external pure {
 
-        SettingsValidationLibrary.validateRecipient(recipient, sender);
+            SettingsValidationLibrary.validateRecipient(recipient, sender, address(0));
 
     }
 

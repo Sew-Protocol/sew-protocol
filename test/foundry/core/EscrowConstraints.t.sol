@@ -16,6 +16,7 @@ import '../../../contracts/ops/CreateOps.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
+import { ADDR_GENERIC, ADDR_RECIPIENT, ADDR_INITIAL_RESOLVER } from "../../../contracts/types/EscrowTypes.sol";
 
 /**
  * @title EscrowConstraints
@@ -104,6 +105,7 @@ contract EscrowConstraints is Test {
     function getDefaultSettings() internal view returns (EscrowSettings memory) {
         return EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
             autoCancelTime: 0

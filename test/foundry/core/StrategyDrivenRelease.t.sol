@@ -39,7 +39,8 @@ contract StrategyDrivenReleaseTest is Test {
             address(0x1111),  // token
             sender,           // sender
             recipient,        // recipient
-            100 ether         // amount
+            100 ether,        // amount
+            address(0)        // releaseAddress (no delegated releaser for this test)
         );
 
         // Sender should get reason code 0 (allowed)
@@ -68,17 +69,19 @@ contract StrategyDrivenReleaseTest is Test {
     function test_strategy_canonicalEscrowDataFormat() public {
         address token = address(0x2222);
         uint256 amount = 50 ether;
+        address delegatedReleaser = address(0x123);
 
-        // Build canonical escrowData
+        // Build canonical escrowData with a delegated releaser
         bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(
             token,
             sender,
             recipient,
-            amount
+            amount,
+            delegatedReleaser
         );
 
         // DefaultReleaseStrategy should be able to decode it correctly
-        // We verify this by ensuring sender can call it without revert
+        // We verify this by ensuring sender or delegated releaser can call it without revert
         (bool allowed, uint8 reasonCode) = defaultStrategy.canRelease(
             0,
             address(this),
@@ -86,28 +89,44 @@ contract StrategyDrivenReleaseTest is Test {
             escrowData
         );
 
-        assertTrue(allowed, "Strategy should successfully decode canonical format");
-        assertEq(reasonCode, 0, "Decoding should succeed");
+        assertTrue(allowed, "Sender should successfully decode canonical format");
+        assertEq(reasonCode, 0, "Decoding should succeed for sender");
+
+        (allowed, reasonCode) = defaultStrategy.canRelease(
+            0,
+            address(this),
+            delegatedReleaser,
+            escrowData
+        );
+        assertTrue(allowed, "Delegated releaser should successfully decode canonical format");
+        assertEq(reasonCode, 0, "Decoding should succeed for delegated releaser");
     }
 
-    // ============ Test 3: DefaultReleaseStrategy Only Allows Sender ============
+    // ============ Test 3: DefaultReleaseStrategy Allows Sender and Delegated Releaser ============
 
-    function test_strategy_defaultReleaseOnlyAllowsSender() public {
+    function test_strategy_defaultReleaseAllowsSenderAndDelegated() public {
+        address delegatedReleaser = address(0x123);
         bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(
             address(0x3333),
             sender,
             recipient,
-            75 ether
+            75 ether,
+            delegatedReleaser
         );
 
-        // Only sender can release
+        // Sender can release
         (bool allowed, ) = defaultStrategy.canRelease(0, address(this), sender, escrowData);
         assertTrue(allowed, "Sender should be allowed");
 
-        // Anyone else is rejected
+        // Delegated releaser can release
+        (allowed, ) = defaultStrategy.canRelease(0, address(this), delegatedReleaser, escrowData);
+        assertTrue(allowed, "Delegated releaser should be allowed");
+
+        // Recipient is rejected
         (allowed, ) = defaultStrategy.canRelease(0, address(this), recipient, escrowData);
         assertFalse(allowed, "Recipient should not be allowed");
 
+        // Random address is rejected
         (allowed, ) = defaultStrategy.canRelease(0, address(this), wrongAddress, escrowData);
         assertFalse(allowed, "Random address should not be allowed");
     }
@@ -119,7 +138,8 @@ contract StrategyDrivenReleaseTest is Test {
             address(0x4444),
             sender,
             recipient,
-            25 ether
+            25 ether,
+            address(0x123) // Delegated releaser, still rejected by rejectStrategy
         );
 
         // Even sender is rejected
@@ -164,31 +184,41 @@ contract StrategyDrivenReleaseTest is Test {
     function test_strategy_multipleEscrows() public {
         address sender1 = address(0x100);
         address sender2 = address(0x200);
+        address delegatedReleaser1 = address(0x101);
+        address delegatedReleaser2 = address(0x201);
 
         bytes memory data1 = EscrowEncodingLibrary.encodeEscrowTransferData(
             address(0x5555),
             sender1,
             recipient,
-            10 ether
+            10 ether,
+            delegatedReleaser1
         );
 
         bytes memory data2 = EscrowEncodingLibrary.encodeEscrowTransferData(
             address(0x6666),
             sender2,
             recipient,
-            20 ether
+            20 ether,
+            delegatedReleaser2
         );
 
-        // Escrow 1: only sender1 allowed
+        // Escrow 1: only sender1 or delegatedReleaser1 allowed
         (bool allowed, ) = defaultStrategy.canRelease(0, address(this), sender1, data1);
         assertTrue(allowed, "Sender1 should be allowed for escrow1");
+
+        (allowed, ) = defaultStrategy.canRelease(0, address(this), delegatedReleaser1, data1);
+        assertTrue(allowed, "DelegatedReleaser1 should be allowed for escrow1");
 
         (allowed, ) = defaultStrategy.canRelease(0, address(this), sender2, data1);
         assertFalse(allowed, "Sender2 should not be allowed for escrow1");
 
-        // Escrow 2: only sender2 allowed
+        // Escrow 2: only sender2 or delegatedReleaser2 allowed
         (allowed, ) = defaultStrategy.canRelease(0, address(this), sender2, data2);
         assertTrue(allowed, "Sender2 should be allowed for escrow2");
+
+        (allowed, ) = defaultStrategy.canRelease(0, address(this), delegatedReleaser2, data2);
+        assertTrue(allowed, "DelegatedReleaser2 should be allowed for escrow2");
 
         (allowed, ) = defaultStrategy.canRelease(0, address(this), sender1, data2);
         assertFalse(allowed, "Sender1 should not be allowed for escrow2");

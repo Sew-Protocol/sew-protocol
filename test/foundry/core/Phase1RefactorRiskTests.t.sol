@@ -163,7 +163,7 @@ contract Phase1RefactorRiskTests is Test {
         uint256 workflowId = vault.createEscrow(address(token), seller, AMOUNT, settings);
         
         // Verify settings were applied (public mapping getter returns tuple)
-        (address customResolver, YieldPreset yieldPreset, uint256 autoReleaseTime, uint256 autoCancelTime) = vault.escrowSettings(workflowId);
+        (address customResolver, address releaseAddress, YieldPreset yieldPreset, uint256 autoReleaseTime, uint256 autoCancelTime) = vault.escrowSettings(workflowId);
         assertEq(autoReleaseTime, futureTime, "autoReleaseTime should be applied");
         assertEq(autoCancelTime, 0, "autoCancelTime should be 0");
         

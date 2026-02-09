@@ -161,7 +161,8 @@ contract ModulesCoverageTest is Test {
             address(token),
             sender,
             recipient,
-            1000e18
+            1000e18,
+            address(0) // Added default releaseAddress
         );
         
         // Non-sender (address(0)) should not be allowed

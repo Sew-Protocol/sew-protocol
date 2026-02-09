@@ -7,6 +7,9 @@ import "forge-std/StdJson.sol";
 import { ERC20Mock } from "../../../contracts/mocks/ERC20Mock.sol";
 import { EscrowSettings } from "../../../contracts/types/EscrowTypes.sol";
 import { YieldPreset } from "../../../contracts/types/YieldPresets.sol";
+import { CreateOps } from "../../../contracts/ops/CreateOps.sol";
+import { EscrowVault } from "../../../contracts/core/EscrowVault.sol";
+import { BaseEscrow } from "../../../contracts/core/BaseEscrow.sol";
 
 interface IAccessControlMinimal {
     function hasRole(bytes32 role, address account) external view returns (bool);
@@ -91,6 +94,12 @@ contract Phase0BaseSepoliaForkTest is Test {
         moduleManagement = _dep("ModuleSnapshotRegistry");
         escrowAdmin = _dep("EscrowGovernanceTimelock");
         escrowVault = _dep("EscrowVault");
+
+        // --- UPGRADE CORE ON FORK ---
+        // NOTE: Skipping contract upgrades on fork to preserve existing state.
+        // The fork already has deployed and configured contracts. Etching would replace
+        // the code but keep the old storage, causing state mismatches. In production, 
+        // proper upgrade patterns (proxy, etc) should be used.
     }
 
     function test_phase0_deployment_health_and_minimal_e2e() public {
@@ -157,6 +166,7 @@ contract Phase0BaseSepoliaForkTest is Test {
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: resolver,
+            releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
             autoCancelTime: 0

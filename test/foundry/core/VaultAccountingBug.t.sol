@@ -83,6 +83,7 @@ contract VaultAccountingBugTest is Test {
         token.approve(address(escrow), 100 ether);
         uint256 wid = escrow.createEscrow(address(token), user2, 100 ether, EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
             autoCancelTime: 0

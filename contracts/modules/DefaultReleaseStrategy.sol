@@ -30,15 +30,15 @@ contract DefaultReleaseStrategy is IReleaseStrategy, ERC165 {
         address caller,
         bytes calldata escrowData
     ) external pure override returns (bool allowed, uint8 reasonCode) {
-        // Decode escrowData to get sender address
-        // Expected format: abi.encode(token, sender, recipient, amountAfterFee)
-        (address token, address sender, address recipient, uint256 amountAfterFee) = abi.decode(
+        // Decode escrowData to get sender and releaseAddress
+        // Expected format: abi.encode(token, sender, recipient, amountAfterFee, releaseAddress)
+        (address token, address sender, address recipient, uint256 amountAfterFee, address releaseAddress) = abi.decode(
             escrowData,
-            (address, address, address, uint256)
+            (address, address, address, uint256, address)
         );
 
-        // Only the sender (buyer) can release
-        if (caller == sender) {
+        // Allowed if caller is the sender (buyer) OR the delegated releaseAddress
+        if (caller == sender || (releaseAddress != address(0) && caller == releaseAddress)) {
             return (true, REASON_ALLOWED);
         } else {
             return (false, REASON_NOT_AUTHORIZED);

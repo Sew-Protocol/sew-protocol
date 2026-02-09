@@ -248,6 +248,7 @@ contract AaveFailureScenarios is Test {
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.TO_SENDER,
             autoReleaseTime: 0,
             autoCancelTime: 0
@@ -268,6 +269,7 @@ contract AaveFailureScenarios is Test {
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.TO_SENDER,
             autoReleaseTime: 0,
             autoCancelTime: 0
@@ -289,6 +291,7 @@ contract AaveFailureScenarios is Test {
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.TO_SENDER,
             autoReleaseTime: 0,
             autoCancelTime: 0
@@ -321,6 +324,7 @@ contract AaveFailureScenarios is Test {
     function test_supply_reverts_onBadApproval() public {
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.TO_SENDER,
             autoReleaseTime: 0,
             autoCancelTime: 0
@@ -337,6 +341,7 @@ contract AaveFailureScenarios is Test {
     function test_withdraw_reverts_onInsufficientLiquidity() public {
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.TO_SENDER,
             autoReleaseTime: 0,
             autoCancelTime: 0

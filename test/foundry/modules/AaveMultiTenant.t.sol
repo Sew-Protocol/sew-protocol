@@ -353,6 +353,7 @@ contract AaveMultiTenantTest is Test {
     function _getSettings() internal pure returns (EscrowSettings memory) {
         return EscrowSettings({
             customResolver: address(0),
+            releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.TO_SENDER,
             autoReleaseTime: 0,
             autoCancelTime: 0

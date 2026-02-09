@@ -140,6 +140,7 @@ contract ReentrancyProtectionTest is Test {
             ESCROW_AMOUNT,
             EscrowSettings({
                 customResolver: address(0),
+                releaseAddress: address(0), // Added default releaseAddress
                 yieldPreset: YieldPreset.OFF,
                 autoReleaseTime: 0,
                 autoCancelTime: 0

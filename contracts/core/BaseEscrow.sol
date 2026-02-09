@@ -485,7 +485,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         return true;
     }
 
-    function recipientCancel(uint256 workflowId) external nonReentrant whenNotPaused returns (bool) {
+    function recipientCancel(uint256 workflowId) external nonReentrant returns (bool) {
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
         if (et.to != _msgSender()) revert NotRecipient(workflowId, _msgSender(), et.to);
@@ -494,7 +494,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         return _cancelWorkflow(workflowId, _msgSender(), false);
     }
 
-    function senderCancel(uint256 workflowId) external nonReentrant whenNotPaused returns (bool) {
+    function senderCancel(uint256 workflowId) external nonReentrant returns (bool) {
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
         if (et.from != _msgSender()) revert NotSender(workflowId, _msgSender(), et.from);
@@ -553,7 +553,8 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
                 et.token,
                 et.from,
                 et.to,
-                et.amountAfterFee
+                et.amountAfterFee,
+                escrowSettings[workflowId].releaseAddress
             )
         );
         if (updated != disputeResolver) {
@@ -644,7 +645,8 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
             et.token,
             et.from,
             et.to,
-            et.amountAfterFee
+            et.amountAfterFee,
+            escrowSettings[workflowId].releaseAddress
         );
         (bool bondQuerySuccess, uint256 bondAmount, address bondToken) = DisputeEscalationLibrary.queryAppealBond(
             address(resolutionModule),
@@ -814,11 +816,11 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     }
 
 
-    function cancelAsDisputeResolver(uint256 workflowId, bytes32 resolutionHash) public nonReentrant returns (bool) {
+    function cancelAsDisputeResolver(uint256 workflowId, bytes32 resolutionHash) public nonReentrant whenNotPaused returns (bool) {
         return _executeResolution(workflowId, false, resolutionHash);
     }
 
-    function releaseAsDisputeResolver(uint256 workflowId, bytes32 resolutionHash) public nonReentrant returns (bool) {
+    function releaseAsDisputeResolver(uint256 workflowId, bytes32 resolutionHash) public nonReentrant whenNotPaused returns (bool) {
         return _executeResolution(workflowId, true, resolutionHash);
     }
 
@@ -841,7 +843,8 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
                 et.token,
                 et.from,
                 et.to,
-                et.amountAfterFee
+                et.amountAfterFee,
+                settings.releaseAddress
             );
             (bool success, bytes memory data) = snap.staticcall(
                 abi.encodeWithSelector(IResolutionModule.isAuthorizedDisputeResolver.selector, workflowId, address(this), disputeResolver, escrowData)
@@ -906,7 +909,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     /// @dev Transitions PENDING → RELEASED
     /// @dev May transfer funds immediately (push) or create claimable balance (fallback)
     /// @dev Part of IEscrowCore interface for wallet adoption
-    function release(uint256 workflowId) external nonReentrant whenNotPaused {
+    function release(uint256 workflowId) external nonReentrant {
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
 
@@ -920,7 +923,8 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
             et.token,
             et.from,
             et.to,
-            et.amountAfterFee
+            et.amountAfterFee,
+            escrowSettings[workflowId].releaseAddress
         );
 
         // Load release strategy from snapshot
@@ -1047,6 +1051,35 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     }
 
     /**
+     * @notice Wrapper for staticcall to strategy (internal helper for getActionStatus)
+     * @dev Takes individual escrow fields instead of storage pointer (required for external function)
+     */
+    function _queryStrategyCanRelease(
+        uint256 workflowId,
+        address token,
+        address sender,
+        address recipient,
+        uint256 amountAfterFee,
+        address releaseAddress
+    ) internal view returns (bool) {
+        IReleaseStrategy strategy = _getReleaseStrategy(workflowId);
+        if (address(strategy) == address(0)) {
+            return false;
+        }
+
+        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(
+            token,
+            sender,
+            recipient,
+            amountAfterFee,
+            releaseAddress
+        );
+
+        (bool allowed, ) = strategy.canRelease(workflowId, address(this), _msgSender(), escrowData);
+        return allowed;
+    }
+
+    /**
      * @notice Query wallet-friendly action eligibility (IEscrowCore interface)
      * @param workflowId Unique escrow identifier
      * @return actionMask Bitmask of available actions (0=release, 1=senderCancel, 2=recipientCancel, 3=raiseDispute, 4=withdrawEscrow)
@@ -1081,7 +1114,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
             // Release: consult strategy via best-effort staticcall
             // Only caller == sender should even be checked, but strategy is authoritative
             if (caller == et.from) {
-                bool canRelease = _checkStrategyCanRelease(workflowId, et);
+                bool canRelease = _queryStrategyCanRelease(workflowId, et.token, et.from, et.to, et.amountAfterFee, escrowSettings[workflowId].releaseAddress);
                 if (canRelease) {
                     actionMask |= (1 << 0); // bit 0: release
                 }
@@ -1107,54 +1140,28 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     }
 
     /**
-     * @notice Best-effort check if strategy allows release (used by getActionStatus)
-     * @dev Uses staticcall to safely query strategy without reverting
-     * @return canRelease True if strategy returns allowed=true, false if call fails or not allowed
+     * @notice Check if a release is allowed for the given escrow and caller
+     * @param workflowId The escrow transfer ID
+     * @param caller The address attempting to release
+     * @return allowed True if release is allowed
      */
-    function _checkStrategyCanRelease(uint256 workflowId, EscrowTransfer storage et) internal view returns (bool canRelease) {
-        IReleaseStrategy strategy = _getReleaseStrategy(workflowId);
-        if (address(strategy) == address(0)) {
-            return false;
-        }
+    function canRelease(uint256 workflowId, address caller) external view returns (bool allowed) {
+        if (workflowId >= escrowTransfers.length) return false;
+        EscrowTransfer storage et = escrowTransfers[workflowId];
+        if (et.escrowState != EscrowState.PENDING) return false;
 
-        try this._staticCanRelease(
-            workflowId,
+        IReleaseStrategy strategy = _getReleaseStrategy(workflowId);
+        if (address(strategy) == address(0)) return false;
+
+        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(
             et.token,
             et.from,
             et.to,
-            et.amountAfterFee
-        ) returns (bool allowed) {
-            return allowed;
-        } catch {
-            // If strategy call fails, report as unavailable (safe default for UI)
-            return false;
-        }
-    }
-
-    /**
-     * @notice Wrapper for staticcall to strategy (internal helper for getActionStatus)
-     * @dev Takes individual escrow fields instead of storage pointer (required for external function)
-     */
-    function _staticCanRelease(
-        uint256 workflowId,
-        address token,
-        address sender,
-        address recipient,
-        uint256 amountAfterFee
-    ) external view returns (bool) {
-        IReleaseStrategy strategy = _getReleaseStrategy(workflowId);
-        if (address(strategy) == address(0)) {
-            return false;
-        }
-
-        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(
-            token,
-            sender,
-            recipient,
-            amountAfterFee
+            et.amountAfterFee,
+            escrowSettings[workflowId].releaseAddress
         );
 
-        (bool allowed, ) = strategy.canRelease(workflowId, address(this), _msgSender(), escrowData);
+        (allowed, ) = strategy.canRelease(workflowId, address(this), caller, escrowData);
         return allowed;
     }
 

@@ -16,6 +16,7 @@ import '../../../contracts/ops/CreateOps.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
+import '../../../contracts/libraries/EscrowEncodingLibrary.sol'; // Added import
 
 /**
  * @title AppealWindowEnforcementTest
@@ -145,9 +146,6 @@ contract AppealWindowEnforcementTest is Test {
         vm.startPrank(timelock);
         resolutionModule.setResolverActive(seniorResolver, true);
         resolutionModule.setResolverActive(resolver1, true);
-        resolutionModule.setResolverActive(resolver2, true);
-        resolutionModule.setResolverCapacity(seniorResolver, 0, true);
-        resolutionModule.setResolverCapacity(resolver1, 0, true);
         resolutionModule.setResolverCapacity(resolver2, 0, true);
         vm.stopPrank();
 
@@ -174,6 +172,7 @@ contract AppealWindowEnforcementTest is Test {
             ESCROW_AMOUNT,
             EscrowSettings({
                 customResolver: address(0),
+                releaseAddress: address(0), // Added default releaseAddress
                 yieldPreset: YieldPreset.OFF,
                 autoReleaseTime: 0,
                 autoCancelTime: 0
@@ -200,7 +199,7 @@ contract AppealWindowEnforcementTest is Test {
         raiseDispute(workflowId);
 
         // Get resolver
-        bytes memory escrowData = abi.encode(address(token), buyer, seller, ESCROW_AMOUNT);
+        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(address(token), buyer, seller, ESCROW_AMOUNT, address(0));
         (address resolver, ) = resolutionModule.getDisputeResolver(workflowId, address(escrow), escrowData);
 
         // Resolver resolves (release)
@@ -236,7 +235,7 @@ contract AppealWindowEnforcementTest is Test {
         uint256 workflowId = createEscrow();
         raiseDispute(workflowId);
 
-        bytes memory escrowData = abi.encode(address(token), buyer, seller, ESCROW_AMOUNT);
+        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(address(token), buyer, seller, ESCROW_AMOUNT, address(0));
 
         // Round 0 resolver must first issue a decision before escalation is allowed
         (address round0Resolver, ) = resolutionModule.getDisputeResolver(workflowId, address(escrow), escrowData);
@@ -299,7 +298,7 @@ contract AppealWindowEnforcementTest is Test {
         raiseDispute(workflowId);
 
         // Get resolver
-        bytes memory escrowData = abi.encode(address(token), buyer, seller, ESCROW_AMOUNT);
+        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(address(token), buyer, seller, ESCROW_AMOUNT, address(0));
         (address resolver, ) = resolutionModule.getDisputeResolver(workflowId, address(escrow), escrowData);
 
         // Resolver resolves (release)
@@ -344,7 +343,7 @@ contract AppealWindowEnforcementTest is Test {
         raiseDispute(workflowId);
 
         // Get resolver
-        bytes memory escrowData = abi.encode(address(token), buyer, seller, ESCROW_AMOUNT);
+        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(address(token), buyer, seller, ESCROW_AMOUNT, address(0));
         (address resolver, ) = resolutionModule.getDisputeResolver(workflowId, address(escrow), escrowData);
 
         // Resolver resolves (release)
@@ -382,7 +381,7 @@ contract AppealWindowEnforcementTest is Test {
         raiseDispute(workflowId);
 
         // Get resolver
-        bytes memory escrowData = abi.encode(address(token), buyer, seller, ESCROW_AMOUNT);
+        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(address(token), buyer, seller, ESCROW_AMOUNT, address(0));
         (address resolver, ) = resolutionModule.getDisputeResolver(workflowId, address(escrow), escrowData);
 
         // Resolver resolves (release)
@@ -428,7 +427,7 @@ contract AppealWindowEnforcementTest is Test {
         raiseDispute(workflowId);
 
         // Get resolver
-        bytes memory escrowData = abi.encode(address(token), buyer, seller, ESCROW_AMOUNT);
+        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(address(token), buyer, seller, ESCROW_AMOUNT, address(0));
         (address resolver, ) = resolutionModule.getDisputeResolver(workflowId, address(escrow), escrowData);
 
         // Resolver resolves (release)
@@ -468,7 +467,7 @@ contract AppealWindowEnforcementTest is Test {
         raiseDispute(workflowId);
 
         // Get resolver
-        bytes memory escrowData = abi.encode(address(token), buyer, seller, ESCROW_AMOUNT);
+        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(address(token), buyer, seller, ESCROW_AMOUNT, address(0));
         (address resolver, ) = resolutionModule.getDisputeResolver(workflowId, address(escrow), escrowData);
 
         // Resolver resolves (release)
@@ -496,7 +495,7 @@ contract AppealWindowEnforcementTest is Test {
         raiseDispute(workflowId);
 
         // Get resolver
-        bytes memory escrowData = abi.encode(address(token), buyer, seller, ESCROW_AMOUNT);
+        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(address(token), buyer, seller, ESCROW_AMOUNT, address(0));
         (address resolver, ) = resolutionModule.getDisputeResolver(workflowId, address(escrow), escrowData);
 
         // Resolver resolves (release)
@@ -533,7 +532,7 @@ contract AppealWindowEnforcementTest is Test {
         raiseDispute(workflowId);
 
         // Get resolver
-        bytes memory escrowData = abi.encode(address(token), buyer, seller, ESCROW_AMOUNT);
+        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(address(token), buyer, seller, ESCROW_AMOUNT, address(0));
         (address resolver, ) = resolutionModule.getDisputeResolver(workflowId, address(escrow), escrowData);
 
         // Resolver resolves (cancel)
@@ -578,7 +577,7 @@ contract AppealWindowEnforcementTest is Test {
         raiseDispute(workflowId);
 
         // Get resolver
-        bytes memory escrowData = abi.encode(address(token), buyer, seller, ESCROW_AMOUNT);
+        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(address(token), buyer, seller, ESCROW_AMOUNT, address(0));
         (address resolver, ) = resolutionModule.getDisputeResolver(workflowId, address(escrow), escrowData);
 
         // Resolver resolves (release)
