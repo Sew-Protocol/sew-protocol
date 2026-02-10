@@ -157,7 +157,6 @@ contract EscrowViewContractTest is Test {
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0), // Use default resolver
             releaseAddress: address(0),
-            releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.TO_SENDER,
             autoReleaseTime: block.timestamp + 7 days,
             autoCancelTime: 0
@@ -219,7 +218,6 @@ contract EscrowViewContractTest is Test {
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0), // Use default resolver
             releaseAddress: address(0),
-            releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.TO_SENDER,
             autoReleaseTime: block.timestamp + 5 days,
             autoCancelTime: 0
@@ -714,7 +712,6 @@ contract EscrowViewContractTest is Test {
             EscrowSettings memory settings = EscrowSettings({
                 customResolver: address(0),
             releaseAddress: address(0),
-                releaseAddress: address(0), // Added default releaseAddress
                 yieldPreset: presets[i],
                 autoReleaseTime: 0,
                 autoCancelTime: 0

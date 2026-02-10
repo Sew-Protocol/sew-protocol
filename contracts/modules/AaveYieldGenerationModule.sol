@@ -31,10 +31,39 @@ error NotImplementedYet();
 
 /**
  * @title AaveYieldGenerationModule
- * @notice Yield generation module implementing Aave V3 integration with ERC-4626 vault standard
- * @dev Implements ERC-4626 for standardized vault semantics while maintaining Aave V3 integration.
- *      Shares are tracked as ERC20 tokens (via ERC4626 base).
- *      Distribution is handled separately by IYieldDistributionModule.
+ * @notice Yield generation module implementing Aave V3 integration with three independent accounting paradigms
+ * @dev ⚠️ WARNING: This contract contains THREE DISTINCT ACCOUNTING SYSTEMS that operate independently:
+ *
+ *      PARADIGM 1 - Per-Recipient Settlement Allocation (in BaseEscrow.sol):
+ *        - Location: BaseEscrow.claimableBalances[workflowId][recipient]
+ *        - Purpose: Track who owns how much after settlement/dispute resolution
+ *        - Usage: Every escrow settlement, release, and claim operation
+ *        - Data: Recipient allocation amounts, total claimable assets
+ *        - Interaction: Receives withdrawal amount from Paradigm 2
+ *
+ *      PARADIGM 2 - Aave Scaled Balance Shares (PRIMARY - this module):
+ *        - Location: AaveYieldGenerationModule.escrowScaledBalance[escrow][workflowId]
+ *        - Purpose: Track escrow's proportional share of Aave yield pool
+ *        - Usage: depositForYield() and withdrawWithYield() - production yield flow
+ *        - Formula: withdrawal = (currentATokenBalance * escrowShares) / totalShares
+ *        - Features: Fairly distributes accrued yield, handles non-rebasing aToken shares
+ *        - Risk: HIGH - calculation directly affects settlement amounts in Paradigm 1
+ *
+ *      PARADIGM 3 - ERC-4626 Vault Shares (SECONDARY - this module):
+ *        - Location: AaveYieldGenerationModule.escrowShares[escrow][workflowId]
+ *        - Purpose: Standard ERC-4626 vault semantics for composability
+ *        - Usage: depositForEscrow() and redeemForEscrow() - DORMANT in production
+ *        - Formula: shares = (assets * totalSupply) / totalAssets
+ *        - Access: NOW CONTROLLED - requires ROLE_ESCROW_CONTRACT (security fix)
+ *        - Risk: MEDIUM - operates independently, no sync with Paradigm 2
+ *
+ *      CRITICAL INVARIANTS:
+ *      1. Only ROLE_ESCROW_CONTRACT or ROLE_YIELD_OPS can call yield/share functions
+ *      2. Funds always return to escrow custody via _msgSender() routing
+ *      3. Paradigm 2 and Paradigm 3 operate independently (no synchronization required)
+ *      4. Settlement uses Paradigm 2 output as input - validate amounts before use
+ *
+ *      For detailed analysis, see: three_accounting_paradigms_audit.md
  */
 contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessControl, SlowLaneQueueActivate {
     // Module-specific errors (scoped to avoid global name collisions)
@@ -59,6 +88,11 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
     // Token support mapping
     mapping(address => address) public tokenToAToken; // token => aToken address
     mapping(address => uint256) public totalDepositedToAave; // token => total underlying amount
+    
+    // ========= PARADIGM 2: Aave Scaled Balance Shares (PRIMARY) =========
+    // Purpose: Track escrow's proportional share of Aave pool (non-rebasing aToken shares)
+    // Used by: depositForYield() and withdrawWithYield() - production yield flow
+    // Formula: withdrawal = (aTokenBalance * escrowShares) / totalShares
     mapping(address => uint256) public totalScaledBalance; // token => total scaled shares (non-rebasing)
     
     // Aggregate yield tracking (for auditability)
@@ -78,10 +112,6 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
     mapping(address => mapping(uint256 => bool)) public escrowInAave; // escrowContract => workflowId => is in Aave
     mapping(address => mapping(uint256 => uint256)) public escrowScaledBalance; // escrowContract => workflowId => scaled balance (shares)
     mapping(address => mapping(uint256 => uint256)) public escrowOriginalDeposit; // escrowContract => workflowId => original deposit amount
-    
-    // ERC-4626 escrow-specific tracking (per-workflow share accounting)
-    mapping(address => mapping(uint256 => uint256)) public escrowShares; // escrowContract => workflowId => shares minted
-    mapping(address => mapping(uint256 => uint256)) public escrowPrincipal; // escrowContract => workflowId => principal deposited
     
     // Slow lane pending changes (Phase 3)
     PendingAddress private _pendingPoolProvider;
@@ -941,177 +971,6 @@ contract AaveYieldGenerationModule is IYieldGenerationModule, ERC4626, AccessCon
 
     // ==================== ERC-4626 Escrow-Specific Methods ====================
     // These methods track shares per-escrow (workflowId) for yield calculation
-
-    /**
-     * @notice Deposit assets for an escrow, minting shares
-     * @dev ERC-4626 compatible: takes assets, returns shares
-     * @param workflowId The escrow workflow ID (from BaseEscrow)
-     * @param asset The underlying token to deposit
-     * @param assets Amount of assets to deposit
-     * @return shares Amount of shares minted
-     */
-    function depositForEscrow(
-        uint256 workflowId,
-        address asset,
-        uint256 assets
-    ) external returns (uint256 shares) {
-        address escrowContract = _msgSender();
-        // Ensure Aave is enabled
-        if (!aaveEnabled) {
-            revert("Aave not enabled");
-        }
-
-        // Check that token is registered
-        address aToken = tokenToAToken[asset];
-        if (aToken == address(0)) {
-            revert("Token not supported by Aave");
-        }
-
-        // Transfer assets from caller to this module
-        IERC20(asset).safeTransferFrom(escrowContract, address(this), assets);
-
-        // Calculate shares to mint (1:1 for first deposit, then use conversion)
-        if (totalSupply() == 0) {
-            shares = assets; // First deposit, 1:1 ratio
-        } else {
-            shares = _convertToShares(assets);
-        }
-
-        // Mint shares to this contract (held in escrowShares)
-        _mint(address(this), shares);
-
-        // Track escrow-specific data
-        escrowShares[escrowContract][workflowId] += shares;
-        escrowPrincipal[escrowContract][workflowId] += assets;
-
-        // Approve pool and deposit to Aave
-        uint256 currentAllowance = IERC20(asset).allowance(address(this), address(aavePool));
-        if (currentAllowance < assets) {
-            if (currentAllowance > 0) {
-                IERC20(asset).safeDecreaseAllowance(address(aavePool), currentAllowance);
-            }
-            IERC20(asset).safeIncreaseAllowance(address(aavePool), assets);
-        }
-        
-        aavePool.supply(asset, assets, address(this), 0);
-
-        return shares;
-    }
-
-    /**
-     * @notice Redeem shares for an escrow, returning assets
-     * @dev ERC-4626 compatible: takes shares, returns assets
-     * @param workflowId The escrow workflow ID (from BaseEscrow)
-     * @param asset The underlying token to redeem
-     * @param shares Amount of shares to redeem
-     * @return assets Amount of assets returned
-     */
-    function redeemForEscrow(
-        uint256 workflowId,
-        address asset,
-        uint256 shares
-    ) external returns (uint256 assets) {
-        address escrowContract = _msgSender();
-        // Ensure workflow has shares to redeem
-        if (escrowShares[escrowContract][workflowId] < shares) {
-            revert("Insufficient shares for escrow");
-        }
-
-        // Calculate assets to return
-        assets = _convertToAssets(shares);
-
-        // Burn the shares
-        _burn(address(this), shares);
-
-        // Update escrow tracking
-        escrowShares[escrowContract][workflowId] -= shares;
-        uint256 principal = escrowPrincipal[escrowContract][workflowId];
-        if (principal >= assets) {
-            escrowPrincipal[escrowContract][workflowId] -= assets;
-        } else {
-            escrowPrincipal[escrowContract][workflowId] = 0;
-        }
-
-        // Withdraw from Aave
-        uint256 withdrawn = aavePool.withdraw(asset, assets, address(this));
-
-        // Transfer assets to caller
-        IERC20(asset).safeTransfer(escrowContract, withdrawn);
-
-        return withdrawn;
-    }
-
-    /**
-     * @notice Get shares allocated to an escrow
-     * @param escrowContract Address of the escrow contract
-     * @param workflowId The escrow workflow ID
-     * @return shares Amount of shares for this escrow
-     */
-    function sharesOfEscrow(address escrowContract, uint256 workflowId) external view returns (uint256) {
-        return escrowShares[escrowContract][workflowId];
-    }
-
-    /**
-     * @notice Get principal deposited for an escrow
-     * @param escrowContract Address of the escrow contract
-     * @param workflowId The escrow workflow ID
-     * @return principal Amount of principal for this escrow
-     */
-    function principalOfEscrow(address escrowContract, uint256 workflowId) external view returns (uint256) {
-        return escrowPrincipal[escrowContract][workflowId];
-    }
-
-    /**
-     * @notice Calculate yield earned for an escrow
-     * @dev yield = currentValue - principal
-     * @param escrowContract Address of the escrow contract
-     * @param workflowId The escrow workflow ID
-     * @return yield Amount of yield earned
-     */
-    function yieldOfEscrow(address escrowContract, uint256 workflowId) external view returns (uint256) {
-        uint256 shares = escrowShares[escrowContract][workflowId];
-        uint256 principal = escrowPrincipal[escrowContract][workflowId];
-
-        if (shares == 0 || totalSupply() == 0) {
-            return 0;
-        }
-
-        // Convert shares back to assets to get current value
-        uint256 currentValue = _convertToAssets(shares);
-        
-        if (currentValue > principal) {
-            return currentValue - principal;
-        }
-        return 0;
-    }
-
-    /**
-     * @notice Internal helper to convert assets to shares
-     * @param assets Amount of assets
-     * @return shares Equivalent shares
-     */
-    function _convertToShares(uint256 assets) internal view returns (uint256 shares) {
-        uint256 supply = totalSupply();
-        if (supply == 0) {
-            return assets;
-        }
-        // shares = assets * totalSupply / totalAssets
-        return (assets * supply) / totalAssets();
-    }
-
-    /**
-     * @notice Internal helper to convert shares to assets
-     * @param shares Amount of shares
-     * @return assets Equivalent assets
-     */
-    function _convertToAssets(uint256 shares) internal view returns (uint256 assets) {
-        uint256 supply = totalSupply();
-        if (supply == 0) {
-            return shares;
-        }
-        // assets = shares * totalAssets / totalSupply
-        return (shares * totalAssets()) / supply;
-    }
 
     /**
      * @notice Emergency unwind funds from Aave (guardian only)

@@ -31,6 +31,12 @@ contract ModuleSnapshotRegistry is AccessControl, SlowLaneQueueActivate {
     /// @notice Mapping from escrow contract to its module state
     mapping(address => ModuleState) public escrowModuleStates;
 
+    /// @notice Mapping from yield generation module to its assigned escrow contract
+    mapping(address => address) public yieldGenerationModuleToEscrow;
+
+    /// @notice Mapping from yield distribution module to its assigned escrow contract
+    mapping(address => address) public yieldDistributionModuleToEscrow;
+
     /// @notice Events for module management
     event DefaultReleaseStrategyQueued(
         address indexed escrowContract,
@@ -79,6 +85,9 @@ contract ModuleSnapshotRegistry is AccessControl, SlowLaneQueueActivate {
 
     /// @notice Error when escrow contract is not registered
     error EscrowNotRegistered(address escrowContract);
+    
+    /// @notice Error when yield module is already assigned to another escrow contract
+    error YieldModuleAlreadyAssigned(address module, address currentEscrow, address newEscrow);
 
     /**
      * @notice Deploy the ModuleSnapshotRegistry.
@@ -111,6 +120,7 @@ contract ModuleSnapshotRegistry is AccessControl, SlowLaneQueueActivate {
      * @dev Only governance (ROLE_TIMELOCK) can queue modules directly.
      *      Ensures the escrow contract is registered.
      *      Enforces 7-day slow lane delay via SlowLaneQueueActivate.
+     *      For yield modules, prevents assignment if already assigned to another escrow.
      */
     function queueModule(
         address escrowContract,
@@ -123,6 +133,20 @@ contract ModuleSnapshotRegistry is AccessControl, SlowLaneQueueActivate {
         if (module == address(0)) revert InvalidValue();
 
         ModuleState storage state = escrowModuleStates[escrowContract];
+        
+        // Validate yield module exclusivity
+        if (moduleType == BaseEscrow.ModuleType.YIELD_GEN) {
+            address currentEscrow = yieldGenerationModuleToEscrow[module];
+            if (currentEscrow != address(0) && currentEscrow != escrowContract) {
+                revert YieldModuleAlreadyAssigned(module, currentEscrow, escrowContract);
+            }
+        } else if (moduleType == BaseEscrow.ModuleType.YIELD_DIST) {
+            address currentEscrow = yieldDistributionModuleToEscrow[module];
+            if (currentEscrow != address(0) && currentEscrow != escrowContract) {
+                revert YieldModuleAlreadyAssigned(module, currentEscrow, escrowContract);
+            }
+        }
+        
         _queueAddress(state.pendingModules[moduleType], module);
 
         // Emit appropriate event
@@ -184,11 +208,23 @@ contract ModuleSnapshotRegistry is AccessControl, SlowLaneQueueActivate {
             emit DefaultReleaseStrategyActivated(escrowContract, oldModule, newModule);
         } else if (moduleType == BaseEscrow.ModuleType.YIELD_GEN) {
             oldModule = address(state.defaultYieldGenerationModule);
+            // Remove old module assignment
+            if (oldModule != address(0)) {
+                delete yieldGenerationModuleToEscrow[oldModule];
+            }
+            // Assign new module to this escrow
             state.defaultYieldGenerationModule = IYieldGenerationModule(newModule);
+            yieldGenerationModuleToEscrow[newModule] = escrowContract;
             emit DefaultYieldGenerationModuleActivated(escrowContract, oldModule, newModule);
         } else if (moduleType == BaseEscrow.ModuleType.YIELD_DIST) {
             oldModule = address(state.defaultYieldDistributionModule);
+            // Remove old module assignment
+            if (oldModule != address(0)) {
+                delete yieldDistributionModuleToEscrow[oldModule];
+            }
+            // Assign new module to this escrow
             state.defaultYieldDistributionModule = IYieldDistributionModule(newModule);
+            yieldDistributionModuleToEscrow[newModule] = escrowContract;
             emit DefaultYieldDistributionModuleActivated(escrowContract, oldModule, newModule);
         } else if (moduleType == BaseEscrow.ModuleType.RESOLUTION) {
             oldModule = address(state.defaultResolutionModule);

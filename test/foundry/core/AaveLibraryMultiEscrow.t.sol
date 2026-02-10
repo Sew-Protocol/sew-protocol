@@ -249,7 +249,6 @@ contract AaveLibraryMultiEscrowTest is Test {
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
             releaseAddress: address(0),
-            releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.TO_SENDER,
             autoReleaseTime: 0,
             autoCancelTime: 0

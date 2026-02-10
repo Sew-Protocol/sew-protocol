@@ -30,11 +30,11 @@ contract PerEscrowSettingsHarness is EscrowVault {
     ) EscrowVault(escrowFeeBps, feeAddress, yieldOpsAddress, disputeOpsAddress, moduleManagementAddress) {}
 
     function getReleaseStrategyAddr(uint256 workflowId) external view returns (address) {
-        return address(_getReleaseStrategy(workflowId));
+        return moduleSnapshots[workflowId].releaseStrategy;
     }
 
     function getResolutionModuleAddr(uint256 workflowId) external view returns (address) {
-        return address(_getResolutionModule(workflowId));
+        return moduleSnapshots[workflowId].resolutionModule;
     }
 
     function getModuleSnapshot(uint256 workflowId) external view returns (ModuleSnapshot memory) {

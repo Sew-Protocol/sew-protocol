@@ -91,7 +91,6 @@ contract BaseEscrowComprehensive is Test {
         settings = EscrowSettings({
             customResolver: customResolver,
             releaseAddress: address(0),
-            releaseAddress: releaseAddress, // NEW
             yieldPreset: yieldPreset,
             autoReleaseTime: autoReleaseTime,
             autoCancelTime: autoCancelTime
@@ -301,6 +300,16 @@ contract BaseEscrowComprehensive is Test {
     // ============ Dispute Timeout ============
 
     function test_autoCancelDisputedEscrow() public {
+        // Set short maxDisputeDuration for testing (must be >= 7 days per protocol)
+        TimeoutConfig memory config = TimeoutConfig({
+            defaultAutoReleaseDelay: 0,
+            defaultAutoCancelDelay: 0,
+            maxDisputeDuration: 7 days,
+            appealWindowDuration: 1 days
+        });
+        vm.prank(address(this));
+        adminContract.setTimeoutConfig(address(vault), config);
+        
         uint256 amount = 1000e18;
         token.mint(buyer, amount);
         vm.prank(buyer);
@@ -312,17 +321,7 @@ contract BaseEscrowComprehensive is Test {
         vm.prank(buyer);
         vault.raiseDispute(workflowId);
 
-        // Set max dispute duration to short time (minimum is 7 days)
-        TimeoutConfig memory config = TimeoutConfig({
-            defaultAutoReleaseDelay: 0,
-            defaultAutoCancelDelay: 0,
-            maxDisputeDuration: 7 days,
-            appealWindowDuration: 1 days
-        });
-        vm.prank(timelock);
-        adminContract.setTimeoutConfig(address(vault), config);
-
-        // Warp past max dispute duration
+        // Warp past the snapshot's max dispute duration (7 days from snapshot at creation)
         vm.warp(block.timestamp + 7 days + 1);
 
         vault.autoCancelDisputedEscrow(workflowId);
@@ -656,7 +655,6 @@ contract BaseEscrowComprehensive is Test {
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
             releaseAddress: address(0),
-            releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
             autoCancelTime: 0
@@ -678,7 +676,6 @@ contract BaseEscrowComprehensive is Test {
         EscrowSettings memory newSettings = EscrowSettings({
             customResolver: address(0),
             releaseAddress: address(0),
-            releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: block.timestamp + 7 days,
             autoCancelTime: 0

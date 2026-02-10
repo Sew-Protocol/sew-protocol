@@ -121,7 +121,6 @@ contract Phase3AaveEmergencyTest is Test {
         return EscrowSettings({
             customResolver: address(0),
             releaseAddress: address(0),
-            releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.TO_SENDER,
             autoReleaseTime: 0,
             autoCancelTime: 0
@@ -218,9 +217,9 @@ contract Phase3AaveEmergencyTest is Test {
         // Verify unpaused
         assertFalse(vault.paused(), "Vault not unpaused");
         
-        // Funds should be in yieldOps now
-        uint256 yoBalance = token.balanceOf(address(yieldOps));
-        assertGt(yoBalance, 0, "YieldOps did not receive funds");
+        // Funds should be in vault now (emergency unwind returns to vault, not yieldOps)
+        uint256 vaultBalance = token.balanceOf(address(vault));
+        assertGt(vaultBalance, 0, "Vault did not receive funds");
     }
 
     /**
@@ -345,9 +344,9 @@ contract Phase3AaveEmergencyTest is Test {
         // Should get at least original amount
         assertGe(unwoundAmount, originalDeposit, "Unwind returned less than original");
         
-        // YieldOps receives unwound funds
-        uint256 yoBalance = token.balanceOf(address(yieldOps));
-        assertGt(yoBalance, 0, "YieldOps did not receive unwound funds");
+        // Vault receives unwound funds (emergency unwind returns to vault, not yieldOps)
+        uint256 vaultBalance = token.balanceOf(address(vault));
+        assertGt(vaultBalance, 0, "Vault did not receive unwound funds");
     }
 
     /**
@@ -382,9 +381,9 @@ contract Phase3AaveEmergencyTest is Test {
         assertEq(module.escrowScaledBalance(address(vault), workflowId), 0, "Shares not cleared");
         assertEq(module.escrowOriginalDeposit(address(vault), workflowId), 0, "Deposit not cleared");
         
-        // Verify funds in yieldOps
-        uint256 yoBalance = token.balanceOf(address(yieldOps));
-        assertGt(yoBalance, 0, "No funds in yieldOps");
+        // Verify funds in vault (emergency unwind returns to vault, not yieldOps)
+        uint256 vaultBalance = token.balanceOf(address(vault));
+        assertGt(vaultBalance, 0, "No funds in vault");
     }
 
     /**

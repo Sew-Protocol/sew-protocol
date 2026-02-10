@@ -112,7 +112,6 @@ contract EscrowVaultUniqueCoverageTest is Test {
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
             releaseAddress: address(0),
-            releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
             autoCancelTime: 0

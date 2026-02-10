@@ -17,3 +17,13 @@ The architecture is designed to be modular and composable, allowing new modules 
 This repository serves as the reference implementation of Sew Protocol’s onchain payment framework.
 
 
+
+## Security Model
+
+The protocol is built on three core security principles:
+
+1. **Containment over prevention**: Failures are contained rather than prevented
+2. **Determinism over discretion**: Funds move according to predefined rules
+3. **Isolation over shared risk**: Each escrow is independent; failures don't cascade
+
+Each escrow captures its configuration (modules, fees, timeouts) at creation time, ensuring that global updates never affect existing agreements. For details, see [SECURITY_MODEL.md](./SECURITY_MODEL.md).

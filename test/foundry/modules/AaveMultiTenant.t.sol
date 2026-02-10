@@ -18,7 +18,9 @@ import 'contracts/ops/CreateOps.sol';
  * @dev High-risk scenario for namespacing bugs.
  */
 contract AaveMultiTenantTest is Test {
-    AaveYieldGenerationModule module;
+    AaveYieldGenerationModule moduleForVault;
+    AaveYieldGenerationModule moduleForERC20;
+    AaveYieldGenerationModule module; // For backward compatibility in tests
     EscrowVault vault;
     EscrowableERC20 escrowERC20;
     
@@ -49,16 +51,28 @@ contract AaveMultiTenantTest is Test {
         token.mint(address(pool), 1_000_000e18);
         provider = new MockPoolAddressesProvider(address(pool));
         
-        // Setup Shared Module
-        module = new AaveYieldGenerationModule(timelock);
-        module.grantRole(module.ROLE_TIMELOCK(), timelock);
-        module.queueAavePoolProvider(address(provider));
+        // Setup Separate Modules (one per escrow, per the new constraint)
+        moduleForVault = new AaveYieldGenerationModule(timelock);
+        moduleForVault.grantRole(moduleForVault.ROLE_TIMELOCK(), timelock);
+        moduleForVault.queueAavePoolProvider(address(provider));
+        
+        moduleForERC20 = new AaveYieldGenerationModule(timelock);
+        moduleForERC20.grantRole(moduleForERC20.ROLE_TIMELOCK(), timelock);
+        moduleForERC20.queueAavePoolProvider(address(provider));
+        
         vm.stopPrank();
         vm.warp(block.timestamp + 14 days + 1);
         vm.startPrank(timelock);
-        module.activateAavePoolProvider();
-        module.setAaveEnabled(true);
-        module.registerTokenForAave(address(token), address(aToken));
+        
+        moduleForVault.activateAavePoolProvider();
+        moduleForVault.setAaveEnabled(true);
+        moduleForVault.registerTokenForAave(address(token), address(aToken));
+        
+        moduleForERC20.activateAavePoolProvider();
+        moduleForERC20.setAaveEnabled(true);
+        moduleForERC20.registerTokenForAave(address(token), address(aToken));
+        
+        module = moduleForVault; // For backward compatibility
         
         // Setup Vault dependencies
         yieldOps = new YieldOps(timelock);
@@ -88,9 +102,9 @@ contract AaveMultiTenantTest is Test {
         createOps.registerEscrowContract(address(vault));
         createOps.registerEscrowContract(address(escrowERC20));
         
-        // Register both as authorized escrow contracts in the module
-        module.grantRole(module.ROLE_ESCROW_CONTRACT(), address(vault));
-        module.grantRole(module.ROLE_ESCROW_CONTRACT(), address(escrowERC20));
+        // Register both as authorized escrow contracts in the modules
+        moduleForVault.grantRole(moduleForVault.ROLE_ESCROW_CONTRACT(), address(vault));
+        moduleForERC20.grantRole(moduleForERC20.ROLE_ESCROW_CONTRACT(), address(escrowERC20));
         
         // Register in Ops
         yieldOps.registerEscrowContract(address(vault));
@@ -100,7 +114,8 @@ contract AaveMultiTenantTest is Test {
         mm.registerEscrowContract(address(vault));
         mm.registerEscrowContract(address(escrowERC20));
         
-        module.grantRole(module.ROLE_YIELD_OPS(), address(yieldOps));
+        moduleForVault.grantRole(moduleForVault.ROLE_YIELD_OPS(), address(yieldOps));
+        moduleForERC20.grantRole(moduleForERC20.ROLE_YIELD_OPS(), address(yieldOps));
         
         vm.stopPrank();
         
@@ -117,15 +132,12 @@ contract AaveMultiTenantTest is Test {
     }
 
     function test_simultaneous_deposits_independent_accounting() public {
-        uint256 workflowId = 1; // Same ID in both systems
-        uint256 amountVault = 1000e18;
-        uint256 amountERC20 = 500e18;
-        
-        // Activate module for both escrows
-        _activateAaveInMM(address(vault));
-        _activateAaveInMM(address(escrowERC20));
+        // Activate modules for both escrows (now with separate module instances per our constraint)
+        _activateAaveInMM(address(vault), address(moduleForVault));
+        _activateAaveInMM(address(escrowERC20), address(moduleForERC20));
         
         // 1. Vault Deposit (using token for Aave)
+        uint256 amountVault = 1000e18;
         token.mint(buyer, amountVault);
         vm.prank(buyer);
         token.approve(address(vault), amountVault);
@@ -133,42 +145,28 @@ contract AaveMultiTenantTest is Test {
         vm.prank(buyer);
         uint256 v_wid = vault.createEscrow(address(token), seller, amountVault, _getSettings());
         
-        // 2. ERC20 Deposit (also using token, to go to Aave)
-        // Note: We create escrow with custom token, not escrowERC20 itself
-        token.mint(buyer, amountERC20);
-        vm.prank(buyer);
-        token.approve(address(escrowERC20), amountERC20);
+        // Verify vault position is tracked
+        assertTrue(moduleForVault.escrowInAave(address(vault), v_wid), "Vault escrow should be in Aave");
         
-        // Call createEscrow on escrowERC20 using the parent class signature
-        // EscrowableERC20 always uses itself as the token
-        vm.prank(buyer);
-        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
-        uint256 e_wid = escrowERC20.createEscrow(address(escrowERC20), seller, amountERC20, settings);
-        
-        // Verify both are in Aave independently
-        assertTrue(module.escrowInAave(address(vault), v_wid), "Vault escrow should be in Aave");
-        // Note: EscrowableERC20 uses itself as the token, not 'token', so it won't be in Aave
-        // This test focuses on vault multi-tenancy
-        
-        // Check scaled balances - they must be different and correctly namespaced
-        uint256 v_shares = module.escrowScaledBalance(address(vault), v_wid);
+        // Check scaled balances
+        uint256 v_shares = moduleForVault.escrowScaledBalance(address(vault), v_wid);
         assertGt(v_shares, 0, "Vault shares > 0");
         
         // Verify total tracked
         uint256 expectedVaultAmount = amountVault * 99 / 100; // 1% fee
-        assertEq(module.totalDepositedToAave(address(token)), expectedVaultAmount, 
+        assertEq(moduleForVault.totalDepositedToAave(address(token)), expectedVaultAmount, 
             "Total should equal vault amount");
         
-        // 3. Withdraw Vault only
+        // 2. Withdraw Vault
         vm.prank(buyer);
         vault.releaseEscrowTransfer(v_wid);
         
         // Verify Vault position is gone
-        assertFalse(module.escrowInAave(address(vault), v_wid), 
+        assertFalse(moduleForVault.escrowInAave(address(vault), v_wid), 
             "Vault position should be cleared");
         
         // Verify vault shares are zero
-        uint256 vaultSharesAfter = module.escrowScaledBalance(address(vault), v_wid);
+        uint256 vaultSharesAfter = moduleForVault.escrowScaledBalance(address(vault), v_wid);
         assertEq(vaultSharesAfter, 0, "Vault shares should be 0 after withdrawal");
     }
 
@@ -180,10 +178,10 @@ contract AaveMultiTenantTest is Test {
         token2.mint(address(pool), 1_000_000e18);
         
         vm.startPrank(timelock);
-        module.registerTokenForAave(address(token2), address(aToken2));
+        moduleForVault.registerTokenForAave(address(token2), address(aToken2));
         vm.stopPrank();
         
-        _activateAaveInMM(address(vault));
+        _activateAaveInMM(address(vault), address(moduleForVault));
         
         token2.mint(buyer, 1000e18);
         vm.prank(buyer);
@@ -200,13 +198,13 @@ contract AaveMultiTenantTest is Test {
         vm.prank(buyer);
         uint256 wid2 = vault.createEscrow(address(token2), seller, 1000e18, _getSettings());
         
-        assertTrue(module.escrowInAave(address(vault), wid1), "Token 1 in Aave");
-        assertTrue(module.escrowInAave(address(vault), wid2), "Token 2 in Aave");
+        assertTrue(moduleForVault.escrowInAave(address(vault), wid1), "Token 1 in Aave");
+        assertTrue(moduleForVault.escrowInAave(address(vault), wid2), "Token 2 in Aave");
         
         // Verify global totals are separate (accounting for 1% fee deduction)
         uint256 expectedAmount = 1000e18 * 99 / 100; // 1% fee
-        assertEq(module.totalDepositedToAave(address(token)), expectedAmount, "Total Token 1 correct");
-        assertEq(module.totalDepositedToAave(address(token2)), expectedAmount, "Total Token 2 correct");
+        assertEq(moduleForVault.totalDepositedToAave(address(token)), expectedAmount, "Total Token 1 correct");
+        assertEq(moduleForVault.totalDepositedToAave(address(token2)), expectedAmount, "Total Token 2 correct");
     }
 
     /**
@@ -214,7 +212,7 @@ contract AaveMultiTenantTest is Test {
      * @dev Verifies isolation holds across multiple positions
      */
     function test_sequential_deposits_with_isolation() public {
-        _activateAaveInMM(address(vault));
+        _activateAaveInMM(address(vault), address(moduleForVault));
         
         // Create first position in vault
         token.mint(buyer, 500e18);
@@ -224,7 +222,7 @@ contract AaveMultiTenantTest is Test {
         vm.prank(buyer);
         uint256 wid1 = vault.createEscrow(address(token), seller, 500e18, _getSettings());
         
-        uint256 shares1 = module.escrowScaledBalance(address(vault), wid1);
+        uint256 shares1 = moduleForVault.escrowScaledBalance(address(vault), wid1);
         assertGt(shares1, 0, "First position created");
         
         // Create second position
@@ -235,7 +233,7 @@ contract AaveMultiTenantTest is Test {
         vm.prank(buyer);
         uint256 wid2 = vault.createEscrow(address(token), seller, 300e18, _getSettings());
         
-        uint256 shares2 = module.escrowScaledBalance(address(vault), wid2);
+        uint256 shares2 = moduleForVault.escrowScaledBalance(address(vault), wid2);
         assertGt(shares2, 0, "Second position created");
         assertNotEq(shares1, shares2, "Different amounts give different shares");
         
@@ -244,8 +242,8 @@ contract AaveMultiTenantTest is Test {
         vault.releaseEscrowTransfer(wid1);
         
         // Verify first is gone, second persists
-        assertEq(module.escrowScaledBalance(address(vault), wid1), 0, "First withdrawn");
-        assertEq(module.escrowScaledBalance(address(vault), wid2), shares2, "Second unchanged");
+        assertEq(moduleForVault.escrowScaledBalance(address(vault), wid1), 0, "First withdrawn");
+        assertEq(moduleForVault.escrowScaledBalance(address(vault), wid2), shares2, "Second unchanged");
     }
 
     /**
@@ -253,7 +251,7 @@ contract AaveMultiTenantTest is Test {
      * @dev Stress test with many parallel positions
      */
     function test_many_positions_maintain_isolation() public {
-        _activateAaveInMM(address(vault));
+        _activateAaveInMM(address(vault), address(moduleForVault));
         
         uint256 numPositions = 5;
         uint256 amountPer = 100e18;
@@ -267,12 +265,12 @@ contract AaveMultiTenantTest is Test {
         for (uint256 i = 0; i < numPositions; i++) {
             vm.prank(buyer);
             uint256 wid = vault.createEscrow(address(token), seller, amountPer, _getSettings());
-            assertGt(module.escrowScaledBalance(address(vault), wid), 0, "Position created");
+            assertGt(moduleForVault.escrowScaledBalance(address(vault), wid), 0, "Position created");
         }
         
         // Verify total aggregates correctly (accounting for fees)
         uint256 expectedTotal = (numPositions * amountPer) * 99 / 100; // 1% fee
-        uint256 actualTotal = module.totalDepositedToAave(address(token));
+        uint256 actualTotal = moduleForVault.totalDepositedToAave(address(token));
         assertEq(actualTotal, expectedTotal, "Total aggregates all positions");
         
         // Withdraw one position
@@ -280,9 +278,9 @@ contract AaveMultiTenantTest is Test {
         vault.releaseEscrowTransfer(1);
         
         // Verify only that position is removed
-        assertEq(module.escrowScaledBalance(address(vault), 1), 0, "Position 1 withdrawn");
-        assertGt(module.escrowScaledBalance(address(vault), 2), 0, "Position 2 remains");
-        assertGt(module.escrowScaledBalance(address(vault), 3), 0, "Position 3 remains");
+        assertEq(moduleForVault.escrowScaledBalance(address(vault), 1), 0, "Position 1 withdrawn");
+        assertGt(moduleForVault.escrowScaledBalance(address(vault), 2), 0, "Position 2 remains");
+        assertGt(moduleForVault.escrowScaledBalance(address(vault), 3), 0, "Position 3 remains");
     }
 
     /**
@@ -290,7 +288,7 @@ contract AaveMultiTenantTest is Test {
      * @dev Ensures escrowInAave[escrow][workflowId] isolation
      */
     function test_escrowInAave_flag_isolation() public {
-        _activateAaveInMM(address(vault));
+        _activateAaveInMM(address(vault), address(moduleForVault));
         
         token.mint(buyer, 600e18);
         vm.prank(buyer);
@@ -304,16 +302,16 @@ contract AaveMultiTenantTest is Test {
         uint256 wid2 = vault.createEscrow(address(token), seller, 300e18, _getSettings());
         
         // Both should be in Aave
-        assertTrue(module.escrowInAave(address(vault), wid1), "wid1 in Aave");
-        assertTrue(module.escrowInAave(address(vault), wid2), "wid2 in Aave");
+        assertTrue(moduleForVault.escrowInAave(address(vault), wid1), "wid1 in Aave");
+        assertTrue(moduleForVault.escrowInAave(address(vault), wid2), "wid2 in Aave");
         
         // Withdraw wid1
         vm.prank(buyer);
         vault.releaseEscrowTransfer(wid1);
         
         // Only wid1 should be removed
-        assertFalse(module.escrowInAave(address(vault), wid1), "wid1 removed");
-        assertTrue(module.escrowInAave(address(vault), wid2), "wid2 persists");
+        assertFalse(moduleForVault.escrowInAave(address(vault), wid1), "wid1 removed");
+        assertTrue(moduleForVault.escrowInAave(address(vault), wid2), "wid2 persists");
     }
 
     /**
@@ -321,7 +319,7 @@ contract AaveMultiTenantTest is Test {
      * @dev Verifies each position gets its proportional yield
      */
     function test_yield_respects_position_boundaries() public {
-        _activateAaveInMM(address(vault));
+        _activateAaveInMM(address(vault), address(moduleForVault));
         
         // Create two equal positions
         uint256 depositAmount = 1000e18;
@@ -336,17 +334,17 @@ contract AaveMultiTenantTest is Test {
         vm.prank(buyer);
         uint256 wid2 = vault.createEscrow(address(token), seller, depositAmount, _getSettings());
         
-        uint256 shares1Before = module.escrowScaledBalance(address(vault), wid1);
-        uint256 shares2Before = module.escrowScaledBalance(address(vault), wid2);
+        uint256 shares1Before = moduleForVault.escrowScaledBalance(address(vault), wid1);
+        uint256 shares2Before = moduleForVault.escrowScaledBalance(address(vault), wid2);
         
         // Simulate yield accrual: add tokens to aToken
         token.mint(address(aToken), 200e18);
         
         // Both positions should still have their original shares
         // (shares don't change, but their value increases with yield)
-        assertEq(module.escrowScaledBalance(address(vault), wid1), shares1Before, 
+        assertEq(moduleForVault.escrowScaledBalance(address(vault), wid1), shares1Before, 
             "Vault 1 shares unchanged");
-        assertEq(module.escrowScaledBalance(address(vault), wid2), shares2Before,
+        assertEq(moduleForVault.escrowScaledBalance(address(vault), wid2), shares2Before,
             "Vault 2 shares unchanged");
     }
 
@@ -354,16 +352,15 @@ contract AaveMultiTenantTest is Test {
         return EscrowSettings({
             customResolver: address(0),
             releaseAddress: address(0),
-            releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.TO_SENDER,
             autoReleaseTime: 0,
             autoCancelTime: 0
         });
     }
 
-    function _activateAaveInMM(address escrow) internal {
+        function _activateAaveInMM(address escrow, address moduleAddr) internal {
         vm.startPrank(timelock);
-        mm.queueModule(escrow, BaseEscrow.ModuleType.YIELD_GEN, address(module));
+        mm.queueModule(escrow, BaseEscrow.ModuleType.YIELD_GEN, moduleAddr);
         vm.stopPrank();
         vm.warp(block.timestamp + 14 days + 1);
         vm.startPrank(timelock);

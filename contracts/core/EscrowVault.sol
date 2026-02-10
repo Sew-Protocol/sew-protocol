@@ -108,16 +108,36 @@ contract EscrowVault is BaseEscrow {
         emit FeesWithdrawn(token, feeAmount);
     }
 
-    function _getDefaultReleaseStrategy() internal view override returns (IReleaseStrategy) {
+    function _getDefaultReleaseStrategy() internal view returns (IReleaseStrategy) {
         return moduleManagement.getDefaultReleaseStrategy(address(this));
     }
 
-    function _getDefaultYieldGenerationModule(uint256 workflowId) internal view override returns (IYieldGenerationModule) {
+    function _getDefaultYieldGenerationModule(uint256 workflowId) internal view returns (IYieldGenerationModule) {
         return IYieldGenerationModule(moduleManagement.getDefaultYieldGenerationModule(address(this)));
     }
 
-    function _getDefaultYieldDistributionModule(uint256 workflowId) internal view override returns (IYieldDistributionModule) {
+    function _getDefaultYieldDistributionModule(uint256 workflowId) internal view returns (IYieldDistributionModule) {
         return IYieldDistributionModule(moduleManagement.getDefaultYieldDistributionModule(address(this)));
     }
+
+    function _getYieldGenerationModule(uint256 workflowId) internal view override returns (IYieldGenerationModule) {
+        return _getDefaultYieldGenerationModule(workflowId);
+    }
+
+    function _getYieldDistributionModule(uint256 workflowId) internal view override returns (IYieldDistributionModule) {
+        return _getDefaultYieldDistributionModule(workflowId);
+    }
+
+    function _getReleaseStrategy(uint256 workflowId) internal view override returns (IReleaseStrategy) {
+        return _getDefaultReleaseStrategy();
+    }
+
+    function _emitEscrowTransferCreated(
+        uint256 workflowId,
+        address token,
+        address from,
+        address to,
+        uint256 amount
+    ) internal override {}
 
 }

@@ -85,6 +85,8 @@ contract EscalationDepthHistogramIntegrationTest is Test {
         createOps.registerEscrowContract(address(escrow));
         settlementOps.registerEscrowContract(address(escrow));
         bondCollector.registerEscrowContract(address(escrow));
+        disputeOps.registerEscrowContract(address(escrow));
+        yieldOps.registerEscrowContract(address(escrow));
 
         // Grant admin-contract role so this test can configure ops
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(this));
@@ -200,10 +202,10 @@ contract EscalationDepthHistogramIntegrationTest is Test {
 
         // Simulate escalation by recording bond directly (in real flow, BaseEscrow does this)
         vm.deal(address(escrow), BOND_AMOUNT);
-        vm.prank(address(this));
+        vm.prank(address(escrow));
         incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
             workflowId,
-            address(this),
+            address(escrow),
             user1,
             user1,
             BOND_AMOUNT,

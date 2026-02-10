@@ -44,21 +44,32 @@ contract AaveCrossContractSharedModule is Test {
         pool.setAToken(address(token), address(aToken));
         provider = new MockPoolAddressesProvider(address(pool));
 
-        aaveModule = new AaveYieldGenerationModule(owner);
-        aaveModule.grantRole(aaveModule.ROLE_TIMELOCK(), owner);
+        AaveYieldGenerationModule aaveModuleForVault = new AaveYieldGenerationModule(owner);
+        aaveModuleForVault.grantRole(aaveModuleForVault.ROLE_TIMELOCK(), owner);
+        
+        AaveYieldGenerationModule aaveModuleForERC20 = new AaveYieldGenerationModule(owner);
+        aaveModuleForERC20.grantRole(aaveModuleForERC20.ROLE_TIMELOCK(), owner);
         
         vm.warp(100);
 
-        // 1. Provider Queue
-        aaveModule.queueAavePoolProvider(address(provider));
+        // 1. Provider Queue for Vault Module
+        aaveModuleForVault.queueAavePoolProvider(address(provider));
         vm.warp(100 + 8 days);
-        aaveModule.activateAavePoolProvider();
-        
-        aaveModule.setAaveEnabled(true);
-        aaveModule.registerTokenForAave(address(token), address(aToken));
+        aaveModuleForVault.activateAavePoolProvider();
+        aaveModuleForVault.setAaveEnabled(true);
+        aaveModuleForVault.registerTokenForAave(address(token), address(aToken));
+
+        // 2. Provider Queue for ERC20 Module
+        aaveModuleForERC20.queueAavePoolProvider(address(provider));
+        vm.warp(100 + 16 days);
+        aaveModuleForERC20.activateAavePoolProvider();
+        aaveModuleForERC20.setAaveEnabled(true);
+
+        aaveModule = aaveModuleForVault; // Use first module as default reference
 
         yieldOps = new YieldOps(owner);
-        aaveModule.grantRole(aaveModule.ROLE_YIELD_OPS(), address(yieldOps));
+        aaveModuleForVault.grantRole(aaveModuleForVault.ROLE_YIELD_OPS(), address(yieldOps));
+        aaveModuleForERC20.grantRole(aaveModuleForERC20.ROLE_YIELD_OPS(), address(yieldOps));
         mm = new ModuleSnapshotRegistry(owner);
 
         vault = new EscrowVault(0, address(0xFEE), address(yieldOps), address(new DisputeOps(owner)), address(mm));
@@ -69,23 +80,23 @@ contract AaveCrossContractSharedModule is Test {
         mm.registerEscrowContract(address(vault));
         mm.registerEscrowContract(address(escrowERC20));
 
-        // 2. Vault Module Queue
-        mm.queueModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN, address(aaveModule));
-        vm.warp(100 + 16 days);
+        // 3. Vault Module Queue with separate instance
+        mm.queueModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN, address(aaveModuleForVault));
+        vm.warp(100 + 24 days);
         mm.activateModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN);
 
-        // 3. ERC20 Module Queue
-        mm.queueModule(address(escrowERC20), BaseEscrow.ModuleType.YIELD_GEN, address(aaveModule));
-        vm.warp(100 + 24 days);
+        // 4. ERC20 Module Queue with separate instance
+        mm.queueModule(address(escrowERC20), BaseEscrow.ModuleType.YIELD_GEN, address(aaveModuleForERC20));
+        vm.warp(100 + 32 days);
         mm.activateModule(address(escrowERC20), BaseEscrow.ModuleType.YIELD_GEN);
 
-        aaveModule.registerEscrowContract(address(vault));
-        aaveModule.registerEscrowContract(address(escrowERC20));
+        aaveModuleForVault.registerEscrowContract(address(vault));
+        aaveModuleForERC20.registerEscrowContract(address(escrowERC20));
 
         aERC20 = new MockAToken(address(escrowERC20), "aE20", "aE20");
         aERC20.setPool(address(pool));
         pool.setAToken(address(escrowERC20), address(aERC20));
-        aaveModule.registerTokenForAave(address(escrowERC20), address(aERC20));
+        aaveModuleForERC20.registerTokenForAave(address(escrowERC20), address(aERC20));
 
         CreateOps co = new CreateOps(owner);
         co.grantRole(co.ROLE_TIMELOCK(), owner);
@@ -120,8 +131,22 @@ contract AaveCrossContractSharedModule is Test {
         uint256 e20Wid = escrowERC20.createEscrow(address(escrowERC20), seller, amount, settings);
         vm.stopPrank();
 
-        assertEq(aaveModule.escrowScaledBalance(address(vault), vaultWid), amount);
-        assertEq(aaveModule.escrowScaledBalance(address(escrowERC20), e20Wid), amount);
+        // Get the module instances - we already have them from setUp since we created separate ones
+        AaveYieldGenerationModule moduleForVault;
+        AaveYieldGenerationModule moduleForERC20;
+        
+        {
+            (, , address yieldGenModule, , , , , , , , , ) = vault.moduleSnapshots(vaultWid);
+            moduleForVault = AaveYieldGenerationModule(yieldGenModule);
+        }
+        
+        {
+            (, , address yieldGenModule, , , , , , , , , ) = escrowERC20.moduleSnapshots(e20Wid);
+            moduleForERC20 = AaveYieldGenerationModule(yieldGenModule);
+        }
+
+        assertEq(moduleForVault.escrowScaledBalance(address(vault), vaultWid), amount);
+        assertEq(moduleForERC20.escrowScaledBalance(address(escrowERC20), e20Wid), amount);
 
         vm.prank(buyer);
         vault.releaseEscrowTransfer(vaultWid);
@@ -129,8 +154,8 @@ contract AaveCrossContractSharedModule is Test {
         vm.prank(buyer);
         escrowERC20.releaseEscrowTransfer(e20Wid);
 
-        assertEq(aaveModule.escrowScaledBalance(address(vault), vaultWid), 0);
-        assertEq(aaveModule.escrowScaledBalance(address(escrowERC20), e20Wid), 0);
+        assertEq(moduleForVault.escrowScaledBalance(address(vault), vaultWid), 0);
+        assertEq(moduleForERC20.escrowScaledBalance(address(escrowERC20), e20Wid), 0);
         
         assertEq(token.balanceOf(seller), amount);
         assertEq(escrowERC20.balanceOf(seller), amount);

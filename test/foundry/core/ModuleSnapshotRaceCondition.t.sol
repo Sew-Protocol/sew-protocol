@@ -18,11 +18,11 @@ contract SimpleReleaseStrategy is IReleaseStrategy {
     bool public isV2;
     constructor(bool _isV2) { isV2 = _isV2; }
     
-    function canRelease(uint256, address, address, bytes calldata) external pure override returns (bool, string memory) {
-        return (true, "");
+    function canRelease(uint256, address, address, bytes calldata) external pure override returns (bool, uint8) {
+        return (true, 0);
     }
-    function executeRelease(uint256, address, bytes calldata) external pure override returns (bool, address, uint256) {
-        return (true, address(0), 0);
+    function executeRelease(uint256, address, bytes calldata) external pure override returns (bool) {
+        return true;
     }
     function strategyName() external pure override returns (string memory) { return "Simple"; }
     function moduleName() external pure override returns (string memory) { return "Simple"; }
@@ -78,8 +78,8 @@ contract ModuleSnapshotRaceConditionTest is Test {
         vm.stopPrank();
 
         // 2. Verify snapshot for wid is V1
-        // struct ModuleSnapshot: resolution, release, yieldGen, yieldDist, incentive, yieldFee, appealFee
-        (, address snapRelease, , , , , ) = vault.moduleSnapshots(wid);
+        // struct ModuleSnapshot: resolution, release, yieldGen, yieldDist, incentive, yieldFee, appealFee, escrowFee, autoRelease, autoCancel, maxDispute, appealWindow
+        (, address snapRelease, , , , , , , , , , ) = vault.moduleSnapshots(wid);
         assertEq(snapRelease, address(strategyV1));
 
         // 3. Swap default strategy to V2
@@ -91,7 +91,7 @@ contract ModuleSnapshotRaceConditionTest is Test {
         assertEq(mm.getModule(address(vault), BaseEscrow.ModuleType.RELEASE), address(strategyV2));
 
         // 5. Verify snapshotted module for wid is STILL V1
-        (, snapRelease, , , , , ) = vault.moduleSnapshots(wid);
+        (, snapRelease, , , , , , , , , , ) = vault.moduleSnapshots(wid);
         assertEq(snapRelease, address(strategyV1));
     }
 }

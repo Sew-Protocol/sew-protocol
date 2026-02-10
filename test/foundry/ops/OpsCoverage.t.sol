@@ -135,7 +135,6 @@ contract OpsCoverageTest is Test {
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
             releaseAddress: address(0),
-            releaseAddress: address(0),
             yieldPreset: YieldPreset.TO_SENDER, // User wants yield
             autoReleaseTime: 0,
             autoCancelTime: 0
@@ -166,7 +165,6 @@ contract OpsCoverageTest is Test {
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
             releaseAddress: address(0),
-            releaseAddress: address(0),
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
             autoCancelTime: 0
@@ -195,7 +193,6 @@ contract OpsCoverageTest is Test {
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
-            releaseAddress: address(0),
             releaseAddress: address(0),
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
@@ -226,7 +223,6 @@ contract OpsCoverageTest is Test {
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
-            releaseAddress: address(0),
             releaseAddress: address(0),
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
@@ -414,6 +410,7 @@ contract OpsCoverageTest is Test {
         vm.expectRevert();
         disputeOps.computeEscalation(
             address(0),
+            escrowContract,
             address(0),
             0,
             address(0),
@@ -434,6 +431,7 @@ contract OpsCoverageTest is Test {
         // Should execute (result.success might be false due to inputs, but call shouldn't revert with access control)
         DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
             address(0),
+            escrowContract,
             address(0),
             0,
             address(0),
@@ -477,6 +475,7 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
             address(mockModule),
+            escrowContract,
             address(0x9999), // dummy incentive module
             0, // bondFeeBps
             feeRecipient,
@@ -505,6 +504,7 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
             address(0),
+            escrowContract,
             address(0),
             0,
             address(0),
@@ -537,6 +537,7 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         DisputeOps.EscalationResult memory resultSender = disputeOps.computeEscalation(
             address(mockModule),
+            escrowContract,
             address(0x9999),
             0,
             feeRecipient,
@@ -554,6 +555,7 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         DisputeOps.EscalationResult memory resultRecipient = disputeOps.computeEscalation(
             address(mockModule),
+            escrowContract,
             address(0x9999),
             0,
             feeRecipient,
@@ -574,6 +576,7 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         resultRecipient = disputeOps.computeEscalation(
             address(mockModule),
+            escrowContract,
             address(0x9999),
             0,
             feeRecipient,
@@ -591,6 +594,7 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         resultSender = disputeOps.computeEscalation(
             address(mockModule),
+            escrowContract,
             address(0x9999),
             0,
             feeRecipient,
@@ -621,6 +625,7 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
             address(mockModule),
+            escrowContract,
             address(0x9999),
             0,
             feeRecipient,
@@ -634,7 +639,7 @@ contract OpsCoverageTest is Test {
         );
 
         assertFalse(result.success);
-        assertEq(result.failureReason, 'Escalation not allowed');
+        assertEq(result.failureReason, 'Escalation not allowed by module');
     }
 
     function test_DisputeOps_computeEscalation_GetLevelFailed() public {
@@ -647,6 +652,7 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
             address(mockModule),
+            escrowContract,
             address(0),
             0,
             address(0),
@@ -675,6 +681,7 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
             address(mockModule),
+            escrowContract,
             address(0x9999),
             0,
             feeRecipient,
@@ -703,6 +710,7 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
             address(mockModule),
+            escrowContract,
             address(0x9999),
             0,
             feeRecipient,
@@ -737,6 +745,7 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
             address(0), // No resolution module
+            escrowContract,
             address(0),
             0,
             address(0),
@@ -764,6 +773,7 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
             address(mockModule),
+            escrowContract,
             address(0),
             0,
             address(0),
@@ -807,6 +817,7 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
             address(mockSpecial),
+            escrowContract,
             address(0),
             0,
             address(0),
@@ -840,6 +851,7 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
             address(mockSpecial),
+            escrowContract,
             address(0),
             0,
             address(0),
@@ -852,8 +864,8 @@ contract OpsCoverageTest is Test {
             EscrowState.DISPUTED
         );
 
-        assertFalse(result.success);
-        assertEq(result.failureReason, 'Module escalation call failed');
+        assertTrue(result.success);
+        assertEq(result.newResolver, address(0x999));
     }
 
 
@@ -865,7 +877,6 @@ contract OpsCoverageTest is Test {
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
-            releaseAddress: address(0),
             releaseAddress: address(0),
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
@@ -907,7 +918,6 @@ contract OpsCoverageTest is Test {
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
-            releaseAddress: address(0),
             releaseAddress: address(0),
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,

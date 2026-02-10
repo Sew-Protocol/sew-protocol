@@ -76,6 +76,7 @@ contract DisputeOps is AccessControl {
      */
     function computeDisputeOpening(
         address resolutionModule,
+        address escrowContract,
         address incentiveModule,
         uint256 workflowId,
         address caller,
@@ -101,7 +102,7 @@ contract DisputeOps is AccessControl {
         result.updatedResolver = currentResolver;
         if (resolutionModule != address(0) && resolutionModule.code.length > 0) {
             bytes memory escrowData = abi.encode(token, from, to, amountAfterFee);
-            try IResolutionModule(resolutionModule).getDisputeResolver(workflowId, address(this), escrowData) returns (
+            try IResolutionModule(resolutionModule).getDisputeResolver(workflowId, escrowContract, escrowData) returns (
                 address updated,
                 uint8 /* level */
             ) {
@@ -148,6 +149,7 @@ contract DisputeOps is AccessControl {
      */
     function computeEscalation(
         address resolutionModule,
+        address escrowContract,
         address incentiveModule,
         uint256 bondFeeBps,
         address feeRecipient,
@@ -183,7 +185,7 @@ contract DisputeOps is AccessControl {
         bytes memory escrowData = abi.encode(token, from, to, amountAfterFee);
 
         // Get current level from module
-        try IResolutionModule(resolutionModule).getDisputeResolver(workflowId, address(this), escrowData) returns (
+        try IResolutionModule(resolutionModule).getDisputeResolver(workflowId, escrowContract, escrowData) returns (
             address /* currentResolver */,
             uint8 currentLevel
         ) {
@@ -195,7 +197,7 @@ contract DisputeOps is AccessControl {
 
         // Validate only the disagreed-with participant can appeal
         (bool decisionSuccess, bytes memory decisionData) = resolutionModule.staticcall(
-            abi.encodeWithSignature('getDecisionAtRound(uint256,address,uint8)', workflowId, address(this), result.currentLevel)
+            abi.encodeWithSignature('getDecisionAtRound(uint256,address,uint8)', workflowId, escrowContract, result.currentLevel)
         );
         
         if (decisionSuccess && decisionData.length >= 32) {
@@ -217,9 +219,13 @@ contract DisputeOps is AccessControl {
         }
 
         // Check if escalation is allowed and get next resolver/bond
-        try IResolutionModule(resolutionModule).canEscalate(workflowId, address(this), result.currentLevel, escrowData)
+        try IResolutionModule(resolutionModule).canEscalate(workflowId, escrowContract, result.currentLevel, escrowData)
         returns (bool canEscalate, address nextResolver, uint256 /* dummyFee */) {
             if (!canEscalate) {
+                result.failureReason = 'Escalation not allowed by module';
+                return result;
+            }
+            if (nextResolver == address(0)) {
                 result.failureReason = 'Escalation not allowed by module';
                 return result;
             }
@@ -231,7 +237,7 @@ contract DisputeOps is AccessControl {
         }
 
         // Get required appeal bond
-        try IResolutionModule(resolutionModule).getRequiredAppealBond(workflowId, address(this), result.currentLevel, escrowData)
+        try IResolutionModule(resolutionModule).getRequiredAppealBond(workflowId, escrowContract, result.currentLevel, escrowData)
         returns (uint256 bondAmount, address bondToken) {
             result.bondAmount = bondAmount;
             result.bondToken = bondToken;

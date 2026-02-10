@@ -106,6 +106,11 @@ contract EscrowVaultReleaseStrategyHarness is EscrowVault {
     }
 
     function resolvedReleaseStrategy(uint256 workflowId) external view returns (address) {
+        address snap = moduleSnapshots[workflowId].releaseStrategy;
+        if (snap != address(0)) {
+            return snap;
+        }
+        // If no snapshot, fall back to current default
         return address(_getReleaseStrategy(workflowId));
     }
 }
@@ -164,7 +169,6 @@ contract ReleaseStrategyWiringTest is Test {
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
             releaseAddress: address(0),
-            releaseAddress: address(0), // Added default releaseAddress
             yieldPreset: YieldPreset.OFF,
             autoReleaseTime: 0,
             autoCancelTime: 0

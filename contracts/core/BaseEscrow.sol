@@ -80,6 +80,8 @@ error AppealBondQueryFailed(uint256 workflowId);
 error InvalidBondMsgValue(uint256 workflowId, uint256 required, uint256 provided);
 error AppealsNotEnabledInV1();
 error AlreadyPausedCannotRepause();
+error MaxPauseCyclesExceeded(uint256 currentCount, uint256 maxCycles);
+error PauseDurationExceeded(uint256 duration, uint256 maxDuration);
 
 // Errors used by child contracts (EscrowVault, EscrowableERC20)
 error BalanceUnderflow(address token, uint256 currentBalance, uint256 requestedAmount);
@@ -161,6 +163,11 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         address incentiveModule;
         uint256 yieldProtocolFeeBps;      // Snapshotted at creation - fee on yield generated
         uint256 appealBondProtocolFeeBps; // Snapshotted at creation - fee on appeal bonds
+        uint256 escrowFeeBps;             // Snapshotted at creation - escrow fee
+        uint256 defaultAutoReleaseDelay;  // Snapshotted at creation
+        uint256 defaultAutoCancelDelay;   // Snapshotted at creation
+        uint256 maxDisputeDuration;       // Snapshotted at creation
+        uint256 appealWindowDuration;     // Snapshotted at creation
     }
     mapping(uint256 => ModuleSnapshot) public moduleSnapshots;
 
@@ -291,11 +298,11 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     event SystemResumed(
         uint256 timestamp
     );
-    event MaxPauseCyclesExceeded(
+    event MaxPauseCyclesExceededEvent(
         uint256 pauseCycleCount,
         uint256 maxCycles
     );
-    event PauseDurationExceeded(
+    event PauseDurationExceededEvent(
         uint256 pausedDuration,
         uint256 maxDuration
     );
@@ -495,16 +502,31 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
             yieldDistributionModule: address(_getYieldDistributionModule(workflowId)),
             incentiveModule: incentiveMod,
             yieldProtocolFeeBps: yieldProtocolFeeBps,
-            appealBondProtocolFeeBps: appealBondProtocolFeeBps
+            appealBondProtocolFeeBps: appealBondProtocolFeeBps,
+            escrowFeeBps: escrowFee,
+            defaultAutoReleaseDelay: timeoutConfig.defaultAutoReleaseDelay,
+            defaultAutoCancelDelay: timeoutConfig.defaultAutoCancelDelay,
+            maxDisputeDuration: timeoutConfig.maxDisputeDuration,
+            appealWindowDuration: timeoutConfig.appealWindowDuration
         });
     }
 
     function automateTimedActions(uint256 workflowId) external nonReentrant returns (bool) {
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
+        ModuleSnapshot storage snap = moduleSnapshots[workflowId];
         if (address(settlementOps) == address(0)) return false;
         SettlementOps.SettlementPendingSettlement memory pendingMem = _convertPendingSettlement(pendingSettlements[workflowId]);
-        (uint8 actionType, bool isRelease) = settlementOps.computeTimedActions(workflowId, et, pendingMem, timeoutConfig);
+        
+        // Use snapshotted timeout config
+        TimeoutConfig memory snappedTimeoutConfig = TimeoutConfig({
+            defaultAutoReleaseDelay: snap.defaultAutoReleaseDelay,
+            defaultAutoCancelDelay: snap.defaultAutoCancelDelay,
+            maxDisputeDuration: snap.maxDisputeDuration,
+            appealWindowDuration: snap.appealWindowDuration
+        });
+        
+        (uint8 actionType, bool isRelease) = settlementOps.computeTimedActions(workflowId, et, pendingMem, snappedTimeoutConfig);
         if (actionType == ACTION_NONE) return false;
 
         ExecutionSource source = hasRole(ROLE_TIMELOCK, _msgSender()) ? ExecutionSource.GOVERNANCE : ExecutionSource.KEEPER;
@@ -569,6 +591,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         _enforceMaxPauseDuration();
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
+        ModuleSnapshot storage snap = moduleSnapshots[workflowId];
         if (et.escrowState != EscrowState.DISPUTED) {
             revert TransferNotInDispute(workflowId, et.escrowState);
         }
@@ -579,7 +602,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         }
 
         uint256 ts = disputeRaisedTimestamp[workflowId];
-        if (ts == 0 || block.timestamp < ts + timeoutConfig.maxDisputeDuration) {
+        if (ts == 0 || block.timestamp < ts + snap.maxDisputeDuration) {
             revert InvalidState(workflowId, uint8(EscrowState.DISPUTED), uint8(et.escrowState)); // Dispute timeout not exceeded
         }
         address from = et.from;
@@ -602,6 +625,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
 
         DisputeOps.DisputeOpeningResult memory result = disputeOps.computeDisputeOpening(
             address(_getResolutionModule(workflowId)),
+            address(this),
             snap.incentiveModule,
             workflowId,
             _msgSender(),
@@ -639,7 +663,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
                 workflowId,
                 et.token,
                 et.amountAfterFee,
-                escrowFee,
+                snap.escrowFeeBps,
                 ESCROW_FEE_DENOMINATOR
             )) {
                 emit OperationFailure(3, workflowId, result.incentiveModule, IIncentiveModule.onDisputeOpened.selector, uint8(FailureReason.CALL_FAILED));
@@ -702,6 +726,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
 
         DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
             address(resolutionModule),
+            address(this),
             snap.incentiveModule,
             snap.appealBondProtocolFeeBps,
             escrowFeeAddress,
@@ -861,7 +886,8 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     /// @dev Transitions PENDING → RELEASED
     /// @dev May transfer funds immediately (push) or create claimable balance (fallback)
     /// @dev Part of IEscrowCore interface for wallet adoption
-    function release(uint256 workflowId) external nonReentrant whenNotPaused {
+    /// @dev Callable even when paused (release strategy may further restrict)
+    function release(uint256 workflowId) external nonReentrant {
         _enforceMaxPauseDuration();
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
@@ -911,11 +937,11 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         _releaseEscrowTransfer(workflowId);
     }
 
-    function cancelAsDisputeResolver(uint256 workflowId, bytes32 resolutionHash) public nonReentrant returns (bool) {
+    function cancelAsDisputeResolver(uint256 workflowId, bytes32 resolutionHash) public nonReentrant whenNotPaused returns (bool) {
         return _executeResolution(workflowId, false, resolutionHash);
     }
 
-    function releaseAsDisputeResolver(uint256 workflowId, bytes32 resolutionHash) public nonReentrant returns (bool) {
+    function releaseAsDisputeResolver(uint256 workflowId, bytes32 resolutionHash) public nonReentrant whenNotPaused returns (bool) {
         return _executeResolution(workflowId, true, resolutionHash);
     }
 
@@ -1243,6 +1269,15 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
 
         YieldOps.YieldResult memory result = abi.decode(ret, (YieldOps.YieldResult));
         if (result.actualAmount > 0) {
+            // ========= VALIDATION: Paradigm 2 → Paradigm 1 Handoff (Fix #2) =========
+            // Verify yield withdrawal is within reasonable bounds to detect calculation errors
+            // Sanity check: withdrawn amount should not exceed 10000x original (prevents integer overflow)
+            uint256 maxReasonableAmount = amount * 10000;
+            require(
+                result.actualAmount <= maxReasonableAmount,
+                "BaseEscrow: yield withdrawal exceeds reasonable bounds (possible integer overflow or Aave corruption)"
+            );
+            
             // PUSH MODEL: If yield was generated, transfer it to YieldOps and distribute
             if (result.yield > 0) {
                 // Transfer yield portion to YieldOps (PUSH)

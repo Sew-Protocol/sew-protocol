@@ -212,7 +212,6 @@ contract AaveForkTests is Test {
             EscrowSettings({
                 customResolver: address(0),
             releaseAddress: address(0),
-                releaseAddress: address(0), // Added default releaseAddress
                 yieldPreset: YieldPreset.TO_SENDER,
                 autoReleaseTime: 0,
                 autoCancelTime: 0
@@ -239,7 +238,6 @@ contract AaveForkTests is Test {
             EscrowSettings({
                 customResolver: address(0),
             releaseAddress: address(0),
-                releaseAddress: address(0), // Added default releaseAddress
                 yieldPreset: YieldPreset.TO_SENDER,
                 autoReleaseTime: 0,
                 autoCancelTime: 0
@@ -275,7 +273,6 @@ contract AaveForkTests is Test {
             EscrowSettings({
                 customResolver: address(0),
             releaseAddress: address(0),
-                releaseAddress: address(0), // Added default releaseAddress
                 yieldPreset: YieldPreset.TO_SENDER,
                 autoReleaseTime: 0,
                 autoCancelTime: 0
@@ -310,7 +307,6 @@ contract AaveForkTests is Test {
             EscrowSettings({
                 customResolver: address(0),
             releaseAddress: address(0),
-                releaseAddress: address(0), // Added default releaseAddress
                 yieldPreset: YieldPreset.TO_SENDER,
                 autoReleaseTime: 0,
                 autoCancelTime: 0
@@ -361,7 +357,6 @@ contract AaveForkTests is Test {
             EscrowSettings({
                 customResolver: address(0),
             releaseAddress: address(0),
-                releaseAddress: address(0), // Added default releaseAddress
                 yieldPreset: YieldPreset.TO_SENDER,
                 autoReleaseTime: 0,
                 autoCancelTime: 0

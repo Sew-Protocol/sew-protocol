@@ -149,6 +149,7 @@ contract MultiL2ViewAggregator {
 
         (
             address customResolver,
+            address releaseAddress,
             YieldPreset yieldPreset,
             uint256 autoReleaseTime,
             uint256 autoCancelTime
