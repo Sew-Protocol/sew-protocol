@@ -82,6 +82,7 @@ error AppealsNotEnabledInV1();
 error AlreadyPausedCannotRepause();
 error MaxPauseCyclesExceeded(uint256 currentCount, uint256 maxCycles);
 error PauseDurationExceeded(uint256 duration, uint256 maxDuration);
+error BothAutoTimesNotAllowed(uint256 workflowId);
 
 // Errors used by child contracts (EscrowVault, EscrowableERC20)
 error BalanceUnderflow(address token, uint256 currentBalance, uint256 requestedAmount);
@@ -977,6 +978,9 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     }
 
     function _applyEscrowSettings(uint256 workflowId, EscrowSettings memory settings) internal {
+        if (settings.autoReleaseTime > 0 && settings.autoCancelTime > 0) {
+            revert BothAutoTimesNotAllowed(workflowId);
+        }
         EscrowTransfer storage et = escrowTransfers[workflowId];
         if (settings.customResolver != address(0)) et.disputeResolver = settings.customResolver;
         bool useDefaults = (settings.autoReleaseTime == 0 && settings.autoCancelTime == 0);
