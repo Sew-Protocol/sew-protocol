@@ -69,13 +69,30 @@ Welcome to the Multi-Escrow protocol documentation. This index helps you navigat
 ### 📊 Phase Delivery Documentation
 **Phase-specific implementation and deliverables**
 
+- [phase-delivery/PHASE2_SUMMARY.md](./phase-delivery/PHASE2_SUMMARY.md) - Phase 2 summary and completion
+- [phase-delivery/PHASE2_TEST_COMPLETION.md](./phase-delivery/PHASE2_TEST_COMPLETION.md) - Phase 2 test report
 - [phase-delivery/PHASE3_SUMMARY.md](./phase-delivery/PHASE3_SUMMARY.md) - Phase 3 summary
-- [phase-delivery/PHASE3_BALANCE_AGGREGATOR.md](./phase-delivery/PHASE3_BALANCE_AGGREGATOR.md) - Balance aggregator
-- [phase-delivery/PHASE3_RECOVERY_FRAMEWORK.md](./phase-delivery/PHASE3_RECOVERY_FRAMEWORK.md) - Recovery framework
+- [phase-delivery/PHASE3_DELIVERY.md](./phase-delivery/PHASE3_DELIVERY.md) - Phase 3 deliverables
+- [phase-delivery/PHASE3_DEV_PLAN.md](./phase-delivery/PHASE3_DEV_PLAN.md) - Phase 3 development plan
+- [phase-delivery/PHASE3_EXECUTIVE_SUMMARY.md](./phase-delivery/PHASE3_EXECUTIVE_SUMMARY.md) - Phase 3 executive summary
+- [phase-delivery/PHASE3_IMPLEMENTATION_PLAN.md](./phase-delivery/PHASE3_IMPLEMENTATION_PLAN.md) - Phase 3 implementation
+- [phase-delivery/PHASE3_MERGE_STRATEGY.md](./phase-delivery/PHASE3_MERGE_STRATEGY.md) - Phase 3 merge strategy
+- [phase-delivery/PHASE3_TEST_COMPLETION.md](./phase-delivery/PHASE3_TEST_COMPLETION.md) - Phase 3 test report
+- [phase-delivery/PHASE4_SUMMARY.md](./phase-delivery/PHASE4_SUMMARY.md) - Phase 4 summary
+- [phase-delivery/PHASE4_TEST_COMPLETION.md](./phase-delivery/PHASE4_TEST_COMPLETION.md) - Phase 4 test report
 
-### 📈 Analysis & Reviews
-**Security reviews, audits, and system analysis**
+### 🔒 Security Model & Architecture
+**Security principles, threat models, and per-escrow isolation**
 
+- [security/SECURITY_MODEL.md](./security/SECURITY_MODEL.md) - Core security model and principles
+- [security/SECURITY.md](./security/SECURITY.md) - Security policies and best practices
+
+### 📈 Analysis & Technical Design
+**Security reviews, system analysis, and technical decisions**
+
+- [analysis/DESIGN_DECISIONS.md](./analysis/DESIGN_DECISIONS.md) - Key architectural decisions
+- [analysis/ANALYSIS_RELEASE_STRATEGY.md](./analysis/ANALYSIS_RELEASE_STRATEGY.md) - Release strategy analysis
+- [analysis/PARADIGM_FIXES_SUMMARY.md](./analysis/PARADIGM_FIXES_SUMMARY.md) - Paradigm security fixes
 - [analysis/PRODUCTION_READY_CHECKLIST.md](./analysis/PRODUCTION_READY_CHECKLIST.md) - Production readiness
 - [analysis/PRODUCTION_HARDENING_STATUS.md](./analysis/PRODUCTION_HARDENING_STATUS.md) - Hardening status
 - [analysis/MULTI_ESCROW_REFACTOR_STATUS.md](./analysis/MULTI_ESCROW_REFACTOR_STATUS.md) - Refactor status
@@ -86,6 +103,15 @@ Welcome to the Multi-Escrow protocol documentation. This index helps you navigat
 - [analysis/MODULE_MANAGEMENT_SECURITY_ANALYSIS.md](./analysis/MODULE_MANAGEMENT_SECURITY_ANALYSIS.md) - Module security
 - [analysis/MODULE_REGISTRY_YIELD_PRESET_ANALYSIS.md](./analysis/MODULE_REGISTRY_YIELD_PRESET_ANALYSIS.md) - Module registry analysis
 - [analysis/REPOSITORY_FIXES_AND_PROPOSALS.md](./analysis/REPOSITORY_FIXES_AND_PROPOSALS.md) - Fixes and proposals
+
+### 📚 Reference & Guides
+**Quick references, test guides, and integration documentation**
+
+- [reference/AAVE_TEST_QUICK_REFERENCE.md](./reference/AAVE_TEST_QUICK_REFERENCE.md) - Aave testing quick reference
+- [reference/COMPREHENSIVE_AAVE_TEST_SUMMARY.md](./reference/COMPREHENSIVE_AAVE_TEST_SUMMARY.md) - Aave test summary
+- [reference/INTERFACE_DISCOVERY_MAP.md](./reference/INTERFACE_DISCOVERY_MAP.md) - Interface discovery guide
+- [reference/TEST_SUITE_INDEX.md](./reference/TEST_SUITE_INDEX.md) - Test suite overview
+- [guides/WALLET_INTEGRATION_GUIDE.md](./guides/WALLET_INTEGRATION_GUIDE.md) - Wallet integration guide
 
 ### 🔍 Security & Reviews
 **External reviews, DeFi analysis, and security documentation**

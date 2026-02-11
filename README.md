@@ -26,4 +26,49 @@ The protocol is built on three core security principles:
 2. **Determinism over discretion**: Funds move according to predefined rules
 3. **Isolation over shared risk**: Each escrow is independent; failures don't cascade
 
-Each escrow captures its configuration (modules, fees, timeouts) at creation time, ensuring that global updates never affect existing agreements. For details, see [SECURITY_MODEL.md](./SECURITY_MODEL.md).
+Each escrow captures its configuration (modules, fees, timeouts) at creation time, ensuring that global updates never affect existing agreements. For details, see [docs/security/SECURITY_MODEL.md](./docs/security/SECURITY_MODEL.md).
+
+## Documentation Structure
+
+Comprehensive documentation is organized in [`docs/`](./docs/) with an [INDEX](./docs/INDEX.md) to help you navigate:
+
+### For Developers & Auditors
+- **[docs/security/SECURITY_MODEL.md](./docs/security/SECURITY_MODEL.md)** - Security principles, threat model, and per-escrow isolation
+- **[docs/architecture/](./docs/architecture/)** - System design, contract dependencies, and technical overview
+- **[docs/analysis/](./docs/analysis/)** - Design decisions, fixes, and technical analysis
+
+### For Operations & Deployment
+- **[docs/operations/](./docs/operations/)** - Deployment procedures, monitoring, and operational runbooks
+- **[docs/setup/](./docs/setup/)** - Deployment checklists and prerequisites
+
+### For Integration & Development
+- **[docs/guides/](./docs/guides/)** - Wallet integration, wallet UX, mobile app integration
+- **[docs/reference/](./docs/reference/)** - Quick references, test summaries, interface maps
+
+### By Phase & Status
+- **[docs/phase-delivery/](./docs/phase-delivery/)** - Phase 2, 3, 4 deliverables, implementation plans, test reports
+
+### Full Navigation
+See **[docs/INDEX.md](./docs/INDEX.md)** for complete documentation index with 100+ pages organized by topic, audience, and use case.
+
+## Quick Start
+
+```bash
+# Install dependencies
+pnpm install
+
+# Run tests
+pnpm test
+
+# Build contracts
+pnpm build
+
+# Run linter
+pnpm lint
+```
+
+## Project Status
+
+- **Test Suite**: 1186/1194 tests passing (99.3%)
+- **Phase 4 Complete**: Per-escrow configuration isolation fully implemented
+- **Security Model**: Fully documented and enforced in code

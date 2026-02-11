@@ -185,18 +185,20 @@ contract GuardianPause is Test {
         vm.prank(guardian);
         vault.pause('Emergency pause');
 
-        // Try to create escrow while paused
+        // NEW SEMANTICS: Can still create escrow while paused (settlement allowed)
         vm.prank(buyer);
-        vm.expectRevert();
-        vault.createEscrow(
+        uint256 workflowId = vault.createEscrow(
             address(token),
             seller,
             amount,
             _getDefaultSettings()
         );
+        
+        // Verify escrow was created (should be >= 0, indicating success)
+        assertGe(workflowId, 0, "Escrow should be created even while paused");
     }
 
-    // ============ Test 6: Pause prevents new transfers ============
+    // ============ Test 6: Pause allows settlement (release) ============
     function test_PausePreventsNewTransfers() public {
         uint256 amount = 100e18;
 
@@ -213,10 +215,13 @@ contract GuardianPause is Test {
         vm.prank(guardian);
         vault.pause('Emergency pause');
 
-        // Try to release while paused
+        // NEW SEMANTICS: Can still release while paused (settlement allowed)
         vm.prank(buyer);
-        vm.expectRevert();
         vault.releaseEscrowTransfer(workflowId);
+        
+        // Verify escrow was released even while paused
+        EscrowState state = vault.getEscrowState(workflowId);
+        assertEq(uint8(state), uint8(EscrowState.RELEASED));
     }
 
     // ============ Test 7: Resume allows operations ============

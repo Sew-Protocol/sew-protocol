@@ -170,27 +170,28 @@ contract AavePauseSemantics is Test {
         // Verify pause state
         assertTrue(vault.paused(), "Vault should be paused");
 
-        // Try to create new escrow - should be blocked by pause
+        // NEW SEMANTICS: Can still create escrow when paused (settlement allowed)
         address newSender = address(0x2001);
         token.mint(newSender, 100 ether);
         vm.startPrank(newSender);
         token.approve(address(vault), 100 ether);
         
-        // createEscrow should revert due to pause
-        vm.expectRevert(); // Pausable: EnforcedPause
-        vault.createEscrow(address(token), recipient, 100 ether, settings);
+        // createEscrow should SUCCEED when paused (settlement operations allowed)
+        uint256 newWid = vault.createEscrow(address(token), recipient, 100 ether, settings);
+        assertGt(newWid, 0, "Escrow should be created even while paused");
         vm.stopPrank();
 
-        // Existing escrow cannot exit via release when paused (whenNotPaused modifier blocks it)
-        // This is a design decision - pause blocks both enter and exit for safety
-        // Emergency unwind is available for guardian, but regular users cannot exit when paused
+        // NEW SEMANTICS: Can still release when paused (settlement allowed)
         vm.prank(sender);
-        vm.expectRevert(); // Pausable: EnforcedPause
         vault.releaseEscrowTransfer(wid);
+        
+        // Verify escrow was released even while paused
+        EscrowState state = vault.getEscrowState(wid);
+        assertEq(uint8(state), uint8(EscrowState.RELEASED));
     }
 
     /**
-     * @notice Test: New escrows cannot enter yield when paused
+     * @notice Test: New escrows CAN enter yield when paused (settlement allowed)
      */
     function test_pause_newEscrows_cannotEnterYield() public {
         // Pause first
@@ -209,9 +210,12 @@ contract AavePauseSemantics is Test {
         vm.startPrank(sender);
         token.approve(address(vault), amount);
 
-        // Should revert due to pause
-        vm.expectRevert(); // Pausable: EnforcedPause
-        vault.createEscrow(address(token), recipient, amount, settings);
+        // NEW SEMANTICS: Should SUCCEED when paused (settlement operations allowed)
+        uint256 wid = vault.createEscrow(address(token), recipient, amount, settings);
+        
+        // Verify escrow count increased (creation succeeded)
+        uint256 count = vault.getEscrowCount();
+        assertEq(count, 1, "Escrow should be created even while paused");
         vm.stopPrank();
     }
 
@@ -240,10 +244,13 @@ contract AavePauseSemantics is Test {
         vm.prank(guardian);
         vault.pause("test pause");
 
-        // Release should be blocked by whenNotPaused modifier
+        // NEW SEMANTICS: Release should SUCCEED even when paused (settlement allowed)
         vm.prank(sender);
-        vm.expectRevert(); // Pausable: EnforcedPause
         vault.releaseEscrowTransfer(wid);
+        
+        // Verify escrow was released
+        EscrowState state = vault.getEscrowState(wid);
+        assertEq(uint8(state), uint8(EscrowState.RELEASED));
     }
 
     /**

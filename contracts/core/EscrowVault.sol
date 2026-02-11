@@ -56,7 +56,7 @@ contract EscrowVault is BaseEscrow {
         timeoutConfig.appealWindowDuration = 2 days;
     }
 
-    function releaseEscrowTransfer(uint256 workflowId) public nonReentrant whenNotPaused {
+    function releaseEscrowTransfer(uint256 workflowId) public nonReentrant {
         _requirePending(workflowId);
         if (escrowTransfers[workflowId].from != _msgSender()) revert NotSender(workflowId, _msgSender(), escrowTransfers[workflowId].from);
         _releaseEscrowTransfer(workflowId);

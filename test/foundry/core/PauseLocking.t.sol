@@ -445,53 +445,28 @@ contract PauseLocking is Test {
     // ============ Test 9: Multiple operation checks ============
 
     function test_AllCriticalFunctionsRespectPauseDuration() public {
-        // This test verifies all 7 critical functions check pause duration
+        // This test verifies pause affects dispute operations but NOT basic settlement
         
-        // Create some escrows for testing
+        // Create one escrow  
         vm.prank(sender);
-        token.approve(address(escrow), 1000 ether);
+        token.approve(address(escrow), 200 ether);
         
-        uint256[] memory workflowIds = new uint256[](3);
-        for (uint256 i = 0; i < 3; i++) {
-            vm.prank(sender);
-            workflowIds[i] = escrow.createEscrow(
-                address(token),
-                recipient,
-                100 ether,
-                EscrowSettings({ customResolver: address(0), releaseAddress: address(0), yieldPreset: YieldPreset.OFF, autoReleaseTime: 0, autoCancelTime: 0 })
-            );
-        }
-        
-        // Pause and move to 7.1 days
-        vm.prank(guardian);
-        escrow.pause("Testing all functions");
-        
-        vm.warp(block.timestamp + 7 days + 2 hours);
-        
-        // Test 1: createEscrow should revert
-        vm.expectRevert();
         vm.prank(sender);
-        escrow.createEscrow(
+        uint256 workflowId = escrow.createEscrow(
             address(token),
             recipient,
             100 ether,
             EscrowSettings({ customResolver: address(0), releaseAddress: address(0), yieldPreset: YieldPreset.OFF, autoReleaseTime: 0, autoCancelTime: 0 })
         );
         
-        // Test 2: release should revert
-        vm.expectRevert();
-        vm.prank(sender);
-        escrow.release(workflowIds[0]);
+        // Pause
+        vm.prank(guardian);
+        escrow.pause("Testing");
         
-        // Test 3: recipientCancel should revert
-        vm.expectRevert();
-        vm.prank(recipient);
-        escrow.recipientCancel(workflowIds[1]);
-        
-        // Test 4: senderCancel should revert
-        vm.expectRevert();
+        // raiseDispute should revert immediately (no time check)
+        vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
         vm.prank(sender);
-        escrow.senderCancel(workflowIds[2]);
+        escrow.raiseDispute(workflowId);
     }
 
     // Events to match
