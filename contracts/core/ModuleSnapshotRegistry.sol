@@ -4,6 +4,7 @@ pragma solidity ^0.8.33;
 import '@openzeppelin/contracts/access/AccessControl.sol';
 import '../governance/SlowLaneQueueActivate.sol';
 import '../interfaces/IReleaseStrategy.sol';
+import '../interfaces/ICancellationStrategy.sol';
 import '../interfaces/IYieldGenerationModule.sol';
 import '../interfaces/IYieldDistributionModule.sol';
 import '../shared/interfaces/IResolutionModule.sol';
@@ -22,6 +23,7 @@ contract ModuleSnapshotRegistry is AccessControl, SlowLaneQueueActivate {
     /// @notice Module state for each escrow contract
     struct ModuleState {
         IReleaseStrategy defaultReleaseStrategy;
+        ICancellationStrategy defaultCancellationStrategy;
         IYieldGenerationModule defaultYieldGenerationModule;
         IYieldDistributionModule defaultYieldDistributionModule;
         IResolutionModule defaultResolutionModule;
@@ -261,6 +263,17 @@ contract ModuleSnapshotRegistry is AccessControl, SlowLaneQueueActivate {
     }
 
     /**
+     * @notice Get default cancellation strategy for an escrow contract
+     * @param escrowContract Address of the escrow contract
+     * @return The default cancellation strategy
+     */
+    function getDefaultCancellationStrategy(
+        address escrowContract
+    ) external view virtual returns (ICancellationStrategy) {
+        return escrowModuleStates[escrowContract].defaultCancellationStrategy;
+    }
+
+    /**
      * @notice Get default yield generation module for an escrow contract
      * @param escrowContract Address of the escrow contract
      * @return The default yield generation module
@@ -315,5 +328,22 @@ contract ModuleSnapshotRegistry is AccessControl, SlowLaneQueueActivate {
             return address(state.defaultResolutionModule);
         }
         return address(0);
+    }
+
+    /**
+     * @notice Set the default cancellation strategy for an escrow contract
+     * @param escrowContract Address of the escrow contract
+     * @param cancellationStrategy Address of the cancellation strategy
+     * @dev Only callable by ROLE_TIMELOCK (governance)
+     */
+    function setDefaultCancellationStrategy(
+        address escrowContract,
+        address cancellationStrategy
+    ) external onlyRole(ROLE_TIMELOCK) {
+        if (!hasRole(ROLE_ESCROW_CONTRACT, escrowContract)) {
+            revert EscrowNotRegistered(escrowContract);
+        }
+        if (cancellationStrategy == address(0)) revert InvalidValue();
+        escrowModuleStates[escrowContract].defaultCancellationStrategy = ICancellationStrategy(cancellationStrategy);
     }
 }

@@ -6,6 +6,7 @@ import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import './BaseEscrow.sol';
 import '../types/EscrowTypes.sol';
 import '../interfaces/IReleaseStrategy.sol';
+import '../interfaces/ICancellationStrategy.sol';
 import '../shared/interfaces/IResolutionModule.sol';
 import '../interfaces/IYieldGenerationModule.sol';
 import '../interfaces/IYieldDistributionModule.sol';
@@ -112,6 +113,10 @@ contract EscrowVault is BaseEscrow {
         return moduleManagement.getDefaultReleaseStrategy(address(this));
     }
 
+    function _getDefaultCancellationStrategy() internal view returns (ICancellationStrategy) {
+        return moduleManagement.getDefaultCancellationStrategy(address(this));
+    }
+
     function _getDefaultYieldGenerationModule(uint256 workflowId) internal view returns (IYieldGenerationModule) {
         return IYieldGenerationModule(moduleManagement.getDefaultYieldGenerationModule(address(this)));
     }
@@ -130,6 +135,10 @@ contract EscrowVault is BaseEscrow {
 
     function _getReleaseStrategy(uint256 workflowId) internal view override returns (IReleaseStrategy) {
         return _getDefaultReleaseStrategy();
+    }
+
+    function _getCancellationStrategy(uint256 workflowId) internal view override returns (ICancellationStrategy) {
+        return _getDefaultCancellationStrategy();
     }
 
     function _emitEscrowTransferCreated(
