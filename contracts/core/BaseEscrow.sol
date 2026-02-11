@@ -420,8 +420,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         address to,
         uint256 amount,
         EscrowSettings memory settings
-    ) public nonReentrant whenNotPaused returns (uint256) {
-        _enforceMaxPauseDuration();
+    ) public nonReentrant returns (uint256) {
         uint256 workflowId = escrowTransfers.length; // Array index IS the workflowId
         
         // CreateOps is mandatory (removed inline fallback to save >1KB bytecode)
@@ -566,8 +565,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         return true;
     }
 
-    function recipientCancel(uint256 workflowId) external nonReentrant whenNotPaused returns (bool) {
-        _enforceMaxPauseDuration();
+    function recipientCancel(uint256 workflowId) external nonReentrant returns (bool) {
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
         if (et.to != _msgSender()) revert NotRecipient(workflowId, _msgSender(), et.to);
@@ -576,8 +574,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         return _cancelWorkflow(workflowId, _msgSender(), false);
     }
 
-    function senderCancel(uint256 workflowId) external nonReentrant whenNotPaused returns (bool) {
-        _enforceMaxPauseDuration();
+    function senderCancel(uint256 workflowId) external nonReentrant returns (bool) {
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
         if (et.from != _msgSender()) revert NotSender(workflowId, _msgSender(), et.from);
@@ -617,7 +614,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     }
 
     // slither-disable-next-line reentrancy-no-eth
-    function raiseDispute(uint256 workflowId) external nonReentrant {
+    function raiseDispute(uint256 workflowId) external nonReentrant whenNotPaused {
         _enforceMaxPauseDuration();
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
@@ -719,6 +716,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         external
         payable
         nonReentrant
+        whenNotPaused
         returns (bool success, address newDisputeResolver, uint8 newLevel)
     {
         (EscrowTransfer storage et, IResolutionModule resolutionModule) = _validateAndPrepareEscalation(workflowId);
@@ -786,7 +784,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         // Execute escalation in module (modifies module state)
         bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(et.token, et.from, et.to, et.amountAfterFee, escrowSettings[workflowId].releaseAddress);
         (bool escSuccess, bytes memory escData) = address(resolutionModule).call(
-            abi.encodeWithSelector(IResolutionModule.executeEscalation.selector, workflowId, _msgSender(), escrowData)
+            abi.encodeWithSelector(IResolutionModule.executeEscalation.selector, workflowId, address(this), escrowData)
         );
         if (!escSuccess) revert EscalationNotAllowed();
         
