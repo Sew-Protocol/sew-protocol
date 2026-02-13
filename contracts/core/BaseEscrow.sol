@@ -10,11 +10,9 @@ import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/utils/Address.sol';
 import '../interfaces/IResolver.sol';
 import '../interfaces/IReleaseStrategy.sol';
-import '../interfaces/ICancellationStrategy.sol';
 import '../shared/interfaces/IResolutionModule.sol';
 import '../interfaces/IYieldGenerationModule.sol';
 import '../interfaces/IYieldDistributionModule.sol';
-import '../libraries/SettingsValidationLibrary.sol';
 import '../libraries/EscrowEncodingLibrary.sol';
 import '../libraries/ResolverLogicLibrary.sol';
 import '../libraries/RecoveryLibrary.sol';
@@ -56,7 +54,9 @@ bytes4 constant SEL_RECORD_RESOLUTION = bytes4(keccak256("recordResolution(uint2
 
 error InvalidWorkflowId(uint256 workflowId, uint256 maxWorkflowId);
 error TransferNotPending(uint256 workflowId, EscrowState currentStatus);
-error CancellationNotAllowed(uint256 workflowId, address caller);
+error ReleaseStrategyNotSet(uint256 workflowId);
+error ReleaseNotAllowed(uint256 workflowId, uint8 reasonCode);
+error YieldWithdrawalUnreasonable(uint256 actualAmount, uint256 maxAmount);
 error NotAuthorizedResolver(address caller, address expectedResolver);
 error TransferNotInDispute(uint256 workflowId, EscrowState currentStatus);
 error NotParticipant(uint256 workflowId, address caller, address sender, address recipient);
@@ -84,7 +84,6 @@ error AppealsNotEnabledInV1();
 error AlreadyPausedCannotRepause();
 error MaxPauseCyclesExceeded(uint256 currentCount, uint256 maxCycles);
 error PauseDurationExceeded(uint256 duration, uint256 maxDuration);
-error BothAutoTimesNotAllowed(uint256 workflowId);
 
 // Errors used by child contracts (EscrowVault, EscrowableERC20)
 error BalanceUnderflow(address token, uint256 currentBalance, uint256 requestedAmount);
@@ -164,7 +163,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         address yieldGenerationModule;
         address yieldDistributionModule;
         address incentiveModule;
-        address cancellationStrategy;     // Snapshotted at creation - determines cancel rules
         uint256 yieldProtocolFeeBps;      // Snapshotted at creation - fee on yield generated
         uint256 appealBondProtocolFeeBps; // Snapshotted at creation - fee on appeal bonds
         uint256 escrowFeeBps;             // Snapshotted at creation - escrow fee
@@ -221,8 +219,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         uint256 amount,
         uint8 reasonCode
     );
-    event CancelRequested(uint256 indexed workflowId, address indexed by);
-    event CancelConfirmed(uint256 indexed workflowId, address indexed by);
     event DisputeOpened(
         uint256 indexed workflowId,
         address indexed by,
@@ -504,7 +500,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
             yieldGenerationModule: address(_getYieldGenerationModule(workflowId)),
             yieldDistributionModule: address(_getYieldDistributionModule(workflowId)),
             incentiveModule: incentiveMod,
-            cancellationStrategy: address(_getCancellationStrategy(workflowId)),
             yieldProtocolFeeBps: yieldProtocolFeeBps,
             appealBondProtocolFeeBps: appealBondProtocolFeeBps,
             escrowFeeBps: escrowFee,
@@ -565,21 +560,11 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         if (et.escrowState != EscrowState.PENDING)
             revert TransferNotPending(workflowId, et.escrowState);
         
-        // Delegate to cancellation strategy
-        ModuleSnapshot storage snap = moduleSnapshots[workflowId];
-        ICancellationStrategy strategy = ICancellationStrategy(snap.cancellationStrategy);
-        
-        if (!strategy.canCancel(workflowId, _msgSender(), et)) {
-            revert CancellationNotAllowed(workflowId, _msgSender());
+        et.recipientStatus = RecipientStatus.AGREE_TO_CANCEL;
+        if (et.senderStatus == SenderStatus.AGREE_TO_CANCEL) {
+            _cancelAndRefund(workflowId);
         }
-        
-        // Execute cancellation
-        bool success = _cancelAndRefund(workflowId);
-        
-        // Notify strategy (allows tracking state for mutual consent)
-        strategy.onCancelAttempt(workflowId, _msgSender(), success);
-        
-        return success;
+        return true;
     }
 
     function senderCancel(uint256 workflowId) external nonReentrant returns (bool) {
@@ -589,21 +574,11 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         if (et.escrowState != EscrowState.PENDING)
             revert TransferNotPending(workflowId, et.escrowState);
         
-        // Delegate to cancellation strategy
-        ModuleSnapshot storage snap = moduleSnapshots[workflowId];
-        ICancellationStrategy strategy = ICancellationStrategy(snap.cancellationStrategy);
-        
-        if (!strategy.canCancel(workflowId, _msgSender(), et)) {
-            revert CancellationNotAllowed(workflowId, _msgSender());
+        et.senderStatus = SenderStatus.AGREE_TO_CANCEL;
+        if (et.recipientStatus == RecipientStatus.AGREE_TO_CANCEL) {
+            _cancelAndRefund(workflowId);
         }
-        
-        // Execute cancellation
-        bool success = _cancelAndRefund(workflowId);
-        
-        // Notify strategy (allows tracking state for mutual consent)
-        strategy.onCancelAttempt(workflowId, _msgSender(), success);
-        
-        return success;
+        return true;
     }
 
     // slither-disable-next-line reentrancy-no-eth
@@ -932,7 +907,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         
         // Check strategy is configured (revert if not; don't silently bypass policy)
         if (address(strategy) == address(0)) {
-            revert('BaseEscrow: release strategy not configured');
+            revert ReleaseStrategyNotSet(workflowId);
         }
 
         // Consult strategy for eligibility
@@ -950,7 +925,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
             if (reasonCode == 1) {
                 revert NotSender(workflowId, _msgSender(), et.from);
             } else {
-                revert('BaseEscrow: release not allowed by strategy');
+                revert ReleaseNotAllowed(workflowId, reasonCode);
             }
         }
 
@@ -1000,9 +975,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     }
 
     function _applyEscrowSettings(uint256 workflowId, EscrowSettings memory settings) internal {
-        if (settings.autoReleaseTime > 0 && settings.autoCancelTime > 0) {
-            revert BothAutoTimesNotAllowed(workflowId);
-        }
         EscrowTransfer storage et = escrowTransfers[workflowId];
         if (settings.customResolver != address(0)) et.disputeResolver = settings.customResolver;
         bool useDefaults = (settings.autoReleaseTime == 0 && settings.autoCancelTime == 0);
@@ -1263,7 +1235,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         uint256 workflowId,
         address token,
         uint256 amount
-    ) internal returns (uint256 actualAmount) {
+    ) internal virtual returns (uint256 actualAmount) {
         EscrowSettings memory settings = escrowSettings[workflowId];
         bool yieldEnabled = settings.yieldPreset != YieldPreset.OFF;
         
@@ -1297,10 +1269,9 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
             // Verify yield withdrawal is within reasonable bounds to detect calculation errors
             // Sanity check: withdrawn amount should not exceed 10000x original (prevents integer overflow)
             uint256 maxReasonableAmount = amount * 10000;
-            require(
-                result.actualAmount <= maxReasonableAmount,
-                "BaseEscrow: yield withdrawal exceeds reasonable bounds (possible integer overflow or Aave corruption)"
-            );
+            if (result.actualAmount > maxReasonableAmount) {
+                revert YieldWithdrawalUnreasonable(result.actualAmount, maxReasonableAmount);
+            }
             
             // PUSH MODEL: If yield was generated, transfer it to YieldOps and distribute
             if (result.yield > 0) {
@@ -1472,9 +1443,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     function _getReleaseStrategy(
         uint256 workflowId
     ) internal view virtual returns (IReleaseStrategy);
-    function _getCancellationStrategy(
-        uint256 workflowId
-    ) internal view virtual returns (ICancellationStrategy);
     function _getResolutionModule(
         uint256 workflowId
     ) internal view virtual returns (IResolutionModule) {
@@ -1485,7 +1453,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         return IResolutionModule(disputeResolutionModule);
     }
 
-    function _depositYieldForEscrow(uint256 workflowId, address token, uint256 amount) internal {
+    function _depositYieldForEscrow(uint256 workflowId, address token, uint256 amount) internal virtual {
         IYieldGenerationModule genModule = _getYieldGenerationModule(workflowId);
         if (address(genModule) != address(0) && genModule.isTokenSupported(token)) {
             // Call _depositForYield which is overridden in child contracts (EscrowVault/EscrowableERC20)

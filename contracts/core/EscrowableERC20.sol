@@ -92,9 +92,13 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         uint256 autoReleaseTime,
         uint256 autoCancelTime
     ) public whenNotPaused returns (uint256) {
-        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
-        settings.autoReleaseTime = autoReleaseTime;
-        settings.autoCancelTime = autoCancelTime;
+        EscrowSettings memory settings = EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: autoReleaseTime,
+            autoCancelTime: autoCancelTime
+        });
         return createEscrow(address(this), seller, amount, settings);
     }
 
