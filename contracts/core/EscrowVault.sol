@@ -5,9 +5,10 @@ import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import './BaseEscrow.sol';
 import '../types/EscrowTypes.sol';
+import '../types/YieldPresets.sol';
 import '../interfaces/IReleaseStrategy.sol';
 import '../shared/interfaces/IResolutionModule.sol';
-import '../interfaces/IYieldGenerationModule.sol';
+import '../interfaces/IYieldModule.sol';
 import '../interfaces/IYieldDistributionModule.sol';
 import './ModuleSnapshotRegistry.sol';
 import '../libraries/FeeRecordingLibrary.sol';
@@ -68,14 +69,14 @@ contract EscrowVault is BaseEscrow {
     function _recordFee(address token, uint256 amount) internal override {
         FeeRecordingLibrary.recordFee(totalFeesPerToken, token, amount);
     }
-    function _depositForYield(IYieldGenerationModule generationModule, uint256 workflowId, address token, uint256 amount) internal override {
+    function _depositForYield(IYieldModule generationModule, uint256 workflowId, address token, uint256 amount) internal override {
         address m = address(generationModule);
         if (IERC20(token).allowance(address(this), m) < amount) {
             IERC20(token).safeIncreaseAllowance(m, type(uint256).max);
         }
         uint256 b = IERC20(token).balanceOf(address(this));
-        (bool s, ) = generationModule.depositForYield(workflowId, token, amount, address(this));
-        if (!s || b - IERC20(token).balanceOf(address(this)) < amount) revert AccountingDeficit(token, amount);
+        uint256 accepted = generationModule.initializeYield(workflowId, token, amount, YieldPreset.OFF);
+        if (b - IERC20(token).balanceOf(address(this)) < accepted) revert AccountingDeficit(token, amount);
     }
     function _transferTokens(address token, address to, uint256 amount) internal override {
         IERC20(token).safeTransfer(to, amount);
@@ -120,8 +121,12 @@ contract EscrowVault is BaseEscrow {
         return IYieldDistributionModule(moduleManagement.getDefaultYieldDistributionModule(address(this)));
     }
 
-    function _getYieldGenerationModule(uint256 workflowId) internal view override returns (IYieldGenerationModule) {
-        return _getDefaultYieldGenerationModule(workflowId);
+    function _getYieldGenerationModule(uint256 workflowId) internal view override returns (IYieldModule) {
+        address moduleAddr = address(moduleManagement.getDefaultYieldGenerationModule(address(this)));
+        if (moduleAddr == address(0)) {
+            return IYieldModule(address(0));
+        }
+        return IYieldModule(moduleAddr);
     }
 
     function _getYieldDistributionModule(uint256 workflowId) internal view override returns (IYieldDistributionModule) {

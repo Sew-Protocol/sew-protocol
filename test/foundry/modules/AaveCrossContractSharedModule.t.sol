@@ -4,7 +4,7 @@ pragma solidity ^0.8.33;
 import "forge-std/Test.sol";
 import "../../../contracts/core/EscrowVault.sol";
 import "../../../contracts/core/EscrowableERC20.sol";
-import "../../../contracts/modules/AaveYieldGenerationModule.sol";
+import "../../../contracts/modules/AaveYieldModule.sol";
 import "../../../contracts/mocks/MockAavePool.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
 import "../../../contracts/ops/YieldOps.sol";
@@ -23,7 +23,7 @@ import "../../../contracts/core/modules/DefaultResolutionModule.sol";
 contract AaveCrossContractSharedModule is Test {
     EscrowVault public vault;
     EscrowableERC20 public escrowERC20;
-    AaveYieldGenerationModule public aaveModule;
+    AaveYieldModule public aaveModule;
     YieldOps public yieldOps;
     ModuleSnapshotRegistry public mm;
     ERC20Mock public token;
@@ -44,10 +44,10 @@ contract AaveCrossContractSharedModule is Test {
         pool.setAToken(address(token), address(aToken));
         provider = new MockPoolAddressesProvider(address(pool));
 
-        AaveYieldGenerationModule aaveModuleForVault = new AaveYieldGenerationModule(owner);
+        AaveYieldModule aaveModuleForVault = new AaveYieldModule(owner);
         aaveModuleForVault.grantRole(aaveModuleForVault.ROLE_TIMELOCK(), owner);
         
-        AaveYieldGenerationModule aaveModuleForERC20 = new AaveYieldGenerationModule(owner);
+        AaveYieldModule aaveModuleForERC20 = new AaveYieldModule(owner);
         aaveModuleForERC20.grantRole(aaveModuleForERC20.ROLE_TIMELOCK(), owner);
         
         vm.warp(100);
@@ -132,17 +132,17 @@ contract AaveCrossContractSharedModule is Test {
         vm.stopPrank();
 
         // Get the module instances - we already have them from setUp since we created separate ones
-        AaveYieldGenerationModule moduleForVault;
-        AaveYieldGenerationModule moduleForERC20;
+        AaveYieldModule moduleForVault;
+        AaveYieldModule moduleForERC20;
         
         {
             (, , address yieldGenModule, , , , , , , , , ) = vault.moduleSnapshots(vaultWid);
-            moduleForVault = AaveYieldGenerationModule(yieldGenModule);
+            moduleForVault = AaveYieldModule(yieldGenModule);
         }
         
         {
             (, , address yieldGenModule, , , , , , , , , ) = escrowERC20.moduleSnapshots(e20Wid);
-            moduleForERC20 = AaveYieldGenerationModule(yieldGenModule);
+            moduleForERC20 = AaveYieldModule(yieldGenModule);
         }
 
         assertEq(moduleForVault.escrowScaledBalance(address(vault), vaultWid), amount);

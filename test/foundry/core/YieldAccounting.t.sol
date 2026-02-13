@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import "../../../contracts/core/EscrowVault.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
 import "../../../contracts/mocks/MockAavePool.sol";
-import "../../../contracts/modules/AaveYieldGenerationModule.sol";
+import "../../../contracts/modules/AaveYieldModule.sol";
 import "../../../contracts/modules/DefaultYieldDistributionModule.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/ops/YieldOps.sol";
@@ -29,7 +29,7 @@ contract YieldAccountingTest is Test {
     MockAavePool internal pool;
     MockAToken internal aToken;
     MockPoolAddressesProvider internal provider;
-    AaveYieldGenerationModule internal aaveModule;
+    AaveYieldModule internal aaveModule;
     DefaultYieldDistributionModule internal yieldDistModule;
     
     ModuleSnapshotRegistry internal mm;
@@ -58,7 +58,7 @@ contract YieldAccountingTest is Test {
         provider = new MockPoolAddressesProvider(address(pool));
 
         // Setup Modules
-        aaveModule = new AaveYieldGenerationModule(address(this));
+        aaveModule = new AaveYieldModule(address(this));
         aaveModule.grantRole(aaveModule.ROLE_TIMELOCK(), address(this));
         aaveModule.queueAavePoolProvider(address(provider));
         vm.warp(block.timestamp + 8 days);

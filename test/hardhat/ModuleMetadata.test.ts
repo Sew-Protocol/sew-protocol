@@ -17,7 +17,7 @@ import {
   DecentralizedResolutionModule,
   DefaultResolutionModule,
   DefaultReleaseStrategy,
-  AaveYieldGenerationModule,
+  AaveYieldModule,
   DefaultYieldDistributionModule,
   IResolutionModule,
   IReleaseStrategy,
@@ -34,7 +34,7 @@ describe('Module Metadata', function () {
   let decentralizedModule: DecentralizedResolutionModule;
   let defaultResolutionModule: DefaultResolutionModule;
   let defaultReleaseStrategy: DefaultReleaseStrategy;
-  let aaveYieldModule: AaveYieldGenerationModule;
+  let aaveYieldModule: AaveYieldModule;
   let defaultYieldDistribution: DefaultYieldDistributionModule;
 
   beforeEach(async function () {
@@ -59,9 +59,9 @@ describe('Module Metadata', function () {
     defaultReleaseStrategy = await ReleaseStrategyFactory.deploy();
     await defaultReleaseStrategy.waitForDeployment();
 
-    // Deploy AaveYieldGenerationModule (if available)
+    // Deploy AaveYieldModule (if available)
     try {
-      const AaveFactory = await ethers.getContractFactory('AaveYieldGenerationModule');
+      const AaveFactory = await ethers.getContractFactory('AaveYieldModule');
       aaveYieldModule = await AaveFactory.deploy(
         deployer.address,
         ethers.ZeroAddress, // aavePoolProvider (placeholder)
@@ -70,7 +70,7 @@ describe('Module Metadata', function () {
       await aaveYieldModule.waitForDeployment();
     } catch (e) {
       // Aave module may not be available in test environment
-      console.log('AaveYieldGenerationModule not available for testing');
+      console.log('AaveYieldModule not available for testing');
     }
 
     // Deploy DefaultYieldDistributionModule
@@ -233,7 +233,7 @@ describe('Module Metadata', function () {
     });
   });
 
-  describe('AaveYieldGenerationModule', function () {
+  describe('AaveYieldModule', function () {
     it('Should return correct module name', async function () {
       if (!aaveYieldModule) {
         this.skip();

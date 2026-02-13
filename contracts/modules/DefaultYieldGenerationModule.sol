@@ -19,7 +19,7 @@ import '@openzeppelin/contracts/utils/introspection/ERC165.sol';
  *      2. **Safe placeholder**: Acts as a default during development and testing before
  *         external yield sources (Aave, Compound, etc.) are configured.
  *
- *      3. **Graceful degradation**: If an active yield module (e.g., AaveYieldGenerationModule)
+ *      3. **Graceful degradation**: If an active yield module (e.g., AaveYieldModule)
  *         fails or is paused, this contract can serve as a fallback to keep the escrow operational.
  *
  *      Architecture:

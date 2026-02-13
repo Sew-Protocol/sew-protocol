@@ -4,7 +4,7 @@ pragma solidity ^0.8.33;
 import "forge-std/Test.sol";
 import "../adapters/IVaultLike.sol";
 import "../adapters/AaveVaultAdapter.sol";
-import "../../../contracts/modules/AaveYieldGenerationModule.sol";
+import "../../../contracts/modules/AaveYieldModule.sol";
 import "../../../contracts/mocks/MockAavePool.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
 import "../../../contracts/interfaces/aave/AaveV3Interfaces.sol";
@@ -12,13 +12,13 @@ import "../../../contracts/interfaces/aave/AaveV3Interfaces.sol";
 /**
  * @title VaultBehaviorBasicTest  
  * @notice Basic vault behavior tests using IVaultLike interface
- * @dev Tests AaveYieldGenerationModule through the adapter using standard vault semantics
+ * @dev Tests AaveYieldModule through the adapter using standard vault semantics
  *      Uses forge-std assertions to validate ERC-4626-like behavior
  */
 contract VaultBehaviorBasicTest is Test {
     IVaultLike public vault;
     AaveVaultAdapter public adapter;
-    AaveYieldGenerationModule public aaveModule;
+    AaveYieldModule public aaveModule;
     MockAavePool public mockPool;
     ERC20Mock public underlying;
     MockAToken public aToken;
@@ -46,7 +46,7 @@ contract VaultBehaviorBasicTest is Test {
         mockPool.setAToken(address(underlying), address(aToken));
         
         // Deploy Aave module
-        aaveModule = new AaveYieldGenerationModule(admin);
+        aaveModule = new AaveYieldModule(admin);
         
         // Configure Aave pool (using slow-lane queue mechanism)
         vm.startPrank(admin);

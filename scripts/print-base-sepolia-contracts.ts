@@ -77,7 +77,7 @@ async function main() {
 
     DefaultResolutionModule: 'IEO/initial resolution module (single trusted resolver)',
     DefaultReleaseStrategy: 'Default release strategy module (if deployed)',
-    AaveYieldGenerationModule: 'Aave yield generation module (optional)',
+    AaveYieldModule: 'Aave yield generation module (optional)',
     DefaultYieldDistributionModule: 'Default yield distribution module (optional)',
   };
 
@@ -107,7 +107,7 @@ async function main() {
       names: [
         'DefaultResolutionModule',
         'DefaultReleaseStrategy',
-        'AaveYieldGenerationModule',
+        'AaveYieldModule',
         'DefaultYieldDistributionModule',
       ],
     },

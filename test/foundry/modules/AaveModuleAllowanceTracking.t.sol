@@ -2,7 +2,7 @@
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
-import 'contracts/modules/AaveYieldGenerationModule.sol';
+import 'contracts/modules/AaveYieldModule.sol';
 import 'contracts/mocks/ERC20Mock.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
@@ -12,13 +12,13 @@ import 'contracts/mocks/MockAavePool.sol';
 
 /**
  * @title AaveModuleAllowanceTrackingTest
- * @notice Tests for allowance tracking and reset in AaveYieldGenerationModule
+ * @notice Tests for allowance tracking and reset in AaveYieldModule
  * @dev Ensures remainingAllowance is correctly tracked and reset after deposits
  */
 contract AaveModuleAllowanceTrackingTest is Test {
     using SafeERC20 for IERC20;
 
-    AaveYieldGenerationModule module;
+    AaveYieldModule module;
     ERC20Mock token;
     MockAToken aToken;
     MockAavePool pool;
@@ -49,7 +49,7 @@ contract AaveModuleAllowanceTrackingTest is Test {
         token.mint(address(pool), 1_000_000e18);
         provider = new MockPoolAddressesProvider(address(pool));
         
-        module = new AaveYieldGenerationModule(timelock);
+        module = new AaveYieldModule(timelock);
         module.grantRole(ROLE_TIMELOCK, timelock);
         module.grantRole(ROLE_GUARDIAN, guardian);
         module.grantRole(module.ROLE_ESCROW_CONTRACT(), escrowContract);

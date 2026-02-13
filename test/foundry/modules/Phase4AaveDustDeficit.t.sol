@@ -2,7 +2,7 @@
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
-import 'contracts/modules/AaveYieldGenerationModule.sol';
+import 'contracts/modules/AaveYieldModule.sol';
 import 'contracts/core/EscrowVault.sol';
 import 'contracts/mocks/ERC20Mock.sol';
 import 'contracts/mocks/MockAavePool.sol';
@@ -15,11 +15,11 @@ import 'contracts/types/YieldPresets.sol';
 
 /**
  * @title Phase4AaveDustDeficitTest
- * @notice Dust & deficit unit tests for AaveYieldGenerationModule
+ * @notice Dust & deficit unit tests for AaveYieldModule
  * @dev Tests dust/deficit tracking behavior around 5 wei threshold
  */
 contract Phase4AaveDustDeficitTest is Test {
-    AaveYieldGenerationModule module;
+    AaveYieldModule module;
     EscrowVault vault;
     
     ERC20Mock token;
@@ -51,7 +51,7 @@ contract Phase4AaveDustDeficitTest is Test {
         provider = new MockPoolAddressesProvider(address(pool));
         
         // Setup Module
-        module = new AaveYieldGenerationModule(timelock);
+        module = new AaveYieldModule(timelock);
         module.grantRole(module.ROLE_TIMELOCK(), timelock);
         module.grantRole(module.ROLE_GUARDIAN(), guardian);
         module.queueAavePoolProvider(address(provider));

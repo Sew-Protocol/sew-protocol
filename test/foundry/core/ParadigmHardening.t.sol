@@ -4,7 +4,7 @@ pragma solidity ^0.8.33;
 import {Test} from "forge-std/Test.sol";
 import {BaseEscrow} from "contracts/core/BaseEscrow.sol";
 import {EscrowVault} from "contracts/core/EscrowVault.sol";
-import {AaveYieldGenerationModule} from "contracts/modules/AaveYieldGenerationModule.sol";
+import {AaveYieldModule} from "contracts/modules/AaveYieldModule.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
@@ -132,7 +132,7 @@ contract ParadigmHardeningTest is Test {
      * @dev Verifies that paradigm intent is clear in code
      */
     function test_ContractDocumentation_ParadigmsExplained() public pure {
-        // The AaveYieldGenerationModule now has:
+        // The AaveYieldModule now has:
         // 1. Contract-level documentation explaining:
         //    - Three paradigms (if any remain)
         //    - Purpose of each

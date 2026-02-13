@@ -4,7 +4,7 @@ pragma solidity ^0.8.33;
 import "forge-std/Test.sol";
 
 import { ERC20Mock } from "../../../contracts/mocks/ERC20Mock.sol";
-import { AaveYieldGenerationModule } from "../../../contracts/modules/AaveYieldGenerationModule.sol";
+import { AaveYieldModule } from "../../../contracts/modules/AaveYieldModule.sol";
 
 contract MockAToken {
     address public immutable underlyingAsset;
@@ -153,7 +153,7 @@ contract MockPoolAddressesProvider {
     }
 }
 
-contract Phase2AaveYieldGenerationModuleTest is Test {
+contract Phase2AaveYieldModuleTest is Test {
     bytes32 internal constant ROLE_TIMELOCK = keccak256("ROLE_TIMELOCK");
     bytes32 internal constant ROLE_GUARDIAN = keccak256("ROLE_GUARDIAN");
 
@@ -172,7 +172,7 @@ contract Phase2AaveYieldGenerationModuleTest is Test {
         MockPoolAddressesProvider provider = new MockPoolAddressesProvider(address(pool));
 
         // Deploy module and grant roles to this test contract
-        AaveYieldGenerationModule module = new AaveYieldGenerationModule(timelock);
+        AaveYieldModule module = new AaveYieldModule(timelock);
         module.grantRole(ROLE_TIMELOCK, timelock);
         module.grantRole(ROLE_GUARDIAN, guardian);
         
@@ -238,7 +238,7 @@ contract Phase2AaveYieldGenerationModuleTest is Test {
         pool.setAToken(address(token), address(aToken));
         MockPoolAddressesProvider provider = new MockPoolAddressesProvider(address(pool));
 
-        AaveYieldGenerationModule module = new AaveYieldGenerationModule(timelock);
+        AaveYieldModule module = new AaveYieldModule(timelock);
         module.grantRole(ROLE_TIMELOCK, timelock);
         module.registerEscrowContract(escrowContract);
         module.queueAavePoolProvider(address(provider));
@@ -264,7 +264,7 @@ contract Phase2AaveYieldGenerationModuleTest is Test {
         pool.setAToken(address(token), address(aToken));
         MockPoolAddressesProvider provider = new MockPoolAddressesProvider(address(pool));
 
-        AaveYieldGenerationModule module = new AaveYieldGenerationModule(timelock);
+        AaveYieldModule module = new AaveYieldModule(timelock);
         module.grantRole(ROLE_TIMELOCK, timelock);
         module.registerEscrowContract(escrowContract);
 
@@ -292,7 +292,7 @@ contract Phase2AaveYieldGenerationModuleTest is Test {
         address escrowContract = makeAddr("escrowContract");
         address token = address(0x123);
 
-        AaveYieldGenerationModule module = new AaveYieldGenerationModule(timelock);
+        AaveYieldModule module = new AaveYieldModule(timelock);
         module.grantRole(ROLE_TIMELOCK, timelock);
         module.registerEscrowContract(escrowContract);
 

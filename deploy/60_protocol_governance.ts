@@ -43,7 +43,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     'EscrowableERC20',
     'EscrowVault',
     'EscrowGovernanceTimelock',
-    'AaveYieldGenerationModule',
+    'AaveYieldModule',
     'DefaultResolutionModule',
     // Ops contracts
     'CreateOps', // Has ROLE_TIMELOCK and ROLE_GUARDIAN for yield deposits control

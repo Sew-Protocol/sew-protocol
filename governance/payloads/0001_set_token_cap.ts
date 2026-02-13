@@ -1,7 +1,7 @@
 /**
  * Payload: Set Token Cap (Standard Lane)
  *
- * Sets a cap for a specific token in AaveYieldGenerationModule.
+ * Sets a cap for a specific token in AaveYieldModule.
  * This is a Standard lane action (48-hour Timelock delay).
  */
 
@@ -52,7 +52,7 @@ This helps manage risk by limiting the total amount of USDC that can be deposite
 - Cap: 10,000,000 USDC (6 decimals)
   `,
   lane: 'standard' as const,
-  requiredContracts: ['AaveYieldGenerationModule'],
+  requiredContracts: ['AaveYieldModule'],
   config: {
     // Override these via command line or environment
     tokenAddress: process.env.TOKEN_ADDRESS || '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', // Base USDC
@@ -63,7 +63,7 @@ This helps manage risk by limiting the total amount of USDC that can be deposite
 
 const buildPayload: PayloadBuilder = async (hre, config) => {
   // Allow placeholder for offline proposal building
-  const aaveModule = await getDeployedAddress(hre, 'AaveYieldGenerationModule', true);
+  const aaveModule = await getDeployedAddress(hre, 'AaveYieldModule', true);
 
   // Use config from metadata or override
   const tokenAddressRaw = config?.tokenAddress || metadata.config.tokenAddress;
@@ -81,7 +81,7 @@ const buildPayload: PayloadBuilder = async (hre, config) => {
   return [
     {
       target: aaveModule,
-      contractName: 'AaveYieldGenerationModule',
+      contractName: 'AaveYieldModule',
       functionName: 'setTokenCap',
       args: [tokenAddress, capWei],
       description: `Set USDC cap to ${capAmount} (${capWei.toString()} wei)`,

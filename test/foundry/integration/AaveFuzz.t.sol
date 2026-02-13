@@ -6,7 +6,7 @@ import "forge-std/Test.sol";
 import "../../../contracts/core/EscrowVault.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/core/modules/DefaultResolutionModule.sol";
-import "../../../contracts/modules/AaveYieldGenerationModule.sol";
+import "../../../contracts/modules/AaveYieldModule.sol";
 import "../../../contracts/modules/DefaultYieldDistributionModule.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
 import "../../../contracts/mocks/MockAavePool.sol";
@@ -63,7 +63,7 @@ contract AaveFuzz is Test {
     ERC20Mock internal token;
     MockAToken internal aToken;
     MockPoolAddressesProvider internal provider;
-    AaveYieldGenerationModule internal aaveModule;
+    AaveYieldModule internal aaveModule;
 
     // Core system
     EscrowVault internal vault;
@@ -97,7 +97,7 @@ contract AaveFuzz is Test {
         provider = new MockPoolAddressesProvider(address(pool));
 
         // Deploy module
-        aaveModule = new AaveYieldGenerationModule(address(this));
+        aaveModule = new AaveYieldModule(address(this));
         aaveModule.grantRole(aaveModule.ROLE_TIMELOCK(), address(this));
         aaveModule.queueAavePoolProvider(address(provider));
         (, uint64 etaProvider, bool existsProvider) = aaveModule.getPendingAavePoolProvider();

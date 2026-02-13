@@ -11,8 +11,7 @@ import '@openzeppelin/contracts/utils/Address.sol';
 import '../interfaces/IResolver.sol';
 import '../interfaces/IReleaseStrategy.sol';
 import '../shared/interfaces/IResolutionModule.sol';
-import '../interfaces/IYieldGenerationModule.sol';
-import '../interfaces/IYieldDistributionModule.sol';
+import '../interfaces/IYieldModule.sol';
 import '../libraries/EscrowEncodingLibrary.sol';
 import '../libraries/ResolverLogicLibrary.sol';
 import '../libraries/RecoveryLibrary.sol';
@@ -156,6 +155,11 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         bytes32 resolutionHash;
     }
     mapping(uint256 => PendingSettlement) public pendingSettlements;
+    
+    // ========== v2.5 Yield Module Storage (NEW) ==========
+    // Separate from existing yield system for independent operation
+    mapping(uint256 => address) public v25YieldModules;           // workflowId -> module address
+    mapping(uint256 => uint256) public v25YieldPrincipals;        // workflowId -> accepted principal amount
 
     struct ModuleSnapshot {
         address resolutionModule;
@@ -478,7 +482,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     function _pullTokens(address token, address from, uint256 amount) internal virtual;
     function _recordFee(address token, uint256 amount) internal virtual;
     function _depositForYield(
-        IYieldGenerationModule genModule,
+        IYieldModule genModule,
         uint256 workflowId,
         address token,
         uint256 amount
@@ -1231,88 +1235,29 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         }
     }
 
-    function _handleYieldAndGetActualAmount(
+
+
+    /**
+     * @notice Handle v2.5 yield module unwind on release/cancel
+     * @dev If no module or no initialized yield, returns original amount
+     * @dev Otherwise delegates to module for unwind (which handles all recovery)
+     */
+    function _handleYieldModuleUnwind(
         uint256 workflowId,
         address token,
         uint256 amount
-    ) internal virtual returns (uint256 actualAmount) {
-        EscrowSettings memory settings = escrowSettings[workflowId];
-        bool yieldEnabled = settings.yieldPreset != YieldPreset.OFF;
+    ) internal virtual returns (uint256 principalOut, uint256 yieldOut) {
+        address module = v25YieldModules[workflowId];
+        if (module == address(0)) return (amount, 0);
         
-        if (address(yieldOps) == address(0)) {
-            if (yieldEnabled) emit OperationFailure(2, workflowId, address(0), YieldOps.handleYield.selector, uint8(FailureReason.MODULE_NOT_SET));
-            return amount;
-        }
-        if (address(yieldOps).code.length == 0) {
-            if (yieldEnabled) emit OperationFailure(2, workflowId, address(yieldOps), YieldOps.handleYield.selector, uint8(FailureReason.MODULE_NOT_CONTRACT));
-            return amount;
-        }
+        uint256 yieldPrincipal = v25YieldPrincipals[workflowId];
+        if (yieldPrincipal == 0) return (amount, 0);
         
-        IYieldGenerationModule genModule = _getYieldGenerationModule(workflowId);
-        IYieldDistributionModule distModule = _getYieldDistributionModule(workflowId);
-        uint256 snapshottedYieldFee = moduleSnapshots[workflowId].yieldProtocolFeeBps;
-        EscrowTransfer memory et = escrowTransfers[workflowId];
-        bytes memory distributionData = YieldPresetLibrary.deriveDistributionData(settings.yieldPreset, et.from, et.to);
-
-        (bool ok, bytes memory ret) = address(yieldOps).call(
-            abi.encodeWithSelector(YieldOps.handleYield.selector, genModule, distModule, workflowId, token, amount, snapshottedYieldFee, escrowFeeAddress, distributionData)
+        // Call module unwind - module is responsible for safety
+        (uint256 principal, uint256 yield) = IYieldModule(module).unwindToEscrow(
+            workflowId, token, yieldPrincipal
         );
-
-        if (!ok || ret.length < 128) {
-            if (yieldEnabled) emit OperationFailure(2, workflowId, address(yieldOps), YieldOps.handleYield.selector, uint8(FailureReason.CALL_FAILED));
-            return amount;
-        }
-
-        YieldOps.YieldResult memory result = abi.decode(ret, (YieldOps.YieldResult));
-        if (result.actualAmount > 0) {
-            // ========= VALIDATION: Paradigm 2 → Paradigm 1 Handoff (Fix #2) =========
-            // Verify yield withdrawal is within reasonable bounds to detect calculation errors
-            // Sanity check: withdrawn amount should not exceed 10000x original (prevents integer overflow)
-            uint256 maxReasonableAmount = amount * 10000;
-            if (result.actualAmount > maxReasonableAmount) {
-                revert YieldWithdrawalUnreasonable(result.actualAmount, maxReasonableAmount);
-            }
-            
-            // PUSH MODEL: If yield was generated, transfer it to YieldOps and distribute
-            if (result.yield > 0) {
-                // Transfer yield portion to YieldOps (PUSH)
-                IERC20(token).safeTransfer(address(yieldOps), result.yield);
-                
-                // Call YieldOps to distribute the yield (best-effort, non-blocking)
-                (bool distOk, bytes memory distRet) = address(yieldOps).call(
-                    abi.encodeWithSelector(
-                        YieldOps.distributeWithdrawnYield.selector,
-                        distModule,
-                        workflowId,
-                        token,
-                        result.yield,
-                        snapshottedYieldFee,
-                        escrowFeeAddress,
-                        distributionData
-                    )
-                );
-                
-                if (distOk && distRet.length >= 32) {
-                    YieldOps.DistributionResult memory distResult = abi.decode(distRet, (YieldOps.DistributionResult));
-                    result.yieldDistributed = distResult.distributedAmount;
-                    result.success = distResult.success;
-                } else if (yieldEnabled) {
-                    emit OperationFailure(2, workflowId, address(yieldOps), YieldOps.distributeWithdrawnYield.selector, uint8(FailureReason.CALL_FAILED));
-                }
-            }
-            // If loss occurred, result.actualAmount reflects the lower value.
-            if (result.actualAmount < amount) {
-                if (yieldEnabled) emit OperationFailure(2, workflowId, address(yieldOps), YieldOps.handleYield.selector, uint8(FailureReason.LESS_THAN_PRINCIPAL));
-                return result.actualAmount;
-            }
-            
-            // If yield was generated, it was pushed to YieldOps for distribution.
-            // The vault now only holds the principal 'amount'.
-            return amount;
-        }
-        // If yield was enabled but actualAmount is 0, it means withdrawal failed or returned nothing.
-        // Return 0 to prevent stealing principal from other escrows.
-        return yieldEnabled ? 0 : amount;
+        return (principal, yield);
     }
 
     function _cancelAndRefund(uint256 workflowId) internal {
@@ -1329,7 +1274,8 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         EscrowState oldStatus = StateManagementLibrary.transitionToRefunded(et, workflowId);
         emit EscrowStateChanged(workflowId, oldStatus, EscrowState.REFUNDED);
         
-        uint256 actualAmount = _handleYieldAndGetActualAmount(workflowId, token, amount);
+        (uint256 principal, uint256 yield) = _handleYieldModuleUnwind(workflowId, token, amount);
+        uint256 actualAmount = principal + yield;
         
         // Update accounting based on full principal amount (regardless of yield loss)
         // This ensures that losses are recognized and the "expected" balance is reduced correctly.
@@ -1410,7 +1356,8 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         EscrowState oldStatus = StateManagementLibrary.transitionToReleased(et, workflowId);
         emit EscrowStateChanged(workflowId, oldStatus, EscrowState.RELEASED);
         
-        uint256 actualAmount = _handleYieldAndGetActualAmount(workflowId, token, amount);
+        (uint256 principal, uint256 yield) = _handleYieldModuleUnwind(workflowId, token, amount);
+        uint256 actualAmount = principal + yield;
         
         // Update accounting based on full principal amount (regardless of yield loss)
         _updateEscrowBalance(token, amount, false);
@@ -1436,7 +1383,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     ) internal virtual;
     function _getYieldGenerationModule(
         uint256 workflowId
-    ) internal view virtual returns (IYieldGenerationModule);
+    ) internal view virtual returns (IYieldModule);
     function _getYieldDistributionModule(
         uint256 workflowId
     ) internal view virtual returns (IYieldDistributionModule);
@@ -1454,11 +1401,14 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     }
 
     function _depositYieldForEscrow(uint256 workflowId, address token, uint256 amount) internal virtual {
-        IYieldGenerationModule genModule = _getYieldGenerationModule(workflowId);
-        if (address(genModule) != address(0) && genModule.isTokenSupported(token)) {
-            // Call _depositForYield which is overridden in child contracts (EscrowVault/EscrowableERC20)
-            // This allows child contracts to set approvals before calling the module
-            _depositForYield(genModule, workflowId, token, amount);
+        IYieldModule genModule = _getYieldGenerationModule(workflowId);
+        if (address(genModule) != address(0)) {
+            (bool supported, ) = genModule.canHandle(token, YieldPreset.OFF, amount);
+            if (supported) {
+                // Call _depositForYield which is overridden in child contracts (EscrowVault/EscrowableERC20)
+                // This allows child contracts to set approvals before calling the module
+                _depositForYield(genModule, workflowId, token, amount);
+            }
         }
     }
 

@@ -2,12 +2,12 @@
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/modules/AaveYieldGenerationModule.sol';
+import '../../../contracts/modules/AaveYieldModule.sol';
 import '../../../contracts/mocks/MockAavePool.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 
 contract AaveYieldBugReproduction is Test {
-    AaveYieldGenerationModule public module;
+    AaveYieldModule public module;
     MockAavePool public pool;
     MockPoolAddressesProvider public provider;
     ERC20Mock public token;
@@ -29,7 +29,7 @@ contract AaveYieldBugReproduction is Test {
         pool.setAToken(address(token), address(aToken));
         aToken.setPool(address(pool));
 
-        module = new AaveYieldGenerationModule(owner);
+        module = new AaveYieldModule(owner);
         module.grantRole(module.ROLE_TIMELOCK(), timelock);
         
         vm.startPrank(timelock);

@@ -3,7 +3,7 @@ pragma solidity ^0.8.33;
 
 import '../interfaces/IReleaseStrategy.sol';
 import '../shared/interfaces/IResolutionModule.sol';
-import '../interfaces/IYieldGenerationModule.sol';
+import '../interfaces/IYieldModule.sol';
 import '../interfaces/IYieldDistributionModule.sol';
 
 /**
@@ -20,8 +20,8 @@ library ModuleGetterConsolidationLibrary {
         return IResolutionModule(moduleAddr != address(0) ? moduleAddr : fallbackModule);
     }
     
-    function getYieldGenerationModule(address moduleAddr) internal pure returns (IYieldGenerationModule) {
-        return IYieldGenerationModule(moduleAddr);
+    function getYieldModule(address moduleAddr) internal pure returns (IYieldModule) {
+        return IYieldModule(moduleAddr);
     }
     
     function getYieldDistributionModule(address moduleAddr) internal pure returns (IYieldDistributionModule) {

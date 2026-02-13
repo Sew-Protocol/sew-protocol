@@ -10,7 +10,7 @@ import { MockAavePool, MockAToken, MockPoolAddressesProvider } from '../typechai
 
 describe('Aave Integration', function () {
   let escrowableERC20: EscrowableERC20;
-  let aaveModule: any; // AaveYieldGenerationModule
+  let aaveModule: any; // AaveYieldModule
   let mockToken: ERC20Mock;
   let mockAavePool: MockAavePool;
   let mockAToken: MockAToken;
@@ -95,8 +95,8 @@ describe('Aave Integration', function () {
       await escrowTokenAToken.getAddress(),
     );
 
-    // Deploy AaveYieldGenerationModule
-    const aaveModuleFactory = await ethers.getContractFactory('AaveYieldGenerationModule');
+    // Deploy AaveYieldModule
+    const aaveModuleFactory = await ethers.getContractFactory('AaveYieldModule');
     aaveModule = await aaveModuleFactory.deploy(owner.address);
     await aaveModule.waitForDeployment();
 

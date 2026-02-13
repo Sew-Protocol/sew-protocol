@@ -3,13 +3,13 @@ pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
 import 'forge-std/StdInvariant.sol';
-import 'contracts/modules/AaveYieldGenerationModule.sol';
+import 'contracts/modules/AaveYieldModule.sol';
 import 'contracts/mocks/ERC20Mock.sol';
 import 'contracts/mocks/MockAavePool.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 
 contract AaveHandler is Test {
-    AaveYieldGenerationModule public module;
+    AaveYieldModule public module;
     ERC20Mock public token;
     address public me;
     
@@ -17,7 +17,7 @@ contract AaveHandler is Test {
     uint256 public ghost_principal;
     uint256 public ghost_shares;
     
-    constructor(AaveYieldGenerationModule _module, ERC20Mock _token) {
+    constructor(AaveYieldModule _module, ERC20Mock _token) {
         module = _module;
         token = _token;
         me = address(this);
@@ -72,7 +72,7 @@ contract AaveHandler is Test {
 }
 
 contract MultiVaultAaveInvariants is StdInvariant, Test {
-    AaveYieldGenerationModule module;
+    AaveYieldModule module;
     ERC20Mock token;
     MockAToken aToken;
     MockAavePool pool;
@@ -94,7 +94,7 @@ contract MultiVaultAaveInvariants is StdInvariant, Test {
         token.mint(address(pool), 1_000_000e18); // Fund pool
         provider = new MockPoolAddressesProvider(address(pool));
         
-        module = new AaveYieldGenerationModule(timelock);
+        module = new AaveYieldModule(timelock);
         vm.startPrank(timelock);
         module.grantRole(module.ROLE_TIMELOCK(), timelock);
         module.queueAavePoolProvider(address(provider));

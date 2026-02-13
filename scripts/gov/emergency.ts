@@ -52,8 +52,8 @@ async function pauseProtocol(contractName: string): Promise<void> {
 }
 
 async function disableAave(): Promise<void> {
-  const aaveModule = await getDeployedAddress(hre, 'AaveYieldGenerationModule');
-  const contract = await hre.ethers.getContractAt('AaveYieldGenerationModule', aaveModule);
+  const aaveModule = await getDeployedAddress(hre, 'AaveYieldModule');
+  const contract = await hre.ethers.getContractAt('AaveYieldModule', aaveModule);
 
   const [guardian] = await hre.ethers.getSigners();
   const guardianAddress = process.env.GUARDIAN_ADDRESS || guardian.address;
@@ -83,8 +83,8 @@ async function disableAave(): Promise<void> {
 }
 
 async function lowerTokenCap(tokenAddress: string, newCap: string): Promise<void> {
-  const aaveModule = await getDeployedAddress(hre, 'AaveYieldGenerationModule');
-  const contract = await hre.ethers.getContractAt('AaveYieldGenerationModule', aaveModule);
+  const aaveModule = await getDeployedAddress(hre, 'AaveYieldModule');
+  const contract = await hre.ethers.getContractAt('AaveYieldModule', aaveModule);
 
   const [guardian] = await hre.ethers.getSigners();
   const guardianAddress = process.env.GUARDIAN_ADDRESS || guardian.address;
@@ -125,8 +125,8 @@ async function lowerTokenCap(tokenAddress: string, newCap: string): Promise<void
 }
 
 async function lowerGlobalCap(newCap: string): Promise<void> {
-  const aaveModule = await getDeployedAddress(hre, 'AaveYieldGenerationModule');
-  const contract = await hre.ethers.getContractAt('AaveYieldGenerationModule', aaveModule);
+  const aaveModule = await getDeployedAddress(hre, 'AaveYieldModule');
+  const contract = await hre.ethers.getContractAt('AaveYieldModule', aaveModule);
 
   const [guardian] = await hre.ethers.getSigners();
   const guardianAddress = process.env.GUARDIAN_ADDRESS || guardian.address;

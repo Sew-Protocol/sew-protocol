@@ -5,11 +5,10 @@ import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/utils/Address.sol';
 import '@openzeppelin/contracts/utils/Context.sol';
-import '../interfaces/IYieldGenerationModule.sol';
+import '../interfaces/IYieldModule.sol';
 import '../interfaces/aave/AaveV3Interfaces.sol';
 import '../core/BaseEscrow.sol';
 import '../core/ModuleSnapshotRegistry.sol';
-import '../modules/AaveYieldGenerationModule.sol';
 
 /**
  * @title GuardianOps
@@ -107,7 +106,7 @@ contract GuardianOps is Context {
         }
 
         // Get yield generation module
-        IYieldGenerationModule genModule;
+        IYieldModule genModule;
         
         // Try to get moduleManagement from EscrowVault (public getter)
         (bool success, bytes memory data) = address(escrowContract).staticcall(
@@ -117,7 +116,7 @@ contract GuardianOps is Context {
             address moduleMgmtAddr = abi.decode(data, (address));
             if (moduleMgmtAddr != address(0) && moduleMgmtAddr.code.length > 0) {
                 ModuleSnapshotRegistry mm = ModuleSnapshotRegistry(moduleMgmtAddr);
-                genModule = IYieldGenerationModule(mm.getModule(targetEscrow, BaseEscrow.ModuleType.YIELD_GEN));
+                genModule = IYieldModule(mm.getModule(targetEscrow, BaseEscrow.ModuleType.YIELD_GEN));
             }
         }
         
@@ -126,8 +125,8 @@ contract GuardianOps is Context {
         }
 
         // Call emergencyUnwind on the module
-        // This function hardcodes the destination to targetEscrow and fixes accounting
-        unwoundAmount = AaveYieldGenerationModule(address(genModule)).emergencyUnwind(token, workflowId, targetEscrow);
+        // New IYieldModule signature: emergencyUnwind(escrowId, token, principalExpected)
+        unwoundAmount = genModule.emergencyUnwind(workflowId, token, 0);
 
         if (unwoundAmount > 0) {
             totalUnwoundAmount += unwoundAmount;

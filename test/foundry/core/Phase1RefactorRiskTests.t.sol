@@ -48,8 +48,8 @@ contract Phase1RefactorRiskTests is Test {
         token = new ERC20Mock('Test Token', 'TEST', address(this), 10000000e18);
         resolutionModule = new DefaultResolutionModule(address(this), resolver);
         releaseStrategy = new DefaultReleaseStrategy();
-        // AaveYieldGenerationModule requires pool provider - skip for now (not needed for basic tests)
-        // yieldGenModule = new AaveYieldGenerationModule(...);
+        // AaveYieldModule requires pool provider - skip for now (not needed for basic tests)
+        // yieldGenModule = new AaveYieldModule(...);
         // yieldDistModule will be null for now (not needed for basic tests)
         
         // Deploy ops contracts

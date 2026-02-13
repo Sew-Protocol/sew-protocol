@@ -4,7 +4,7 @@ pragma solidity ^0.8.33;
 import 'forge-std/Test.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/core/EscrowVaultAnalytics.sol';
-import '../../../contracts/modules/AaveYieldGenerationModule.sol';
+import '../../../contracts/modules/AaveYieldModule.sol';
 import '../../../contracts/mocks/MockAavePool.sol';
 import '../mocks/ERC20LowDecimalMock.sol';
 import '../../../contracts/ops/YieldOps.sol';
@@ -23,7 +23,7 @@ import '../../../contracts/modules/DefaultYieldDistributionModule.sol';
  */
 contract AaveDecimalRobustness is Test {
     EscrowVault public vault;
-    AaveYieldGenerationModule public aaveModule;
+    AaveYieldModule public aaveModule;
     YieldOps public yieldOps;
     DisputeOps public disputeOps;
     ModuleSnapshotRegistry public mm;
@@ -51,7 +51,7 @@ contract AaveDecimalRobustness is Test {
         pool.setAToken(address(usdc), address(aUsdc));
         provider = new MockPoolAddressesProvider(address(pool));
 
-        aaveModule = new AaveYieldGenerationModule(address(this));
+        aaveModule = new AaveYieldModule(address(this));
         aaveModule.grantRole(aaveModule.ROLE_TIMELOCK(), address(this));
         aaveModule.queueAavePoolProvider(address(provider));
         (, uint64 etaProvider, ) = aaveModule.getPendingAavePoolProvider();

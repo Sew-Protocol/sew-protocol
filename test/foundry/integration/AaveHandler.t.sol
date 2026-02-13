@@ -9,13 +9,13 @@ import {EscrowVault} from "../../../contracts/core/EscrowVault.sol";
 import {BaseEscrow} from "../../../contracts/core/BaseEscrow.sol";
 import {ERC20Mock} from "../../../contracts/mocks/ERC20Mock.sol";
 import {MockAavePool} from "../../../contracts/mocks/MockAavePool.sol";
-import {AaveYieldGenerationModule} from "../../../contracts/modules/AaveYieldGenerationModule.sol";
+import {AaveYieldModule} from "../../../contracts/modules/AaveYieldModule.sol";
 import {DefaultYieldDistributionModule} from "../../../contracts/modules/DefaultYieldDistributionModule.sol";
 import {EscrowSettings, YieldPreset, EscrowState} from "../../../contracts/types/EscrowTypes.sol";
 
 contract AaveHandler is CommonBase, StdCheats, StdUtils {
     EscrowVault public vault;
-    AaveYieldGenerationModule public aaveModule;
+    AaveYieldModule public aaveModule;
     MockAavePool public aavePool;
     ERC20Mock public token;
     
@@ -28,7 +28,7 @@ contract AaveHandler is CommonBase, StdCheats, StdUtils {
     
     constructor(
         EscrowVault _vault,
-        AaveYieldGenerationModule _aaveModule,
+        AaveYieldModule _aaveModule,
         MockAavePool _aavePool,
         ERC20Mock _token
     ) {

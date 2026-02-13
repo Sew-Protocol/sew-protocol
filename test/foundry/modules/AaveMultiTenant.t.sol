@@ -2,7 +2,7 @@
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
-import 'contracts/modules/AaveYieldGenerationModule.sol';
+import 'contracts/modules/AaveYieldModule.sol';
 import 'contracts/core/EscrowVault.sol';
 import 'contracts/core/EscrowableERC20.sol';
 import 'contracts/mocks/ERC20Mock.sol';
@@ -18,9 +18,9 @@ import 'contracts/ops/CreateOps.sol';
  * @dev High-risk scenario for namespacing bugs.
  */
 contract AaveMultiTenantTest is Test {
-    AaveYieldGenerationModule moduleForVault;
-    AaveYieldGenerationModule moduleForERC20;
-    AaveYieldGenerationModule module; // For backward compatibility in tests
+    AaveYieldModule moduleForVault;
+    AaveYieldModule moduleForERC20;
+    AaveYieldModule module; // For backward compatibility in tests
     EscrowVault vault;
     EscrowableERC20 escrowERC20;
     
@@ -52,11 +52,11 @@ contract AaveMultiTenantTest is Test {
         provider = new MockPoolAddressesProvider(address(pool));
         
         // Setup Separate Modules (one per escrow, per the new constraint)
-        moduleForVault = new AaveYieldGenerationModule(timelock);
+        moduleForVault = new AaveYieldModule(timelock);
         moduleForVault.grantRole(moduleForVault.ROLE_TIMELOCK(), timelock);
         moduleForVault.queueAavePoolProvider(address(provider));
         
-        moduleForERC20 = new AaveYieldGenerationModule(timelock);
+        moduleForERC20 = new AaveYieldModule(timelock);
         moduleForERC20.grantRole(moduleForERC20.ROLE_TIMELOCK(), timelock);
         moduleForERC20.queueAavePoolProvider(address(provider));
         

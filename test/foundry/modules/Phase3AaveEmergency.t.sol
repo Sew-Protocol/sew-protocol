@@ -2,7 +2,7 @@
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
-import 'contracts/modules/AaveYieldGenerationModule.sol';
+import 'contracts/modules/AaveYieldModule.sol';
 import 'contracts/core/EscrowVault.sol';
 import 'contracts/core/EscrowableERC20.sol';
 import 'contracts/mocks/ERC20Mock.sol';
@@ -16,11 +16,11 @@ import 'contracts/types/YieldPresets.sol';
 
 /**
  * @title Phase3AaveEmergencyTest
- * @notice Emergency scenarios and recovery tests for AaveYieldGenerationModule
+ * @notice Emergency scenarios and recovery tests for AaveYieldModule
  * @dev Tests emergency unwind, pause/unpause, and deficit tracking
  */
 contract Phase3AaveEmergencyTest is Test {
-    AaveYieldGenerationModule module;
+    AaveYieldModule module;
     EscrowVault vault;
     EscrowableERC20 escrowERC20;
     
@@ -53,7 +53,7 @@ contract Phase3AaveEmergencyTest is Test {
         provider = new MockPoolAddressesProvider(address(pool));
         
         // Setup Module
-        module = new AaveYieldGenerationModule(timelock);
+        module = new AaveYieldModule(timelock);
         module.grantRole(module.ROLE_TIMELOCK(), timelock);
         module.grantRole(module.ROLE_GUARDIAN(), guardian); // Guardian for emergency operations
         module.queueAavePoolProvider(address(provider));

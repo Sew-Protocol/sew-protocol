@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import "./AaveHandler.t.sol";
 import "../../../contracts/core/EscrowVault.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
-import "../../../contracts/modules/AaveYieldGenerationModule.sol";
+import "../../../contracts/modules/AaveYieldModule.sol";
 import "../../../contracts/modules/DefaultYieldDistributionModule.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
 import "../../../contracts/mocks/MockAavePool.sol";
@@ -19,7 +19,7 @@ import "../../../contracts/core/modules/DefaultResolutionModule.sol";
 contract AaveStatefulFuzz is Test {
     AaveHandler public handler;
     EscrowVault public vault;
-    AaveYieldGenerationModule public aaveModule;
+    AaveYieldModule public aaveModule;
     MockAavePool public aavePool;
     ERC20Mock public token;
     ModuleSnapshotRegistry public mm;
@@ -33,7 +33,7 @@ contract AaveStatefulFuzz is Test {
         aavePool.setAToken(address(token), address(aToken));
         MockPoolAddressesProvider provider = new MockPoolAddressesProvider(address(aavePool));
         
-        aaveModule = new AaveYieldGenerationModule(address(this));
+        aaveModule = new AaveYieldModule(address(this));
         aaveModule.grantRole(aaveModule.ROLE_TIMELOCK(), address(this));
         aaveModule.queueAavePoolProvider(address(provider));
         

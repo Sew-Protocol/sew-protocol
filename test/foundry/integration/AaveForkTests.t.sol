@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {BaseEscrow} from "../../../contracts/core/BaseEscrow.sol";
 import {EscrowVault} from "../../../contracts/core/EscrowVault.sol";
 import {AaveYieldLibrary} from "../../../contracts/libraries/AaveYieldLibrary.sol";
-import {AaveYieldGenerationModule} from "../../../contracts/modules/AaveYieldGenerationModule.sol";
+import {AaveYieldModule} from "../../../contracts/modules/AaveYieldModule.sol";
 import {IYieldGenerationModule} from "../../../contracts/interfaces/IYieldGenerationModule.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -65,7 +65,7 @@ contract AaveForkTests is Test {
     address constant BASE_SEPOLIA_WETH = 0x4200000000000000000000000000000000000006;
     
     EscrowVault public escrowVault;
-    AaveYieldGenerationModule public aaveModule;
+    AaveYieldModule public aaveModule;
     DefaultYieldDistributionModule public yieldDistModule;
     IPool public aavePool;
     IERC20 public token;
@@ -142,7 +142,7 @@ contract AaveForkTests is Test {
             token = IERC20(address(new ERC20Mock("WETH", "WETH", address(this), 0)));
         }
         
-        aaveModule = new AaveYieldGenerationModule(address(this));
+        aaveModule = new AaveYieldModule(address(this));
         aaveModule.grantRole(aaveModule.DEFAULT_ADMIN_ROLE(), address(this));
         aaveModule.grantRole(aaveModule.ROLE_TIMELOCK(), address(this));
         

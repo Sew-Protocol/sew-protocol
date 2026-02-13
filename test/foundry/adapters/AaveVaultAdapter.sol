@@ -3,18 +3,18 @@ pragma solidity ^0.8.33;
 
 import "forge-std/Test.sol";
 import "./IVaultLike.sol";
-import "../../../contracts/modules/AaveYieldGenerationModule.sol";
+import "../../../contracts/modules/AaveYieldModule.sol";
 import "../../../contracts/interfaces/aave/AaveV3Interfaces.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title AaveVaultAdapter
- * @notice Adapts AaveYieldGenerationModule to IVaultLike interface for testing
+ * @notice Adapts AaveYieldModule to IVaultLike interface for testing
  * @dev This adapter allows us to test Aave integration using standard vault behavior tests
  *      without requiring full ERC-4626 compliance in production code yet.
  * 
  *      Design notes:
- *      - Wraps AaveYieldGenerationModule to look like an ERC-4626 vault
+ *      - Wraps AaveYieldModule to look like an ERC-4626 vault
  *      - Tracks per-account "shares" internally
  *      - Shares are 1:1 with deposited aTokens (simplified for initial testing)
  *      - Allows testing with the VaultBehaviorInvariants suite
@@ -27,7 +27,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 contract AaveVaultAdapter is IVaultLike {
     using SafeERC20 for IERC20;
 
-    AaveYieldGenerationModule public immutable aaveModule;
+    AaveYieldModule public immutable aaveModule;
     address public immutable underlyingAsset;
     address public immutable aToken;
     IAavePool public immutable aavePool;
@@ -46,10 +46,10 @@ contract AaveVaultAdapter is IVaultLike {
 
     /**
      * @notice Create adapter for an Aave yield module
-     * @param _aaveModule The AaveYieldGenerationModule to wrap
+     * @param _aaveModule The AaveYieldModule to wrap
      * @param _underlyingAsset The underlying ERC20 token
      */
-    constructor(AaveYieldGenerationModule _aaveModule, address _underlyingAsset) {
+    constructor(AaveYieldModule _aaveModule, address _underlyingAsset) {
         aaveModule = _aaveModule;
         underlyingAsset = _underlyingAsset;
         

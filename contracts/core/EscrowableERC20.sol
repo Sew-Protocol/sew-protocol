@@ -4,9 +4,10 @@ pragma solidity ^0.8.33;
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import './BaseEscrow.sol';
 import '../types/EscrowTypes.sol';
+import '../types/YieldPresets.sol';
 import '../interfaces/IReleaseStrategy.sol';
 import '../shared/interfaces/IResolutionModule.sol';
-import '../interfaces/IYieldGenerationModule.sol';
+import '../interfaces/IYieldModule.sol';
 import '../interfaces/IYieldDistributionModule.sol';
 import './ModuleSnapshotRegistry.sol';
 import '../libraries/ModuleGetterLibrary.sol';
@@ -208,7 +209,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
      * @dev Delegate yield deposit to module
      */
     function _depositForYield(
-        IYieldGenerationModule generationModule,
+        IYieldModule generationModule,
         uint256 workflowId,
         address token,
         uint256 amount
@@ -220,10 +221,10 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         }
         
         uint256 balBefore = balanceOf(address(this));
-        (bool success, ) = generationModule.depositForYield(workflowId, token, amount, address(this));
+        uint256 accepted = generationModule.initializeYield(workflowId, token, amount, YieldPreset.OFF);
         uint256 balAfter = balanceOf(address(this));
 
-        if (!success || balBefore - balAfter < amount) {
+        if (balBefore - balAfter < accepted) {
             revert AccountingDeficit(token, amount);
         }
     }
@@ -244,11 +245,11 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         return ModuleGetterConsolidationLibrary.getResolutionModule(moduleAddr, disputeResolutionModule);
     }
 
-    function _getYieldGenerationModule(uint256 workflowId) internal view override returns (IYieldGenerationModule) {
+    function _getYieldGenerationModule(uint256 workflowId) internal view override returns (IYieldModule) {
         address moduleAddr = ModuleGetterLibrary.getModuleAddress(
             workflowId, ModuleType.YIELD_GEN, moduleSnapshots, moduleManagement, address(this)
         );
-        return ModuleGetterConsolidationLibrary.getYieldGenerationModule(moduleAddr);
+        return ModuleGetterConsolidationLibrary.getYieldModule(moduleAddr);
     }
 
     function _getYieldDistributionModule(uint256 workflowId) internal view override returns (IYieldDistributionModule) {
