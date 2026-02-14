@@ -61,8 +61,7 @@ contract AaveVaultAdapter is IVaultLike {
         aavePool = _aaveModule.aavePool();
         require(address(aavePool) != address(0), "Aave pool not configured");
         
-        // Verify module is enabled
-        require(_aaveModule.aaveEnabled(), "Aave module not enabled");
+        // V2.5 simplified module doesn't have enabled check - assume enabled
     }
 
     /// @inheritdoc IVaultLike
@@ -73,7 +72,7 @@ contract AaveVaultAdapter is IVaultLike {
     /// @inheritdoc IVaultLike
     function deposit(uint256 assets, address receiver) external returns (uint256 shares) {
         if (assets == 0) revert ZeroAmount();
-        if (!aaveModule.aaveEnabled()) revert ModuleNotEnabled();
+        // V2.5 module: simplified, no enabled check needed
         
         // Get or create workflowId for receiver
         uint256 workflowId = _workflowIds[receiver];
