@@ -77,6 +77,10 @@ contract EscrowVault is BaseEscrow {
         uint256 b = IERC20(token).balanceOf(address(this));
         uint256 accepted = generationModule.initializeYield(workflowId, token, amount, YieldPreset.OFF);
         if (b - IERC20(token).balanceOf(address(this)) < accepted) revert AccountingDeficit(token, amount);
+        
+        // Store v2.5 yield tracking data
+        v25YieldModules[workflowId] = m;
+        v25YieldPrincipals[workflowId] = accepted;
     }
     function _transferTokens(address token, address to, uint256 amount) internal override {
         IERC20(token).safeTransfer(to, amount);

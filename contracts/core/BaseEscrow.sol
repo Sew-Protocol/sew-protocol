@@ -1196,24 +1196,36 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
      * @param recipient Address to receive funds
      * @param token Token address
      * @param amount Amount to transfer
+     * @param principalExpected Expected principal (for validating yield claims)
      * @return transferred True if transfer succeeded, false if fell back to claimable
      */
     function _attemptAutoTransfer(
         uint256 workflowId,
         address recipient,
         address token,
-        uint256 amount
+        uint256 amount,
+        uint256 principalExpected
     ) internal returns (bool transferred) {
         if (amount == 0) {
             return false;
         }
 
         uint256 bal = IERC20(token).balanceOf(address(this));
+        
+        // CRITICAL: If module claims yield (amount > principal), escrow MUST have the funds
+        // Otherwise the module overreported and we must revert to prevent fund loss
+        if (amount > principalExpected) {
+            require(bal >= amount, "EscrowInsufficientBalance");
+        }
+        
+        // If amount <= principalExpected, it's OK to fallback to claimable if transfer fails
         bool success = bal >= amount && _tryTransfer(token, recipient, amount);
         if (success) {
             emit EscrowTransferAutoResult(workflowId, recipient, token, amount, true, 0);
             return true;
         }
+        
+        // Transfer failed - set as claimable
         claimableBalances[workflowId][recipient] += amount;
         totalClaimableAssets[token] += amount;
         emit ClaimableBalanceSet(workflowId, recipient, token, amount);
@@ -1241,6 +1253,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
      * @notice Handle v2.5 yield module unwind on release/cancel
      * @dev If no module or no initialized yield, returns original amount
      * @dev Otherwise delegates to module for unwind (which handles all recovery)
+     * @dev If unwind reverts, tries emergencyUnwind as fallback
      */
     function _handleYieldModuleUnwind(
         uint256 workflowId,
@@ -1253,11 +1266,19 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         uint256 yieldPrincipal = v25YieldPrincipals[workflowId];
         if (yieldPrincipal == 0) return (amount, 0);
         
-        // Call module unwind - module is responsible for safety
-        (uint256 principal, uint256 yield) = IYieldModule(module).unwindToEscrow(
-            workflowId, token, yieldPrincipal
-        );
-        return (principal, yield);
+        // Try normal unwind first
+        try IYieldModule(module).unwindToEscrow(workflowId, token, yieldPrincipal) returns (uint256 principal, uint256 yield) {
+            return (principal, yield);
+        } catch {
+            // Unwind failed - try emergency unwind
+            try IYieldModule(module).emergencyUnwind(workflowId, token, yieldPrincipal) returns (uint256 recovered) {
+                // Emergency unwind succeeded - return as principal with no yield
+                return (recovered, 0);
+            } catch {
+                // Emergency unwind also failed - return original amount as fallback
+                return (yieldPrincipal, 0);
+            }
+        }
     }
 
     function _cancelAndRefund(uint256 workflowId) internal {
@@ -1282,7 +1303,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         _updateEscrowBalance(token, amount, false);
         
         // Auto-transfer: Attempt automatic transfer, fallback to claimable if fails
-        _attemptAutoTransfer(workflowId, from, token, actualAmount);
+        _attemptAutoTransfer(workflowId, from, token, actualAmount, amount);
         _emitEscrowTransferCancelled(workflowId, token, from, amount);
     }
 
@@ -1363,7 +1384,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         _updateEscrowBalance(token, amount, false);
         
         // Auto-transfer: Attempt automatic transfer, fallback to claimable if fails
-        _attemptAutoTransfer(workflowId, to, token, actualAmount);
+        _attemptAutoTransfer(workflowId, to, token, actualAmount, amount);
         _emitEscrowTransferReleased(workflowId, token, to, amount);
     }
 

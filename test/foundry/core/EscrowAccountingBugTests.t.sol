@@ -13,61 +13,100 @@ import '../../../contracts/libraries/SettingsValidationLibrary.sol';
 import '../../../contracts/ops/CreateOps.sol';
 import '../../../contracts/ops/SettlementOps.sol';
 import '../../../contracts/core/BondCollector.sol';
-import '../../../contracts/interfaces/IYieldGenerationModule.sol';
+import '../../../contracts/interfaces/IYieldModule.sol';
+import '../../../contracts/types/YieldPresets.sol';
 
-contract MockLossyYieldModule is IYieldGenerationModule {
+contract MockYieldModuleWithLoss is IYieldModule {
     using SafeERC20 for IERC20;
+    
     uint256 public lossAmount;
-    bool public tokenSupported = true;
+    mapping(address escrow => mapping(uint256 escrowId => YieldPosition)) public positions;
+    
+    struct YieldPosition {
+        address token;
+        uint256 principalDeposited;
+    }
 
     function setLoss(uint256 _loss) external {
         lossAmount = _loss;
     }
 
-    function depositForYield(uint256, address token, uint256 amount, address) external override returns (bool, uint256) {
+    function initializeYield(
+        uint256 escrowId,
+        address token,
+        uint256 amount,
+        YieldPreset yieldMode
+    ) external returns (uint256 accepted) {
+        // Accept the full amount (or reduced by loss if simulating fee-on-transfer)
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
-        return (true, 0);
+        
+        positions[msg.sender][escrowId] = YieldPosition({
+            token: token,
+            principalDeposited: amount
+        });
+        
+        emit YieldInitialized(escrowId, token, amount, yieldMode);
+        return amount;
     }
 
-    function withdrawWithYield(uint256, address token, uint256 originalAmount, address) external returns (bool, uint256, uint256) {
-        // Return full amount to vault but report the loss
-        IERC20(token).safeTransfer(msg.sender, originalAmount);
-        return (true, originalAmount - lossAmount, 0);
+    function unwindToEscrow(
+        uint256 escrowId,
+        address token,
+        uint256 principalExpected
+    ) external returns (uint256 principalOut, uint256 yieldOut) {
+        YieldPosition memory pos = positions[msg.sender][escrowId];
+        require(pos.token == token, "TokenMismatch");
+        
+        // Return funds with loss applied
+        uint256 principal = pos.principalDeposited;
+        uint256 returnAmount = principal > lossAmount ? principal - lossAmount : 0;
+        
+        if (returnAmount > 0) {
+            IERC20(token).safeTransfer(msg.sender, returnAmount);
+        }
+        
+        delete positions[msg.sender][escrowId];
+        
+        uint256 yield = 0; // No yield in this mock
+        emit YieldWithdrawn(escrowId, token, principal - lossAmount, yield);
+        
+        return (principal - lossAmount, yield);
     }
 
-    function getPosition(uint256, address, address) external pure returns (IYieldGenerationModule.YieldPosition memory) {
-        return IYieldGenerationModule.YieldPosition(false, 0, 0, 0);
-    }
-    function calculateYield(uint256, address, address) external pure returns (uint256) {
-        return 0;
-    }
-
-    function isTokenSupported(address) external view returns (bool) {
-        return tokenSupported;
-    }
-
-    function getApprovalTarget(address) external pure returns (address) {
-        return address(0);
-    }
-
-    function moduleName() external pure returns (string memory) {
-        return "MockLossyYieldModule";
-    }
-
-    function moduleVersion() external pure returns (string memory) {
-        return "1.0.0";
-    }
-
-    function getAavePoolAddress() external pure returns (address) {
-        return address(0);
+    function emergencyUnwind(
+        uint256 escrowId,
+        address token,
+        uint256 principalExpected
+    ) external returns (uint256 recovered) {
+        YieldPosition memory pos = positions[msg.sender][escrowId];
+        require(pos.token == token, "TokenMismatch");
+        
+        uint256 principal = pos.principalDeposited;
+        uint256 returnAmount = principal > lossAmount ? principal - lossAmount : 0;
+        
+        if (returnAmount > 0) {
+            IERC20(token).safeTransfer(msg.sender, returnAmount);
+        }
+        
+        delete positions[msg.sender][escrowId];
+        
+        require(returnAmount > 0, "EmergencyUnwindFailed");
+        emit EmergencyUnwindExecuted(escrowId, token, returnAmount, keccak256("emergency_unwind"));
+        
+        return returnAmount;
     }
 
-    function getATokenAddress(address) external pure returns (address) {
-        return address(0);
+    function canHandle(
+        address token,
+        YieldPreset mode,
+        uint256 amount
+    ) external pure returns (bool supported, bytes32 reasonCode) {
+        return (true, 0x0);
     }
 
-    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
-        return interfaceId == type(IYieldGenerationModule).interfaceId;
+    function getModuleInfo()
+        external pure returns (string memory name, string memory version, bytes32 protocolId) {
+        return ("MockYieldModuleWithLoss", "1.0.0", keccak256("mock-v1"));
     }
 }
 
@@ -80,7 +119,7 @@ contract EscrowAccountingBugTests is Test {
     SettlementOps public settlementOps;
     BondCollector public bondCollector;
     DefaultResolutionModule public resolutionModule;
-    MockLossyYieldModule public yieldGen;
+    MockYieldModuleWithLoss public yieldGen;
     
     ERC20Mock public token;
 
@@ -101,7 +140,7 @@ contract EscrowAccountingBugTests is Test {
         settlementOps = new SettlementOps(address(this));
         bondCollector = new BondCollector(address(this));
         resolutionModule = new DefaultResolutionModule(address(this), resolver);
-        yieldGen = new MockLossyYieldModule();
+        yieldGen = new MockYieldModuleWithLoss();
 
         vault = new EscrowVault(FEE_BPS, feeAddress, address(yieldOps), address(disputeOps), address(mm));
 

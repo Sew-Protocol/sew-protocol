@@ -227,6 +227,10 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         if (balBefore - balAfter < accepted) {
             revert AccountingDeficit(token, amount);
         }
+        
+        // Store v2.5 yield tracking data
+        v25YieldModules[workflowId] = moduleAddress;
+        v25YieldPrincipals[workflowId] = accepted;
     }
 
     // ============ Module Getters ============

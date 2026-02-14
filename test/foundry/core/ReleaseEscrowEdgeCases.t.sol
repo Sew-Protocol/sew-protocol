@@ -16,7 +16,7 @@ import 'contracts/core/BondCollector.sol';
 import 'contracts/core/ModuleSnapshotRegistry.sol';
 import 'contracts/admin/EscrowGovernanceTimelock.sol';
 import 'contracts/libraries/SettingsValidationLibrary.sol';
-import 'contracts/interfaces/IYieldGenerationModule.sol';
+import 'contracts/interfaces/IYieldModule.sol';
 import 'contracts/interfaces/IYieldDistributionModule.sol';
 
 /**
@@ -381,7 +381,7 @@ contract ReleaseEscrowEdgeCasesTest is Test {
  * @notice Mock yield generation module for testing edge cases
  * @dev Simulates Aave withdrawal by transferring tokens to escrow contract
  */
-contract MockYieldGenForEdgeCases is IYieldGenerationModule {
+contract MockYieldGenForEdgeCases is IYieldModule {
     using SafeERC20 for IERC20;
 
     bool public shouldRevert = false;
@@ -394,7 +394,7 @@ contract MockYieldGenForEdgeCases is IYieldGenerationModule {
     mapping(address => mapping(uint256 => uint256)) public deposits;
     // Track which escrow contract deposited for each workflowId
     // In real flow, BaseEscrow calls module, so msg.sender is escrowContract
-    // But YieldOps calls withdrawWithYield, so we need to track escrowContract per workflowId
+    // But YieldOps calls unwindToEscrow, so we need to track escrowContract per workflowId
     mapping(uint256 => address) public workflowToEscrow;
 
     function setWithdrawResult(bool _success, uint256 _actualAmount, uint256 _yieldAmount) external {
@@ -407,136 +407,111 @@ contract MockYieldGenForEdgeCases is IYieldGenerationModule {
         shouldRevert = _shouldRevert;
     }
 
-    function depositForYield(
-        uint256 workflowId,
+    function initializeYield(
+        uint256 escrowId,
         address token,
         uint256 amount,
-        address escrowContract
-    ) external override returns (bool, uint256) {
+        YieldPreset /* yieldMode */
+    ) external override returns (uint256) {
         // Simulate deposit: transfer tokens from escrow to this module (like Aave)
-        IERC20(token).safeTransferFrom(escrowContract, address(this), amount);
-        deposits[escrowContract][workflowId] = amount;
-        workflowToEscrow[workflowId] = escrowContract; // Track escrow contract for this workflow
-        return (true, amount);
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+        deposits[msg.sender][escrowId] = amount;
+        workflowToEscrow[escrowId] = msg.sender; // Track escrow contract for this workflow
+        return amount;
     }
 
-    function withdrawWithYield(
-        uint256 workflowId,
+    function unwindToEscrow(
+        uint256 escrowId,
         address token,
-        uint256 originalAmount,
-        address escrowContract
-    ) external override returns (bool, uint256, uint256) {
+        uint256 principalExpected
+    ) external override returns (uint256 principalOut, uint256 yieldOut) {
         if (shouldRevert) {
             revert("MockYieldGen: Reverted");
         }
         
-        // Use the passed escrowContract instead of tracking it
-        if (escrowContract == address(0)) {
-            // Fallback to tracking for legacy tests if needed
-            escrowContract = workflowToEscrow[workflowId];
-        }
-        
-        if (escrowContract == address(0)) {
-            // No escrow tracked, use configured values or return original
-            if (actualAmount > 0 || yieldAmount > 0) {
-                return (withdrawSuccess, actualAmount > 0 ? actualAmount : originalAmount, yieldAmount);
-            }
-            return (withdrawSuccess, originalAmount, 0);
-        }
-        
-        uint256 deposited = deposits[escrowContract][workflowId];
+        address escrowContract = msg.sender;
         uint256 balance = IERC20(token).balanceOf(address(this));
         
-        if (deposited == 0 && balance == 0) {
-            // No deposit tracked and no balance, use configured values
-            return (withdrawSuccess, actualAmount > 0 ? actualAmount : originalAmount, yieldAmount);
+        // Determine total amount to transfer back
+        uint256 totalAmount;
+        if (actualAmount > 0) {
+            // Use explicitly configured actualAmount (this is TOTAL, not just principal)
+            totalAmount = actualAmount;
+        } else if (withdrawSuccess) {
+            // Calculate from principalExpected + yieldAmount if success is true
+            totalAmount = principalExpected + yieldAmount;
+        } else {
+            // If withdrawSuccess is false, we can't provide yield, just return principal
+            totalAmount = principalExpected;
         }
         
-        if (withdrawSuccess) {
-            // Transfer actualAmount to escrow contract (simulating Aave withdrawal)
-            // Use actualAmount if explicitly set, otherwise calculate from deposited + yield
-            uint256 toTransfer;
-            if (actualAmount > 0) {
-                // Use explicitly configured actualAmount
-                toTransfer = actualAmount;
-            } else {
-                // Calculate from originalAmount + yieldAmount
-                toTransfer = originalAmount + yieldAmount;
-            }
-            
-            // Cap to available balance
-            if (toTransfer > balance) {
-                toTransfer = balance;
-            }
-            if (toTransfer > 0 && escrowContract != address(0)) {
-                IERC20(token).safeTransfer(escrowContract, toTransfer);
-            }
-            deposits[escrowContract][workflowId] = 0; // Clear deposit
-            workflowToEscrow[workflowId] = address(0); // Clear tracking
-            
-            // Return configured values
-            uint256 finalActual = actualAmount > 0 ? actualAmount : toTransfer;
-            return (true, finalActual, yieldAmount);
+        // Cap to available balance
+        if (totalAmount > balance) {
+            totalAmount = balance;
+        }
+        if (totalAmount > 0) {
+            IERC20(token).safeTransfer(escrowContract, totalAmount);
         }
         
-        // Withdrawal failed - should still return tokens to escrow if they're deposited
-        // In real Aave, if withdrawal fails, tokens remain in Aave, not returned to escrow
-        // But for this test to work with BaseEscrow's expectations, we need to return tokens
-        // when withdrawal fails so the escrow can transfer them to recipient
-        if (deposited > 0 && escrowContract != address(0)) {
-            // Return deposited amount to escrow (so escrow can transfer to recipient)
-            uint256 toReturn = deposited > balance ? balance : deposited;
-            if (toReturn > 0) {
-                IERC20(token).safeTransfer(escrowContract, toReturn);
-            }
-            deposits[escrowContract][workflowId] = 0;
-            workflowToEscrow[workflowId] = address(0);
+        // Clear tracking
+        deposits[escrowContract][escrowId] = 0;
+        workflowToEscrow[escrowId] = address(0);
+        
+        // Return principal and yield separately
+        // If withdrawSuccess is false, we return all transferred amount as principal (no yield)
+        if (!withdrawSuccess) {
+            return (totalAmount, 0);
         }
-        return (false, actualAmount, 0);
+        
+        // Return principal and yield separately
+        // principalOut is what we're returning minus the yield
+        // But we need to be careful: if actualAmount was set, it includes both principal and yield
+        uint256 actualPrincipal = actualAmount > 0 ? (actualAmount - yieldAmount) : principalExpected;
+        return (actualPrincipal, yieldAmount);
     }
 
-    function getPosition(
-        uint256 /* workflowId */,
+    function emergencyUnwind(
+        uint256 escrowId,
+        address token,
+        uint256 principalExpected
+    ) external override returns (uint256) {
+        if (shouldRevert) {
+            revert("MockYieldGen: Reverted");
+        }
+        
+        address escrowContract = msg.sender;
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        uint256 toReturn = deposits[escrowContract][escrowId];
+        
+        if (toReturn == 0) {
+            toReturn = principalExpected;
+        }
+        
+        if (toReturn > balance) {
+            toReturn = balance;
+        }
+        
+        if (toReturn > 0) {
+            IERC20(token).safeTransfer(escrowContract, toReturn);
+            deposits[escrowContract][escrowId] = 0;
+            workflowToEscrow[escrowId] = address(0);
+            return toReturn;
+        }
+        
+        revert("Emergency unwind failed");
+    }
+
+    function canHandle(
         address /* token */,
-        address /* escrowContract */
-    ) external view override returns (YieldPosition memory) {
-        return YieldPosition(true, 0, 0, yieldAmount);
+        YieldPreset /* mode */,
+        uint256 /* amount */
+    ) external pure override returns (bool, bytes32) {
+        return (true, bytes32(0));
     }
 
-    function calculateYield(
-        uint256 /* workflowId */,
-        address /* token */,
-        address /* escrowContract */
-    ) external view override returns (uint256) {
-        return yieldAmount;
-    }
-
-    function isTokenSupported(address /* token */) external pure override returns (bool) {
-        return true;
-    }
-
-    function getApprovalTarget(address /* token */) external pure override returns (address) {
-        return address(0);
-    }
-
-    function moduleName() external pure override returns (string memory) {
-        return "MockYieldGenForEdgeCases";
-    }
-
-    function moduleVersion() external pure override returns (string memory) {
-        return "1.0";
-    }
-
-    function supportsInterface(bytes4 /* interfaceId */) external pure override returns (bool) {
-        return true;
-    }
-
-    function getAavePoolAddress() external pure returns (address) {
-        return address(0);
-    }
-
-    function getATokenAddress(address /* token */) external pure returns (address) {
-        return address(0);
+    function getModuleInfo()
+        external pure override returns (string memory, string memory, bytes32) {
+        return ("MockYieldGenForEdgeCases", "1.0", keccak256("mock-test"));
     }
     
     // Helper to fund the mock for testing
@@ -544,3 +519,4 @@ contract MockYieldGenForEdgeCases is IYieldGenerationModule {
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
     }
 }
+

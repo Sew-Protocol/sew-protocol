@@ -12,32 +12,55 @@ import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
 import "../../../contracts/ops/CreateOps.sol";
-import "../../../contracts/interfaces/IYieldGenerationModule.sol";
+import "../../../contracts/interfaces/IYieldModule.sol";
 
-contract OverreportingModule is IYieldGenerationModule {
-    function depositForYield(uint256, address token, uint256 amount, address) external override returns (bool, uint256) {
+contract OverreportingModule is IYieldModule {
+    function initializeYield(
+        uint256 /* escrowId */,
+        address token,
+        uint256 amount,
+        YieldPreset /* yieldMode */
+    ) external override returns (uint256) {
         // Actually pull tokens so createEscrow succeeds
         IERC20(token).transferFrom(msg.sender, address(this), amount);
-        return (true, amount);
+        return amount;
     }
-    function withdrawWithYield(uint256, address token, uint256 originalAmount, address) external override returns (bool success, uint256 actualAmount, uint256 yieldAmount) {
+
+    function unwindToEscrow(
+        uint256 /* escrowId */,
+        address token,
+        uint256 principalExpected
+    ) external override returns (uint256 principalOut, uint256 yieldOut) {
         // Send BACK the original tokens so YieldOps sees "received"
-        IERC20(token).transfer(msg.sender, originalAmount);
+        IERC20(token).transfer(msg.sender, principalExpected);
         // Report 1000 ether EXTRA yield but don't transfer any tokens for it
-        return (true, originalAmount + 1000 ether, 1000 ether);
+        return (principalExpected, 1000 ether);
     }
-    function getPosition(uint256, address, address) external pure override returns (YieldPosition memory) {
-        return YieldPosition(false, 0, 0, 0);
+
+    function emergencyUnwind(
+        uint256 /* escrowId */,
+        address token,
+        uint256 principalExpected
+    ) external override returns (uint256) {
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        uint256 toReturn = principalExpected > balance ? balance : principalExpected;
+        if (toReturn > 0) {
+            IERC20(token).transfer(msg.sender, toReturn);
+        }
+        return toReturn;
     }
-    function calculateYield(uint256, address, address) external pure override returns (uint256) { return 0; }
-    function isTokenSupported(address) external pure override returns (bool) { return true; }
-    function getApprovalTarget(address) external pure override returns (address) { return address(0); }
-    function moduleName() external pure override returns (string memory) { return "Overreporter"; }
-    function moduleVersion() external pure override returns (string memory) { return "1.0.0"; }
-    function getAavePoolAddress() external pure override returns (address) { return address(0); }
-    function getATokenAddress(address) external pure override returns (address) { return address(0); }
-    function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {
-        return interfaceId == type(IYieldGenerationModule).interfaceId || interfaceId == 0x01ffc9a7;
+
+    function canHandle(
+        address /* token */,
+        YieldPreset /* mode */,
+        uint256 /* amount */
+    ) external pure override returns (bool, bytes32) {
+        return (true, bytes32(0));
+    }
+
+    function getModuleInfo()
+        external pure override returns (string memory, string memory, bytes32) {
+        return ("Overreporter", "1.0.0", keccak256("overreporter"));
     }
 }
 
