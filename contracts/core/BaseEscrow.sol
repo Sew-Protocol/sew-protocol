@@ -258,7 +258,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     event PendingSettlementCancelled(uint256 indexed workflowId);
     event PendingSettlementExecuted(uint256 indexed workflowId, bool isRelease);
     event TimeoutConfigUpdated(TimeoutConfig config);
-    event EscrowFinalized(uint256 indexed workflowId, address indexed recipient, uint256 amount);
     // Consolidated auto-transfer event (replaces AutoCompleted + AutoFailed to save bytecode)
     event EscrowTransferAutoResult(
         uint256 indexed workflowId,
@@ -301,14 +300,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     );
     event SystemResumed(
         uint256 timestamp
-    );
-    event MaxPauseCyclesExceededEvent(
-        uint256 pauseCycleCount,
-        uint256 maxCycles
-    );
-    event PauseDurationExceededEvent(
-        uint256 pausedDuration,
-        uint256 maxDuration
     );
 
     // ============ Pause/Unpause ============
