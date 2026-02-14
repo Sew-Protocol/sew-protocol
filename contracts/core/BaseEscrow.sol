@@ -1,6 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
+/**
+ * @title BaseEscrow
+ * @notice v2.5: Core escrow logic with externalized yield module system
+ * 
+ * VERSIONING NOTES:
+ * - v2.0: Initial escrow implementation with Aave integration
+ * - v2.5: Extracted Aave logic to modular AaveYieldModule contract
+ *         Removed: AaveYieldGenerationModule functions, detailed Aave position handling
+ *         Added: v25YieldModules mapping, generic IYieldModule delegation
+ *         Result: Smaller contract bytecode via module externalization
+ */
+
 import '@openzeppelin/contracts/utils/Context.sol';
 import '@openzeppelin/contracts/access/AccessControl.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
