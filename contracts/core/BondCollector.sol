@@ -123,21 +123,32 @@ contract BondCollector is AccessControl {
         }
         
         if (ethToSend > 0) {
-            (bool s, ) = address(incentiveMod).call{value: ethToSend}(
-                abi.encodeWithSelector(
-                    IIncentiveModule.recordAppealBond.selector,
-                    workflowId,
-                    _msgSender(),
-                    depositor,
-                    escalatedBy,
-                    ethToSend,
-                    address(0),
-                    newLevel
-                )
-            );
-            return s;
+            return _recordETHBond(workflowId, incentiveMod, ethToSend, newLevel, depositor, escalatedBy);
         }
         return false;
+    }
+
+    function _recordETHBond(
+        uint256 workflowId,
+        IIncentiveModule incentiveMod,
+        uint256 ethToSend,
+        uint8 newLevel,
+        address depositor,
+        address escalatedBy
+    ) internal returns (bool) {
+        (bool s, ) = address(incentiveMod).call{value: ethToSend}(
+            abi.encodeWithSelector(
+                IIncentiveModule.recordAppealBond.selector,
+                workflowId,
+                _msgSender(),
+                depositor,
+                escalatedBy,
+                ethToSend,
+                address(0),
+                newLevel
+            )
+        );
+        return s;
     }
 
     /**

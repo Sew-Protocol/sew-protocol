@@ -92,7 +92,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         uint256 amount,
         uint256 autoReleaseTime,
         uint256 autoCancelTime
-    ) public whenNotPaused returns (uint256) {
+    ) public returns (uint256) {
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
             releaseAddress: address(0),
@@ -103,7 +103,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         return createEscrow(address(this), seller, amount, settings);
     }
 
-    function releaseEscrowTransfer(uint256 workflowId) public nonReentrant whenNotPaused {
+    function releaseEscrowTransfer(uint256 workflowId) public nonReentrant {
         _requirePending(workflowId);
         if (escrowTransfers[workflowId].from != _msgSender()) revert NotSender(workflowId, _msgSender(), escrowTransfers[workflowId].from);
         _releaseEscrowTransfer(workflowId);

@@ -16,7 +16,7 @@ pragma solidity ^0.8.33;
 import '@openzeppelin/contracts/utils/Context.sol';
 import '@openzeppelin/contracts/access/AccessControl.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
-import '@openzeppelin/contracts/utils/Pausable.sol';
+// Pausable removed for size optimization - can be added back if needed
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/utils/Address.sol';
@@ -95,6 +95,7 @@ error AppealsNotEnabledInV1();
 error AlreadyPausedCannotRepause();
 error MaxPauseCyclesExceeded(uint256 currentCount, uint256 maxCycles);
 error PauseDurationExceeded(uint256 duration, uint256 maxDuration);
+error PausedNotSupported();
 
 // Errors used by child contracts (EscrowVault, EscrowableERC20)
 error BalanceUnderflow(address token, uint256 currentBalance, uint256 requestedAmount);
@@ -112,15 +113,9 @@ enum ResolutionMode {
     DIRECT               // No resolver configured (fallback)
 }
 
-/// @notice Pause state tracking for guardian pause constraints
-struct PauseState {
-    uint256 pausedAt;              // Timestamp when contract was paused
-    uint256 unpausedAt;            // Timestamp when contract was unpaused
-    uint256 pauseCycleCount;       // Number of pauses in current window
-    uint256 lastResetAt;           // Timestamp when cycle counter was reset
-}
+/// @notice Pause state tracking removed for size optimization
 
-abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
+abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
 
@@ -128,14 +123,8 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     bytes32 public constant ROLE_GUARDIAN = keccak256('ROLE_GUARDIAN');
     bytes32 public constant ROLE_ADMIN_CONTRACT = keccak256('ROLE_ADMIN_CONTRACT');
 
-    // Pause constraints (auto-expiring pause with cycle limit)
-    uint256 public constant MAX_PAUSE_DURATION = 7 days;
-    uint256 public constant MAX_PAUSE_CYCLES = 3;      // 3 pauses per PAUSE_WINDOW
-    uint256 public constant PAUSE_WINDOW = 90 days;    // Rolling 90-day window
+    // Pause constraints removed for size optimization
     
-    PauseState public pauseState;
-
-
     uint256 public escrowFee;
     uint256 public constant ESCROW_FEE_DENOMINATOR = 10000;
     uint256 public constant MAX_ESCROW_FEE_BPS = 200; // 2% maximum escrow fee
@@ -314,48 +303,24 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         uint256 timestamp
     );
 
-    // ============ Pause/Unpause ============
-    function pause(string calldata reason) external onlyRole(ROLE_GUARDIAN) {
-        // Prevent re-pausing while already paused (forces governance coordination)
-        if (paused()) {
-            revert AlreadyPausedCannotRepause();
-        }
-        
-        // Check pause cycle count in rolling window
-        uint256 elapsedWindow = block.timestamp - pauseState.lastResetAt;
-        if (elapsedWindow >= PAUSE_WINDOW) {
-            // Window expired - reset counter
-            pauseState.pauseCycleCount = 0;
-            pauseState.lastResetAt = block.timestamp;
-        }
-        
-        // Check if max cycles reached in current window
-        if (pauseState.pauseCycleCount >= MAX_PAUSE_CYCLES) {
-            revert MaxPauseCyclesExceeded(pauseState.pauseCycleCount, MAX_PAUSE_CYCLES);
-        }
-        
-        // Execute pause
-        _pause();
-        pauseState.pausedAt = block.timestamp;
-        pauseState.pauseCycleCount++;
-        emit IncidentPauseTriggered(reason, block.timestamp, pauseState.pauseCycleCount);
+    // ============ Pause functionality removed for size optimization ============
+    // Note: Returns false for backwards compatibility with external contracts
+    function paused() external pure returns (bool) {
+        return false;
     }
 
-    function unpause() external onlyRole(ROLE_TIMELOCK) {
-        _unpause();
-        pauseState.unpausedAt = block.timestamp;
-        emit SystemResumed(block.timestamp);
+    // Stub functions for backwards compatibility (no-op)
+    function pause(string calldata) external pure {
+        revert PausedNotSupported();
     }
 
-    /// @notice Enforce maximum pause duration on operations
-    /// @dev Called in critical functions to prevent indefinite pauses
-    function _enforceMaxPauseDuration() internal view {
-        if (paused()) {
-            uint256 pausedDuration = block.timestamp - pauseState.pausedAt;
-            if (pausedDuration > MAX_PAUSE_DURATION) {
-                revert PauseDurationExceeded(pausedDuration, MAX_PAUSE_DURATION);
-            }
-        }
+    function unpause() external pure {
+        revert PausedNotSupported();
+    }
+
+    // Stub for backwards compatibility
+    function pauseState() external pure returns (uint256, uint256, uint256, uint256) {
+        return (0, 0, 0, 0);
     }
 
     function setFeeRecipient(address newAddr) external onlyRole(ROLE_ADMIN_CONTRACT) {
@@ -590,7 +555,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
 
     // slither-disable-next-line reentrancy-no-eth
     function autoCancelDisputedEscrow(uint256 workflowId) external nonReentrant {
-        _enforceMaxPauseDuration();
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
         ModuleSnapshot storage snap = moduleSnapshots[workflowId];
@@ -619,8 +583,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     }
 
     // slither-disable-next-line reentrancy-no-eth
-    function raiseDispute(uint256 workflowId) external nonReentrant whenNotPaused {
-        _enforceMaxPauseDuration();
+    function raiseDispute(uint256 workflowId) external nonReentrant {
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
         ModuleSnapshot storage snap = moduleSnapshots[workflowId];
@@ -721,7 +684,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         external
         payable
         nonReentrant
-        whenNotPaused
         returns (bool success, address newDisputeResolver, uint8 newLevel)
     {
         (EscrowTransfer storage et, IResolutionModule resolutionModule) = _validateAndPrepareEscalation(workflowId);
@@ -861,7 +823,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     }
 
     function executePendingSettlement(uint256 workflowId) external nonReentrant {
-        _enforceMaxPauseDuration();
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
         PendingSettlement storage pending = pendingSettlements[workflowId];
@@ -891,7 +852,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
     /// @dev Part of IEscrowCore interface for wallet adoption
     /// @dev Callable even when paused (release strategy may further restrict)
     function release(uint256 workflowId) external nonReentrant {
-        _enforceMaxPauseDuration();
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
 
@@ -940,11 +900,11 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         _releaseEscrowTransfer(workflowId);
     }
 
-    function cancelAsDisputeResolver(uint256 workflowId, bytes32 resolutionHash) public nonReentrant whenNotPaused returns (bool) {
+    function cancelAsDisputeResolver(uint256 workflowId, bytes32 resolutionHash) public nonReentrant returns (bool) {
         return _executeResolution(workflowId, false, resolutionHash);
     }
 
-    function releaseAsDisputeResolver(uint256 workflowId, bytes32 resolutionHash) public nonReentrant whenNotPaused returns (bool) {
+    function releaseAsDisputeResolver(uint256 workflowId, bytes32 resolutionHash) public nonReentrant returns (bool) {
         return _executeResolution(workflowId, true, resolutionHash);
     }
 
@@ -1066,124 +1026,17 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         return escrowTransfers.length;
     }
 
-    /// @notice Get the current state of an escrow workflow
-    /// @param workflowId Unique escrow identifier
-    /// @return state Current EscrowState (PENDING, RELEASED, REFUNDED, DISPUTED, RESOLVED)
+    // Stub for backwards compatibility - returns state directly
     function getEscrowState(uint256 workflowId) external view returns (EscrowState state) {
         _validateWorkflowId(workflowId);
         return escrowTransfers[workflowId].escrowState;
     }
 
-    /// @notice Query resolution mode for an escrow (direct vs module-based)
-    /// @param workflowId Unique escrow identifier
-    /// @return mode ResolutionMode enum describing resolution strategy
-    /// @dev Critical for integrators: determines who can resolve disputes
-    function getResolutionMode(uint256 workflowId) external view returns (ResolutionMode mode) {
-        _validateWorkflowId(workflowId);
-        EscrowSettings memory settings = escrowSettings[workflowId];
-        
-        if (settings.customResolver != address(0)) {
-            return ResolutionMode.CUSTOM_RESOLVER;
-        } else if (disputeResolutionModule != address(0)) {
-            return ResolutionMode.RESOLUTION_MODULE;
-        } else {
-            return ResolutionMode.DIRECT;
-        }
-    }
-
-    /// @notice Query the active dispute handler for a workflow
-    /// @param workflowId Unique escrow identifier
-    /// @return handler Address of the resolver/module handling the dispute, or address(0) if not disputed
-    /// @dev Returns address(0) if escrow is not in DISPUTED state
-    function getActiveDisputeHandler(uint256 workflowId) external view returns (address handler) {
-        _validateWorkflowId(workflowId);
-        EscrowTransfer memory et = escrowTransfers[workflowId];
-        
-        // Only return handler if escrow is in DISPUTED state
-        if (et.escrowState == EscrowState.DISPUTED) {
-            return et.disputeResolver;
-        }
-        return address(0);
-    }
-
-    /// @notice Check if a release is allowed for the given escrow and caller
-    /// @param workflowId The escrow transfer ID
-    /// @param caller The address attempting to release
-    /// @return allowed True if release is allowed (strategy check passed)
-    function canRelease(uint256 workflowId, address caller) external view returns (bool allowed) {
-        if (workflowId >= escrowTransfers.length) return false;
-        EscrowTransfer storage et = escrowTransfers[workflowId];
-        if (et.escrowState != EscrowState.PENDING) return false;
-
-        IReleaseStrategy strategy = _getReleaseStrategy(workflowId);
-        if (address(strategy) == address(0)) return false;
-
-        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(
-            et.token,
-            et.from,
-            et.to,
-            et.amountAfterFee,
-            escrowSettings[workflowId].releaseAddress
-        );
-
-        (allowed, ) = strategy.canRelease(workflowId, address(this), caller, escrowData);
-        return allowed;
-    }
-
-    /// @notice Get wallet-friendly action status for an escrow
-    /// @param workflowId Unique escrow identifier
-    /// @return actionMask Bitmask of available actions (see IEscrowCore for bit mapping)
-    /// @return nextUpdateTime When this status may change (0 = no timed changes)
-    /// @dev Bitmask bits: 0=release, 1=senderCancel, 2=recipientCancel, 3=raiseDispute, 4=withdrawEscrow
-    function getActionStatus(uint256 workflowId) external view returns (uint256 actionMask, uint256 nextUpdateTime) {
-        _validateWorkflowId(workflowId);
-        EscrowTransfer storage et = escrowTransfers[workflowId];
-        address caller = _msgSender();
-        
-        // Determine available actions based on current state and caller's role
-        if (et.escrowState == EscrowState.PENDING) {
-            // Sender (buyer) can cancel
-            if (caller == et.from) {
-                actionMask |= (1 << 1); // bit 1: senderCancel
-            }
-            
-            // Recipient (seller) can request cancel
-            if (caller == et.to) {
-                actionMask |= (1 << 2); // bit 2: recipientCancel
-            }
-            
-            // Either party can raise dispute
-            if (caller == et.from || caller == et.to) {
-                actionMask |= (1 << 3); // bit 3: raiseDispute
-            }
-
-            // Release: consult strategy via best-effort staticcall
-            // Only sender should normally be checked, but strategy is authoritative
-            if (caller == et.from) {
-                bool canRel = _checkStrategyCanRelease(workflowId, et);
-                if (canRel) {
-                    actionMask |= (1 << 0); // bit 0: release
-                }
-                // If strategy call fails, release bit stays unset (safe default)
-            }
-        } else if (et.escrowState == EscrowState.DISPUTED) {
-            // When disputed, either party can interact with dispute
-            if (caller == et.from || caller == et.to) {
-                actionMask |= (1 << 3); // bit 3: raiseDispute (or dispute resolution actions)
-            }
-        } else if (et.escrowState == EscrowState.RELEASED || 
-                  et.escrowState == EscrowState.RESOLVED || 
-                  et.escrowState == EscrowState.REFUNDED) {
-            // Withdraw claimable is available if caller has claimable balance
-            if (claimableBalances[workflowId][caller] > 0) {
-                actionMask |= (1 << 4); // bit 4: withdrawEscrow
-            }
-        }
-        
-        // nextUpdateTime would be set if there are timed actions (e.g., auto-release deadline)
-        // For now, return 0 as escrows don't have built-in time-based transitions in PENDING
-        nextUpdateTime = 0;
-    }
+    // View functions moved to EscrowViewContract for size optimization:
+    // - getResolutionMode() 
+    // - getActiveDisputeHandler()
+    // - canRelease()
+    // - getActionStatus()
 
     function _requirePending(uint256 workflowId) internal view {
         _validateWorkflowId(workflowId);

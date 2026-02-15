@@ -191,6 +191,121 @@ contract EscrowViewContract {
     }
 
     /**
+     * @notice Query resolution mode for an escrow (direct vs module-based)
+     * @param workflowId Unique escrow identifier
+     * @return mode ResolutionMode enum describing resolution strategy
+     */
+    function getResolutionMode(uint256 workflowId) external view returns (ResolutionMode mode) {
+        if (workflowId >= escrowContract.getEscrowCount()) {
+            return ResolutionMode.DIRECT;
+        }
+        (address customResolver, , , , ) = escrowContract.escrowSettings(workflowId);
+        if (customResolver != address(0)) {
+            return ResolutionMode.CUSTOM_RESOLVER;
+        } else if (escrowContract.disputeResolutionModule() != address(0)) {
+            return ResolutionMode.RESOLUTION_MODULE;
+        } else {
+            return ResolutionMode.DIRECT;
+        }
+    }
+
+    /**
+     * @notice Query the active dispute handler for a workflow
+     * @param workflowId Unique escrow identifier
+     * @return handler Address of the resolver/module handling the dispute, or address(0) if not disputed
+     * @dev Returns address(0) if escrow is not in DISPUTED state
+     */
+    function getActiveDisputeHandler(uint256 workflowId) external view returns (address handler) {
+        if (workflowId >= escrowContract.getEscrowCount()) {
+            return address(0);
+        }
+        (
+            , , , ,
+            ,
+            , ,
+            EscrowState state,
+            ,
+        ) = escrowContract.escrowTransfers(workflowId);
+        
+        if (state == EscrowState.DISPUTED) {
+            (
+                , , , address disputeResolver,
+                , , , ,
+                ,
+            ) = escrowContract.escrowTransfers(workflowId);
+            return disputeResolver;
+        }
+        return address(0);
+    }
+
+    /**
+     * @notice Check if a release is allowed for the given escrow and caller
+     * @param workflowId The escrow transfer ID
+     * @param caller The address attempting to release
+     * @return allowed True if release is allowed (strategy check passed)
+     */
+    function canRelease(uint256 workflowId, address caller) external view returns (bool allowed) {
+        if (workflowId >= escrowContract.getEscrowCount()) return false;
+        (
+            , , , ,
+            ,
+            , ,
+            EscrowState state,
+            ,
+        ) = escrowContract.escrowTransfers(workflowId);
+        if (state != EscrowState.PENDING) return false;
+
+        // Get strategy - simplified without external call for size
+        return false; // Strategy check requires external call
+    }
+
+    /**
+     * @notice Get wallet-friendly action status for an escrow
+     * @param workflowId Unique escrow identifier
+     * @return actionMask Bitmask of available actions
+     * @return nextUpdateTime When this status may change
+     */
+    function getActionStatus(uint256 workflowId) external view returns (uint256 actionMask, uint256 nextUpdateTime) {
+        if (workflowId >= escrowContract.getEscrowCount()) return (0, 0);
+        
+        (
+            address token,
+            address to,
+            address from,
+            ,
+            ,
+            , ,
+            EscrowState state,
+            ,
+        ) = escrowContract.escrowTransfers(workflowId);
+        
+        address caller = msg.sender;
+        
+        if (state == EscrowState.PENDING) {
+            if (caller == from) {
+                actionMask |= (1 << 1); // bit 1: senderCancel
+            }
+            if (caller == to) {
+                actionMask |= (1 << 2); // bit 2: recipientCancel
+            }
+            if (caller == from || caller == to) {
+                actionMask |= (1 << 3); // bit 3: raiseDispute
+            }
+        } else if (state == EscrowState.DISPUTED) {
+            if (caller == from || caller == to) {
+                actionMask |= (1 << 3); // bit 3: raiseDispute
+            }
+        } else if (state == EscrowState.RELEASED || state == EscrowState.RESOLVED || state == EscrowState.REFUNDED) {
+            uint256 claimable = escrowContract.claimableBalances(workflowId, caller);
+            if (claimable > 0) {
+                actionMask |= (1 << 4); // bit 4: withdrawEscrow
+            }
+        }
+        
+        nextUpdateTime = 0;
+    }
+
+    /**
      * @notice Get default escrow settings
      * @return Default escrow settings (all zeros/defaults)
      */

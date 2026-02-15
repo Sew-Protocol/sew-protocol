@@ -5,16 +5,13 @@ out = "out"
 libs = ["lib"]
 cache_path = "cache-foundry"
 solc = "0.8.33"
-optimizer = true
-# Reduced to 100 runs to prioritize contract size over gas (EIP-170 24kb limit)
-optimizer_runs = 25
+optimizer_runs = 5
 via_ir = true
 verbosity = 3
 ffi = false
 fs_permissions = [{ access = "read", path = "./" }]
 
 [profile.coverage]
-# Use IR + optimizer for coverage to avoid stack-too-deep in complex contracts
 via_ir = true
 optimizer = true
 optimizer_runs = 1
