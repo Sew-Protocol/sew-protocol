@@ -1301,8 +1301,10 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         (uint256 principal, uint256 yield) = _handleYieldModuleUnwind(workflowId, token, amount);
         uint256 actualAmount = principal + yield;
         
-        // Update accounting based on full principal amount (regardless of yield loss)
-        // This ensures that losses are recognized and the "expected" balance is reduced correctly.
+        // CRITICAL: Update accounting based on FULL principal amount (amount, not principal)
+        // When module has loss: principal < amount
+        // The loss difference appears as "unaccounted" in the balance delta
+        // This makes losses visible in accounting for operators to detect and track
         _updateEscrowBalance(token, amount, false);
         
         // Auto-transfer: Attempt automatic transfer, fallback to claimable if fails
@@ -1383,7 +1385,13 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard, Pausable {
         (uint256 principal, uint256 yield) = _handleYieldModuleUnwind(workflowId, token, amount);
         uint256 actualAmount = principal + yield;
         
-        // Update accounting based on full principal amount (regardless of yield loss)
+        // CRITICAL: Update accounting based on FULL principal amount (amount, not principal)
+        // When module has loss: principal < amount
+        // Example: amount=990e18, principal=890e18 (loss=100e18)
+        // We reduce totalHeldInEscrowPerToken by 990e18 (full amount)
+        // But only transfer out 890e18
+        // The 100e18 difference appears as "unaccounted" in the balance delta
+        // This makes losses visible in accounting: contractBalance - expected = loss
         _updateEscrowBalance(token, amount, false);
         
         // Auto-transfer: Attempt automatic transfer, fallback to claimable if fails
