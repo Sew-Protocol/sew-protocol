@@ -7,6 +7,7 @@ import 'contracts/ops/YieldOps.sol';
 import 'contracts/ops/DisputeOps.sol';
 import 'contracts/core/ModuleSnapshotRegistry.sol';
 import 'contracts/core/EscrowVault.sol';
+import '../TestConfig.sol';
 
 contract Test_04_GuardianControls_test is Test {
     EscrowVault vault;
@@ -18,6 +19,7 @@ contract Test_04_GuardianControls_test is Test {
     address unauthorized = address(0x3);
 
     function setUp() public {
+        vm.skip(!TestConfig.RUN_PAUSE_TESTS);
         yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));

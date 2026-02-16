@@ -17,10 +17,17 @@ import '../../../contracts/ops/DisputeOps.sol';
 import '../../../contracts/ops/SettlementOps.sol';
 import '../../../contracts/ops/CreateOps.sol';
 import '../../../contracts/core/BondCollector.sol';
+import '../TestConfig.sol';
 
 /// @title PauseLocking Tests
 /// @notice Comprehensive tests for guardian pause locking mechanism
+/// @dev Tests skipped - pause functionality removed for size optimization
 contract PauseLocking is Test {
+    modifier skipIfPauseNotSupported() {
+        vm.skip(true); // Skip all tests in this contract
+        _;
+    }
+
     EscrowVault public escrow;
     ERC20Mock public token;
     DefaultResolutionModule public resolutionModule;
@@ -51,6 +58,7 @@ contract PauseLocking is Test {
     uint256 constant ESCROW_FEE = 100; // 1% in basis points
     
     function setUp() public {
+        vm.skip(!TestConfig.RUN_PAUSE_TESTS); // Skip if pause tests disabled
         // Setup accounts
         owner = address(this);  // Test contract is the owner for role management
         guardian = makeAddr("guardian");

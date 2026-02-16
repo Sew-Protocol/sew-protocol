@@ -15,21 +15,12 @@ import '../libraries/ModuleGetterConsolidationLibrary.sol';
 
 /**
  * @title EscrowableERC20
- * @notice ERC20 token with built-in escrow functionality
- * @dev Extends ERC20 and BaseEscrow to provide escrow capabilities for the token itself.
- *      Users can create escrows using this contract's tokens, with support for disputes,
- *      attachments, yield generation via Aave, and modular release/resolution strategies.
- *      Token parameter is always address(this) - single token escrow contract.
  */
 contract EscrowableERC20 is ERC20, BaseEscrow {
     using SafeERC20 for IERC20;
-    uint256 public constant INITIAL_SUPPLY = 1000000000000000000000000; // 1,000,000 tokens with 18 decimals
-    
-    // Single token
+    uint256 public constant INITIAL_SUPPLY = 1000000000000000000000000;
     uint256 public totalHeldInEscrow = 0;
     uint256 public totalFees = 0;
-    
-    // Module management contract (stores module state externally to reduce contract size)
     ModuleSnapshotRegistry public immutable moduleManagement;
 
     event FeesWithdrawn(uint256 amount);
@@ -43,7 +34,6 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         address disputeOpsAddress,
         address moduleManagementAddress
     ) ERC20(name, symbol) {
-        // Validate escrow fee is within allowed range (0 to 2%)
         if (escrowFeeBps > MAX_ESCROW_FEE_BPS) revert InvalidEscrowFee(escrowFeeBps, MAX_ESCROW_FEE_BPS);
         if (feeAddress == address(0)) revert ZeroAddress(1);
         if (yieldOpsAddress == address(0)) revert ZeroAddress(2);
@@ -62,18 +52,13 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _grantRole(ROLE_TIMELOCK, _msgSender());
 
-        // Initialize protocol fees (constants are already within bounds)
         yieldProtocolFeeBps = DEFAULT_YIELD_PROTOCOL_FEE_BPS;
-        appealBondProtocolFeeBps = 0; // 0% default
-
-        // Set timeout config fields directly (avoid struct literal to save bytecode)
+        appealBondProtocolFeeBps = 0;
         timeoutConfig.defaultAutoReleaseDelay = 0;
         timeoutConfig.defaultAutoCancelDelay = 0;
         timeoutConfig.maxDisputeDuration = 90 days;
         timeoutConfig.appealWindowDuration = 2 days;
-        // Note: defaultAutoReleaseTime and defaultAutoCancelTime are zero by default
         
-        // Mint initial supply to deployer
         _mint(_msgSender(), INITIAL_SUPPLY);
     }
 

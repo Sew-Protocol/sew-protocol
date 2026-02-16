@@ -245,18 +245,7 @@ contract EscrowViewContract {
      * @return allowed True if release is allowed (strategy check passed)
      */
     function canRelease(uint256 workflowId, address caller) external view returns (bool allowed) {
-        if (workflowId >= escrowContract.getEscrowCount()) return false;
-        (
-            , , , ,
-            ,
-            , ,
-            EscrowState state,
-            ,
-        ) = escrowContract.escrowTransfers(workflowId);
-        if (state != EscrowState.PENDING) return false;
-
-        // Get strategy - simplified without external call for size
-        return false; // Strategy check requires external call
+        return escrowContract.canRelease(workflowId, caller);
     }
 
     /**

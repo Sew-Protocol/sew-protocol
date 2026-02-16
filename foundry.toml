@@ -5,7 +5,7 @@ out = "out"
 libs = ["lib"]
 cache_path = "cache-foundry"
 solc = "0.8.33"
-optimizer_runs = 5
+optimizer_runs = 1
 via_ir = true
 verbosity = 3
 ffi = false
@@ -21,6 +21,6 @@ runs = 256
 max_test_rejects = 65536
 
 [rpc_endpoints]
-base_sepolia = "${RPC_BASE_SEPOLIA}"
+base_sepolia = "${RPC_BASE_SEPROLIA}"
 base = "${RPC_BASE_MAINNET}"
 ethereum = "${RPC_ETHEREUM}"

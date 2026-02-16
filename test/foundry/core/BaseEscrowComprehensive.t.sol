@@ -263,20 +263,21 @@ contract BaseEscrowComprehensive is Test {
     }
 
     // ============ Pause/Unpause ============
+    // Tests skipped - pause functionality removed for size optimization
 
-    function test_pause() public {
-        vm.prank(guardian);
-        vault.pause("test pause");
-        assertTrue(vault.paused());
-    }
+    // function test_pause() public {
+    //     vm.prank(guardian);
+    //     vault.pause("test pause");
+    //     assertTrue(vault.paused());
+    // }
 
-    function test_unpause() public {
-        vm.prank(guardian);
-        vault.pause("test pause");
-        vm.prank(timelock);
-        vault.unpause();
-        assertFalse(vault.paused());
-    }
+    // function test_unpause() public {
+    //     vm.prank(guardian);
+    //     vault.pause("test pause");
+    //     vm.prank(timelock);
+    //     vault.unpause();
+    //     assertFalse(vault.paused());
+    // }
 
     // ============ Module Management ============
 

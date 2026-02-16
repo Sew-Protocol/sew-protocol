@@ -16,7 +16,7 @@ pragma solidity ^0.8.33;
 import '@openzeppelin/contracts/utils/Context.sol';
 import '@openzeppelin/contracts/access/AccessControl.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
-// Pausable removed for size optimization - can be added back if needed
+import '@openzeppelin/contracts/utils/Pausable.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/utils/Address.sol';
@@ -303,13 +303,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         uint256 timestamp
     );
 
-    // ============ Pause functionality removed for size optimization ============
-    // Note: Returns false for backwards compatibility with external contracts
-    function paused() external pure returns (bool) {
-        return false;
-    }
-
-    // Stub functions for backwards compatibility (no-op)
+    // Pause functionality removed for size optimization - stubs for backwards compatibility
     function pause(string calldata) external pure {
         revert PausedNotSupported();
     }
@@ -318,9 +312,17 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         revert PausedNotSupported();
     }
 
-    // Stub for backwards compatibility
+    function paused() external pure returns (bool) {
+        return false;
+    }
+
+    // Stub for backwards compatibility with existing tests
     function pauseState() external pure returns (uint256, uint256, uint256, uint256) {
         return (0, 0, 0, 0);
+    }
+
+    function pauseCycleCount() external pure returns (uint256) {
+        return 0;
     }
 
     function setFeeRecipient(address newAddr) external onlyRole(ROLE_ADMIN_CONTRACT) {
@@ -1024,6 +1026,15 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
      */
     function getEscrowCount() external view returns (uint256 count) {
         return escrowTransfers.length;
+    }
+
+    /// @notice Check if release is allowed - simplified for size
+    function canRelease(uint256 workflowId, address caller) external view returns (bool allowed) {
+        if (workflowId >= escrowTransfers.length) return false;
+        EscrowTransfer storage et = escrowTransfers[workflowId];
+        if (et.escrowState != EscrowState.PENDING) return false;
+        if (caller != et.from) return false;
+        return true;
     }
 
     // Stub for backwards compatibility - returns state directly

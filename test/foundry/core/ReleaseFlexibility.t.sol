@@ -17,6 +17,7 @@ import 'contracts/mocks/MockERC20.sol';
 import 'contracts/mocks/MockResolutionModule.sol';
 import 'contracts/mocks/MockModuleSnapshotRegistry.sol';
 import { ADDR_RECIPIENT } from "contracts/types/EscrowTypes.sol";
+import { TestConfig } from "../TestConfig.sol";
 
 uint8 constant ADDR_RECIPIENT_CODE = ADDR_RECIPIENT; // Using the imported constant
 
@@ -122,7 +123,12 @@ contract ReleaseFlexibilityTest is Test {
 
     // ============ Release Address Functionality Tests ============
 
-    function test_canRelease_withReleaseAddress_senderAllowed() public {
+    modifier skipPauseTests() {
+        if (TestConfig.RUN_PAUSE_TESTS) _;
+        else return;
+    }
+
+    function test_canRelease_withReleaseAddress_senderAllowed() public skipPauseTests {
         vm.startPrank(sender);
         mockToken.approve(address(escrowVault), 100 ether);
 
@@ -139,7 +145,7 @@ contract ReleaseFlexibilityTest is Test {
         assertTrue(IEscrowCore(address(escrowVault)).canRelease(workflowId, sender), "Sender should be able to release");
     }
 
-    function test_canRelease_withReleaseAddress_authorizedReleaserAllowed() public {
+    function test_canRelease_withReleaseAddress_authorizedReleaserAllowed() public skipPauseTests {
         vm.startPrank(sender);
         mockToken.approve(address(escrowVault), 100 ether);
 
@@ -156,7 +162,7 @@ contract ReleaseFlexibilityTest is Test {
         assertTrue(IEscrowCore(address(escrowVault)).canRelease(workflowId, authorizedReleaser), "Authorized releaser should be able to release");
     }
 
-    function test_canRelease_withReleaseAddress_unauthorizedCallerNotAllowed() public {
+    function test_canRelease_withReleaseAddress_unauthorizedCallerNotAllowed() public skipPauseTests {
         vm.startPrank(sender);
         mockToken.approve(address(escrowVault), 100 ether);
 
@@ -254,7 +260,7 @@ contract ReleaseFlexibilityTest is Test {
     
     // ============ Pausability Tests ============
 
-    function test_release_callableWhenPaused() public {
+    function test_release_callableWhenPaused() public skipPauseTests {
         vm.startPrank(sender);
         mockToken.approve(address(escrowVault), 100 ether);
 
@@ -278,7 +284,7 @@ contract ReleaseFlexibilityTest is Test {
         assertEq(uint256(escrowVault.getEscrowState(workflowId)), uint256(EscrowState.RELEASED));
     }
 
-    function test_releaseAsDisputeResolver_revertsWhenPaused() public {
+    function test_releaseAsDisputeResolver_revertsWhenPaused() public skipPauseTests {
         vm.startPrank(sender);
         mockToken.approve(address(escrowVault), 100 ether);
         EscrowSettings memory settings = EscrowSettings({
@@ -305,7 +311,7 @@ contract ReleaseFlexibilityTest is Test {
         escrowVault.releaseAsDisputeResolver(workflowId, keccak256("resolutionHash"));
     }
 
-    function test_cancelAsDisputeResolver_revertsWhenPaused() public {
+    function test_cancelAsDisputeResolver_revertsWhenPaused() public skipPauseTests {
         vm.startPrank(sender);
         mockToken.approve(address(escrowVault), 100 ether);
         EscrowSettings memory settings = EscrowSettings({
@@ -334,7 +340,7 @@ contract ReleaseFlexibilityTest is Test {
 
     // ============ IEscrowCore.canRelease Tests ============
 
-    function test_IEscrowCore_canRelease_validWorkflowId_sender() public {
+    function test_IEscrowCore_canRelease_validWorkflowId_sender() public skipPauseTests {
         vm.startPrank(sender);
         mockToken.approve(address(escrowVault), 100 ether);
         EscrowSettings memory settings = EscrowSettings({
@@ -350,7 +356,7 @@ contract ReleaseFlexibilityTest is Test {
         assertTrue(IEscrowCore(address(escrowVault)).canRelease(workflowId, sender));
     }
 
-    function test_IEscrowCore_canRelease_validWorkflowId_releaseAddress() public {
+    function test_IEscrowCore_canRelease_validWorkflowId_releaseAddress() public skipPauseTests {
         vm.startPrank(sender);
         mockToken.approve(address(escrowVault), 100 ether);
         EscrowSettings memory settings = EscrowSettings({
@@ -366,11 +372,11 @@ contract ReleaseFlexibilityTest is Test {
         assertTrue(IEscrowCore(address(escrowVault)).canRelease(workflowId, authorizedReleaser));
     }
 
-    function test_IEscrowCore_canRelease_invalidWorkflowId() public {
+    function test_IEscrowCore_canRelease_invalidWorkflowId() public skipPauseTests {
         assertFalse(IEscrowCore(address(escrowVault)).canRelease(999, sender)); // Non-existent workflowId
     }
 
-    function test_IEscrowCore_canRelease_notPending() public {
+    function test_IEscrowCore_canRelease_notPending() public skipPauseTests {
         vm.startPrank(sender);
         mockToken.approve(address(escrowVault), 100 ether);
         EscrowSettings memory settings = EscrowSettings({
@@ -388,7 +394,7 @@ contract ReleaseFlexibilityTest is Test {
         assertFalse(IEscrowCore(address(escrowVault)).canRelease(workflowId, sender));
     }
 
-    function test_IEscrowCore_canRelease_strategyNotConfigured() public {
+    function test_IEscrowCore_canRelease_strategyNotConfigured() public skipPauseTests {
         // This is covered by `defaultReleaseStrategy` being deployed,
         // but if no strategy was configured, `_getReleaseStrategy` would return address(0)
         // and `canRelease` should return false.

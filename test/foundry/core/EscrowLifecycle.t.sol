@@ -13,6 +13,7 @@ import "../../../contracts/ops/DisputeOps.sol";
 import "../../../contracts/ops/SettlementOps.sol";
 import "../../../contracts/ops/CreateOps.sol";
 import "../../../contracts/core/BondCollector.sol";
+import "../TestConfig.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/libraries/SettingsValidationLibrary.sol";
 
@@ -70,6 +71,7 @@ contract EscrowLifecycleTest is Test {
     }
 
     function test_PauseUnpause_AccessControl() public {
+        vm.skip(!TestConfig.RUN_PAUSE_TESTS);
         vm.prank(guardian);
         vault.pause("test pause");
         assertTrue(vault.paused());

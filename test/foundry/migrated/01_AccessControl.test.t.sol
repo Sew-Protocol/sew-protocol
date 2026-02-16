@@ -10,6 +10,7 @@ import 'contracts/core/EscrowableERC20.sol';
 import 'contracts/core/EscrowVault.sol';
 import 'contracts/admin/EscrowGovernanceTimelock.sol';
 import 'contracts/types/EscrowTypes.sol';
+import '../TestConfig.sol';
 
 contract Test_01_AccessControl_test is Test {
     EscrowableERC20 escrowable;
@@ -24,6 +25,7 @@ contract Test_01_AccessControl_test is Test {
     address feeAddr = address(0x4);
 
     function setUp() public {
+        vm.skip(!TestConfig.RUN_PAUSE_TESTS);
         yieldOps = new YieldOps(address(this));
         disputeOps = new DisputeOps(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));

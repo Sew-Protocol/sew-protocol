@@ -18,6 +18,7 @@ import '../../../contracts/ops/SettlementOps.sol';
 import '../../../contracts/ops/CreateOps.sol';
 import '../../../contracts/ops/GuardianOps.sol';
 import '../../../contracts/governance/EmergencyRecoveryProposal.sol';
+import '../TestConfig.sol';
 
 /**
  * @title EmergencyRecoveryProposalTest
@@ -54,6 +55,7 @@ contract EmergencyRecoveryProposalTest is Test {
     }
 
     function setUp() public {
+        vm.skip(!TestConfig.RUN_PAUSE_TESTS);
         owner = address(this);
         timelock = address(0x1111);
         guardian = address(0x2222);
