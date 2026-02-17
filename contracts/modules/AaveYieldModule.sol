@@ -127,16 +127,24 @@ contract AaveYieldModule is IYieldModule {
         require(amount > 0, "ZeroAmount");
         
         // Escrow has already transferred 'amount' to us (push model)
-        // Verify we have the balance
+        // Note: For fee-on-transfer tokens, balance may be less than amount
         uint256 balBefore = IERC20(token).balanceOf(address(this));
-        require(balBefore >= amount, "InsufficientBalance");
+        
+        // We can only deposit what we have
+        uint256 available = balBefore;
+        require(available > 0, "InsufficientBalance");
+        
+        // Approve pool to pull tokens (use available, not amount)
+        SafeERC20.forceApprove(IERC20(token), address(aavePool), available);
         
         // Deposit to Aave
-        aavePool.supply(token, amount, address(this), 0);
+        aavePool.supply(token, available, address(this), 0);
         
         // Calculate actual deposited (handles fee-on-transfer)
         uint256 balAfter = IERC20(token).balanceOf(address(this));
-        uint256 actualDeposited = balBefore - balAfter;
+        uint256 actualDeposited = balBefore > balAfter ? balBefore - balAfter : 0;
+        
+        require(actualDeposited > 0, "InsufficientBalance");
         
         // Store position with actual deposited amount (INVARIANT 4)
         positions[msg.sender][escrowId] = YieldPosition({

@@ -4,6 +4,7 @@ pragma solidity ^0.8.33;
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
+import 'contracts/mocks/ERC20Mock.sol';
 
 /**
  * @title MockAavePool
@@ -49,6 +50,9 @@ contract MockAavePool {
         // and mints aTokens to onBehalfOf.
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
         
+        // Track supplied amount for withdraw
+        deposits[onBehalfOf][asset] += amount;
+        
         // Calculate scaled amount to mint
         uint256 scaledAmount = (amount * INITIAL_LIQUIDITY_INDEX) / currentIndex;
         
@@ -74,7 +78,7 @@ contract MockAavePool {
         // Burn scaled tokens
         aTokenContract.burn(msg.sender, scaledToBurn);
 
-        // Ensure we have enough tokens to transfer
+        // Use balance of pool (includes supplied + yield)
         uint256 poolBalance = IERC20(asset).balanceOf(address(this));
         require(poolBalance >= amount, 'Insufficient pool balance');
 
@@ -118,6 +122,13 @@ contract MockAavePool {
             liquidityIndex[token] +
             (liquidityIndex[token] * YIELD_RATE * blocks) /
             INITIAL_LIQUIDITY_INDEX;
+        
+        // Mint yield tokens to pool (simulating borrower interest payments to lenders)
+        uint256 poolBalance = IERC20(token).balanceOf(address(this));
+        uint256 yieldGenerated = (poolBalance * YIELD_RATE * blocks) / INITIAL_LIQUIDITY_INDEX;
+        if (yieldGenerated > 0) {
+            ERC20Mock(token).mint(address(this), yieldGenerated);
+        }
     }
 
     // ReserveData struct (simplified)
