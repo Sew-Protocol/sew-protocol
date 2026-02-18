@@ -17,6 +17,7 @@ This checklist ensures the codebase is production-ready with comprehensive stati
 ## 1. Static Analysis & Code Quality
 
 ### 1.1 Aderyn Analysis
+
 - [x] **Run Aderyn** on all contracts
 - [x] Document all findings
 - [ ] Fix critical/high severity issues
@@ -30,6 +31,7 @@ This checklist ensures the codebase is production-ready with comprehensive stati
 ---
 
 ### 1.2 Slither Analysis
+
 - [x] **Run Slither** with config file
 - [x] Document all findings
 - [ ] Fix critical/high severity issues
@@ -43,6 +45,7 @@ This checklist ensures the codebase is production-ready with comprehensive stati
 ---
 
 ### 1.3 Linting (ESLint)
+
 - [ ] **Run lint** on all TypeScript/JavaScript files
 - [ ] Fix all linting errors
 - [ ] Fix all linting warnings (or document exceptions)
@@ -55,6 +58,7 @@ This checklist ensures the codebase is production-ready with comprehensive stati
 ---
 
 ### 1.4 TypeScript Type Checking
+
 - [x] **Run typecheck** on all TypeScript files
 - [ ] Fix all type errors
 - [x] Document type errors that won't be fixed (with justification)
@@ -64,6 +68,7 @@ This checklist ensures the codebase is production-ready with comprehensive stati
 **Errors:** ~50+ type errors
 
 **Justification:**
+
 - Hardhat v2 / Ethers v6 / TypeScript compatibility issues
 - Code runs correctly despite type errors
 - Scripts are not part of on-chain contracts
@@ -75,6 +80,7 @@ This checklist ensures the codebase is production-ready with comprehensive stati
 ## 2. Testing Checklist
 
 ### 2.1 Test Coverage
+
 - [x] **Run coverage report** for all contracts
 - [x] Achieve **99% line coverage** target
 - [x] Achieve **80%+ branch coverage** target
@@ -84,6 +90,7 @@ This checklist ensures the codebase is production-ready with comprehensive stati
 **Status:** ✅ DONE
 **Coverage:** 99% achieved across core contracts.
 **Target Contracts:**
+
 - `BaseEscrow.sol`
 - `EscrowVault.sol`
 - `AaveYieldGenerationModule.sol`
@@ -96,6 +103,7 @@ This checklist ensures the codebase is production-ready with comprehensive stati
 ---
 
 ### 2.2 Fuzz Tests
+
 - [x] **Review existing fuzz tests**
 - [x] List all fuzz tests by contract
 - [x] Identify gaps in fuzz test coverage
@@ -112,6 +120,7 @@ This checklist ensures the codebase is production-ready with comprehensive stati
 ---
 
 ### 2.3 Invariant Tests
+
 - [x] **Review existing invariant tests**
 - [x] List all invariant tests by contract
 - [x] Identify gaps in invariant test coverage
@@ -130,10 +139,12 @@ This checklist ensures the codebase is production-ready with comprehensive stati
 ## 3. Security Review
 
 ### 3.1 Official DeFi Expert LLM Review
+
 - [x] **Conduct review** using prompt:
   > "As a 2026 expert of Ethereum/Solidity DeFi, review the contracts in the list specified, from a defi correctness and security perspective. Highlight any issues and next steps before mainnet launch."
 
 **Contracts Reviewed:**
+
 - [x] `BaseEscrow.sol`
 - [x] `EscrowVault.sol`
 - [x] `AaveYieldGenerationModule.sol`
@@ -149,6 +160,7 @@ This checklist ensures the codebase is production-ready with comprehensive stati
 **Report:** `docs/DEFI_EXPERT_REVIEW.md`
 
 **Key Findings:**
+
 - 3 Critical issues requiring review (scaled shares edge cases, yield distribution failures, Aave failure modes)
 - 3 High-priority enhancements recommended
 - Overall assessment: Strong foundation with critical reviews needed
@@ -156,6 +168,7 @@ This checklist ensures the codebase is production-ready with comprehensive stati
 ---
 
 ### 3.2 Known Issues Documentation
+
 - [x] Document all issues found by static analysis tools
 - [x] Categorize by severity (Critical, High, Medium, Low)
 - [x] For each issue that won't be fixed:
@@ -170,6 +183,7 @@ This checklist ensures the codebase is production-ready with comprehensive stati
 ## 4. Pre-Mainnet Requirements
 
 ### 4.1 Critical Items
+
 - [x] **All critical security issues fixed** (3 critical reviews needed - see DEFI_EXPERT_REVIEW.md)
   - [x] CRIT-1: Scaled shares accounting edge cases - ✅ Verified via Fuzz/Invariant tests
   - [x] CRIT-2: Yield distribution failure handling - ✅ Fixed (PUSH model implemented)
@@ -188,6 +202,7 @@ This checklist ensures the codebase is production-ready with comprehensive stati
 ---
 
 ### 4.2 Operational Readiness
+
 - [x] Deployment scripts tested on fork - ✅ Verified
 - [x] Governance procedures documented - ✅ See `docs/governance/`
 - [x] Emergency procedures documented - ✅ See `docs/governance/runbooks/`
@@ -198,6 +213,7 @@ This checklist ensures the codebase is production-ready with comprehensive stati
 ---
 
 ### 4.3 Documentation
+
 - [x] Security model documented - ✅ See `docs/security/SECURITY_MODEL.md`
 - [x] Architecture documented - ✅ See `docs/architecture/`
 - [x] API documentation complete - ✅ In code comments and architecture docs
@@ -210,6 +226,7 @@ This checklist ensures the codebase is production-ready with comprehensive stati
 ## 5. Testnet Readiness
 
 ### 5.1 Testnet Launch Checklist
+
 - [x] All critical tests passing - ✅ 34 Aave tests + all Foundry tests passing
 - [x] All static analysis issues triaged - ✅ Aderyn, Slither findings documented
 - [x] Testnet deployment scripts ready - ✅ Verified
@@ -219,9 +236,11 @@ This checklist ensures the codebase is production-ready with comprehensive stati
 **Ready to Launch to Testnet:** ☑ YES ☐ NO
 
 **Blockers (if NO):**
-- [ ] Review 3 critical security issues from DeFi expert review (CRIT-1, CRIT-2, CRIT-3)
-- [ ] Manual review of 25 reentrancy instances flagged by Aderyn
-- [ ] Verify testnet deployment scripts and configuration
+
+- [x] Review 3 critical security issues from DeFi expert review (CRIT-1, CRIT-2, CRIT-3) - ✅ All addressed
+- [x] Manual review of 25 reentrancy instances flagged by Aderyn - ✅ All reviewed, safe
+- [x] Verify testnet deployment scripts and configuration - ✅ Already deployed to Base Sepolia
+- [x] Fix partial recovery silent acceptance - ✅ Fixed in BaseEscrow.sol, tests added
 
 ---
 
@@ -230,11 +249,13 @@ This checklist ensures the codebase is production-ready with comprehensive stati
 ### 6.1 Explicitly Excluded from Current Release
 
 **Features:**
+
 - [ ] Partial withdrawals (users withdraw all - by design)
 - [ ] Multi-chain support (Base only for v1)
 - [ ] Frontend/backend code (contracts only)
 
 **Known Limitations:**
+
 - [x] Contract size optimization ongoing (separate thread) - ✅ Documented
 - [x] TypeScript type errors in scripts/tests (Hardhat/Ethers v6 compatibility) - ✅ Documented, won't fix
 - [x] Coverage tool compilation issues (tests pass, coverage estimated) - ✅ Documented
@@ -243,6 +264,7 @@ This checklist ensures the codebase is production-ready with comprehensive stati
 ---
 
 ### 6.2 Future Enhancements (Post-Mainnet)
+
 - [ ] Multi-chain support
 - [ ] Additional yield strategies
 - [ ] Enhanced dispute resolution features
@@ -255,20 +277,25 @@ This checklist ensures the codebase is production-ready with comprehensive stati
 ### 7.1 Static Analysis Findings
 
 #### Aderyn Findings
+
 **Status:** ⏳ PENDING  
 **Findings:** TBD
 
 #### Slither Findings
+
 **Status:** ⏳ PENDING  
 **Findings:** TBD
 
 #### Lint Findings
+
 **Status:** ✅ PASSING  
 **Findings:** None
 
 #### TypeCheck Findings
+
 **Status:** ❌ FAILING  
-**Findings:** 
+**Findings:**
+
 - Hardhat/Ethers v6 type compatibility issues
 - Missing type definitions for some modules
 - **Action:** Document as known limitation, fix in future update
@@ -293,11 +320,11 @@ This checklist ensures the codebase is production-ready with comprehensive stati
 
 ### 8.1 Pre-Mainnet Sign-Off
 
-**Technical Lead:** _________________ Date: _________
+**Technical Lead:** **\*\*\*\***\_**\*\*\*\*** Date: \***\*\_\*\***
 
-**Security Review:** _________________ Date: _________
+**Security Review:** **\*\*\*\***\_**\*\*\*\*** Date: \***\*\_\*\***
 
-**Operations Lead:** _________________ Date: _________
+**Operations Lead:** **\*\*\*\***\_**\*\*\*\*** Date: \***\*\_\*\***
 
 ---
 
@@ -305,18 +332,45 @@ This checklist ensures the codebase is production-ready with comprehensive stati
 
 **Approved for Testnet:** ☐ YES ☐ NO
 
-**Approved by:** _________________ Date: _________
+**Approved by:** **\*\*\*\***\_**\*\*\*\*** Date: \***\*\_\*\***
 
 **Notes:**
-- 
 
----
+- ***
 
 ## 9. Progress Tracking
 
 **Last Updated:** 2026-01-21  
 **Current Phase:** Production Hardening + Ops Safety  
 **Next Milestone:** Complete static analysis and security review
+
+---
+
+## 10. Preventing Documentation vs Code Drift
+
+### 10.1 Lessons Learned (2026-02-18)
+
+**Incident:** Partial recovery check (Issue #4 from PUNCH_LIST) was marked as "FIXED" in documentation but was NOT implemented in code.
+
+**Root Cause:**
+
+1. Documentation (`CRITICAL_FIXES_APPLIED_V2.5.md`) was updated to reflect the intended fix
+2. Code (`BaseEscrow.sol`) was NOT actually updated with the check
+3. No automated validation to verify documented fixes exist in code
+4. No test existed to verify the behavior
+
+**Action Taken:**
+
+1. Fixed the code to add: `if (recovered < yieldPrincipal) revert("YieldModuleEmergency: PartialRecoveryNotAllowed")`
+2. Added test: `test_emergencyUnwind_partialRecovery_rejected()` in `ReleaseEscrowEdgeCases.t.sol`
+3. Mock updated with `setEmergencyUnwindReturn()` to support testing
+
+### 10.2 Prevention Measures
+
+- [ ] **Code-to-Docs Validation:** Create a script that parses fix documents and searches for implementation patterns in code
+- [ ] **Mandatory Tests for Critical Fixes:** Every critical fix must have at least one passing test before marking as complete
+- [ ] **Code Review Checklist Item:** When closing a fix ticket, verify both: (a) code changed, (b) test added
+- [ ] **Documentation Update Rule:** Mark docs as "IMPLEMENTED" only after code + tests are merged
 
 ---
 

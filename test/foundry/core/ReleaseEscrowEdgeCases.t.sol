@@ -348,12 +348,10 @@ contract ReleaseEscrowEdgeCasesTest is Test {
         uint256 fee = (AMOUNT * ESCROW_FEE) / 10000;
         uint256 principal = AMOUNT - fee;
 
-        // Configure mock to revert (simulates YieldOps call failure)
-        mockYieldGen.setRevert(true);
+        // Configure mock: unwind reverts, emergencyUnwind also reverts (tokens stuck in module)
+        mockYieldGen.setRevert(true); // unwindToEscrow reverts
+        mockYieldGen.setEmergencyUnwindShouldRevert(true); // emergencyUnwind also reverts
         
-        // Don't fund mock - will revert on withdrawal
-        // Note: Tokens are already in mock from createEscrow deposit, so mock has them
-
         // Track balance before release
         uint256 totalHeldBefore = vault.totalHeldInEscrowPerToken(address(token));
 
@@ -365,14 +363,70 @@ contract ReleaseEscrowEdgeCasesTest is Test {
         uint256 totalHeldAfter = vault.totalHeldInEscrowPerToken(address(token));
         assertEq(totalHeldBefore - totalHeldAfter, principal, "Balance should decrement by principal");
 
-        // When yield withdrawal reverts, tokens are stuck in mock module
-        // So escrow doesn't have tokens to transfer - it sets amount as claimable
+        // When both unwind and emergencyUnwind revert, tokens are stuck in mock module
+        // Escrow doesn't have tokens to transfer - it sets amount as claimable
         // Verify amount is claimable (not directly transferred)
         uint256 claimable = vault.claimableBalances(wid, recipient);
         assertGe(claimable, principal, "Amount should be claimable when escrow lacks tokens");
-        
-        // To verify the system works end-to-end, we need to return tokens from mock
-        // and have recipient withdraw. For now, we verify claimable is set correctly.
+    }
+
+    // ============ Test 7: Emergency Unwind Partial Recovery Rejection ============
+
+    function test_emergencyUnwind_partialRecovery_rejected() public {
+        // Setup: Create escrow with yield enabled
+        vm.prank(sender);
+        token.approve(address(vault), AMOUNT);
+
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
+        settings.yieldPreset = YieldPreset.TO_SENDER;
+        vm.prank(sender);
+        uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT, settings);
+
+        uint256 fee = (AMOUNT * ESCROW_FEE) / 10000;
+        uint256 principal = AMOUNT - fee;
+
+        // Configure mock: normal unwind REVERTS (to trigger emergency unwind path)
+        mockYieldGen.setRevert(true); // This makes unwindToEscrow revert
+        mockYieldGen.setEmergencyUnwindShouldRevert(false); // But emergencyUnwind succeeds
+        mockYieldGen.setEmergencyUnwindReturn(principal * 80 / 100); // Returns only 80%
+
+        // Track balance before release
+        uint256 totalHeldBefore = vault.totalHeldInEscrowPerToken(address(token));
+
+        // Release escrow - should REJECT partial recovery
+        vm.prank(sender);
+        vm.expectRevert("YieldModuleEmergency: PartialRecoveryNotAllowed");
+        vault.releaseEscrowTransfer(wid);
+    }
+
+    function test_emergencyUnwind_fullRecovery_accepted() public {
+        // Setup: Create escrow with yield enabled
+        vm.prank(sender);
+        token.approve(address(vault), AMOUNT);
+
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
+        settings.yieldPreset = YieldPreset.TO_SENDER;
+        vm.prank(sender);
+        uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT, settings);
+
+        uint256 fee = (AMOUNT * ESCROW_FEE) / 10000;
+        uint256 principal = AMOUNT - fee;
+
+        // Configure mock: normal unwind REVERTS, but emergencyUnwind returns FULL principal
+        mockYieldGen.setRevert(true); // Normal unwind reverts
+        mockYieldGen.setEmergencyUnwindShouldRevert(false);
+        mockYieldGen.setEmergencyUnwindReturn(principal); // Emergency returns full principal
+
+        // Track balance before release
+        uint256 totalHeldBefore = vault.totalHeldInEscrowPerToken(address(token));
+
+        // Release escrow - should SUCCEED with full recovery
+        vm.prank(sender);
+        vault.releaseEscrowTransfer(wid);
+
+        // Verify: Balance decremented by principal
+        uint256 totalHeldAfter = vault.totalHeldInEscrowPerToken(address(token));
+        assertEq(totalHeldBefore - totalHeldAfter, principal, "Balance should decrement by principal");
     }
 }
 
@@ -385,9 +439,11 @@ contract MockYieldGenForEdgeCases is IYieldModule {
     using SafeERC20 for IERC20;
 
     bool public shouldRevert = false;
+    bool public emergencyUnwindShouldRevert = false;
     bool public withdrawSuccess = true;
     uint256 public actualAmount = 0;
     uint256 public yieldAmount = 0;
+    uint256 public emergencyUnwindReturn = 0; // 0 = use default behavior
     
     // Track deposits for withdrawal simulation
     // Maps escrowContract -> workflowId -> deposited amount
@@ -405,6 +461,14 @@ contract MockYieldGenForEdgeCases is IYieldModule {
 
     function setRevert(bool _shouldRevert) external {
         shouldRevert = _shouldRevert;
+    }
+
+    function setEmergencyUnwindShouldRevert(bool _shouldRevert) external {
+        emergencyUnwindShouldRevert = _shouldRevert;
+    }
+
+    function setEmergencyUnwindReturn(uint256 _returnAmount) external {
+        emergencyUnwindReturn = _returnAmount;
     }
 
     function initializeYield(
@@ -475,16 +539,22 @@ contract MockYieldGenForEdgeCases is IYieldModule {
         address token,
         uint256 principalExpected
     ) external override returns (uint256) {
-        if (shouldRevert) {
+        if (emergencyUnwindShouldRevert) {
             revert("MockYieldGen: Reverted");
         }
         
         address escrowContract = msg.sender;
         uint256 balance = IERC20(token).balanceOf(address(this));
-        uint256 toReturn = deposits[escrowContract][escrowId];
         
-        if (toReturn == 0) {
-            toReturn = principalExpected;
+        // Support configurable return amount for testing partial recovery
+        uint256 toReturn;
+        if (emergencyUnwindReturn > 0) {
+            toReturn = emergencyUnwindReturn; // Use explicitly set value (can be less than principal)
+        } else {
+            toReturn = deposits[escrowContract][escrowId];
+            if (toReturn == 0) {
+                toReturn = principalExpected;
+            }
         }
         
         if (toReturn > balance) {

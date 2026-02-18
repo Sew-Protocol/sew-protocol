@@ -1,6 +1,10 @@
 import { expect } from 'chai';
 import { ethers } from 'hardhat';
-import { L2AddressRegistry, RPCEndpointManager, MultiL2ModuleCoordinator } from '../typechain-types';
+import {
+  L2AddressRegistry,
+  RPCEndpointManager,
+  MultiL2ModuleCoordinator,
+} from '../typechain-types';
 import { HardhatEthersSigner } from '@nomicfoundation/hardhat-ethers/signers';
 
 describe('Phase 2: Infrastructure Contracts', function () {
@@ -53,7 +57,7 @@ describe('Phase 2: Infrastructure Contracts', function () {
       await registry.connect(governor1).activateVersion(OPTIMISM, 'EscrowVault', 'v1');
 
       // Verify addresses
-      const (eth, ethVersion) = await registry.getAddress(ETHEREUM, 'EscrowVault');
+      const [eth, ethVersion] = await registry.getAddress(ETHEREUM, 'EscrowVault');
       expect(eth.toLowerCase()).to.equal(ethereumVault.toLowerCase());
       expect(ethVersion).to.equal('v1');
     });
@@ -91,7 +95,7 @@ describe('Phase 2: Infrastructure Contracts', function () {
     it('should configure primary endpoint', async function () {
       await manager.connect(mgr1).setPrimaryEndpoint(BASE, primaryRPC, 1000);
 
-      const (endpoint, isPrimary) = await manager.getActiveEndpoint(BASE);
+      const [endpoint, isPrimary] = await manager.getActiveEndpoint(BASE);
       expect(endpoint).to.equal(primaryRPC);
       expect(isPrimary).to.be.true;
     });
@@ -100,7 +104,7 @@ describe('Phase 2: Infrastructure Contracts', function () {
       await manager.connect(mgr1).setBackupEndpoint(BASE, backupRPC, 500);
 
       // Primary should still be active
-      const (endpoint, isPrimary) = await manager.getActiveEndpoint(BASE);
+      const [endpoint, isPrimary] = await manager.getActiveEndpoint(BASE);
       expect(isPrimary).to.be.true;
     });
 
@@ -110,7 +114,7 @@ describe('Phase 2: Infrastructure Contracts', function () {
       await manager.connect(mgr1).recordFailure(BASE);
       await manager.connect(mgr1).recordFailure(BASE);
 
-      const (endpoint, isPrimary) = await manager.getActiveEndpoint(BASE);
+      const [endpoint, isPrimary] = await manager.getActiveEndpoint(BASE);
       expect(endpoint).to.equal(backupRPC);
       expect(isPrimary).to.be.false;
     });
@@ -119,7 +123,7 @@ describe('Phase 2: Infrastructure Contracts', function () {
       await manager.connect(mgr1).resetHealth(BASE);
       await manager.connect(mgr1).recordSuccess(BASE);
 
-      const (working, failureCount, successCount) = await manager.getHealthStatus(BASE);
+      const [working, failureCount, successCount] = await manager.getHealthStatus(BASE);
       expect(working).to.be.true;
       expect(failureCount).to.equal(0);
       expect(successCount).to.be.gt(0);
@@ -184,7 +188,7 @@ describe('Phase 2: Infrastructure Contracts', function () {
       const updateId = pendingUpdates[pendingUpdates.length - 1];
 
       // Get module update to check delay
-      const (ready, readyAt) = await coordinator.isReady(updateId);
+      const [ready, readyAt] = await coordinator.isReady(updateId);
 
       if (ready) {
         // Record activations on each chain
@@ -202,9 +206,8 @@ describe('Phase 2: Infrastructure Contracts', function () {
           .recordActivation(updateId, 10, ethers.id('tx-op'), 'activated');
 
         // Check completion
-        const (completed, activatedCount, totalChains) = await coordinator.getActivationStatus(
-          updateId,
-        );
+        const [completed, activatedCount, totalChains] =
+          await coordinator.getActivationStatus(updateId);
         expect(completed).to.be.true;
         expect(activatedCount).to.equal(totalChains);
       }
@@ -220,7 +223,7 @@ describe('Phase 2: Infrastructure Contracts', function () {
       const pendingUpdates = await coordinator.getPendingUpdates();
       const updateId = pendingUpdates[pendingUpdates.length - 1];
 
-      const (ready) = await coordinator.isReady(updateId);
+      const [ready] = await coordinator.isReady(updateId);
       if (ready) {
         // Record failure on Base
         await coordinator
@@ -280,10 +283,10 @@ describe('Phase 2: Infrastructure Contracts', function () {
         .queueModuleUpdate(moduleAddress, '0x79696509', 'Coordinated update');
 
       // Verify all components are ready
-      const (addr) = await registry.getAddress(8453n, 'EscrowVault');
+      const [addr] = await registry.getAddress(8453n, 'EscrowVault');
       expect(addr.toLowerCase()).to.equal(vaultAddress.toLowerCase());
 
-      const (endpoint, isPrimary) = await rpcManager.getActiveEndpoint(8453n);
+      const [endpoint, isPrimary] = await rpcManager.getActiveEndpoint(8453n);
       expect(endpoint).to.equal(baseRPC);
       expect(isPrimary).to.be.true;
 

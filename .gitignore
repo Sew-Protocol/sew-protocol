@@ -59,3 +59,6 @@ docs/archived
 report.md
 *.report.md
 
+# Telemetry
+telemetry-id
+

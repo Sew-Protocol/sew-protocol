@@ -1139,7 +1139,10 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         } catch {
             // Unwind failed - try emergency unwind
             try IYieldModule(module).emergencyUnwind(workflowId, token, yieldPrincipal) returns (uint256 recovered) {
-                // Emergency unwind succeeded - return as principal with no yield
+                // INVARIANT: Reject partial recovery - must recover full principal or revert
+                if (recovered < yieldPrincipal) {
+                    revert("YieldModuleEmergency: PartialRecoveryNotAllowed");
+                }
                 return (recovered, 0);
             } catch {
                 // Emergency unwind also failed - return original amount as fallback
