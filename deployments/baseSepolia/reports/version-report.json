@@ -1,0 +1,672 @@
+{
+  "generatedAt": "2026-02-19T12:55:37.207Z",
+  "network": {
+    "name": "baseSepolia",
+    "chainId": 84532
+  },
+  "hardhat": {
+    "solidity": {
+      "optimizerRuns": 10,
+      "viaIR": true
+    }
+  },
+  "interfaceIds": {
+    "IArbitrable": "0x311a6c56",
+    "IArbitrator": "0x8114b8a3",
+    "IERC165": "0x01ffc9a7",
+    "IEvidenceModule": "0xfa935b7e",
+    "IFraudProofModule": "0x9308ac9d",
+    "IModuleRegistry": "0xbae9fd9d",
+    "IReleaseStrategy": "0xf4856173",
+    "IResolutionModule": "0x9735510f",
+    "IResolver": "0xe88ef641",
+    "ISlashingModule": "0x10e6c65d",
+    "IStakingModule": "0x0dcc3563",
+    "IYieldDistributionModule": "0xf48a788f",
+    "IYieldGenerationModule": "0xaab6380b"
+  },
+  "deployments": {
+    "BondCollector": {
+      "name": "BondCollector",
+      "address": "0x24240912ed0143A47Cda4b7d32C8AB8CdFA825B4",
+      "runtimeCodeSizeBytes": 4009,
+      "runtimeCodeHash": "0x974a957c5a98d9657d8b17f7f07d0dedf5b380154a251da031e38f52b5edc0e8",
+      "supportsErc165": true,
+      "interfaces": {
+        "IArbitrable": {
+          "interfaceId": "0x311a6c56",
+          "supported": false
+        },
+        "IArbitrator": {
+          "interfaceId": "0x8114b8a3",
+          "supported": false
+        },
+        "IEvidenceModule": {
+          "interfaceId": "0xfa935b7e",
+          "supported": false
+        },
+        "IFraudProofModule": {
+          "interfaceId": "0x9308ac9d",
+          "supported": false
+        },
+        "IModuleRegistry": {
+          "interfaceId": "0xbae9fd9d",
+          "supported": false
+        },
+        "IReleaseStrategy": {
+          "interfaceId": "0xf4856173",
+          "supported": false
+        },
+        "IResolutionModule": {
+          "interfaceId": "0x9735510f",
+          "supported": false
+        },
+        "IResolver": {
+          "interfaceId": "0xe88ef641",
+          "supported": false
+        },
+        "ISlashingModule": {
+          "interfaceId": "0x10e6c65d",
+          "supported": false
+        },
+        "IStakingModule": {
+          "interfaceId": "0x0dcc3563",
+          "supported": false
+        },
+        "IYieldDistributionModule": {
+          "interfaceId": "0xf48a788f",
+          "supported": false
+        },
+        "IYieldGenerationModule": {
+          "interfaceId": "0xaab6380b",
+          "supported": false
+        }
+      },
+      "metadata": {}
+    },
+    "CreateOps": {
+      "name": "CreateOps",
+      "address": "0xBC60481020457CAC819B6938396a1002B0518f34",
+      "runtimeCodeSizeBytes": 3913,
+      "runtimeCodeHash": "0xd3274bdac435a0885d35f44dc8f61cb34f3b38bff0fd28b4a48bde45a41048b9",
+      "supportsErc165": true,
+      "interfaces": {
+        "IArbitrable": {
+          "interfaceId": "0x311a6c56",
+          "supported": false
+        },
+        "IArbitrator": {
+          "interfaceId": "0x8114b8a3",
+          "supported": false
+        },
+        "IEvidenceModule": {
+          "interfaceId": "0xfa935b7e",
+          "supported": false
+        },
+        "IFraudProofModule": {
+          "interfaceId": "0x9308ac9d",
+          "supported": false
+        },
+        "IModuleRegistry": {
+          "interfaceId": "0xbae9fd9d",
+          "supported": false
+        },
+        "IReleaseStrategy": {
+          "interfaceId": "0xf4856173",
+          "supported": false
+        },
+        "IResolutionModule": {
+          "interfaceId": "0x9735510f",
+          "supported": false
+        },
+        "IResolver": {
+          "interfaceId": "0xe88ef641",
+          "supported": false
+        },
+        "ISlashingModule": {
+          "interfaceId": "0x10e6c65d",
+          "supported": false
+        },
+        "IStakingModule": {
+          "interfaceId": "0x0dcc3563",
+          "supported": false
+        },
+        "IYieldDistributionModule": {
+          "interfaceId": "0xf48a788f",
+          "supported": false
+        },
+        "IYieldGenerationModule": {
+          "interfaceId": "0xaab6380b",
+          "supported": false
+        }
+      },
+      "metadata": {}
+    },
+    "DefaultReleaseStrategy": {
+      "name": "DefaultReleaseStrategy",
+      "address": "0xAaB4EeE521768df1f39501798A8D2a39b19c4E18",
+      "runtimeCodeSizeBytes": 986,
+      "runtimeCodeHash": "0x75e34cb2183b690cc7ba6e83344007711dcff7ab9dead57efee4cc87923c08e2",
+      "supportsErc165": true,
+      "interfaces": {
+        "IArbitrable": {
+          "interfaceId": "0x311a6c56",
+          "supported": false
+        },
+        "IArbitrator": {
+          "interfaceId": "0x8114b8a3",
+          "supported": false
+        },
+        "IEvidenceModule": {
+          "interfaceId": "0xfa935b7e",
+          "supported": false
+        },
+        "IFraudProofModule": {
+          "interfaceId": "0x9308ac9d",
+          "supported": false
+        },
+        "IModuleRegistry": {
+          "interfaceId": "0xbae9fd9d",
+          "supported": false
+        },
+        "IReleaseStrategy": {
+          "interfaceId": "0xf4856173",
+          "supported": false
+        },
+        "IResolutionModule": {
+          "interfaceId": "0x9735510f",
+          "supported": false
+        },
+        "IResolver": {
+          "interfaceId": "0xe88ef641",
+          "supported": false
+        },
+        "ISlashingModule": {
+          "interfaceId": "0x10e6c65d",
+          "supported": false
+        },
+        "IStakingModule": {
+          "interfaceId": "0x0dcc3563",
+          "supported": false
+        },
+        "IYieldDistributionModule": {
+          "interfaceId": "0xf48a788f",
+          "supported": false
+        },
+        "IYieldGenerationModule": {
+          "interfaceId": "0xaab6380b",
+          "supported": false
+        }
+      },
+      "metadata": {
+        "moduleName": "DefaultBuyerRelease",
+        "moduleVersion": "1.0.0",
+        "strategyName": "DefaultBuyerRelease"
+      }
+    },
+    "DisputeOps": {
+      "name": "DisputeOps",
+      "address": "0xd62A061bcC7b934558bd4c5dDa4E1FbeDC06D394",
+      "runtimeCodeSizeBytes": 5530,
+      "runtimeCodeHash": "0x25f6be13926d14986ef387dbb779b8abaf203005b98afac73ee7b24ab792fd68",
+      "supportsErc165": true,
+      "interfaces": {
+        "IArbitrable": {
+          "interfaceId": "0x311a6c56",
+          "supported": false
+        },
+        "IArbitrator": {
+          "interfaceId": "0x8114b8a3",
+          "supported": false
+        },
+        "IEvidenceModule": {
+          "interfaceId": "0xfa935b7e",
+          "supported": false
+        },
+        "IFraudProofModule": {
+          "interfaceId": "0x9308ac9d",
+          "supported": false
+        },
+        "IModuleRegistry": {
+          "interfaceId": "0xbae9fd9d",
+          "supported": false
+        },
+        "IReleaseStrategy": {
+          "interfaceId": "0xf4856173",
+          "supported": false
+        },
+        "IResolutionModule": {
+          "interfaceId": "0x9735510f",
+          "supported": false
+        },
+        "IResolver": {
+          "interfaceId": "0xe88ef641",
+          "supported": false
+        },
+        "ISlashingModule": {
+          "interfaceId": "0x10e6c65d",
+          "supported": false
+        },
+        "IStakingModule": {
+          "interfaceId": "0x0dcc3563",
+          "supported": false
+        },
+        "IYieldDistributionModule": {
+          "interfaceId": "0xf48a788f",
+          "supported": false
+        },
+        "IYieldGenerationModule": {
+          "interfaceId": "0xaab6380b",
+          "supported": false
+        }
+      },
+      "metadata": {}
+    },
+    "EscrowGovernanceTimelock": {
+      "name": "EscrowGovernanceTimelock",
+      "address": "0x13e2DBa43A28D5278803764F8308f1D230478391",
+      "runtimeCodeSizeBytes": 6146,
+      "runtimeCodeHash": "0x2e95b7b9314c6cbbd45350969af4fd417d3cc4f071afa4f3a208ed2a2951389c",
+      "supportsErc165": true,
+      "interfaces": {
+        "IArbitrable": {
+          "interfaceId": "0x311a6c56",
+          "supported": false
+        },
+        "IArbitrator": {
+          "interfaceId": "0x8114b8a3",
+          "supported": false
+        },
+        "IEvidenceModule": {
+          "interfaceId": "0xfa935b7e",
+          "supported": false
+        },
+        "IFraudProofModule": {
+          "interfaceId": "0x9308ac9d",
+          "supported": false
+        },
+        "IModuleRegistry": {
+          "interfaceId": "0xbae9fd9d",
+          "supported": false
+        },
+        "IReleaseStrategy": {
+          "interfaceId": "0xf4856173",
+          "supported": false
+        },
+        "IResolutionModule": {
+          "interfaceId": "0x9735510f",
+          "supported": false
+        },
+        "IResolver": {
+          "interfaceId": "0xe88ef641",
+          "supported": false
+        },
+        "ISlashingModule": {
+          "interfaceId": "0x10e6c65d",
+          "supported": false
+        },
+        "IStakingModule": {
+          "interfaceId": "0x0dcc3563",
+          "supported": false
+        },
+        "IYieldDistributionModule": {
+          "interfaceId": "0xf48a788f",
+          "supported": false
+        },
+        "IYieldGenerationModule": {
+          "interfaceId": "0xaab6380b",
+          "supported": false
+        }
+      },
+      "metadata": {}
+    },
+    "GuardianSafe": {
+      "name": "GuardianSafe",
+      "address": "0x5F13B5089a0B23c74AD9A22a2db59F5F48ab09bC",
+      "runtimeCodeSizeBytes": 0,
+      "runtimeCodeHash": null,
+      "supportsErc165": null,
+      "interfaces": {
+        "IArbitrable": {
+          "interfaceId": "0x311a6c56",
+          "supported": null
+        },
+        "IArbitrator": {
+          "interfaceId": "0x8114b8a3",
+          "supported": null
+        },
+        "IEvidenceModule": {
+          "interfaceId": "0xfa935b7e",
+          "supported": null
+        },
+        "IFraudProofModule": {
+          "interfaceId": "0x9308ac9d",
+          "supported": null
+        },
+        "IModuleRegistry": {
+          "interfaceId": "0xbae9fd9d",
+          "supported": null
+        },
+        "IReleaseStrategy": {
+          "interfaceId": "0xf4856173",
+          "supported": null
+        },
+        "IResolutionModule": {
+          "interfaceId": "0x9735510f",
+          "supported": null
+        },
+        "IResolver": {
+          "interfaceId": "0xe88ef641",
+          "supported": null
+        },
+        "ISlashingModule": {
+          "interfaceId": "0x10e6c65d",
+          "supported": null
+        },
+        "IStakingModule": {
+          "interfaceId": "0x0dcc3563",
+          "supported": null
+        },
+        "IYieldDistributionModule": {
+          "interfaceId": "0xf48a788f",
+          "supported": null
+        },
+        "IYieldGenerationModule": {
+          "interfaceId": "0xaab6380b",
+          "supported": null
+        }
+      },
+      "metadata": {}
+    },
+    "ModuleSnapshotRegistry": {
+      "name": "ModuleSnapshotRegistry",
+      "address": "0x1B152685Fb8268d7eb4F292524d86661dCFEEdE6",
+      "runtimeCodeSizeBytes": 4192,
+      "runtimeCodeHash": "0x876120f81b0ea730da739c91b9f6e82b02cca2228f5c61d6c9305cce489fb9cb",
+      "supportsErc165": true,
+      "interfaces": {
+        "IArbitrable": {
+          "interfaceId": "0x311a6c56",
+          "supported": false
+        },
+        "IArbitrator": {
+          "interfaceId": "0x8114b8a3",
+          "supported": false
+        },
+        "IEvidenceModule": {
+          "interfaceId": "0xfa935b7e",
+          "supported": false
+        },
+        "IFraudProofModule": {
+          "interfaceId": "0x9308ac9d",
+          "supported": false
+        },
+        "IModuleRegistry": {
+          "interfaceId": "0xbae9fd9d",
+          "supported": false
+        },
+        "IReleaseStrategy": {
+          "interfaceId": "0xf4856173",
+          "supported": false
+        },
+        "IResolutionModule": {
+          "interfaceId": "0x9735510f",
+          "supported": false
+        },
+        "IResolver": {
+          "interfaceId": "0xe88ef641",
+          "supported": false
+        },
+        "ISlashingModule": {
+          "interfaceId": "0x10e6c65d",
+          "supported": false
+        },
+        "IStakingModule": {
+          "interfaceId": "0x0dcc3563",
+          "supported": false
+        },
+        "IYieldDistributionModule": {
+          "interfaceId": "0xf48a788f",
+          "supported": false
+        },
+        "IYieldGenerationModule": {
+          "interfaceId": "0xaab6380b",
+          "supported": false
+        }
+      },
+      "metadata": {}
+    },
+    "SettlementOps": {
+      "name": "SettlementOps",
+      "address": "0x2cB13cefF8E5326647454aa2d50db15f5282c3A4",
+      "runtimeCodeSizeBytes": 3105,
+      "runtimeCodeHash": "0xdbbfb538cca524ea2ed484501543c616eab298c2830753795d975749c01fd179",
+      "supportsErc165": true,
+      "interfaces": {
+        "IArbitrable": {
+          "interfaceId": "0x311a6c56",
+          "supported": false
+        },
+        "IArbitrator": {
+          "interfaceId": "0x8114b8a3",
+          "supported": false
+        },
+        "IEvidenceModule": {
+          "interfaceId": "0xfa935b7e",
+          "supported": false
+        },
+        "IFraudProofModule": {
+          "interfaceId": "0x9308ac9d",
+          "supported": false
+        },
+        "IModuleRegistry": {
+          "interfaceId": "0xbae9fd9d",
+          "supported": false
+        },
+        "IReleaseStrategy": {
+          "interfaceId": "0xf4856173",
+          "supported": false
+        },
+        "IResolutionModule": {
+          "interfaceId": "0x9735510f",
+          "supported": false
+        },
+        "IResolver": {
+          "interfaceId": "0xe88ef641",
+          "supported": false
+        },
+        "ISlashingModule": {
+          "interfaceId": "0x10e6c65d",
+          "supported": false
+        },
+        "IStakingModule": {
+          "interfaceId": "0x0dcc3563",
+          "supported": false
+        },
+        "IYieldDistributionModule": {
+          "interfaceId": "0xf48a788f",
+          "supported": false
+        },
+        "IYieldGenerationModule": {
+          "interfaceId": "0xaab6380b",
+          "supported": false
+        }
+      },
+      "metadata": {}
+    },
+    "SewToken": {
+      "name": "SewToken",
+      "address": "0x79913fCa36Ea4e747F4742a4c1C7bC93a1522a14",
+      "runtimeCodeSizeBytes": 7171,
+      "runtimeCodeHash": "0x75e091631e341df4185bcb7788fb122f3f5752af357a764c60ff96c39a0d2238",
+      "supportsErc165": null,
+      "interfaces": {
+        "IArbitrable": {
+          "interfaceId": "0x311a6c56",
+          "supported": null
+        },
+        "IArbitrator": {
+          "interfaceId": "0x8114b8a3",
+          "supported": null
+        },
+        "IEvidenceModule": {
+          "interfaceId": "0xfa935b7e",
+          "supported": null
+        },
+        "IFraudProofModule": {
+          "interfaceId": "0x9308ac9d",
+          "supported": null
+        },
+        "IModuleRegistry": {
+          "interfaceId": "0xbae9fd9d",
+          "supported": null
+        },
+        "IReleaseStrategy": {
+          "interfaceId": "0xf4856173",
+          "supported": null
+        },
+        "IResolutionModule": {
+          "interfaceId": "0x9735510f",
+          "supported": null
+        },
+        "IResolver": {
+          "interfaceId": "0xe88ef641",
+          "supported": null
+        },
+        "ISlashingModule": {
+          "interfaceId": "0x10e6c65d",
+          "supported": null
+        },
+        "IStakingModule": {
+          "interfaceId": "0x0dcc3563",
+          "supported": null
+        },
+        "IYieldDistributionModule": {
+          "interfaceId": "0xf48a788f",
+          "supported": null
+        },
+        "IYieldGenerationModule": {
+          "interfaceId": "0xaab6380b",
+          "supported": null
+        }
+      },
+      "metadata": {}
+    },
+    "TimelockController": {
+      "name": "TimelockController",
+      "address": "0xF61053a82F5dBd0a2eCDebb9748e457119305F6a",
+      "runtimeCodeSizeBytes": 5377,
+      "runtimeCodeHash": "0x84e66431de7ae75cc22934e986105312a1640ebb89dd4ac566c4302e8e552078",
+      "supportsErc165": true,
+      "interfaces": {
+        "IArbitrable": {
+          "interfaceId": "0x311a6c56",
+          "supported": false
+        },
+        "IArbitrator": {
+          "interfaceId": "0x8114b8a3",
+          "supported": false
+        },
+        "IEvidenceModule": {
+          "interfaceId": "0xfa935b7e",
+          "supported": false
+        },
+        "IFraudProofModule": {
+          "interfaceId": "0x9308ac9d",
+          "supported": false
+        },
+        "IModuleRegistry": {
+          "interfaceId": "0xbae9fd9d",
+          "supported": false
+        },
+        "IReleaseStrategy": {
+          "interfaceId": "0xf4856173",
+          "supported": false
+        },
+        "IResolutionModule": {
+          "interfaceId": "0x9735510f",
+          "supported": false
+        },
+        "IResolver": {
+          "interfaceId": "0xe88ef641",
+          "supported": false
+        },
+        "ISlashingModule": {
+          "interfaceId": "0x10e6c65d",
+          "supported": false
+        },
+        "IStakingModule": {
+          "interfaceId": "0x0dcc3563",
+          "supported": false
+        },
+        "IYieldDistributionModule": {
+          "interfaceId": "0xf48a788f",
+          "supported": false
+        },
+        "IYieldGenerationModule": {
+          "interfaceId": "0xaab6380b",
+          "supported": false
+        }
+      },
+      "metadata": {}
+    },
+    "YieldOps": {
+      "name": "YieldOps",
+      "address": "0xEc421d01E88754dAe5AAdE24C7616F8161f9f0F3",
+      "runtimeCodeSizeBytes": 5487,
+      "runtimeCodeHash": "0x5d251a5d29afa89f3bdb5a3ea1689d869a4129f9cfdedb20f253d16fb39e766c",
+      "supportsErc165": true,
+      "interfaces": {
+        "IArbitrable": {
+          "interfaceId": "0x311a6c56",
+          "supported": false
+        },
+        "IArbitrator": {
+          "interfaceId": "0x8114b8a3",
+          "supported": false
+        },
+        "IEvidenceModule": {
+          "interfaceId": "0xfa935b7e",
+          "supported": false
+        },
+        "IFraudProofModule": {
+          "interfaceId": "0x9308ac9d",
+          "supported": false
+        },
+        "IModuleRegistry": {
+          "interfaceId": "0xbae9fd9d",
+          "supported": false
+        },
+        "IReleaseStrategy": {
+          "interfaceId": "0xf4856173",
+          "supported": null
+        },
+        "IResolutionModule": {
+          "interfaceId": "0x9735510f",
+          "supported": false
+        },
+        "IResolver": {
+          "interfaceId": "0xe88ef641",
+          "supported": false
+        },
+        "ISlashingModule": {
+          "interfaceId": "0x10e6c65d",
+          "supported": false
+        },
+        "IStakingModule": {
+          "interfaceId": "0x0dcc3563",
+          "supported": false
+        },
+        "IYieldDistributionModule": {
+          "interfaceId": "0xf48a788f",
+          "supported": false
+        },
+        "IYieldGenerationModule": {
+          "interfaceId": "0xaab6380b",
+          "supported": false
+        }
+      },
+      "metadata": {}
+    }
+  }
+}
