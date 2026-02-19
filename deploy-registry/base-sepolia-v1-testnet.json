@@ -1,0 +1,140 @@
+{
+  "epoch": "v1.x",
+  "chain": "baseSepolia",
+  "chainId": 84532,
+  "deploymentDate": "2026-02-19T11:52:00Z",
+  "status": "partial-deployed",
+  "description": "Base Sepolia testnet v1 deployment - core protocol contracts (deployment in progress)",
+  "notes": [
+    "Successfully deployed core operations and governance infrastructure",
+    "Governor and remaining contracts deployment interrupted and will be resumed",
+    "All deployed contracts verified and functional on chain"
+  ],
+  "contracts": {
+    "ModuleSnapshotRegistry": {
+      "address": "0x1B152685Fb8268d7eb4F292524d86661dCFEEdE6",
+      "deploymentBlock": "37866817",
+      "deploymentTx": "0xc11b28a1dcca133230fcc6034fb16bb7ddbe700e02660e759f4d3b5f5423d0ab",
+      "artifactPath": "deployments/baseSepolia/ModuleSnapshotRegistry.json",
+      "verified": false,
+      "notes": "Module registry for snapshot and metadata"
+    },
+    "YieldOps": {
+      "address": "0xEc421d01E88754dAe5AAdE24C7616F8161f9f0F3",
+      "deploymentBlock": "37866818",
+      "deploymentTx": "0xb91fc585876b3d4bd2d7dda0bb119c6208e10cb7df919f21bc75c2f42a557117",
+      "artifactPath": "deployments/baseSepolia/YieldOps.json",
+      "verified": false,
+      "notes": "Yield operations handler"
+    },
+    "DisputeOps": {
+      "address": "0xd62A061bcC7b934558bd4c5dDa4E1FbeDC06D394",
+      "deploymentBlock": "37866819",
+      "deploymentTx": "0x86e0aa096853bd410e5335ccf9c092ed6c4da7ec0f00bdc893967233fdece9ba",
+      "artifactPath": "deployments/baseSepolia/DisputeOps.json",
+      "verified": false,
+      "notes": "Dispute initialization and state transitions"
+    },
+    "SettlementOps": {
+      "address": "0x2cB13cefF8E5326647454aa2d50db15f5282c3A4",
+      "deploymentBlock": "37866820",
+      "deploymentTx": "0x4715592c1f5a5832140f33ac752419244a8dd62df7205122e1a88eb06afc3b30",
+      "artifactPath": "deployments/baseSepolia/SettlementOps.json",
+      "verified": false,
+      "notes": "Release and settlement logic"
+    },
+    "CreateOps": {
+      "address": "0xBC60481020457CAC819B6938396a1002B0518f34",
+      "deploymentBlock": "37866821",
+      "deploymentTx": "0x75fad5369b81e04a7fb9581ddf6f28bca4706ff0eab1c7f32e467b54a2cad807",
+      "artifactPath": "deployments/baseSepolia/CreateOps.json",
+      "verified": false,
+      "notes": "Escrow creation and validation"
+    },
+    "BondCollector": {
+      "address": "0x24240912ed0143A47Cda4b7d32C8AB8CdFA825B4",
+      "deploymentBlock": "37866822",
+      "deploymentTx": "0xaeee64894a71beb3ab7b05e62a1872e3b8708c88e5861dbb09b4a3f3b24c9a41",
+      "artifactPath": "deployments/baseSepolia/BondCollector.json",
+      "verified": false,
+      "notes": "Bond collection and management"
+    },
+    "EscrowGovernanceTimelock": {
+      "address": "0x13e2DBa43A28D5278803764F8308f1D230478391",
+      "deploymentBlock": "37866823",
+      "deploymentTx": "0xf154eed0d71a60fd9cede57b06d2f4b4159dbd0c1c3ce9d6918e54bf79c47cf3",
+      "artifactPath": "deployments/baseSepolia/EscrowGovernanceTimelock.json",
+      "verified": false,
+      "notes": "Governance timelock for escrow"
+    },
+    "SewToken": {
+      "address": "0x79913fCa36Ea4e747F4742a4c1C7bC93a1522a14",
+      "deploymentBlock": "37866824",
+      "deploymentTx": "0x12d11252185faaf1b6fb7821f8826e961e55474967e07456335bf20948967218",
+      "artifactPath": "deployments/baseSepolia/SewToken.json",
+      "verified": false,
+      "status": "new",
+      "notes": "Fresh deployment of governance token (v1.x epoch)"
+    },
+    "TimelockController": {
+      "address": "0xF61053a82F5dBd0a2eCDebb9748e457119305F6a",
+      "deploymentBlock": "37866825",
+      "deploymentTx": "0x9fbfc1cc38e32b8acd701e672c7ac775e83764470fc7efbc421134bada03ed6e",
+      "artifactPath": "deployments/baseSepolia/TimelockController.json",
+      "verified": false,
+      "notes": "2-day execution delay for governance"
+    },
+    "DefaultReleaseStrategy": {
+      "address": "0xAaB4EeE521768df1f39501798A8D2a39b19c4E18",
+      "deploymentBlock": "37866826",
+      "deploymentTx": "0x388a988c61529e89fe1a68127e729f84c69efff7d37151431581e99f96d6717c",
+      "artifactPath": "deployments/baseSepolia/DefaultReleaseStrategy.json",
+      "verified": false,
+      "notes": "Default release strategy module"
+    },
+    "GuardianSafe": {
+      "address": "0x5F13B5089a0B23c74AD9A22a2db59F5F48ab09bC",
+      "deploymentBlock": "10000",
+      "status": "carried-from-v0.x",
+      "artifactPath": "deployments/baseSepolia/.archive/2026-01-20-v0.x/Safe_Multisig.json",
+      "verified": true,
+      "notes": "Guardian multi-sig carried forward from v0.x (unchanged)"
+    },
+    "GovGovernor": {
+      "address": "pending",
+      "status": "pending-deployment",
+      "notes": "OpenZeppelin Governor with SewToken voting - deployment interrupted"
+    },
+    "L2AddressRegistry": {
+      "address": "pending",
+      "status": "pending-deployment",
+      "notes": "L2 address registry for cross-chain coordination"
+    },
+    "EscrowVault": {
+      "address": "pending",
+      "status": "pending-deployment",
+      "notes": "Core protocol escrow management"
+    },
+    "ModuleRegistry": {
+      "address": "pending",
+      "status": "pending-deployment",
+      "notes": "Registry of available modules"
+    }
+  },
+  "persistentAssets": [
+    {
+      "name": "GuardianSafe",
+      "address": "0x5F13B5089a0B23c74AD9A22a2db59F5F48ab09bC",
+      "reason": "Governance anchor unchanged since v0.x",
+      "carryForwardFrom": "v0.x"
+    }
+  ],
+  "deployment_summary": {
+    "total_contracts_targeted": 15,
+    "deployed": 11,
+    "pending": 4,
+    "deployment_start": "2026-02-19T11:43:00Z",
+    "deployment_paused": "2026-02-19T12:15:00Z",
+    "reason_paused": "Governor deployment took longer than expected due to high gas and contract size"
+  }
+}

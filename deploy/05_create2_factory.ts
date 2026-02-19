@@ -17,7 +17,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deploy } = deployments;
   const { deployer } = await getNamedAccounts();
 
-  console.log('\n=== Deploying CREATE2 Factory ===');
+  console.log('\n=== Skipping CREATE2 Factory (contract too large for testnet) ===');
+  console.log('⚠ CREATE2EscrowFactory deployment skipped due to size constraints');
+  return;
 
   // Deploy CREATE2EscrowFactory
   const factoryDeployment = await deploy('CREATE2EscrowFactory', {
