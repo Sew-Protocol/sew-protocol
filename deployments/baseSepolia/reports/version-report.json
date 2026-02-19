@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-02-19T12:55:37.207Z",
+  "generatedAt": "2026-02-19T13:03:42.733Z",
   "network": {
     "name": "baseSepolia",
     "chainId": 84532
@@ -639,7 +639,7 @@
         },
         "IReleaseStrategy": {
           "interfaceId": "0xf4856173",
-          "supported": null
+          "supported": false
         },
         "IResolutionModule": {
           "interfaceId": "0x9735510f",
