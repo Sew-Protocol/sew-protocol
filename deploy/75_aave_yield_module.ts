@@ -32,11 +32,13 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   let poolAddress: string;
 
   if (chainConfig.chainId === 8453) {
-    // Base Mainnet
-    poolAddress = '0x4EdB3d48697eB0C8f4fC4d12b3c5D0eB4C1eD76';
+    // Base Mainnet - Aave V3 Pool
+    // TODO: Verify the correct Base Mainnet pool address from Aave docs
+    // Current placeholder: poolAddress = '0x...';
+    throw new Error('Base Mainnet Aave Pool address not configured - please verify from Aave documentation');
   } else if (chainConfig.chainId === 84532) {
-    // Base Sepolia
-    poolAddress = '0xA238Dd80C259a72e81d7e0664A4EA4B9e5d86005';
+    // Base Sepolia - Aave V3 Pool (verified checksum)
+    poolAddress = '0xa238DD80c259A72E81D7E0664A4EA4b9e5d86005';
   } else if (addressesProvider) {
     // Try to get pool from addresses provider
     poolAddress = addressesProvider;
