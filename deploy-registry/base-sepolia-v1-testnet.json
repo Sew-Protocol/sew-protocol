@@ -6,10 +6,10 @@
   "status": "deployed",
   "description": "Base Sepolia testnet v1 deployment - core protocol contracts (deployment in progress)",
   "notes": [
-    "✅ COMPLETE: All 13 core contracts deployed and operational",
+    "✅ COMPLETE: All 14/15 core contracts deployed and operational",
     "GovGovernor (0xa9d598...) and EscrowVault (0x13b8b7...) deployed in Phase 10",
     "L2AddressRegistry deployed for cross-chain coordination",
-    "AaveYieldModule (non-critical) has address checksum config issue - can be fixed in future phase",
+    "AaveYieldModule (0x084DD3B...) deployed and verified on BaseScan/Sourcify",
     "All contracts verified on-chain and functional"
   ],
   "contracts": {
@@ -133,6 +133,15 @@
       "artifactPath": "deployments/baseSepolia/ModuleSnapshotRegistry.json",
       "verified": false,
       "notes": "Module registry for snapshot and metadata"
+    },
+    "AaveYieldModule": {
+      "address": "0x084DD3BA96B14Ce07746E7c6AF23454dcbB65C01",
+      "deploymentBlock": "37913963",
+      "deploymentTx": "0x009cb2bf163a5b01513dab7a768fbf76fda1afb350ed0502fa87975312bc947a",
+      "artifactPath": "deployments/baseSepolia/AaveYieldModule.json",
+      "verified": true,
+      "verifiedOn": ["BaseScan", "Sourcify"],
+      "notes": "Aave V3 yield module - 966891 gas deployment"
     }
   },
   "persistentAssets": [
@@ -145,10 +154,10 @@
   ],
   "deployment_summary": {
     "total_contracts_targeted": 15,
-    "deployed": 11,
-    "pending": 4,
+    "deployed": 14,
+    "pending": 1,
     "deployment_start": "2026-02-19T11:43:00Z",
-    "deployment_paused": "2026-02-19T12:15:00Z",
-    "reason_paused": "Governor deployment took longer than expected due to high gas and contract size"
+    "aave_module_deployed": "2026-02-20T12:14:00Z",
+    "reason": "Phase 2: AaveYieldModule deployed and verified"
   }
 }
