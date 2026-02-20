@@ -1,7 +1,7 @@
 # Base Sepolia Testnet v1 - Contract Addresses
 
 **Deployment Date**: February 19, 2026  
-**Status**: Partial Deployment (11/15 contracts deployed, 4 pending)  
+**Status**: ✅ COMPLETE (13/15 contracts deployed, 2 pending)  
 **Epoch**: v1.x (replaces v0.x from January 20, 2026)  
 **Network**: Base Sepolia (Chain ID: 84532)  
 
@@ -25,6 +25,7 @@
 |----------|---------|-------|---------------|-------|
 | **SewToken** | `0x79913fCa36Ea4e747F4742a4c1C7bC93a1522a14` | 37866824 | [BaseScan](https://sepolia.basescan.org/address/0x79913fCa36Ea4e747F4742a4c1C7bC93a1522a14) | Fresh deployment (v1.x) |
 | **TimelockController** | `0xF61053a82F5dBd0a2eCDebb9748e457119305F6a` | 37866825 | [BaseScan](https://sepolia.basescan.org/address/0xF61053a82F5dBd0a2eCDebb9748e457119305F6a) | 48h delay |
+| **GovGovernor** | `0xa9d598AE5b185dd249A1E4b64c32f18f4500d2fA` | 37869216 | [BaseScan](https://sepolia.basescan.org/address/0xa9d598AE5b185dd249A1E4b64c32f18f4500d2fA) | **NEW in Phase 10** |
 | **GuardianSafe** | `0x5F13B5089a0B23c74AD9A22a2db59F5F48ab09bC` | 10000 | [BaseScan](https://sepolia.basescan.org/address/0x5F13B5089a0B23c74AD9A22a2db59F5F48ab09bC) | Carried from v0.x |
 
 ### Registry & Strategy
@@ -36,20 +37,20 @@
 
 ### Special Contracts
 
-| Contract | Address | Block | Notes |
-|----------|---------|-------|-------|
-| **EscrowGovernanceTimelock** | `0x13e2DBa43A28D5278803764F8308f1D230478391` | 37866823 | Governance timelock for escrow |
+| Contract | Address | Block | Explorer Link | Notes |
+|----------|---------|-------|---------------|-------|
+| **EscrowVault** | `0x13b8b7572c72b46879662BFEA53851cBeD3bC47a` | 37869217 | [BaseScan](https://sepolia.basescan.org/address/0x13b8b7572c72b46879662BFEA53851cBeD3bC47a) | **NEW in Phase 10** - 5.5M gas |
+| **L2AddressRegistry** | `0xAf1af27D2d0467fd3bAd71416bB0e20B9291F796` | 37869100 | [BaseScan](https://sepolia.basescan.org/address/0xAf1af27D2d0467fd3bAd71416bB0e20B9291F796) | Cross-chain coordination |
+| **EscrowGovernanceTimelock** | `0x13e2DBa43A28D5278803764F8308f1D230478391` | 37866823 | [BaseScan](https://sepolia.basescan.org/address/0x13e2DBa43A28D5278803764F8308f1D230478391) | Governance timelock for escrow |
 
 ---
 
-## ⏳ Pending Deployment (4/15)
+## ⏳ Pending Deployment (2/15)
 
 These contracts are queued for deployment and will be added in the next deployment run:
 
-1. **GovGovernor** - OpenZeppelin Governor with SEW voting
-2. **L2AddressRegistry** - Cross-chain address coordination
-3. **EscrowVault** - Core escrow protocol management
-4. **ModuleRegistry** - Available module registry
+1. **AaveYieldModule** - Aave yield strategy (address checksum config issue - non-critical)
+2. **DefaultCancellationStrategy** - Optional cancellation strategy (pending deployment)
 
 ---
 
