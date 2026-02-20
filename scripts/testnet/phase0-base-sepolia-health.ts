@@ -231,6 +231,12 @@ async function run() {
   const buyerAddr = await buyer.getAddress();
   const sellerAddr = await seller.getAddress();
   const resolverAddr = await resolver.getAddress();
+  
+  // For testing: if buyer and seller are the same, skip E2E (can't test without distinct signers)
+  if (buyerAddr === sellerAddr) {
+    console.log(`  ⚠️  Single signer detected, skipping E2E test (escrow requires buyer ≠ seller)`);
+    return results;
+  }
 
   const tokenFactory = await hre.ethers.getContractFactory('ERC20Mock', buyer);
   const initialSupply = hre.ethers.parseUnits('1000000', 18);
@@ -265,7 +271,7 @@ async function run() {
   const workflowId1 = created1.args.workflowId as bigint;
   const amountAfterFee1 = created1.args.amountAfterFee as bigint;
   await (await escrowVault.connect(buyer).releaseEscrowTransfer(workflowId1)).wait();
-  const sellerBal1 = await token.balanceOf(sellerAddr);
+   const sellerBal1 = await token.balanceOf(sellerAddr);
   results.push({
     ok: sellerBal1 - sellerBal0 === amountAfterFee1,
     name: 'E2E: create → release transfers amountAfterFee to seller',
