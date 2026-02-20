@@ -82,6 +82,9 @@ const config: HardhatUserConfig = {
     base: { url: rpc('RPC_BASE_MAINNET'), accounts: accountsOrThrow('base'), chainId: 8453 },
     ethereum: { url: rpc('RPC_ETHEREUM'), accounts: accountsOrThrow('ethereum'), chainId: 1 },
   },
+  sourcify: {
+    enabled: true,
+  },
   etherscan: {
     // Use a single API key for V2 API (Basescan uses same API key format)
     apiKey: process.env.BASESCAN_API_KEY || process.env.ETHERSCAN_API_KEY || '',
