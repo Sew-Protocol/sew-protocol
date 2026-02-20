@@ -98,15 +98,8 @@ contract Phase0BaseSepoliaForkTest is Test {
 
     function test_phase0_deployment_health_and_minimal_e2e() public {
         // NOTE: Fork tests require contracts deployed with the latest code.
-        // Current deployment on Base Sepolia is from an older version that doesn't
-        // support ModuleSnapshot and other recent features. These tests will pass
-        // once contracts are redeployed with the latest code.
-        // To test locally without fork, use local integration tests instead.
-        bool skipForkTests = true;  // Set to false after redeployment
-        if (skipForkTests) {
-            vm.skip(true);
-            return;
-        }
+        // EscrowVault and supporting contracts are now current.
+        // AaveYieldModule deployment can be tested in Phase 4 after activation.
 
         bool strictGov = vm.envOr("PHASE0_STRICT_GOVERNANCE", uint256(0)) == 1;
 
