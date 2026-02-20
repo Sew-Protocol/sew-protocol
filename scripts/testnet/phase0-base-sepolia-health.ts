@@ -215,7 +215,19 @@ async function run() {
 
   // 6) Minimal E2E on fork (no external keys)
   console.log(`\n6) Minimal E2E on fork (ERC20Mock)`);
-  const [buyer, seller, resolver] = await hre.ethers.getSigners();
+  const signers = await hre.ethers.getSigners();
+  let buyer, seller, resolver;
+  
+  if (signers.length >= 3) {
+    [buyer, seller, resolver] = signers;
+  } else if (signers.length > 0) {
+    // Use same signer for multiple roles if needed
+    buyer = seller = resolver = signers[0];
+  } else {
+    console.log(`  ⚠️  No signers available, skipping E2E test`);
+    return results;
+  }
+  
   const buyerAddr = await buyer.getAddress();
   const sellerAddr = await seller.getAddress();
   const resolverAddr = await resolver.getAddress();
@@ -229,6 +241,7 @@ async function run() {
   const amount = hre.ethers.parseUnits('100', 18);
   const settings = {
     customResolver: resolverAddr,
+    releaseAddress: ethers.ZeroAddress,
     yieldPreset: 0, // OFF
     autoReleaseTime: 0n,
     autoCancelTime: 0n,
