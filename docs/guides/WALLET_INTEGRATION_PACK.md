@@ -193,7 +193,9 @@ enum EscrowState {
     NONE,          // Not created
     PENDING,       // Created, awaiting release/cancel
     RELEASED,      // Released to recipient
-    REFUNDED       // Cancelled, refunded to sender
+    REFUNDED,      // Cancelled, refunded to sender
+    DISPUTED,      // In active dispute (resolution pending)
+    RESOLVED       // Dispute resolved (release or cancel executed)
 }
 ```
 
@@ -645,7 +647,7 @@ async function checkEscrowStatus(workflowId) {
     const escrow = await vault.escrowTransfers(workflowId);
     const state = await vault.escrowStates(workflowId);
 
-    const states = ['NONE', 'PENDING', 'RELEASED', 'REFUNDED'];
+    const states = ['NONE', 'PENDING', 'RELEASED', 'REFUNDED', 'DISPUTED', 'RESOLVED'];
 
     console.log('=== ESCROW STATUS ===');
     console.log(`Workflow ID: ${workflowId}`);

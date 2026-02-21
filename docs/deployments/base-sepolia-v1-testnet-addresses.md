@@ -1,7 +1,7 @@
 # Base Sepolia Testnet v1 - Contract Addresses
 
 **Deployment Date**: February 19, 2026  
-**Status**: ✅ COMPLETE (13/15 contracts deployed, 2 pending)  
+**Status**: ✅ COMPLETE (14/15 contracts deployed, 1 pending)  
 **Epoch**: v1.x (replaces v0.x from January 20, 2026)  
 **Network**: Base Sepolia (Chain ID: 84532)  
 
@@ -34,6 +34,13 @@
 |----------|---------|-------|---------------|
 | **ModuleSnapshotRegistry** | `0x1B152685Fb8268d7eb4F292524d86661dCFEEdE6` | 37866817 | [BaseScan](https://sepolia.basescan.org/address/0x1B152685Fb8268d7eb4F292524d86661dCFEEdE6) |
 | **DefaultReleaseStrategy** | `0xAaB4EeE521768df1f39501798A8D2a39b19c4E18` | 37866826 | [BaseScan](https://sepolia.basescan.org/address/0xAaB4EeE521768df1f39501798A8D2a39b19c4E18) |
+| **AaveYieldModule** | `0x084DD3BA96B14Ce07746E7c6AF23454dcbB65C01` | 37869218 | [BaseScan](https://sepolia.basescan.org/address/0x084DD3BA96B14Ce07746E7c6AF23454dcbB65C01) |
+
+### External Integrations
+
+| Service | Address / URL | Notes |
+|---------|---------|-------|
+| **Aave V3 Pool** | `0x8bAB6d1b75f19e9eD9fCe8b9BD338844fF79aE27` | Base Sepolia Aave instance |
 
 ### Special Contracts
 
@@ -45,12 +52,11 @@
 
 ---
 
-## ⏳ Pending Deployment (2/15)
+## ⏳ Pending Deployment (1/15)
 
-These contracts are queued for deployment and will be added in the next deployment run:
+This contract is queued for deployment and will be added in the next deployment run:
 
-1. **AaveYieldModule** - Aave yield strategy (address checksum config issue - non-critical)
-2. **DefaultCancellationStrategy** - Optional cancellation strategy (pending deployment)
+1. **DefaultCancellationStrategy** - Optional cancellation strategy (pending deployment)
 
 ---
 
@@ -136,7 +142,7 @@ Run `hardhat run scripts/verify.ts --network baseSepolia` to verify remaining co
 
 **Last Updated**: February 19, 2026  
 **Epoch**: v1.x  
-**Status**: Partial (11/15 deployed)  
+**Status**: Partial (14/15 deployed)  
 
 ---
 

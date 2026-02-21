@@ -158,15 +158,34 @@ Sender → Create (releaseAddress=arbitrator) → Arbitrator calls release()
         └─────────────────┘
 ```
 
+**Dispute Flow:**
+```
+┌─ PENDING ──────────────────────────┐
+│  Either party can raise dispute     │
+└─────────────────┬───────────────────┘
+                  │
+              DISPUTED
+                  │
+           Resolver decides
+                  │
+              RESOLVED
+                  │
+    ├─→ Auto-release or Cancel
+    │
+RELEASED or REFUNDED (final)
+```
+
 ---
 
 ## 🔍 State Machine
 
-| State | Can Release? | Can Cancel? | Next States |
-|-------|---------|---------|---------|
-| PENDING | ✅ Yes | ✅ Yes | RELEASED or REFUNDED |
-| RELEASED | ❌ No | ❌ No | (final) |
-| REFUNDED | ❌ No | ❌ No | (final) |
+| State | Can Release? | Can Cancel? | Can Dispute? | Next States |
+|-------|---------|---------|---------|---------|
+| PENDING | ✅ Yes | ✅ Yes | ✅ Yes | RELEASED, REFUNDED, or DISPUTED |
+| RELEASED | ❌ No | ❌ No | ❌ No | (final) |
+| REFUNDED | ❌ No | ❌ No | ❌ No | (final) |
+| DISPUTED | ❌ No | ❌ No | ❌ No | RESOLVED |
+| RESOLVED | ❌ No | ❌ No | ❌ No | RELEASED or REFUNDED (final) |
 
 ---
 
