@@ -1,0 +1,144 @@
+specVersion: 0.0.7
+schema:
+  file: schema.graphql
+description: Sew Protocol Escrow on Base Sepolia
+repository: https://github.com/sew-protocol/escrow
+
+dataSources:
+  - kind: ethereum
+    network: base-sepolia
+    name: EscrowVault
+    source:
+      address: "0x13b8b7572c72b46879662BFEA53851cBeD3bC47a"
+      abi: EscrowVault
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - Escrow
+        - EscrowStateChange
+        - EscrowWithdrawal
+        - Dispute
+        - DisputeEscalation
+        - Resolution
+        - Fee
+      abis:
+        - name: EscrowVault
+          file: ./abis/EscrowVault.json
+      eventHandlers:
+        - event: EscrowCreated(indexed uint256,indexed address,indexed address,address,uint256,uint256,uint256)
+          handler: handleEscrowCreated
+        - event: EscrowStateChanged(indexed uint256,uint8,uint8)
+          handler: handleEscrowStateChanged
+        - event: EscrowWithdrawn(indexed uint256,indexed address,indexed address,uint256)
+          handler: handleEscrowWithdrawn
+        - event: DisputeOpened(indexed uint256,indexed address,indexed address)
+          handler: handleDisputeOpened
+        - event: DisputeEscalated(indexed uint256,uint8,uint8,indexed address,indexed address)
+          handler: handleDisputeEscalated
+        - event: EscrowResolved(indexed uint256,indexed address,bytes32)
+          handler: handleEscrowResolved
+        - event: ProtocolFeeCollected(indexed uint8,indexed uint256,indexed address,uint256,uint256,uint256)
+          handler: handleProtocolFeeCollected
+        - event: TimedActionTriggered(indexed uint256,uint8,uint8,indexed address)
+          handler: handleTimedActionTriggered
+        - event: ClaimableBalanceSet(indexed uint256,indexed address,indexed address,uint256)
+          handler: handleClaimableBalanceSet
+        - event: PendingSettlementSet(indexed uint256,bool,uint256)
+          handler: handlePendingSettlementSet
+        - event: PendingSettlementExecuted(indexed uint256,bool)
+          handler: handlePendingSettlementExecuted
+        - event: DisputeAutoCancelled(indexed uint256,indexed address,uint256,uint8)
+          handler: handleDisputeAutoCancelled
+      file: ./src/escrow.ts
+
+  - kind: ethereum
+    network: base-sepolia
+    name: SewToken
+    source:
+      address: "0x79913fCa36Ea4e747F4742a4c1C7bC93a1522a14"
+      abi: SewToken
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - TokenHolder
+        - TokenTransfer
+        - DelegateChange
+      abis:
+        - name: SewToken
+          file: ./abis/SewToken.json
+      eventHandlers:
+        - event: Transfer(indexed address,indexed address,uint256)
+          handler: handleTransfer
+        - event: DelegateChanged(indexed address,indexed address,indexed address)
+          handler: handleDelegateChanged
+        - event: DelegateVotesChanged(indexed address,uint256,uint256)
+          handler: handleDelegateVotesChanged
+      file: ./src/token.ts
+
+  - kind: ethereum
+    network: base-sepolia
+    name: ModuleSnapshotRegistry
+    source:
+      address: "0x1B152685Fb8268d7eb4F292524d86661dCFEEdE6"
+      abi: ModuleSnapshotRegistry
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - ModuleChange
+      abis:
+        - name: ModuleSnapshotRegistry
+          file: ./abis/ModuleSnapshotRegistry.json
+      eventHandlers:
+        - event: DefaultReleaseStrategyActivated(indexed address,indexed address,indexed address)
+          handler: handleDefaultReleaseStrategyActivated
+        - event: DefaultReleaseStrategyQueued(indexed address,indexed address,indexed address,uint64)
+          handler: handleDefaultReleaseStrategyQueued
+        - event: DefaultResolutionModuleActivated(indexed address,indexed address,indexed address)
+          handler: handleDefaultResolutionModuleActivated
+        - event: DefaultResolutionModuleQueued(indexed address,indexed address,indexed address,uint64)
+          handler: handleDefaultResolutionModuleQueued
+        - event: DefaultYieldGenerationModuleActivated(indexed address,indexed address,indexed address)
+          handler: handleDefaultYieldGenerationModuleActivated
+        - event: DefaultYieldGenerationModuleQueued(indexed address,indexed address,indexed address,uint64)
+          handler: handleDefaultYieldGenerationModuleQueued
+        - event: DefaultYieldDistributionModuleActivated(indexed address,indexed address,indexed address)
+          handler: handleDefaultYieldDistributionModuleActivated
+        - event: DefaultYieldDistributionModuleQueued(indexed address,indexed address,indexed address,uint64)
+          handler: handleDefaultYieldDistributionModuleQueued
+      file: ./src/modules.ts
+
+  - kind: ethereum
+    network: base-sepolia
+    name: GovGovernor
+    source:
+      address: "0xa9d598AE5b185dd249A1E4b64c32f18f4500d2fA"
+      abi: GovGovernor
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - Proposal
+        - Vote
+        - ProposalStateChange
+      abis:
+        - name: GovGovernor
+          file: ./abis/GovGovernor.json
+      eventHandlers:
+        - event: ProposalCreated(uint256,address,address[],uint256[],string[],bytes[],uint256,uint256,string)
+          handler: handleProposalCreated
+        - event: ProposalCanceled(uint256)
+          handler: handleProposalCanceled
+        - event: ProposalExecuted(uint256)
+          handler: handleProposalExecuted
+        - event: ProposalQueued(uint256,uint256)
+          handler: handleProposalQueued
+        - event: VoteCast(indexed address,uint256,uint8,uint256,string)
+          handler: handleVoteCast
+      file: ./src/governance.ts

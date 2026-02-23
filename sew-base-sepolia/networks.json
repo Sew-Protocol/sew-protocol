@@ -1,0 +1,8 @@
+{
+  "base-sepolia": {
+    "EscrowVault": {
+      "address": "0x13b8b7572c72b46879662BFEA53851cBeD3bC47a",
+      "startBlock": 37907959
+    }
+  }
+}
