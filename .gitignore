@@ -21,14 +21,14 @@ package-lock.json
 yarn.lock
 
 # Deployment artifacts
-deploy-ledger/
 deployments/
-deploy-registry/
+!deploy-registry/
 
 # Environment files
 .env
 .env.local
 .env.*.local
+!config/env/*.example
 
 # Codacy
 .codacy/
@@ -55,6 +55,8 @@ temp/
 work/
 bugs/
 tmp/
+*.tmp
+*.bak
 
 # Analysis & reports
 report/
