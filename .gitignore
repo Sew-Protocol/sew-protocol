@@ -81,11 +81,15 @@ telemetry-id
 archive/
 archived/
 
+# Hardhat
+hardhat/
+
 # Misc
 *.bak
 *.cache
 
 # Subgraph/build artifacts (should be in separate repo or generated)
+subgraph
 subgraph/sew-base-sepolia/build/
 subgraph/sew-base-sepolia/generated/
 subgraph/sew-base-sepolia/node_modules/

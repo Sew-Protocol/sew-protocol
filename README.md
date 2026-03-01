@@ -14,9 +14,7 @@ The contracts in this repository include:
 
 The architecture is designed to be modular and composable, allowing new modules to be introduced over time without affecting existing in-progress payments. This ensures predictability, transparency, and long-term stability for users and integrators.
 
-This repository serves as the reference implementation of Sew Protocol’s onchain payment framework.
-
-
+This repository serves as the reference implementation of Sew Protocol's onchain payment framework.
 
 ## Security Model
 
@@ -57,7 +55,7 @@ See **[docs/INDEX.md](./docs/INDEX.md)** for complete documentation index with 1
 # Install dependencies
 pnpm install
 
-# Run tests
+# Run tests (Foundry + Hardhat)
 pnpm test
 
 # Build contracts
@@ -65,10 +63,28 @@ pnpm build
 
 # Run linter
 pnpm lint
+
+# Run typecheck
+pnpm typecheck
 ```
+
+## Deployment
+
+The protocol has been deployed to:
+- **Base Sepolia** (testnet): See `deployments/baseSepolia/`
+- **Base Mainnet**: Coming soon
+
+For deployment documentation, see:
+- [docs/deployment/](./docs/deployment/) - Deployment guides
+- [docs/DEPLOYMENT_POST_ROLES.md](./docs/DEPLOYMENT_POST_ROLES.md) - Post-deployment checklist
 
 ## Project Status
 
-- **Test Suite**: 1186/1194 tests passing (99.3%)
+- **Test Suite**: Comprehensive unit, fuzz, and integration tests
 - **Phase 4 Complete**: Per-escrow configuration isolation fully implemented
 - **Security Model**: Fully documented and enforced in code
+- **Base Sepolia**: Deployed and operational
+
+## License
+
+Apache License 2.0 - see [LICENSE](./LICENSE) for details. Individual source files may use different licenses as specified in each file's SPDX license identifier.
