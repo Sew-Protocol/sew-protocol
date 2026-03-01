@@ -72,6 +72,7 @@ telemetry-id
 
 # Testnet deployment files (local only)
 *.testnet.log
+edr-cache
 
 # Build artifacts
 *.bin
