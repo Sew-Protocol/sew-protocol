@@ -13,6 +13,13 @@ coverage/
 coverage.json
 *.tsbuildinfo
 
+# Lock files (package managers)
+pnpm-lock.yaml
+pnpm-workspace.yaml
+foundry.lock
+package-lock.json
+yarn.lock
+
 # Deployment artifacts
 deploy-ledger/
 deployments/
