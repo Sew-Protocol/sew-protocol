@@ -1,0 +1,43 @@
+{
+  "startDate": "2026-02-20T18:54:06.587Z",
+  "blockNumber": 37922679,
+  "blockTimestamp": 1771613646,
+  "escrowCreationTx": "0x92b7f82f1fee10983f489023da133d39660e0c709f7fb8a46a800a281eca42f4",
+  "workflowId": "18",
+  "initialAmount": "1.0",
+  "tokenSymbol": "USDC",
+  "tokenAddress": "0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f",
+  "escrowVaultAddress": "0x13b8b7572c72b46879662BFEA53851cBeD3bC47a",
+  "aaveYieldModule": "0x084DD3BA96B14Ce07746E7c6AF23454dcbB65C01",
+  "aavePool": "0x8bAB6d1b75f19e9eD9fCe8b9BD338844fF79aE27",
+  "buyerAddress": "0xE8d7Fbd5Db3ad910370Be315f21D4596ed45122f",
+  "recipientAddress": "0x8Db7E76b6718F6531770dae051e55C5Dd8A7D2e2",
+  "yieldCheckDate7Days": "2026-02-27",
+  "instructions": [
+    "1. Return on 2026-02-27 (exactly 7 days from now)",
+    "",
+    "2. Run the yield check script:",
+    "   pnpm hardhat run scripts/testnet/phase4-check-yield-7days.ts --network baseSepolia",
+    "",
+    "3. The script will:",
+    "   - Check the aToken balance held by EscrowVault",
+    "   - Calculate yield generated (current - initial)",
+    "   - Show yield percentage return",
+    "   - Test release and withdrawal mechanisms",
+    "   - Verify funds reach recipient"
+  ],
+  "checkCommands": [
+    "# Manual check: View escrow transaction on BaseScan",
+    "https://sepolia.basescan.org/tx/0x92b7f82f1fee109f489023da133d39660e0c709f7fb8a46a800a281eca42f4",
+    "",
+    "# Check USDC balance held by EscrowVault",
+    "cast call 0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f \"balanceOf(address)(uint256)\" 0x13b8b7572c72b46879662BFEA53851cBeD3bC47a --rpc-url https://sepolia.base.org",
+    "",
+    "# Check escrow state",
+    "cast call 0x13b8b7572c72b46879662BFEA53851cBeD3bC47a \"escrowTransfers(uint256)(address,address,address,address,uint256,uint64,uint64,uint8,uint8,uint8)\" 18 --rpc-url https://sepolia.base.org",
+    "# State at index 7: 0=None, 1=Pending, 2=Released, 3=Refunded",
+    "",
+    "# Check recipient balance",
+    "cast call 0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f \"balanceOf(address)(uint256)\" 0x8Db7E76b6718F6531770dae051e55C5Dd8A7D2e2 --rpc-url https://sepolia.base.org"
+  ]
+}
