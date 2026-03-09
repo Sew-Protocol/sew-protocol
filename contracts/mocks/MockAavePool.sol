@@ -21,6 +21,11 @@ contract MockAavePool {
     uint256 public constant INITIAL_LIQUIDITY_INDEX = 1e27; // 1.0 with 27 decimals
     uint256 public constant YIELD_RATE = 1e25; // 1% per block (for testing)
 
+    // Failure simulation
+    bool public supplyFail;
+    bool public withdrawFail;
+    uint256 public supplyFailAmount; // 0 = fail all, >0 = partial fail
+
     event Supply(
         address indexed asset,
         address indexed onBehalfOf,
@@ -37,14 +42,33 @@ contract MockAavePool {
         tokenToAToken[token] = aToken;
     }
 
+    // Failure simulation setters
+    function setSupplyFail(bool _fail) external {
+        supplyFail = _fail;
+    }
+
+    function setWithdrawFail(bool _fail) external {
+        withdrawFail = _fail;
+    }
+
+    function setSupplyFailAmount(uint256 _amount) external {
+        supplyFailAmount = _amount;
+    }
+
     function getLiquidityIndex(address asset) public view returns (uint256) {
         return liquidityIndex[asset] > 0 ? liquidityIndex[asset] : INITIAL_LIQUIDITY_INDEX;
     }
 
     function supply(address asset, uint256 amount, address onBehalfOf, uint16) external virtual {
         require(tokenToAToken[asset] != address(0), 'Token not supported');
+        require(!supplyFail, 'Supply failed');
 
         uint256 currentIndex = getLiquidityIndex(asset);
+
+        // Handle partial failure
+        if (supplyFailAmount > 0 && amount > supplyFailAmount) {
+            amount = supplyFailAmount;
+        }
 
         // Aave v3 semantics: Pool pulls underlying from msg.sender (the caller),
         // and mints aTokens to onBehalfOf.
@@ -64,6 +88,7 @@ contract MockAavePool {
 
     function withdraw(address asset, uint256 amount, address to) external virtual returns (uint256) {
         require(tokenToAToken[asset] != address(0), 'Token not supported');
+        require(!withdrawFail, 'Withdraw failed');
 
         MockAToken aTokenContract = MockAToken(tokenToAToken[asset]);
         uint256 currentIndex = getLiquidityIndex(asset);
@@ -217,5 +242,26 @@ contract MockPoolAddressesProvider {
 
     function getPool() external view returns (address) {
         return pool;
+    }
+}
+
+// ============ Failure Simulation Additions ============
+
+contract MockAavePoolWithFailures {
+    // Failure simulation flags
+    bool public supplyFail;
+    bool public withdrawFail;
+    uint256 public supplyFailAmount; // 0 = fail all, >0 = partial fail
+    
+    function setSupplyFail(bool _fail) external {
+        supplyFail = _fail;
+    }
+    
+    function setWithdrawFail(bool _fail) external {
+        withdrawFail = _fail;
+    }
+    
+    function setSupplyFailAmount(uint256 _amount) external {
+        supplyFailAmount = _amount;
     }
 }
