@@ -550,16 +550,25 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         
         ModuleSnapshot storage snap = moduleSnapshots[workflowId];
         
+        bool unilateralCancel = false;
+        
         // Use cancellation strategy if configured
         if (snap.cancellationStrategy != address(0)) {
             ICancellationStrategy strategy = ICancellationStrategy(snap.cancellationStrategy);
             if (!strategy.canCancel(workflowId, _msgSender(), et)) {
                 revert NotAuthorizedToCancelYet(workflowId, _msgSender());
             }
-            // Notify strategy of attempt
+            unilateralCancel = strategy.canCancelUnilaterally(workflowId, _msgSender(), et);
             strategy.onCancelAttempt(workflowId, _msgSender(), true);
         }
         
+        // If strategy allows unilateral cancellation, cancel immediately
+        if (unilateralCancel) {
+            _cancelAndRefund(workflowId);
+            return true;
+        }
+        
+        // Otherwise require mutual consent
         et.recipientStatus = RecipientStatus.AGREE_TO_CANCEL;
         if (et.senderStatus == SenderStatus.AGREE_TO_CANCEL) {
             _cancelAndRefund(workflowId);
@@ -576,16 +585,26 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         
         ModuleSnapshot storage snap = moduleSnapshots[workflowId];
         
+        bool unilateralCancel = false;
+        
         // Use cancellation strategy if configured
         if (snap.cancellationStrategy != address(0)) {
             ICancellationStrategy strategy = ICancellationStrategy(snap.cancellationStrategy);
             if (!strategy.canCancel(workflowId, _msgSender(), et)) {
                 revert NotAuthorizedToCancelYet(workflowId, _msgSender());
             }
+            unilateralCancel = strategy.canCancelUnilaterally(workflowId, _msgSender(), et);
             // Notify strategy of attempt
             strategy.onCancelAttempt(workflowId, _msgSender(), true);
         }
         
+        // If strategy allows unilateral cancellation, cancel immediately
+        if (unilateralCancel) {
+            _cancelAndRefund(workflowId);
+            return true;
+        }
+        
+        // Otherwise require mutual consent
         et.senderStatus = SenderStatus.AGREE_TO_CANCEL;
         if (et.recipientStatus == RecipientStatus.AGREE_TO_CANCEL) {
             _cancelAndRefund(workflowId);

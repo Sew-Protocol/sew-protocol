@@ -19,6 +19,17 @@ interface ICancellationStrategy {
         EscrowTransfer calldata et
     ) external view returns (bool canCancel);
 
+    /// @notice Determine if caller can cancel unilaterally without waiting for other party
+    /// @param workflowId The escrow workflow ID
+    /// @param caller The address requesting cancellation (msg.sender)
+    /// @param et The EscrowTransfer storage reference
+    /// @return canCancelUnilaterally True if caller can cancel immediately
+    function canCancelUnilaterally(
+        uint256 workflowId,
+        address caller,
+        EscrowTransfer calldata et
+    ) external view returns (bool canCancelUnilaterally);
+
     /// @notice Notify the strategy of a cancellation attempt
     /// @dev Called by BaseEscrow BEFORE executing the cancellation
     /// @dev Allows the strategy to track state (e.g., pending cancel requests)
