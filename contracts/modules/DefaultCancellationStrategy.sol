@@ -41,6 +41,15 @@ contract DefaultCancellationStrategy is ICancellationStrategy {
                (caller == et.to && pending == et.from);
     }
 
+    /// @notice Default strategy requires mutual consent - never unilateral
+    function canCancelUnilaterally(
+        uint256 workflowId,
+        address caller,
+        EscrowTransfer calldata et
+    ) external pure returns (bool) {
+        return false;
+    }
+
     /// @notice Track cancellation attempt
     /// @dev Stores initiating party on first call, clears on successful second call
     function onCancelAttempt(

@@ -21,6 +21,7 @@ import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/utils/Address.sol';
 import '../interfaces/IResolver.sol';
+import '../interfaces/ICancellationStrategy.sol';
 import '../interfaces/IReleaseStrategy.sol';
 import '../shared/interfaces/IResolutionModule.sol';
 import '../interfaces/IYieldModule.sol';
@@ -72,6 +73,7 @@ error NotAuthorizedResolver(address caller, address expectedResolver);
 error TransferNotInDispute(uint256 workflowId, EscrowState currentStatus);
 error NotParticipant(uint256 workflowId, address caller, address sender, address recipient);
 error NotSender(uint256 workflowId, address caller, address expectedSender);
+error NotAuthorizedToCancelYet(uint256 workflowId, address caller);
 error NotRecipient(uint256 workflowId, address caller, address expectedRecipient);
 error InvalidEscrowFee(uint256 fee, uint256 maxFee);
 error FeeExceedsMaximum(uint256 feeBps, uint256 maxFeeBps);
@@ -139,6 +141,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     uint256 public appealBondProtocolFeeBps; // Protocol fee on appeal bonds (0-3000 bps = 0-30%)
 
     address public disputeResolutionModule;
+    address public defaultCancellationStrategy;
 
     TimeoutConfig public timeoutConfig;
 
@@ -165,6 +168,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     struct ModuleSnapshot {
         address resolutionModule;
         address releaseStrategy;
+        address cancellationStrategy;
         address yieldGenerationModule;
         address yieldDistributionModule;
         address incentiveModule;
@@ -230,6 +234,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         address indexed disputeResolver
     );
     event ResolutionModuleActivated(address indexed oldModule, address indexed newModule);
+    event DefaultCancellationStrategyUpdated(address indexed oldStrategy, address indexed newStrategy);
     event EscrowSettingsUpdated(uint256 indexed workflowId, EscrowSettings settings);
     event ClaimableBalanceSet(
         uint256 indexed workflowId,
@@ -365,6 +370,14 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         emit ResolutionModuleActivated(oldModule, module);
     }
 
+    function setDefaultCancellationStrategy(address strategy) external onlyRole(ROLE_ADMIN_CONTRACT) {
+        if (strategy == address(0)) revert InvalidAddress(ADDR_GENERIC, strategy);
+        if (strategy.code.length == 0) revert ModuleNotContract(strategy);
+        address oldStrategy = defaultCancellationStrategy;
+        defaultCancellationStrategy = strategy;
+        emit DefaultCancellationStrategyUpdated(oldStrategy, strategy);
+    }
+
     function setTimeoutConfig(TimeoutConfig calldata config) external onlyRole(ROLE_ADMIN_CONTRACT) {
         timeoutConfig = config;
         emit TimeoutConfigUpdated(config);
@@ -471,6 +484,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         moduleSnapshots[workflowId] = ModuleSnapshot({
             resolutionModule: resModule,
             releaseStrategy: address(_getReleaseStrategy(workflowId)),
+            cancellationStrategy: _getCancellationStrategy(workflowId),
             yieldGenerationModule: address(_getYieldGenerationModule(workflowId)),
             yieldDistributionModule: address(_getYieldDistributionModule(workflowId)),
             incentiveModule: incentiveMod,
@@ -534,6 +548,27 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         if (et.escrowState != EscrowState.PENDING)
             revert TransferNotPending(workflowId, et.escrowState);
         
+        ModuleSnapshot storage snap = moduleSnapshots[workflowId];
+        
+        bool unilateralCancel = false;
+        
+        // Use cancellation strategy if configured
+        if (snap.cancellationStrategy != address(0)) {
+            ICancellationStrategy strategy = ICancellationStrategy(snap.cancellationStrategy);
+            if (!strategy.canCancel(workflowId, _msgSender(), et)) {
+                revert NotAuthorizedToCancelYet(workflowId, _msgSender());
+            }
+            unilateralCancel = strategy.canCancelUnilaterally(workflowId, _msgSender(), et);
+            strategy.onCancelAttempt(workflowId, _msgSender(), true);
+        }
+        
+        // If strategy allows unilateral cancellation, cancel immediately
+        if (unilateralCancel) {
+            _cancelAndRefund(workflowId);
+            return true;
+        }
+        
+        // Otherwise require mutual consent
         et.recipientStatus = RecipientStatus.AGREE_TO_CANCEL;
         if (et.senderStatus == SenderStatus.AGREE_TO_CANCEL) {
             _cancelAndRefund(workflowId);
@@ -548,6 +583,28 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         if (et.escrowState != EscrowState.PENDING)
             revert TransferNotPending(workflowId, et.escrowState);
         
+        ModuleSnapshot storage snap = moduleSnapshots[workflowId];
+        
+        bool unilateralCancel = false;
+        
+        // Use cancellation strategy if configured
+        if (snap.cancellationStrategy != address(0)) {
+            ICancellationStrategy strategy = ICancellationStrategy(snap.cancellationStrategy);
+            if (!strategy.canCancel(workflowId, _msgSender(), et)) {
+                revert NotAuthorizedToCancelYet(workflowId, _msgSender());
+            }
+            unilateralCancel = strategy.canCancelUnilaterally(workflowId, _msgSender(), et);
+            // Notify strategy of attempt
+            strategy.onCancelAttempt(workflowId, _msgSender(), true);
+        }
+        
+        // If strategy allows unilateral cancellation, cancel immediately
+        if (unilateralCancel) {
+            _cancelAndRefund(workflowId);
+            return true;
+        }
+        
+        // Otherwise require mutual consent
         et.senderStatus = SenderStatus.AGREE_TO_CANCEL;
         if (et.recipientStatus == RecipientStatus.AGREE_TO_CANCEL) {
             _cancelAndRefund(workflowId);
@@ -1289,6 +1346,15 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     function _getReleaseStrategy(
         uint256 workflowId
     ) internal view virtual returns (IReleaseStrategy);
+    function _getCancellationStrategy(
+        uint256 workflowId
+    ) internal view virtual returns (address) {
+        address snap = moduleSnapshots[workflowId].cancellationStrategy;
+        if (snap != address(0)) {
+            return snap;
+        }
+        return defaultCancellationStrategy;
+    }
     function _getResolutionModule(
         uint256 workflowId
     ) internal view virtual returns (IResolutionModule) {

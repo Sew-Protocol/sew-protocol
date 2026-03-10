@@ -78,8 +78,8 @@ contract ModuleSnapshotRaceConditionTest is Test {
         vm.stopPrank();
 
         // 2. Verify snapshot for wid is V1
-        // struct ModuleSnapshot: resolution, release, yieldGen, yieldDist, incentive, yieldFee, appealFee, escrowFee, autoRelease, autoCancel, maxDispute, appealWindow
-        (, address snapRelease, , , , , , , , , , ) = vault.moduleSnapshots(wid);
+        // struct ModuleSnapshot: resolution, release, cancellation, yieldGen, yieldDist, incentive, yieldFee, appealFee, escrowFee, autoRelease, autoCancel, maxDispute, appealWindow
+        (, address snapRelease, , , , , , , , , , , ) = vault.moduleSnapshots(wid);
         assertEq(snapRelease, address(strategyV1));
 
         // 3. Swap default strategy to V2
@@ -91,7 +91,7 @@ contract ModuleSnapshotRaceConditionTest is Test {
         assertEq(mm.getModule(address(vault), BaseEscrow.ModuleType.RELEASE), address(strategyV2));
 
         // 5. Verify snapshotted module for wid is STILL V1
-        (, snapRelease, , , , , , , , , , ) = vault.moduleSnapshots(wid);
+        (, snapRelease, , , , , , , , , , , ) = vault.moduleSnapshots(wid);
         assertEq(snapRelease, address(strategyV1));
     }
 }
