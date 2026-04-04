@@ -226,4 +226,3 @@ contract Phase0BaseSepoliaForkTest is Test {
         require(a.code.length > 0, string.concat("no code for ", name));
     }
 }
-

@@ -8,6 +8,11 @@ import '@openzeppelin/contracts/access/AccessControl.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 import '@openzeppelin/contracts/utils/introspection/IERC165.sol';
 
+interface IBaseEscrowSettlement {
+    function releaseAsDisputeResolver(uint256 workflowId, bytes32 resolutionHash) external returns (bool);
+    function cancelAsDisputeResolver(uint256 workflowId, bytes32 resolutionHash) external returns (bool);
+}
+
 /**
  * @title KlerosArbitrableProxy
  * @notice Proxy contract that integrates Kleros arbitration with BaseEscrow
@@ -57,6 +62,7 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
     );
 
     event RulingExecuted(uint256 indexed workflowId, uint256 indexed klerosDisputeId, uint256 ruling);
+    event SettlementPropagated(uint256 indexed workflowId, address indexed escrowContract, bool isRelease, bool success);
 
     constructor(address _arbitrator, address _admin) {
         require(_arbitrator != address(0), 'Invalid arbitrator');
@@ -93,7 +99,6 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
     )
         external
         payable
-        onlyRole(ROLE_ESCROW_CONTRACT)
         nonReentrant
         returns (uint256 klerosDisputeId)
     {
@@ -104,6 +109,11 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
             escrowData,
             (address, address, address, uint256, uint256)
         );
+
+        // Authorization check: Only escrow contract or associated participants
+        if (!hasRole(ROLE_ESCROW_CONTRACT, _msgSender())) {
+            require(_msgSender() == from || _msgSender() == to, 'Not authorized');
+        }
 
         // Check arbitration cost
         uint256 cost = arbitrator.arbitrationCost(extraData);
@@ -164,9 +174,11 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
     function rule(uint256 _disputeID, uint256 _ruling) external override {
         require(_msgSender() == address(arbitrator), 'Only arbitrator can rule');
 
-        uint256 workflowId = klerosDisputeToWorkflow[_disputeID];
+        // BUG FIX: workflowId 0 is valid, use escrowContract to validate existence
         address escrowContract = klerosDisputeToEscrow[_disputeID];
-        require(workflowId != 0 && escrowContract != address(0), 'Unknown dispute');
+        require(escrowContract != address(0), 'Unknown dispute');
+        
+        uint256 workflowId = klerosDisputeToWorkflow[_disputeID];
 
         DisputeMetadata storage dispute = disputes[escrowContract][workflowId];
         require(!dispute.resolved, 'Already resolved');
@@ -176,6 +188,54 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
 
         emit Ruling(arbitrator, _disputeID, _ruling);
         emit RulingExecuted(workflowId, _disputeID, _ruling);
+
+        // Automatic propagation to BaseEscrow
+        _propagateRuling(workflowId, escrowContract, _ruling);
+    }
+
+    /**
+     * @notice Manually trigger ruling propagation if automatic attempt failed
+     * @param workflowId The escrow workflow ID
+     * @param escrowContract Address of the escrow contract
+     */
+    function propagateRuling(uint256 workflowId, address escrowContract) external nonReentrant {
+        require(workflowToKlerosDispute[escrowContract][workflowId] != 0, 'Dispute does not exist');
+        DisputeMetadata storage dispute = disputes[escrowContract][workflowId];
+        
+        if (!dispute.resolved) {
+            // Check if arbitrator has ruled but hasn't called rule() yet (unlikely but possible in some arbitrator implementations)
+            IArbitrator.DisputeStatus status = arbitrator.disputeStatus(dispute.klerosDisputeId);
+            if (status == IArbitrator.DisputeStatus.Solved) {
+                dispute.ruling = arbitrator.currentRuling(dispute.klerosDisputeId);
+                dispute.resolved = true;
+            } else {
+                revert('Not yet resolved by Kleros');
+            }
+        }
+
+        _propagateRuling(workflowId, escrowContract, dispute.ruling);
+    }
+
+    /**
+     * @dev Internal helper for propagating ruling to BaseEscrow
+     */
+    function _propagateRuling(uint256 workflowId, address escrowContract, uint256 ruling) internal {
+        if (ruling == 0) return; // Refused to rule - requires manual intervention or timeout
+
+        bytes32 resolutionHash = keccak256(abi.encodePacked('KlerosRuling', ruling, block.timestamp));
+        bool success;
+
+        if (ruling == 1) { // Release
+            try IBaseEscrowSettlement(escrowContract).releaseAsDisputeResolver(workflowId, resolutionHash) returns (bool s) {
+                success = s;
+            } catch {}
+            emit SettlementPropagated(workflowId, escrowContract, true, success);
+        } else if (ruling == 2) { // Cancel
+            try IBaseEscrowSettlement(escrowContract).cancelAsDisputeResolver(workflowId, resolutionHash) returns (bool s) {
+                success = s;
+            } catch {}
+            emit SettlementPropagated(workflowId, escrowContract, false, success);
+        }
     }
 
     /**
@@ -224,7 +284,7 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
         address,
         bytes32
     ) external pure override {
-        // No-op: Kleros disputes are created explicitly
+        // No-op: Kleros disputes are created explicitly via createDispute
     }
 
     /**

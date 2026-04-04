@@ -594,11 +594,17 @@ contract DecentralizedResolutionModule is
      * @return token Token address for bond
      */
     function getRequiredAppealBond(
-        uint256 /* workflowId */,
-        address /* escrowContract */,
+        uint256 workflowId,
+        address escrowContract,
         uint8 currentLevel,
         bytes calldata escrowData
     ) external view override returns (uint256 amount, address token) {
+        // If escalating to Level 2 (External Resolver), use Pay-at-Proxy model (bond = 0)
+        uint8 nextRound = currentLevel + 1;
+        if (nextRound == 2 && externalResolver != address(0)) {
+            return (0, address(0));
+        }
+
         if (!escalationCostConfig.enabled) {
             return (0, address(0));
         }
