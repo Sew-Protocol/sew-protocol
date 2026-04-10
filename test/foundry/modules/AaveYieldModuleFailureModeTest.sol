@@ -63,7 +63,7 @@ contract AaveYieldModuleFailureModeTest is Test {
         vm.expectRevert();
         module.unwindToEscrow(1, address(token), DEPOSIT_AMOUNT);
         
-        (address posToken, uint256 principal) = module.positions(escrow, 1);
+        (address posToken, uint256 principal, ) = module.positions(escrow, 1);
         assertEq(posToken, address(token));
         assertEq(principal, DEPOSIT_AMOUNT);
         
@@ -104,7 +104,7 @@ contract AaveYieldModuleFailureModeTest is Test {
         vm.expectRevert();
         module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.TO_SENDER);
         
-        (address posToken, uint256 principal) = module.positions(escrow, 1);
+        (address posToken, uint256 principal, ) = module.positions(escrow, 1);
         assertEq(posToken, address(0));
         assertEq(principal, 0);
         
@@ -214,7 +214,7 @@ contract AaveYieldModuleFailureModeTest is Test {
         vm.prank(escrow);
         module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.TO_SENDER);
         
-        (address posToken, uint256 principal) = module.positions(escrow, 1);
+        (address posToken, uint256 principal, ) = module.positions(escrow, 1);
         assertEq(posToken, address(token));
         assertEq(principal, DEPOSIT_AMOUNT);
     }

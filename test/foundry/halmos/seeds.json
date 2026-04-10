@@ -1,0 +1,102 @@
+{
+  "_doc": "Maps each Halmos check_* function to its property-test-generator bounds and any shrunk counterexamples from test.check. Generator source: sew-simulation/test/resolver_sim/contract_model/properties_test.clj",
+
+  "generators": {
+    "gen-amount": {
+      "clojure_range": [1, 1000000],
+      "solidity_range": [10000, "1000000000000000000000000"],
+      "note": "Clojure model has no decimals; Solidity ERC20Mock uses 18 decimals. Handler bound: [1e4, 1_000_000e18]."
+    },
+    "gen-bps": {
+      "clojure_range": [0, 500],
+      "note": "Fee basis points. FEE_BPS=100 in tests (1%), within range."
+    },
+    "gen-time": {
+      "clojure_range": [1, 9999],
+      "note": "Block time deltas in seconds. APPEAL_WINDOW=9999 to match upper bound."
+    },
+    "gen-addr": {
+      "values": ["0x1001", "0x1002", "0x1003", "0x1004"],
+      "roles": ["sender", "recipient", "customResolver", "feeAddr"],
+      "note": "Halmos check_custom_resolver_exclusivity generalises to svm.createAddress() covering all 2^160 addresses."
+    }
+  },
+
+  "checks": {
+    "check_solvency_after_create": {
+      "property": "inv/solvency-holds?",
+      "symbolic_inputs": ["amount: uint256"],
+      "bounds": {
+        "amount": {"min": "1e4", "max": "1_000_000e18"}
+      },
+      "assertion": "contractBalance >= principal + fees",
+      "counterexample_shape": "amount where fee arithmetic underflows or double-credit inflates held figure",
+      "seeds": []
+    },
+
+    "check_fees_monotone_after_create": {
+      "property": "inv/fee-increased-or-equal?",
+      "symbolic_inputs": ["amount: uint256"],
+      "bounds": {
+        "amount": {"min": "1e4", "max": "1_000_000e18"}
+      },
+      "assertion": "feesAfter >= feesBefore",
+      "counterexample_shape": "amount where FEE_BPS arithmetic rounds down to zero fee despite nonzero amount",
+      "seeds": [
+        {"_note": "Boundary seed: minimum amount where fee > 0 at 1% = 10000 / 100 = 100 wei fee", "amount": "10000"}
+      ]
+    },
+
+    "check_custom_resolver_exclusivity": {
+      "property": "inv/resolver-exclusivity?",
+      "symbolic_inputs": ["attacker: address (function parameter — Halmos 0.3.x does not support vm.prank with svm.createAddress)"],
+      "bounds": {
+        "attacker": "any address != customResolver (0x1003), != address(0), != address(this)"
+      },
+      "assertion": "releaseAsDisputeResolver by attacker always reverts",
+      "counterexample_shape": "attacker address that passes _isAuthorizedDisputeResolver despite not being customResolver",
+      "seeds": [
+        {"_note": "Boundary seed: zero address (excluded by vm.assume)", "attacker": "0x0000000000000000000000000000000000000000"},
+        {"_note": "Boundary seed: address(1) — minimal non-excluded attacker", "attacker": "0x0000000000000000000000000000000000000001"}
+      ]
+    },
+
+    "check_released_state_absorbing": {
+      "property": "inv/terminal-states-unchanged?",
+      "symbolic_inputs": ["amount: uint256"],
+      "bounds": {
+        "amount": {"min": "1e4", "max": "1_000_000e18"}
+      },
+      "assertion": "raiseDispute on RELEASED escrow always reverts",
+      "counterexample_shape": "amount where releaseEscrowTransfer leaves state flag inconsistent",
+      "seeds": []
+    },
+
+    "check_appeal_window_enforced": {
+      "property": "res/execute-pending-settlement appeal-window-not-expired guard",
+      "symbolic_inputs": ["timeDelta: uint256"],
+      "bounds": {
+        "timeDelta": {"min": 1, "max": "APPEAL_WINDOW - 1 = 9998"}
+      },
+      "assertion": "executePendingSettlement before appeal deadline always reverts",
+      "counterexample_shape": "timeDelta where block.timestamp + timeDelta >= appealDeadline despite timeDelta < APPEAL_WINDOW",
+      "seeds": [
+        {"_note": "Boundary seed: timeDelta=1 (one second into window)", "timeDelta": 1},
+        {"_note": "Boundary seed: timeDelta=9998 (one second before deadline)", "timeDelta": 9998}
+      ]
+    }
+  },
+
+  "halmos_invocation": {
+    "build":  "forge build --profile halmos",
+    "run_all": "/usr/bin/python3 -m halmos --root . --contract HalmosEscrowProperties --profile halmos --loop 3",
+    "run_one": "/usr/bin/python3 -m halmos --root . --contract HalmosEscrowProperties --function check_solvency_after_create --profile halmos --loop 3",
+    "notes": [
+      "Always build with --profile halmos first (via_ir=false required)",
+      "Start with check_solvency_after_create — simplest, single createEscrow call",
+      "check_custom_resolver_exclusivity is the highest-value check (proves authority logic exhaustively)",
+      "Increase --loop if Halmos reports 'loop bound exceeded' warnings",
+      "If SMT solver times out, try --solver-timeout-branching 30000"
+    ]
+  }
+}

@@ -1,0 +1,8 @@
+{
+    "importFilesToOrigRelpaths": {},
+    "primary_contract": "EscrowVaultHarness",
+    "specfile": "/home/user/Code/sew-protocol/certora/specs/EscrowInvariants.spec",
+    "specfileOrigRelpath": "certora/specs/EscrowInvariants.spec",
+    "specfilesToImportDecls": {},
+    "type": "spec"
+}

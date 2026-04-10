@@ -30,7 +30,8 @@ library FeeWithdrawalLibrary {
         if (feeAmount == 0) revert NoFeesToWithdraw(token, feeAmount);
         uint256 balance = IERC20(token).balanceOf(address(this));
         if (balance < feeAmount) revert InsufficientContractBalance(token, feeAmount, balance);
-        IERC20(token).safeTransfer(feeRecipient, feeAmount);
+        // Zero state before external call (CEI pattern) to prevent reentrancy double-withdrawal.
         totalFeesPerToken[token] = 0;
+        IERC20(token).safeTransfer(feeRecipient, feeAmount);
     }
 }

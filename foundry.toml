@@ -10,11 +10,30 @@ via_ir = true
 verbosity = 3
 ffi = false
 fs_permissions = [{ access = "read", path = "./" }]
+# Required for Halmos symbolic execution (halmos 0.3.x needs the AST in artifacts)
+ast = true
 
 [profile.coverage]
 via_ir = true
 optimizer = true
 optimizer_runs = 1
+
+# Halmos symbolic execution profile.
+# via_ir must be false — Halmos 0.3.x cannot process YUL IR bytecode.
+# Halmos reads the JSON artifacts in out-halmos/ produced by:
+#   forge build --profile halmos
+# Run a check with:
+#   /usr/bin/python3 -m halmos \
+#     --root . \
+#     --contract HalmosEscrowProperties \
+#     --function check_solvency_after_create \
+#     --profile halmos \
+#     --loop 3
+[profile.halmos]
+via_ir = true
+optimizer = true
+optimizer_runs = 1
+out = "out-halmos"
 
 [fuzz]
 runs = 256

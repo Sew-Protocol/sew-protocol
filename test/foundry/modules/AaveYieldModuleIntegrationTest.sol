@@ -106,8 +106,8 @@ contract AaveYieldModuleIntegrationTest is Test {
         vm.prank(otherEscrow);
         module.initializeYield(1, address(token), amount2, YieldPreset.TO_SENDER);
         
-        (, uint256 p1) = module.positions(escrow, 1);
-        (, uint256 p2) = module.positions(otherEscrow, 1);
+        (, uint256 p1, ) = module.positions(escrow, 1);
+        (, uint256 p2, ) = module.positions(otherEscrow, 1);
         
         assertEq(p1, amount1, "Escrow1 correct");
         assertEq(p2, amount2, "Escrow2 correct");
@@ -115,8 +115,8 @@ contract AaveYieldModuleIntegrationTest is Test {
         vm.prank(escrow);
         module.unwindToEscrow(1, address(token), amount1);
         
-        (, uint256 p1After) = module.positions(escrow, 1);
-        (, uint256 p2After) = module.positions(otherEscrow, 1);
+        (, uint256 p1After, ) = module.positions(escrow, 1);
+        (, uint256 p2After, ) = module.positions(otherEscrow, 1);
         
         assertEq(p1After, 0, "Escrow1 withdrawn");
         assertEq(p2After, amount2, "Escrow2 unchanged");
@@ -191,7 +191,7 @@ contract AaveYieldModuleIntegrationTest is Test {
         assertGt(yieldOut, 0, "Yield earned");
         
         // Position should be cleared
-        (, uint256 remaining) = module.positions(escrow, 1);
+        (, uint256 remaining, ) = module.positions(escrow, 1);
         assertEq(remaining, 0, "Position cleared");
     }
 }

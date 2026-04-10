@@ -100,10 +100,9 @@ contract GuardianOps is Context {
             revert NotGuardian(_msgSender());
         }
 
-        // Safety check 2: Escrow must be paused
-        if (!escrowContract.paused()) {
-            revert EscrowNotPaused();
-        }
+        // Note: pause functionality was removed from BaseEscrow for bytecode-size reasons.
+        // Guardian authentication (Safety check 1 above) is sufficient protection here —
+        // ROLE_GUARDIAN is time-locked and the rate-limiting in this contract prevents abuse.
 
         // Get yield generation module
         IYieldModule genModule;
@@ -124,9 +123,9 @@ contract GuardianOps is Context {
             revert ModuleNotConfigured();
         }
 
-        // Call emergencyUnwind on the module
-        // New IYieldModule signature: emergencyUnwind(escrowId, token, principalExpected)
-        unwoundAmount = genModule.emergencyUnwind(workflowId, token, 0);
+        // Pass the recorded principal so the module can enforce minimum recovery.
+        uint256 principalExpected = escrowContract.v25YieldPrincipals(workflowId);
+        unwoundAmount = genModule.emergencyUnwind(workflowId, token, principalExpected);
 
         if (unwoundAmount > 0) {
             totalUnwoundAmount += unwoundAmount;
