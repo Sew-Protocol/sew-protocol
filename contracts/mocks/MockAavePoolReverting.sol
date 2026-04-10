@@ -129,6 +129,10 @@ contract MockAavePoolReverting {
             INITIAL_LIQUIDITY_INDEX;
     }
 
+    function getReserveNormalizedIncome(address token) external view returns (uint256) {
+        return liquidityIndex[token] > 0 ? liquidityIndex[token] : INITIAL_LIQUIDITY_INDEX;
+    }
+
     function _calculateWithYield(address token, uint256 amount) internal view returns (uint256) {
         uint256 index = liquidityIndex[token] > 0 ? liquidityIndex[token] : INITIAL_LIQUIDITY_INDEX;
         return (amount * index) / INITIAL_LIQUIDITY_INDEX;

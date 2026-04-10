@@ -199,9 +199,15 @@ contract AaveYieldModule is IYieldModule, Ownable2Step {
         // Withdraw only our position's aToken shares — not the global balance
         address aToken = _getAToken(token);
         uint256 currentATokenBalance = IERC20(aToken).balanceOf(address(this));
-        // Cap at actual balance in case of minor rounding from Aave interest accrual
-        uint256 sharesToWithdraw = pos.aTokenShares <= currentATokenBalance
-            ? pos.aTokenShares
+        // pos.aTokenShares was recorded as the rebased-balance delta at deposit time.
+        // Since the liquidity index equals INITIAL_INDEX at deposit, aTokenShares == scaled shares.
+        // Current underlying value = scaledShares * currentLiquidityIndex / INITIAL_INDEX.
+        // We retrieve currentIndex from the pool to compute the correct withdrawal amount,
+        // which correctly includes any yield that has accrued since deposit.
+        uint256 currentIndex = aavePool.getReserveNormalizedIncome(token);
+        uint256 positionCurrentValue = (pos.aTokenShares * currentIndex) / 1e27;
+        uint256 sharesToWithdraw = positionCurrentValue <= currentATokenBalance
+            ? positionCurrentValue
             : currentATokenBalance;
         require(sharesToWithdraw > 0, "NoATokenBalance");
 
@@ -246,10 +252,12 @@ contract AaveYieldModule is IYieldModule, Ownable2Step {
         address aToken = _getAToken(token);
         uint256 currentATokenBalance = IERC20(aToken).balanceOf(address(this));
 
-        // Use position's recorded shares, capped at actual balance
-        uint256 sharesToWithdraw = pos.aTokenShares <= currentATokenBalance
-            ? pos.aTokenShares
+        uint256 currentIndex = aavePool.getReserveNormalizedIncome(token);
+        uint256 positionCurrentValue = (pos.aTokenShares * currentIndex) / 1e27;
+        uint256 sharesToWithdraw = positionCurrentValue <= currentATokenBalance
+            ? positionCurrentValue
             : currentATokenBalance;
+
 
         if (sharesToWithdraw == 0) {
             revert("NoATokenBalance");

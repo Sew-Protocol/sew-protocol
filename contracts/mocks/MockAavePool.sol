@@ -59,6 +59,10 @@ contract MockAavePool {
         return liquidityIndex[asset] > 0 ? liquidityIndex[asset] : INITIAL_LIQUIDITY_INDEX;
     }
 
+    function getReserveNormalizedIncome(address asset) external view returns (uint256) {
+        return getLiquidityIndex(asset);
+    }
+
     function supply(address asset, uint256 amount, address onBehalfOf, uint16) external virtual {
         require(tokenToAToken[asset] != address(0), 'Token not supported');
         require(!supplyFail, 'Supply failed');

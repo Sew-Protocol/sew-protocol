@@ -185,11 +185,12 @@ contract AaveYieldModuleTest is Test {
     function test_GetModuleInfo() public {
         (string memory name, string memory version, bytes32 protocolId) = module.getModuleInfo();
         assertEq(name, "AaveYieldModule");
-        assertEq(version, "2.5.0");
+        assertEq(version, "2.5.1");
         assertEq(protocolId, keccak256("aave-v3"));
     }
 
     function test_CanHandle() public {
+        module.configureToken(address(token), address(aToken));
         (bool supported, bytes32 reason) = module.canHandle(address(token), YieldPreset.OFF, 1000e18);
         assertTrue(supported);
         assertEq(reason, bytes32(0));
@@ -314,9 +315,9 @@ contract AaveYieldModuleTest is Test {
         otherToken.approve(address(pool), type(uint256).max);
         otherToken.transfer(address(module), DEPOSIT_AMOUNT);
         
-        // Pool rejects unconfigured tokens first
+        // Module reverts with TokenNotConfigured custom error before reaching the pool
         vm.prank(escrow);
-        vm.expectRevert("Token not supported");
+        vm.expectRevert(abi.encodeWithSelector(AaveYieldModule.TokenNotConfigured.selector, address(otherToken)));
         module.initializeYield(1, address(otherToken), DEPOSIT_AMOUNT, YieldPreset.OFF);
     }
 

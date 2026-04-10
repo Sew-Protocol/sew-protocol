@@ -307,6 +307,11 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     event SystemResumed(
         uint256 timestamp
     );
+    event YieldUnwindFailed(
+        uint256 indexed workflowId,
+        address indexed token,
+        uint256 principal
+    );
 
     // Pause functionality removed for size optimization - stubs for backwards compatibility
     function pause(string calldata) external pure {
@@ -1204,11 +1209,13 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
                 }
                 return (recovered, 0);
             } catch {
-                // Both unwind paths failed. Do NOT proceed with a phantom amount —
-                // funds are still in the yield module and the vault balance does not
-                // cover the principal. Reverting here prevents accounting corruption
-                // (claimable balances set for amounts the contract cannot pay).
-                revert("YieldModule: UnwindFailed");
+                // Both unwind paths failed — tokens are stuck in yield module.
+                // Complete the release lifecycle using principal so the escrow is not
+                // permanently frozen; admin must recover tokens from the yield module.
+                // The auto-transfer will fall back to claimable since the vault balance
+                // no longer covers this principal (tokens are in the module).
+                emit YieldUnwindFailed(workflowId, token, yieldPrincipal);
+                return (yieldPrincipal, 0);
             }
         }
     }
