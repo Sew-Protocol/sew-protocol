@@ -118,11 +118,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
      * @param amount Fee amount
      */
     function _recordFee(address token, uint256 amount) internal override onlyThisToken(token) {
-        uint256 currentFees = totalFees;
-        if (amount > type(uint256).max - currentFees) {
-            revert FeeOverflow();
-        }
-        totalFees = currentFees + amount;
+        totalFees += amount;
     }
 
     /**
@@ -151,43 +147,6 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
             }
             totalHeldInEscrow -= amount;
         }
-    }
-
-    /**
-     * @dev Emit EscrowTransferCreated event (without token parameter)
-     */
-    function _emitEscrowTransferCreated(
-        uint256 workflowId,
-        address token,
-        address from,
-        address to,
-        uint256 amount
-    ) internal pure override {
-        workflowId; token; from; to; amount;
-    }
-
-    /**
-     * @dev Emit EscrowTransferCancelled event (without token parameter)
-     */
-    function _emitEscrowTransferCancelled(
-        uint256 workflowId,
-        address token,
-        address from,
-        uint256 amount
-    ) internal pure override {
-        workflowId; token; from; amount;
-    }
-
-    /**
-     * @dev Emit EscrowTransferReleased event (without token parameter)
-     */
-    function _emitEscrowTransferReleased(
-        uint256 workflowId,
-        address token,
-        address to,
-        uint256 amount
-    ) internal pure override {
-        workflowId; token; to; amount;
     }
 
     /**

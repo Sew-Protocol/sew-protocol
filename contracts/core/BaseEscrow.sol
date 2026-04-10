@@ -336,6 +336,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     }
 
     function setEscrowFeeBps(uint256 feeBps) external onlyRole(ROLE_ADMIN_CONTRACT) {
+        if (feeBps > MAX_ESCROW_FEE_BPS) revert InvalidEscrowFee(feeBps, MAX_ESCROW_FEE_BPS);
         escrowFee = feeBps;
     }
 
@@ -476,7 +477,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         address from,
         address to,
         uint256 amount
-    ) internal virtual;
+    ) internal virtual {}
 
     function _snapshotModulesForEscrow(uint256 workflowId) internal {
         address resModule = address(_getResolutionModule(workflowId));
@@ -1160,14 +1161,15 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     }
 
     function _tryTransfer(address token, address to, uint256 amount) internal returns (bool success) {
-        (success, ) = token.call(abi.encodeWithSelector(IERC20.transfer.selector, to, amount));
-        if (success) {
-            assembly {
-                if returndatasize() {
-                    returndatacopy(0, 0, returndatasize())
-                    success := and(mload(0), 0xff)
-                }
-            }
+        bytes memory data;
+        (success, data) = token.call(abi.encodeWithSelector(IERC20.transfer.selector, to, amount));
+        // If the call succeeded but returned data, decode it as bool.
+        // Tokens that return no data (bare transfer) are treated as success.
+        // Tokens that return a non-zero 32-byte value are treated as success.
+        // This avoids the lowest-byte masking bug where tokens returning a non-bool
+        // non-zero value with a zero lowest byte would be misread as failure.
+        if (success && data.length > 0) {
+            success = abi.decode(data, (bool));
         }
     }
 
@@ -1202,8 +1204,11 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
                 }
                 return (recovered, 0);
             } catch {
-                // Emergency unwind also failed - return original amount as fallback
-                return (yieldPrincipal, 0);
+                // Both unwind paths failed. Do NOT proceed with a phantom amount —
+                // funds are still in the yield module and the vault balance does not
+                // cover the principal. Reverting here prevents accounting corruption
+                // (claimable balances set for amounts the contract cannot pay).
+                revert("YieldModule: UnwindFailed");
             }
         }
     }
@@ -1330,13 +1335,13 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         address token,
         address from,
         uint256 amount
-    ) internal virtual;
+    ) internal virtual {}
     function _emitEscrowTransferReleased(
         uint256 workflowId,
         address token,
         address to,
         uint256 amount
-    ) internal virtual;
+    ) internal virtual {}
     function _getYieldGenerationModule(
         uint256 workflowId
     ) internal view virtual returns (IYieldModule);

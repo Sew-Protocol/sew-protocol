@@ -88,9 +88,6 @@ contract EscrowVault is BaseEscrow {
     function _updateEscrowBalance(address token, uint256 amount, bool add) internal override {
         BalanceUpdateLibrary.updateBalance(totalHeldInEscrowPerToken, token, amount, add);
     }
-    function _emitEscrowTransferCancelled(uint256, address, address, uint256) internal pure override {}
-    function _emitEscrowTransferReleased(uint256, address, address, uint256) internal pure override {}
-
     function getAccountingBreakdown(address token) external view returns (
         uint256 principalHeld,
         uint256 feesCollected,
@@ -113,40 +110,18 @@ contract EscrowVault is BaseEscrow {
         emit FeesWithdrawn(token, feeAmount);
     }
 
-    function _getDefaultReleaseStrategy() internal view returns (IReleaseStrategy) {
-        return moduleManagement.getDefaultReleaseStrategy(address(this));
-    }
-
-    function _getDefaultYieldGenerationModule(uint256 workflowId) internal view returns (IYieldGenerationModule) {
-        return IYieldGenerationModule(moduleManagement.getDefaultYieldGenerationModule(address(this)));
-    }
-
-    function _getDefaultYieldDistributionModule(uint256 workflowId) internal view returns (IYieldDistributionModule) {
-        return IYieldDistributionModule(moduleManagement.getDefaultYieldDistributionModule(address(this)));
-    }
-
     function _getYieldGenerationModule(uint256 workflowId) internal view override returns (IYieldModule) {
-        address moduleAddr = address(moduleManagement.getDefaultYieldGenerationModule(address(this)));
-        if (moduleAddr == address(0)) {
-            return IYieldModule(address(0));
-        }
-        return IYieldModule(moduleAddr);
+        address snap = moduleSnapshots[workflowId].yieldGenerationModule;
+        if (snap != address(0)) return IYieldModule(snap);
+        return IYieldModule(address(moduleManagement.getDefaultYieldGenerationModule(address(this))));
     }
 
     function _getYieldDistributionModule(uint256 workflowId) internal view override returns (IYieldDistributionModule) {
-        return _getDefaultYieldDistributionModule(workflowId);
+        return IYieldDistributionModule(moduleManagement.getDefaultYieldDistributionModule(address(this)));
     }
 
     function _getReleaseStrategy(uint256 workflowId) internal view override returns (IReleaseStrategy) {
-        return _getDefaultReleaseStrategy();
+        return moduleManagement.getDefaultReleaseStrategy(address(this));
     }
-
-    function _emitEscrowTransferCreated(
-        uint256 workflowId,
-        address token,
-        address from,
-        address to,
-        uint256 amount
-    ) internal override {}
 
 }
