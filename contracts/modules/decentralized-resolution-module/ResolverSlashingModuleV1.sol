@@ -157,6 +157,8 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
 
     event SlashedSEWHandled(uint256 indexed workflowId, uint256 amount, bool supplyReduced);
 
+    event PenaltyActivated(SlashReason indexed reason, uint256 newBps);
+
     // ============ Initialization ============
 
     constructor(
@@ -253,6 +255,13 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         _currentSlashStableAmount = 0;
         _currentSlashSewAmount = 0;
 
+        // CEI: update status and mark slashed before external calls
+        slashEvent.status = SlashStatus.EXECUTED;
+        slashEvent.executedAt = block.timestamp;
+
+        // Mark as slashed before external calls (CEI)
+        workflowSlashed[slashEvent.escrowContract][slashEvent.workflowId][resolver] = true;
+
         // Execute waterfall slash
         (uint256 resolverSlashed, uint256 seniorSlashed, address senior) = _executeWaterfallSlash(
             resolver,
@@ -260,13 +269,6 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         );
 
         uint256 totalSlashed = resolverSlashed + seniorSlashed;
-
-        // Update slash event
-        slashEvent.status = SlashStatus.EXECUTED;
-        slashEvent.executedAt = block.timestamp;
-
-        // Mark as slashed
-        workflowSlashed[slashEvent.escrowContract][slashEvent.workflowId][resolver] = true;
 
         // Freeze resolver
         _freezeResolver(resolver);
@@ -367,7 +369,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         address escrowContract,
         address resolver,
         uint8 timeoutType
-    ) external override onlyRole(ROLE_RESOLUTION_MODULE) returns (uint256 slashId) {
+    ) external override nonReentrant onlyRole(ROLE_RESOLUTION_MODULE) returns (uint256 slashId) {
         // Reset tracking before slash
         _currentSlashStableAmount = 0;
         _currentSlashSewAmount = 0;
@@ -415,6 +417,9 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
             evidence: ''
         });
 
+        // CEI: mark as slashed before external calls to prevent double-slash
+        workflowSlashed[escrowContract][workflowId][resolver] = true;
+
         // Execute waterfall slash immediately
         (uint256 resolverSlashed, uint256 seniorSlashed, address senior) = _executeWaterfallSlash(
             resolver,
@@ -422,9 +427,6 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         );
 
         uint256 totalSlashed = resolverSlashed + seniorSlashed;
-
-        // Mark as slashed
-        workflowSlashed[escrowContract][workflowId][resolver] = true;
 
         // Freeze resolver
         _freezeResolver(resolver);
@@ -464,7 +466,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         address escrowContract,
         address resolver,
         uint8 priorRound
-    ) external override onlyRole(ROLE_RESOLUTION_MODULE) returns (uint256 slashId) {
+    ) external override nonReentrant onlyRole(ROLE_RESOLUTION_MODULE) returns (uint256 slashId) {
         priorRound;
         // Reset tracking before slash
         _currentSlashStableAmount = 0;
@@ -510,6 +512,9 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
             evidence: ''
         });
 
+        // CEI: mark as slashed before external calls to prevent double-slash
+        workflowSlashed[escrowContract][workflowId][resolver] = true;
+
         // Execute waterfall slash immediately
         (uint256 resolverSlashed, uint256 seniorSlashed, address senior) = _executeWaterfallSlash(
             resolver,
@@ -517,9 +522,6 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         );
 
         uint256 totalSlashed = resolverSlashed + seniorSlashed;
-
-        // Mark as slashed
-        workflowSlashed[escrowContract][workflowId][resolver] = true;
 
         // Freeze resolver
         _freezeResolver(resolver);
@@ -556,7 +558,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         address escrowContract,
         address resolver,
         bytes calldata evidence
-    ) external override onlyRole(ROLE_TIMELOCK) returns (uint256 slashId) {
+    ) external override nonReentrant onlyRole(ROLE_TIMELOCK) returns (uint256 slashId) {
         // Reset tracking before slash
         _currentSlashStableAmount = 0;
         _currentSlashSewAmount = 0;
@@ -604,6 +606,9 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
             evidence: evidence // Store evidence for audit
         });
 
+        // CEI: mark as slashed before external calls to prevent double-slash
+        workflowSlashed[escrowContract][workflowId][resolver] = true;
+
         // Execute waterfall slash immediately
         (uint256 resolverSlashed, uint256 seniorSlashed, address senior) = _executeWaterfallSlash(
             resolver,
@@ -611,9 +616,6 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         );
 
         uint256 totalSlashed = resolverSlashed + seniorSlashed;
-
-        // Mark as slashed
-        workflowSlashed[escrowContract][workflowId][resolver] = true;
 
         // Freeze resolver (fraud is severe)
         _freezeResolver(resolver);
@@ -1089,6 +1091,11 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         } else {
             oldBps = slashConfig.fraudSlashBps;
             slashConfig.fraudSlashBps = bps;
+        }
+
+        // Signal when a previously-disabled penalty type is activated
+        if (oldBps == 0 && bps > 0) {
+            emit PenaltyActivated(reason, bps);
         }
 
         emit SlashConfigUpdated(reason, oldBps, bps);

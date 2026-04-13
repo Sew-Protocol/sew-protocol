@@ -155,6 +155,9 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
     mapping(address => mapping(uint256 => mapping(address => uint256))) public lockedStakes; // escrowContract => workflowId => resolver => locked amount
     mapping(address => uint256) public totalLockedStake; // Total locked across all disputes
 
+    // Cumulative slash tracking (historical, per resolver)
+    mapping(address => uint256) public cumulativeSlashed;
+
     // Slashing module reference (for freeze checks)
     address public slashingModule;
 
@@ -723,7 +726,7 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
             lockedStake: totalLockedStake[resolver],
             delegatedFrom: delegation.active ? delegation.coverageAmount : 0,
             delegatedTo: reservedCoverage[resolver],
-            slashedAmount: 0, // Not implemented yet
+            slashedAmount: cumulativeSlashed[resolver],
             unstakeRequestedAt: unbondRequests[resolver].exists
                 ? unbondRequests[resolver].availableAt
                 : 0,
@@ -972,6 +975,9 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
 
         bond.lastUpdated = block.timestamp;
 
+        // Track cumulative slashed amount
+        cumulativeSlashed[resolver] += amount;
+
         // Transfer slashed stable to slashing module
         if (stableSlashed > 0) {
             if (slashingModule == address(0)) revert ZeroAddress('slashingModule');
@@ -1057,6 +1063,9 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
 
         bond.lastUpdated = block.timestamp;
 
+        // Track cumulative slashed amount for senior
+        cumulativeSlashed[senior] += amount;
+
         // Also reduce reserved coverage if this senior was providing coverage
         if (reservedCoverage[senior] > 0) {
             uint256 coverageReduction = amount;
@@ -1111,11 +1120,14 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
     }
 
     /**
-     * @notice Set unstake period (not used in this version, delays are constants)
+     * @notice Set unstake period — not supported in V1 (delays are immutable constants)
+     * @dev Reverts to prevent silent no-op. Unbond delays are:
+     *      - RESOLVER_UNBOND_DELAY = 14 days
+     *      - SENIOR_UNBOND_DELAY = 21 days
+     *      A future V2 staking module may support configurable delays.
      */
-    function setUnstakePeriod(uint256 period) external onlyRole(ROLE_TIMELOCK) {
-        // No-op: Delays are constants in this version
-        emit UnstakePeriodUpdated(0, period);
+    function setUnstakePeriod(uint256 /* period */) external view onlyRole(ROLE_TIMELOCK) {
+        revert('StakingModuleV1: unstake delays are immutable constants');
     }
 
     /**
