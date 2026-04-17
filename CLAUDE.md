@@ -94,14 +94,26 @@ All shared structs and enums live in `contracts/types/`:
 ### Dispute Flow
 
 1. Either party calls `raiseDispute()` → state: `PENDING → DISPUTED`
-2. `DisputeOps` initialises the dispute in the resolution module
+2. `DisputeOps` initialises the dispute in the resolution module; resolver address is captured in `EscrowTransfer.disputeResolver`
 3. Resolver calls `releaseAsDisputeResolver()` or `cancelAsDisputeResolver()` → state: `DISPUTED → PENDING_SETTLEMENT`
 4. A 2-day appeal window runs; anyone calls `executePendingSettlement()` after expiry → final state
-5. If a dispute sits unresolved for 90 days, `autoCancelDisputedEscrow()` refunds the sender
+5. If a dispute sits unresolved for 90 days, `autoCancelDisputedEscrow()` refunds the sender and emits `DisputeAutoCancelled`
+
+#### Resolver authority model
+
+`_isAuthorizedDisputeResolver` checks in this order:
+
+1. **customResolver** (per-escrow, set at creation) — sole authority if set; governance cannot override
+2. **`et.disputeResolver`** (captured at `raiseDispute`, updated by `escalateDispute`) — sole authority if set; the module-level resolver is intentionally NOT re-consulted during resolution to prevent governance from injecting a replacement resolver mid-dispute (governance sandwich, sew-simulation F3)
+3. **Snapshotted module fallback** — only if no resolver was captured (not expected in normal operation)
+
+Off-chain monitoring note: if a resolver refuses to act (e.g. fee below cost floor, capacity exhausted), the 90-day `autoCancelDisputedEscrow()` timeout fires and emits `DisputeAutoCancelled(workflowId, from, amt, FailureReason.TIMEOUT)`. These are economic/operational failures, not code bugs — the protocol cannot enforce resolver participation. See `sew-simulation` F7 (profit-threshold strike) and F10 (cascade escalation drain) for reproducible examples.
 
 ### Governance
 
 Protocol parameters are controlled via a Governor + `EscrowGovernanceTimelock` (TimelockController). Changes only affect modules registered after the change; per-escrow snapshots are immutable. Access roles: `DEFAULT_ADMIN_ROLE`, `ROLE_TIMELOCK`, `ROLE_GUARDIAN`, `ROLE_ESCROW_CONTRACT`.
+
+**Governance cannot rotate the resolver on an in-flight dispute.** `DefaultResolutionModule.setResolver()` changes who can be assigned as resolver on *new* disputes but has no effect on disputes already open (their resolver is locked in `et.disputeResolver`).
 
 ### Transfer Safety
 

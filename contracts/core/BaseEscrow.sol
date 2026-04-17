@@ -986,6 +986,19 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
             return disputeResolver == settings.customResolver;
         }
 
+        // If a resolver was captured at dispute creation (or updated by a legitimate escalation),
+        // it is the sole authority for this dispute. Checking against et.disputeResolver BEFORE
+        // consulting the live module prevents a governance actor from rotating the module-level
+        // resolver mid-dispute and injecting a replacement (F3 — governance sandwich).
+        // escalateDispute() always writes et.disputeResolver = newRes, so this path
+        // correctly tracks the resolver across escalation rounds.
+        if (et.disputeResolver != address(0)) {
+            return disputeResolver == et.disputeResolver;
+        }
+
+        // Fallback: no resolver was captured at dispute creation. Consult the snapshotted module.
+        // This path is not expected in normal operation but ensures compatibility with future
+        // resolution module variants that manage resolver assignment entirely within the module.
         address snap = moduleSnapshots[workflowId].resolutionModule;
         if (snap != address(0)) {
             bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(
@@ -1003,7 +1016,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
                 if (authorized) return true;
             }
         }
-        return disputeResolver == et.disputeResolver;
+        return false;
     }
 
     function _applyEscrowSettings(uint256 workflowId, EscrowSettings memory settings) internal {
