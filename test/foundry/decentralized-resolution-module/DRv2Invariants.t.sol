@@ -90,6 +90,7 @@ contract DRv2InvariantsTest is StdInvariant, Test {
         (
             uint256 posted,
             uint256 refunded,
+            ,
             uint256 paidToResolvers,
             uint256 forfeited
         ) = incentiveModuleV2.getV2Metrics();
@@ -123,7 +124,7 @@ contract DRv2InvariantsTest is StdInvariant, Test {
      * @dev Once a metric increases, it can only increase or stay the same
      */
     function invariant_MetricsMonotonic() public {
-        (uint256 posted, uint256 refunded, uint256 paid, uint256 forfeited) = incentiveModuleV2
+        (uint256 posted, uint256 refunded, , uint256 paid, uint256 forfeited) = incentiveModuleV2
             .getV2Metrics();
 
         assertTrue(posted >= lastPosted, 'Posted bonds cannot decrease');
@@ -362,7 +363,7 @@ contract DRv2FuzzTest is Test {
         assertFalse(bond.distributed, 'Should not be distributed');
 
         // Verify metrics
-        (uint256 posted, , , ) = incentiveModuleV2.getV2Metrics();
+        (uint256 posted, , , , ) = incentiveModuleV2.getV2Metrics();
         assertEq(posted, amount, 'Posted metric should equal amount');
     }
 
@@ -517,19 +518,21 @@ contract DRv2FuzzTest is Test {
         vm.prank(escrowContract);
         incentiveModuleV2.recordAppealBond(workflowId, escrowContract, depositor, depositor, amount, address(token), 1);
 
-        uint256 depositorBalanceBefore = token.balanceOf(depositor);
-
-        // Refund bond
+        // Refund bond (ERC20 uses pull pattern)
         vm.prank(escrowContract);
         incentiveModuleV2.distributeAppealBond(workflowId, escrowContract, 0, true); // outcomeFlipped = true
 
-        uint256 depositorBalanceAfter = token.balanceOf(depositor);
+        // Verify claimable refund, then claim it
+        uint256 claimable = incentiveModuleV2.claimableBondRefunds(escrowContract, workflowId, depositor);
+        assertEq(claimable, amount, 'Refund amount mismatch');
 
-        // Verify refund
-        assertEq(depositorBalanceAfter - depositorBalanceBefore, amount, 'Refund amount mismatch');
+        uint256 depositorBalanceBefore = token.balanceOf(depositor);
+        vm.prank(depositor);
+        incentiveModuleV2.claimBondRefund(workflowId, escrowContract, address(token));
+        assertEq(token.balanceOf(depositor) - depositorBalanceBefore, amount, 'Claim amount mismatch');
 
         // Verify metrics
-        (, uint256 refunded, , ) = incentiveModuleV2.getV2Metrics();
+        (, uint256 refunded, , , ) = incentiveModuleV2.getV2Metrics();
         assertEq(refunded, amount, 'Refunded metric mismatch');
     }
 
@@ -604,7 +607,7 @@ contract DRv2FuzzTest is Test {
         }
 
         // Verify final metrics
-        (uint256 posted, uint256 refunded, uint256 paid, uint256 forfeited) = incentiveModuleV2
+        (uint256 posted, uint256 refunded, , uint256 paid, uint256 forfeited) = incentiveModuleV2
             .getV2Metrics();
 
         assertEq(posted, expectedPosted, 'Posted metric mismatch');

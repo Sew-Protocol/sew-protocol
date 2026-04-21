@@ -274,15 +274,19 @@ contract AppealBondDistributionFuzzTest is Test {
         incentiveModule.recordAppealBond(workflowId, escrowContract, depositor, depositor, bondAmount, address(token), bondRound);
 
         // Distribute bond (simulating successful appeal - refund)
-        uint256 depositorBalanceBefore = token.balanceOf(depositor);
         vm.startPrank(escrowContract);
         incentiveModule.distributeAppealBond(workflowId, escrowContract, 0, true); // true = appeal succeeded
         vm.stopPrank();
 
-        // Verify depositor received refund
-        uint256 depositorBalanceAfter = token.balanceOf(depositor);
+        // ERC20 refunds use pull pattern — verify claimable, then claim
+        uint256 claimable = incentiveModule.claimableBondRefunds(escrowContract, workflowId, depositor);
+        assertEq(claimable, bondAmount, 'Depositor should have claimable refund');
+
+        uint256 depositorBalanceBefore = token.balanceOf(depositor);
+        vm.prank(depositor);
+        incentiveModule.claimBondRefund(workflowId, escrowContract, address(token));
         assertEq(
-            depositorBalanceAfter - depositorBalanceBefore,
+            token.balanceOf(depositor) - depositorBalanceBefore,
             bondAmount,
             'Depositor should receive full refund'
         );
