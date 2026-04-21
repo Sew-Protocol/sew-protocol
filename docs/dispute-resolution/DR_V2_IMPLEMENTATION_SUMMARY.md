@@ -80,9 +80,10 @@ struct EscalationCostConfig {
 **Tracked Metrics:**
 
 - `totalBondsPosted` - Sum of all bonds deposited
-- `totalBondsRefunded` - Sum of bonds returned to depositors (appeals succeeded)
+- `totalBondsRefunded` - Sum of bond value credited for refund (appeals succeeded)
+- `totalBondRefundsClaimed` - Sum of ERC20 refunds actually claimed via `claimBondRefund`
 - `totalBondsPaidToResolvers` - Sum of bonds paid to resolvers (appeals failed)
-- `totalBondsForfeited` - Sum of bonds confiscated (escalator didn't follow through)
+- `totalBondsForfeited` - Sum of bonds retained by protocol (no eligible resolvers)
 - `escalationDepthHistogram[round]` - Count of escalations to each round
 
 **View Functions:**
@@ -92,16 +93,29 @@ function getV2Metrics()
   external
   view
   returns (
-    uint256 bondsPosted,
-    uint256 bondsRefunded,
-    uint256 bondsPaidToResolvers,
-    uint256 bondsForfeited
+    uint256 posted,
+    uint256 refunded,
+    uint256 refundsClaimed,
+    uint256 paidToResolvers,
+    uint256 forfeited
   );
 
 function getEscalationDepthHistogram()
   external
   view
   returns (uint256 round0, uint256 round1, uint256 round2);
+```
+
+### 3a. Bond Refund Pattern
+
+ERC20 bond refunds use a **pull pattern**: `distributeAppealBond` credits `claimableBondRefunds[escrowContract][workflowId][escalatedBy]`; the escalator then calls `claimBondRefund(workflowId, escrowContract, token)` to receive tokens. ETH bond refunds use an immediate push transfer (no pull equivalent for native value).
+
+```solidity
+// Check pending refund
+claimableBondRefunds[escrowContract][workflowId][escalatedBy]
+
+// Claim ERC20 refund
+function claimBondRefund(uint256 workflowId, address escrowContract, address token) external
 ```
 
 ### 4. Anti-Griefing Measures
