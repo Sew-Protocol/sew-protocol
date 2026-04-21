@@ -4,6 +4,7 @@ pragma solidity ^0.8.33;
 import 'forge-std/Test.sol';
 import 'forge-std/StdInvariant.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol';
+import '../../../contracts/modules/decentralized-resolution-module/DRMAdminFacet.sol';
 import '../../../contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV2.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
 import '../../../contracts/modules/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
@@ -43,6 +44,7 @@ contract DRv2InvariantsTest is StdInvariant, Test {
         token = new MockERC20();
         paymentLib = new PaymentCalculationLibraryV1();
         resolutionModule = new DecentralizedResolutionModule(admin);
+        { DRMAdminFacet drmAdminFacet_ = new DRMAdminFacet(); resolutionModule.setAdminFacet(address(drmAdminFacet_)); }
         incentiveModuleV2 = new ResolverIncentiveModuleV2(admin, address(paymentLib));
 
         // Register escrow - admin has DEFAULT_ADMIN_ROLE from constructors
@@ -295,6 +297,7 @@ contract DRv2FuzzTest is Test {
         token = new MockERC20();
         paymentLib = new PaymentCalculationLibraryV1();
         resolutionModule = new DecentralizedResolutionModule(admin);
+        { DRMAdminFacet drmAdminFacet_ = new DRMAdminFacet(); resolutionModule.setAdminFacet(address(drmAdminFacet_)); }
         incentiveModuleV2 = new ResolverIncentiveModuleV2(admin, address(paymentLib));
 
         // Grant ROLE_TIMELOCK to admin first, then register escrow

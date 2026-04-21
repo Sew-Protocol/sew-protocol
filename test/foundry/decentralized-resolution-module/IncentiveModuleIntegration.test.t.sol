@@ -8,6 +8,7 @@ import '../../../contracts/modules/decentralized-resolution-module/Decentralized
 import '../../../contracts/modules/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
+import '../../../contracts/modules/decentralized-resolution-module/DRMAdminFacet.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/ops/YieldOps.sol';
@@ -75,6 +76,7 @@ contract IncentiveModuleIntegrationTest is Test {
 
         // Deploy resolution module
         resolutionModule = new DecentralizedResolutionModule(deployer);
+        { DRMAdminFacet drmAdminFacet_ = new DRMAdminFacet(); resolutionModule.setAdminFacet(address(drmAdminFacet_)); }
 
         // Deploy escrow
         yieldOps = new YieldOps(address(this));

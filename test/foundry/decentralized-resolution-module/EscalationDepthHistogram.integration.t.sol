@@ -4,6 +4,7 @@ pragma solidity ^0.8.33;
 import 'forge-std/Test.sol';
 import '../../../contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV2.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol';
+import '../../../contracts/modules/decentralized-resolution-module/DRMAdminFacet.sol';
 import '../../../contracts/modules/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/core/BaseEscrow.sol';
@@ -69,6 +70,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
 
         // Deploy resolution module
         resolutionModule = new DecentralizedResolutionModule(deployer);
+        { DRMAdminFacet drmAdminFacet_ = new DRMAdminFacet(); resolutionModule.setAdminFacet(address(drmAdminFacet_)); }
         resolutionModule.grantRole(resolutionModule.ROLE_TIMELOCK(), address(this));
         resolutionModule.registerEscrowContract(address(this));
 
