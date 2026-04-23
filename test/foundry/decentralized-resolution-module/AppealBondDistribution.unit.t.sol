@@ -85,20 +85,19 @@ contract AppealBondDistributionTest is Test {
     function test_distributeAppealBond_AppealSucceeds_Refund() public {
         _recordBond(WORKFLOW_ID, 1);
 
-        // Record balance before distribution
-        uint256 depositBalanceBefore = token.balanceOf(depositor);
-
         // Distribute bond on successful appeal (outcomeFlipped = true)
         vm.prank(address(this));
         incentiveModule.distributeAppealBond(WORKFLOW_ID, address(this), 0, true);
 
-        // Verify bond refunded to depositor
-        uint256 depositBalanceAfter = token.balanceOf(depositor);
-        assertEq(
-            depositBalanceAfter - depositBalanceBefore,
-            BOND_AMOUNT,
-            'Depositor should receive bond'
-        );
+        // ERC20 refunds use pull pattern — verify claimable refund credited
+        uint256 claimable = incentiveModule.claimableBondRefunds(address(this), WORKFLOW_ID, depositor);
+        assertEq(claimable, BOND_AMOUNT, 'Claimable refund should equal bond amount');
+
+        // Verify depositor can claim and receives tokens
+        uint256 balanceBefore = token.balanceOf(depositor);
+        vm.prank(depositor);
+        incentiveModule.claimBondRefund(WORKFLOW_ID, address(this), address(token));
+        assertEq(token.balanceOf(depositor) - balanceBefore, BOND_AMOUNT, 'Depositor should receive bond on claim');
     }
 
     /**
@@ -164,16 +163,32 @@ contract AppealBondDistributionTest is Test {
     function test_distributeAppealBond_NoResolvers_Forfeit() public {
         _recordBond(WORKFLOW_ID, 1);
 
-        // No resolvers recorded at round 0
-
-        // Distribute bond
+        // No resolvers recorded at round 0 — expect AppealBondForfeited event
         vm.prank(address(this));
+        vm.expectEmit(true, false, false, true);
+        emit AppealBondForfeited(WORKFLOW_ID, 0, BOND_AMOUNT, address(token), 'No resolvers recorded');
         incentiveModule.distributeAppealBond(WORKFLOW_ID, address(this), 0, false);
 
-        // Bond should be forfeited (remains in protocol)
-        // Verify no payment to any resolver
+        // Verify no payment to any resolver and metric updated
         uint256 resolver1Payment = incentiveModule.getClaimablePayment(WORKFLOW_ID, address(this), resolver1);
         assertEq(resolver1Payment, 0, 'No payment to unrecorded resolver');
+        (, , , , uint256 forfeited) = incentiveModule.getV2Metrics();
+        assertEq(forfeited, BOND_AMOUNT, 'Forfeited metric should equal bond amount');
+    }
+
+    function test_claimBondRefund_NothingToClaim_Reverts() public {
+        _recordBond(WORKFLOW_ID, 1);
+        vm.prank(address(this));
+        incentiveModule.distributeAppealBond(WORKFLOW_ID, address(this), 0, true);
+
+        // Claim once successfully
+        vm.prank(depositor);
+        incentiveModule.claimBondRefund(WORKFLOW_ID, address(this), address(token));
+
+        // Second claim should revert
+        vm.prank(depositor);
+        vm.expectRevert('Nothing to claim');
+        incentiveModule.claimBondRefund(WORKFLOW_ID, address(this), address(token));
     }
 
     /**
@@ -182,9 +197,10 @@ contract AppealBondDistributionTest is Test {
     function test_distributeAppealBond_EventEmittedOnRefund() public {
         _recordBond(WORKFLOW_ID, 1);
 
+        // ERC20 bond refunds emit AppealBondRefundClaimable (pull pattern), not AppealBondRefunded
         vm.prank(address(this));
         vm.expectEmit(true, true, true, true);
-        emit AppealBondRefunded(WORKFLOW_ID, 1, depositor, BOND_AMOUNT, address(token));
+        emit AppealBondRefundClaimable(WORKFLOW_ID, 1, depositor, BOND_AMOUNT, address(token));
 
         incentiveModule.distributeAppealBond(WORKFLOW_ID, address(this), 0, true);
     }
@@ -218,11 +234,27 @@ contract AppealBondDistributionTest is Test {
         address token
     );
 
+    event AppealBondRefundClaimable(
+        uint256 indexed escrowId,
+        uint8 round,
+        address indexed claimant,
+        uint256 amount,
+        address token
+    );
+
     event AppealBondPaidToResolvers(
         uint256 indexed escrowId,
         uint8 round,
         address[] resolvers,
         uint256 totalAmount,
         address token
+    );
+
+    event AppealBondForfeited(
+        uint256 indexed escrowId,
+        uint8 round,
+        uint256 amount,
+        address token,
+        string reason
     );
 }
