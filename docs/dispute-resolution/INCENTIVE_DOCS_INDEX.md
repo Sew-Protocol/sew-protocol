@@ -62,6 +62,22 @@ This document provides an index of all documentation related to resolver incenti
 
 ---
 
+## Comparative Analysis & Benchmarks
+
+1. **`docs/dispute-resolution/COMPARATIVE_ANALYSIS_DR_SYSTEMS.md`**
+   - Architecture comparison: Sew vs UMA vs Kleros
+   - Decision model, appeal mechanism, economic security, token design
+   - Structural gaps vs design intent
+   - Positioning summary and open design questions
+
+2. **`docs/dispute-resolution/APPEAL_GAME_THEORY_BENCHMARKS.md`**
+   - Formal theorems: rational escalation, griefing equilibrium, bribery resistance, EMA convergence, Schelling comparison
+   - Public benchmark suite (BM-01 through BM-07) with runnable Python/Solidity specs
+   - Parameter sensitivity table
+   - **BM-03 currently FAILS** (bond distribution bug — fix in `finalizeDispute`)
+
+---
+
 ## Economics Documentation
 
 1. **`docs/dispute-resolution/RESOLVER_ECONOMICS.md`**
@@ -166,4 +182,4 @@ This document provides an index of all documentation related to resolver incenti
 
 ---
 
-**Last Updated**: 2025-01-16
+**Last Updated**: 2026-04-25
