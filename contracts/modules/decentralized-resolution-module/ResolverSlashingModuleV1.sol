@@ -508,7 +508,14 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
                 evidence: ''
             });
 
-            // Do NOT execute waterfall or freeze yet — deferred until executeSlash().
+            // Mark as slashed immediately so the same workflow cannot be double-slashed
+            // while the contest window is open.
+            workflowSlashed[escrowContract][workflowId][resolver] = true;
+
+            // Freeze resolver now to lock stake during the contest window.
+            // Waterfall execution is deferred until executeSlash().
+            _freezeResolver(resolver);
+
             emit SlashProposed(slashId, workflowId, resolver, reason, slashAmount, _msgSender());
         }
 
@@ -668,6 +675,12 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
             proposer: _msgSender(),
             evidence: evidence
         });
+
+        // Mark as slashed immediately — prevents double-slashing during the appeal window.
+        workflowSlashed[escrowContract][workflowId][resolver] = true;
+
+        // Freeze resolver now to lock stake during the appeal window.
+        _freezeResolver(resolver);
 
         emit SlashProposed(slashId, workflowId, resolver, reason, slashAmount, _msgSender());
         return slashId;

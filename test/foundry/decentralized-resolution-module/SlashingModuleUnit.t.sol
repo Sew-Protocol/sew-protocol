@@ -259,11 +259,11 @@ contract SlashingModuleUnitTest is Test {
         uint256 slashId = slashingModule.slashForFraud(workflowId, address(this), resolver1, evidence);
         assertGt(slashId, 0, 'Should create slash');
 
-        // Freeze is deferred to executeSlash; resolver must NOT be frozen yet.
+        // Resolver is frozen immediately at proposal time to lock stake during the appeal window.
         uint256 frozenUntil = slashingModule.frozenUntil(resolver1);
-        assertEq(frozenUntil, 0, 'Resolver must not be frozen before slash is executed');
+        assertGt(frozenUntil, block.timestamp, 'Resolver should be frozen after fraud slash proposal');
 
-        // After the appeal window, timelock executes — resolver becomes frozen.
+        // After the appeal window, timelock executes — resolver remains frozen (or re-frozen).
         vm.warp(block.timestamp + slashingModule.getSlashConfig().appealWindow + 1);
         vm.prank(timelock);
         slashingModule.executeSlash(slashId);
