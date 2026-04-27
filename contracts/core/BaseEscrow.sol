@@ -986,6 +986,19 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
             return disputeResolver == settings.customResolver;
         }
 
+        // S26 Governance Sandwich mitigation:
+        // Once a resolver is assigned to a dispute (et.disputeResolver != address(0)), it becomes
+        // the sole authority for that dispute. Consulting the module's live state would allow
+        // governance to inject a replacement resolver mid-dispute via setResolver(), creating a
+        // race condition where a malicious incoming resolver could finalize before the legitimate
+        // outgoing one. The per-escrow assignment is immutable for the lifetime of the dispute;
+        // escalation (escalateDispute) explicitly updates et.disputeResolver to the new level's
+        // resolver, so this check remains correct across all escalation rounds.
+        if (et.disputeResolver != address(0)) {
+            return disputeResolver == et.disputeResolver;
+        }
+
+        // No per-escrow resolver assigned yet: consult the module as a fallback.
         address snap = moduleSnapshots[workflowId].resolutionModule;
         if (snap != address(0)) {
             bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(
@@ -1003,7 +1016,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
                 if (authorized) return true;
             }
         }
-        return disputeResolver == et.disputeResolver;
+        return false;
     }
 
     function _applyEscrowSettings(uint256 workflowId, EscrowSettings memory settings) internal {
