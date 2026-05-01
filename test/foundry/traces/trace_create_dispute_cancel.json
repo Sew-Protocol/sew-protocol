@@ -1,0 +1,76 @@
+{
+  "schema_version": "1",
+  "scenario_id": "create_dispute_cancel",
+  "description": "Golden trace: buyer creates, raises dispute, resolver cancels (refunds buyer), settlement executed",
+  "fee_bps": 100,
+  "step_count": 4,
+  "steps": [
+    {
+      "seq": 0,
+      "action": "create_escrow",
+      "caller_role": "buyer",
+      "warp_to": 1001,
+      "save_wf_as": "wf0",
+      "params": {
+        "to_role": "seller",
+        "amount": 10000000000000000000000
+      },
+      "expected": {
+        "escrow_state": 1,
+        "amount_after_fee": 9900000000000000000000,
+        "total_held": 9900000000000000000000,
+        "total_fees": 100000000000000000000,
+        "pending_settlement_exists": false,
+        "dispute_level": 0
+      }
+    },
+    {
+      "seq": 1,
+      "action": "raise_dispute",
+      "caller_role": "buyer",
+      "warp_to": 2000,
+      "wf_alias": "wf0",
+      "params": {},
+      "expected": {
+        "escrow_state": 4,
+        "amount_after_fee": 9900000000000000000000,
+        "total_held": 9900000000000000000000,
+        "total_fees": 100000000000000000000,
+        "pending_settlement_exists": false,
+        "dispute_level": 0
+      }
+    },
+    {
+      "seq": 2,
+      "action": "cancel_as_dispute_resolver",
+      "caller_role": "resolver",
+      "warp_to": 3000,
+      "wf_alias": "wf0",
+      "params": {},
+      "expected": {
+        "escrow_state": 4,
+        "amount_after_fee": 9900000000000000000000,
+        "total_held": 9900000000000000000000,
+        "total_fees": 100000000000000000000,
+        "pending_settlement_exists": true,
+        "dispute_level": 0
+      }
+    },
+    {
+      "seq": 3,
+      "action": "execute_pending_settlement",
+      "caller_role": "buyer",
+      "warp_to": 175801,
+      "wf_alias": "wf0",
+      "params": {},
+      "expected": {
+        "escrow_state": 3,
+        "amount_after_fee": 9900000000000000000000,
+        "total_held": 0,
+        "total_fees": 100000000000000000000,
+        "pending_settlement_exists": false,
+        "dispute_level": 0
+      }
+    }
+  ]
+}

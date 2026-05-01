@@ -9,7 +9,10 @@ optimizer_runs = 1
 via_ir = true
 verbosity = 3
 ffi = false
-fs_permissions = [{ access = "read", path = "./" }]
+fs_permissions = [
+  { access = "read", path = "./" },
+  { access = "write", path = "./" }
+]
 # Required for Halmos symbolic execution (halmos 0.3.x needs the AST in artifacts)
 ast = true
 

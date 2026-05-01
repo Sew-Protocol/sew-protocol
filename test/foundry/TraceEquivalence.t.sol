@@ -932,4 +932,51 @@ contract TraceEquivalenceTest is Test {
     function test_v2_s05_pending_settlement() public {
         _replayTrace("test/foundry/traces/v2/s05.json");
     }
+
+    // ====================================================================
+    // CDRS v0.2 Negative Tests
+    // These tests verify that semantic violations are caught by TraceEquivalence
+    // ====================================================================
+
+    function test_negative_n01_wrong_outcome() public {
+        // N01: Expected outcome="refund" but actual is "release"
+        // Should fail when _assertResolutionSemantics checks outcome
+        _replayTrace("test/foundry/traces/v2/negative/n01.json");
+    }
+
+    function test_negative_n02_unauthorized_resolver() public {
+        // N02: Expected authorized_resolver=false but actual is true
+        // Should fail when _assertResolutionSemantics checks authorization
+        _replayTrace("test/foundry/traces/v2/negative/n02.json");
+    }
+
+    function test_negative_n03_settlement_not_executed() public {
+        // N03: Expected settlement_executed=false but actual is true
+        // Should fail when _assertResolutionSemantics checks settlement execution
+        _replayTrace("test/foundry/traces/v2/negative/n03.json");
+    }
+
+    function test_negative_n04_wrong_escalation_level() public {
+        // N04: Expected escalation.level=1 but actual is 0
+        // Should fail when _assertEscalationSemantics checks level
+        _replayTrace("test/foundry/traces/v2/negative/n04.json");
+    }
+
+    function test_negative_n05_wrong_dispute_initiator() public {
+        // N05: Expected dispute_initiator="seller" but actual is "buyer"
+        // Should fail when _assertParticipationSemantics checks initiator
+        _replayTrace("test/foundry/traces/v2/negative/n05.json");
+    }
+
+    function test_negative_n06_auto_cancel_triggered() public {
+        // N06: Expected auto_cancel_triggered=true but actual is false
+        // Should fail when _assertTimingSemantics checks auto-cancel
+        _replayTrace("test/foundry/traces/v2/negative/n06.json");
+    }
+
+    function test_negative_n07_wrong_resolution_actor() public {
+        // N07: Expected resolution_actor="buyer" but actual is "resolver"
+        // Should fail when _assertParticipationSemantics checks resolution actor
+        _replayTrace("test/foundry/traces/v2/negative/n07.json");
+    }
 }

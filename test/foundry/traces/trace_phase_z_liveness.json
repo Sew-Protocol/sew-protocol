@@ -1,0 +1,63 @@
+{
+  "schema_version": "1",
+  "phase": "Z",
+  "scenario_id": "phase-z-liveness-resolver-absent",
+  "description": "Phase Z liveness failure: resolver participates in dispute opening but never resolves. After 90-day max-dispute-duration the escrow auto-cancels (refunds buyer). Maps to Phase Z TEST 2 (market shock) and TEST 4 (combined shock) — resolver exits mid-stream.",
+  "trace_score": 5,
+  "categories": ["liveness-fail"],
+  "fee_bps": 100,
+  "step_count": 3,
+  "steps": [
+    {
+      "seq": 0,
+      "action": "create_escrow",
+      "caller_role": "buyer",
+      "warp_to": 1001,
+      "save_wf_as": "wf0",
+      "params": {
+        "to_role": "seller",
+        "amount": 10000000000000000000000
+      },
+      "expected": {
+        "escrow_state": 1,
+        "amount_after_fee": 9900000000000000000000,
+        "total_held": 9900000000000000000000,
+        "total_fees": 100000000000000000000,
+        "pending_settlement_exists": false,
+        "dispute_level": 0
+      }
+    },
+    {
+      "seq": 1,
+      "action": "raise_dispute",
+      "caller_role": "buyer",
+      "warp_to": 2000,
+      "wf_alias": "wf0",
+      "params": {},
+      "expected": {
+        "escrow_state": 4,
+        "amount_after_fee": 9900000000000000000000,
+        "total_held": 9900000000000000000000,
+        "total_fees": 100000000000000000000,
+        "pending_settlement_exists": false,
+        "dispute_level": 0
+      }
+    },
+    {
+      "seq": 2,
+      "action": "auto_cancel_disputed",
+      "caller_role": "buyer",
+      "warp_to": 7778001,
+      "wf_alias": "wf0",
+      "params": {},
+      "expected": {
+        "escrow_state": 3,
+        "amount_after_fee": 9900000000000000000000,
+        "total_held": 0,
+        "total_fees": 100000000000000000000,
+        "pending_settlement_exists": false,
+        "dispute_level": 0
+      }
+    }
+  ]
+}
