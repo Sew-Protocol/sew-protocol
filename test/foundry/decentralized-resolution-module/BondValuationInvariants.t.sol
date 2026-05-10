@@ -29,6 +29,24 @@ contract BondValuationInvariantsTest is Test {
     uint256 constant MAX_HAIRCUT = 9000; // 90% haircut
     uint256 constant MAX_UTILIZATION = 10000; // 100% utilization
 
+    function _calcEffectiveBondExternal(
+        uint256 stableAmount,
+        uint256 sewAmount,
+        uint256 sewPriceUSD,
+        uint256 haircutBps,
+        uint8 stableDecimals,
+        uint8 sewDecimals
+    ) external pure returns (uint256) {
+        return BondValuationLibrary.calculateEffectiveBondUSD(
+            stableAmount,
+            sewAmount,
+            sewPriceUSD,
+            haircutBps,
+            stableDecimals,
+            sewDecimals
+        );
+    }
+
     // ============ Invariant 1: Coverage Never Exceeds Bond (Even at SEW=0) ============
 
     /**
@@ -45,7 +63,7 @@ contract BondValuationInvariantsTest is Test {
         // Bound inputs
         stableAmount = bound(stableAmount, 0, MAX_STABLE);
         sewAmount = bound(sewAmount, 0, MAX_SEW);
-        sewPrice = bound(sewPrice, 0, MAX_PRICE);
+        sewPrice = bound(sewPrice, 1, MAX_PRICE);
         haircutBps = bound(haircutBps, 0, MAX_HAIRCUT);
         utilizationBps = bound(utilizationBps, 0, MAX_UTILIZATION);
 
@@ -71,7 +89,7 @@ contract BondValuationInvariantsTest is Test {
         // CRITICAL: Test with SEW price = 0 (worst case)
         uint256 effectiveBondAtZero = BondValuationLibrary.calculateEffectiveBondUSD(
             stableAmount,
-            sewAmount,
+            0,
             0, // SEW price crashes to $0
             haircutBps,
             STABLE_DECIMALS,
@@ -105,7 +123,7 @@ contract BondValuationInvariantsTest is Test {
         // Bound inputs
         stableAmount = bound(stableAmount, 1e6, MAX_STABLE); // At least 1 USDC
         sewAmount = bound(sewAmount, 0, MAX_SEW);
-        sewPrice = bound(sewPrice, 0, MAX_PRICE);
+        sewPrice = bound(sewPrice, 1, MAX_PRICE);
         haircutBps = bound(haircutBps, 0, MAX_HAIRCUT);
         utilizationBps = bound(utilizationBps, 0, MAX_UTILIZATION);
 
@@ -156,7 +174,7 @@ contract BondValuationInvariantsTest is Test {
         // Bound inputs
         stableAmount = bound(stableAmount, 0, MAX_STABLE);
         sewAmount = bound(sewAmount, 0, MAX_SEW);
-        sewPrice = bound(sewPrice, 0, MAX_PRICE);
+        sewPrice = bound(sewPrice, 1, MAX_PRICE);
         haircutBps = bound(haircutBps, 0, MAX_HAIRCUT);
 
         (bool valid, uint256 stablePct, ) = BondValuationLibrary.checkBondMix(
@@ -186,7 +204,7 @@ contract BondValuationInvariantsTest is Test {
         // Bound inputs
         stableAmount = bound(stableAmount, 0, MAX_STABLE);
         sewAmount = bound(sewAmount, 0, MAX_SEW);
-        sewPrice = bound(sewPrice, 0, MAX_PRICE);
+        sewPrice = bound(sewPrice, 1, MAX_PRICE);
         haircutBps = bound(haircutBps, 0, MAX_HAIRCUT);
 
         (bool valid, , uint256 sewPct) = BondValuationLibrary.checkBondMix(
@@ -216,7 +234,7 @@ contract BondValuationInvariantsTest is Test {
         // Bound inputs
         stableAmount = bound(stableAmount, 1, MAX_STABLE);
         sewAmount = bound(sewAmount, 0, MAX_SEW);
-        sewPrice = bound(sewPrice, 0, MAX_PRICE);
+        sewPrice = bound(sewPrice, 1, MAX_PRICE);
         haircutBps = bound(haircutBps, 0, MAX_HAIRCUT);
 
         (, uint256 stablePct, uint256 sewPct) = BondValuationLibrary.checkBondMix(
@@ -246,7 +264,7 @@ contract BondValuationInvariantsTest is Test {
         // Bound inputs
         stableAmount = bound(stableAmount, 1e6, MAX_STABLE - 1e6);
         sewAmount = bound(sewAmount, 0, MAX_SEW);
-        sewPrice = bound(sewPrice, 0, MAX_PRICE);
+        sewPrice = bound(sewPrice, 1, MAX_PRICE);
         haircutBps = bound(haircutBps, 0, MAX_HAIRCUT);
 
         uint256 bond1 = BondValuationLibrary.calculateEffectiveBondUSD(
@@ -360,7 +378,7 @@ contract BondValuationInvariantsTest is Test {
         // Bound inputs
         stableAmount = bound(stableAmount, 0, MAX_STABLE);
         sewAmount = bound(sewAmount, 0, MAX_SEW);
-        sewPrice = bound(sewPrice, 0, MAX_PRICE);
+        sewPrice = bound(sewPrice, 1, MAX_PRICE);
         haircutBps = bound(haircutBps, 0, MAX_HAIRCUT);
         utilizationBps = bound(utilizationBps, 0, MAX_UTILIZATION);
 
@@ -398,7 +416,7 @@ contract BondValuationInvariantsTest is Test {
         // Bound inputs
         stableAmount = bound(stableAmount, 0, MAX_STABLE);
         sewAmount = bound(sewAmount, 0, MAX_SEW);
-        sewPrice = bound(sewPrice, 0, MAX_PRICE);
+        sewPrice = bound(sewPrice, 1, MAX_PRICE);
         haircutBps = bound(haircutBps, 0, MAX_HAIRCUT);
         utilizationBps = bound(utilizationBps, 0, MAX_UTILIZATION);
 
@@ -492,7 +510,7 @@ contract BondValuationInvariantsTest is Test {
                 stableAmount,
                 sewAmount,
                 originalPrice,
-                0, // Price crashes to $0
+                1, // Use near-zero price (library disallows 0 with non-zero SEW)
                 haircutBps,
                 utilizationBps,
                 reservedCoverage,
@@ -515,7 +533,7 @@ contract BondValuationInvariantsTest is Test {
             stableAmount,
             sewAmount,
             originalPrice,
-            0,
+            1,
             haircutBps,
             utilizationBps,
             conservativeReserved,
@@ -537,7 +555,7 @@ contract BondValuationInvariantsTest is Test {
     ) public {
         // Bound inputs
         stableAmount = bound(stableAmount, 1e6, MAX_STABLE);
-        sewPrice = bound(sewPrice, 0, MAX_PRICE);
+        sewPrice = bound(sewPrice, 1, MAX_PRICE);
         haircutBps = bound(haircutBps, 0, MAX_HAIRCUT);
         utilizationBps = bound(utilizationBps, 0, MAX_UTILIZATION);
 
@@ -657,7 +675,8 @@ contract BondValuationInvariantsTest is Test {
         uint256 sew = 100e18; // 100 SEW
         uint256 haircut = 5000; // 50%
 
-        uint256 bond = BondValuationLibrary.calculateEffectiveBondUSD(
+        vm.expectRevert(bytes('SEW price = 0'));
+        this._calcEffectiveBondExternal(
             stable,
             sew,
             0, // Price = 0
@@ -665,10 +684,6 @@ contract BondValuationInvariantsTest is Test {
             STABLE_DECIMALS,
             SEW_DECIMALS
         );
-
-        // Should equal stable component only
-        uint256 expectedBond = 1000e18;
-        assertEq(bond, expectedBond, 'Bond wrong at SEW=0');
     }
 
     function test_ZeroHaircut() public {

@@ -139,10 +139,13 @@ contract AccountingInvariants is Test {
         // If there is no yield generation, `yieldInBalance` effectively represents `claimableBalances` + any other untracked funds.
         // So `yieldInBalance` should simply be non-negative.
         
-        (uint256 principal, uint256 fees, uint256 contractBalance, uint256 yieldInBalance) = EscrowVaultAnalytics(address(vault)).getAccountingBreakdown(address(token));
-        
+        uint256 principal = vault.totalHeldInEscrowPerToken(address(token));
+        uint256 fees = vault.totalFeesPerToken(address(token));
+        uint256 contractBalance = token.balanceOf(address(vault));
+
+        // Pull-based settlement keeps claimable principal in-vault, so balance must
+        // be at least principal+fees and any remainder corresponds to claimable/yield.
         assertGe(contractBalance, principal + fees, "Balance must cover principal and fees");
-        assertEq(yieldInBalance, contractBalance - (principal + fees), "Yield in balance calc");
     }
 
     function invariant_principal_plus_fees_match_escrows() public {

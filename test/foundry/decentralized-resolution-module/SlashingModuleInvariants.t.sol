@@ -487,10 +487,8 @@ contract SlashingModuleInvariantsTest is Test {
 
         // Try to slash for reversal
         vm.prank(resolutionModule);
-        uint256 slashId = slashingModule.slashForReversal(1, address(this), resolver1, 0);
-
-        // INVARIANT: Reversal slashing returns 0 (disabled)
-        assertEq(slashId, 0, 'Reversal slashing should be disabled');
+        vm.expectRevert();
+        slashingModule.slashForReversal(1, address(this), resolver1, 0);
     }
 
     /**
