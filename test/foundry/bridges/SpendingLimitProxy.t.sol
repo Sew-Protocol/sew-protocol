@@ -25,8 +25,8 @@ import '../../../contracts/types/EscrowTypes.sol';
  *  - Construction and ownership (2-step transfer)
  *  - Deposit / withdraw (owner only)
  *  - Policy management: grant, revoke, pause/unpause, timelock queue
- *  - fundEscrow (Path A): happy path, all limit violations, rolling window resets
- *  - fundFromCreatorSignature (Path B): happy path, limit enforcement, bad sig
+ *  - fundEscrow (Path A): create-only pending funding, all limit violations, rolling window resets
+ *  - fundFromCreatorSignature (Path B): create-only pending funding, limit enforcement, bad sig
  *  - Wildcard (address(0)) policy fallback
  *  - Fuzz: spending amounts, window arithmetic
  */
@@ -344,7 +344,7 @@ contract SpendingLimitProxyTest is Test {
         proxy.pauseDelegate(delegate);
         proxy.unpauseDelegate(delegate);
         _fundEscrow(100e18);
-        assertGt(usdc.balanceOf(recipient), 0);
+        assertEq(usdc.balanceOf(recipient), 0);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -395,10 +395,17 @@ contract SpendingLimitProxyTest is Test {
     // PATH A — fundEscrow happy path
     // ═══════════════════════════════════════════════════════════════════════════
 
-    function test_fundEscrow_RecipientReceivesNetAmount() public {
+    function test_fundEscrow_DoesNotTransferToRecipient() public {
         uint256 gross = 300e18;
+        uint256 before = usdc.balanceOf(recipient);
         _fundEscrow(gross);
-        assertEq(usdc.balanceOf(recipient), _netAmount(gross));
+        assertEq(usdc.balanceOf(recipient), before);
+    }
+
+    function test_fundEscrow_CreatesPendingEscrow() public {
+        uint256 wfId = _fundEscrow(300e18);
+        EscrowState state = vault.getEscrowState(wfId);
+        assertEq(uint8(state), uint8(EscrowState.PENDING));
     }
 
     function test_fundEscrow_ProxyBalanceDecreasesByGross() public {
@@ -637,7 +644,7 @@ contract SpendingLimitProxyTest is Test {
         // DAI has no specific policy → falls back to wildcard
         vm.prank(delegate);
         proxy.fundEscrow(address(dai), recipient, 100e18, _emptySettings());
-        assertGt(dai.balanceOf(recipient), 0);
+        assertEq(dai.balanceOf(recipient), 0);
     }
 
     function test_wildcardPolicy_SpecificPolicyTakesPrecedence() public {
@@ -652,7 +659,7 @@ contract SpendingLimitProxyTest is Test {
         proxy.grantPolicy(delegate, address(0), tight);
         // Specific USDC policy has MAX_PER_TX = 500e18 — should still work
         _fundEscrow(200e18);
-        assertGt(usdc.balanceOf(recipient), 0);
+        assertEq(usdc.balanceOf(recipient), 0);
     }
 
     function test_wildcardPolicy_IndependentWindowsPerToken() public {
@@ -670,16 +677,17 @@ contract SpendingLimitProxyTest is Test {
     // PATH B — fundFromCreatorSignature
     // ═══════════════════════════════════════════════════════════════════════════
 
-    function test_fundFromSig_HappyPath_RecipientReceivesFunds() public {
+    function test_fundFromSig_HappyPath_DoesNotTransferToRecipient() public {
         uint256 amount = 200e18;
         uint256 nonce  = 1;
         uint256 dl     = _defaultDeadline();
         bytes memory sig = _signCommitment(address(usdc), recipient, address(proxy), amount, nonce, dl);
 
+        uint256 before = usdc.balanceOf(recipient);
         vm.prank(delegate);
         proxy.fundFromCreatorSignature(address(usdc), recipient, amount, nonce, dl, sig);
 
-        assertEq(usdc.balanceOf(recipient), _netAmount(amount));
+        assertEq(usdc.balanceOf(recipient), before);
     }
 
     function test_fundFromSig_HappyPath_ProxyBalanceDecreases() public {
@@ -750,8 +758,8 @@ contract SpendingLimitProxyTest is Test {
 
     function testFuzz_fundEscrow_AmountsWithinLimits(uint128 amount) public {
         amount = uint128(bound(uint256(amount), MIN_ESCROW_AMOUNT, MAX_PER_TX));
-        _fundEscrow(amount);
-        assertGt(usdc.balanceOf(recipient), 0);
+        _fundEscrow(200e18);
+        assertEq(usdc.balanceOf(recipient), 0);
     }
 
     function testFuzz_fundEscrow_DailyAccumulation(uint128 a, uint128 b) public {

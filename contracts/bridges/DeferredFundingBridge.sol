@@ -20,7 +20,6 @@ interface IEscrowVaultMinimal {
         EscrowSettings memory settings
     ) external returns (uint256 workflowId);
 
-    function release(uint256 workflowId) external;
 }
 
 /**
@@ -37,7 +36,7 @@ interface IEscrowVaultMinimal {
  * ---------------------
  * A. On-chain slot  (creator has gas, wants on-chain proof of commitment)
  *    1. Creator calls openSlot()      — records commitment, emits SlotOpened
- *    2. Releaser calls executeSlot()  — pulls tokens from releaser, creates + releases
+ *    2. Releaser calls executeSlot()  — pulls tokens from releaser and creates escrow
  *    3. Creator may call cancelSlot() — invalidates slot before releaser acts
  *
  * B. EIP-712 gasless (creator only needs to sign, great for mobile wallets)
@@ -49,7 +48,7 @@ interface IEscrowVaultMinimal {
  * -----------
  * - Creator commits to escrow terms (recipient, amount, releaser, deadline) but holds no funds.
  * - Releaser supplies funds and decides when to execute (i.e., after verifying off-chain work).
- * - Recipient receives funds directly from the vault push transfer (or via withdrawEscrow pull).
+ * - Recipient receives funds only when normal escrow release/cancel/dispute flow later creates claimable entitlement.
  * - The vault escrow's `from` address is the bridge itself; creator identity is tracked here.
  *
  * Security properties
@@ -63,9 +62,8 @@ interface IEscrowVaultMinimal {
  * ---------------------------
  * - The vault `from` = bridge address, not creator. Dispute rights belong to the bridge.
  *   Phase 2 will add a creator-delegated dispute proxy.
- * - Atomic create+release means no on-chain hold period for disputes. Use a separate
- *   pending-hold variant (Phase 2) when a dispute window is required.
- * - Yield is not available (fund → immediately release, no holding time).
+ * - Bridge execution intentionally does NOT release. Escrow remains in protected lifecycle.
+ * - Yield is not available by default in bridge-created escrows.
  */
 contract DeferredFundingBridge is EIP712, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -156,6 +154,16 @@ contract DeferredFundingBridge is EIP712, ReentrancyGuard {
         uint256 vaultWorkflowId
     );
 
+    /// @notice Emitted when bridge funds and creates escrow only (no automatic release)
+    event DeferredEscrowFunded(
+        uint256 indexed workflowId,
+        address indexed creator,
+        address indexed releaser,
+        address recipient,
+        address token,
+        uint256 grossAmount
+    );
+
     /// @notice Emitted when a creator burns a nonce
     event NonceInvalidated(address indexed creator, uint256 nonce);
 
@@ -215,7 +223,7 @@ contract DeferredFundingBridge is EIP712, ReentrancyGuard {
     }
 
     /**
-     * @notice Releaser executes a slot: pulls tokens, creates escrow, releases funds atomically.
+     * @notice Releaser executes a slot: pulls tokens and creates escrow.
      * @dev The caller must be the designated releaser. The caller must have approved this
      *      contract to spend at least `slot.amount` of `slot.token`.
      * @param slotId The slot identifier returned by openSlot()
@@ -235,11 +243,12 @@ contract DeferredFundingBridge is EIP712, ReentrancyGuard {
         // Mark consumed before external calls (CEI)
         s.active = false;
 
-        uint256 workflowId = _fundAndRelease(token, recipient, amount, msg.sender);
+        uint256 workflowId = _fundAndCreateEscrow(token, recipient, amount, msg.sender);
 
         workflowCreator[workflowId] = creator;
         workflowReleaser[workflowId] = releaser;
 
+        emit DeferredEscrowFunded(workflowId, creator, releaser, recipient, token, amount);
         emit CommitmentExecuted(slotId, creator, releaser, recipient, token, amount, workflowId);
     }
 
@@ -313,10 +322,11 @@ contract DeferredFundingBridge is EIP712, ReentrancyGuard {
         if (usedNonces[creator][nonce]) revert NonceAlreadyUsed(creator, nonce);
         usedNonces[creator][nonce] = true;
 
-        uint256 workflowId = _fundAndRelease(token, recipient, amount, msg.sender);
+        uint256 workflowId = _fundAndCreateEscrow(token, recipient, amount, msg.sender);
 
         workflowCreator[workflowId] = creator;
         workflowReleaser[workflowId] = releaser;
+        emit DeferredEscrowFunded(workflowId, creator, releaser, recipient, token, amount);
 
         // Derive a deterministic commitmentId for the event
         bytes32 commitmentId = keccak256(abi.encode(creator, token, recipient, releaser, amount, nonce, deadline));
@@ -375,10 +385,10 @@ contract DeferredFundingBridge is EIP712, ReentrancyGuard {
 
     /**
      * @dev Pulls `amount` from `funder`, approves vault for exactly that amount,
-     *      creates an escrow (bridge is `from`), and immediately releases it.
+     *      and creates an escrow (bridge is `from`).
      *      The vault fee is deducted by the vault itself — we pass the gross amount.
      */
-    function _fundAndRelease(
+    function _fundAndCreateEscrow(
         address token,
         address recipient,
         uint256 amount,
@@ -398,8 +408,7 @@ contract DeferredFundingBridge is EIP712, ReentrancyGuard {
         // Reset allowance — vault should have consumed it all, but be explicit
         IERC20(token).forceApprove(address(vault), 0);
 
-        // Release: bridge is `from`, so DefaultReleaseStrategy allows this call
-        vault.release(workflowId);
+        // Intentionally no release here: escrow must follow normal protected lifecycle.
     }
 
     /**

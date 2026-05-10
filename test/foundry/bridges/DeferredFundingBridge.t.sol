@@ -24,7 +24,7 @@ import '../../../contracts/libraries/SettingsValidationLibrary.sol';
  * Test coverage:
  *  - Path A (on-chain slot): openSlot, executeSlot, cancelSlot
  *  - Path B (EIP-712 gasless): executeFromSignature, invalidateNonce
- *  - Shared: parameter validation, fee accounting, recipient balance, event emission
+ *  - Shared: parameter validation, fee accounting, pending-state preservation, event emission
  *  - Negative cases: wrong releaser, expired deadline, nonce replay, cancelled slot,
  *                    bad signature, zero inputs
  */
@@ -241,7 +241,7 @@ contract DeferredFundingBridgeTest is Test {
     // PATH A — executeSlot (happy path)
     // ═══════════════════════════════════════════════════════════════════════════
 
-    function test_executeSlot_HappyPath_RecipientReceivesFunds() public {
+    function test_executeSlot_HappyPath_DoesNotTransferToRecipient() public {
         vm.prank(creator);
         bytes32 slotId = bridge.openSlot(address(token), recipient, releaser, DEFAULT_AMOUNT, _defaultDeadline());
 
@@ -250,8 +250,7 @@ contract DeferredFundingBridgeTest is Test {
 
         _approveAndExecuteSlot(slotId);
 
-        uint256 expected = _netAmount(DEFAULT_AMOUNT);
-        assertEq(token.balanceOf(recipient), recipientBefore + expected, 'recipient balance');
+        assertEq(token.balanceOf(recipient), recipientBefore, 'recipient balance should not change on funding');
         assertEq(token.balanceOf(releaser),  releaserBefore  - DEFAULT_AMOUNT, 'releaser balance');
     }
 
@@ -292,14 +291,26 @@ contract DeferredFundingBridgeTest is Test {
         assertEq(bridge.workflowReleaser(0), releaser, 'workflowReleaser');
     }
 
-    function test_executeSlot_HappyPath_VaultEscrowIsReleased() public {
+    function test_executeSlot_HappyPath_VaultEscrowStaysPending() public {
         vm.prank(creator);
         bytes32 slotId = bridge.openSlot(address(token), recipient, releaser, DEFAULT_AMOUNT, _defaultDeadline());
 
         _approveAndExecuteSlot(slotId);
 
         EscrowState state = vault.getEscrowState(0);
-        assertEq(uint8(state), uint8(EscrowState.RELEASED), 'vault escrow should be RELEASED');
+        assertEq(uint8(state), uint8(EscrowState.PENDING), 'vault escrow should remain PENDING');
+    }
+
+    function test_executeSlot_HappyPath_EmitsDeferredEscrowFunded() public {
+        vm.prank(creator);
+        bytes32 slotId = bridge.openSlot(address(token), recipient, releaser, DEFAULT_AMOUNT, _defaultDeadline());
+
+        vm.startPrank(releaser);
+        token.approve(address(bridge), DEFAULT_AMOUNT);
+        vm.expectEmit(true, true, true, false);
+        emit DeferredFundingBridge.DeferredEscrowFunded(0, creator, releaser, recipient, address(token), DEFAULT_AMOUNT);
+        bridge.executeSlot(slotId);
+        vm.stopPrank();
     }
 
     function test_executeSlot_HappyPath_EmitsCommitmentExecuted() public {
@@ -418,7 +429,7 @@ contract DeferredFundingBridgeTest is Test {
     // PATH B — executeFromSignature (happy path)
     // ═══════════════════════════════════════════════════════════════════════════
 
-    function test_executeFromSignature_HappyPath_RecipientReceivesFunds() public {
+    function test_executeFromSignature_HappyPath_DoesNotTransferToRecipient() public {
         uint256 nonce    = 1;
         uint256 deadline = _defaultDeadline();
         bytes memory sig = _signCommitment(address(token), recipient, releaser, DEFAULT_AMOUNT, nonce, deadline);
@@ -430,8 +441,7 @@ contract DeferredFundingBridgeTest is Test {
         bridge.executeFromSignature(address(token), recipient, releaser, DEFAULT_AMOUNT, nonce, deadline, sig);
         vm.stopPrank();
 
-        uint256 expected = _netAmount(DEFAULT_AMOUNT);
-        assertEq(token.balanceOf(recipient), recipientBefore + expected, 'recipient balance');
+        assertEq(token.balanceOf(recipient), recipientBefore, 'recipient balance should not change on funding');
     }
 
     function test_executeFromSignature_HappyPath_NonceMark() public {
@@ -447,7 +457,7 @@ contract DeferredFundingBridgeTest is Test {
         assertTrue(bridge.usedNonces(creator, nonce), 'nonce should be marked used');
     }
 
-    function test_executeFromSignature_HappyPath_VaultEscrowIsReleased() public {
+    function test_executeFromSignature_HappyPath_VaultEscrowStaysPending() public {
         uint256 nonce    = 1;
         uint256 deadline = _defaultDeadline();
         bytes memory sig = _signCommitment(address(token), recipient, releaser, DEFAULT_AMOUNT, nonce, deadline);
@@ -458,7 +468,7 @@ contract DeferredFundingBridgeTest is Test {
         vm.stopPrank();
 
         EscrowState state = vault.getEscrowState(0);
-        assertEq(uint8(state), uint8(EscrowState.RELEASED));
+        assertEq(uint8(state), uint8(EscrowState.PENDING));
     }
 
     function test_executeFromSignature_HappyPath_TracksWorkflowMetadata() public {
@@ -654,13 +664,13 @@ contract DeferredFundingBridgeTest is Test {
     // Fee accounting (detailed)
     // ═══════════════════════════════════════════════════════════════════════════
 
-    function test_feeAccounting_VaultTotalHeldDecreasedAfterRelease() public {
+    function test_feeAccounting_VaultTotalHeldAfterFunding() public {
         vm.prank(creator);
         bytes32 slotId = bridge.openSlot(address(token), recipient, releaser, DEFAULT_AMOUNT, _defaultDeadline());
         _approveAndExecuteSlot(slotId);
 
-        // After release, escrow balance returns to 0 (funds sent to recipient)
-        assertEq(vault.totalHeldInEscrowPerToken(address(token)), 0, 'no funds held after release');
+        // After funding-only create, net amount stays held in escrow
+        assertEq(vault.totalHeldInEscrowPerToken(address(token)), _netAmount(DEFAULT_AMOUNT), 'net funds held in escrow');
     }
 
     function test_feeAccounting_BridgeHoldsNoResidualTokens() public {
@@ -683,7 +693,7 @@ contract DeferredFundingBridgeTest is Test {
     // Fuzz: fee invariant across amounts
     // ═══════════════════════════════════════════════════════════════════════════
 
-    function testFuzz_executeSlot_RecipientReceivesCorrectAmount(uint256 amount) public {
+    function testFuzz_executeSlot_DoesNotTransferToRecipient(uint256 amount) public {
         // Clamp to valid range: must be >= MIN_ESCROW_AMOUNT (1000) and fit in releaser balance
         amount = bound(amount, SettingsValidationLibrary.MIN_ESCROW_AMOUNT, 10_000e18);
 
@@ -699,7 +709,6 @@ contract DeferredFundingBridgeTest is Test {
         bridge.executeSlot(slotId);
         vm.stopPrank();
 
-        uint256 expectedNet = amount - (amount * FEE_BPS / FEE_DENOM);
-        assertEq(token.balanceOf(recipient), before + expectedNet);
+        assertEq(token.balanceOf(recipient), before);
     }
 }
