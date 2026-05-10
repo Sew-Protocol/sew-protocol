@@ -20,7 +20,7 @@ import './DeferredFundingBridge.sol';
  *
  * Two funding paths
  * -----------------
- * A. fundEscrow()                — proxy creates + immediately releases; no creator
+ * A. fundEscrow()                — proxy funds and creates escrow only; no creator
  *                                  signature required (proxy is `from` in the vault escrow).
  * B. fundFromCreatorSignature()  — proxy funds an off-chain EIP-712 commitment signed by a
  *                                  creator; proxy is the bridge releaser.
@@ -360,12 +360,11 @@ contract SpendingLimitProxy is ReentrancyGuard {
     // ═══════════════════════════════════════════════════════════════════════════
 
     /**
-     * @notice PATH A — Auto-fund an escrow directly through the vault.
+ * @notice PATH A — Fund and create an escrow directly through the vault.
      *
-     *         The proxy creates the escrow (proxy = `from`) and immediately releases it.
-     *         No creator signature is needed: the delegate is authorised by policy.
-     *
-     *         Vault's DefaultReleaseStrategy allows proxy-as-from to call release().
+ *         The proxy creates the escrow (proxy = `from`) and leaves it in normal
+ *         protected lifecycle (PENDING until explicit release/cancel/dispute flow).
+ *         No creator signature is needed: the delegate is authorised by policy.
      *
      * @param token      ERC20 token held by this proxy
      * @param recipient  Escrow beneficiary
@@ -390,9 +389,6 @@ contract SpendingLimitProxy is ReentrancyGuard {
         IERC20(token).forceApprove(address(vault), amount);
         workflowId = vault.createEscrow(token, recipient, amount, settings);
         IERC20(token).forceApprove(address(vault), 0);
-
-        // Proxy is `from` — DefaultReleaseStrategy allows sender == from
-        vault.release(workflowId);
 
         emit EscrowFunded(msg.sender, token, recipient, amount, workflowId);
     }
