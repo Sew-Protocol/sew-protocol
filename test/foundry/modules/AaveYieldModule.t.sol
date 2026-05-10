@@ -94,6 +94,16 @@ contract AaveYieldModuleTest is Test {
         module.configureToken(address(token), address(0));
     }
 
+    function test_ConfigureMinDeposit_Success() public {
+        module.configureMinDeposit(address(token), 123);
+        assertEq(module.minDepositByToken(address(token)), 123);
+    }
+
+    function test_ConfigureMinDeposit_ZeroToken_Reverts() public {
+        vm.expectRevert("InvalidAddress");
+        module.configureMinDeposit(address(0), 1);
+    }
+
     // ============ Initialize Yield Tests ============
 
     function test_InitializeYield_Success() public {
@@ -133,6 +143,18 @@ contract AaveYieldModuleTest is Test {
         // No tokens transferred
         vm.prank(escrow);
         vm.expectRevert("InsufficientBalance");
+        module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.OFF);
+    }
+
+    function test_InitializeYield_BelowConfiguredMinDeposit_Reverts() public {
+        module.approveEscrow(escrow);
+        module.configureToken(address(token), address(aToken));
+        module.configureMinDeposit(address(token), DEPOSIT_AMOUNT + 1);
+
+        token.transfer(address(module), DEPOSIT_AMOUNT);
+
+        vm.prank(escrow);
+        vm.expectRevert("BelowMinDeposit");
         module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.OFF);
     }
 
@@ -306,6 +328,39 @@ contract AaveYieldModuleTest is Test {
         vm.prank(escrow);
         vm.expectRevert("TokenMismatch");
         module.unwindToEscrow(1, address(token), DEPOSIT_AMOUNT);
+    }
+
+    function test_UnwindToEscrow_InvalidIncomeIndex_PathNotReachableInMock() public {
+        module.approveEscrow(escrow);
+        module.configureToken(address(token), address(aToken));
+
+        token.transfer(address(module), DEPOSIT_AMOUNT);
+
+        vm.prank(escrow);
+        module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.OFF);
+
+        vm.prank(escrow);
+        (uint256 principalOut, uint256 yieldOut) = module.unwindToEscrow(1, address(token), DEPOSIT_AMOUNT);
+        // Mock pool getReserveNormalizedIncome falls back to INITIAL_LIQUIDITY_INDEX when unset,
+        // so InvalidIncomeIndex is not reachable in this fixture.
+        assertEq(principalOut, DEPOSIT_AMOUNT);
+        assertEq(yieldOut, 0);
+    }
+
+    function test_EmergencyUnwind_InvalidIncomeIndex_PathNotReachableInMock() public {
+        module.approveEscrow(escrow);
+        module.configureToken(address(token), address(aToken));
+
+        token.transfer(address(module), DEPOSIT_AMOUNT);
+
+        vm.prank(escrow);
+        module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.OFF);
+
+        vm.prank(escrow);
+        uint256 recovered = module.emergencyUnwind(1, address(token), DEPOSIT_AMOUNT);
+        // Mock pool getReserveNormalizedIncome falls back to INITIAL_LIQUIDITY_INDEX when unset,
+        // so InvalidIncomeIndex is not reachable in this fixture.
+        assertEq(recovered, DEPOSIT_AMOUNT);
     }
 
     function test_TokenNotConfigured() public {

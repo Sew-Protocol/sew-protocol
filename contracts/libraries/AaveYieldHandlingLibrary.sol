@@ -3,6 +3,7 @@ pragma solidity ^0.8.33;
 
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
+import '@openzeppelin/contracts/utils/math/Math.sol';
 import '../interfaces/IYieldGenerationModule.sol';
 import '../interfaces/IYieldDistributionModule.sol';
 import '../interfaces/aave/AaveV3Interfaces.sol';
@@ -20,6 +21,7 @@ import '../ops/YieldOps.sol';
  */
 library AaveYieldHandlingLibrary {
     using SafeERC20 for IERC20;
+    using Math for uint256;
 
     uint256 internal constant AAVE_RAY = 1e27;
     uint256 internal constant MAX_PROTOCOL_FEE_BPS = 3000; // 30% maximum
@@ -96,11 +98,11 @@ library AaveYieldHandlingLibrary {
      * @param pool Aave pool address
      * @param token Token address
      * @return incomeRay Normalized income in RAY (1e27 = 1.0)
-     * @dev Returns AAVE_RAY (1.0) if unavailable or too small
+     * @dev Returns 0 if unavailable/invalid so callers can fail loudly.
      *      CRIT-1: Validates income is >= MIN_NORMALIZED_INCOME to prevent precision issues
      */
     function getAaveNormalizedIncome(address pool, address token) internal view returns (uint256 incomeRay) {
-        if (pool == address(0)) return AAVE_RAY;
+        if (pool == address(0)) return 0;
         (bool success, bytes memory data) = pool.staticcall(
             abi.encodeWithSelector(bytes4(keccak256("getReserveNormalizedIncome(address)")), token)
         );
@@ -108,11 +110,11 @@ library AaveYieldHandlingLibrary {
             incomeRay = abi.decode(data, (uint256));
             // CRIT-1: Handle zero or very small income (could cause overflow/underflow)
             if (incomeRay == 0 || incomeRay < MIN_NORMALIZED_INCOME) {
-                return AAVE_RAY;
+                return 0;
             }
             return incomeRay;
         }
-        return AAVE_RAY;
+        return 0;
     }
 
     /**
@@ -170,7 +172,11 @@ library AaveYieldHandlingLibrary {
 
         // Compute underlying to withdraw = scaledShares * normalizedIncome / RAY
         uint256 incomeRay = getAaveNormalizedIncome(aavePool, token);
-        uint256 underlyingToWithdraw = (scaledShares * incomeRay) / AAVE_RAY;
+        if (incomeRay == 0) {
+            result.failureReason = 3; // MODULE_NOT_SET / invalid external source state
+            return result;
+        }
+        uint256 underlyingToWithdraw = Math.mulDiv(scaledShares, incomeRay, AAVE_RAY);
         if (underlyingToWithdraw == 0) {
             return result; // No underlying to withdraw
         }
@@ -265,12 +271,12 @@ library AaveYieldHandlingLibrary {
         
         // CRIT-1: Additional validation - ensure income is valid before calculation
         // This prevents division by very small numbers that could cause overflow
-        if (incomeRay < MIN_NORMALIZED_INCOME) {
+        if (incomeRay == 0 || incomeRay < MIN_NORMALIZED_INCOME) {
             result.failureReason = 3; // MODULE_NOT_SET (treat as configuration issue)
             return result;
         }
         
-        uint256 scaledShares = (amount * AAVE_RAY) / incomeRay;
+        uint256 scaledShares = Math.mulDiv(amount, AAVE_RAY, incomeRay);
         if (scaledShares == 0) {
             result.failureReason = 8; // DEPOSIT_FAILED
             return result;

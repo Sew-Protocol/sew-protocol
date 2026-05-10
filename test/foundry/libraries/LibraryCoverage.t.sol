@@ -747,11 +747,12 @@ contract LibraryCoverageTest is Test {
 
         uint256 dist = harness.distributeYieldFallback(address(token), 100, r, p, feeAddress);
 
-        assertEq(dist, 50);
+        // Pull-only mode: no recipient-level transfers are performed
+        assertEq(dist, 0);
 
-        assertEq(token.balanceOf(address(0x1)), 50);
+        assertEq(token.balanceOf(address(0x1)), 0);
 
-        assertEq(token.balanceOf(feeAddress), 50);
+        assertEq(token.balanceOf(feeAddress), 0);
 
     }
 

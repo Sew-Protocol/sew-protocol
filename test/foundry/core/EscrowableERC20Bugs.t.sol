@@ -127,6 +127,8 @@ contract EscrowableERC20BugsTest is Test {
         escrowToken.release(wid);
         vm.stopPrank();
 
-        assertEq(escrowToken.balanceOf(user2), 100 ether, "User should get tokens via releaseEscrowTransfer");
+        // Pull-only settlement: recipient is credited claimable, not paid during release.
+        assertEq(escrowToken.balanceOf(user2), 0, "User should not be paid during settlement");
+        assertEq(escrowToken.claimableBalances(wid, user2), 100 ether, "Recipient should receive claimable entitlement");
     }
 }

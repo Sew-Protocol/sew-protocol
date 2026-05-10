@@ -4,6 +4,7 @@ pragma solidity ^0.8.33;
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/access/AccessControl.sol';
+import '@openzeppelin/contracts/utils/math/Math.sol';
 import '../shared/interfaces/IIncentiveModule.sol';
 import '../types/EscrowTypes.sol';
 
@@ -21,6 +22,7 @@ import '../types/EscrowTypes.sol';
  */
 contract BondCollector is AccessControl {
     using SafeERC20 for IERC20;
+    using Math for uint256;
 
     // ============ Role Constants ============
     bytes32 public constant ROLE_ESCROW_CONTRACT = keccak256('ROLE_ESCROW_CONTRACT');
@@ -113,7 +115,7 @@ contract BondCollector is AccessControl {
         }
         
         if (snapshottedBondFee > 0 && escrowFeeAddress != address(0)) {
-            uint256 protocolFeeAmount = (ethToSend * snapshottedBondFee) / 10000;
+            uint256 protocolFeeAmount = Math.mulDiv(ethToSend, snapshottedBondFee, 10000);
             if (protocolFeeAmount > 0) {
                 (bool feeSuccess, ) = payable(escrowFeeAddress).call{value: protocolFeeAmount}('');
                 if (!feeSuccess) return false;
@@ -171,7 +173,7 @@ contract BondCollector is AccessControl {
         uint256 bondToRecord = bondAmount;
         
         if (snapshottedBondFee > 0 && escrowFeeAddress != address(0)) {
-            uint256 protocolFeeAmount = (bondAmount * snapshottedBondFee) / 10000;
+            uint256 protocolFeeAmount = Math.mulDiv(bondAmount, snapshottedBondFee, 10000);
             if (protocolFeeAmount > 0) {
                 bondToRecord = bondAmount - protocolFeeAmount;
                 IERC20(bondToken).safeTransfer(escrowFeeAddress, protocolFeeAmount);

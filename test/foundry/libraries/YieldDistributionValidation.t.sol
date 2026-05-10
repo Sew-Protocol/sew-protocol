@@ -64,9 +64,9 @@ contract YieldDistributionValidationTest is Test {
             distributionData
         );
 
-        // assertTrue(success);
-        assertEq(distributed, 1000 ether);
-        assertEq(token.balanceOf(recipient1), 1000 ether);
+        assertTrue(success);
+        assertEq(distributed, 0);
+        assertEq(token.balanceOf(recipient1), 0);
     }
 
     function test_AcceptsMaxRecipients() public {
@@ -100,12 +100,12 @@ contract YieldDistributionValidationTest is Test {
             distributionData
         );
 
-        // assertTrue(success);
-        assertEq(distributed, 1000 ether);
+        assertTrue(success);
+        assertEq(distributed, 0);
 
         // Verify each recipient got 10%
         for (uint256 i = 0; i < MAX_RECIPIENTS; i++) {
-            assertEq(token.balanceOf(recipients[i]), 100 ether);
+            assertEq(token.balanceOf(recipients[i]), 0);
         }
     }
 
@@ -133,11 +133,11 @@ contract YieldDistributionValidationTest is Test {
             distributionData
         );
 
-        // assertTrue(success);
-        assertEq(distributed, 1000 ether);
-        assertEq(token.balanceOf(recipient1), 400 ether);
-        assertEq(token.balanceOf(recipient2), 300 ether);
-        assertEq(token.balanceOf(recipient3), 300 ether);
+        assertTrue(success);
+        assertEq(distributed, 0);
+        assertEq(token.balanceOf(recipient1), 0);
+        assertEq(token.balanceOf(recipient2), 0);
+        assertEq(token.balanceOf(recipient3), 0);
     }
 
     // ============ Invalid Distribution Tests ============
@@ -230,10 +230,9 @@ contract YieldDistributionValidationTest is Test {
             distributionData
         );
 
-        // assertTrue(success);
-        // Only recipient1 should receive, zero address skipped
-        assertEq(token.balanceOf(recipient1), 500 ether);
-        assertEq(distributed, 500 ether); // Only what was actually distributed
+        assertTrue(success);
+        assertEq(token.balanceOf(recipient1), 0);
+        assertEq(distributed, 0);
     }
 
     function test_HandlesDuplicateRecipients() public {
@@ -258,10 +257,9 @@ contract YieldDistributionValidationTest is Test {
             distributionData
         );
 
-        // assertTrue(success);
-        // Recipient1 receives both shares (total 100%)
-        assertEq(token.balanceOf(recipient1), 1000 ether);
-        assertEq(distributed, 1000 ether);
+        assertTrue(success);
+        assertEq(token.balanceOf(recipient1), 0);
+        assertEq(distributed, 0);
     }
 
     // ============ Edge Cases ============
@@ -283,7 +281,7 @@ contract YieldDistributionValidationTest is Test {
             distributionData
         );
 
-        // assertTrue(success);
+        assertTrue(success);
         assertEq(distributed, 0);
     }
 
@@ -298,7 +296,7 @@ contract YieldDistributionValidationTest is Test {
             '' // Empty distribution data
         );
 
-        // assertTrue(success);
+        assertTrue(success);
         assertEq(distributed, 0); // Nothing distributed, yield stays in module
     }
 
@@ -326,20 +324,20 @@ contract YieldDistributionValidationTest is Test {
             distributionData
         );
 
-        // assertTrue(success);
-        assertTrue(distributed <= 1001 ether); // Due to rounding, some dust may remain
+        assertTrue(success);
+        assertEq(distributed, 0);
 
         // Verify distribution (within rounding tolerance)
         uint256 expectedShare1 = (1001 ether * 3333) / BPS_DENOMINATOR;
         uint256 expectedShare2 = (1001 ether * 3333) / BPS_DENOMINATOR;
         uint256 expectedShare3 = (1001 ether * 3334) / BPS_DENOMINATOR;
 
-        assertEq(token.balanceOf(recipient1), expectedShare1);
-        assertEq(token.balanceOf(recipient2), expectedShare2);
-        assertEq(token.balanceOf(recipient3), expectedShare3);
+        assertEq(token.balanceOf(recipient1), 0);
+        assertEq(token.balanceOf(recipient2), 0);
+        assertEq(token.balanceOf(recipient3), 0);
     }
 
-    function test_EmitsYieldDistributedEvents() public {
+    function test_EmitsYieldDistributionDeferredEvent() public {
         address[] memory recipients = new address[](2);
         recipients[0] = recipient1;
         recipients[1] = recipient2;
@@ -352,12 +350,9 @@ contract YieldDistributionValidationTest is Test {
 
         token.mint(address(module), 1000 ether);
 
-        // Expect two YieldDistributed events
+        // Pull-only mode emits a single deferred event (no recipient-level push events)
         vm.expectEmit(true, true, false, true);
-        emit DefaultYieldDistributionModule.YieldDistributed(1, recipient1, 600 ether);
-
-        vm.expectEmit(true, true, false, true);
-        emit DefaultYieldDistributionModule.YieldDistributed(1, recipient2, 400 ether);
+        emit DefaultYieldDistributionModule.YieldDistributionDeferred(1, address(token), 1000 ether);
 
         module.distributeYield(1, address(this), address(token), 1000 ether, distributionData);
     }

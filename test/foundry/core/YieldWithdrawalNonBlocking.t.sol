@@ -51,6 +51,7 @@ contract YieldWithdrawalNonBlockingTest is Test {
     SettlementOps settlementOps;
     CreateOps createOps;
     BondCollector bondCollector;
+    DefaultReleaseStrategy releaseStrategy;
     BadYieldOps badYieldOps;
     ERC20Mock token;
 
@@ -67,14 +68,16 @@ contract YieldWithdrawalNonBlockingTest is Test {
         settlementOps = new SettlementOps(address(this));
         createOps = new CreateOps(address(this));
         bondCollector = new BondCollector(address(this));
+        releaseStrategy = new DefaultReleaseStrategy();
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));
 
         badYieldOps = new BadYieldOps();
         vault = new EscrowVault(ESCROW_FEE, feeAddress, address(badYieldOps), address(disputeOps), address(moduleManagement));
         moduleManagement.registerEscrowContract(address(vault));
-        moduleManagement.queueModule(address(escrow), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
         moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
+        vm.warp(block.timestamp + 7 days + 1);
+        moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
 
         // Register escrow contract with ops contracts
         disputeOps.registerEscrowContract(address(vault));
@@ -95,7 +98,7 @@ contract YieldWithdrawalNonBlockingTest is Test {
         vault.grantRole(vault.ROLE_TIMELOCK(), address(this));
         adminContract.grantRole(adminContract.ROLE_TIMELOCK(), address(this));
         adminContract.queueResolutionModule(address(vault), address(rm));
-        vm.warp(block.timestamp + 7 days + 1);
+        vm.warp(block.timestamp + 14 days + 1);
         adminContract.activateResolutionModule(address(vault));
 
         token = new ERC20Mock("Test", "TST", address(this), 1e24);

@@ -59,9 +59,9 @@ contract ModulesCoverageTest is Test {
 
         (bool success, uint256 distributed) = distModule.distributeYield(1, address(this), address(token), 100, data);
         assertTrue(success);
-        assertEq(distributed, 100);
-        assertEq(token.balanceOf(address(0x1)), 50);
-        assertEq(token.balanceOf(address(0x2)), 50);
+        assertEq(distributed, 0);
+        assertEq(token.balanceOf(address(0x1)), 0);
+        assertEq(token.balanceOf(address(0x2)), 0);
     }
 
     function test_DefaultDist_distributeYield_Mismatch() public {
@@ -116,8 +116,8 @@ contract ModulesCoverageTest is Test {
 
         (bool success, uint256 distributed) = distModule.distributeYield(1, address(this), address(token), 100, data);
         assertTrue(success);
-        assertEq(distributed, 50);
-        assertEq(token.balanceOf(address(0x2)), 50);
+        assertEq(distributed, 0);
+        assertEq(token.balanceOf(address(0x2)), 0);
     }
 
     function test_DefaultDist_distributeYield_ZeroShare() public {

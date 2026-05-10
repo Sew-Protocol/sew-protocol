@@ -4,6 +4,7 @@ pragma solidity ^0.8.33;
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/access/AccessControl.sol';
+import '@openzeppelin/contracts/utils/math/Math.sol';
 import '../interfaces/IYieldGenerationModule.sol';
 import '../interfaces/IYieldDistributionModule.sol';
 import '../libraries/ResolverLogicLibrary.sol';
@@ -14,6 +15,7 @@ import '../libraries/ResolverLogicLibrary.sol';
  */
 contract YieldOps is AccessControl {
     using SafeERC20 for IERC20;
+    using Math for uint256;
 
     // ============ Custom Errors ============
     error ZeroOwner();
@@ -40,10 +42,14 @@ contract YieldOps is AccessControl {
     event YieldProtocolFeeCollected(uint256 indexed workflowId, address indexed token, uint256 yieldAmount, uint256 protocolFeeAmount);
     event ProtocolFeeClaimableCredited(uint256 indexed workflowId, address indexed token, address indexed feeRecipient, uint256 amount);
     event ProtocolFeeClaimed(address indexed token, address indexed feeRecipient, uint256 amount);
+    event EscrowYieldClaimableCredited(uint256 indexed workflowId, address indexed token, address indexed escrowContract, uint256 amount);
+    event EscrowYieldClaimed(address indexed token, address indexed escrowContract, uint256 amount);
     event TokensRecovered(address indexed token, address indexed to, uint256 amount);
 
     // token => recipient => claimable protocol fee amount
     mapping(address => mapping(address => uint256)) public claimableProtocolFees;
+    // token => escrowContract => claimable amount withdrawn from generation module and held for explicit pull
+    mapping(address => mapping(address => uint256)) public claimableEscrowYield;
 
     constructor(address initialOwner) {
         if (initialOwner == address(0)) revert ZeroOwner();
@@ -98,7 +104,7 @@ contract YieldOps is AccessControl {
         if (protocolFeeBps > 0) {
             if (feeRecipient == address(0)) revert FeeRecipientCannotBeZero();
             if (protocolFeeBps > MAX_PROTOCOL_FEE_BPS) revert ProtocolFeeExceedsMaximum(protocolFeeBps, MAX_PROTOCOL_FEE_BPS);
-            protocolFeeAmount = (yieldAmount * protocolFeeBps) / 10000;
+            protocolFeeAmount = Math.mulDiv(yieldAmount, protocolFeeBps, 10000);
             if (protocolFeeAmount > 0) {
                 yieldToDistribute = yieldAmount - protocolFeeAmount;
                 claimableProtocolFees[token][feeRecipient] += protocolFeeAmount;
@@ -202,10 +208,11 @@ contract YieldOps is AccessControl {
                     emit YieldWithdrawn(workflowId, token, result.yield);
                 }
                 
-                // Forward any tokens actually received to the caller (vault),
-                // where settlement remains claimable-first.
+                // Pull-only hardening: do not auto-forward to escrow contract.
+                // Credit escrow claimable balance for explicit pull.
                 if (received > 0) {
-                    IERC20(token).safeTransfer(escrowContract, received);
+                    claimableEscrowYield[token][escrowContract] += received;
+                    emit EscrowYieldClaimableCredited(workflowId, token, escrowContract, received);
                 }
             } else {
                 result.success = false;
@@ -222,6 +229,18 @@ contract YieldOps is AccessControl {
         }
 
         return result;
+    }
+
+    /**
+     * @notice Escrow contract explicitly claims yield previously credited in handleYield().
+     */
+    function claimEscrowYield(address token, uint256 amount) external onlyRole(ROLE_ESCROW_CONTRACT) returns (uint256 claimed) {
+        uint256 available = claimableEscrowYield[token][_msgSender()];
+        if (amount == 0 || amount > available) revert TransferFailed(_msgSender(), amount);
+        claimableEscrowYield[token][_msgSender()] = available - amount;
+        IERC20(token).safeTransfer(_msgSender(), amount);
+        emit EscrowYieldClaimed(token, _msgSender(), amount);
+        return amount;
     }
 
     function _distributeYieldInternal(
