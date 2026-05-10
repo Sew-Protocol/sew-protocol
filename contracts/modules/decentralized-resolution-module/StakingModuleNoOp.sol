@@ -174,6 +174,19 @@ contract StakingModuleNoOp is IStakingModule, AccessControl {
             });
     }
 
+    function getActiveDelegation(
+        address delegator
+    ) external pure override returns (DelegationInfo memory info) {
+        return
+            DelegationInfo({
+                delegator: delegator,
+                delegatee: address(0),
+                amount: 0,
+                delegatedAt: 0,
+                active: false
+            });
+    }
+
     function getMinimumStake(uint8 tier) external view override returns (uint256 minimum) {
         return _dummyMinimumStakes[tier];
     }

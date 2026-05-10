@@ -105,6 +105,9 @@ function ensureRegistryDir(): void {
  * Get registry file path for a chain
  */
 function getRegistryFilePath(chainId: number): string {
+  if (!Number.isInteger(chainId) || chainId <= 0) {
+    throw new Error(`Invalid chainId: ${chainId}`);
+  }
   ensureRegistryDir();
   return path.join(REGISTRY_DIR, `chain-${chainId}.json`);
 }

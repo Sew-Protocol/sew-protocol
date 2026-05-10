@@ -22,7 +22,7 @@ import '../../../contracts/libraries/EscrowEncodingLibrary.sol'; // Added import
 /**
  * @title AppealWindowEnforcementTest
  * @notice Comprehensive tests for appeal window enforcement feature
- * @dev Tests that tokens are only transferred after appeal window expires
+ * @dev Tests pending-settlement timing with pull-only entitlement delivery
  */
 contract AppealWindowEnforcementTest is Test {
     EscrowVault public escrow;
@@ -286,11 +286,9 @@ contract AppealWindowEnforcementTest is Test {
         ) = escrow.escrowTransfers(workflowId);
         assertEq(uint8(escrowState), uint8(EscrowState.RELEASED), 'State should be RELEASED');
 
-        // Check tokens transferred via autotransfer
+        // Settlement is pull-only: claimable must be credited
         uint256 sellerClaimable = escrow.claimableBalances(workflowId, seller);
-        uint256 sellerBalance = token.balanceOf(seller);
-        // Either claimable > 0 (fallback) or balance > 0 (autotransfer succeeded)
-        assertTrue(sellerClaimable > 0 || sellerBalance > 0, 'Seller should have either claimable balance or received funds via autotransfer');
+        assertTrue(sellerClaimable > 0, 'Seller should have claimable balance after settlement');
     }
 
     // ============ Test: Appeal Window Expires - Settlement Can Be Executed ============
@@ -326,11 +324,9 @@ contract AppealWindowEnforcementTest is Test {
         ) = escrow.escrowTransfers(workflowId);
         assertEq(uint8(escrowState), uint8(EscrowState.RELEASED), 'State should be RELEASED');
 
-        // Check tokens transferred via autotransfer
+        // Settlement is pull-only: claimable must be credited
         uint256 sellerClaimable = escrow.claimableBalances(workflowId, seller);
-        uint256 sellerBalance = token.balanceOf(seller);
-        // Either claimable > 0 (fallback) or balance > 0 (autotransfer succeeded)
-        assertTrue(sellerClaimable > 0 || sellerBalance > 0, 'Seller should have either claimable balance or received funds via autotransfer');
+        assertTrue(sellerClaimable > 0, 'Seller should have claimable balance after settlement');
 
         // Check pending settlement cleared
         (bool exists_, , , ) = escrow.pendingSettlements(workflowId);
@@ -455,11 +451,9 @@ contract AppealWindowEnforcementTest is Test {
         ) = escrow.escrowTransfers(workflowId);
         assertEq(uint8(escrowState), uint8(EscrowState.RELEASED), 'State should be RELEASED');
 
-        // Check tokens transferred via autotransfer
+        // Settlement is pull-only: claimable must be credited
         uint256 sellerClaimable = escrow.claimableBalances(workflowId, seller);
-        uint256 sellerBalance = token.balanceOf(seller);
-        // Either claimable > 0 (fallback) or balance > 0 (autotransfer succeeded)
-        assertTrue(sellerClaimable > 0 || sellerBalance > 0, 'Seller should have either claimable balance or received funds via autotransfer');
+        assertTrue(sellerClaimable > 0, 'Seller should have claimable balance after settlement');
     }
 
     // ============ Test: Multiple Calls to executePendingSettlement Revert ============
@@ -565,11 +559,9 @@ contract AppealWindowEnforcementTest is Test {
         ) = escrow.escrowTransfers(workflowId);
         assertEq(uint8(escrowState), uint8(EscrowState.REFUNDED), 'State should be REFUNDED');
 
-        // Check tokens refunded to buyer via autotransfer
+        // Settlement is pull-only: buyer claimable must be credited
         uint256 buyerClaimable = escrow.claimableBalances(workflowId, buyer);
-        uint256 buyerBalance = token.balanceOf(buyer);
-        // Either claimable > 0 (fallback) or balance > 0 (autotransfer succeeded)
-        assertTrue(buyerClaimable > 0 || buyerBalance > 0, 'Buyer should have either claimable balance or received funds via autotransfer');
+        assertTrue(buyerClaimable > 0, 'Buyer should have claimable balance after settlement');
     }
 
     // ============ Test: getPendingSettlement View Function ============

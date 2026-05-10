@@ -38,6 +38,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
     error AlreadyAppealed(uint256 slashId);
     error AppealAlreadyResolved(uint256 appealId);
     error FraudSlashingNotEnabled();
+    error ReversalSlashingNotEnabled();
     error InvalidBps(uint256 bps, uint256 maxBps);
     error CooldownNotPassed(uint256 availableAt, uint256 currentTime);
     error ZeroAmount();
@@ -134,6 +135,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         uint256 lastUpdate;
     }
     UnavailabilityStats public unavailabilityStats;
+    mapping(address => bool) public resolverUnavailable;
 
     // Slash config (governance-controlled)
     SlashConfig public slashConfig;
@@ -141,6 +143,10 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
     // Efficient pending slash tracking
     mapping(address => uint256) public pendingSlashCount;
     mapping(address => uint256) public juniorsPendingSlashCount;
+
+    // Explicit accounting for slashed funds retained in this module.
+    // This tracks the currently unallocated stable amount from distribution policy.
+    uint256 public retainedSlashReserves;
 
     // ============ Events ============
 
@@ -169,6 +175,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
     );
 
     event SlashedSEWHandled(uint256 indexed workflowId, uint256 amount, bool supplyReduced);
+    event SlashReservesUpdated(uint256 addedAmount, uint256 newTotal, uint256 indexed workflowId);
 
     // ============ Initialization ============
 
@@ -333,7 +340,9 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
             revert AppealWindowClosed(slashId, slashEvent.appealDeadline, block.timestamp);
         }
         if (_msgSender() != slashEvent.resolver) revert NotResolver(_msgSender(), slashEvent.resolver);
-        if (slashAppeals[slashId].slashId != 0 && slashAppeals[slashId].slashId != 0 && slashAppeals[slashId].resolved) {
+        // Disallow duplicate appeals for the same slashId (pending or resolved).
+        // Prevents appeal metadata overwrite and bond custody/accounting inconsistencies.
+        if (slashAppeals[slashId].slashId != 0) {
             revert AlreadyAppealed(slashId);
         }
 
@@ -541,6 +550,10 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         uint8 priorRound
     ) external override onlyRole(ROLE_RESOLUTION_MODULE) returns (uint256 slashId) {
         priorRound;
+        // Explicit launch gate: reversal slashing is disabled until governance enables
+        // a non-zero reversalSlashBps.
+        if (slashConfig.reversalSlashBps == 0) revert ReversalSlashingNotEnabled();
+
         // Reset tracking before slash
         _currentSlashStableAmount = 0;
         _currentSlashSewAmount = 0;
@@ -937,38 +950,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
     function _findDelegation(
         address resolver
     ) internal view returns (IStakingModule.DelegationInfo memory) {
-        // Access the public delegations mapping via low-level call
-        (bool success, bytes memory data) = address(stakingModule).staticcall(
-            abi.encodeWithSignature('delegations(address)', resolver)
-        );
-
-        if (success && data.length >= 128) {
-            // Decode the tuple: (address senior, uint256 coverageAmount, uint256 delegatedAt, bool active)
-            (address senior, uint256 coverageAmount, uint256 delegatedAt, bool active) = abi.decode(
-                data,
-                (address, uint256, uint256, bool)
-            );
-
-            if (active && senior != address(0)) {
-                return
-                    IStakingModule.DelegationInfo({
-                        delegator: resolver,
-                        delegatee: senior,
-                        amount: coverageAmount,
-                        delegatedAt: delegatedAt,
-                        active: true
-                    });
-            }
-        }
-
-        return
-            IStakingModule.DelegationInfo({
-                delegator: resolver,
-                delegatee: address(0),
-                amount: 0,
-                delegatedAt: 0,
-                active: false
-            });
+        return stakingModule.getActiveDelegation(resolver);
     }
 
     /**
@@ -983,6 +965,19 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         distribution.toProtocol = (amount * 3000) / BASIS_POINTS;
         distribution.toCounterParty = 0;
         distribution.toSlashProposer = 0;
+
+        // Explicitly account for residual stable retained by policy (currently 20%).
+        // Keeps accounting transparent instead of implicit balance drift.
+        uint256 distributed =
+            distribution.toInsurancePool +
+            distribution.toProtocol +
+            distribution.toCounterParty +
+            distribution.toSlashProposer;
+        uint256 retained = amount > distributed ? amount - distributed : 0;
+        if (retained > 0) {
+            retainedSlashReserves += retained;
+            emit SlashReservesUpdated(retained, retainedSlashReserves, workflowId);
+        }
 
         // Transfer insurance pool portion to vault
         if (amount > 0 && distribution.toInsurancePool > 0 && address(insurancePoolVault) != address(0)) {
@@ -1041,12 +1036,24 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
     /**
      * @notice Update unavailability stats (for circuit breaker)
      */
-    function _updateUnavailabilityStats(address /* resolver */, bool unavailable) internal {
+    function _updateUnavailabilityStats(address resolver, bool unavailable) internal {
         UnavailabilityStats storage stats = unavailabilityStats;
         stats.lastUpdate = block.timestamp;
 
         if (unavailable) {
-            stats.unavailableCount++;
+            // Idempotent increment: count resolver as unavailable only once.
+            if (!resolverUnavailable[resolver]) {
+                resolverUnavailable[resolver] = true;
+                stats.unavailableCount++;
+            }
+        } else {
+            // Idempotent decrement: only decrement if resolver was marked unavailable.
+            if (resolverUnavailable[resolver]) {
+                resolverUnavailable[resolver] = false;
+                if (stats.unavailableCount > 0) {
+                    stats.unavailableCount--;
+                }
+            }
         }
 
         if (stats.totalResolvers > 0) {
@@ -1231,6 +1238,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
 
     function unfreezeResolver(address resolver) external onlyRole(ROLE_TIMELOCK) {
         frozenUntil[resolver] = 0;
+        _updateUnavailabilityStats(resolver, false);
         emit ResolverUnfrozen(resolver);
     }
 
