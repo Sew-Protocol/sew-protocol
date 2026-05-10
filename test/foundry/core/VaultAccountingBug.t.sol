@@ -100,7 +100,7 @@ contract VaultAccountingBugTest is Test {
         // 2. Release escrow but make transfer fail -> moves to claimable
         token.setShouldRevert(true);
         vm.prank(user1);
-        escrow.releaseEscrowTransfer(wid);
+        escrow.release(wid);
 
         // Verify state
         assertEq(escrow.claimableBalances(wid, user2), 100 ether);

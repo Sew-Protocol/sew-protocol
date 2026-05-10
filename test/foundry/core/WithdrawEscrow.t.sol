@@ -96,7 +96,7 @@ contract WithdrawEscrowTest is Test {
         // Release creates claimable entitlement (no direct transfer)
         uint256 recipientBalanceBefore = token.balanceOf(recipient);
         vm.prank(sender);
-        vault.releaseEscrowTransfer(wid);
+        vault.release(wid);
 
         // After release, recipient balance is unchanged
         uint256 recipientBalanceAfter = token.balanceOf(recipient);
@@ -122,7 +122,7 @@ contract WithdrawEscrowTest is Test {
         uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT, settings);
 
         vm.prank(sender);
-        vault.releaseEscrowTransfer(wid);
+        vault.release(wid);
 
         uint256 fee = (AMOUNT * ESCROW_FEE) / 10000;
         uint256 expected = AMOUNT - fee;
@@ -172,10 +172,10 @@ contract WithdrawEscrowTest is Test {
         // Release both - must only create claimables
         uint256 recipientBalanceBefore = token.balanceOf(recipient);
         vm.prank(sender);
-        vault.releaseEscrowTransfer(wid1);
+        vault.release(wid1);
 
         vm.prank(sender2);
-        vault.releaseEscrowTransfer(wid2);
+        vault.release(wid2);
 
         // Direct balance unchanged until explicit withdrawals
         uint256 fee1 = (amount1 * ESCROW_FEE) / 10000;
@@ -210,7 +210,7 @@ contract WithdrawEscrowTest is Test {
         // Release creates claimable only
         uint256 recipientBalanceBefore = token.balanceOf(recipient);
         vm.prank(sender);
-        vault.releaseEscrowTransfer(wid);
+        vault.release(wid);
 
         // After release, no direct payout yet
         uint256 fee = (AMOUNT * ESCROW_FEE) / 10000;
@@ -250,7 +250,7 @@ contract WithdrawEscrowTest is Test {
 
         // Release credits claimable balance.
         vm.prank(sender);
-        vault.releaseEscrowTransfer(wid);
+        vault.release(wid);
 
         uint256 claimable = vault.claimableBalances(wid, recipient);
         assertEq(claimable, expected, 'Claimable should be credited on push failure');

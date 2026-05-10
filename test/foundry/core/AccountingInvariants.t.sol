@@ -46,7 +46,7 @@ contract AccountingHandler is Test {
 
         // Prank as sender (buyer)
         vm.prank(buyer);
-        vault.releaseEscrowTransfer(workflowId);
+        vault.release(workflowId);
     }
 
     function refund(uint256 workflowId) public {

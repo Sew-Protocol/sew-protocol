@@ -331,6 +331,11 @@ User-flow
 3. Escrow marks amount claimable.
 4. User calls withdraw.
 Do not combine yield unwind and arbitrary user transfer unless strictly necessary.
+
+Sew implementation note (alignment target)
+- Yield distribution helpers must not fallback-push non-fee yield to arbitrary recipients.
+- If distribution fails or is unavailable, non-fee yield should remain in escrow-controlled accounting and become claimable through the standard withdrawal path.
+- Protocol fee portion should be credited as claimable to the configured fee recipient; delivery occurs only via explicit withdrawal.
 17. Events and observability
 Emit events for every entitlement and every delivery.
 Recommended events:

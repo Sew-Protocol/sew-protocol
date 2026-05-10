@@ -130,12 +130,12 @@ contract EscrowStateMachineTest is Test {
         // Invalid: non-sender cannot release
         vm.prank(recipient);
         vm.expectRevert(abi.encodeWithSignature("NotSender(uint256,address,address)", wid, recipient, sender));
-        vault.releaseEscrowTransfer(wid);
+        vault.release(wid);
 
         // Release creates claimable (no direct transfer)
         uint256 recipientBal0 = token.balanceOf(recipient);
         vm.prank(sender);
-        vault.releaseEscrowTransfer(wid);
+        vault.release(wid);
         uint256 recipientBal1 = token.balanceOf(recipient);
         assertEq(recipientBal1 - recipientBal0, 0, "settlement must not transfer directly");
         assertEq(vault.claimableBalances(wid, recipient), aaf, "recipient claimable mismatch");
@@ -189,7 +189,7 @@ contract EscrowStateMachineTest is Test {
         // Invalid: cannot release or dispute from terminal state
         vm.prank(sender);
         vm.expectRevert(abi.encodeWithSignature("TransferNotPending(uint256,uint8)", wid, uint8(EscrowState.REFUNDED)));
-        vault.releaseEscrowTransfer(wid);
+        vault.release(wid);
 
         vm.prank(sender);
         vm.expectRevert(abi.encodeWithSignature("TransferNotPending(uint256,uint8)", wid, uint8(EscrowState.REFUNDED)));
@@ -215,7 +215,7 @@ contract EscrowStateMachineTest is Test {
         // Invalid: release/cancel/raiseDispute again should revert due to not PENDING
         vm.prank(sender);
         vm.expectRevert(abi.encodeWithSignature("TransferNotPending(uint256,uint8)", wid, uint8(EscrowState.DISPUTED)));
-        vault.releaseEscrowTransfer(wid);
+        vault.release(wid);
 
         vm.prank(sender);
         vm.expectRevert(abi.encodeWithSignature("TransferNotPending(uint256,uint8)", wid, uint8(EscrowState.DISPUTED)));

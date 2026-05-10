@@ -198,7 +198,7 @@ contract EscrowViewContractTest is Test {
 
         // Release escrow
         vm.prank(buyer);
-        vault.releaseEscrowTransfer(workflowId);
+        vault.release(workflowId);
 
         // Test RELEASED state
         summary = escrowView.getEscrowSummary(workflowId);
@@ -302,7 +302,7 @@ contract EscrowViewContractTest is Test {
         uint256 workflowId = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, SettingsValidationLibrary.getDefaultSettings());
 
         vm.prank(buyer);
-        vault.releaseEscrowTransfer(workflowId);
+        vault.release(workflowId);
 
         (EscrowState status, bool isActive, bool isPending) = escrowView.getEscrowStatusInfo(workflowId);
 

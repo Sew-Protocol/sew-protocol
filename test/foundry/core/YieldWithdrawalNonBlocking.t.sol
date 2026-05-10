@@ -112,7 +112,7 @@ contract YieldWithdrawalNonBlockingTest is Test {
 
         // Should not revert even though yieldOps returns malformed data.
         vm.prank(sender);
-        vault.releaseEscrowTransfer(wid);
+        vault.release(wid);
     }
 }
 

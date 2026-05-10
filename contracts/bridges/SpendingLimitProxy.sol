@@ -360,11 +360,11 @@ contract SpendingLimitProxy is ReentrancyGuard {
     // ═══════════════════════════════════════════════════════════════════════════
 
     /**
- * @notice PATH A — Fund and create an escrow directly through the vault.
+     * @notice PATH A — Fund and create an escrow directly through the vault.
      *
- *         The proxy creates the escrow (proxy = `from`) and leaves it in normal
- *         protected lifecycle (PENDING until explicit release/cancel/dispute flow).
- *         No creator signature is needed: the delegate is authorised by policy.
+     *         The proxy creates the escrow (proxy = `from`) and leaves it in normal
+     *         protected lifecycle (PENDING until explicit release/cancel/dispute flow).
+     *         No creator signature is needed: the delegate is authorised by policy.
      *
      * @param token      ERC20 token held by this proxy
      * @param recipient  Escrow beneficiary

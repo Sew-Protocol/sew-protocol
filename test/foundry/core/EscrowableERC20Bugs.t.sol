@@ -119,7 +119,7 @@ contract EscrowableERC20BugsTest is Test {
         escrowToken.approve(address(escrowToken), 100 ether);
         uint256 wid = escrowToken.createEscrow(address(escrowToken), user2, 100 ether, SettingsValidationLibrary.getDefaultSettings());
         
-        escrowToken.releaseEscrowTransfer(wid);
+        escrowToken.release(wid);
         vm.stopPrank();
 
         assertEq(escrowToken.balanceOf(user2), 100 ether, "User should get tokens via releaseEscrowTransfer");

@@ -138,7 +138,7 @@ contract ReleaseEscrowEdgeCasesTest is Test {
 
         // Release escrow
         vm.prank(sender);
-        vault.releaseEscrowTransfer(wid);
+        vault.release(wid);
 
         // Verify: Balance decremented by principal (not actualAmount)
         uint256 totalHeldAfter = vault.totalHeldInEscrowPerToken(address(token));
@@ -189,7 +189,7 @@ contract ReleaseEscrowEdgeCasesTest is Test {
 
         // Release first escrow
         vm.prank(sender);
-        vault.releaseEscrowTransfer(wid1);
+        vault.release(wid1);
 
         // Verify accounting: totalHeldInEscrowPerToken decreased by principal (not actualAmount)
         uint256 expectedAfterFirst = expectedTotal - principalPerEscrow;
@@ -208,9 +208,9 @@ contract ReleaseEscrowEdgeCasesTest is Test {
 
         // Release remaining escrows
         vm.prank(sender);
-        vault.releaseEscrowTransfer(wid2);
+        vault.release(wid2);
         vm.prank(sender);
-        vault.releaseEscrowTransfer(wid3);
+        vault.release(wid3);
 
         // Verify final accounting
         assertEq(vault.totalHeldInEscrowPerToken(address(token)), 0);
@@ -241,7 +241,7 @@ contract ReleaseEscrowEdgeCasesTest is Test {
 
         // Release escrow
         vm.prank(sender);
-        vault.releaseEscrowTransfer(wid);
+        vault.release(wid);
 
         // Verify: Transfer should succeed for the partial amount recovered
         // because the Push Model ensures tokens arrive at the vault before transfer
@@ -285,7 +285,7 @@ contract ReleaseEscrowEdgeCasesTest is Test {
 
         // Release escrow
         vm.prank(sender);
-        vault.releaseEscrowTransfer(wid);
+        vault.release(wid);
 
         // Verify: Transfer should fail (insufficient balance) OR succeed if YieldOps refills
         // Fallback to claimable should work if transfer fails
@@ -320,7 +320,7 @@ contract ReleaseEscrowEdgeCasesTest is Test {
 
         // Release escrow
         vm.prank(sender);
-        vault.releaseEscrowTransfer(wid);
+        vault.release(wid);
 
         // Verify: _handleYieldAndGetActualAmount returns amount (principal)
         // Verify: Transfer succeeds with amount (principal)
@@ -357,7 +357,7 @@ contract ReleaseEscrowEdgeCasesTest is Test {
 
         // Release escrow - should still work (falls back to principal)
         vm.prank(sender);
-        vault.releaseEscrowTransfer(wid);
+        vault.release(wid);
 
         // Verify: Balance decremented by principal
         uint256 totalHeldAfter = vault.totalHeldInEscrowPerToken(address(token));
@@ -396,7 +396,7 @@ contract ReleaseEscrowEdgeCasesTest is Test {
         // Release escrow - should REJECT partial recovery
         vm.prank(sender);
         vm.expectRevert("YieldModuleEmergency: PartialRecoveryNotAllowed");
-        vault.releaseEscrowTransfer(wid);
+        vault.release(wid);
     }
 
     function test_emergencyUnwind_fullRecovery_accepted() public {
@@ -422,7 +422,7 @@ contract ReleaseEscrowEdgeCasesTest is Test {
 
         // Release escrow - should SUCCEED with full recovery
         vm.prank(sender);
-        vault.releaseEscrowTransfer(wid);
+        vault.release(wid);
 
         // Verify: Balance decremented by principal
         uint256 totalHeldAfter = vault.totalHeldInEscrowPerToken(address(token));

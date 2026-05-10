@@ -49,7 +49,7 @@ library BondHandlingLibrary {
      * @param bondToRecord Net bond amount after fee
      * @param bondToken Token address (must be address(0) for ETH)
      * @param newLevel New escalation level
-     * @param escrowFeeAddress Fee recipient
+     * @param escrowFeeAddress Fee recipient (unused in pull-only hardening)
      * @param protocolFeeAmount Protocol fee amount
      */
     function handleETHBond(
@@ -62,11 +62,10 @@ library BondHandlingLibrary {
         address escrowFeeAddress,
         uint256 protocolFeeAmount
     ) internal {
-        // Pay protocol fee first
-        if (protocolFeeAmount > 0) {
-            (bool feeSuccess, ) = payable(escrowFeeAddress).call{value: protocolFeeAmount}('');
-            if (!feeSuccess) revert BondHandlingLibrary.TransferFailed(1, bondToken, escrowFeeAddress, protocolFeeAmount);
-        }
+        // Pull-only hardening: do not auto-forward protocol fees.
+        // Any fee amount remains in escrow custody for explicit governed withdrawal.
+        escrowFeeAddress; // silence unused-parameter warning
+        protocolFeeAmount; // silence unused-parameter warning
 
         // Record bond (depositor MUST equal escalatedBy for ETH bonds)
         incentiveMod.recordAppealBond{value: bondToRecord}(
@@ -89,7 +88,7 @@ library BondHandlingLibrary {
      * @param bondToken Token address
      * @param bondToRecord Net bond amount after fee
      * @param newLevel New escalation level
-     * @param escrowFeeAddress Fee recipient
+     * @param escrowFeeAddress Fee recipient (unused in pull-only hardening)
      * @param protocolFeeAmount Protocol fee amount
      */
     function handleERC20BondAfterPull(
@@ -103,10 +102,10 @@ library BondHandlingLibrary {
         address escrowFeeAddress,
         uint256 protocolFeeAmount
     ) internal {
-        // Pay protocol fee
-        if (protocolFeeAmount > 0) {
-            IERC20(bondToken).safeTransfer(escrowFeeAddress, protocolFeeAmount);
-        }
+        // Pull-only hardening: do not auto-forward protocol fees.
+        // Fee tokens remain in escrow custody for explicit governed withdrawal.
+        escrowFeeAddress; // silence unused-parameter warning
+        protocolFeeAmount; // silence unused-parameter warning
         
         // Transfer to bond collector
         IERC20(bondToken).safeTransfer(address(bondCollector), bondToRecord);

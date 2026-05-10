@@ -291,10 +291,11 @@ contract OpsCoverageTest is Test {
         );
 
         assertTrue(result.success);
-        assertEq(result.distributedAmount, 90); // 90 after 10% fee
-        assertEq(bytes(result.failureReason).length, 0, "Should have no failure reason");
-        // feeRecipient should have: 10 (protocol fee) + 90 (distributed amount since no distModule) = 100
-        assertEq(token.balanceOf(feeRecipient), 100);
+        assertEq(result.distributedAmount, 0); // non-fee yield retained for claimable flow
+        assertEq(result.failureReason, 'Yield retained in escrow claimable pool');
+        // feeRecipient should not receive direct transfer; fee is claimable
+        assertEq(token.balanceOf(feeRecipient), 0);
+        assertEq(yieldOps.claimableProtocolFees(address(token), feeRecipient), 10);
     }
 
     function test_YieldOps_recoverTokens_Guardian() public {
@@ -1029,13 +1030,13 @@ contract OpsCoverageTest is Test {
             ""
         );
 
-        // On failure, success = false, but yield is sent to feeRecipient as fallback
+        // On failure, no fallback transfer of yield remainder should occur
         assertFalse(result.success, "Should fail"); 
-        assertEq(result.distributedAmount, earned, "Should distribute to fallback"); // Fallback amount
+        assertEq(result.distributedAmount, 0, "Should not distribute on failure fallback path");
         assertTrue(bytes(result.failureReason).length > 0, "Should have failure reason");
-        
-        // Verify feeRecipient got tokens
-        assertEq(token.balanceOf(feeRecipient), earned);
+
+        // Verify feeRecipient did not get fallback yield transfer
+        assertEq(token.balanceOf(feeRecipient), 0);
     }
 
     function test_YieldOps_handleYield_WithdrawSuccessFalse() public {
@@ -1081,7 +1082,7 @@ contract OpsCoverageTest is Test {
 
         assertTrue(result.success);
         assertEq(result.distributedAmount, 0);
-        assertEq(result.failureReason, "No distribution module and no fee recipient");
+        assertEq(result.failureReason, "Yield retained in escrow claimable pool");
     }
 
     function test_YieldOps_distributeYieldInternal_Partial() public {
@@ -1129,11 +1130,46 @@ contract OpsCoverageTest is Test {
             ""
         );
 
-        // No distribution module: yield goes to feeRecipient as fallback
-        assertTrue(result.success, "Should succeed with fallback");
-        assertEq(result.distributedAmount, earned, "Should distribute full amount");
-        assertEq(bytes(result.failureReason).length, 0, "Should have no failure reason");
-        assertEq(token.balanceOf(feeRecipient), earned);
+        // No distribution module: non-fee yield is retained (claimable path)
+        assertTrue(result.success, "Should succeed with retained-yield path");
+        assertEq(result.distributedAmount, 0, "Should not transfer non-fee yield directly");
+        assertEq(result.failureReason, 'Yield retained in escrow claimable pool');
+        assertEq(token.balanceOf(feeRecipient), 0);
+    }
+
+    function test_YieldOps_withdrawClaimableProtocolFee_Success() public {
+        vm.prank(timelock);
+        yieldOps.registerEscrowContract(escrowContract);
+
+        uint256 earned = 100;
+        token.mint(address(yieldOps), earned);
+
+        vm.prank(escrowContract);
+        yieldOps.distributeWithdrawnYield(
+            IYieldDistributionModule(address(0)),
+            1,
+            address(token),
+            earned,
+            1000,
+            feeRecipient,
+            ""
+        );
+
+        assertEq(yieldOps.claimableProtocolFees(address(token), feeRecipient), 10);
+        assertEq(token.balanceOf(feeRecipient), 0);
+
+        vm.prank(feeRecipient);
+        uint256 withdrawn = yieldOps.withdrawClaimableProtocolFee(address(token), 10);
+
+        assertEq(withdrawn, 10);
+        assertEq(yieldOps.claimableProtocolFees(address(token), feeRecipient), 0);
+        assertEq(token.balanceOf(feeRecipient), 10);
+    }
+
+    function test_YieldOps_withdrawClaimableProtocolFee_InvalidAmount() public {
+        vm.prank(feeRecipient);
+        vm.expectRevert();
+        yieldOps.withdrawClaimableProtocolFee(address(token), 1);
     }
 
     function test_YieldOps_distributeWithdrawnYield_FeeRecipientCannotBeZero() public {

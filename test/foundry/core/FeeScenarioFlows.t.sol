@@ -200,7 +200,7 @@ contract FeeScenarioFlowsTest is Test {
 
         // release (purchase completes)
         vm.prank(buyer);
-        vault.releaseEscrowTransfer(workflowId);
+        vault.release(workflowId);
 
         // after release
         assertEq(vault.totalHeldInEscrowPerToken(address(token)), 0, "held should be zero after release");
