@@ -85,4 +85,46 @@ contract BondWithdrawalGuardTest is Test {
         staking.completeUnstake();
         vm.stopPrank();
     }
+
+    function test_SeniorBlockedByJuniorPendingSlash() public {
+        address senior = address(0xAAAA);
+        address junior = address(0xBBBB);
+
+        // 1. Setup senior and junior
+        vm.startPrank(admin);
+        stableToken.transfer(senior, 100000 ether);
+        stableToken.transfer(junior, 500 ether);
+        staking.setResolverTier(senior, 1);
+        vm.stopPrank();
+
+        vm.startPrank(senior);
+        stableToken.approve(address(staking), 100000 ether);
+        staking.stakeWithMix(100000 ether, 0);
+        vm.stopPrank();
+
+        vm.startPrank(junior);
+        stableToken.approve(address(staking), 500 ether);
+        staking.stakeWithMix(500 ether, 0);
+        // Junior delegates to senior
+        staking.delegateStake(senior, 1000 ether);
+        vm.stopPrank();
+
+        // 2. Junior gets a pending slash
+        vm.startPrank(admin);
+        slashing.slashForFraud(2, address(0), junior, "");
+        vm.stopPrank();
+
+        // 3. Junior attempts to undelegate - should revert
+        vm.startPrank(junior);
+        vm.expectRevert(abi.encodeWithSignature("ResolverHasPendingSlash(address)", junior));
+        staking.undelegateStake(senior, 0);
+        vm.stopPrank();
+
+        // 4. Senior attempts withdrawal - should still be blocked by reserved coverage
+        // AND by the junior's pending slash (extra layer of protection)
+        vm.startPrank(senior);
+        vm.expectRevert(abi.encodeWithSignature("ResolverHasPendingSlash(address)", senior));
+        staking.requestUnstakeWithMix(100 ether, 0);
+        vm.stopPrank();
+    }
 }

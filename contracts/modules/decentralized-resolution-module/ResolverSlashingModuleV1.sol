@@ -138,6 +138,10 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
     // Slash config (governance-controlled)
     SlashConfig public slashConfig;
 
+    // Efficient pending slash tracking
+    mapping(address => uint256) public pendingSlashCount;
+    mapping(address => uint256) public juniorsPendingSlashCount;
+
     // ============ Events ============
 
     event SlashExecutedWithWaterfall(
@@ -240,6 +244,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         });
 
         emit SlashProposed(slashId, workflowId, resolver, reason, slashAmount, _msgSender());
+        _recordPendingSlash(resolver);
         return slashId;
     }
 
@@ -279,6 +284,8 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         // Update slash event
         slashEvent.status = SlashStatus.EXECUTED;
         slashEvent.executedAt = block.timestamp;
+        
+        _clearPendingSlash(resolver);
 
         // Mark as slashed
         workflowSlashed[slashEvent.escrowContract][slashEvent.workflowId][resolver] = true;
@@ -389,6 +396,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         } else {
             // Appeal accepted — cancel slash. Refund bond to resolver.
             slashEvent.status = SlashStatus.REVERSED;
+            _clearPendingSlash(slashEvent.resolver);
             if (bondHeld > 0) {
                 stableToken.safeTransfer(appeal.appellant, bondHeld);
             }
@@ -517,6 +525,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
             _freezeResolver(resolver);
 
             emit SlashProposed(slashId, workflowId, resolver, reason, slashAmount, _msgSender());
+            _recordPendingSlash(resolver);
         }
 
         return slashId;
@@ -683,6 +692,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         _freezeResolver(resolver);
 
         emit SlashProposed(slashId, workflowId, resolver, reason, slashAmount, _msgSender());
+        _recordPendingSlash(resolver);
         return slashId;
     }
 
@@ -745,6 +755,36 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
                 }
                 seniorSlashed = 0;
                 senior = address(0);
+            }
+        }
+    }
+
+    /**
+     * @notice Record a pending slash and update senior risk counts
+     */
+    function _recordPendingSlash(address resolver) internal {
+        pendingSlashCount[resolver]++;
+        
+        // Update senior if applicable
+        IStakingModule.DelegationInfo memory delegation = _findDelegation(resolver);
+        if (delegation.active && delegation.delegatee != address(0)) {
+            juniorsPendingSlashCount[delegation.delegatee]++;
+        }
+    }
+
+    /**
+     * @notice Clear a pending slash and update senior risk counts
+     */
+    function _clearPendingSlash(address resolver) internal {
+        if (pendingSlashCount[resolver] > 0) {
+            pendingSlashCount[resolver]--;
+        }
+        
+        // Update senior if applicable
+        IStakingModule.DelegationInfo memory delegation = _findDelegation(resolver);
+        if (delegation.active && delegation.delegatee != address(0)) {
+            if (juniorsPendingSlashCount[delegation.delegatee] > 0) {
+                juniorsPendingSlashCount[delegation.delegatee]--;
             }
         }
     }
@@ -1081,13 +1121,15 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
 
     /**
      * @notice Check if a resolver has a pending slash proposal
+     * @dev Also checks if a senior is at risk due to pending slashes of their juniors
      */
     function hasPendingSlash(address resolver) external view override returns (bool hasPending) {
-        for (uint256 i = 0; i < _nextSlashId; i++) {
-            if (slashEvents[i].resolver == resolver && slashEvents[i].status == SlashStatus.PENDING) {
-                return true;
-            }
-        }
+        // Direct pending slash check (using optimized mapping)
+        if (pendingSlashCount[resolver] > 0) return true;
+
+        // Senior risk check: if any junior has a pending slash that could hit this senior
+        if (juniorsPendingSlashCount[resolver] > 0) return true;
+
         return false;
     }
 

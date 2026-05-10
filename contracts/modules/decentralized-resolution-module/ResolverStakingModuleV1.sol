@@ -517,6 +517,13 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
         if (paused) revert ContractPaused();
 
         address junior = _msgSender();
+
+        // CRITICAL: Check if junior has pending slash
+        if (slashingModule != address(0) && ISlashingModule(address(slashingModule)).hasPendingSlash(junior)) revert ResolverHasPendingSlash(junior);
+
+        // CRITICAL: Check if junior is frozen
+        if (isResolverFrozen(junior)) revert ResolverFrozen(junior);
+
         if (junior == senior) revert CannotDelegateToSelf(junior);
         if (resolverTier[junior] != 0) revert OnlyResolversCanDelegate(junior, resolverTier[junior]);
         if (resolverTier[senior] != 1) revert MustDelegateToSenior(senior, resolverTier[senior]);
@@ -564,6 +571,13 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
      */
     function undelegateStake(address senior, uint256 /* amount - unused */) external nonReentrant {
         address junior = _msgSender();
+
+        // CRITICAL: Check if resolver has pending slash
+        if (slashingModule != address(0) && ISlashingModule(address(slashingModule)).hasPendingSlash(junior)) revert ResolverHasPendingSlash(junior);
+
+        // CRITICAL: Check if resolver is frozen
+        if (isResolverFrozen(junior)) revert ResolverFrozen(junior);
+
         DelegationRecord storage delegation = delegations[junior];
 
         if (!delegation.active) revert NotDelegated(junior);
