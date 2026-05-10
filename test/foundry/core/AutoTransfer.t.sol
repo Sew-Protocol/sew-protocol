@@ -84,7 +84,7 @@ contract AutoTransferTest is Test {
 
         uint256 balBefore = token.balanceOf(recipient);
         vm.prank(sender);
-        vault.releaseEscrowTransfer(wid);
+        vault.release(wid);
 
         assertEq(token.balanceOf(recipient), balBefore, 'recipient must not be paid during settlement');
         assertEq(vault.claimableBalances(wid, recipient), expected, 'claimable must be created');

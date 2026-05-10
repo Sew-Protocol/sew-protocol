@@ -35,10 +35,15 @@ contract YieldOps is AccessControl {
     // Events
     event YieldWithdrawn(uint256 indexed workflowId, address indexed token, uint256 yieldAmount);
     event YieldDistributed(uint256 indexed workflowId, address indexed token, uint256 yieldAmount);
+    event YieldDistributionDeferred(uint256 indexed workflowId, address indexed token, uint256 yieldAmount, string reason);
     event YieldDistributionFailed(uint256 indexed workflowId, address indexed token, uint256 yieldAmount, string reason);
     event YieldProtocolFeeCollected(uint256 indexed workflowId, address indexed token, uint256 yieldAmount, uint256 protocolFeeAmount);
-    event YieldRecoveredToFeeAddress(uint256 indexed workflowId, address indexed token, uint256 yieldAmount, address indexed feeRecipient);
+    event ProtocolFeeClaimableCredited(uint256 indexed workflowId, address indexed token, address indexed feeRecipient, uint256 amount);
+    event ProtocolFeeClaimed(address indexed token, address indexed feeRecipient, uint256 amount);
     event TokensRecovered(address indexed token, address indexed to, uint256 amount);
+
+    // token => recipient => claimable protocol fee amount
+    mapping(address => mapping(address => uint256)) public claimableProtocolFees;
 
     constructor(address initialOwner) {
         if (initialOwner == address(0)) revert ZeroOwner();
@@ -66,7 +71,10 @@ contract YieldOps is AccessControl {
     }
 
     /**
-     * @notice Distribute yield that has already been withdrawn.
+     * @notice Distribute withdrawn yield with pull-first safety semantics.
+     * @dev Protocol fee (if configured) is credited as claimable for feeRecipient.
+     *      Any non-fee remainder that cannot be distributed is retained for
+     *      escrow-level claimable accounting (no fallback push transfer).
      */
     function distributeWithdrawnYield(
         IYieldDistributionModule distModule,
@@ -93,15 +101,20 @@ contract YieldOps is AccessControl {
             protocolFeeAmount = (yieldAmount * protocolFeeBps) / 10000;
             if (protocolFeeAmount > 0) {
                 yieldToDistribute = yieldAmount - protocolFeeAmount;
-                IERC20(token).safeTransfer(feeRecipient, protocolFeeAmount);
+                claimableProtocolFees[token][feeRecipient] += protocolFeeAmount;
                 emit YieldProtocolFeeCollected(workflowId, token, yieldAmount, protocolFeeAmount);
+                emit ProtocolFeeClaimableCredited(workflowId, token, feeRecipient, protocolFeeAmount);
             }
         }
 
         if (yieldToDistribute > 0 && address(distModule) != address(0)) {
-            try this._distributeYieldInternal(distModule, workflowId, escrowContract, token, yieldToDistribute, distributionData) {
-                emit YieldDistributed(workflowId, token, yieldToDistribute);
-                result.distributedAmount = yieldToDistribute;
+            try this._distributeYieldInternal(distModule, workflowId, escrowContract, token, yieldToDistribute, distributionData) returns (uint256 distributedAmount) {
+                if (distributedAmount > 0) {
+                    emit YieldDistributed(workflowId, token, distributedAmount);
+                } else {
+                    emit YieldDistributionDeferred(workflowId, token, yieldToDistribute, 'Deferred to escrow claimable flow');
+                }
+                result.distributedAmount = distributedAmount;
                 return result;
             } catch Error(string memory reason) {
                 result.failureReason = reason;
@@ -112,10 +125,8 @@ contract YieldOps is AccessControl {
             }
 
             if (feeRecipient != address(0)) {
-                IERC20(token).safeTransfer(feeRecipient, yieldToDistribute);
-                emit YieldRecoveredToFeeAddress(workflowId, token, yieldToDistribute, feeRecipient);
                 result.success = false;
-                result.distributedAmount = yieldToDistribute;
+                result.distributedAmount = 0;
                 return result;
             }
             result.success = false;
@@ -123,18 +134,33 @@ contract YieldOps is AccessControl {
         }
 
         if (yieldToDistribute > 0 && feeRecipient != address(0)) {
-            IERC20(token).safeTransfer(feeRecipient, yieldToDistribute);
-            emit YieldRecoveredToFeeAddress(workflowId, token, yieldToDistribute, feeRecipient);
-            result.distributedAmount = yieldToDistribute;
+            result.distributedAmount = 0;
+            result.failureReason = 'Yield retained in escrow claimable pool';
+            emit YieldDistributionDeferred(workflowId, token, yieldToDistribute, result.failureReason);
             return result;
         }
 
         if (yieldToDistribute > 0) {
             result.success = true;
-            result.failureReason = 'No distribution module and no fee recipient';
+            result.failureReason = 'Yield retained in escrow claimable pool';
+            emit YieldDistributionDeferred(workflowId, token, yieldToDistribute, result.failureReason);
         }
 
         return result;
+    }
+
+    /**
+     * @notice Withdraw claimable protocol fees for msg.sender.
+     * @dev Explicit pull path only; no automatic fee delivery.
+     */
+    function withdrawClaimableProtocolFee(address token, uint256 amount) external returns (uint256 withdrawn) {
+        uint256 claimable = claimableProtocolFees[token][_msgSender()];
+        if (amount == 0 || amount > claimable) revert TransferFailed(_msgSender(), amount);
+
+        claimableProtocolFees[token][_msgSender()] = claimable - amount;
+        IERC20(token).safeTransfer(_msgSender(), amount);
+        emit ProtocolFeeClaimed(token, _msgSender(), amount);
+        return amount;
     }
 
     /**
@@ -176,8 +202,8 @@ contract YieldOps is AccessControl {
                     emit YieldWithdrawn(workflowId, token, result.yield);
                 }
                 
-                // CRIT-2 FIX: Forward any tokens actually received to the caller (Vault)
-                // This maintains the Push Model while being robust to module behavior
+                // Forward any tokens actually received to the caller (vault),
+                // where settlement remains claimable-first.
                 if (received > 0) {
                     IERC20(token).safeTransfer(escrowContract, received);
                 }
@@ -205,15 +231,16 @@ contract YieldOps is AccessControl {
         address token,
         uint256 yieldAmount,
         bytes memory distributionData
-    ) public {
+    ) public returns (uint256 distributedAmount) {
         if (_msgSender() != address(this)) revert InternalOnly(_msgSender());
-        if (yieldAmount == 0) return;
+        if (yieldAmount == 0) return 0;
         IERC20(token).safeTransfer(address(distModule), yieldAmount);
-        (bool success, uint256 distributedAmount) = distModule.distributeYield(workflowId, escrowContract, token, yieldAmount, distributionData);
+        (bool success, uint256 moduleDistributedAmount) = distModule.distributeYield(workflowId, escrowContract, token, yieldAmount, distributionData);
         if (!success) revert DistributionFailed(workflowId, token, yieldAmount);
-        if (distributedAmount < yieldAmount) {
-             emit YieldDistributionFailed(workflowId, token, yieldAmount - distributedAmount, 'Partial distribution');
+        if (moduleDistributedAmount < yieldAmount) {
+             emit YieldDistributionFailed(workflowId, token, yieldAmount - moduleDistributedAmount, 'Partial distribution');
         }
+        return moduleDistributedAmount;
     }
 
     function recoverTokens(address token, address to, uint256 amount) external onlyRole(ROLE_GUARDIAN) {

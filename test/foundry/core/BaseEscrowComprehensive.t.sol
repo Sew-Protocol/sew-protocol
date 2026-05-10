@@ -706,7 +706,7 @@ contract BaseEscrowComprehensive is Test {
         uint256 workflowId = vault.createEscrow(address(token), seller, amount, _getDefaultSettings());
 
         vm.prank(buyer);
-        vault.releaseEscrowTransfer(workflowId);
+        vault.release(workflowId);
 
         vm.expectRevert();
         vault.senderCancel(workflowId);

@@ -135,7 +135,7 @@ contract YieldDosBugTest is Test {
         // but it doesn't have enough tokens (balance is only 100 ether).
         vm.prank(user1);
         vm.expectRevert(); // safeTransfer to YieldOps fails
-        escrow.releaseEscrowTransfer(wid);
+        escrow.release(wid);
 
         // Verify escrow is still PENDING (blocked)
         (,,,,,,, EscrowState state,,) = escrow.escrowTransfers(wid);

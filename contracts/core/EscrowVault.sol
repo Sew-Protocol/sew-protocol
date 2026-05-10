@@ -57,6 +57,9 @@ contract EscrowVault is BaseEscrow {
         timeoutConfig.appealWindowDuration = 2 days;
     }
 
+    /// @notice Deprecated compatibility entrypoint for legacy integrations.
+    /// @dev This path is entitlement-only and does not push payouts; recipients
+    ///      must use withdrawEscrow() for explicit delivery.
     function releaseEscrowTransfer(uint256 workflowId) public nonReentrant {
         _requirePending(workflowId);
         if (escrowTransfers[workflowId].from != _msgSender()) revert NotSender(workflowId, _msgSender(), escrowTransfers[workflowId].from);

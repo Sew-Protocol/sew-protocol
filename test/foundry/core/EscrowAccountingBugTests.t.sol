@@ -195,7 +195,7 @@ contract EscrowAccountingBugTests is Test {
 
         // 2. Release escrow - this will trigger _handleYieldAndGetActualAmount which returns principal - loss
         vm.prank(buyer);
-        vault.releaseEscrowTransfer(wid);
+        vault.release(wid);
 
         uint256 heldAfter = vault.totalHeldInEscrowPerToken(address(token));
         

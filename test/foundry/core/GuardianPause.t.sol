@@ -225,7 +225,7 @@ contract GuardianPause is Test {
 
         // NEW SEMANTICS: Can still release while paused (settlement allowed)
         vm.prank(buyer);
-        vault.releaseEscrowTransfer(workflowId);
+        vault.release(workflowId);
         
         // Verify escrow was released even while paused
         EscrowState state = vault.getEscrowState(workflowId);
@@ -257,7 +257,7 @@ contract GuardianPause is Test {
 
         // Operations resume
         vm.prank(buyer);
-        vault.releaseEscrowTransfer(workflowId);
+        vault.release(workflowId);
         
         // Verify escrow was released
         (,,,,,,, EscrowState state,,) = vault.escrowTransfers(workflowId);

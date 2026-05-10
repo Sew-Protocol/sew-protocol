@@ -204,21 +204,23 @@ contract EscrowableERC20CoverageTest is Test {
         uint256 id = _createEscrow(buyer, AMOUNT);
         uint256 sellerBefore = token.balanceOf(seller);
         vm.prank(buyer);
-        token.releaseEscrowTransfer(id);
-        assertGt(token.balanceOf(seller), sellerBefore);
+        token.release(id);
+        assertEq(token.balanceOf(seller), sellerBefore);
+        uint256 fee = AMOUNT * FEE_BPS / 10_000;
+        assertEq(token.claimableBalances(id, seller), AMOUNT - fee);
     }
 
     function test_releaseEscrowTransfer_revert_non_sender() public {
         uint256 id = _createEscrow(buyer, AMOUNT);
         vm.expectRevert();
         vm.prank(seller);
-        token.releaseEscrowTransfer(id);
+        token.release(id);
     }
 
     function test_releaseEscrowTransfer_clears_totalHeld() public {
         uint256 id = _createEscrow(buyer, AMOUNT);
         vm.prank(buyer);
-        token.releaseEscrowTransfer(id);
+        token.release(id);
         assertEq(token.totalHeldInEscrow(), 0);
     }
 
@@ -299,7 +301,7 @@ contract EscrowableERC20CoverageTest is Test {
         // Normal release: balance was set during create, release decrements correctly.
         uint256 id = _createEscrow(buyer, AMOUNT);
         vm.prank(buyer);
-        token.releaseEscrowTransfer(id);
+        token.release(id);
         assertEq(token.totalHeldInEscrow(), 0);
     }
 
@@ -338,7 +340,8 @@ contract EscrowableERC20CoverageTest is Test {
         token.senderCancel(id);
 
         uint256 fee = AMOUNT * FEE_BPS / 10_000;
-        assertEq(token.balanceOf(buyer), AMOUNT - fee);
+        assertEq(token.balanceOf(buyer), 0);
+        assertEq(token.claimableBalances(id, buyer), AMOUNT - fee);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -365,7 +368,7 @@ contract EscrowableERC20CoverageTest is Test {
         uint256 fee = AMOUNT * FEE_BPS / 10_000;
 
         vm.prank(buyer);
-        token.releaseEscrowTransfer(id0);
+        token.release(id0);
         assertEq(token.totalHeldInEscrow(), AMOUNT - fee);
 
         // Mutual cancel for id1
@@ -455,7 +458,7 @@ contract EscrowableERC20CoverageTest is Test {
         assertEq(zeroFeeToken.totalHeldInEscrow(), AMOUNT);
 
         vm.prank(buyer2);
-        zeroFeeToken.releaseEscrowTransfer(id);
+        zeroFeeToken.release(id);
         assertEq(zeroFeeToken.totalHeldInEscrow(), 0);
     }
 }

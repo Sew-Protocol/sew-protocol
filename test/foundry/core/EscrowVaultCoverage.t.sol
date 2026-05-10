@@ -182,21 +182,23 @@ contract EscrowVaultCoverageTest is Test {
         uint256 id = _createEscrow(buyer, AMOUNT);
         uint256 before = tokenA.balanceOf(seller);
         vm.prank(buyer);
-        vault.releaseEscrowTransfer(id);
-        assertGt(tokenA.balanceOf(seller), before);
+        vault.release(id);
+        assertEq(tokenA.balanceOf(seller), before);
+        uint256 fee = AMOUNT * FEE_BPS / 10_000;
+        assertEq(vault.claimableBalances(id, seller), AMOUNT - fee);
     }
 
     function test_releaseEscrowTransfer_revert_non_sender() public {
         uint256 id = _createEscrow(buyer, AMOUNT);
         vm.expectRevert();
         vm.prank(seller);
-        vault.releaseEscrowTransfer(id);
+        vault.release(id);
     }
 
     function test_releaseEscrowTransfer_clears_totalHeld() public {
         uint256 id = _createEscrow(buyer, AMOUNT);
         vm.prank(buyer);
-        vault.releaseEscrowTransfer(id);
+        vault.release(id);
         assertEq(vault.totalHeldInEscrowPerToken(address(tokenA)), 0);
     }
 
@@ -236,7 +238,7 @@ contract EscrowVaultCoverageTest is Test {
     function test_getAccountingBreakdown_after_release() public {
         uint256 id = _createEscrow(buyer, AMOUNT);
         vm.prank(buyer);
-        vault.releaseEscrowTransfer(id);
+        vault.release(id);
         uint256 fee = AMOUNT * FEE_BPS / 10_000;
         (uint256 principal, uint256 fees, , ) = vault.getAccountingBreakdown(address(tokenA));
         assertEq(principal, 0);
@@ -382,11 +384,11 @@ contract EscrowVaultCoverageTest is Test {
         assertEq(vault.totalFeesPerToken(address(tokenA)), fee * 2);
 
         vm.prank(buyer);
-        vault.releaseEscrowTransfer(id0);
+        vault.release(id0);
         assertEq(vault.totalHeldInEscrowPerToken(address(tokenA)), AMOUNT - fee);
 
         vm.prank(buyer);
-        vault.releaseEscrowTransfer(id1);
+        vault.release(id1);
         assertEq(vault.totalHeldInEscrowPerToken(address(tokenA)), 0);
     }
 
@@ -403,8 +405,9 @@ contract EscrowVaultCoverageTest is Test {
         // and verifying the pull-path via withdrawEscrow exists.
         // Since seller is a plain address and transfer succeeds, verify claimable = 0.
         vm.prank(buyer);
-        vault.releaseEscrowTransfer(id);
-        // Push transfer succeeded — claimable for this workflowId should be zero
+        vault.release(id);
+        // Entitlement-only settlement credits the human recipient, not token address keys.
+        assertEq(vault.claimableBalances(id, seller), AMOUNT - (AMOUNT * FEE_BPS / 10_000));
         assertEq(vault.claimableBalances(id, address(tokenA)), 0);
     }
 }

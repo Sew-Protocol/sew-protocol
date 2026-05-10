@@ -78,6 +78,7 @@ error NotRecipient(uint256 workflowId, address caller, address expectedRecipient
 error InvalidEscrowFee(uint256 fee, uint256 maxFee);
 error FeeExceedsMaximum(uint256 feeBps, uint256 maxFeeBps);
 error NoClaimableBalance(uint256 workflowId, address recipient, address token);
+error NoClaimableBondProtocolFee(address token, address recipient);
 error TransferNotFinalized(uint256 workflowId, EscrowState currentState);
 error NoPendingSettlement(uint256 workflowId);
 error AppealWindowNotExpired(uint256 workflowId, uint256 appealDeadline, uint256 currentTime);
@@ -150,6 +151,9 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
 
     mapping(uint256 => mapping(address => uint256)) public claimableBalances;
     mapping(address => uint256) public totalClaimableAssets;
+
+    // token => feeRecipient => claimable protocol fee amount (from appeal bonds)
+    mapping(address => mapping(address => uint256)) public claimableBondProtocolFees;
 
     // Phase 1: Pending settlement storage (appeal window enforcement)
     struct PendingSettlement {
@@ -283,6 +287,17 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         uint256 grossAmount,
         uint256 feeBps,
         uint256 feeAmount
+    );
+    event BondProtocolFeeClaimableCredited(
+        address indexed token,
+        address indexed feeRecipient,
+        uint256 amount,
+        uint256 indexed workflowId
+    );
+    event BondProtocolFeeClaimed(
+        address indexed token,
+        address indexed feeRecipient,
+        uint256 amount
     );
 
     // op codes (append-only):
@@ -776,6 +791,9 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
 
         if (result.bondAmount > 0) {
             if (result.protocolFeeAmount > 0) {
+                // Pull-only protocol fee handling: credit claimable ledger instead of auto-push.
+                claimableBondProtocolFees[result.bondToken][escrowFeeAddress] += result.protocolFeeAmount;
+                emit BondProtocolFeeClaimableCredited(result.bondToken, escrowFeeAddress, result.protocolFeeAmount, workflowId);
                 emit ProtocolFeeCollected(1, workflowId, result.bondToken, result.bondAmount, snap.appealBondProtocolFeeBps, result.protocolFeeAmount);
             }
 
@@ -833,6 +851,38 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
 
         emit DisputeEscalated(workflowId, result.currentLevel, newLvl, newRes, _msgSender());
         return (true, newRes, newLvl);
+    }
+
+    /**
+     * @notice Claim accrued bond protocol fees via explicit pull.
+     * @param token Token address (address(0) for ETH)
+     * @param recipient Recipient to receive claimed amount
+     * @return claimed Amount claimed
+     * @dev CEI + nonReentrant + transfer-last.
+     */
+    function claimBondProtocolFees(address token, address recipient) external nonReentrant returns (uint256 claimed) {
+        if (recipient != _msgSender()) revert InvalidAddress(ADDR_RECIPIENT, recipient);
+
+        uint256 amount = claimableBondProtocolFees[token][recipient];
+        if (amount == 0) revert NoClaimableBondProtocolFee(token, recipient);
+
+        // Effects first
+        claimableBondProtocolFees[token][recipient] = 0;
+
+        // Interactions last
+        if (token == address(0)) {
+            (bool success, ) = payable(recipient).call{value: amount}("");
+            if (!success) {
+                // Restore state on failed transfer
+                claimableBondProtocolFees[token][recipient] = amount;
+                revert InvalidAddress(ADDR_RECIPIENT, recipient);
+            }
+        } else {
+            _transferTokens(token, recipient, amount);
+        }
+
+        emit BondProtocolFeeClaimed(token, recipient, amount);
+        return amount;
     }
 
     // ============ Resolution ============

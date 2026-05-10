@@ -106,14 +106,15 @@ contract EscrowVaultAccountingTest is Test {
         vm.startPrank(buyer);
         tokenA.approve(address(vault), amount);
         uint256 wid = vault.createEscrow(address(tokenA), seller, amount, SettingsValidationLibrary.getDefaultSettings());
-        vault.releaseEscrowTransfer(wid);
+        vault.release(wid);
         vm.stopPrank();
 
         (uint256 principal, uint256 fees, uint256 bal, ) = vault.getAccountingBreakdown(address(tokenA));
         assertEq(principal, 0, "Principal should be 0 after release");
         assertEq(fees, expectedFee, "Fees should still be tracked");
-        assertEq(bal, expectedFee, "Vault balance should only have fees");
-        assertEq(tokenA.balanceOf(seller), expectedPrincipal, "Seller should have received principal");
+        assertEq(bal, amount, "Vault balance should retain principal+fees until withdrawEscrow");
+        assertEq(tokenA.balanceOf(seller), 0, "Seller should not be paid during settlement");
+        assertEq(vault.claimableBalances(wid, seller), expectedPrincipal, "Seller should have claimable principal");
     }
 
     function test_accounting_after_refund() public {
@@ -134,8 +135,9 @@ contract EscrowVaultAccountingTest is Test {
         (uint256 principal, uint256 fees, uint256 bal, ) = vault.getAccountingBreakdown(address(tokenA));
         assertEq(principal, 0, "Principal should be 0 after refund");
         assertEq(fees, expectedFee, "Fees should still be tracked");
-        assertEq(bal, expectedFee, "Vault balance should only have fees");
-        assertEq(tokenA.balanceOf(buyer), 100000e18 - amount + expectedPrincipal);
+        assertEq(bal, amount, "Vault balance should retain principal+fees until withdrawEscrow");
+        assertEq(tokenA.balanceOf(buyer), 100000e18 - amount);
+        assertEq(vault.claimableBalances(wid, buyer), expectedPrincipal, "Buyer should have claimable refund");
     }
 
     // ============ Claimable Balances ============
@@ -151,7 +153,7 @@ contract EscrowVaultAccountingTest is Test {
         
         revertingToken.setShouldRevert(true);
         
-        vault.releaseEscrowTransfer(wid);
+        vault.release(wid);
         vm.stopPrank();
 
         (uint256 principal, uint256 fees, uint256 bal, ) = vault.getAccountingBreakdown(address(revertingToken));

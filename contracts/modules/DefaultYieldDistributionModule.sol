@@ -2,8 +2,6 @@
 pragma solidity ^0.8.33;
 
 import '../interfaces/IYieldDistributionModule.sol';
-import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
-import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/utils/introspection/ERC165.sol';
 
 /**
@@ -13,21 +11,19 @@ import '@openzeppelin/contracts/utils/introspection/ERC165.sol';
  *      This module is separate from yield generation, allowing independent swapping of generation modules.
  */
 contract DefaultYieldDistributionModule is IYieldDistributionModule, ERC165 {
-    using SafeERC20 for IERC20;
-
-    // Events
-    event YieldDistributed(uint256 indexed workflowId, address indexed recipient, uint256 amount);
+    // Event retained for compatibility; no recipient-level push transfers are performed.
+    event YieldDistributionDeferred(uint256 indexed workflowId, address indexed token, uint256 amount);
 
     /**
-     * @notice Distribute yield according to distribution data
+     * @notice Validate distribution settings and defer delivery to escrow pull paths.
      * @param workflowId The escrow transfer ID
      * @param token Token address
      * @param yieldAmount Amount of yield to distribute
      * @param distributionData Encoded (address[] recipients, uint256[] percentages)
      * @return success True if distribution was successful
-     * @return distributedAmount Total amount distributed
-     * @dev Decodes distribution data and distributes yield proportionally to recipients.
-     *      Percentages must sum to 10000 (100% in basis points).
+     * @return distributedAmount Always 0 in pull-only mode
+     * @dev Decodes and validates distribution data but does not transfer to recipients.
+     *      Yield remains in escrow-controlled accounting for explicit withdrawal delivery.
      */
     function distributeYield(
         uint256 workflowId,
@@ -67,23 +63,8 @@ contract DefaultYieldDistributionModule is IYieldDistributionModule, ERC165 {
             return (false, 0); // Invalid distribution
         }
 
-        // Distribute yield
-        uint256 totalDistributed = 0;
-        for (uint256 i = 0; i < recipients.length; i++) {
-            address recipient = recipients[i];
-            if (recipient == address(0)) {
-                continue; // Skip zero address
-            }
-
-            uint256 share = (yieldAmount * percentages[i]) / ESCROW_FEE_DENOMINATOR;
-            if (share > 0) {
-                IERC20(token).safeTransfer(recipient, share);
-                totalDistributed += share;
-                emit YieldDistributed(workflowId, recipient, share);
-            }
-        }
-
-        return (true, totalDistributed);
+        emit YieldDistributionDeferred(workflowId, token, yieldAmount);
+        return (true, 0);
     }
 
     /**

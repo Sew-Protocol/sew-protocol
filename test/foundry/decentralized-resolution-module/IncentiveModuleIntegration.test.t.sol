@@ -45,8 +45,16 @@ contract IncentiveModuleIntegrationTest is Test {
     address public seniorResolver;
     address public user1;
     address public user2;
+    address public feeRecipient;
 
     uint256 public constant INITIAL_BALANCE = 10000 ether;
+
+    event BondProtocolFeeClaimableCredited(
+        address indexed token,
+        address indexed feeRecipient,
+        uint256 amount,
+        uint256 indexed workflowId
+    );
 
     function setUp() public {
         deployer = address(this);
@@ -56,6 +64,7 @@ contract IncentiveModuleIntegrationTest is Test {
         seniorResolver = makeAddr('seniorResolver');
         user1 = makeAddr('user1');
         user2 = makeAddr('user2');
+        feeRecipient = makeAddr('feeAddress');
 
         // Deploy token
         token = new ERC20Mock('Test Token', 'TEST', address(this), 0);
@@ -85,7 +94,7 @@ contract IncentiveModuleIntegrationTest is Test {
         adminContract = new EscrowGovernanceTimelock(address(this));
         escrow = new EscrowVault(
             100,
-            makeAddr('feeAddress'),
+            feeRecipient,
             address(yieldOps),
             address(disputeOps),
             address(moduleManagement)
@@ -752,5 +761,225 @@ contract IncentiveModuleIntegrationTest is Test {
         // Verify resolver can claim
         uint256 claimable = incentiveModuleV1.getClaimablePayment(workflowId, address(escrow), resolver1);
         assertTrue(claimable > 0, 'Resolver should have claimable payment');
+    }
+
+    function test_bondProtocolFee_erc20_claimableOnly_noImmediateTransfer_thenExplicitClaim() public {
+        vm.prank(timelock);
+        resolutionModule.setIncentiveModule(address(incentiveModuleV2));
+
+        // Enable non-zero appeal bond protocol fee.
+        escrow.setAppealBondProtocolFeeBps(500); // 5%
+
+        DecentralizedResolverStructs.EscalationCostConfig
+            memory costConfig = DecentralizedResolverStructs.EscalationCostConfig({
+                enabled: true,
+                curveType: DecentralizedResolverStructs.CostCurveType.QUADRATIC,
+                baseCost: 100e18,
+                stepSize: 0,
+                multiplier: 0,
+                bondToken: address(0)
+            });
+        vm.prank(timelock);
+        resolutionModule.queueEscalationCostConfig(costConfig);
+        vm.warp(block.timestamp + 7 days + 1);
+        vm.prank(timelock);
+        resolutionModule.activateEscalationCostConfig();
+        vm.warp(block.timestamp + 1);
+
+        vm.startPrank(user1);
+        token.approve(address(escrow), 2000e18);
+        uint256 workflowId = escrow.createEscrow(
+            address(token),
+            user2,
+            1000e18,
+            EscrowSettings({
+                customResolver: address(0),
+                releaseAddress: address(0),
+                yieldPreset: YieldPreset.OFF,
+                autoReleaseTime: 0,
+                autoCancelTime: 0
+            })
+        );
+        escrow.raiseDispute(workflowId);
+        vm.stopPrank();
+
+        vm.prank(address(this));
+        resolutionModule.recordResolution(workflowId, address(escrow), resolver1, ResolutionOutcome.CANCEL, 1 days);
+
+        (uint256 bondAmount, address bondToken) = resolutionModule.getRequiredAppealBond(
+            workflowId,
+            address(escrow),
+            0,
+            abi.encode(address(token), user1, user2, 1000e18 - ((1000e18 * escrow.escrowFee()) / escrow.ESCROW_FEE_DENOMINATOR()))
+        );
+        uint256 expectedFee = (bondAmount * 500) / 10000;
+
+        uint256 feeRecipientBalBefore = token.balanceOf(feeRecipient);
+
+        vm.startPrank(user2);
+        token.approve(address(escrow), bondAmount);
+        vm.expectEmit(true, true, true, true);
+        emit BondProtocolFeeClaimableCredited(bondToken, feeRecipient, expectedFee, workflowId);
+        escrow.escalateDispute(workflowId);
+        vm.stopPrank();
+
+        // No immediate transfer to fee recipient.
+        assertEq(token.balanceOf(feeRecipient), feeRecipientBalBefore);
+        assertEq(escrow.claimableBondProtocolFees(bondToken, feeRecipient), expectedFee);
+
+        vm.prank(feeRecipient);
+        escrow.claimBondProtocolFees(bondToken, feeRecipient);
+
+        assertEq(token.balanceOf(feeRecipient), feeRecipientBalBefore + expectedFee);
+        assertEq(escrow.claimableBondProtocolFees(bondToken, feeRecipient), 0);
+    }
+
+    function test_bondProtocolFee_recipientRotation_oldKeepsCredit_newGetsFuture() public {
+        vm.prank(timelock);
+        resolutionModule.setIncentiveModule(address(incentiveModuleV2));
+        escrow.setAppealBondProtocolFeeBps(500);
+
+        DecentralizedResolverStructs.EscalationCostConfig memory costConfig = DecentralizedResolverStructs.EscalationCostConfig({
+            enabled: true,
+            curveType: DecentralizedResolverStructs.CostCurveType.QUADRATIC,
+            baseCost: 100e18,
+            stepSize: 0,
+            multiplier: 0,
+            bondToken: address(0)
+        });
+        vm.prank(timelock);
+        resolutionModule.queueEscalationCostConfig(costConfig);
+        vm.warp(block.timestamp + 7 days + 1);
+        vm.prank(timelock);
+        resolutionModule.activateEscalationCostConfig();
+        vm.warp(block.timestamp + 1);
+
+        // First escrow escalates with old fee recipient.
+        vm.startPrank(user1);
+        token.approve(address(escrow), 3000e18);
+        uint256 wf1 = escrow.createEscrow(address(token), user2, 1000e18, EscrowSettings(address(0), address(0), YieldPreset.OFF, 0, 0));
+        escrow.raiseDispute(wf1);
+        vm.stopPrank();
+        vm.prank(address(this));
+        resolutionModule.recordResolution(wf1, address(escrow), resolver1, ResolutionOutcome.CANCEL, 1 days);
+        (uint256 b1, address t1) = resolutionModule.getRequiredAppealBond(wf1, address(escrow), 0, abi.encode(address(token), user1, user2, 1000e18 - ((1000e18 * escrow.escrowFee()) / escrow.ESCROW_FEE_DENOMINATOR())));
+        vm.startPrank(user2);
+        token.approve(address(escrow), b1);
+        escrow.escalateDispute(wf1);
+        vm.stopPrank();
+
+        uint256 oldCredit = escrow.claimableBondProtocolFees(t1, feeRecipient);
+        assertGt(oldCredit, 0);
+
+        // Rotate fee recipient.
+        address newFeeRecipient = makeAddr("newFeeRecipient");
+        escrow.setFeeRecipient(newFeeRecipient);
+
+        // Second escrow escalates after rotation.
+        vm.startPrank(user1);
+        uint256 wf2 = escrow.createEscrow(address(token), user2, 1000e18, EscrowSettings(address(0), address(0), YieldPreset.OFF, 0, 0));
+        escrow.raiseDispute(wf2);
+        vm.stopPrank();
+        vm.prank(address(this));
+        resolutionModule.recordResolution(wf2, address(escrow), resolver1, ResolutionOutcome.CANCEL, 1 days);
+        (uint256 b2, address t2) = resolutionModule.getRequiredAppealBond(wf2, address(escrow), 0, abi.encode(address(token), user1, user2, 1000e18 - ((1000e18 * escrow.escrowFee()) / escrow.ESCROW_FEE_DENOMINATOR())));
+        vm.startPrank(user2);
+        token.approve(address(escrow), b2);
+        escrow.escalateDispute(wf2);
+        vm.stopPrank();
+
+        assertEq(escrow.claimableBondProtocolFees(t1, feeRecipient), oldCredit, "old recipient credit must persist");
+        assertGt(escrow.claimableBondProtocolFees(t2, newFeeRecipient), 0, "new recipient should receive future credits");
+    }
+
+    function test_bondProtocolFee_erc20_conservation_noStranding() public {
+        vm.prank(timelock);
+        resolutionModule.setIncentiveModule(address(incentiveModuleV2));
+        escrow.setAppealBondProtocolFeeBps(500);
+
+        DecentralizedResolverStructs.EscalationCostConfig memory costConfig = DecentralizedResolverStructs.EscalationCostConfig({
+            enabled: true,
+            curveType: DecentralizedResolverStructs.CostCurveType.QUADRATIC,
+            baseCost: 100e18,
+            stepSize: 0,
+            multiplier: 0,
+            bondToken: address(0)
+        });
+        vm.prank(timelock);
+        resolutionModule.queueEscalationCostConfig(costConfig);
+        vm.warp(block.timestamp + 7 days + 1);
+        vm.prank(timelock);
+        resolutionModule.activateEscalationCostConfig();
+        vm.warp(block.timestamp + 1);
+
+        vm.startPrank(user1);
+        token.approve(address(escrow), 3000e18);
+        uint256 wf = escrow.createEscrow(address(token), user2, 1000e18, EscrowSettings(address(0), address(0), YieldPreset.OFF, 0, 0));
+        escrow.raiseDispute(wf);
+        vm.stopPrank();
+        vm.prank(address(this));
+        resolutionModule.recordResolution(wf, address(escrow), resolver1, ResolutionOutcome.CANCEL, 1 days);
+
+        (uint256 bondAmount, address bondToken) = resolutionModule.getRequiredAppealBond(
+            wf,
+            address(escrow),
+            0,
+            abi.encode(address(token), user1, user2, 1000e18 - ((1000e18 * escrow.escrowFee()) / escrow.ESCROW_FEE_DENOMINATOR()))
+        );
+        uint256 expectedFee = (bondAmount * 500) / 10000;
+        uint256 expectedBondToRecord = bondAmount - expectedFee;
+
+        vm.startPrank(user2);
+        token.approve(address(escrow), bondAmount);
+        escrow.escalateDispute(wf);
+        vm.stopPrank();
+
+        ResolverIncentiveModuleV2.AppealBondRecord memory bond = incentiveModuleV2.getAppealBond(wf, address(escrow), 1);
+        assertEq(bond.amount, expectedBondToRecord, "recorded bond must equal net bond amount");
+        assertEq(escrow.claimableBondProtocolFees(bondToken, feeRecipient), expectedFee, "fee must be fully credited");
+        assertEq(expectedBondToRecord + expectedFee, bondAmount, "no protocol fee value may disappear");
+    }
+
+    function test_bondProtocolFee_zeroFee_noClaimableCredit() public {
+        vm.prank(timelock);
+        resolutionModule.setIncentiveModule(address(incentiveModuleV2));
+        escrow.setAppealBondProtocolFeeBps(0);
+
+        DecentralizedResolverStructs.EscalationCostConfig memory costConfig = DecentralizedResolverStructs.EscalationCostConfig({
+            enabled: true,
+            curveType: DecentralizedResolverStructs.CostCurveType.QUADRATIC,
+            baseCost: 100e18,
+            stepSize: 0,
+            multiplier: 0,
+            bondToken: address(0)
+        });
+        vm.prank(timelock);
+        resolutionModule.queueEscalationCostConfig(costConfig);
+        vm.warp(block.timestamp + 7 days + 1);
+        vm.prank(timelock);
+        resolutionModule.activateEscalationCostConfig();
+        vm.warp(block.timestamp + 1);
+
+        vm.startPrank(user1);
+        token.approve(address(escrow), 3000e18);
+        uint256 wf = escrow.createEscrow(address(token), user2, 1000e18, EscrowSettings(address(0), address(0), YieldPreset.OFF, 0, 0));
+        escrow.raiseDispute(wf);
+        vm.stopPrank();
+        vm.prank(address(this));
+        resolutionModule.recordResolution(wf, address(escrow), resolver1, ResolutionOutcome.CANCEL, 1 days);
+
+        (uint256 bondAmount, address bondToken) = resolutionModule.getRequiredAppealBond(
+            wf,
+            address(escrow),
+            0,
+            abi.encode(address(token), user1, user2, 1000e18 - ((1000e18 * escrow.escrowFee()) / escrow.ESCROW_FEE_DENOMINATOR()))
+        );
+
+        vm.startPrank(user2);
+        token.approve(address(escrow), bondAmount);
+        escrow.escalateDispute(wf);
+        vm.stopPrank();
+
+        assertEq(escrow.claimableBondProtocolFees(bondToken, feeRecipient), 0, "zero protocol fee should create no claimable credit");
     }
 }
