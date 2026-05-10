@@ -482,14 +482,6 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
         // I will log this for the team's attention and revert to a safe state if necessary.
         revert("EmergencyWithdraw implementation is mis-scoped; requires resolver parameter");
     }
-            stableToken.safeTransfer(to, stableAmount);
-        }
-        if (sewAmount > 0) {
-            sewToken.safeTransfer(to, sewAmount);
-        }
-
-        emit EmergencyWithdrawal(resolver, totalAmount, to);
-    }
 
     // ============ Delegation Functions (Coverage) ============
 
@@ -810,6 +802,33 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
             info = DelegationInfo({
                 delegator: delegator,
                 delegatee: delegatee,
+                amount: 0,
+                delegatedAt: 0,
+                active: false
+            });
+        }
+    }
+
+    /**
+     * @notice Get active delegation for a delegator
+     */
+    function getActiveDelegation(
+        address delegator
+    ) external view returns (DelegationInfo memory info) {
+        DelegationRecord storage delegation = delegations[delegator];
+
+        if (delegation.active && delegation.senior != address(0)) {
+            info = DelegationInfo({
+                delegator: delegator,
+                delegatee: delegation.senior,
+                amount: delegation.coverageAmount,
+                delegatedAt: delegation.delegatedAt,
+                active: true
+            });
+        } else {
+            info = DelegationInfo({
+                delegator: delegator,
+                delegatee: address(0),
                 amount: 0,
                 delegatedAt: 0,
                 active: false

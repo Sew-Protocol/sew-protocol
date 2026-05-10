@@ -239,6 +239,13 @@ interface IStakingModule {
     ) external view returns (DelegationInfo memory info);
 
     /**
+     * @notice Get active delegation for a delegator (if any)
+     * @param delegator Who is delegating
+     * @return info Active delegation information, or inactive with zero delegatee
+     */
+    function getActiveDelegation(address delegator) external view returns (DelegationInfo memory info);
+
+    /**
      * @notice Get minimum stake required for a resolver tier
      * @param tier Resolver tier (0 = standard, 1 = senior)
      * @return minimum Minimum stake required

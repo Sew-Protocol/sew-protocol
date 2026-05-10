@@ -132,12 +132,13 @@ contract EscrowStateMachineTest is Test {
         vm.expectRevert(abi.encodeWithSignature("NotSender(uint256,address,address)", wid, recipient, sender));
         vault.releaseEscrowTransfer(wid);
 
-        // Release
+        // Release creates claimable (no direct transfer)
         uint256 recipientBal0 = token.balanceOf(recipient);
         vm.prank(sender);
         vault.releaseEscrowTransfer(wid);
         uint256 recipientBal1 = token.balanceOf(recipient);
-        assertEq(recipientBal1 - recipientBal0, aaf, "recipient payout mismatch");
+        assertEq(recipientBal1 - recipientBal0, 0, "settlement must not transfer directly");
+        assertEq(vault.claimableBalances(wid, recipient), aaf, "recipient claimable mismatch");
 
         // After release
         (, , , , , st, ss, rs) = _load(wid);
@@ -174,12 +175,13 @@ contract EscrowStateMachineTest is Test {
         vm.expectRevert(abi.encodeWithSignature("NotSender(uint256,address,address)", wid, attacker, sender));
         vault.senderCancel(wid);
 
-        // Recipient confirms cancel -> REFUNDED + refund to sender
+        // Recipient confirms cancel -> REFUNDED + sender claimable
         uint256 senderBal0 = token.balanceOf(sender);
         vm.prank(recipient);
         vault.recipientCancel(wid);
         uint256 senderBal1 = token.balanceOf(sender);
-        assertEq(senderBal1 - senderBal0, aaf, "refund amount mismatch");
+        assertEq(senderBal1 - senderBal0, 0, "settlement must not transfer directly");
+        assertEq(vault.claimableBalances(wid, sender), aaf, "sender claimable mismatch");
 
         (, , , , , EscrowState st2, , ) = _load(wid);
         assertEq(uint8(st2), uint8(EscrowState.REFUNDED), "state should be REFUNDED after 2-party cancel");
@@ -193,10 +195,10 @@ contract EscrowStateMachineTest is Test {
         vm.expectRevert(abi.encodeWithSignature("TransferNotPending(uint256,uint8)", wid, uint8(EscrowState.REFUNDED)));
         vault.raiseDispute(wid);
 
-        // Invalid: cannot withdraw when no claimable (autotransfer succeeded)
+        // Sender can withdraw explicit claimable
         vm.prank(sender);
-        vm.expectRevert(abi.encodeWithSignature("NoClaimableBalance(uint256,address,address)", wid, sender, address(token)));
-        vault.withdrawEscrow(wid);
+        uint256 withdrawn = vault.withdrawEscrow(wid);
+        assertEq(withdrawn, aaf, "withdrawn refund mismatch");
     }
 
     function test_state_raise_dispute_sets_status_and_invalid_actions() public {
@@ -249,12 +251,13 @@ contract EscrowStateMachineTest is Test {
         );
         vault.executePendingSettlement(wid);
 
-        // Execute after deadline
+        // Execute after deadline (creates claimable)
         vm.warp(appealDeadline + 1);
         uint256 senderBal0 = token.balanceOf(sender);
         vault.executePendingSettlement(wid);
         uint256 senderBal1 = token.balanceOf(sender);
-        assertEq(senderBal1 - senderBal0, aaf, "refund after pending settlement mismatch");
+        assertEq(senderBal1 - senderBal0, 0, "settlement must not transfer directly");
+        assertEq(vault.claimableBalances(wid, sender), aaf, "refund claimable mismatch");
 
         (, , , , , EscrowState st2, , ) = _load(wid);
         assertEq(uint8(st2), uint8(EscrowState.REFUNDED), "state should be REFUNDED after executing pending settlement");

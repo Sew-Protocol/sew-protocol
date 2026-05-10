@@ -22,7 +22,12 @@ import { getDeployedAddress } from './addresses';
 type Stage = 'propose' | 'queue' | 'execute' | 'all';
 
 async function loadProposal(proposalPath: string): Promise<ProposalArtifact> {
+  const proposalsDir = path.resolve(process.cwd(), 'governance', 'proposals');
   const fullPath = path.resolve(proposalPath);
+
+  if (!fullPath.startsWith(proposalsDir)) {
+    throw new Error(`Proposal path is outside proposals directory: ${fullPath}`);
+  }
 
   if (!fs.existsSync(fullPath)) {
     throw new Error(`Proposal file not found: ${fullPath}`);

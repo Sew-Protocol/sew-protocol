@@ -21,7 +21,7 @@ import '../types/EscrowTypes.sol';
  * @dev Implementers should provide clear documentation of:
  * - Which token(s) this escrow accepts (single-token vs multi-token)
  * - Dispute handling flow (direct resolution vs module-based)
- * - Settlement mechanics (push vs pull, and under what conditions)
+ * - Settlement mechanics (entitlement creation vs withdrawal delivery)
  */
 interface IEscrowCore {
     // ============ Core Data Structures ============
@@ -70,15 +70,15 @@ interface IEscrowCore {
     /// @notice Release escrow (core action for settlement)
     /// @param workflowId Unique escrow identifier
     /// @dev Transitions PENDING → RELEASED
-    /// @dev May transfer funds immediately (push) or make claimable (fallback)
+    /// @dev Entitlement-only: marks funds claimable; does not deliver payout
     /// @dev Only callable by sender (buyer) when escrow is PENDING
     /// @dev Part of IEscrowCore interface for wallet adoption
     function release(uint256 workflowId) external;
 
-    /// @notice Withdraw claimable funds (fallback when push transfer failed)
+    /// @notice Withdraw claimable funds (explicit user-authorised delivery path)
     /// @param workflowId Unique escrow identifier
     /// @return amount Actual amount withdrawn
-    /// @dev Used when release() could not push funds immediately
+    /// @dev Used to deliver funds after settlement creates claimable entitlement
     /// @dev Requires escrow to be RELEASED, REFUNDED, or RESOLVED
     function withdrawEscrow(uint256 workflowId) external returns (uint256 amount);
 
@@ -116,7 +116,7 @@ interface IEscrowCore {
     ///   bit 1: can call senderCancel()
     ///   bit 2: can call recipientCancel()
     ///   bit 3: can call raiseDispute()
-    ///   bit 4: can call withdrawEscrow() (claimable fallback)
+    ///   bit 4: can call withdrawEscrow() (claimable delivery)
     /// @dev Caller should check caller's role (sender/recipient/resolver)
     /// @dev Returns actions that MAY succeed; authorization still enforced
     function getActionStatus(uint256 workflowId) external view returns (uint256 actionMask, uint256 nextUpdateTime);
@@ -136,7 +136,7 @@ interface IEscrowCore {
         EscrowState state
     );
 
-    /// @notice Get claimable balance for a recipient (if push settlement failed)
+    /// @notice Get claimable balance for a recipient
     /// @param workflowId Unique escrow identifier
     /// @param account Address to check balance for
     /// @return claimable Amount available to withdraw via withdrawEscrow()

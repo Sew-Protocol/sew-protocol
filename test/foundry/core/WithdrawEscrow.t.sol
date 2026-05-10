@@ -93,23 +93,23 @@ contract WithdrawEscrowTest is Test {
         uint256 claimableBefore = vault.claimableBalances(wid, recipient);
         assertEq(claimableBefore, 0);
 
-        // Release - autotransfer should automatically transfer funds
+        // Release creates claimable entitlement (no direct transfer)
         uint256 recipientBalanceBefore = token.balanceOf(recipient);
         vm.prank(sender);
         vault.releaseEscrowTransfer(wid);
 
-        // After release, autotransfer should have transferred funds automatically
+        // After release, recipient balance is unchanged
         uint256 recipientBalanceAfter = token.balanceOf(recipient);
-        assertEq(recipientBalanceAfter - recipientBalanceBefore, expected, 'Autotransfer should have transferred funds');
+        assertEq(recipientBalanceAfter - recipientBalanceBefore, 0, 'Settlement must not transfer directly');
 
-        // Claimable should be 0 (autotransfer succeeded)
+        // Claimable should be set
         uint256 claimableAfter = vault.claimableBalances(wid, recipient);
-        assertEq(claimableAfter, 0, 'Claimable should be 0 when autotransfer succeeds');
+        assertEq(claimableAfter, expected, 'Claimable should equal settlement amount');
 
-        // Withdrawal should fail (no claimable balance, already transferred)
+        // Withdrawal succeeds and delivers funds
         vm.prank(recipient);
-        vm.expectRevert(abi.encodeWithSignature("NoClaimableBalance(uint256,address,address)", wid, recipient, address(token)));
-        vault.withdrawEscrow(wid);
+        uint256 withdrawn = vault.withdrawEscrow(wid);
+        assertEq(withdrawn, expected);
     }
 
     function test_withdrawEscrow_idempotent() public {
@@ -127,13 +127,10 @@ contract WithdrawEscrowTest is Test {
         uint256 fee = (AMOUNT * ESCROW_FEE) / 10000;
         uint256 expected = AMOUNT - fee;
 
-        // Autotransfer should have automatically transferred funds
-        assertEq(token.balanceOf(recipient), expected, 'Autotransfer should have transferred funds');
-
-        // Withdrawal should fail (no claimable balance, already transferred)
+        // Settlement is entitlement-only; withdraw performs delivery
         vm.prank(recipient);
-        vm.expectRevert(abi.encodeWithSignature("NoClaimableBalance(uint256,address,address)", wid, recipient, address(token)));
-        vault.withdrawEscrow(wid);
+        uint256 withdrawn = vault.withdrawEscrow(wid);
+        assertEq(withdrawn, expected);
     }
 
     function test_withdrawEscrow_non_finalized_fails() public {
@@ -172,7 +169,7 @@ contract WithdrawEscrowTest is Test {
         vm.prank(sender2);
         uint256 wid2 = vault.createEscrow(address(token), recipient, amount2, settings2);
 
-        // Release both - autotransfer should automatically transfer funds
+        // Release both - must only create claimables
         uint256 recipientBalanceBefore = token.balanceOf(recipient);
         vm.prank(sender);
         vault.releaseEscrowTransfer(wid1);
@@ -180,22 +177,21 @@ contract WithdrawEscrowTest is Test {
         vm.prank(sender2);
         vault.releaseEscrowTransfer(wid2);
 
-        // Autotransfer should have transferred both amounts
+        // Direct balance unchanged until explicit withdrawals
         uint256 fee1 = (amount1 * ESCROW_FEE) / 10000;
         uint256 fee2 = (amount2 * ESCROW_FEE) / 10000;
         uint256 expectedTotal = (amount1 - fee1) + (amount2 - fee2);
         
         uint256 recipientBalanceAfter = token.balanceOf(recipient);
-        assertEq(recipientBalanceAfter - recipientBalanceBefore, expectedTotal, 'Autotransfer should have transferred both amounts');
+        assertEq(recipientBalanceAfter - recipientBalanceBefore, 0, 'Settlement must not transfer directly');
 
-        // Withdrawals should fail (no claimable balance, already transferred)
+        // Withdraw from each escrow
         vm.prank(recipient);
-        vm.expectRevert(abi.encodeWithSignature("NoClaimableBalance(uint256,address,address)", wid1, recipient, address(token)));
-        vault.withdrawEscrow(wid1);
+        uint256 withdrawn1 = vault.withdrawEscrow(wid1);
         
         vm.prank(recipient);
-        vm.expectRevert(abi.encodeWithSignature("NoClaimableBalance(uint256,address,address)", wid2, recipient, address(token)));
-        vault.withdrawEscrow(wid2);
+        uint256 withdrawn2 = vault.withdrawEscrow(wid2);
+        assertEq(withdrawn1 + withdrawn2, expectedTotal, 'Total withdrawn should match both claimables');
     }
 
     function test_claimable_balance_tracking() public {
@@ -211,32 +207,32 @@ contract WithdrawEscrowTest is Test {
         uint256 claimableBefore = vault.claimableBalances(wid, recipient);
         assertEq(claimableBefore, 0);
 
-        // Release - autotransfer should automatically transfer funds
+        // Release creates claimable only
         uint256 recipientBalanceBefore = token.balanceOf(recipient);
         vm.prank(sender);
         vault.releaseEscrowTransfer(wid);
 
-        // After release, autotransfer should have transferred funds automatically
+        // After release, no direct payout yet
         uint256 fee = (AMOUNT * ESCROW_FEE) / 10000;
         uint256 expected = AMOUNT - fee;
         
         uint256 recipientBalanceAfter = token.balanceOf(recipient);
-        assertEq(recipientBalanceAfter - recipientBalanceBefore, expected, 'Autotransfer should have transferred funds');
+        assertEq(recipientBalanceAfter - recipientBalanceBefore, 0, 'Settlement must not transfer directly');
 
-        // Claimable should be 0 (autotransfer succeeded)
+        // Claimable should be set
         uint256 claimableAfter = vault.claimableBalances(wid, recipient);
-        assertEq(claimableAfter, 0, 'Claimable should be 0 when autotransfer succeeds');
+        assertEq(claimableAfter, expected, 'Claimable should equal settlement amount');
 
-        // Withdrawal should fail (no claimable balance, already transferred)
+        // Withdrawal should deliver and clear claimable
         vm.prank(recipient);
-        vm.expectRevert(abi.encodeWithSignature("NoClaimableBalance(uint256,address,address)", wid, recipient, address(token)));
-        vault.withdrawEscrow(wid);
+        uint256 withdrawn = vault.withdrawEscrow(wid);
+        assertEq(withdrawn, expected);
 
         uint256 claimableFinal = vault.claimableBalances(wid, recipient);
         assertEq(claimableFinal, 0, 'Claimable should remain 0');
     }
 
-    function test_withdrawEscrow_succeeds_after_autotransfer_fallback_and_refill() public {
+    function test_withdrawEscrow_succeeds_after_settlement_claimable_and_refill() public {
         // Create escrow
         vm.prank(sender);
         token.approve(address(vault), AMOUNT);
@@ -248,12 +244,11 @@ contract WithdrawEscrowTest is Test {
         uint256 fee = (AMOUNT * ESCROW_FEE) / 10000;
         uint256 expected = AMOUNT - fee; // amountAfterFee
 
-        // Simulate an unexpected vault balance deficit right before release:
-        // drain the vault's escrowed amount so the push transfer fails and we fall back to pull.
+        // Simulate unexpected vault balance deficit before release.
         vm.prank(address(vault));
         token.transfer(address(0xdead), expected);
 
-        // Release: autotransfer should fail and credit claimable balance.
+        // Release credits claimable balance.
         vm.prank(sender);
         vault.releaseEscrowTransfer(wid);
 

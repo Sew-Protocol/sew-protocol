@@ -234,6 +234,41 @@ contract SlashingModuleUnitTest is Test {
         assertEq(slashId, 0, 'Should return 0 when circuit breaker active');
     }
 
+    function test_unavailability_IdempotentIncrementAndDecrement() public {
+        // Configure a small resolver set so one timeout slash can trigger circuit-breaker logic path.
+        vm.prank(timelock);
+        slashingModule.setUnavailabilityStats(10, 0);
+
+        // First timeout-accept slash marks resolver1 unavailable.
+        vm.prank(resolutionModule);
+        uint256 slashId1 = slashingModule.slashForTimeout(1001, address(this), resolver1, 0);
+        assertGt(slashId1, 0, 'first timeout slash should execute');
+        (uint256 totalResolvers, uint256 unavailableCount, ) = slashingModule.unavailabilityStats();
+        assertEq(totalResolvers, 10, 'totalResolvers set');
+        assertEq(unavailableCount, 1, 'resolver counted unavailable once');
+        assertTrue(slashingModule.resolverUnavailable(resolver1), 'resolver marked unavailable');
+
+        // Second timeout-accept slash for same resolver should not double-count unavailability.
+        vm.prank(resolutionModule);
+        uint256 slashId2 = slashingModule.slashForTimeout(1002, address(this), resolver1, 0);
+        assertGt(slashId2, 0, 'second timeout slash should execute');
+        (, unavailableCount, ) = slashingModule.unavailabilityStats();
+        assertEq(unavailableCount, 1, 'idempotent increment (no double count)');
+
+        // Unfreeze should clear unavailable flag and decrement count once.
+        vm.prank(timelock);
+        slashingModule.unfreezeResolver(resolver1);
+        (, unavailableCount, ) = slashingModule.unavailabilityStats();
+        assertEq(unavailableCount, 0, 'unavailability decremented on recovery');
+        assertFalse(slashingModule.resolverUnavailable(resolver1), 'resolver cleared from unavailable set');
+
+        // Repeated unfreeze should remain idempotent and not underflow.
+        vm.prank(timelock);
+        slashingModule.unfreezeResolver(resolver1);
+        (, unavailableCount, ) = slashingModule.unavailabilityStats();
+        assertEq(unavailableCount, 0, 'idempotent decrement (no underflow)');
+    }
+
     function test_slashForFraud_RespectsSlashCaps() public {
         // Create large slash that would exceed cap
         uint256 workflowId = 1;
@@ -366,9 +401,25 @@ contract SlashingModuleUnitTest is Test {
         uint8 priorRound = 0;
 
         vm.prank(resolutionModule);
+        vm.expectRevert(ResolverSlashingModuleV1.ReversalSlashingNotEnabled.selector);
+        slashingModule.slashForReversal(workflowId, address(this), resolver1, priorRound);
+    }
+
+    function test_slashForReversal_EnabledByGovernance() public {
+        uint256 workflowId = 1;
+        uint8 priorRound = 0;
+
+        vm.prank(timelock);
+        slashingModule.setSlashPercentage(ISlashingModule.SlashReason.REVERSAL, 500); // 5%
+
+        vm.prank(resolutionModule);
         uint256 slashId = slashingModule.slashForReversal(workflowId, address(this), resolver1, priorRound);
 
-        assertEq(slashId, 0, 'Should return 0 (disabled)');
+        assertGt(slashId, 0, 'Should create slash when reversal enabled');
+        ISlashingModule.SlashEvent memory ev = slashingModule.getSlashEvent(slashId);
+        assertEq(uint8(ev.reason), uint8(ISlashingModule.SlashReason.REVERSAL), 'Should be reversal reason');
+        assertEq(uint8(ev.status), uint8(ISlashingModule.SlashStatus.EXECUTED), 'Should execute immediately');
+        assertGt(ev.amount, 0, 'Should slash non-zero amount');
     }
 
     // ============ Slash Configuration Tests ============
@@ -473,6 +524,25 @@ contract SlashingModuleUnitTest is Test {
 
         uint256 stakingModuleStableAfter = stableToken.balanceOf(address(stakingModule));
         assertLt(stakingModuleStableAfter, stakingModuleStableBefore, 'Staking module stable balance should decrease');
+    }
+
+    function test_slashForTimeout_TracksRetainedSlashReserves() public {
+        uint256 workflowId = 4242;
+        uint8 timeoutType = 0; // TIMEOUT_ACCEPT — immediate execution
+
+        uint256 retainedBefore = slashingModule.retainedSlashReserves();
+        uint256 insuranceBefore = stableToken.balanceOf(address(insurancePool));
+
+        vm.prank(resolutionModule);
+        uint256 slashId = slashingModule.slashForTimeout(workflowId, address(this), resolver1, timeoutType);
+        assertGt(slashId, 0, 'Should create slash event');
+
+        uint256 insuranceAfter = stableToken.balanceOf(address(insurancePool));
+        uint256 insuranceDelta = insuranceAfter - insuranceBefore; // 50% of slashed stable amount
+        uint256 expectedRetained = (insuranceDelta * 2 * 2000) / BASIS_POINTS; // infer amount via 50% insurance share
+
+        uint256 retainedAfter = slashingModule.retainedSlashReserves();
+        assertEq(retainedAfter, retainedBefore + expectedRetained, 'retained reserves should track residual 20%');
     }
 
     function test_slashForTimeout_MixedBond_BurnsSewAndTransfersStable() public {
@@ -590,6 +660,43 @@ contract SlashingModuleUnitTest is Test {
         assertEq(stableToken.balanceOf(address(slashingModule)), moduleBalBefore + 50e6, 'Module should hold bond');
         assertEq(stableToken.balanceOf(resolver1), resolverBalBefore - 50e6, 'Resolver paid bond');
         assertEq(slashingModule.appealBondsHeld(slashId), 50e6, 'Bond mapping records amount');
+    }
+
+    function test_appealSlash_RevertsOnDuplicateAppeal_AndDoesNotOverwriteBondOrMetadata() public {
+        vm.prank(timelock);
+        slashingModule.setAppealBond(50e6);
+
+        stableToken.mint(resolver1, 200e6);
+        vm.prank(resolver1);
+        stableToken.approve(address(slashingModule), 200e6);
+
+        vm.prank(timelock);
+        uint256 slashId = slashingModule.slashForFraud(1, address(this), resolver1, 'evidence');
+
+        vm.prank(resolver1);
+        slashingModule.appealSlash(slashId, 'first reason', bytes('first evidence'));
+
+        ISlashingModule.SlashAppeal memory firstAppeal = slashingModule.getSlashAppeal(slashId);
+        uint256 heldAfterFirst = slashingModule.appealBondsHeld(slashId);
+        uint256 moduleBalAfterFirst = stableToken.balanceOf(address(slashingModule));
+        uint256 resolverBalAfterFirst = stableToken.balanceOf(resolver1);
+
+        vm.prank(resolver1);
+        vm.expectRevert(abi.encodeWithSelector(ResolverSlashingModuleV1.AlreadyAppealed.selector, slashId));
+        slashingModule.appealSlash(slashId, 'second reason', bytes('second evidence'));
+
+        ISlashingModule.SlashAppeal memory secondRead = slashingModule.getSlashAppeal(slashId);
+        assertEq(secondRead.appellant, firstAppeal.appellant, 'appellant unchanged');
+        assertEq(secondRead.appealBond, firstAppeal.appealBond, 'appeal bond unchanged');
+        assertEq(secondRead.appealedAt, firstAppeal.appealedAt, 'appealedAt unchanged');
+        assertEq(secondRead.reason, firstAppeal.reason, 'reason unchanged');
+        assertEq(secondRead.evidence, firstAppeal.evidence, 'evidence unchanged');
+        assertEq(secondRead.resolved, firstAppeal.resolved, 'resolved flag unchanged');
+        assertEq(secondRead.upheld, firstAppeal.upheld, 'upheld flag unchanged');
+
+        assertEq(slashingModule.appealBondsHeld(slashId), heldAfterFirst, 'held bond unchanged');
+        assertEq(stableToken.balanceOf(address(slashingModule)), moduleBalAfterFirst, 'module balance unchanged');
+        assertEq(stableToken.balanceOf(resolver1), resolverBalAfterFirst, 'resolver balance unchanged');
     }
 
     function test_appealBond_RefundedOnUpheld() public {

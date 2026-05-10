@@ -289,7 +289,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     // 1 = yield deposit
     // 2 = yield withdraw/distribute
     // 3 = incentive module hook
-    // 4 = auto-transfer push (fallback to pull)
+    // 4 = reserved (legacy auto-transfer push path removed)
     event OperationFailure(
         uint8 indexed op,
         uint256 indexed workflowId,
@@ -913,7 +913,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     /// @param workflowId Unique escrow identifier
     /// @dev Consults the release strategy to determine eligibility
     /// @dev Transitions PENDING → RELEASED
-    /// @dev May transfer funds immediately (push) or create claimable balance (fallback)
+    /// @dev Creates claimable entitlement only (no automatic payout delivery)
     /// @dev Part of IEscrowCore interface for wallet adoption
     /// @dev Callable even when paused (release strategy may further restrict)
     function release(uint256 workflowId) external nonReentrant {
@@ -961,7 +961,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
             }
         }
 
-        // Release the escrow (handles push/fallback internally)
+        // Release the escrow (entitlement-only settlement)
         _releaseEscrowTransfer(workflowId);
     }
 
@@ -1133,62 +1133,24 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         }
     }
 
-    /**
-     * @notice Attempt automatic transfer with graceful fallback to claimable balance
-     * @param workflowId The escrow ID
-     * @param recipient Address to receive funds
-     * @param token Token address
-     * @param amount Amount to transfer
-     * @param principalExpected Expected principal (for validating yield claims)
-     * @return transferred True if transfer succeeded, false if fell back to claimable
-     */
-    function _attemptAutoTransfer(
+    function _creditClaimable(
         uint256 workflowId,
         address recipient,
         address token,
         uint256 amount,
         uint256 principalExpected
-    ) internal returns (bool transferred) {
-        if (amount == 0) {
-            return false;
-        }
+    ) internal {
+        if (amount == 0) return;
 
-        uint256 bal = IERC20(token).balanceOf(address(this));
-        
-        // CRITICAL: If module claims yield (amount > principal), escrow MUST have the funds
-        // Otherwise the module overreported and we must revert to prevent fund loss
+        // If module reports yield (amount > principal), escrow must hold it.
         if (amount > principalExpected) {
+            uint256 bal = IERC20(token).balanceOf(address(this));
             require(bal >= amount, "EscrowInsufficientBalance");
         }
-        
-        // If amount <= principalExpected, it's OK to fallback to claimable if transfer fails
-        bool success = bal >= amount && _tryTransfer(token, recipient, amount);
-        if (success) {
-            emit EscrowTransferAutoResult(workflowId, recipient, token, amount, true, 0);
-            return true;
-        }
-        
-        // Transfer failed - set as claimable
+
         claimableBalances[workflowId][recipient] += amount;
         totalClaimableAssets[token] += amount;
         emit ClaimableBalanceSet(workflowId, recipient, token, amount);
-        uint8 reason = bal < amount ? uint8(FailureReason.CONTRACT_INSUFFICIENT_BALANCE) : uint8(FailureReason.PUSH_FAILED_FALLBACK_TO_PULL);
-        emit EscrowTransferAutoResult(workflowId, recipient, token, amount, false, reason);
-        emit OperationFailure(4, workflowId, token, IERC20.transfer.selector, reason);
-        return false;
-    }
-
-    function _tryTransfer(address token, address to, uint256 amount) internal returns (bool success) {
-        bytes memory data;
-        (success, data) = token.call(abi.encodeWithSelector(IERC20.transfer.selector, to, amount));
-        // If the call succeeded but returned data, decode it as bool.
-        // Tokens that return no data (bare transfer) are treated as success.
-        // Tokens that return a non-zero 32-byte value are treated as success.
-        // This avoids the lowest-byte masking bug where tokens returning a non-bool
-        // non-zero value with a zero lowest byte would be misread as failure.
-        if (success && data.length > 0) {
-            success = abi.decode(data, (bool));
-        }
     }
 
 
@@ -1225,8 +1187,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
                 // Both unwind paths failed — tokens are stuck in yield module.
                 // Complete the release lifecycle using principal so the escrow is not
                 // permanently frozen; admin must recover tokens from the yield module.
-                // The auto-transfer will fall back to claimable since the vault balance
-                // no longer covers this principal (tokens are in the module).
+                // Settlement remains claimable-only; admin must recover assets separately.
                 emit YieldUnwindFailed(workflowId, token, yieldPrincipal);
                 return (yieldPrincipal, 0);
             }
@@ -1256,8 +1217,8 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         // This makes losses visible in accounting for operators to detect and track
         _updateEscrowBalance(token, amount, false);
         
-        // Auto-transfer: Attempt automatic transfer, fallback to claimable if fails
-        _attemptAutoTransfer(workflowId, from, token, actualAmount, amount);
+        // Pull-only settlement: create entitlement, do not push transfer
+        _creditClaimable(workflowId, from, token, actualAmount, amount);
         _emitEscrowTransferCancelled(workflowId, token, from, amount);
     }
 
@@ -1341,10 +1302,9 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         // But only transfer out 890e18
         // The 100e18 difference appears as "unaccounted" in the balance delta
         // This makes losses visible in accounting: contractBalance - expected = loss
+        // Pull-only settlement: create entitlement, do not push transfer
         _updateEscrowBalance(token, amount, false);
-        
-        // Auto-transfer: Attempt automatic transfer, fallback to claimable if fails
-        _attemptAutoTransfer(workflowId, to, token, actualAmount, amount);
+        _creditClaimable(workflowId, to, token, actualAmount, amount);
         _emitEscrowTransferReleased(workflowId, token, to, amount);
     }
 
