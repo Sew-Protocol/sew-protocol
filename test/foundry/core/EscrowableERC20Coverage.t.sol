@@ -446,7 +446,10 @@ contract EscrowableERC20CoverageTest is Test {
             address(yieldOps), address(disputeOps), address(moduleManagement)
         );
         moduleManagement.registerEscrowContract(address(zeroFeeToken));
-        // Remove invalid module registrations
+        moduleManagement.queueModule(address(zeroFeeToken), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
+        vm.warp(block.timestamp + 8 days);
+        moduleManagement.activateModule(address(zeroFeeToken), BaseEscrow.ModuleType.RELEASE);
+
         yieldOps.registerEscrowContract(address(zeroFeeToken));
         disputeOps.registerEscrowContract(address(zeroFeeToken));
         createOps.registerEscrowContract(address(zeroFeeToken));

@@ -33,9 +33,7 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
     // Appeal bond storage: escrowContract => workflowId => round => AppealBondRecord
     mapping(address => mapping(uint256 => mapping(uint8 => AppealBondRecord))) public appealBonds;
 
-    // Pull-based ERC20 bond refunds: escrowContract => workflowId => claimant => amount
-    // ETH bond refunds use push (immediate transfer) — pull requires a separate accounting layer
-    // for native value, adding complexity with no meaningful safety benefit for ETH amounts.
+    // Pull-based bond refunds (ERC20 + ETH): escrowContract => workflowId => claimant => amount
     mapping(address => mapping(uint256 => mapping(address => uint256))) public claimableBondRefunds;
 
     // Observability metrics
@@ -83,7 +81,7 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
         address token
     );
 
-    // Emitted when an ERC20 bond refund is credited to claimableBondRefunds (pull pattern)
+    // Emitted when a bond refund is credited to claimableBondRefunds (pull pattern)
     event AppealBondRefundClaimable(
         uint256 indexed workflowId,
         uint8 round,
@@ -349,18 +347,21 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
     }
 
     /**
-     * @notice Claim a pending ERC20 bond refund (pull pattern)
-     * @dev ETH bond refunds are pushed immediately in _refundBond; this handles ERC20 only.
+     * @notice Claim a pending bond refund (pull pattern for ERC20 + ETH)
      */
     function claimBondRefund(uint256 workflowId, address escrowContract, address token) external nonReentrant {
-        require(token != address(0), 'Use ETH claim path');
         uint256 amount = claimableBondRefunds[escrowContract][workflowId][_msgSender()];
         require(amount > 0, 'Nothing to claim');
 
         delete claimableBondRefunds[escrowContract][workflowId][_msgSender()];
         totalBondRefundsClaimed += amount;
 
-        IERC20(token).safeTransfer(_msgSender(), amount);
+        if (token == address(0)) {
+            (bool success, ) = payable(_msgSender()).call{value: amount}("");
+            require(success, 'ETH refund claim failed');
+        } else {
+            IERC20(token).safeTransfer(_msgSender(), amount);
+        }
         emit BondRefundClaimed(workflowId, _msgSender(), amount, token);
     }
 
@@ -398,18 +399,10 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
         // but escalatedBy is always the user who should receive the refund.
         address refundTo = bond.escalatedBy;
 
-        if (bond.token == address(0)) {
-            // ETH: push immediately. Pull for native value requires a separate accounting
-            // layer with no meaningful safety benefit for the amounts involved here.
-            (bool success, ) = refundTo.call{value: bondAmount}('');
-            require(success, 'ETH refund failed');
-            emit AppealBondRefunded(workflowId, bondRound, bond.depositor, bondAmount, bond.token);
-        } else {
-            // ERC20: pull pattern — credit claimableBondRefunds; escalator claims via claimBondRefund().
-            // Avoids push-to-contract failure trapping the bond permanently.
-            claimableBondRefunds[escrowContract][workflowId][refundTo] += bondAmount;
-            emit AppealBondRefundClaimable(workflowId, bondRound, refundTo, bondAmount, bond.token);
-        }
+        // Pull pattern for both ETH and ERC20 bonds.
+        // Avoids push-to-contract failure trapping the bond permanently.
+        claimableBondRefunds[escrowContract][workflowId][refundTo] += bondAmount;
+        emit AppealBondRefundClaimable(workflowId, bondRound, refundTo, bondAmount, bond.token);
     }
 
     /**

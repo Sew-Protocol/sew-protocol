@@ -13,6 +13,9 @@ import '../interfaces/aave/AaveV3Interfaces.sol';
  */
 library AaveYieldLibrary {
     using SafeERC20 for IERC20;
+
+    error InvalidAddress();
+    error InvalidAmount();
     
     /**
      * @notice Supply tokens to Aave Pool
@@ -28,29 +31,19 @@ library AaveYieldLibrary {
         uint256 amount,
         address onBehalfOf
     ) external {
+        if (pool == address(0) || token == address(0) || onBehalfOf == address(0)) revert InvalidAddress();
+        if (amount == 0) revert InvalidAmount();
+
         IERC20 tokenContract = IERC20(token);
-        
-        // Get current allowance (address(this) = BaseEscrow via delegatecall)
-        uint256 currentAllowance = tokenContract.allowance(address(this), pool);
-        
-        // Approve pool (msg.sender = BaseEscrow via delegatecall)
-        if (currentAllowance != amount) {
-            // Reset to zero first if needed
-            if (currentAllowance > 0) {
-                tokenContract.safeDecreaseAllowance(pool, currentAllowance);
-            }
-            // Set new allowance
-            tokenContract.safeIncreaseAllowance(pool, amount);
-        }
+
+        // Force exact allowance for the operation.
+        SafeERC20.forceApprove(tokenContract, pool, amount);
         
         // Supply to Aave (msg.sender = BaseEscrow, pulls from BaseEscrow)
         IAavePool(pool).supply(token, amount, onBehalfOf, 0);
         
         // Reset approval to zero (safety)
-        uint256 remainingAllowance = tokenContract.allowance(address(this), pool);
-        if (remainingAllowance > 0) {
-            tokenContract.safeDecreaseAllowance(pool, remainingAllowance);
-        }
+        SafeERC20.forceApprove(tokenContract, pool, 0);
     }
     
     /**
@@ -68,6 +61,9 @@ library AaveYieldLibrary {
         uint256 amount,
         address to
     ) external returns (uint256 actualAmount) {
+        if (pool == address(0) || token == address(0) || to == address(0)) revert InvalidAddress();
+        if (amount == 0) revert InvalidAmount();
+
         // Withdraw from Aave (msg.sender = BaseEscrow, burns BaseEscrow's aTokens)
         actualAmount = IAavePool(pool).withdraw(token, amount, to);
     }

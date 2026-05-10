@@ -3,11 +3,13 @@ pragma solidity ^0.8.33;
 
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
+import '@openzeppelin/contracts/utils/math/Math.sol';
 import '../shared/interfaces/IIncentiveModule.sol';
 import '../core/BondCollector.sol';
 
 library BondHandlingLibrary {
     using SafeERC20 for IERC20;
+    using Math for uint256;
 
     struct BondProcessingResult {
         bool success;
@@ -34,7 +36,7 @@ library BondHandlingLibrary {
         result.protocolFeeAmount = 0;
 
         if (snapshottedBondFee > 0 && escrowFeeAddress != address(0)) {
-            result.protocolFeeAmount = (bondAmount * snapshottedBondFee) / 10000;
+            result.protocolFeeAmount = Math.mulDiv(bondAmount, snapshottedBondFee, 10000);
             if (result.protocolFeeAmount > 0) {
                 result.bondToRecord = bondAmount - result.protocolFeeAmount;
             }

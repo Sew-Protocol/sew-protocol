@@ -153,10 +153,11 @@ contract ReleaseEscrowEdgeCasesTest is Test {
         uint256 totalHeldAfter = vault.totalHeldInEscrowPerToken(address(token));
         assertEq(totalHeldBefore - totalHeldAfter, principal, "Balance should decrement by principal");
 
-        // Verify: Transfer was for actualAmount (principal + yield)
+        // Pull-only settlement: recipient is credited claimable, not paid during release.
         uint256 recipientBalance = token.balanceOf(recipient);
-        // Recipient should receive actualAmount (>= principal)
-        assertGe(recipientBalance, principal, "Recipient should receive at least principal");
+        assertEq(recipientBalance, 0, "Recipient should not be paid during settlement");
+        uint256 claimableAfterRelease = vault.claimableBalances(wid, recipient);
+        assertGe(claimableAfterRelease, principal, "Recipient should receive at least principal as claimable");
     }
 
     // ============ Test 2: Accounting Correctness with Multiple Escrows ============
@@ -252,13 +253,12 @@ contract ReleaseEscrowEdgeCasesTest is Test {
         vm.prank(sender);
         vault.release(wid);
 
-        // Verify: Transfer should succeed for the partial amount recovered
-        // because the Push Model ensures tokens arrive at the vault before transfer
+        // Pull-only settlement: partial recovery should be claimable, not direct-transfered.
         uint256 recipientBalance = token.balanceOf(recipient);
-        assertEq(recipientBalance, partialAmount, "Recipient should receive the partial amount");
-        
+        assertEq(recipientBalance, 0, "Recipient should not be paid during settlement");
+
         uint256 claimable = vault.claimableBalances(wid, recipient);
-        assertEq(claimable, 0, "Claimable should be zero as transfer succeeded");
+        assertEq(claimable, partialAmount, "Claimable should equal the recovered partial amount");
     }
 
     // ============ Test 4: Insufficient Balance After Yield Distribution ============
@@ -337,9 +337,11 @@ contract ReleaseEscrowEdgeCasesTest is Test {
         uint256 totalHeldAfter = vault.totalHeldInEscrowPerToken(address(token));
         assertEq(totalHeldBefore - totalHeldAfter, principal, "Balance should decrement by principal");
 
-        // Verify recipient received principal
+        // Pull-only settlement: recipient should have claimable principal, not direct transfer.
         uint256 recipientBalance = token.balanceOf(recipient);
-        assertGe(recipientBalance, principal, "Recipient should receive at least principal");
+        assertEq(recipientBalance, 0, "Recipient should not be paid during settlement");
+        uint256 claimableAfterRelease = vault.claimableBalances(wid, recipient);
+        assertGe(claimableAfterRelease, principal, "Recipient should receive at least principal as claimable");
     }
 
     // ============ Test 6: YieldOps Call Failure ============

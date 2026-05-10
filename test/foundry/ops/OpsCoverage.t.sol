@@ -1108,8 +1108,8 @@ contract OpsCoverageTest is Test {
         );
 
         assertTrue(result.success);
-        // distributeWithdrawnYield returns the input yieldAmount if it reaches the return statement
-        assertEq(result.distributedAmount, earned);
+        // Partial distribution module reports the partial amount
+        assertEq(result.distributedAmount, 50);
     }
 
     function test_YieldOps_distributeWithdrawnYield_NoDistModule() public {

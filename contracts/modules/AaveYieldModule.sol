@@ -6,6 +6,7 @@ import '../interfaces/aave/AaveV3Interfaces.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/access/Ownable2Step.sol';
+import '@openzeppelin/contracts/utils/math/Math.sol';
 
 /**
  * @title AaveYieldModule
@@ -26,6 +27,7 @@ import '@openzeppelin/contracts/access/Ownable2Step.sol';
  */
 contract AaveYieldModule is IYieldModule, Ownable2Step {
     using SafeERC20 for IERC20;
+    using Math for uint256;
 
     // ============ Types ============
 
@@ -55,11 +57,16 @@ contract AaveYieldModule is IYieldModule, Ownable2Step {
     // Must be set by owner before tokens can be deposited
     mapping(address token => address aToken) public tokenToAToken;
 
+    // Per-token minimum accepted deposit amount (in underlying token decimals).
+    // If unset (0), defaults to 1 unit to avoid accidental zero-value/noise positions.
+    mapping(address token => uint256 minDepositByToken) public minDepositByToken;
+
     // ============ Events ============
 
     event EscrowApproved(address indexed escrow);
     event EscrowRevoked(address indexed escrow);
     event TokenConfigured(address indexed token, address indexed aToken);
+    event MinDepositConfigured(address indexed token, uint256 minDeposit);
 
     // ============ Errors ============
 
@@ -111,6 +118,15 @@ contract AaveYieldModule is IYieldModule, Ownable2Step {
         emit TokenConfigured(token, aToken);
     }
 
+    /**
+     * @notice Configure per-token minimum accepted deposit amount.
+     */
+    function configureMinDeposit(address token, uint256 minDeposit) external onlyOwner {
+        require(token != address(0), "InvalidAddress");
+        minDepositByToken[token] = minDeposit;
+        emit MinDepositConfigured(token, minDeposit);
+    }
+
     // ============ Core Yield Operations ============
 
     /**
@@ -142,6 +158,9 @@ contract AaveYieldModule is IYieldModule, Ownable2Step {
         // We can only deposit what we have
         uint256 available = balBefore;
         require(available > 0, "InsufficientBalance");
+        uint256 minDeposit = minDepositByToken[token];
+        if (minDeposit == 0) minDeposit = 1;
+        require(available >= minDeposit, "BelowMinDeposit");
 
         // Snapshot aToken balance before deposit to calculate our exact share
         uint256 aTokenBefore = IERC20(aToken).balanceOf(address(this));
@@ -205,7 +224,8 @@ contract AaveYieldModule is IYieldModule, Ownable2Step {
         // We retrieve currentIndex from the pool to compute the correct withdrawal amount,
         // which correctly includes any yield that has accrued since deposit.
         uint256 currentIndex = aavePool.getReserveNormalizedIncome(token);
-        uint256 positionCurrentValue = (pos.aTokenShares * currentIndex) / 1e27;
+        require(currentIndex > 0, "InvalidIncomeIndex");
+        uint256 positionCurrentValue = Math.mulDiv(pos.aTokenShares, currentIndex, 1e27);
         uint256 sharesToWithdraw = positionCurrentValue <= currentATokenBalance
             ? positionCurrentValue
             : currentATokenBalance;
@@ -253,7 +273,8 @@ contract AaveYieldModule is IYieldModule, Ownable2Step {
         uint256 currentATokenBalance = IERC20(aToken).balanceOf(address(this));
 
         uint256 currentIndex = aavePool.getReserveNormalizedIncome(token);
-        uint256 positionCurrentValue = (pos.aTokenShares * currentIndex) / 1e27;
+        require(currentIndex > 0, "InvalidIncomeIndex");
+        uint256 positionCurrentValue = Math.mulDiv(pos.aTokenShares, currentIndex, 1e27);
         uint256 sharesToWithdraw = positionCurrentValue <= currentATokenBalance
             ? positionCurrentValue
             : currentATokenBalance;

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
+import '@openzeppelin/contracts/utils/math/Math.sol';
+
 /**
  * @title BondValuationLibrary
  * @notice Library for calculating effective bond values with haircuts and mix enforcement
@@ -20,6 +22,7 @@ pragma solidity ^0.8.33;
  *   sew% = 100/900 = 11.1% ✓ (<= 20%)
  */
 library BondValuationLibrary {
+    using Math for uint256;
     // Precision constants
     uint256 public constant PRECISION = 1e18;
     uint256 public constant BASIS_POINTS = 10000;
@@ -54,6 +57,8 @@ library BondValuationLibrary {
         uint8 sewDecimals
     ) internal pure returns (uint256 effectiveUSD) {
         require(haircutBps <= BASIS_POINTS, 'Haircut > 100%');
+        require(sewPriceUSD > 0 || sewAmount == 0, 'SEW price = 0');
+        require(stableDecimals <= 36 && sewDecimals <= 36, 'Decimals too high');
 
         // Normalize stable to 18 decimals (assume 1:1 USD peg)
         uint256 stableUSD = _normalizeDecimals(stableAmount, stableDecimals, 18);
@@ -62,8 +67,11 @@ library BondValuationLibrary {
         // sewUSD = sewAmount × sewPrice × (1 - haircut)
         uint256 sewNormalized = _normalizeDecimals(sewAmount, sewDecimals, 18);
         uint256 haircutMultiplier = BASIS_POINTS - haircutBps; // e.g., 10000 - 5000 = 5000 (50%)
-        uint256 sewUSD = (sewNormalized * sewPriceUSD * haircutMultiplier) /
-            (PRECISION * BASIS_POINTS);
+        uint256 sewUSD = Math.mulDiv(
+            Math.mulDiv(sewNormalized, sewPriceUSD, PRECISION),
+            haircutMultiplier,
+            BASIS_POINTS
+        );
 
         effectiveUSD = stableUSD + sewUSD;
     }
@@ -107,7 +115,7 @@ library BondValuationLibrary {
 
         // Calculate percentages in basis points
         uint256 stableUSD = _normalizeDecimals(stableAmount, stableDecimals, 18);
-        stablePct = (stableUSD * BASIS_POINTS) / effectiveUSD;
+        stablePct = Math.mulDiv(stableUSD, BASIS_POINTS, effectiveUSD);
         sewPct = BASIS_POINTS - stablePct; // Remainder is SEW
 
         // Check enforcement rules
@@ -139,7 +147,7 @@ library BondValuationLibrary {
         // If stable is 80%, total bond = stable / 0.8
         // SEW can be 20% of total = (stable / 0.8) × 0.2 = stable / 4
         uint256 stableUSD = _normalizeDecimals(stableAmount, stableDecimals, 18);
-        uint256 maxSewUSD = (stableUSD * MAX_SEW_BPS) / MIN_STABLE_BPS;
+        uint256 maxSewUSD = Math.mulDiv(stableUSD, MAX_SEW_BPS, MIN_STABLE_BPS);
 
         // Convert SEW USD value to SEW tokens (accounting for haircut)
         // sewUSD = sewAmount × sewPrice × (1 - haircut)
@@ -149,8 +157,11 @@ library BondValuationLibrary {
             return 0; // 100% haircut means no SEW allowed
         }
 
-        uint256 sewAmountNormalized = (maxSewUSD * PRECISION * BASIS_POINTS) /
-            (sewPriceUSD * haircutMultiplier);
+        uint256 sewAmountNormalized = Math.mulDiv(
+            Math.mulDiv(maxSewUSD, PRECISION, sewPriceUSD),
+            BASIS_POINTS,
+            haircutMultiplier
+        );
         maxSewAmount = _normalizeDecimals(sewAmountNormalized, 18, sewDecimals);
     }
 
@@ -178,11 +189,14 @@ library BondValuationLibrary {
         // Calculate SEW USD value (with haircut)
         uint256 sewNormalized = _normalizeDecimals(sewAmount, sewDecimals, 18);
         uint256 haircutMultiplier = BASIS_POINTS - haircutBps;
-        uint256 sewUSD = (sewNormalized * sewPriceUSD * haircutMultiplier) /
-            (PRECISION * BASIS_POINTS);
+        uint256 sewUSD = Math.mulDiv(
+            Math.mulDiv(sewNormalized, sewPriceUSD, PRECISION),
+            haircutMultiplier,
+            BASIS_POINTS
+        );
 
         // If SEW is 20%, stable must be 80% = SEW × 4
-        uint256 minStableUSD = (sewUSD * MIN_STABLE_BPS) / MAX_SEW_BPS;
+        uint256 minStableUSD = Math.mulDiv(sewUSD, MIN_STABLE_BPS, MAX_SEW_BPS);
 
         // Custom normalization with ceiling for minStable calculation
         if (18 == stableDecimals) {
@@ -218,7 +232,7 @@ library BondValuationLibrary {
     ) internal pure returns (bool sufficient, uint256 availableCoverage, uint256 shortfall) {
         require(utilizationBps <= BASIS_POINTS, 'Utilization > 100%');
 
-        availableCoverage = (effectiveBondUSD * utilizationBps) / BASIS_POINTS;
+        availableCoverage = Math.mulDiv(effectiveBondUSD, utilizationBps, BASIS_POINTS);
 
         if (availableCoverage >= reservedCoverageUSD) {
             sufficient = true;
@@ -240,7 +254,7 @@ library BondValuationLibrary {
         uint256 utilizationBps
     ) internal pure returns (uint256 maxCoverage) {
         require(utilizationBps <= BASIS_POINTS, 'Utilization > 100%');
-        maxCoverage = (effectiveBondUSD * utilizationBps) / BASIS_POINTS;
+        maxCoverage = Math.mulDiv(effectiveBondUSD, utilizationBps, BASIS_POINTS);
     }
 
     /**

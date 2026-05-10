@@ -203,8 +203,9 @@ contract ReleaseFlexibilityTest is Test {
         vm.stopPrank();
 
         assertEq(uint256(escrowVault.getEscrowState(workflowId)), uint256(EscrowState.RELEASED));
-        assertEq(mockToken.balanceOf(address(escrowVault)), 0);
-        assertEq(mockToken.balanceOf(recipient), 100 ether);
+        assertEq(mockToken.balanceOf(address(escrowVault)), 100 ether);
+        assertEq(mockToken.balanceOf(recipient), 0);
+        assertEq(escrowVault.claimableBalances(workflowId, recipient), 100 ether);
     }
 
     function test_release_noReleaseAddress_onlySender() public {
@@ -231,7 +232,8 @@ contract ReleaseFlexibilityTest is Test {
         vm.prank(sender);
         escrowVault.release(workflowId);
         assertEq(uint256(escrowVault.getEscrowState(workflowId)), uint256(EscrowState.RELEASED));
-        assertEq(mockToken.balanceOf(recipient), 100 ether);
+        assertEq(mockToken.balanceOf(recipient), 0);
+        assertEq(escrowVault.claimableBalances(workflowId, recipient), 100 ether);
     }
 
     function test_validateRecipient_revertsIfRecipientIsReleaseAddress() public {

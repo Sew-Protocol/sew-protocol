@@ -2,6 +2,7 @@
 pragma solidity ^0.8.33;
 
 import '@openzeppelin/contracts/access/AccessControl.sol';
+import '@openzeppelin/contracts/utils/math/Math.sol';
 import '../shared/interfaces/IResolutionModule.sol';
 import '../types/EscrowTypes.sol';
 
@@ -22,6 +23,7 @@ import '../types/EscrowTypes.sol';
  *      BaseEscrow applies: Updates state and collects fees
  */
 contract DisputeOps is AccessControl {
+    using Math for uint256;
     // ============ Role Constants ============
     bytes32 public constant ROLE_ESCROW_CONTRACT = keccak256('ROLE_ESCROW_CONTRACT');
     bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');
@@ -255,7 +257,7 @@ contract DisputeOps is AccessControl {
             result.incentiveModule = incentiveModule;
             
             if (bondFeeBps > 0 && feeRecipient != address(0)) {
-                result.protocolFeeAmount = (result.bondAmount * bondFeeBps) / 10000;
+                result.protocolFeeAmount = Math.mulDiv(result.bondAmount, bondFeeBps, 10000);
                 result.bondToRecord = result.bondAmount - result.protocolFeeAmount;
             } else {
                 result.bondToRecord = result.bondAmount;

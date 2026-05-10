@@ -141,6 +141,8 @@ contract TraceEquivalenceTest is Test {
         vault.setCreateOps(address(createOps));
         vault.setSettlementOps(address(settlementOps));
         vault.setBondCollector(address(bondCollector));
+        // Keep trace executor authorized for timed actions in fixture replays
+        vault.grantRole(vault.ROLE_TIMELOCK(), EXECUTOR);
         // setResolutionModule requires ROLE_ADMIN_CONTRACT
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), owner);
         vault.setResolutionModule(address(drModule));
@@ -347,6 +349,11 @@ contract TraceEquivalenceTest is Test {
         if (isV2 && stdJson.keyExists(raw, ".expected_semantics")) {
             _assertSemantics(raw);
         }
+    }
+
+    /// @dev External wrapper so negative tests can assert semantic-failure via try/catch.
+    function replayTraceExternal(string calldata fixturePath) external {
+        _replayTrace(fixturePath);
     }
 
     // ====================================================================
@@ -941,42 +948,56 @@ contract TraceEquivalenceTest is Test {
     function test_negative_n01_wrong_outcome() public {
         // N01: Expected outcome="refund" but actual is "release"
         // Should fail when _assertResolutionSemantics checks outcome
-        _replayTrace("test/foundry/traces/v2/negative/n01.json");
+        try this.replayTraceExternal("test/foundry/traces/v2/negative/n01.json") {
+            fail("expected semantic mismatch");
+        } catch {}
     }
 
     function test_negative_n02_unauthorized_resolver() public {
         // N02: Expected authorized_resolver=false but actual is true
         // Should fail when _assertResolutionSemantics checks authorization
-        _replayTrace("test/foundry/traces/v2/negative/n02.json");
+        try this.replayTraceExternal("test/foundry/traces/v2/negative/n02.json") {
+            fail("expected semantic mismatch");
+        } catch {}
     }
 
     function test_negative_n03_settlement_not_executed() public {
         // N03: Expected settlement_executed=false but actual is true
         // Should fail when _assertResolutionSemantics checks settlement execution
-        _replayTrace("test/foundry/traces/v2/negative/n03.json");
+        try this.replayTraceExternal("test/foundry/traces/v2/negative/n03.json") {
+            fail("expected semantic mismatch");
+        } catch {}
     }
 
     function test_negative_n04_wrong_escalation_level() public {
         // N04: Expected escalation.level=1 but actual is 0
         // Should fail when _assertEscalationSemantics checks level
-        _replayTrace("test/foundry/traces/v2/negative/n04.json");
+        try this.replayTraceExternal("test/foundry/traces/v2/negative/n04.json") {
+            fail("expected semantic mismatch");
+        } catch {}
     }
 
     function test_negative_n05_wrong_dispute_initiator() public {
         // N05: Expected dispute_initiator="seller" but actual is "buyer"
         // Should fail when _assertParticipationSemantics checks initiator
-        _replayTrace("test/foundry/traces/v2/negative/n05.json");
+        try this.replayTraceExternal("test/foundry/traces/v2/negative/n05.json") {
+            fail("expected semantic mismatch");
+        } catch {}
     }
 
     function test_negative_n06_auto_cancel_triggered() public {
         // N06: Expected auto_cancel_triggered=true but actual is false
         // Should fail when _assertTimingSemantics checks auto-cancel
-        _replayTrace("test/foundry/traces/v2/negative/n06.json");
+        try this.replayTraceExternal("test/foundry/traces/v2/negative/n06.json") {
+            fail("expected semantic mismatch");
+        } catch {}
     }
 
     function test_negative_n07_wrong_resolution_actor() public {
         // N07: Expected resolution_actor="buyer" but actual is "resolver"
         // Should fail when _assertParticipationSemantics checks resolution actor
-        _replayTrace("test/foundry/traces/v2/negative/n07.json");
+        try this.replayTraceExternal("test/foundry/traces/v2/negative/n07.json") {
+            fail("expected semantic mismatch");
+        } catch {}
     }
 }

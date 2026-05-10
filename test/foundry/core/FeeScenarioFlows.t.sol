@@ -211,8 +211,10 @@ contract FeeScenarioFlowsTest is Test {
         // after release
         assertEq(vault.totalHeldInEscrowPerToken(address(token)), 0, "held should be zero after release");
         assertEq(vault.totalFeesPerToken(address(token)), expectedFee, "fees should remain until withdrawn");
-        assertEq(token.balanceOf(seller), expectedAmountAfterFee, "seller receives amountAfterFee");
-        assertEq(token.balanceOf(address(vault)), expectedFee, "vault retains only fees post-release");
+        assertEq(token.balanceOf(seller), 0, "seller must not be paid during settlement");
+        assertEq(vault.claimableBalances(workflowId, seller), expectedAmountAfterFee, "seller should receive claimable amountAfterFee");
+        // Pull-only settlement retains principal as claimable in-vault until recipient withdraws.
+        assertEq(token.balanceOf(address(vault)), amount, "vault retains principal+fees until recipient withdraw");
 
         // DAO withdraws fees to treasury
         uint256 treasuryBal0 = token.balanceOf(treasury);
@@ -224,7 +226,7 @@ contract FeeScenarioFlowsTest is Test {
 
         // after withdraw
         assertEq(vault.totalFeesPerToken(address(token)), 0, "fees should be zero after withdrawal");
-        assertEq(token.balanceOf(address(vault)), 0, "vault should have no remaining tokens after fee withdrawal");
+        assertEq(token.balanceOf(address(vault)), expectedAmountAfterFee, "vault retains recipient claimable principal after fee withdrawal");
         assertEq(token.balanceOf(treasury) - treasuryBal0, expectedFee, "treasury receives withdrawn fees");
     }
 
@@ -251,16 +253,15 @@ contract FeeScenarioFlowsTest is Test {
         vm.prank(seller);
         vault.recipientCancel(workflowId);
 
-        uint256 buyerBal0 = token.balanceOf(buyer);
         vm.prank(buyer);
         vault.senderCancel(workflowId);
-        uint256 buyerDelta = token.balanceOf(buyer) - buyerBal0;
-        assertEq(buyerDelta, expectedAmountAfterFee, "buyer refunded amountAfterFee");
+        assertEq(vault.claimableBalances(workflowId, buyer), expectedAmountAfterFee, "buyer should receive claimable refund amountAfterFee");
 
         // after refund
         assertEq(vault.totalHeldInEscrowPerToken(address(token)), 0, "held should be zero after refund");
         assertEq(vault.totalFeesPerToken(address(token)), expectedFee, "fees should remain until withdrawn");
-        assertEq(token.balanceOf(address(vault)), expectedFee, "vault retains only fees post-refund");
+        // Pull-only settlement retains refundable principal in-vault until buyer withdraws.
+        assertEq(token.balanceOf(address(vault)), amount, "vault retains principal+fees until buyer withdraw");
 
         // DAO withdraws fees to treasury
         uint256 treasuryBal0 = token.balanceOf(treasury);
