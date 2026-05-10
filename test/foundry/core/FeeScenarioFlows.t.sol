@@ -4,6 +4,7 @@ pragma solidity ^0.8.33;
 import "forge-std/Test.sol";
 
 import "../../../contracts/core/EscrowVault.sol";
+import "../../../contracts/modules/DefaultReleaseStrategy.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
 import "../../../contracts/core/modules/DefaultResolutionModule.sol";
 import "../../../contracts/types/EscrowTypes.sol";
@@ -85,6 +86,7 @@ contract MockIncentiveModule is IIncentiveModule {
  */
 contract FeeScenarioFlowsTest is Test {
     EscrowVault public vault;
+    DefaultReleaseStrategy public releaseStrategy;
     ERC20Mock public token;
     DefaultResolutionModule public resolutionModule;
     YieldOps public yieldOps;
@@ -119,6 +121,7 @@ contract FeeScenarioFlowsTest is Test {
 
         // Core components
         resolutionModule = new DefaultResolutionModule(owner, resolver);
+        releaseStrategy = new DefaultReleaseStrategy();
         token = new ERC20Mock("Token", "TKN", owner, 10000000e18);
         yieldOps = new YieldOps(owner);
         disputeOps = new DisputeOps(owner);
@@ -131,6 +134,9 @@ contract FeeScenarioFlowsTest is Test {
         // Vault starts with 0% fee; we'll slow-lane set to 1% in tests.
         vault = new EscrowVault(INITIAL_ESCROW_FEE_BPS, treasury, address(yieldOps), address(disputeOps), address(moduleManagement));
         moduleManagement.registerEscrowContract(address(vault));
+        moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
+        vm.warp(block.timestamp + 8 days);
+        moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
 
         // Register vault on ops contracts
         yieldOps.registerEscrowContract(address(vault));

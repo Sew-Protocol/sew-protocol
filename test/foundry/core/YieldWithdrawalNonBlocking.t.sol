@@ -3,7 +3,8 @@ pragma solidity ^0.8.33;
 
 import "forge-std/Test.sol";
 
-import "contracts/core/EscrowVault.sol";
+import "../../../contracts/core/EscrowVault.sol";
+import "../../../contracts/modules/DefaultReleaseStrategy.sol";
 import "contracts/core/ModuleSnapshotRegistry.sol";
 import "contracts/admin/EscrowGovernanceTimelock.sol";
 import "contracts/core/modules/DefaultResolutionModule.sol";
@@ -72,6 +73,8 @@ contract YieldWithdrawalNonBlockingTest is Test {
         badYieldOps = new BadYieldOps();
         vault = new EscrowVault(ESCROW_FEE, feeAddress, address(badYieldOps), address(disputeOps), address(moduleManagement));
         moduleManagement.registerEscrowContract(address(vault));
+        moduleManagement.queueModule(address(escrow), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
+        moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
 
         // Register escrow contract with ops contracts
         disputeOps.registerEscrowContract(address(vault));

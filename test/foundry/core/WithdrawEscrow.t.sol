@@ -14,6 +14,7 @@ import 'contracts/ops/SettlementOps.sol';
 import 'contracts/ops/CreateOps.sol';
 import 'contracts/core/BondCollector.sol';
 import 'contracts/core/ModuleSnapshotRegistry.sol';
+import 'contracts/modules/DefaultReleaseStrategy.sol';
 import 'contracts/admin/EscrowGovernanceTimelock.sol';
 import 'contracts/libraries/SettingsValidationLibrary.sol';
 
@@ -21,6 +22,7 @@ contract WithdrawEscrowTest is Test {
     EscrowVault vault;
     ERC20Mock token;
     DefaultResolutionModule rm;
+    DefaultReleaseStrategy releaseStrategy;
     YieldOps yieldOps;
     DisputeOps disputeOps;
     SettlementOps settlementOps;
@@ -45,8 +47,13 @@ contract WithdrawEscrowTest is Test {
         bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));
+        releaseStrategy = new DefaultReleaseStrategy();
         vault = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
         moduleManagement.registerEscrowContract(address(vault));
+        moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
+        vm.warp(block.timestamp + 8 days);
+        moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
+
 
         // Register escrow contract with all ops contracts
         yieldOps.registerEscrowContract(address(vault));

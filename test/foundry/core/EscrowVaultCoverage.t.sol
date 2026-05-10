@@ -13,6 +13,7 @@ import '../../../contracts/ops/SettlementOps.sol';
 import '../../../contracts/ops/CreateOps.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
+import '../../../contracts/modules/DefaultReleaseStrategy.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
 
 /**
@@ -31,6 +32,7 @@ contract EscrowVaultCoverageTest is Test {
     CreateOps public createOps;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
+    DefaultReleaseStrategy public releaseStrategy;
 
     address public feeAddress = address(0xFEE);
     address public resolver   = address(0x1234);
@@ -74,10 +76,15 @@ contract EscrowVaultCoverageTest is Test {
         bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         resolutionModule = new DefaultResolutionModule(address(this), resolver);
+        releaseStrategy = new DefaultReleaseStrategy();
 
         vault = new EscrowVault(FEE_BPS, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
 
         moduleManagement.registerEscrowContract(address(vault));
+        moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
+        vm.warp(block.timestamp + 8 days);
+        moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
+
         yieldOps.registerEscrowContract(address(vault));
         disputeOps.registerEscrowContract(address(vault));
         settlementOps.registerEscrowContract(address(vault));

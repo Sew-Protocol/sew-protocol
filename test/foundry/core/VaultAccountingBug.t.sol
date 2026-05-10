@@ -3,6 +3,7 @@ pragma solidity ^0.8.33;
 
 import "forge-std/Test.sol";
 import "../../../contracts/core/EscrowVault.sol";
+import "../../../contracts/modules/DefaultReleaseStrategy.sol";
 import '../../../contracts/core/EscrowVaultAnalytics.sol';
 import "../../../contracts/core/modules/DefaultResolutionModule.sol";
 import "../../../contracts/types/EscrowTypes.sol";
@@ -33,6 +34,7 @@ contract RevertingERC20 is ERC20Mock {
 
 contract VaultAccountingBugTest is Test {
     EscrowVault public escrow;
+    DefaultReleaseStrategy public releaseStrategy;
     RevertingERC20 public token;
     DefaultResolutionModule public resolutionModule;
     YieldOps public yieldOps;
@@ -58,12 +60,16 @@ contract VaultAccountingBugTest is Test {
         settlementOps = new SettlementOps(owner);
         bondCollector = new BondCollector(owner);
         resolutionModule = new DefaultResolutionModule(owner, resolver);
+        releaseStrategy = new DefaultReleaseStrategy();
 
         escrow = new EscrowVault(0, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
         
         yieldOps.registerEscrowContract(address(escrow));
         disputeOps.registerEscrowContract(address(escrow));
         moduleManagement.registerEscrowContract(address(escrow));
+        moduleManagement.queueModule(address(escrow), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
+        vm.warp(block.timestamp + 8 days);
+        moduleManagement.activateModule(address(escrow), BaseEscrow.ModuleType.RELEASE);
         createOps.registerEscrowContract(address(escrow));
         settlementOps.registerEscrowContract(address(escrow));
         bondCollector.registerEscrowContract(address(escrow));
