@@ -77,6 +77,16 @@ interface ISlashingModule {
         uint256 toSlashProposer; // Reward for slash proposer (fraud cases)
     }
 
+    // ============ Custom Errors ============
+
+    /**
+     * @notice Reverts when governance tries to resolve an appeal on an already-executed slash.
+     * @dev Executed slashes have already distributed funds to the insurance pool and burned SEW.
+     *      Reversal would require minting, which is out of scope for this module.
+     *      Only PENDING slashes are reversible via resolveAppeal.
+     */
+    error CannotReverseExecutedSlash(uint256 slashId);
+
     // ============ Events ============
 
     event SlashProposed(
@@ -123,6 +133,13 @@ interface ISlashingModule {
     event InsurancePoolFunded(uint256 amount, uint256 newBalance);
     event InsurancePoolPayout(address indexed to, uint256 amount, uint256 indexed workflowId);
 
+    /**
+     * @notice Check if a resolver has a pending slash proposal
+     * @param resolver Address of the resolver
+     * @return hasPending True if a pending slash proposal exists
+     */
+    function hasPendingSlash(address resolver) external view returns (bool hasPending);
+
     // ============ Core Slashing Functions ============
 
     /**
@@ -143,13 +160,18 @@ interface ISlashingModule {
     ) external returns (uint256 slashId);
 
     /**
-     * @notice Execute a slash after appeal period
+     * @notice Execute a slash after the appeal/contest window has closed.
+     * @dev Callable by ROLE_TIMELOCK (for manual/fraud slashes) and ROLE_RESOLUTION_MODULE
+     *      (for automated timeout slashes whose contest window has expired without a contest).
      * @param slashId Slash ID to execute
      */
     function executeSlash(uint256 slashId) external;
 
     /**
-     * @notice Appeal a slash
+     * @notice Appeal a PENDING slash by posting an appeal bond.
+     * @dev If slashConfig.appealBond > 0, transfers that amount from the caller before
+     *      recording the appeal. The bond is refunded if the appeal is upheld, or
+     *      forfeited to the insurance pool if rejected.
      * @param slashId Slash ID to appeal
      * @param reason Appeal reason
      * @param evidence Counter-evidence
@@ -158,6 +180,10 @@ interface ISlashingModule {
 
     /**
      * @notice Resolve a slash appeal (governance/senior resolver)
+     * @dev Reverts with CannotReverseExecutedSlash if the slash is already executed.
+     *      If upheld (appeal succeeds): sets status REVERSED and refunds the appeal bond.
+     *      If not upheld (appeal fails): slash remains PENDING for execution and bond is
+     *      forfeited to the insurance pool.
      * @param slashId Slash ID
      * @param upheld Whether to uphold the appeal (true = reverse slash)
      */

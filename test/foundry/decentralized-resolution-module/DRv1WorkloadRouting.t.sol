@@ -3,6 +3,7 @@ pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol';
+import '../../../contracts/modules/decentralized-resolution-module/DRMAdminFacet.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
 import '@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol';
 
@@ -45,24 +46,9 @@ contract DRv1WorkloadRoutingTest is Test {
         seniorResolver1 = makeAddr('seniorResolver1');
         escrowContract = makeAddr('escrowContract');
 
-        // Deploy implementation
-        DecentralizedResolutionModule implementation = new DecentralizedResolutionModule(owner);
-
-        // Deploy proxy and initialize
-        ERC1967Proxy proxy = new ERC1967Proxy(
-            address(implementation),
-            '' // No initialize call as constructor handles init
-        );
-        module = DecentralizedResolutionModule(address(proxy));
-
-        // When using proxy, the proxy address needs admin role, not the implementation
-        // The implementation constructor grants DEFAULT_ADMIN_ROLE to owner, but proxy doesn't inherit this
-        // We need to grant DEFAULT_ADMIN_ROLE to owner on the proxy first
-        // Since we can't do that directly, we'll use the owner address that was passed to the implementation constructor
-        // Actually, the proxy doesn't have any admin role set. We need to set it up differently.
-        // Let's deploy without proxy for testing, or grant roles through a different mechanism.
-        // For now, let's just deploy directly without proxy since we're testing functionality, not upgradeability
         module = new DecentralizedResolutionModule(owner);
+        DRMAdminFacet drmAdminFacet_ = new DRMAdminFacet();
+        module.setAdminFacet(address(drmAdminFacet_));
 
         // Setup roles - owner has DEFAULT_ADMIN_ROLE from constructor
         vm.startPrank(owner);

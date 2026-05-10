@@ -33,9 +33,15 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
     // Appeal bond storage: escrowContract => workflowId => round => AppealBondRecord
     mapping(address => mapping(uint256 => mapping(uint8 => AppealBondRecord))) public appealBonds;
 
+    // Pull-based ERC20 bond refunds: escrowContract => workflowId => claimant => amount
+    // ETH bond refunds use push (immediate transfer) — pull requires a separate accounting layer
+    // for native value, adding complexity with no meaningful safety benefit for ETH amounts.
+    mapping(address => mapping(uint256 => mapping(address => uint256))) public claimableBondRefunds;
+
     // Observability metrics
     uint256 public totalBondsPosted;
     uint256 public totalBondsRefunded;
+    uint256 public totalBondRefundsClaimed;
     uint256 public totalBondsPaidToResolvers;
     uint256 public totalBondsForfeited;
 
@@ -73,6 +79,22 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
         uint256 indexed workflowId,
         uint8 round,
         address indexed depositor,
+        uint256 amount,
+        address token
+    );
+
+    // Emitted when an ERC20 bond refund is credited to claimableBondRefunds (pull pattern)
+    event AppealBondRefundClaimable(
+        uint256 indexed workflowId,
+        uint8 round,
+        address indexed claimant,
+        uint256 amount,
+        address token
+    );
+
+    event BondRefundClaimed(
+        uint256 indexed workflowId,
+        address indexed claimant,
         uint256 amount,
         address token
     );
@@ -281,6 +303,11 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
 
     /**
      * @notice Get observability metrics for V2 (bonds)
+     * @return posted Total bond value posted
+     * @return refunded Total bond value credited to claimableBondRefunds or pushed (ETH)
+     * @return refundsClaimed Total ERC20 bond refund value claimed via claimBondRefund
+     * @return paidToResolvers Total bond value paid to resolvers
+     * @return forfeited Total bond value forfeited to protocol (no eligible resolvers)
      */
     function getV2Metrics()
         external
@@ -288,6 +315,7 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
         returns (
             uint256 posted,
             uint256 refunded,
+            uint256 refundsClaimed,
             uint256 paidToResolvers,
             uint256 forfeited
         )
@@ -295,6 +323,7 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
         return (
             totalBondsPosted,
             totalBondsRefunded,
+            totalBondRefundsClaimed,
             totalBondsPaidToResolvers,
             totalBondsForfeited
         );
@@ -317,6 +346,22 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
             escalationDepthHistogram[1],
             escalationDepthHistogram[2]
         );
+    }
+
+    /**
+     * @notice Claim a pending ERC20 bond refund (pull pattern)
+     * @dev ETH bond refunds are pushed immediately in _refundBond; this handles ERC20 only.
+     */
+    function claimBondRefund(uint256 workflowId, address escrowContract, address token) external nonReentrant {
+        require(token != address(0), 'Use ETH claim path');
+        uint256 amount = claimableBondRefunds[escrowContract][workflowId][_msgSender()];
+        require(amount > 0, 'Nothing to claim');
+
+        delete claimableBondRefunds[escrowContract][workflowId][_msgSender()];
+        totalBondRefundsClaimed += amount;
+
+        IERC20(token).safeTransfer(_msgSender(), amount);
+        emit BondRefundClaimed(workflowId, _msgSender(), amount, token);
     }
 
     /**
@@ -354,15 +399,17 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
         address refundTo = bond.escalatedBy;
 
         if (bond.token == address(0)) {
-            // ETH
+            // ETH: push immediately. Pull for native value requires a separate accounting
+            // layer with no meaningful safety benefit for the amounts involved here.
             (bool success, ) = refundTo.call{value: bondAmount}('');
             require(success, 'ETH refund failed');
+            emit AppealBondRefunded(workflowId, bondRound, bond.depositor, bondAmount, bond.token);
         } else {
-            // ERC20
-            IERC20(bond.token).safeTransfer(refundTo, bondAmount);
+            // ERC20: pull pattern — credit claimableBondRefunds; escalator claims via claimBondRefund().
+            // Avoids push-to-contract failure trapping the bond permanently.
+            claimableBondRefunds[escrowContract][workflowId][refundTo] += bondAmount;
+            emit AppealBondRefundClaimable(workflowId, bondRound, refundTo, bondAmount, bond.token);
         }
-
-        emit AppealBondRefunded(workflowId, bondRound, bond.depositor, bondAmount, bond.token);
     }
 
     /**
@@ -387,17 +434,10 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
         // Get resolvers from prior round
         ResolverRecord[] storage resolvers = disputeResolvers[escrowContract][workflowId];
 
-        // If no resolvers in storage (e.g., testing scenario), bond is retained by protocol
+        // If no resolvers in storage, bond is retained by protocol as revenue
         if (resolvers.length == 0) {
-            // Don't increment totalBondsPaidToResolvers - bond is not actually paid
-            // Bond remains in contract as protocol revenue
-            emit AppealBondPaidToResolvers(
-                workflowId,
-                priorRound,
-                new address[](0),
-                bondAmount,
-                bond.token
-            );
+            totalBondsForfeited += bondAmount;
+            emit AppealBondForfeited(workflowId, priorRound, bondAmount, bond.token, 'No resolvers recorded');
             return;
         }
 
@@ -412,16 +452,10 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
             }
         }
 
-        // If no resolvers found at this round, bond is retained by protocol
+        // If no resolvers found at this round, bond is retained by protocol as revenue
         if (count == 0) {
-            // Don't increment totalBondsPaidToResolvers - bond is not actually paid
-            emit AppealBondPaidToResolvers(
-                workflowId,
-                priorRound,
-                new address[](0),
-                bondAmount,
-                bond.token
-            );
+            totalBondsForfeited += bondAmount;
+            emit AppealBondForfeited(workflowId, priorRound, bondAmount, bond.token, 'No resolvers at round');
             return;
         }
 

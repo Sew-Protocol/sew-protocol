@@ -72,6 +72,11 @@ contract Phase0BaseSepoliaForkTest is Test {
     address internal escrowVault;
 
     function setUp() public {
+        if (!vm.exists("deployments/baseSepolia/EscrowVault.json")) {
+            vm.skip(true);
+            return;
+        }
+
         RPC_URL = vm.envOr("RPC_BASE_SEPOLIA", string("https://sepolia.base.org"));
         FORK_BLOCK = vm.envOr("FORK_BLOCK_NUMBER", uint256(0)); // 0 = latest
 

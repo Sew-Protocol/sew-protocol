@@ -307,6 +307,11 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     event SystemResumed(
         uint256 timestamp
     );
+    event YieldUnwindFailed(
+        uint256 indexed workflowId,
+        address indexed token,
+        uint256 principal
+    );
 
     // Pause functionality removed for size optimization - stubs for backwards compatibility
     function pause(string calldata) external pure {
@@ -336,6 +341,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     }
 
     function setEscrowFeeBps(uint256 feeBps) external onlyRole(ROLE_ADMIN_CONTRACT) {
+        if (feeBps > MAX_ESCROW_FEE_BPS) revert InvalidEscrowFee(feeBps, MAX_ESCROW_FEE_BPS);
         escrowFee = feeBps;
     }
 
@@ -476,7 +482,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         address from,
         address to,
         uint256 amount
-    ) internal virtual;
+    ) internal virtual {}
 
     function _snapshotModulesForEscrow(uint256 workflowId) internal {
         address resModule = address(_getResolutionModule(workflowId));
@@ -980,6 +986,19 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
             return disputeResolver == settings.customResolver;
         }
 
+        // S26 Governance Sandwich mitigation:
+        // Once a resolver is assigned to a dispute (et.disputeResolver != address(0)), it becomes
+        // the sole authority for that dispute. Consulting the module's live state would allow
+        // governance to inject a replacement resolver mid-dispute via setResolver(), creating a
+        // race condition where a malicious incoming resolver could finalize before the legitimate
+        // outgoing one. The per-escrow assignment is immutable for the lifetime of the dispute;
+        // escalation (escalateDispute) explicitly updates et.disputeResolver to the new level's
+        // resolver, so this check remains correct across all escalation rounds.
+        if (et.disputeResolver != address(0)) {
+            return disputeResolver == et.disputeResolver;
+        }
+
+        // No per-escrow resolver assigned yet: consult the module as a fallback.
         address snap = moduleSnapshots[workflowId].resolutionModule;
         if (snap != address(0)) {
             bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(
@@ -997,7 +1016,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
                 if (authorized) return true;
             }
         }
-        return disputeResolver == et.disputeResolver;
+        return false;
     }
 
     function _applyEscrowSettings(uint256 workflowId, EscrowSettings memory settings) internal {
@@ -1160,14 +1179,15 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     }
 
     function _tryTransfer(address token, address to, uint256 amount) internal returns (bool success) {
-        (success, ) = token.call(abi.encodeWithSelector(IERC20.transfer.selector, to, amount));
-        if (success) {
-            assembly {
-                if returndatasize() {
-                    returndatacopy(0, 0, returndatasize())
-                    success := and(mload(0), 0xff)
-                }
-            }
+        bytes memory data;
+        (success, data) = token.call(abi.encodeWithSelector(IERC20.transfer.selector, to, amount));
+        // If the call succeeded but returned data, decode it as bool.
+        // Tokens that return no data (bare transfer) are treated as success.
+        // Tokens that return a non-zero 32-byte value are treated as success.
+        // This avoids the lowest-byte masking bug where tokens returning a non-bool
+        // non-zero value with a zero lowest byte would be misread as failure.
+        if (success && data.length > 0) {
+            success = abi.decode(data, (bool));
         }
     }
 
@@ -1202,7 +1222,12 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
                 }
                 return (recovered, 0);
             } catch {
-                // Emergency unwind also failed - return original amount as fallback
+                // Both unwind paths failed — tokens are stuck in yield module.
+                // Complete the release lifecycle using principal so the escrow is not
+                // permanently frozen; admin must recover tokens from the yield module.
+                // The auto-transfer will fall back to claimable since the vault balance
+                // no longer covers this principal (tokens are in the module).
+                emit YieldUnwindFailed(workflowId, token, yieldPrincipal);
                 return (yieldPrincipal, 0);
             }
         }
@@ -1330,13 +1355,13 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         address token,
         address from,
         uint256 amount
-    ) internal virtual;
+    ) internal virtual {}
     function _emitEscrowTransferReleased(
         uint256 workflowId,
         address token,
         address to,
         uint256 amount
-    ) internal virtual;
+    ) internal virtual {}
     function _getYieldGenerationModule(
         uint256 workflowId
     ) internal view virtual returns (IYieldModule);

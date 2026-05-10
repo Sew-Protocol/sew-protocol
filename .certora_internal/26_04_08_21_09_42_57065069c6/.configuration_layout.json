@@ -1,0 +1,177 @@
+[
+    {
+        "card_title": "general",
+        "content_type": "COMPLEX",
+        "content": [
+            {
+                "inner_title": "CLI Version",
+                "content_type": "FLAG",
+                "content": "8.8.1",
+                "doc_link": "",
+                "tooltip": "",
+                "unsound": false
+            },
+            {
+                "inner_title": "branch",
+                "content_type": "FLAG",
+                "content": "main",
+                "doc_link": "",
+                "tooltip": "",
+                "unsound": false
+            },
+            {
+                "inner_title": "dirty",
+                "content_type": "FLAG",
+                "content": "true",
+                "doc_link": "",
+                "tooltip": "",
+                "unsound": false
+            },
+            {
+                "inner_title": "origin",
+                "content_type": "FLAG",
+                "content": "git@github.com:Sew-Protocol/sew-protocol.git",
+                "doc_link": "",
+                "tooltip": "",
+                "unsound": false
+            },
+            {
+                "inner_title": "revision",
+                "content_type": "FLAG",
+                "content": "01d0e46f1c274e82c0aa1fef2ea3cb88c20fe4a3",
+                "doc_link": "",
+                "tooltip": "",
+                "unsound": false
+            }
+        ]
+    },
+    {
+        "card_title": "files",
+        "content_type": "SIMPLE",
+        "content": [
+            {
+                "inner_title": "files",
+                "content_type": "SIMPLE",
+                "content": [
+                    "certora/harness/EscrowVaultHarness.sol",
+                    "contracts/core/BaseEscrow.sol",
+                    "contracts/core/BondCollector.sol",
+                    "contracts/core/EscrowVault.sol",
+                    "contracts/core/ModuleSnapshotRegistry.sol",
+                    "contracts/mocks/ERC20Mock.sol",
+                    "contracts/ops/CreateOps.sol",
+                    "contracts/ops/DisputeOps.sol",
+                    "contracts/ops/SettlementOps.sol",
+                    "contracts/ops/YieldOps.sol"
+                ],
+                "doc_link": "https://docs.certora.com/en/latest/docs/prover/cli/options.html#files",
+                "tooltip": "",
+                "unsound": false
+            }
+        ]
+    },
+    {
+        "card_title": "options",
+        "content_type": "COMPLEX",
+        "content": [
+            {
+                "inner_title": "verify",
+                "content_type": "FLAG",
+                "content": "EscrowVaultHarness:certora/specs/EscrowInvariants.spec",
+                "doc_link": "https://docs.certora.com/en/latest/docs/prover/cli/options.html#verify",
+                "tooltip": "",
+                "unsound": false
+            },
+            {
+                "inner_title": "global_timeout",
+                "content_type": "FLAG",
+                "content": 1800,
+                "doc_link": "https://docs.certora.com/en/latest/docs/prover/cli/options.html#global-timeout",
+                "tooltip": "",
+                "unsound": false
+            },
+            {
+                "inner_title": "loop_iter",
+                "content_type": "FLAG",
+                "content": 3,
+                "doc_link": "https://docs.certora.com/en/latest/docs/prover/cli/options.html#loop-iter",
+                "tooltip": "",
+                "unsound": false
+            },
+            {
+                "inner_title": "msg",
+                "content_type": "FLAG",
+                "content": "Verify EscrowVault solvency, fee monotonicity, state irreversibility, resolver exclusivity and appeal-window enforcement",
+                "doc_link": "https://docs.certora.com/en/latest/docs/prover/cli/options.html#msg",
+                "tooltip": "",
+                "unsound": false
+            },
+            {
+                "inner_title": "multi_assert_check",
+                "content_type": "FLAG",
+                "content": "true",
+                "doc_link": "https://docs.certora.com/en/latest/docs/prover/cli/options.html#multi-assert-check",
+                "tooltip": "",
+                "unsound": false
+            },
+            {
+                "inner_title": "optimistic_fallback",
+                "content_type": "FLAG",
+                "content": "true",
+                "doc_link": "https://docs.certora.com/en/latest/docs/prover/cli/options.html#optimistic-fallback",
+                "tooltip": "",
+                "unsound": true
+            },
+            {
+                "inner_title": "optimistic_loop",
+                "content_type": "FLAG",
+                "content": "true",
+                "doc_link": "https://docs.certora.com/en/latest/docs/prover/cli/options.html#optimistic-loop",
+                "tooltip": "",
+                "unsound": true
+            },
+            {
+                "inner_title": "parametric_contracts",
+                "content_type": "SIMPLE",
+                "content": [
+                    "EscrowVaultHarness"
+                ],
+                "doc_link": "https://docs.certora.com/en/latest/docs/prover/cli/options.html#parametric-contracts",
+                "tooltip": "",
+                "unsound": false
+            },
+            {
+                "inner_title": "rule_sanity",
+                "content_type": "FLAG",
+                "content": "basic",
+                "doc_link": "https://docs.certora.com/en/latest/docs/prover/cli/options.html#rule-sanity",
+                "tooltip": "",
+                "unsound": false
+            },
+            {
+                "inner_title": "smt_timeout",
+                "content_type": "FLAG",
+                "content": 600,
+                "doc_link": "https://docs.certora.com/en/latest/docs/prover/cli/options.html#smt-timeout",
+                "tooltip": "",
+                "unsound": false
+            }
+        ]
+    },
+    {
+        "card_title": "packages",
+        "content_type": "SIMPLE",
+        "content": [
+            {
+                "inner_title": "packages",
+                "content_type": "SIMPLE",
+                "content": [
+                    "@openzeppelin=node_modules/@openzeppelin"
+                ],
+                "doc_link": "https://docs.certora.com/en/latest/docs/prover/cli/options.html#packages",
+                "tooltip": "",
+                "unsound": false
+            }
+        ]
+    }
+]

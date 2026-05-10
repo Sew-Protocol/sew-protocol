@@ -102,7 +102,11 @@ contract EscrowDisputeTest is Test {
         vault.escalateDispute(wid);
     }
 
-    function test_Dispute_GlobalResolverChange_AllowsNewResolverOnExistingEscrow() public {
+    // S26 Governance Sandwich: after a dispute is raised, the per-escrow assigned resolver
+    // (et.disputeResolver) is the sole authority. A governance call to
+    // DefaultResolutionModule.setResolver() CANNOT inject a replacement resolver that acts
+    // on the in-flight dispute. The originally assigned resolver retains exclusive authority.
+    function test_Dispute_GlobalResolverChange_BlocksNewResolverOnActiveDispute() public {
         uint256 amount = 1000e18;
         address newResolver = address(0xDEAD);
 
@@ -126,18 +130,20 @@ contract EscrowDisputeTest is Test {
         vm.prank(buyer);
         vault.raiseDispute(wid);
 
-        // Governance updates the global default resolver in DefaultResolutionModule
+        // Governance attempts to inject a new resolver into the live module.
         resolutionModule.setResolver(newResolver);
-        assertEq(resolutionModule.resolver(), newResolver, "global resolver should be updated");
+        assertEq(resolutionModule.resolver(), newResolver, "global resolver updated");
 
-        // New resolver (set after escrow creation) can issue a resolution, but because
-        // DefaultResolutionModule does not expose appeal metadata, SettlementOps will
-        // create a pending settlement and leave the escrow in DISPUTED state until
-        // the appeal window expires and executePendingSettlement is called.
+        // S26 guard: the governance-injected resolver MUST NOT be able to act on this
+        // already-active dispute. et.disputeResolver was frozen at dispute-raise time.
         vm.prank(newResolver);
-        vault.releaseAsDisputeResolver(wid, bytes32("hash"));
+        vm.expectRevert(); // NotAuthorizedResolver
+        vault.releaseAsDisputeResolver(wid, bytes32("attacker-hash"));
 
-        // Escrow should remain DISPUTED with a pending settlement
+        // The original assigned resolver remains the sole authority and can still resolve.
+        vm.prank(resolver);
+        vault.releaseAsDisputeResolver(wid, bytes32("legitimate-hash"));
+
         ( , , , , , , , EscrowState stAfter, , ) = vault.escrowTransfers(wid);
         assertEq(uint256(stAfter), uint256(EscrowState.DISPUTED), "escrow should remain DISPUTED with pending settlement");
 

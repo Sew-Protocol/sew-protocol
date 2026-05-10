@@ -129,4 +129,10 @@ interface DecentralizedResolverStructs {
         uint256 depositedAt; // Timestamp when bond was deposited
         bool refunded; // Whether bond has been refunded
     }
+
+    struct PendingEscalationCostConfig {
+        EscalationCostConfig config;
+        uint64 eta;
+        bool exists;
+    }
 }

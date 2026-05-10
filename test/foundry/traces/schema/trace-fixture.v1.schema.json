@@ -1,0 +1,211 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sew-protocol.io/schemas/trace-fixture.v1.schema.json",
+  "title": "SEW Protocol Trace Fixture",
+  "description": "Canonical format for SEW escrow action traces used by TraceEquivalenceTest and TraceRegressionTest to replay simulated sequences against live EVM contracts and verify projection equality at every step.",
+  "type": "object",
+  "required": ["schema_version", "scenario_id", "fee_bps", "step_count", "steps"],
+  "additionalProperties": false,
+  "properties": {
+
+    "schema_version": {
+      "type": "string",
+      "const": "1",
+      "description": "Locked to '1'. Increment to '2' only when making a breaking change to this schema."
+    },
+
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9_-]+$",
+      "description": "Snake-case identifier unique within the trace corpus. Used for test naming and regression lookup."
+    },
+
+    "description": {
+      "type": "string",
+      "description": "Human-readable summary of what this trace exercises."
+    },
+
+    "phase": {
+      "type": "string",
+      "description": "Optional simulation phase label this trace was generated from (e.g. 'Z' for Phase Z legitimacy tests)."
+    },
+
+    "trace_score": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Score computed by trace-score/score-result: attacker-profit + 10×invariant-violations + 5×liveness-failure. Higher = more adversarial."
+    },
+
+    "categories": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["top-profitable", "liveness-fail", "cascade", "abnormal-slash"]
+      },
+      "uniqueItems": true,
+      "description": "Classification tags used for selective persistence and regression filtering."
+    },
+
+    "fee_bps": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10000,
+      "description": "Protocol fee in basis points applied at escrow creation. Must match the EscrowVault constructor argument used in the test setUp."
+    },
+
+    "step_count": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Number of steps in the steps array. Must equal steps.length. Exists so Forge can pre-allocate the loop without parsing the full array."
+    },
+
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Ordered sequence of actions to replay. Replayed in array order; seq values must be monotonically increasing.",
+      "items": { "$ref": "#/definitions/step" }
+    }
+  },
+
+  "definitions": {
+
+    "step": {
+      "type": "object",
+      "required": ["seq", "action", "caller_role", "warp_to", "params"],
+      "additionalProperties": false,
+      "properties": {
+
+        "seq": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Zero-based monotonically increasing step index."
+        },
+
+        "action": {
+          "type": "string",
+          "enum": [
+            "create_escrow",
+            "release",
+            "sender_cancel",
+            "recipient_cancel",
+            "raise_dispute",
+            "release_as_dispute_resolver",
+            "cancel_as_dispute_resolver",
+            "execute_pending_settlement",
+            "auto_cancel_disputed"
+          ],
+          "description": "Contract action to invoke. Maps directly to EscrowVault public functions."
+        },
+
+        "caller_role": {
+          "type": "string",
+          "enum": ["buyer", "seller", "resolver"],
+          "description": "Role of the msg.sender. Mapped to stable test addresses by _roleToAddress()."
+        },
+
+        "warp_to": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Unix timestamp to warp block.timestamp to before executing this action. Must be >= previous step's warp_to. If equal to current block.timestamp, no warp occurs."
+        },
+
+        "save_wf_as": {
+          "type": "string",
+          "pattern": "^wf[0-9]+$",
+          "description": "Only valid on create_escrow steps. Registers the newly created workflow ID under this alias for use in subsequent wf_alias fields."
+        },
+
+        "wf_alias": {
+          "type": "string",
+          "pattern": "^wf[0-9]+$",
+          "description": "Workflow alias registered by a prior save_wf_as. Resolved to a concrete workflow ID before the action is dispatched."
+        },
+
+        "params": {
+          "type": "object",
+          "description": "Action-specific parameters.",
+          "oneOf": [
+            { "$ref": "#/definitions/params_create_escrow" },
+            { "$ref": "#/definitions/params_empty" }
+          ]
+        },
+
+        "expected": {
+          "$ref": "#/definitions/expected_projection",
+          "description": "Simulation projection asserted against the live EVM state after this action. Omit on steps where no assertion is needed (e.g. intentionally rejected steps)."
+        }
+      }
+    },
+
+    "params_create_escrow": {
+      "type": "object",
+      "required": ["amount", "to_role"],
+      "additionalProperties": false,
+      "properties": {
+        "amount": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Gross token amount in wei. Must be within ERC20Mock minted balance for the buyer role."
+        },
+        "to_role": {
+          "type": "string",
+          "enum": ["buyer", "seller", "resolver"],
+          "description": "Recipient role. Typically 'seller'."
+        }
+      }
+    },
+
+    "params_empty": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {},
+      "description": "Empty params object for actions that take no parameters (release, raise_dispute, etc.)."
+    },
+
+    "expected_projection": {
+      "type": "object",
+      "required": [
+        "escrow_state",
+        "amount_after_fee",
+        "total_held",
+        "total_fees",
+        "pending_settlement_exists",
+        "dispute_level"
+      ],
+      "additionalProperties": false,
+      "description": "EVM state snapshot at this step. All numeric fields are token amounts in wei (uint256). Corresponds to diff.clj comparable-keys.",
+      "properties": {
+        "escrow_state": {
+          "type": "integer",
+          "enum": [0, 1, 2, 3, 4, 5],
+          "description": "EscrowState enum value: 0=NONE 1=PENDING 2=RELEASED 3=REFUNDED 4=DISPUTED 5=RESOLVED."
+        },
+        "amount_after_fee": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "EscrowTransfer.amountAfterFee in wei. Unchanged after terminal transitions (struct is not cleared on release/refund)."
+        },
+        "total_held": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "EscrowVault.totalHeldInEscrowPerToken[token] in wei. Zero after any terminal transition."
+        },
+        "total_fees": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "EscrowVault.totalFeesPerToken[token] in wei. Accumulates on create; never decremented in current protocol version."
+        },
+        "pending_settlement_exists": {
+          "type": "boolean",
+          "description": "EscrowVault.pendingSettlements[wfId].exists. True only between resolver-acts and execute_pending_settlement."
+        },
+        "dispute_level": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "DefaultResolutionModule.getAppealDeadlineAndRound()[1] (currentRound). Zero for DefaultResolutionModule stub; non-zero only with DRM multi-round resolution."
+        }
+      }
+    }
+  }
+}

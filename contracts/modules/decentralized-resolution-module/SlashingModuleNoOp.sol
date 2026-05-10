@@ -53,7 +53,7 @@ contract SlashingModuleNoOp is ISlashingModule, AccessControl {
 
     function proposeSlash(
         uint256 workflowId,
-        address escrowContract,
+        address /* escrowContract */,
         address resolver,
         SlashReason reason,
         bytes calldata /* evidence */
@@ -106,7 +106,7 @@ contract SlashingModuleNoOp is ISlashingModule, AccessControl {
 
     function slashForTimeout(
         uint256 workflowId,
-        address escrowContract,
+        address /* escrowContract */,
         address resolver,
         uint8 timeoutType
     ) external override onlyRole(ROLE_RESOLUTION_MODULE) returns (uint256 slashId) {
@@ -130,27 +130,22 @@ contract SlashingModuleNoOp is ISlashingModule, AccessControl {
 
     function slashForReversal(
         uint256 workflowId,
-        address escrowContract,
+        address /* escrowContract */,
         address resolver,
         uint8 /* priorRound */
     ) external override onlyRole(ROLE_RESOLUTION_MODULE) returns (uint256 slashId) {
         slashId = _nextSlashId++;
-
-        emit SlashProposed(
-            slashId,
-            workflowId,
-            resolver,
-            SlashReason.REVERSAL,
-            0, // No actual amount in no-op
-            _msgSender()
-        );
-
+        emit SlashProposed(slashId, workflowId, resolver, SlashReason.REVERSAL, 0, _msgSender());
         return slashId;
+    }
+
+    function hasPendingSlash(address /* resolver */) external pure override returns (bool hasPending) {
+        return false;
     }
 
     function slashForFraud(
         uint256 workflowId,
-        address escrowContract,
+        address /* escrowContract */,
         address resolver,
         bytes calldata /* evidence */
     ) external override returns (uint256 slashId) {

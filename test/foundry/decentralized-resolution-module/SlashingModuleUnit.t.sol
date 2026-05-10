@@ -131,6 +131,11 @@ contract SlashingModuleUnitTest is Test {
         vm.prank(timelock);
         slashingModule.setSlashPercentage(ISlashingModule.SlashReason.FRAUD, 5000); // 50%
         vm.stopPrank();
+
+        // Default appeal bond is 0 so tests that call appealSlash don't need a token approval.
+        // Individual tests that want to verify bond enforcement call setAppealBond explicitly.
+        vm.prank(timelock);
+        slashingModule.setAppealBond(0);
     }
 
     // ============ slashForTimeout Tests ============
@@ -173,9 +178,11 @@ contract SlashingModuleUnitTest is Test {
         ISlashingModule.SlashEvent memory event_ = slashingModule.getSlashEvent(slashId);
         assertEq(uint8(event_.reason), uint8(ISlashingModule.SlashReason.FRAUD), 'Should be fraud');
         assertGt(event_.amount, 0, 'Should have slash amount');
-        assertEq(uint8(event_.status), uint8(ISlashingModule.SlashStatus.EXECUTED), 'Should be executed');
+        // Fraud slashes now create PENDING so the resolver can exercise their right to appeal.
+        assertEq(uint8(event_.status), uint8(ISlashingModule.SlashStatus.PENDING), 'Should be PENDING');
+        assertEq(event_.executedAt, 0, 'executedAt should be 0 before execution');
         assertEq(event_.evidence, evidence, 'Should store evidence');
-        assertTrue(event_.appealDeadline > block.timestamp, 'Should have appeal deadline');
+        assertGt(event_.appealDeadline, block.timestamp, 'Should have an appeal deadline');
     }
 
     function test_slashForFraud_RequiresTimelock() public {
@@ -249,11 +256,20 @@ contract SlashingModuleUnitTest is Test {
         bytes memory evidence = 'Evidence';
 
         vm.prank(timelock);
-        slashingModule.slashForFraud(workflowId, address(this), resolver1, evidence);
+        uint256 slashId = slashingModule.slashForFraud(workflowId, address(this), resolver1, evidence);
+        assertGt(slashId, 0, 'Should create slash');
 
-        // Check resolver is frozen
+        // Resolver is frozen immediately at proposal time to lock stake during the appeal window.
         uint256 frozenUntil = slashingModule.frozenUntil(resolver1);
-        assertGt(frozenUntil, block.timestamp, 'Resolver should be frozen');
+        assertGt(frozenUntil, block.timestamp, 'Resolver should be frozen after fraud slash proposal');
+
+        // After the appeal window, timelock executes — resolver remains frozen (or re-frozen).
+        vm.warp(block.timestamp + slashingModule.getSlashConfig().appealWindow + 1);
+        vm.prank(timelock);
+        slashingModule.executeSlash(slashId);
+
+        frozenUntil = slashingModule.frozenUntil(resolver1);
+        assertGt(frozenUntil, block.timestamp, 'Resolver should be frozen after executeSlash');
     }
 
     function test_slashForFraud_DistributesToInsurancePool() public {
@@ -263,10 +279,18 @@ contract SlashingModuleUnitTest is Test {
         uint256 poolBalanceBefore = stableToken.balanceOf(address(insurancePool));
 
         vm.prank(timelock);
-        slashingModule.slashForFraud(workflowId, address(this), resolver1, evidence);
+        uint256 slashId = slashingModule.slashForFraud(workflowId, address(this), resolver1, evidence);
+
+        // No distribution yet — slash is PENDING.
+        assertEq(stableToken.balanceOf(address(insurancePool)), poolBalanceBefore, 'No distribution before executeSlash');
+
+        // Execute after appeal window passes.
+        vm.warp(block.timestamp + slashingModule.getSlashConfig().appealWindow + 1);
+        vm.prank(timelock);
+        slashingModule.executeSlash(slashId);
 
         uint256 poolBalanceAfter = stableToken.balanceOf(address(insurancePool));
-        assertGt(poolBalanceAfter, poolBalanceBefore, 'Insurance pool should receive funds');
+        assertGt(poolBalanceAfter, poolBalanceBefore, 'Insurance pool should receive funds after executeSlash');
     }
 
     function test_slashForFraud_CanAppeal() public {
@@ -276,11 +300,16 @@ contract SlashingModuleUnitTest is Test {
         vm.prank(timelock);
         uint256 slashId = slashingModule.slashForFraud(workflowId, address(this), resolver1, evidence);
 
-        ISlashingModule.SlashEvent memory event_ = slashingModule.getSlashEvent(slashId);
-        assertGt(event_.appealDeadline, block.timestamp, 'Should have appeal deadline');
-        // Note: Fraud slashes are executed immediately (status = EXECUTED)
-        // Appeals may work differently for executed vs pending slashes
-        // This test verifies the slash event is created with appeal deadline
+        // Slash is PENDING — canAppeal should be true within the window.
+        assertTrue(slashingModule.canAppeal(slashId), 'Fraud slash should be appealable within window');
+
+        // Resolver can successfully call appealSlash (no bond configured in default setup).
+        vm.prank(resolver1);
+        slashingModule.appealSlash(slashId, 'I did not commit fraud', '');
+
+        ISlashingModule.SlashAppeal memory appeal = slashingModule.getSlashAppeal(slashId);
+        assertEq(appeal.appellant, resolver1, 'Appeal should record resolver as appellant');
+        assertFalse(appeal.resolved, 'Appeal should not be resolved yet');
     }
 
     function test_slashForFraud_EvidenceStorage() public {
@@ -315,11 +344,19 @@ contract SlashingModuleUnitTest is Test {
         vm.prank(timelock);
         uint256 slashId = slashingModule.slashForFraud(workflowId, address(this), resolver1, evidence);
 
-        // Verify slash completed successfully
+        // Verify slash created as PENDING (waterfall deferred to executeSlash)
         assertGt(slashId, 0, 'Should create slash event');
         ISlashingModule.SlashEvent memory event_ = slashingModule.getSlashEvent(slashId);
         assertGt(event_.amount, 0, 'Should have slash amount');
-        // Note: Waterfall slashing logic is tested in integration/invariant tests
+        assertEq(uint8(event_.status), uint8(ISlashingModule.SlashStatus.PENDING), 'Should be PENDING');
+
+        // Waterfall slashing executes after appeal window
+        vm.warp(block.timestamp + slashingModule.getSlashConfig().appealWindow + 1);
+        vm.prank(timelock);
+        slashingModule.executeSlash(slashId);
+
+        ISlashingModule.SlashEvent memory executed = slashingModule.getSlashEvent(slashId);
+        assertEq(uint8(executed.status), uint8(ISlashingModule.SlashStatus.EXECUTED), 'Should be EXECUTED after executeSlash');
     }
 
     // ============ slashForReversal Tests ============
@@ -354,7 +391,7 @@ contract SlashingModuleUnitTest is Test {
 
     function test_slashForTimeout_BurnsSew() public {
         uint256 workflowId = 1;
-        uint8 timeoutType = 1; // Resolve timeout
+        uint8 timeoutType = 0; // TIMEOUT_ACCEPT — immediate execution
 
         // Get initial balances and supply
         uint256 stakingModuleSewBefore = sewToken.balanceOf(address(stakingModule));
@@ -370,7 +407,7 @@ contract SlashingModuleUnitTest is Test {
 
         assertGt(slashId, 0, 'Should create slash event');
 
-        // Verify SEW was burned (total supply decreased)
+        // TIMEOUT_ACCEPT is immediate — SEW burned right away.
         uint256 totalSupplyAfter = sewToken.totalSupply();
         assertLt(totalSupplyAfter, totalSupplyBefore, 'SEW total supply should decrease');
 
@@ -397,22 +434,29 @@ contract SlashingModuleUnitTest is Test {
 
         assertGt(slashId, 0, 'Should create slash event');
 
-        // Verify SEW was burned (total supply decreased)
-        uint256 totalSupplyAfter = sewToken.totalSupply();
-        assertLt(totalSupplyAfter, totalSupplyBefore, 'SEW total supply should decrease');
+        // Fraud is PENDING — no burn yet at proposal time.
+        assertEq(sewToken.totalSupply(), totalSupplyBefore, 'SEW must not be burned before executeSlash');
 
-        // Verify slashing module did NOT receive SEW
+        // After appeal window, execute.
+        vm.warp(block.timestamp + slashingModule.getSlashConfig().appealWindow + 1);
+        vm.prank(timelock);
+        slashingModule.executeSlash(slashId);
+
+        // Now SEW should be burned.
+        uint256 totalSupplyAfter = sewToken.totalSupply();
+        assertLt(totalSupplyAfter, totalSupplyBefore, 'SEW total supply should decrease after executeSlash');
+
+        // Slashing module must never hold SEW.
         uint256 slashingModuleSewAfter = sewToken.balanceOf(address(slashingModule));
         assertEq(slashingModuleSewAfter, slashingModuleSewBefore, 'Slashing module should not receive SEW');
 
-        // Verify staking module SEW balance decreased
         uint256 stakingModuleSewAfter = sewToken.balanceOf(address(stakingModule));
         assertLt(stakingModuleSewAfter, stakingModuleSewBefore, 'Staking module SEW balance should decrease');
     }
 
     function test_slashForTimeout_StableStillTransferred() public {
         uint256 workflowId = 1;
-        uint8 timeoutType = 1; // Resolve timeout
+        uint8 timeoutType = 0; // TIMEOUT_ACCEPT — immediate execution
 
         // Get initial balances
         uint256 stakingModuleStableBefore = stableToken.balanceOf(address(stakingModule));
@@ -423,18 +467,17 @@ contract SlashingModuleUnitTest is Test {
 
         assertGt(slashId, 0, 'Should create slash event');
 
-        // Verify stable was transferred to insurance pool (50% distribution)
+        // TIMEOUT_ACCEPT is immediate — stable distributed right away.
         uint256 insurancePoolStableAfter = stableToken.balanceOf(address(insurancePool));
         assertGt(insurancePoolStableAfter, insurancePoolStableBefore, 'Insurance pool should receive stable tokens');
 
-        // Verify staking module stable balance decreased
         uint256 stakingModuleStableAfter = stableToken.balanceOf(address(stakingModule));
         assertLt(stakingModuleStableAfter, stakingModuleStableBefore, 'Staking module stable balance should decrease');
     }
 
     function test_slashForTimeout_MixedBond_BurnsSewAndTransfersStable() public {
         uint256 workflowId = 1;
-        uint8 timeoutType = 1; // Resolve timeout
+        uint8 timeoutType = 0; // TIMEOUT_ACCEPT — immediate execution
 
         // Get initial state
         uint256 totalSupplyBefore = sewToken.totalSupply();
@@ -467,10 +510,9 @@ contract SlashingModuleUnitTest is Test {
         uint256 totalSupplyBefore = sewToken.totalSupply();
         uint256 slashingModuleSewBefore = sewToken.balanceOf(address(slashingModule));
 
-        // Create large slash that will use senior coverage
-        // First, slash resolver's own stake (should burn their SEW)
+        // Use TIMEOUT_ACCEPT (type=0) for immediate execution to test SEW burn
         uint256 workflowId = 1;
-        uint8 timeoutType = 1;
+        uint8 timeoutType = 0;
 
         vm.prank(resolutionModule);
         slashingModule.slashForTimeout(workflowId, address(this), resolver1, timeoutType);
@@ -482,5 +524,155 @@ contract SlashingModuleUnitTest is Test {
         // Verify slashing module did NOT receive SEW
         uint256 slashingModuleSewAfter = sewToken.balanceOf(address(slashingModule));
         assertEq(slashingModuleSewAfter, slashingModuleSewBefore, 'Slashing module should not receive SEW');
+    }
+
+    // ============ Fair Slashing: New Behavior Tests ============
+
+    function test_slashForTimeout_ResolveCreatesPending() public {
+        uint256 workflowId = 1;
+        uint8 timeoutType = 1; // TIMEOUT_RESOLVE
+
+        vm.prank(resolutionModule);
+        uint256 slashId = slashingModule.slashForTimeout(workflowId, address(this), resolver1, timeoutType);
+
+        assertGt(slashId, 0, 'Should create slash');
+        ISlashingModule.SlashEvent memory ev = slashingModule.getSlashEvent(slashId);
+        assertEq(uint8(ev.status), uint8(ISlashingModule.SlashStatus.PENDING), 'TIMEOUT_RESOLVE should be PENDING');
+        assertEq(ev.executedAt, 0, 'executedAt should be 0');
+        assertGt(ev.appealDeadline, block.timestamp, 'Should have contest deadline');
+        assertLe(ev.appealDeadline, block.timestamp + slashingModule.TIMEOUT_RESOLVE_CONTEST_WINDOW(), 'Contest window <=24h');
+    }
+
+    function test_slashForTimeout_AcceptStillImmediate() public {
+        uint256 workflowId = 1;
+        uint8 timeoutType = 0; // TIMEOUT_ACCEPT
+
+        vm.prank(resolutionModule);
+        uint256 slashId = slashingModule.slashForTimeout(workflowId, address(this), resolver1, timeoutType);
+
+        ISlashingModule.SlashEvent memory ev = slashingModule.getSlashEvent(slashId);
+        assertEq(uint8(ev.status), uint8(ISlashingModule.SlashStatus.EXECUTED), 'TIMEOUT_ACCEPT should be immediate');
+    }
+
+    function test_slashForTimeout_ResolveExecutableAfterContestWindow() public {
+        uint256 workflowId = 1;
+        uint8 timeoutType = 1;
+
+        vm.prank(resolutionModule);
+        uint256 slashId = slashingModule.slashForTimeout(workflowId, address(this), resolver1, timeoutType);
+
+        // After contest window, resolution module can execute.
+        vm.warp(block.timestamp + slashingModule.TIMEOUT_RESOLVE_CONTEST_WINDOW() + 1);
+        vm.prank(resolutionModule);
+        slashingModule.executeSlash(slashId);
+
+        ISlashingModule.SlashEvent memory ev = slashingModule.getSlashEvent(slashId);
+        assertEq(uint8(ev.status), uint8(ISlashingModule.SlashStatus.EXECUTED), 'Should be EXECUTED after window');
+    }
+
+    function test_appealBond_CollectedOnAppeal() public {
+        vm.prank(timelock);
+        slashingModule.setAppealBond(50e6);
+
+        stableToken.mint(resolver1, 100e6);
+        vm.prank(resolver1);
+        stableToken.approve(address(slashingModule), 50e6);
+
+        vm.prank(timelock);
+        uint256 slashId = slashingModule.slashForFraud(1, address(this), resolver1, 'evidence');
+
+        uint256 moduleBalBefore = stableToken.balanceOf(address(slashingModule));
+        uint256 resolverBalBefore = stableToken.balanceOf(resolver1);
+
+        vm.prank(resolver1);
+        slashingModule.appealSlash(slashId, 'Not guilty', '');
+
+        assertEq(stableToken.balanceOf(address(slashingModule)), moduleBalBefore + 50e6, 'Module should hold bond');
+        assertEq(stableToken.balanceOf(resolver1), resolverBalBefore - 50e6, 'Resolver paid bond');
+        assertEq(slashingModule.appealBondsHeld(slashId), 50e6, 'Bond mapping records amount');
+    }
+
+    function test_appealBond_RefundedOnUpheld() public {
+        vm.prank(timelock);
+        slashingModule.setAppealBond(50e6);
+
+        stableToken.mint(resolver1, 100e6);
+        vm.prank(resolver1);
+        stableToken.approve(address(slashingModule), 50e6);
+
+        vm.prank(timelock);
+        uint256 slashId = slashingModule.slashForFraud(1, address(this), resolver1, 'evidence');
+
+        vm.prank(resolver1);
+        slashingModule.appealSlash(slashId, 'Not guilty', '');
+
+        uint256 resolverBalBefore = stableToken.balanceOf(resolver1);
+
+        vm.prank(timelock);
+        slashingModule.resolveAppeal(slashId, true);
+
+        assertEq(stableToken.balanceOf(resolver1), resolverBalBefore + 50e6, 'Bond refunded to resolver');
+        assertEq(slashingModule.appealBondsHeld(slashId), 0, 'Bond mapping cleared');
+        assertEq(
+            uint8(slashingModule.getSlashEvent(slashId).status),
+            uint8(ISlashingModule.SlashStatus.REVERSED),
+            'Slash REVERSED'
+        );
+    }
+
+    function test_appealBond_ForfeitedOnRejected() public {
+        vm.prank(timelock);
+        slashingModule.setAppealBond(50e6);
+
+        stableToken.mint(resolver1, 100e6);
+        vm.prank(resolver1);
+        stableToken.approve(address(slashingModule), 50e6);
+
+        vm.prank(timelock);
+        uint256 slashId = slashingModule.slashForFraud(1, address(this), resolver1, 'evidence');
+
+        vm.prank(resolver1);
+        slashingModule.appealSlash(slashId, 'Not guilty', '');
+
+        uint256 poolBalBefore = stableToken.balanceOf(address(insurancePool));
+
+        vm.prank(timelock);
+        slashingModule.resolveAppeal(slashId, false);
+
+        assertGt(stableToken.balanceOf(address(insurancePool)), poolBalBefore, 'Pool receives forfeited bond');
+        assertEq(slashingModule.appealBondsHeld(slashId), 0, 'Bond mapping cleared');
+        assertEq(
+            uint8(slashingModule.getSlashEvent(slashId).status),
+            uint8(ISlashingModule.SlashStatus.PENDING),
+            'Slash stays PENDING after rejected appeal'
+        );
+    }
+
+    function test_resolveAppeal_CannotReverseExecuted() public {
+        // Slash a resolver using an immediate path (TIMEOUT_ACCEPT).
+        vm.prank(resolutionModule);
+        uint256 slashId = slashingModule.slashForTimeout(1, address(this), resolver1, 0);
+
+        // Trying to resolve an appeal on an already-EXECUTED slash must revert.
+        vm.prank(timelock);
+        vm.expectRevert(abi.encodeWithSelector(ISlashingModule.CannotReverseExecutedSlash.selector, slashId));
+        slashingModule.resolveAppeal(slashId, true);
+    }
+
+    function test_fraudAppeal_UpheldBlocksFurtherExecution() public {
+        vm.prank(timelock);
+        uint256 slashId = slashingModule.slashForFraud(1, address(this), resolver1, 'evidence');
+
+        vm.prank(resolver1);
+        slashingModule.appealSlash(slashId, 'Not guilty', '');
+
+        vm.prank(timelock);
+        slashingModule.resolveAppeal(slashId, true);
+
+        // Slash is REVERSED — executeSlash should revert.
+        vm.warp(block.timestamp + slashingModule.getSlashConfig().appealWindow + 1);
+        vm.prank(timelock);
+        vm.expectRevert();
+        slashingModule.executeSlash(slashId);
     }
 }

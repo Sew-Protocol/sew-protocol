@@ -71,6 +71,11 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
     uint256 public constant MASS_UNAVAILABILITY_THRESHOLD = 3000; // 30% of resolvers
     uint256 public constant CIRCUIT_BREAKER_COOLDOWN = 1 hours;
 
+    // Contest window for TIMEOUT_RESOLVE automated slashes.
+    // Resolver may call appealSlash() within this window (requires appeal bond).
+    // If no appeal is filed, executeSlash() becomes callable by ROLE_RESOLUTION_MODULE.
+    uint256 public constant TIMEOUT_RESOLVE_CONTEST_WINDOW = 24 hours;
+
     // SEW burn handling:
     // Prefer reducing totalSupply via ERC20Burnable.burn(uint256) if the token supports it.
     // Fallback is a transfer to a well-known dead address (effective burn, but supply not reduced).
@@ -112,6 +117,10 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
     // Freeze tracking (prevents withdrawal during slash processing)
     mapping(address => uint256) public frozenUntil; // resolver => timestamp
     mapping(address => uint256) public freezeUntil; // resolver => timestamp (for insufficient bond)
+
+    // Appeal bond custody: slashId => amount held in this contract pending resolveAppeal.
+    // Non-zero only while a PENDING slash has an active (unresolved) appeal.
+    mapping(uint256 => uint256) public appealBondsHeld;
     
     // v3 freeze durations
     uint256 public constant FREEZE_DURATION_SEVERE = 72 hours; // Severe event (missed resolve deadline)
@@ -128,6 +137,10 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
 
     // Slash config (governance-controlled)
     SlashConfig public slashConfig;
+
+    // Efficient pending slash tracking
+    mapping(address => uint256) public pendingSlashCount;
+    mapping(address => uint256) public juniorsPendingSlashCount;
 
     // ============ Events ============
 
@@ -231,13 +244,20 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         });
 
         emit SlashProposed(slashId, workflowId, resolver, reason, slashAmount, _msgSender());
+        _recordPendingSlash(resolver);
         return slashId;
     }
 
     /**
      * @notice Execute a slash (with waterfall: resolver → senior)
+     * @dev Callable by ROLE_TIMELOCK (manual / fraud slashes) or ROLE_RESOLUTION_MODULE
+     *      (automated timeout slashes after the contest window has expired).
      */
-    function executeSlash(uint256 slashId) external override nonReentrant onlyRole(ROLE_TIMELOCK) {
+    function executeSlash(uint256 slashId) external override nonReentrant {
+        require(
+            hasRole(ROLE_TIMELOCK, _msgSender()) || hasRole(ROLE_RESOLUTION_MODULE, _msgSender()),
+            'Not authorized'
+        );
         SlashEvent storage slashEvent = slashEvents[slashId];
         if (slashEvent.slashId == 0) revert SlashNotFound(slashId);
 
@@ -264,6 +284,8 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         // Update slash event
         slashEvent.status = SlashStatus.EXECUTED;
         slashEvent.executedAt = block.timestamp;
+        
+        _clearPendingSlash(resolver);
 
         // Mark as slashed
         workflowSlashed[slashEvent.escrowContract][slashEvent.workflowId][resolver] = true;
@@ -294,7 +316,9 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
     }
 
     /**
-     * @notice Appeal a slash
+     * @notice Appeal a PENDING slash within the appeal/contest window.
+     * @dev If slashConfig.appealBond > 0 the caller must have approved this contract to
+     *      spend that amount of stableToken beforehand. The bond is held until resolveAppeal.
      */
     function appealSlash(
         uint256 slashId,
@@ -313,11 +337,18 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
             revert AlreadyAppealed(slashId);
         }
 
+        // Collect appeal bond before recording the appeal (checks-effects-interactions).
+        uint256 bondAmount = slashConfig.appealBond;
+        if (bondAmount > 0) {
+            stableToken.safeTransferFrom(_msgSender(), address(this), bondAmount);
+            appealBondsHeld[slashId] = bondAmount;
+        }
+
         // Record appeal
         slashAppeals[slashId] = SlashAppeal({
             slashId: slashId,
             appellant: _msgSender(),
-            appealBond: slashConfig.appealBond,
+            appealBond: bondAmount,
             appealedAt: block.timestamp,
             reason: reason,
             evidence: evidence,
@@ -325,16 +356,23 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
             upheld: false
         });
 
-        emit SlashAppealed(slashId, _msgSender(), slashConfig.appealBond, reason);
+        emit SlashAppealed(slashId, _msgSender(), bondAmount, reason);
     }
 
     /**
      * @notice Resolve an appeal
+     * @dev Reverts with CannotReverseExecutedSlash if the slash has already been executed.
+     *      If upheld: cancels the slash (status→REVERSED) and refunds the appeal bond.
+     *      If not upheld: slash remains PENDING (executeSlash is callable after appeal window)
+     *      and the appeal bond is forfeited to the insurance pool.
      */
     function resolveAppeal(uint256 slashId, bool upheld) external override onlyRole(ROLE_TIMELOCK) {
         SlashAppeal storage appeal = slashAppeals[slashId];
         SlashEvent storage slashEvent = slashEvents[slashId];
         if (slashEvent.slashId == 0) revert SlashNotFound(slashId);
+
+        // Guard: funds already distributed for executed slashes; reversal would require minting.
+        if (slashEvent.status == SlashStatus.EXECUTED) revert CannotReverseExecutedSlash(slashId);
 
         if (appeal.resolved) revert AppealAlreadyResolved(slashId);
         if (slashEvent.status != SlashStatus.PENDING) revert SlashNotPending(slashId, slashEvent.status);
@@ -342,14 +380,28 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         appeal.resolved = true;
         appeal.upheld = upheld;
 
+        uint256 bondHeld = appealBondsHeld[slashId];
+        // Clear bond custody regardless of outcome.
+        if (bondHeld > 0) {
+            appealBondsHeld[slashId] = 0;
+        }
+
         if (!upheld) {
-            // Appeal rejected, slash proceeds
+            // Appeal rejected — slash proceeds. Forfeit bond to insurance pool.
+            if (bondHeld > 0) {
+                stableToken.safeTransfer(address(insurancePoolVault), bondHeld);
+                insurancePoolVault.recordDeposit(bondHeld, SlashReason.FRAUD, slashEvent.workflowId, address(0));
+            }
             emit SlashAppealResolved(slashId, false, address(0), 0);
         } else {
-            // Appeal accepted, cancel slash
+            // Appeal accepted — cancel slash. Refund bond to resolver.
             slashEvent.status = SlashStatus.REVERSED;
+            _clearPendingSlash(slashEvent.resolver);
+            if (bondHeld > 0) {
+                stableToken.safeTransfer(appeal.appellant, bondHeld);
+            }
             emit SlashReversed(slashId, slashEvent.resolver, slashEvent.amount);
-            emit SlashAppealResolved(slashId, true, slashEvent.resolver, slashEvent.amount);
+            emit SlashAppealResolved(slashId, true, slashEvent.resolver, bondHeld);
         }
     }
 
@@ -360,7 +412,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
      * @param workflowId Dispute ID
      * @param escrowContract Related escrow contract
      * @param resolver Resolver who timed out
-     * @param timeoutType 0 = accept, 1 = resolve
+     * @param timeoutType 0 = accept (TIMEOUT_ACCEPT, immediate), 1 = resolve (TIMEOUT_RESOLVE, 24h contest window)
      */
     function slashForTimeout(
         uint256 workflowId,
@@ -397,62 +449,85 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
             return 0; // Cap reached, skip slash
         }
 
-        // Create slash event
         slashId = _nextSlashId++;
 
-        slashEvents[slashId] = SlashEvent({
-            slashId: slashId,
-            workflowId: workflowId,
-            escrowContract: escrowContract,
-            resolver: resolver,
-            reason: reason,
-            amount: slashAmount,
-            proposedAt: block.timestamp,
-            executedAt: block.timestamp, // Auto-execute
-            appealDeadline: 0, // No appeal for automated slashes
-            status: SlashStatus.EXECUTED,
-            proposer: _msgSender(),
-            evidence: ''
-        });
+        if (reason == SlashReason.TIMEOUT_ACCEPT) {
+            // Low-penalty, highly objective offense — execute immediately.
+            slashEvents[slashId] = SlashEvent({
+                slashId: slashId,
+                workflowId: workflowId,
+                escrowContract: escrowContract,
+                resolver: resolver,
+                reason: reason,
+                amount: slashAmount,
+                proposedAt: block.timestamp,
+                executedAt: block.timestamp,
+                appealDeadline: 0,
+                status: SlashStatus.EXECUTED,
+                proposer: _msgSender(),
+                evidence: ''
+            });
 
-        // Execute waterfall slash immediately
-        (uint256 resolverSlashed, uint256 seniorSlashed, address senior) = _executeWaterfallSlash(
-            resolver,
-            slashAmount
-        );
+            // Execute waterfall slash immediately
+            (uint256 resolverSlashed, uint256 seniorSlashed, address senior) = _executeWaterfallSlash(
+                resolver,
+                slashAmount
+            );
 
-        uint256 totalSlashed = resolverSlashed + seniorSlashed;
+            uint256 totalSlashed = resolverSlashed + seniorSlashed;
 
-        // Mark as slashed
-        workflowSlashed[escrowContract][workflowId][resolver] = true;
+            // Mark as slashed
+            workflowSlashed[escrowContract][workflowId][resolver] = true;
 
-        // Freeze resolver
-        _freezeResolver(resolver);
+            // Freeze resolver
+            _freezeResolver(resolver);
 
-        // Distribute slashed funds (using actual token amounts received from staking module)
-        SlashDistribution memory distribution = _distributeSlashedFunds(
-            _currentSlashStableAmount,
-            reason,
-            workflowId
-        );
+            // Distribute slashed funds
+            SlashDistribution memory distribution = _distributeSlashedFunds(
+                _currentSlashStableAmount,
+                reason,
+                workflowId
+            );
 
-        // Reset tracking after distribution
-        _currentSlashStableAmount = 0;
-        _currentSlashSewAmount = 0;
+            _currentSlashStableAmount = 0;
+            _currentSlashSewAmount = 0;
 
-        // Update unavailability stats
-        _updateUnavailabilityStats(resolver, true);
+            _updateUnavailabilityStats(resolver, true);
 
-        emit SlashProposed(slashId, workflowId, resolver, reason, slashAmount, _msgSender());
-        emit SlashExecuted(slashId, resolver, totalSlashed, distribution);
-        emit SlashExecutedWithWaterfall(
-            slashId,
-            resolver,
-            senior,
-            resolverSlashed,
-            seniorSlashed,
-            totalSlashed
-        );
+            emit SlashProposed(slashId, workflowId, resolver, reason, slashAmount, _msgSender());
+            emit SlashExecuted(slashId, resolver, totalSlashed, distribution);
+            emit SlashExecutedWithWaterfall(slashId, resolver, senior, resolverSlashed, seniorSlashed, totalSlashed);
+        } else {
+            // TIMEOUT_RESOLVE: higher penalty — give resolver a 24h contest window.
+            // The resolver may call appealSlash() (posting the appeal bond) within the window.
+            // If no appeal is filed, ROLE_RESOLUTION_MODULE calls executeSlash() after the deadline.
+            slashEvents[slashId] = SlashEvent({
+                slashId: slashId,
+                workflowId: workflowId,
+                escrowContract: escrowContract,
+                resolver: resolver,
+                reason: reason,
+                amount: slashAmount,
+                proposedAt: block.timestamp,
+                executedAt: 0,
+                appealDeadline: block.timestamp + TIMEOUT_RESOLVE_CONTEST_WINDOW,
+                status: SlashStatus.PENDING,
+                proposer: _msgSender(),
+                evidence: ''
+            });
+
+            // Mark as slashed immediately so the same workflow cannot be double-slashed
+            // while the contest window is open.
+            workflowSlashed[escrowContract][workflowId][resolver] = true;
+
+            // Freeze resolver now to lock stake during the contest window.
+            // Waterfall execution is deferred until executeSlash().
+            _freezeResolver(resolver);
+
+            emit SlashProposed(slashId, workflowId, resolver, reason, slashAmount, _msgSender());
+            _recordPendingSlash(resolver);
+        }
+
         return slashId;
     }
 
@@ -550,6 +625,10 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
 
     /**
      * @notice Slash for fraud (provable malicious behavior)
+     * @dev Creates a PENDING slash so the resolver can exercise their right to appeal.
+     *      Execution is deferred: call executeSlash() after the appeal window closes.
+     *      This is the correct procedure for the most serious category of slash — the
+     *      strongest penalty should also carry the strongest procedural protection.
      */
     function slashForFraud(
         uint256 workflowId,
@@ -557,7 +636,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         address resolver,
         bytes calldata evidence
     ) external override onlyRole(ROLE_TIMELOCK) returns (uint256 slashId) {
-        // Reset tracking before slash
+        // Reset tracking (will be used when executeSlash is called, not here)
         _currentSlashStableAmount = 0;
         _currentSlashSewAmount = 0;
 
@@ -586,7 +665,9 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
             return 0; // Cap reached, skip slash
         }
 
-        // Create slash event with evidence
+        // Create PENDING slash — NOT executed immediately.
+        // Resolver may call appealSlash() within the appeal window.
+        // After the window (or after a rejected appeal), ROLE_TIMELOCK calls executeSlash().
         slashId = _nextSlashId++;
 
         slashEvents[slashId] = SlashEvent({
@@ -597,52 +678,21 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
             reason: reason,
             amount: slashAmount,
             proposedAt: block.timestamp,
-            executedAt: block.timestamp, // Auto-execute for TIMELOCK-initiated fraud slashes
-            appealDeadline: block.timestamp + slashConfig.appealWindow, // Allow appeal
-            status: SlashStatus.EXECUTED,
+            executedAt: 0,
+            appealDeadline: block.timestamp + slashConfig.appealWindow,
+            status: SlashStatus.PENDING,
             proposer: _msgSender(),
-            evidence: evidence // Store evidence for audit
+            evidence: evidence
         });
 
-        // Execute waterfall slash immediately
-        (uint256 resolverSlashed, uint256 seniorSlashed, address senior) = _executeWaterfallSlash(
-            resolver,
-            slashAmount
-        );
-
-        uint256 totalSlashed = resolverSlashed + seniorSlashed;
-
-        // Mark as slashed
+        // Mark as slashed immediately — prevents double-slashing during the appeal window.
         workflowSlashed[escrowContract][workflowId][resolver] = true;
 
-        // Freeze resolver (fraud is severe)
+        // Freeze resolver now to lock stake during the appeal window.
         _freezeResolver(resolver);
 
-        // Distribute slashed funds
-        SlashDistribution memory distribution = _distributeSlashedFunds(
-            _currentSlashStableAmount,
-            reason,
-            workflowId
-        );
-
-        // Reset tracking after distribution
-        _currentSlashStableAmount = 0;
-        _currentSlashSewAmount = 0;
-
-        // Update unavailability stats
-        _updateUnavailabilityStats(resolver, true);
-
         emit SlashProposed(slashId, workflowId, resolver, reason, slashAmount, _msgSender());
-        emit SlashExecuted(slashId, resolver, totalSlashed, distribution);
-        emit SlashExecutedWithWaterfall(
-            slashId,
-            resolver,
-            senior,
-            resolverSlashed,
-            seniorSlashed,
-            totalSlashed
-        );
-
+        _recordPendingSlash(resolver);
         return slashId;
     }
 
@@ -705,6 +755,36 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
                 }
                 seniorSlashed = 0;
                 senior = address(0);
+            }
+        }
+    }
+
+    /**
+     * @notice Record a pending slash and update senior risk counts
+     */
+    function _recordPendingSlash(address resolver) internal {
+        pendingSlashCount[resolver]++;
+        
+        // Update senior if applicable
+        IStakingModule.DelegationInfo memory delegation = _findDelegation(resolver);
+        if (delegation.active && delegation.delegatee != address(0)) {
+            juniorsPendingSlashCount[delegation.delegatee]++;
+        }
+    }
+
+    /**
+     * @notice Clear a pending slash and update senior risk counts
+     */
+    function _clearPendingSlash(address resolver) internal {
+        if (pendingSlashCount[resolver] > 0) {
+            pendingSlashCount[resolver]--;
+        }
+        
+        // Update senior if applicable
+        IStakingModule.DelegationInfo memory delegation = _findDelegation(resolver);
+        if (delegation.active && delegation.delegatee != address(0)) {
+            if (juniorsPendingSlashCount[delegation.delegatee] > 0) {
+                juniorsPendingSlashCount[delegation.delegatee]--;
             }
         }
     }
@@ -1037,6 +1117,20 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         SlashEvent storage slashEvent = slashEvents[slashId];
         return
             slashEvent.status == SlashStatus.PENDING && block.timestamp > slashEvent.appealDeadline;
+    }
+
+    /**
+     * @notice Check if a resolver has a pending slash proposal
+     * @dev Also checks if a senior is at risk due to pending slashes of their juniors
+     */
+    function hasPendingSlash(address resolver) external view override returns (bool hasPending) {
+        // Direct pending slash check (using optimized mapping)
+        if (pendingSlashCount[resolver] > 0) return true;
+
+        // Senior risk check: if any junior has a pending slash that could hit this senior
+        if (juniorsPendingSlashCount[resolver] > 0) return true;
+
+        return false;
     }
 
     function getInsurancePoolBalance() external view override returns (uint256) {

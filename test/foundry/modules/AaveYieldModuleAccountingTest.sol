@@ -101,7 +101,7 @@ contract AaveYieldModuleAccountingTest is Test {
         assertEq(accepted, largeAmount, "Large amount should be accepted");
         
         // Verify position recorded correctly
-        (, uint256 principal) = module.positions(escrow, 1);
+        (, uint256 principal, ) = module.positions(escrow, 1);
         assertEq(principal, largeAmount, "Large principal should be stored");
     }
 
@@ -178,8 +178,8 @@ contract AaveYieldModuleAccountingTest is Test {
         module.initializeYield(2, address(token), 75e18, YieldPreset.TO_SENDER);
         
         // Verify both positions
-        (, uint256 p1) = module.positions(escrow, 1);
-        (, uint256 p2) = module.positions(escrow, 2);
+        (, uint256 p1, ) = module.positions(escrow, 1);
+        (, uint256 p2, ) = module.positions(escrow, 2);
         
         assertEq(p1, 50e18, "First position correct");
         assertEq(p2, 75e18, "Second position correct");
@@ -189,8 +189,8 @@ contract AaveYieldModuleAccountingTest is Test {
         module.unwindToEscrow(1, address(token), 50e18);
         
         // Verify first withdrawn, second intact
-        (, uint256 p1After) = module.positions(escrow, 1);
-        (, uint256 p2After) = module.positions(escrow, 2);
+        (, uint256 p1After, ) = module.positions(escrow, 1);
+        (, uint256 p2After, ) = module.positions(escrow, 2);
         
         assertEq(p1After, 0, "First withdrawn");
         assertEq(p2After, 75e18, "Second intact");

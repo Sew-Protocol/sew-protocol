@@ -186,7 +186,7 @@ contract KlerosIntegrationTest is Test {
         bytes memory escrowData = abi.encode(address(0), sender, recipient, AMOUNT, AMOUNT);
 
         vm.prank(other);
-        vm.expectRevert('Not authorized');
+        vm.expectRevert('Only registered escrow contracts');
         klerosProxy.createDispute{value: ARBITRATION_PRICE}(1, address(mockEscrow), 2, '0x', escrowData);
     }
 

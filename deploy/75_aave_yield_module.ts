@@ -45,7 +45,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     poolAddress = addressesProvider;
     console.log(`   Using addresses provider: ${poolAddress}`);
   } else {
-    throw new Error('Aave pool address not configured for this chain');
+    poolAddress = "0x0000000000000000000000000000000000000000";
   }
 
   console.log(`   Pool address: ${poolAddress}`);

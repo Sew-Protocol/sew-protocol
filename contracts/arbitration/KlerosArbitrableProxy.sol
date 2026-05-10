@@ -88,7 +88,12 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
      * @param workflowId The escrow workflow ID
      * @param choices Number of ruling choices (typically 2: release or cancel)
      * @param extraData Additional data for Kleros
-     * @param escrowData Encoded escrow data (token, from, to, amount)
+     * @param escrowData Encoded escrow data (token, from, to, amount) for Kleros metadata
+     * @dev Only registered escrow contracts (ROLE_ESCROW_CONTRACT) may call this function.
+     *      Allowing arbitrary callers to supply escrowData would let anyone attach fabricated
+     *      participant metadata to a real workflowId, corrupting the Kleros evidence record
+     *      and enabling third-party griefing. Dispute initiation by end-users is handled via
+     *      BaseEscrow.raiseDispute, which then calls this function through the resolution module.
      */
     function createDispute(
         uint256 workflowId,
@@ -102,18 +107,14 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
         nonReentrant
         returns (uint256 klerosDisputeId)
     {
+        require(hasRole(ROLE_ESCROW_CONTRACT, _msgSender()), 'Only registered escrow contracts');
         require(workflowToKlerosDispute[escrowContract][workflowId] == 0, 'Dispute already exists');
 
-        // Decode escrow data
+        // Decode escrow data (supplied by the trusted escrow contract)
         (, address from, address to, uint256 amount, ) = abi.decode(
             escrowData,
             (address, address, address, uint256, uint256)
         );
-
-        // Authorization check: Only escrow contract or associated participants
-        if (!hasRole(ROLE_ESCROW_CONTRACT, _msgSender())) {
-            require(_msgSender() == from || _msgSender() == to, 'Not authorized');
-        }
 
         // Check arbitration cost
         uint256 cost = arbitrator.arbitrationCost(extraData);
@@ -171,7 +172,7 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
      * @param _disputeID The Kleros dispute ID
      * @param _ruling The ruling (0 = refused to rule, 1 = release to recipient, 2 = cancel to sender)
      */
-    function rule(uint256 _disputeID, uint256 _ruling) external override {
+    function rule(uint256 _disputeID, uint256 _ruling) external override nonReentrant {
         require(_msgSender() == address(arbitrator), 'Only arbitrator can rule');
 
         // BUG FIX: workflowId 0 is valid, use escrowContract to validate existence

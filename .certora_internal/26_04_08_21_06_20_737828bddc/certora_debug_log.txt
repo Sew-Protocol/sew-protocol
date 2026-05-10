@@ -1,0 +1,19 @@
+Saving last configuration file to .certora_internal/26_04_08_21_06_20_737828bddc/run.conf
+There is no TAC file. Going to script CertoraProver/certoraBuild.py to main_with_args()
+main build cache key computed based on {'files': ['certora/harness/EscrowVaultHarness.sol', 'contracts/core/BaseEscrow.sol', 'contracts/core/BondCollector.sol', 'contracts/core/EscrowVault.sol', 'contracts/core/ModuleSnapshotRegistry.sol', 'contracts/mocks/ERC20Mock.sol', 'contracts/ops/CreateOps.sol', 'contracts/ops/DisputeOps.sol', 'contracts/ops/SettlementOps.sol', 'contracts/ops/YieldOps.sol'], 'package_version_for_build_cache': 'certora-cli 8.8.1', 'packages': ['@openzeppelin=node_modules/@openzeppelin'], 'packages_path': 'node_modules', 'solc': 'solc', 'solc_allow_path': 'contracts', 'test_condition': 'True'}
+Creating dir /home/user/Code/sew-protocol/.certora_internal/26_04_08_21_06_20_737828bddc/.certora_config
+In /home/user/Code/sew-protocol/certora/specs/EscrowInvariants.spec, found the imports: []
+copying spec file /home/user/Code/sew-protocol/certora/specs/EscrowInvariants.spec to /home/user/Code/sew-protocol/.certora_internal/26_04_08_21_06_20_737828bddc/.certora_sources/.0_EscrowInvariants.spec.spec
+writing /home/user/Code/sew-protocol/.certora_internal/26_04_08_21_06_20_737828bddc/.certora_verify.json
+
+building file certora/harness/EscrowVaultHarness.sol
+Running cmd solc --version
+stdout, stderr = .certora_internal/26_04_08_21_06_20_737828bddc/.certora_config/version_check_solc.stdout, .certora_internal/26_04_08_21_06_20_737828bddc/.certora_config/version_check_solc.stderr
+Exitcode 0
+Solc run solc --version time: 0.038
+Running cmd solc -o ".certora_internal/26_04_08_21_06_20_737828bddc/.certora_config/EscrowVaultHarness.sol_0/" --overwrite --allow-paths "contracts",.,"node_modules/@openzeppelin" --standard-json
+stdout, stderr = .certora_internal/26_04_08_21_06_20_737828bddc/.certora_config/EscrowVaultHarness.sol_0.standard.stdout.json, .certora_internal/26_04_08_21_06_20_737828bddc/.certora_config/EscrowVaultHarness.sol_0.standard.stderr.json
+Exitcode 0
+Solc run solc -o ".certora_internal/26_04_08_21_06_20_737828bddc/.certora_config/EscrowVaultHarness.sol_0/" --overwrite --allow-paths "contracts",.,"node_modules/@openzeppelin" --standard-json time: 0.0146
+reading standard json data from .certora_internal/26_04_08_21_06_20_737828bddc/.certora_config/EscrowVaultHarness.sol_0.standard.stdout.json
+build failed

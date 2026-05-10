@@ -9,9 +9,6 @@ import '../types/EscrowTypes.sol';
  * @dev Extracted from BaseEscrow to reduce contract size. Phase 6: Added bounds validation.
  */
 library SettingsValidationLibrary {
-    /// @notice Maximum auto time duration (10 years in seconds)
-    uint256 public constant MAX_AUTO_TIME_DURATION = 10 * 365 * 24 * 60 * 60;
-
     // Phase 6: Bounds constants
     uint256 public constant MAX_AUTO_TIME_DAYS = 30 days;
     uint256 public constant MAX_ATTACHMENTS = 20;
@@ -36,7 +33,9 @@ library SettingsValidationLibrary {
      * @dev Validate a single auto time value
      * @param autoTime The auto time to validate (0 means no auto time, which is valid)
      * @param currentTime Current block timestamp
-     * @dev Reverts if autoTime is in the past or exceeds MAX_AUTO_TIME_DURATION from current block timestamp
+     * @dev Reverts if autoTime is in the past or exceeds MAX_ESCROW_DURATION (1 year) from
+     *      current block timestamp. A single canonical limit avoids the confusion of having
+     *      both a 10-year cap here and a 1-year cap in validateEscrowSettings.
      */
     function validateAutoTime(
         uint256 autoTime,
@@ -51,8 +50,8 @@ library SettingsValidationLibrary {
             revert InvalidAutoTime(AUTO_TIME_IN_PAST, autoTime, currentTime);
         }
 
-        // Validate time doesn't exceed maximum duration
-        uint256 maxAllowedTime = currentTime + MAX_AUTO_TIME_DURATION;
+        // Validate time doesn't exceed maximum duration (1 year — canonical limit)
+        uint256 maxAllowedTime = currentTime + MAX_ESCROW_DURATION;
         if (autoTime > maxAllowedTime) {
             revert AutoTimeExceedsMaxLimit(autoTime, maxAllowedTime);
         }
@@ -80,23 +79,10 @@ library SettingsValidationLibrary {
             revert CannotSetBothAutoTimes(settings.autoReleaseTime, settings.autoCancelTime);
         }
 
-        // Validate auto times using helper function
+        // validateAutoTime already enforces MAX_ESCROW_DURATION (1 year) as the single
+        // canonical limit, so no additional cap checks are needed here.
         validateAutoTime(settings.autoReleaseTime, currentTime);
         validateAutoTime(settings.autoCancelTime, currentTime);
-        
-        // Validate maximum escrow duration (for auto times)
-        if (settings.autoReleaseTime > 0) {
-            uint256 maxAllowedTime = currentTime + MAX_ESCROW_DURATION;
-            if (settings.autoReleaseTime > maxAllowedTime) {
-                revert AutoTimeExceedsMaxLimit(settings.autoReleaseTime, maxAllowedTime);
-            }
-        }
-        if (settings.autoCancelTime > 0) {
-            uint256 maxAllowedTime = currentTime + MAX_ESCROW_DURATION;
-            if (settings.autoCancelTime > maxAllowedTime) {
-                revert AutoTimeExceedsMaxLimit(settings.autoCancelTime, maxAllowedTime);
-            }
-        }
 
         // Validate custom dispute resolver if set
         if (settings.customResolver != address(0)) {

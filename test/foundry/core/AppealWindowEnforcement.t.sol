@@ -5,6 +5,7 @@ import 'forge-std/Test.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/core/BaseEscrow.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol';
+import '../../../contracts/modules/decentralized-resolution-module/DRMAdminFacet.sol';
 import '../../../contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV2.sol';
 import '../../../contracts/modules/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
@@ -72,6 +73,7 @@ contract AppealWindowEnforcementTest is Test {
 
         // Deploy resolution module
         resolutionModule = new DecentralizedResolutionModule(deployer);
+        { DRMAdminFacet drmAdminFacet_ = new DRMAdminFacet(); resolutionModule.setAdminFacet(address(drmAdminFacet_)); }
 
         // Deploy escrow
         yieldOps = new YieldOps(address(this));

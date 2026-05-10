@@ -2,6 +2,7 @@
 
 **Date**: 2025-01-XX  
 **Reviewer**: AI Assistant  
+**Resolved**: 2026-04-21 (branch `fix/drm-size-reduction`)  
 **Scope**: Interface, V1/V2 implementations, upgrade path, appeal bonds, escalation incentives
 
 ---
@@ -20,13 +21,17 @@ This review covers the `IIncentiveModule` interface and its implementations (`Re
 **Key Findings:**
 
 1. ✅ Interface is well-designed and extensible
-2. ⚠️ **CRITICAL**: `onDisputeOpened` is never called - missing integration
-3. ⚠️ **CRITICAL**: `onDisputeFinalized` is never called - missing integration
-4. ⚠️ `distributePayments` interface method not implemented in V1/V2 (uses `onDisputeResolved` instead)
-5. ⚠️ Appeal bond distribution uses pull pattern but bond refund uses push pattern (inconsistent)
-6. ⚠️ V2 `_payBondToResolvers` has potential rounding error (division without remainder handling)
+2. ✅ ~~**CRITICAL**: `onDisputeOpened` is never called~~ — Fixed: called via `DisputeRaiseLibrary`
+3. ✅ ~~**CRITICAL**: `onDisputeFinalized` is never called~~ — Fixed: called in `DecentralizedResolutionModule.finalizeDispute`
+4. ✅ ~~`distributePayments` interface method not implemented~~ — Fixed: implemented in `ResolverIncentiveModuleV1`
+5. ✅ ~~Bond refund uses push pattern (inconsistent)~~ — Fixed: ERC20 refunds use pull via `claimableBondRefunds`/`claimBondRefund`; ETH push retained (documented rationale)
+6. ✅ ~~Rounding error in `_payBondToResolvers`~~ — Fixed: remainder distributed 1-wei each
 7. ✅ Upgrade path from V1 to V2 is clean (inheritance-based)
-8. ⚠️ Missing integration: `recordAppealBond` not called from escalation flow
+8. ✅ ~~`recordAppealBond` not called from escalation flow~~ — Fixed: called in `BondCollector` and `BondHandlingLibrary`
+9. ✅ ~~No event when bond forfeited to protocol~~ — Fixed: `AppealBondForfeited` emitted with reason string; `totalBondsForfeited` updated
+10. ✅ Reentrancy guard already present on `distributeAppealBond`
+11. ✅ ~~`hasAppealBond` view missing~~ — Already implemented
+12. ✅ `totalBondRefundsClaimed` metric added; `getV2Metrics` returns 5 values
 
 ---
 
@@ -579,29 +584,29 @@ function distributePayments(
 
 ### Critical (Must Fix)
 
-1. **Add `onDisputeOpened` call** in dispute initialization flow
-2. **Add `onDisputeFinalized` call** when dispute finalizes
-3. **Add `recordAppealBond` call** in escalation flow after bond collection
-4. **Add `distributeAppealBond` call** when dispute finalizes or reversal occurs
-5. **Implement `distributePayments`** interface method (or update interface docs)
+1. ✅ **Add `onDisputeOpened` call** — `DisputeRaiseLibrary` calls via low-level call
+2. ✅ **Add `onDisputeFinalized` call** — `DecentralizedResolutionModule.finalizeDispute`
+3. ✅ **Add `recordAppealBond` call** — `BondCollector` + `BondHandlingLibrary`
+4. ✅ **Add `distributeAppealBond` call** — `DecentralizedResolutionModule.recordReversal`
+5. ✅ **Implement `distributePayments`** — `ResolverIncentiveModuleV1` line 555
 
 ### High Priority
 
-6. **Fix rounding error** in `_payBondToResolvers` (distribute remainder)
-7. **Add bond existence check** in `recordAppealBond` (prevent overwrites)
-8. **Clarify round parameter** documentation in `distributeAppealBond`
+6. ✅ **Fix rounding error** — remainder distributed 1-wei each to first `remainder` resolvers
+7. ✅ **Add bond existence check** — `require(appealBonds[...].amount == 0, 'Bond already exists')`
+8. ✅ **Clarify round parameter** — documented; `bond.amount` zeroed before `_payBondToResolvers`
 
 ### Medium Priority
 
-9. **Consider pull pattern for bond refunds** (consistency)
-10. **Add reentrancy guard** to `distributeAppealBond` (if not already present)
-11. **Emit event** when bond forfeited to protocol (empty resolver array case)
+9. ✅ **Pull pattern for ERC20 bond refunds** — `claimableBondRefunds` mapping + `claimBondRefund`; ETH stays push (documented rationale)
+10. ✅ **Reentrancy guard** — `nonReentrant` already on `distributeAppealBond`
+11. ✅ **Emit event when bond forfeited** — `AppealBondForfeited` with reason string; `totalBondsForfeited` updated
 
 ### Low Priority
 
-12. **Document rationale** for mixed push/pull patterns
-13. **Add view function** to check if bond exists for a dispute/round
-14. **Add metrics** for bond collection success/failure rates
+12. ✅ **Document rationale for ETH push** — inline comment in `_refundBond`
+13. ✅ **View function to check bond existence** — `hasAppealBond(workflowId, escrowContract, round)`
+14. ✅ **Metrics for bond collection** — `totalBondRefundsClaimed` added; `getV2Metrics` returns 5 values
 
 ---
 

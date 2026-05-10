@@ -55,11 +55,11 @@ contract AaveYieldModuleInvariantTest is Test {
     }
 
     function invariant_principal_never_exceeds_balance() public {
-        (, uint256 principal1) = module.positions(escrow1, 1);
-        (, uint256 principal2) = module.positions(escrow2, 1);
-        (, uint256 principal3) = module.positions(escrow3, 1);
-        (, uint256 principal4) = module.positions(escrow1, 2);
-        (, uint256 principal5) = module.positions(escrow2, 2);
+        (, uint256 principal1, ) = module.positions(escrow1, 1);
+        (, uint256 principal2, ) = module.positions(escrow2, 1);
+        (, uint256 principal3, ) = module.positions(escrow3, 1);
+        (, uint256 principal4, ) = module.positions(escrow1, 2);
+        (, uint256 principal5, ) = module.positions(escrow2, 2);
         
         uint256 totalPositionPrincipal = principal1 + principal2 + principal3 + principal4 + principal5;
         
@@ -75,9 +75,9 @@ contract AaveYieldModuleInvariantTest is Test {
     }
 
     function invariant_user_isolation() public {
-        (address token1, uint256 principal1) = module.positions(escrow1, 1);
-        (address token2, uint256 principal2) = module.positions(escrow2, 1);
-        (address token3, uint256 principal3) = module.positions(escrow3, 1);
+        (address token1, uint256 principal1, ) = module.positions(escrow1, 1);
+        (address token2, uint256 principal2, ) = module.positions(escrow2, 1);
+        (address token3, uint256 principal3, ) = module.positions(escrow3, 1);
         
         if (principal1 > 0) {
             assertEq(token1, address(token));
