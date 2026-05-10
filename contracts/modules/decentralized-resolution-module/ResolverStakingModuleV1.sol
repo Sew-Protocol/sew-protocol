@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
+import "./ISlashingModule.sol";
 import './IStakingModule.sol';
 import './BondValuationLibrary.sol';
 import '@openzeppelin/contracts/access/AccessControl.sol';
@@ -68,6 +69,7 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
     error InsufficientAvailableStake(address resolver, uint256 available, uint256 required);
     error InsufficientBond(address resolver, uint256 effectiveBond, uint256 required);
     error InvalidTier(uint8 tier, uint8 maxTier);
+    error ResolverHasPendingSlash(address resolver);
 
     // ============ Constants ============
 
@@ -318,6 +320,9 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
 
         address resolver = _msgSender();
 
+        // CRITICAL: Check if resolver has pending slash
+        if (slashingModule != address(0) && ISlashingModule(address(slashingModule)).hasPendingSlash(resolver)) revert ResolverHasPendingSlash(resolver);
+
         // CRITICAL: Check if resolver is frozen (recent slash)
         if (isResolverFrozen(resolver)) revert ResolverFrozen(resolver);
 
@@ -412,6 +417,13 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
      */
     function completeUnstake() external nonReentrant {
         address resolver = _msgSender();
+
+        // CRITICAL: Check if resolver has pending slash
+        if (slashingModule != address(0) && ISlashingModule(address(slashingModule)).hasPendingSlash(resolver)) revert ResolverHasPendingSlash(resolver);
+
+        // CRITICAL: Check if resolver is frozen (recent slash)
+        if (isResolverFrozen(resolver)) revert ResolverFrozen(resolver);
+
         UnbondRequest storage request = unbondRequests[resolver];
 
         if (!request.exists) revert NoUnbondRequest(resolver);

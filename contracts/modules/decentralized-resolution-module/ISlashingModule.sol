@@ -133,6 +133,13 @@ interface ISlashingModule {
     event InsurancePoolFunded(uint256 amount, uint256 newBalance);
     event InsurancePoolPayout(address indexed to, uint256 amount, uint256 indexed workflowId);
 
+    /**
+     * @notice Check if a resolver has a pending slash proposal
+     * @param resolver Address of the resolver
+     * @return hasPending True if a pending slash proposal exists
+     */
+    function hasPendingSlash(address resolver) external view returns (bool hasPending);
+
     // ============ Core Slashing Functions ============
 
     /**

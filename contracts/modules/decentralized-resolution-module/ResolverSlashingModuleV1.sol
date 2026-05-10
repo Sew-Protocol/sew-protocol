@@ -1079,6 +1079,18 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
             slashEvent.status == SlashStatus.PENDING && block.timestamp > slashEvent.appealDeadline;
     }
 
+    /**
+     * @notice Check if a resolver has a pending slash proposal
+     */
+    function hasPendingSlash(address resolver) external view override returns (bool hasPending) {
+        for (uint256 i = 0; i < _nextSlashId; i++) {
+            if (slashEvents[i].resolver == resolver && slashEvents[i].status == SlashStatus.PENDING) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     function getInsurancePoolBalance() external view override returns (uint256) {
         if (address(insurancePoolVault) != address(0)) {
             return insurancePoolVault.getTotalBalance();
