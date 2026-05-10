@@ -9,6 +9,7 @@ import '../../../contracts/ops/YieldOps.sol';
 import '../../../contracts/ops/DisputeOps.sol';
 import '../../../contracts/core/modules/DefaultResolutionModule.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
+import '../../../contracts/modules/DefaultReleaseStrategy.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
 import '../../../contracts/ops/CreateOps.sol';
 import '../../../contracts/ops/SettlementOps.sol';
@@ -120,9 +121,9 @@ contract EscrowAccountingBugTests is Test {
     BondCollector public bondCollector;
     DefaultResolutionModule public resolutionModule;
     MockYieldModuleWithLoss public yieldGen;
-    
-    ERC20Mock public token;
+    DefaultReleaseStrategy public releaseStrategy;
 
+    ERC20Mock public token;
     address public feeAddress = address(0xFEE);
     address public buyer = address(0x1001);
     address public seller = address(0x1002);
@@ -141,6 +142,7 @@ contract EscrowAccountingBugTests is Test {
         bondCollector = new BondCollector(address(this));
         resolutionModule = new DefaultResolutionModule(address(this), resolver);
         yieldGen = new MockYieldModuleWithLoss();
+        releaseStrategy = new DefaultReleaseStrategy();
 
         vault = new EscrowVault(FEE_BPS, feeAddress, address(yieldOps), address(disputeOps), address(mm));
 
@@ -156,12 +158,13 @@ contract EscrowAccountingBugTests is Test {
         vault.setSettlementOps(address(settlementOps));
         vault.setBondCollector(address(bondCollector));
         vault.setResolutionModule(address(resolutionModule));
-        
-        // Set default yield gen module via governance
+
+        // Set default modules via governance
         mm.queueModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN, address(yieldGen));
+        mm.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
         vm.warp(block.timestamp + 8 days);
         mm.activateModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN);
-
+        mm.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
         token.transfer(buyer, 100000e18);
     }
 

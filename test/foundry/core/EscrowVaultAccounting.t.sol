@@ -14,6 +14,7 @@ import '../../../contracts/ops/SettlementOps.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/mocks/MockRevertingERC20.sol';
 import '../../../contracts/types/EscrowTypes.sol';
+import '../../../contracts/modules/DefaultReleaseStrategy.sol';
 
 /**
  * @title EscrowVaultAccountingTest
@@ -28,6 +29,7 @@ contract EscrowVaultAccountingTest is Test {
     SettlementOps public settlementOps;
     BondCollector public bondCollector;
     DefaultResolutionModule public resolutionModule;
+    DefaultReleaseStrategy internal defaultReleaseStrategy;
     
     ERC20Mock public tokenA;
     ERC20Mock public tokenB;
@@ -52,6 +54,7 @@ contract EscrowVaultAccountingTest is Test {
         settlementOps = new SettlementOps(address(this));
         bondCollector = new BondCollector(address(this));
         resolutionModule = new DefaultResolutionModule(address(this), resolver);
+        defaultReleaseStrategy = new DefaultReleaseStrategy();
 
         vault = new EscrowVault(FEE_BPS, feeAddress, address(yieldOps), address(disputeOps), address(mm));
 
@@ -67,6 +70,10 @@ contract EscrowVaultAccountingTest is Test {
         vault.setSettlementOps(address(settlementOps));
         vault.setBondCollector(address(bondCollector));
         vault.setResolutionModule(address(resolutionModule));
+        
+        mm.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(defaultReleaseStrategy));
+        vm.warp(block.timestamp + 8 days);
+        mm.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
 
         tokenA.transfer(buyer, 100000e18);
         tokenB.transfer(buyer, 100000e18);
@@ -202,7 +209,7 @@ contract EscrowVaultAccountingTest is Test {
         vm.startPrank(buyer);
         tokenA.approve(address(vault), 0);
         
-        vm.expectRevert(AmountZero.selector); 
+        vm.expectRevert(AmountZero.selector);
         vault.createEscrow(address(tokenA), seller, 0, SettingsValidationLibrary.getDefaultSettings());
         vm.stopPrank();
     }

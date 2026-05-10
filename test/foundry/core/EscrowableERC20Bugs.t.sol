@@ -3,6 +3,7 @@ pragma solidity ^0.8.33;
 
 import "forge-std/Test.sol";
 import "../../../contracts/core/EscrowableERC20.sol";
+import "../../../contracts/modules/DefaultReleaseStrategy.sol";
 import "../../../contracts/core/modules/DefaultResolutionModule.sol";
 import "../../../contracts/types/EscrowTypes.sol";
 import "../../../contracts/ops/YieldOps.sol";
@@ -40,6 +41,7 @@ contract SilentFailureModule is IYieldGenerationModule {
 
 contract EscrowableERC20BugsTest is Test {
     EscrowableERC20 public escrowToken;
+    DefaultReleaseStrategy public releaseStrategy;
     ERC20Mock public otherToken;
     DefaultResolutionModule public resolutionModule;
     YieldOps public yieldOps;
@@ -67,6 +69,7 @@ contract EscrowableERC20BugsTest is Test {
         bondCollector = new BondCollector(owner);
         resolutionModule = new DefaultResolutionModule(owner, resolver);
         adminContract = new EscrowGovernanceTimelock(owner);
+        releaseStrategy = new DefaultReleaseStrategy();
         silentModule = new SilentFailureModule();
 
         escrowToken = new EscrowableERC20(
@@ -92,7 +95,9 @@ contract EscrowableERC20BugsTest is Test {
         // Configure silent module via Registry
         vm.startPrank(owner);
         moduleManagement.queueModule(address(escrowToken), BaseEscrow.ModuleType.YIELD_GEN, address(silentModule));
+        moduleManagement.queueModule(address(escrowToken), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
         vm.warp(block.timestamp + 8 days);
+        moduleManagement.activateModule(address(escrowToken), BaseEscrow.ModuleType.RELEASE);
         moduleManagement.activateModule(address(escrowToken), BaseEscrow.ModuleType.YIELD_GEN);
         vm.stopPrank();
 

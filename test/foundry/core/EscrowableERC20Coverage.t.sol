@@ -12,7 +12,9 @@ import '../../../contracts/ops/SettlementOps.sol';
 import '../../../contracts/ops/CreateOps.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
+import '../../../contracts/modules/DefaultReleaseStrategy.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
+import '../../../contracts/core/EscrowableERC20.sol';
 
 /**
  * @title EscrowableERC20CoverageTest
@@ -29,6 +31,7 @@ contract EscrowableERC20CoverageTest is Test {
     CreateOps public createOps;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
+    DefaultReleaseStrategy public releaseStrategy;
 
     address public feeAddress = address(0xFEE);
     address public resolver   = address(0x1234);
@@ -70,6 +73,7 @@ contract EscrowableERC20CoverageTest is Test {
         bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         resolutionModule = new DefaultResolutionModule(address(this), resolver);
+        releaseStrategy = new DefaultReleaseStrategy();
 
         token = new EscrowableERC20(
             'SEW Token', 'SEW', FEE_BPS, feeAddress,
@@ -79,6 +83,10 @@ contract EscrowableERC20CoverageTest is Test {
         factory = new EscrowableERC20Factory();
 
         moduleManagement.registerEscrowContract(address(token));
+        moduleManagement.queueModule(address(token), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
+        vm.warp(block.timestamp + 8 days);
+        moduleManagement.activateModule(address(token), BaseEscrow.ModuleType.RELEASE);
+
         yieldOps.registerEscrowContract(address(token));
         disputeOps.registerEscrowContract(address(token));
         settlementOps.registerEscrowContract(address(token));
@@ -438,6 +446,7 @@ contract EscrowableERC20CoverageTest is Test {
             address(yieldOps), address(disputeOps), address(moduleManagement)
         );
         moduleManagement.registerEscrowContract(address(zeroFeeToken));
+        // Remove invalid module registrations
         yieldOps.registerEscrowContract(address(zeroFeeToken));
         disputeOps.registerEscrowContract(address(zeroFeeToken));
         createOps.registerEscrowContract(address(zeroFeeToken));

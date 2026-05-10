@@ -5,6 +5,7 @@ import 'forge-std/Test.sol';
 import 'contracts/core/EscrowVault.sol';
 import 'contracts/mocks/ERC20Mock.sol';
 import 'contracts/core/modules/DefaultResolutionModule.sol';
+import 'contracts/modules/DefaultReleaseStrategy.sol';
 import 'contracts/types/EscrowTypes.sol';
 import 'contracts/ops/YieldOps.sol';
 import 'contracts/ops/DisputeOps.sol';
@@ -23,6 +24,7 @@ contract AutoTransferTest is Test {
     EscrowVault vault;
     ERC20Mock token;
     DefaultResolutionModule rm;
+    DefaultReleaseStrategy defaultReleaseStrategy;
     YieldOps yieldOps;
     DisputeOps disputeOps;
     SettlementOps settlementOps;
@@ -47,8 +49,14 @@ contract AutoTransferTest is Test {
         bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));
+        defaultReleaseStrategy = new DefaultReleaseStrategy();
         vault = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
         moduleManagement.registerEscrowContract(address(vault));
+
+        moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(defaultReleaseStrategy));
+
+        vm.warp(block.timestamp + 8 days);
+        moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
 
         yieldOps.registerEscrowContract(address(vault));
         disputeOps.registerEscrowContract(address(vault));

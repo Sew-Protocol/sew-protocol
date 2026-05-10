@@ -15,6 +15,7 @@ import { SettlementOps } from "../../../contracts/ops/SettlementOps.sol";
 import { CreateOps } from "../../../contracts/ops/CreateOps.sol";
 import { BondCollector } from "../../../contracts/core/BondCollector.sol";
 import { ModuleSnapshotRegistry } from "../../../contracts/core/ModuleSnapshotRegistry.sol";
+import { DefaultReleaseStrategy } from "../../../contracts/modules/DefaultReleaseStrategy.sol";
 import { EscrowGovernanceTimelock } from "../../../contracts/admin/EscrowGovernanceTimelock.sol";
 import { SettingsValidationLibrary } from "../../../contracts/libraries/SettingsValidationLibrary.sol";
 
@@ -27,6 +28,7 @@ contract EscrowStateMachineTest is Test {
     EscrowVault internal vault;
     ERC20Mock internal token;
     DefaultResolutionModule internal rm;
+    DefaultReleaseStrategy internal defaultReleaseStrategy;
     YieldOps internal yieldOps;
     DisputeOps internal disputeOps;
     SettlementOps internal settlementOps;
@@ -51,9 +53,14 @@ contract EscrowStateMachineTest is Test {
         bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));
+        defaultReleaseStrategy = new DefaultReleaseStrategy();
 
         vault = new EscrowVault(ESCROW_FEE_BPS, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
         moduleManagement.registerEscrowContract(address(vault));
+
+        moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(defaultReleaseStrategy));
+        vm.warp(block.timestamp + 8 days);
+        moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
 
         // Register escrow contract with all ops contracts
         yieldOps.registerEscrowContract(address(vault));

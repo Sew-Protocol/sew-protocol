@@ -94,6 +94,7 @@ error ZeroBondCollector();
 error EscalationNotAllowed();
 error AppealBondQueryFailed(uint256 workflowId);
 error InvalidBondMsgValue(uint256 workflowId, uint256 required, uint256 provided);
+error UnauthorizedTimedExecutor(address caller);
 error AppealsNotEnabledInV1();
 error AlreadyPausedCannotRepause();
 error MaxPauseCyclesExceeded(uint256 currentCount, uint256 maxCycles);
@@ -154,6 +155,9 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
 
     // token => feeRecipient => claimable protocol fee amount (from appeal bonds)
     mapping(address => mapping(address => uint256)) public claimableBondProtocolFees;
+
+    // user => native ETH refundable excess amounts (no auto-push)
+    mapping(address => uint256) public claimableExcessEthRefunds;
 
     // Phase 1: Pending settlement storage (appeal window enforcement)
     struct PendingSettlement {
@@ -299,6 +303,8 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         address indexed feeRecipient,
         uint256 amount
     );
+    event ExcessEthRefundCredited(uint256 indexed workflowId, address indexed account, uint256 amount);
+    event ExcessEthRefundClaimed(address indexed account, uint256 amount);
 
     // op codes (append-only):
     // 1 = yield deposit
@@ -522,6 +528,11 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     function automateTimedActions(uint256 workflowId) external nonReentrant returns (bool) {
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
+        if (
+            _msgSender() != et.from &&
+            _msgSender() != et.to &&
+            !hasRole(ROLE_TIMELOCK, _msgSender())
+        ) revert UnauthorizedTimedExecutor(_msgSender());
         ModuleSnapshot storage snap = moduleSnapshots[workflowId];
         if (address(settlementOps) == address(0)) return false;
         SettlementOps.SettlementPendingSettlement memory pendingMem = _convertPendingSettlement(pendingSettlements[workflowId]);
@@ -637,6 +648,11 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     function autoCancelDisputedEscrow(uint256 workflowId) external nonReentrant {
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
+        if (
+            _msgSender() != et.from &&
+            _msgSender() != et.to &&
+            !hasRole(ROLE_TIMELOCK, _msgSender())
+        ) revert UnauthorizedTimedExecutor(_msgSender());
         ModuleSnapshot storage snap = moduleSnapshots[workflowId];
         if (et.escrowState != EscrowState.DISPUTED) {
             revert TransferNotInDispute(workflowId, et.escrowState);
@@ -845,8 +861,8 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         
         if (result.bondToken == address(0) && msg.value > result.bondAmount) {
             uint256 excess = msg.value - result.bondAmount;
-            (bool s, ) = payable(_msgSender()).call{value: excess}('');
-            if (!s) revert ExcessRefundTransferFailed(workflowId, _msgSender(), excess);
+            claimableExcessEthRefunds[_msgSender()] += excess;
+            emit ExcessEthRefundCredited(workflowId, _msgSender(), excess);
         }
 
         emit DisputeEscalated(workflowId, result.currentLevel, newLvl, newRes, _msgSender());
@@ -882,6 +898,19 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         }
 
         emit BondProtocolFeeClaimed(token, recipient, amount);
+        return amount;
+    }
+
+    function claimExcessEthRefund() external nonReentrant returns (uint256 claimed) {
+        uint256 amount = claimableExcessEthRefunds[_msgSender()];
+        if (amount == 0) revert NoClaimableBondProtocolFee(address(0), _msgSender());
+        claimableExcessEthRefunds[_msgSender()] = 0;
+        (bool success, ) = payable(_msgSender()).call{value: amount}("");
+        if (!success) {
+            claimableExcessEthRefunds[_msgSender()] = amount;
+            revert ExcessRefundTransferFailed(0, _msgSender(), amount);
+        }
+        emit ExcessEthRefundClaimed(_msgSender(), amount);
         return amount;
     }
 
@@ -940,6 +969,11 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     function executePendingSettlement(uint256 workflowId) external nonReentrant {
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
+        if (
+            _msgSender() != et.from &&
+            _msgSender() != et.to &&
+            !hasRole(ROLE_TIMELOCK, _msgSender())
+        ) revert UnauthorizedTimedExecutor(_msgSender());
         PendingSettlement storage pending = pendingSettlements[workflowId];
 
         if (address(settlementOps) == address(0)) revert ZeroSettlementOps();
