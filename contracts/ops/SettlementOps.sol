@@ -193,7 +193,8 @@ contract SettlementOps is AccessControl {
         uint256 /* workflowId */,
         EscrowTransfer memory et,
         SettlementPendingSettlement memory pending,
-        TimeoutConfig memory /* timeoutConfig */
+        TimeoutConfig memory /* timeoutConfig */,
+        bool pendingAutoCancelEnabled
     ) external view returns (uint8 actionType, bool isRelease) {
         // Check for pending settlement execution (appeal window enforcement)
         if (
@@ -211,10 +212,24 @@ contract SettlementOps is AccessControl {
 
         if (et.autoReleaseTime > 0 && block.timestamp >= et.autoReleaseTime) {
             return (1, true);
-        } else if (et.autoCancelTime > 0 && block.timestamp >= et.autoCancelTime) {
+        } else if ((pendingAutoCancelEnabled || et.autoCancelTime > 0) && et.autoCancelTime > 0 && block.timestamp >= et.autoCancelTime) {
             return (2, false);
         }
 
         return (0, false);
+    }
+
+    /**
+     * @notice Backward-compatible overload using timeout config to infer pending auto-cancel policy.
+     * @dev Preserves existing call sites while allowing explicit policy calls from upgraded BaseEscrow.
+     */
+    function computeTimedActions(
+        uint256 workflowId,
+        EscrowTransfer memory et,
+        SettlementPendingSettlement memory pending,
+        TimeoutConfig memory timeoutConfig
+    ) external view returns (uint8 actionType, bool isRelease) {
+        bool pendingAutoCancelEnabled = timeoutConfig.defaultAutoCancelDelay > 0;
+        return this.computeTimedActions(workflowId, et, pending, timeoutConfig, pendingAutoCancelEnabled);
     }
 }

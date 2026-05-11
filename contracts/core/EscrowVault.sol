@@ -11,8 +11,10 @@ import '../shared/interfaces/IResolutionModule.sol';
 import '../interfaces/IYieldModule.sol';
 import '../interfaces/IYieldDistributionModule.sol';
 import './ModuleSnapshotRegistry.sol';
-import '../libraries/FeeRecordingLibrary.sol';
 import '../libraries/BalanceUpdateLibrary.sol';
+import '../libraries/FeeRecordingLibrary.sol';
+import '../libraries/EscrowVaultAccountingLibrary.sol';
+import '../libraries/EscrowVaultModuleLibrary.sol';
 import '../libraries/FeeWithdrawalLibrary.sol';
 
 contract EscrowVault is BaseEscrow {
@@ -91,19 +93,20 @@ contract EscrowVault is BaseEscrow {
     function _updateEscrowBalance(address token, uint256 amount, bool add) internal override {
         BalanceUpdateLibrary.updateBalance(totalHeldInEscrowPerToken, token, amount, add);
     }
+
     function getAccountingBreakdown(address token) external view returns (
         uint256 principalHeld,
         uint256 feesCollected,
         uint256 contractBalance,
         uint256 yieldInBalance
     ) {
-        principalHeld = totalHeldInEscrowPerToken[token];
-        feesCollected = totalFeesPerToken[token];
-        contractBalance = IERC20(token).balanceOf(address(this));
-        unchecked {
-            uint256 expected = principalHeld + feesCollected + totalClaimableAssets[token];
-            yieldInBalance = contractBalance > expected ? contractBalance - expected : 0;
-        }
+        return EscrowVaultAccountingLibrary.getAccountingBreakdown(
+            totalHeldInEscrowPerToken, 
+            totalFeesPerToken, 
+            totalClaimableAssets, 
+            address(this), 
+            token
+        );
     }
 
     bytes32 public constant ROLE_FEE_RECIPIENT = keccak256('ROLE_FEE_RECIPIENT');
@@ -114,17 +117,15 @@ contract EscrowVault is BaseEscrow {
     }
 
     function _getYieldGenerationModule(uint256 workflowId) internal view override returns (IYieldModule) {
-        address snap = moduleSnapshots[workflowId].yieldGenerationModule;
-        if (snap != address(0)) return IYieldModule(snap);
-        return IYieldModule(address(moduleManagement.getDefaultYieldGenerationModule(address(this))));
+        return EscrowVaultModuleLibrary.getYieldGenerationModule(workflowId, moduleSnapshots, moduleManagement, address(this));
     }
 
     function _getYieldDistributionModule(uint256 workflowId) internal view override returns (IYieldDistributionModule) {
-        return IYieldDistributionModule(moduleManagement.getDefaultYieldDistributionModule(address(this)));
+        return EscrowVaultModuleLibrary.getYieldDistributionModule(moduleManagement, address(this));
     }
 
     function _getReleaseStrategy(uint256 workflowId) internal view override returns (IReleaseStrategy) {
-        return moduleManagement.getDefaultReleaseStrategy(address(this));
+        return EscrowVaultModuleLibrary.getReleaseStrategy(moduleManagement, address(this));
     }
 
 }

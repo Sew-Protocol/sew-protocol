@@ -159,7 +159,7 @@ contract EscrowViewContract {
      * @dev Note: moduleSnapshots is internal in BaseEscrow, so this function cannot access it directly.
      *      Consider exposing moduleSnapshots as public mapping or adding a minimal getter in BaseEscrow.
      */
-    function getModuleSnapshot(uint256) external pure returns (BaseEscrow.ModuleSnapshot memory) {
+    function getModuleSnapshot(uint256) external pure returns (ModuleSnapshot memory) {
         // moduleSnapshots is internal in BaseEscrow, so we cannot access it directly
         // This requires BaseEscrow to expose moduleSnapshots as public or add a minimal getter
         revert('ModuleSnapshot accessor removed - use events emitted at escrow creation');

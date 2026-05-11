@@ -1,29 +1,34 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
-import '../interfaces/IReleaseStrategy.sol';
-import '../interfaces/IYieldGenerationModule.sol';
+import '../interfaces/IYieldModule.sol';
 import '../interfaces/IYieldDistributionModule.sol';
+import '../types/EscrowTypes.sol';
+import '../core/ModuleSnapshotRegistry.sol';
 
 library EscrowVaultModuleLibrary {
-    function getReleaseStrategyOrDefault(
-        address snapshot,
-        IReleaseStrategy defaultModule
-    ) internal pure returns (IReleaseStrategy) {
-        return snapshot != address(0) ? IReleaseStrategy(snapshot) : defaultModule;
+    function getYieldGenerationModule(
+        uint256 workflowId,
+        mapping(uint256 => ModuleSnapshot) storage moduleSnapshots,
+        ModuleSnapshotRegistry moduleManagement,
+        address vaultAddress
+    ) internal view returns (IYieldModule) {
+        address snap = moduleSnapshots[workflowId].yieldGenerationModule;
+        if (snap != address(0)) return IYieldModule(snap);
+        return IYieldModule(address(moduleManagement.getDefaultYieldGenerationModule(vaultAddress)));
     }
 
-    function getYieldGenerationModuleOrDefault(
-        address snapshot,
-        IYieldGenerationModule defaultModule
-    ) internal pure returns (IYieldGenerationModule) {
-        return snapshot != address(0) ? IYieldGenerationModule(snapshot) : defaultModule;
+    function getYieldDistributionModule(
+        ModuleSnapshotRegistry moduleManagement,
+        address vaultAddress
+    ) internal view returns (IYieldDistributionModule) {
+        return IYieldDistributionModule(moduleManagement.getDefaultYieldDistributionModule(vaultAddress));
     }
 
-    function getYieldDistributionModuleOrDefault(
-        address snapshot,
-        IYieldDistributionModule defaultModule
-    ) internal pure returns (IYieldDistributionModule) {
-        return snapshot != address(0) ? IYieldDistributionModule(snapshot) : defaultModule;
+    function getReleaseStrategy(
+        ModuleSnapshotRegistry moduleManagement,
+        address vaultAddress
+    ) internal view returns (IReleaseStrategy) {
+        return moduleManagement.getDefaultReleaseStrategy(vaultAddress);
     }
 }

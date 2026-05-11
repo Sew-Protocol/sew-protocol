@@ -2,6 +2,7 @@
 pragma solidity ^0.8.33;
 
 import '@openzeppelin/contracts/utils/math/Math.sol';
+import '../../libraries/ProtocolMathLibrary.sol';
 
 /**
  * @title BondValuationLibrary
@@ -61,11 +62,21 @@ library BondValuationLibrary {
         require(stableDecimals <= 36 && sewDecimals <= 36, 'Decimals too high');
 
         // Normalize stable to 18 decimals (assume 1:1 USD peg)
-        uint256 stableUSD = _normalizeDecimals(stableAmount, stableDecimals, 18);
+        uint256 stableUSD = ProtocolMathLibrary.normalize(
+            stableAmount,
+            stableDecimals,
+            18,
+            ProtocolMathLibrary.Rounding.Floor
+        );
 
         // Calculate SEW value with haircut
         // sewUSD = sewAmount × sewPrice × (1 - haircut)
-        uint256 sewNormalized = _normalizeDecimals(sewAmount, sewDecimals, 18);
+        uint256 sewNormalized = ProtocolMathLibrary.normalize(
+            sewAmount,
+            sewDecimals,
+            18,
+            ProtocolMathLibrary.Rounding.Floor
+        );
         uint256 haircutMultiplier = BASIS_POINTS - haircutBps; // e.g., 10000 - 5000 = 5000 (50%)
         uint256 sewUSD = Math.mulDiv(
             Math.mulDiv(sewNormalized, sewPriceUSD, PRECISION),
@@ -114,7 +125,12 @@ library BondValuationLibrary {
         }
 
         // Calculate percentages in basis points
-        uint256 stableUSD = _normalizeDecimals(stableAmount, stableDecimals, 18);
+        uint256 stableUSD = ProtocolMathLibrary.normalize(
+            stableAmount,
+            stableDecimals,
+            18,
+            ProtocolMathLibrary.Rounding.Floor
+        );
         stablePct = Math.mulDiv(stableUSD, BASIS_POINTS, effectiveUSD);
         sewPct = BASIS_POINTS - stablePct; // Remainder is SEW
 
@@ -146,7 +162,12 @@ library BondValuationLibrary {
 
         // If stable is 80%, total bond = stable / 0.8
         // SEW can be 20% of total = (stable / 0.8) × 0.2 = stable / 4
-        uint256 stableUSD = _normalizeDecimals(stableAmount, stableDecimals, 18);
+        uint256 stableUSD = ProtocolMathLibrary.normalize(
+            stableAmount,
+            stableDecimals,
+            18,
+            ProtocolMathLibrary.Rounding.Floor
+        );
         uint256 maxSewUSD = Math.mulDiv(stableUSD, MAX_SEW_BPS, MIN_STABLE_BPS);
 
         // Convert SEW USD value to SEW tokens (accounting for haircut)
@@ -162,7 +183,12 @@ library BondValuationLibrary {
             BASIS_POINTS,
             haircutMultiplier
         );
-        maxSewAmount = _normalizeDecimals(sewAmountNormalized, 18, sewDecimals);
+        maxSewAmount = ProtocolMathLibrary.normalize(
+            sewAmountNormalized,
+            18,
+            sewDecimals,
+            ProtocolMathLibrary.Rounding.Floor
+        );
     }
 
     /**
@@ -187,7 +213,12 @@ library BondValuationLibrary {
         require(haircutBps <= BASIS_POINTS, 'Haircut > 100%');
 
         // Calculate SEW USD value (with haircut)
-        uint256 sewNormalized = _normalizeDecimals(sewAmount, sewDecimals, 18);
+        uint256 sewNormalized = ProtocolMathLibrary.normalize(
+            sewAmount,
+            sewDecimals,
+            18,
+            ProtocolMathLibrary.Rounding.Floor
+        );
         uint256 haircutMultiplier = BASIS_POINTS - haircutBps;
         uint256 sewUSD = Math.mulDiv(
             Math.mulDiv(sewNormalized, sewPriceUSD, PRECISION),
@@ -198,19 +229,12 @@ library BondValuationLibrary {
         // If SEW is 20%, stable must be 80% = SEW × 4
         uint256 minStableUSD = Math.mulDiv(sewUSD, MIN_STABLE_BPS, MAX_SEW_BPS);
 
-        // Custom normalization with ceiling for minStable calculation
-        if (18 == stableDecimals) {
-            minStableAmount = minStableUSD;
-        } else if (18 < stableDecimals) {
-            // Scale up
-            uint8 diff = stableDecimals - 18;
-            minStableAmount = minStableUSD * (10 ** diff);
-        } else {
-            // Scale down with ceil to ensure we meet the minimum requirement
-            uint8 diff = 18 - stableDecimals;
-            uint256 divisor = 10 ** diff;
-            minStableAmount = (minStableUSD + divisor - 1) / divisor;
-        }
+        minStableAmount = ProtocolMathLibrary.normalize(
+            minStableUSD,
+            18,
+            stableDecimals,
+            ProtocolMathLibrary.Rounding.Ceil
+        );
     }
 
     /**
@@ -311,33 +335,6 @@ library BondValuationLibrary {
 
         // Check if still sufficient
         coverageStillSufficient = (newCoverage >= reservedCoverageUSD);
-    }
-
-    // ============ Internal Helper Functions ============
-
-    /**
-     * @notice Normalize token amount from one decimal precision to another
-     * @param amount Amount in source decimals
-     * @param fromDecimals Source decimals
-     * @param toDecimals Target decimals
-     * @return normalized Amount in target decimals
-     */
-    function _normalizeDecimals(
-        uint256 amount,
-        uint8 fromDecimals,
-        uint8 toDecimals
-    ) private pure returns (uint256 normalized) {
-        if (fromDecimals == toDecimals) {
-            return amount;
-        } else if (fromDecimals < toDecimals) {
-            // Scale up
-            uint8 diff = toDecimals - fromDecimals;
-            normalized = amount * (10 ** diff);
-        } else {
-            // Scale down
-            uint8 diff = fromDecimals - toDecimals;
-            normalized = amount / (10 ** diff);
-        }
     }
 
     /**

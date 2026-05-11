@@ -6,6 +6,7 @@ import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/access/AccessControl.sol';
 import '@openzeppelin/contracts/utils/math/Math.sol';
 import '../shared/interfaces/IIncentiveModule.sol';
+import '../libraries/ProtocolMathLibrary.sol';
 import '../types/EscrowTypes.sol';
 
 /**
@@ -115,7 +116,7 @@ contract BondCollector is AccessControl {
         }
         
         if (snapshottedBondFee > 0 && escrowFeeAddress != address(0)) {
-            uint256 protocolFeeAmount = Math.mulDiv(ethToSend, snapshottedBondFee, 10000);
+            uint256 protocolFeeAmount = ProtocolMathLibrary.calculateBps(ethToSend, snapshottedBondFee, ProtocolMathLibrary.Rounding.Floor);
             if (protocolFeeAmount > 0) {
                 (bool feeSuccess, ) = payable(escrowFeeAddress).call{value: protocolFeeAmount}('');
                 if (!feeSuccess) return false;
@@ -173,7 +174,7 @@ contract BondCollector is AccessControl {
         uint256 bondToRecord = bondAmount;
         
         if (snapshottedBondFee > 0 && escrowFeeAddress != address(0)) {
-            uint256 protocolFeeAmount = Math.mulDiv(bondAmount, snapshottedBondFee, 10000);
+            uint256 protocolFeeAmount = ProtocolMathLibrary.calculateBps(bondAmount, snapshottedBondFee, ProtocolMathLibrary.Rounding.Floor);
             if (protocolFeeAmount > 0) {
                 bondToRecord = bondAmount - protocolFeeAmount;
                 IERC20(bondToken).safeTransfer(escrowFeeAddress, protocolFeeAmount);
