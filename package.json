@@ -57,6 +57,5 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@google/gemini-cli": "^0.26.0"
   }
 }
