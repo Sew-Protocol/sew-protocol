@@ -5,7 +5,7 @@ out = "out"
 libs = ["lib"]
 cache_path = "cache-foundry"
 solc = "0.8.33"
-optimizer_runs = 1
+optimizer_runs = 200
 via_ir = true
 verbosity = 3
 ffi = false
@@ -19,7 +19,7 @@ ast = true
 [profile.coverage]
 via_ir = true
 optimizer = true
-optimizer_runs = 1
+optimizer_runs = 200
 
 # Halmos symbolic execution profile.
 # via_ir must be false — Halmos 0.3.x cannot process YUL IR bytecode.
@@ -35,7 +35,7 @@ optimizer_runs = 1
 [profile.halmos]
 via_ir = true
 optimizer = true
-optimizer_runs = 1
+optimizer_runs = 200
 out = "out-halmos"
 
 [fuzz]

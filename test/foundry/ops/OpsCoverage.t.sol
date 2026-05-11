@@ -1354,6 +1354,7 @@ contract OpsCoverageTest is Test {
         EscrowTransfer memory et;
         SettlementOps.SettlementPendingSettlement memory pending;
         TimeoutConfig memory config;
+        config.defaultAutoCancelDelay = 1;
 
         // 1. Pending settlement ready
         et.escrowState = EscrowState.DISPUTED;
@@ -1391,6 +1392,13 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         (action, isRelease) = settlementOps.computeTimedActions(1, et, pending, config);
         assertEq(action, 2); // Auto Cancel
+        assertFalse(isRelease);
+
+        // 5. Auto Cancel disabled via policy inference
+        config.defaultAutoCancelDelay = 0;
+        vm.prank(escrowContract);
+        (action, isRelease) = settlementOps.computeTimedActions(1, et, pending, config);
+        assertEq(action, 0);
         assertFalse(isRelease);
     }
 

@@ -167,27 +167,18 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         bytes32 resolutionHash;
     }
     mapping(uint256 => PendingSettlement) public pendingSettlements;
+
+    struct EscrowTimeoutPolicySnapshot {
+        bool pendingAutoCancelEnabled;
+        bool disputedTimeoutEnabled;
+    }
+    mapping(uint256 => EscrowTimeoutPolicySnapshot) public timeoutPolicySnapshots;
     
     // ========== v2.5 Yield Module Storage (NEW) ==========
     // Separate from existing yield system for independent operation
     mapping(uint256 => address) public v25YieldModules;           // workflowId -> module address
     mapping(uint256 => uint256) public v25YieldPrincipals;        // workflowId -> accepted principal amount
 
-    struct ModuleSnapshot {
-        address resolutionModule;
-        address releaseStrategy;
-        address cancellationStrategy;
-        address yieldGenerationModule;
-        address yieldDistributionModule;
-        address incentiveModule;
-        uint256 yieldProtocolFeeBps;      // Snapshotted at creation - fee on yield generated
-        uint256 appealBondProtocolFeeBps; // Snapshotted at creation - fee on appeal bonds
-        uint256 escrowFeeBps;             // Snapshotted at creation - escrow fee
-        uint256 defaultAutoReleaseDelay;  // Snapshotted at creation
-        uint256 defaultAutoCancelDelay;   // Snapshotted at creation
-        uint256 maxDisputeDuration;       // Snapshotted at creation
-        uint256 appealWindowDuration;     // Snapshotted at creation
-    }
     mapping(uint256 => ModuleSnapshot) public moduleSnapshots;
 
     enum ModuleType {
@@ -271,6 +262,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     event PendingSettlementSet(uint256 indexed workflowId, bool isRelease, uint256 appealDeadline);
     event PendingSettlementCancelled(uint256 indexed workflowId);
     event PendingSettlementExecuted(uint256 indexed workflowId, bool isRelease);
+    event TimeoutPolicySnapshotted(uint256 indexed workflowId, bool pendingAutoCancelEnabled, bool disputedTimeoutEnabled);
     event TimeoutConfigUpdated(TimeoutConfig config);
     // Consolidated auto-transfer event (replaces AutoCompleted + AutoFailed to save bytecode)
     event EscrowTransferAutoResult(
@@ -523,6 +515,14 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
             maxDisputeDuration: timeoutConfig.maxDisputeDuration,
             appealWindowDuration: timeoutConfig.appealWindowDuration
         });
+
+        bool pendingAutoCancelEnabled = timeoutConfig.defaultAutoCancelDelay > 0;
+        bool disputedTimeoutEnabled = timeoutConfig.maxDisputeDuration > 0;
+        timeoutPolicySnapshots[workflowId] = EscrowTimeoutPolicySnapshot({
+            pendingAutoCancelEnabled: pendingAutoCancelEnabled,
+            disputedTimeoutEnabled: disputedTimeoutEnabled
+        });
+        emit TimeoutPolicySnapshotted(workflowId, pendingAutoCancelEnabled, disputedTimeoutEnabled);
     }
 
     function automateTimedActions(uint256 workflowId) external nonReentrant returns (bool) {
@@ -545,7 +545,14 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
             appealWindowDuration: snap.appealWindowDuration
         });
         
-        (uint8 actionType, bool isRelease) = settlementOps.computeTimedActions(workflowId, et, pendingMem, snappedTimeoutConfig);
+        EscrowTimeoutPolicySnapshot memory timeoutPolicy = timeoutPolicySnapshots[workflowId];
+        (uint8 actionType, bool isRelease) = settlementOps.computeTimedActions(
+            workflowId,
+            et,
+            pendingMem,
+            snappedTimeoutConfig,
+            timeoutPolicy.pendingAutoCancelEnabled
+        );
         if (actionType == ACTION_NONE) return false;
 
         ExecutionSource source = hasRole(ROLE_TIMELOCK, _msgSender()) ? ExecutionSource.GOVERNANCE : ExecutionSource.KEEPER;
@@ -645,7 +652,12 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     }
 
     // slither-disable-next-line reentrancy-no-eth
-    function autoCancelDisputedEscrow(uint256 workflowId) external nonReentrant {
+    function autoCancelDisputedEscrow(uint256 workflowId) external {
+        resolveDisputeByTimeout(workflowId);
+    }
+
+    // slither-disable-next-line reentrancy-no-eth
+    function resolveDisputeByTimeout(uint256 workflowId) public nonReentrant {
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
         if (
@@ -654,6 +666,10 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
             !hasRole(ROLE_TIMELOCK, _msgSender())
         ) revert UnauthorizedTimedExecutor(_msgSender());
         ModuleSnapshot storage snap = moduleSnapshots[workflowId];
+        EscrowTimeoutPolicySnapshot memory timeoutPolicy = timeoutPolicySnapshots[workflowId];
+        if (!timeoutPolicy.disputedTimeoutEnabled) {
+            revert InvalidState(workflowId, uint8(EscrowState.DISPUTED), uint8(et.escrowState));
+        }
         if (et.escrowState != EscrowState.DISPUTED) {
             revert TransferNotInDispute(workflowId, et.escrowState);
         }

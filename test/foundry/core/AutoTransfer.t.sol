@@ -123,4 +123,54 @@ contract AutoTransferTest is Test {
         assertEq(token.balanceOf(sender), senderBalBefore, 'sender must not be paid during settlement');
         assertEq(vault.claimableBalances(wid, sender), expected, 'refund entitlement must be claimable');
     }
+
+    function test_timed_auto_release_creates_claimable_not_direct_transfer() public {
+        vm.prank(sender);
+        token.approve(address(vault), AMOUNT);
+
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
+        settings.autoReleaseTime = block.timestamp + 1 days;
+
+        vm.prank(sender);
+        uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT, settings);
+
+        uint256 fee = (AMOUNT * ESCROW_FEE) / 10000;
+        uint256 expected = AMOUNT - fee;
+
+        vm.warp(settings.autoReleaseTime + 1);
+
+        uint256 recipientBalBefore = token.balanceOf(recipient);
+
+        // Timed executor path (authorized in this setup via ROLE_TIMELOCK on this contract)
+        vault.automateTimedActions(wid);
+
+        // No direct payout on timed release; entitlement must be claimable
+        assertEq(token.balanceOf(recipient), recipientBalBefore, 'timed release must not push-transfer');
+        assertEq(vault.claimableBalances(wid, recipient), expected, 'timed release must create claimable entitlement');
+    }
+
+    function test_timed_auto_cancel_creates_claimable_not_direct_transfer() public {
+        vm.prank(sender);
+        token.approve(address(vault), AMOUNT);
+
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
+        settings.autoCancelTime = block.timestamp + 1 days;
+
+        vm.prank(sender);
+        uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT, settings);
+
+        uint256 fee = (AMOUNT * ESCROW_FEE) / 10000;
+        uint256 expected = AMOUNT - fee;
+
+        vm.warp(settings.autoCancelTime + 1);
+
+        uint256 senderBalBefore = token.balanceOf(sender);
+
+        // Timed executor path (authorized in this setup via ROLE_TIMELOCK on this contract)
+        vault.automateTimedActions(wid);
+
+        // No direct payout on timed cancel; sender must get claimable entitlement
+        assertEq(token.balanceOf(sender), senderBalBefore, 'timed cancel must not push-transfer');
+        assertEq(vault.claimableBalances(wid, sender), expected, 'timed cancel must create claimable entitlement');
+    }
 }

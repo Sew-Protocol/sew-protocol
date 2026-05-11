@@ -103,6 +103,22 @@ struct EscrowTransfer {
     RecipientStatus recipientStatus;
 }
 
+struct ModuleSnapshot {
+    address resolutionModule;
+    address releaseStrategy;
+    address cancellationStrategy;
+    address yieldGenerationModule;
+    address yieldDistributionModule;
+    address incentiveModule;
+    uint256 yieldProtocolFeeBps;      // Snapshotted at creation - fee on yield generated
+    uint256 appealBondProtocolFeeBps; // Snapshotted at creation - fee on appeal bonds
+    uint256 escrowFeeBps;             // Snapshotted at creation - escrow fee
+    uint256 defaultAutoReleaseDelay;  // Snapshotted at creation
+    uint256 defaultAutoCancelDelay;   // Snapshotted at creation
+    uint256 maxDisputeDuration;       // Snapshotted at creation
+    uint256 appealWindowDuration;     // Snapshotted at creation
+}
+
 // ============ Wallet UX & Actionability Types ============
 
 enum ExecutionSource { USER, KEEPER, GOVERNANCE }

@@ -155,6 +155,42 @@ contract BondCollectorTest is Test {
         assertTrue(collected);
         assertEq(address(incentiveModule).balance, bondAmount);
         // Excess ETH remains with BondCollector (not refunded)
+        assertEq(address(bondCollector).balance, sentValue - bondAmount);
+    }
+
+    function test_collectBond_ETH_excessValue_recoverable_onlyByTimelock() public {
+        uint256 bondAmount = 1 ether;
+        uint256 sentValue = 2 ether;
+        vm.deal(escrowContract, sentValue);
+
+        vm.prank(escrowContract);
+        bool collected = bondCollector.collectBond{value: sentValue}(
+            1,
+            incentiveModule,
+            bondAmount,
+            address(0),
+            1,
+            0,
+            feeAddress,
+            user,
+            user
+        );
+
+        assertTrue(collected);
+        uint256 excess = sentValue - bondAmount;
+        assertEq(address(bondCollector).balance, excess, 'excess ETH should remain in collector custody');
+
+        // Non-timelock cannot recover
+        vm.prank(unauthorized);
+        vm.expectRevert();
+        bondCollector.recoverNativeETH(user, excess);
+
+        // Timelock can recover
+        uint256 userBefore = user.balance;
+        vm.prank(timelock);
+        bondCollector.recoverNativeETH(user, excess);
+        assertEq(user.balance - userBefore, excess, 'timelock recovery should transfer excess ETH');
+        assertEq(address(bondCollector).balance, 0, 'collector should be drained after recovery');
     }
     
     function test_collectBond_ETH_zeroIncentiveModule() public {

@@ -24,14 +24,14 @@ library ModuleGetterLibrary {
     function getModuleAddress(
         uint256 workflowId,
         BaseEscrow.ModuleType moduleType,
-        mapping(uint256 => BaseEscrow.ModuleSnapshot) storage moduleSnapshots,
+        mapping(uint256 => ModuleSnapshot) storage moduleSnapshots,
         ModuleSnapshotRegistry moduleManagement,
         address escrowContract
     ) internal view returns (address moduleAddress) {
         address snapshotModule;
 
         // Use assembly for optimized switch-like pattern (saves ~600 bytes vs if/else chain)
-        BaseEscrow.ModuleSnapshot storage snapshot = moduleSnapshots[workflowId];
+        ModuleSnapshot storage snapshot = moduleSnapshots[workflowId];
         
         assembly {
             // Switch on moduleType (0=RESOLUTION, 1=RELEASE, 2=YIELD_GEN, 3=YIELD_DIST)
