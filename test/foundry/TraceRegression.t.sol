@@ -197,7 +197,7 @@ contract TraceRegressionTest is Test {
 
         } else if (actionHash == keccak256("release")) {
             vm.prank(caller);
-            vault.releaseEscrowTransfer(wfId);
+            vault.release(wfId);
 
         } else if (actionHash == keccak256("sender_cancel")) {
             vm.prank(caller);

@@ -116,7 +116,7 @@ contract EscrowInvariantHandler is Test {
         _recordTerminalIfNeeded(wf);
 
         vm.prank(sender);
-        try vault.releaseEscrowTransfer(wf) {} catch {}
+        try vault.release(wf) {} catch {}
 
         _recordTerminalIfNeeded(wf);
     }

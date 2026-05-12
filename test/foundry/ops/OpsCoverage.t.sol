@@ -1394,8 +1394,15 @@ contract OpsCoverageTest is Test {
         assertEq(action, 2); // Auto Cancel
         assertFalse(isRelease);
 
-        // 5. Auto Cancel disabled via policy inference
+        // 5. Explicit per-escrow auto-cancel still valid even if default policy is disabled
         config.defaultAutoCancelDelay = 0;
+        vm.prank(escrowContract);
+        (action, isRelease) = settlementOps.computeTimedActions(1, et, pending, config);
+        assertEq(action, 2);
+        assertFalse(isRelease);
+
+        // 6. Auto-cancel disabled when there is no explicit auto-cancel time
+        et.autoCancelTime = 0;
         vm.prank(escrowContract);
         (action, isRelease) = settlementOps.computeTimedActions(1, et, pending, config);
         assertEq(action, 0);

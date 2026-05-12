@@ -4,8 +4,10 @@ pragma solidity ^0.8.33;
 import "forge-std/Test.sol";
 import "forge-std/StdJson.sol";
 import { EscrowVault } from "../../contracts/core/EscrowVault.sol";
+import { BaseEscrow } from "../../contracts/core/BaseEscrow.sol";
 import { EscrowViewContract } from "../../contracts/core/EscrowViewContract.sol";
 import { DefaultResolutionModule } from "../../contracts/core/modules/DefaultResolutionModule.sol";
+import { DefaultReleaseStrategy } from "../../contracts/modules/DefaultReleaseStrategy.sol";
 import { CreateOps } from "../../contracts/ops/CreateOps.sol";
 import { SettlementOps } from "../../contracts/ops/SettlementOps.sol";
 import { YieldOps } from "../../contracts/ops/YieldOps.sol";
@@ -66,6 +68,7 @@ contract TraceEquivalenceTest is Test {
     EscrowVault      vault;
     EscrowViewContract oracle;
     DefaultResolutionModule drModule;
+    DefaultReleaseStrategy  releaseStrategy;
     CreateOps        createOps;
     SettlementOps    settlementOps;
     YieldOps         yieldOps;
@@ -125,6 +128,7 @@ contract TraceEquivalenceTest is Test {
         settlementOps  = new SettlementOps(owner);
         bondCollector  = new BondCollector(owner);
         drModule       = new DefaultResolutionModule(owner, RESOLVER);
+        releaseStrategy = new DefaultReleaseStrategy();
 
         // EscrowVault constructor grants ROLE_TIMELOCK + DEFAULT_ADMIN to address(this)
         vault = new EscrowVault(_vaultFeeBps, FEE_ADDR, address(yieldOps), address(disputeOps), address(moduleManagement));
@@ -146,6 +150,11 @@ contract TraceEquivalenceTest is Test {
         // setResolutionModule requires ROLE_ADMIN_CONTRACT
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), owner);
         vault.setResolutionModule(address(drModule));
+        moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
+        vm.warp(block.timestamp + 7 days + 1);
+        moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
+        // Keep trace fixture timestamps anchored near genesis-like values.
+        vm.warp(1);
 
         oracle = new EscrowViewContract(address(vault));
 
@@ -241,7 +250,7 @@ contract TraceEquivalenceTest is Test {
 
         // Release (sender/buyer initiates the release to recipient)
         vm.prank(BUYER);
-        vault.releaseEscrowTransfer(wfId);
+        vault.release(wfId);
 
         // Step 2 assertion
         _assertEscrowState(wfId, EscrowState.RELEASED, "after release");
@@ -445,7 +454,7 @@ contract TraceEquivalenceTest is Test {
             }
             
             vm.prank(caller);
-            vault.releaseEscrowTransfer(wfId);
+            vault.release(wfId);
 
         } else if (actionHash == keccak256("sender_cancel")) {
             if (!expectedAccepted) {
@@ -811,7 +820,7 @@ contract TraceEquivalenceTest is Test {
 
         } else if (actionHash == keccak256("release")) {
             vm.prank(caller);
-            vault.releaseEscrowTransfer(wfId);
+            vault.release(wfId);
 
         } else if (actionHash == keccak256("sender_cancel")) {
             vm.prank(caller);

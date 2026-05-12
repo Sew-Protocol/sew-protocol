@@ -84,6 +84,8 @@ error NoPendingSettlement(uint256 workflowId);
 error AppealWindowNotExpired(uint256 workflowId, uint256 appealDeadline, uint256 currentTime);
 error NotInDisputedState(uint256 workflowId, EscrowState currentState);
 error ExcessRefundTransferFailed(uint256 workflowId, address recipient, uint256 amount);
+error EscrowInsufficientBalance();
+error PartialRecoveryNotAllowed();
 
 error InvalidState(uint256 workflowId, uint8 expected, uint8 actual);
 error InvalidConfig(uint8 code, uint256 value);
@@ -528,11 +530,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     function automateTimedActions(uint256 workflowId) external nonReentrant returns (bool) {
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
-        if (
-            _msgSender() != et.from &&
-            _msgSender() != et.to &&
-            !hasRole(ROLE_TIMELOCK, _msgSender())
-        ) revert UnauthorizedTimedExecutor(_msgSender());
+        (ExecutionSource source, address caller) = _authorizeTimedActionAndSource(et);
         ModuleSnapshot storage snap = moduleSnapshots[workflowId];
         if (address(settlementOps) == address(0)) return false;
         SettlementOps.SettlementPendingSettlement memory pendingMem = _convertPendingSettlement(pendingSettlements[workflowId]);
@@ -555,25 +553,21 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         );
         if (actionType == ACTION_NONE) return false;
 
-        ExecutionSource source = hasRole(ROLE_TIMELOCK, _msgSender()) ? ExecutionSource.GOVERNANCE : ExecutionSource.KEEPER;
-        // If participant calls it, it's USER authority
-        if (_msgSender() == et.from || _msgSender() == et.to) source = ExecutionSource.USER;
-
         if (actionType == ACTION_EXECUTE_PENDING) {
             delete pendingSettlements[workflowId];
             _finalizeDisputeInModule(workflowId);
             if (isRelease) _releaseEscrowTransfer(workflowId);
             else _cancelAndRefund(workflowId);
             emit PendingSettlementExecuted(workflowId, isRelease);
-            emit TimedActionTriggered(workflowId, ACTION_EXECUTE_PENDING, source, _msgSender());
+            emit TimedActionTriggered(workflowId, ACTION_EXECUTE_PENDING, source, caller);
             return true;
         } else if (actionType == ACTION_AUTO_RELEASE) {
             _releaseEscrowTransfer(workflowId);
-            emit TimedActionTriggered(workflowId, ACTION_AUTO_RELEASE, source, _msgSender());
+            emit TimedActionTriggered(workflowId, ACTION_AUTO_RELEASE, source, caller);
             return true;
         } else if (actionType == ACTION_AUTO_CANCEL) {
             _cancelAndRefund(workflowId);
-            emit TimedActionTriggered(workflowId, ACTION_AUTO_CANCEL, source, _msgSender());
+            emit TimedActionTriggered(workflowId, ACTION_AUTO_CANCEL, source, caller);
             return true;
         }
 
@@ -660,11 +654,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     function resolveDisputeByTimeout(uint256 workflowId) public nonReentrant {
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
-        if (
-            _msgSender() != et.from &&
-            _msgSender() != et.to &&
-            !hasRole(ROLE_TIMELOCK, _msgSender())
-        ) revert UnauthorizedTimedExecutor(_msgSender());
+        (ExecutionSource source, address caller) = _authorizeTimedActionAndSource(et);
         ModuleSnapshot storage snap = moduleSnapshots[workflowId];
         EscrowTimeoutPolicySnapshot memory timeoutPolicy = timeoutPolicySnapshots[workflowId];
         if (!timeoutPolicy.disputedTimeoutEnabled) {
@@ -688,10 +678,8 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         _cancelAndRefund(workflowId);
         delete disputeRaisedTimestamp[workflowId];
         emit DisputeAutoCancelled(workflowId, from, amt, uint8(FailureReason.TIMEOUT));
-        
-        ExecutionSource source = hasRole(ROLE_TIMELOCK, _msgSender()) ? ExecutionSource.GOVERNANCE : ExecutionSource.KEEPER;
-        if (_msgSender() == et.from || _msgSender() == et.to) source = ExecutionSource.USER;
-        emit TimedActionTriggered(workflowId, ACTION_AUTO_CANCEL, source, _msgSender());
+
+        emit TimedActionTriggered(workflowId, ACTION_AUTO_CANCEL, source, caller);
     }
 
     // slither-disable-next-line reentrancy-no-eth
@@ -985,11 +973,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     function executePendingSettlement(uint256 workflowId) external nonReentrant {
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
-        if (
-            _msgSender() != et.from &&
-            _msgSender() != et.to &&
-            !hasRole(ROLE_TIMELOCK, _msgSender())
-        ) revert UnauthorizedTimedExecutor(_msgSender());
+        _authorizeTimedAction(et);
         PendingSettlement storage pending = pendingSettlements[workflowId];
 
         if (address(settlementOps) == address(0)) revert ZeroSettlementOps();
@@ -1007,6 +991,23 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         else _cancelAndRefund(workflowId);
 
         emit PendingSettlementExecuted(workflowId, isRelease);
+    }
+
+    function _authorizeTimedActionAndSource(
+        EscrowTransfer storage et
+    ) internal view returns (ExecutionSource source, address caller) {
+        caller = _msgSender();
+        if (caller == et.from || caller == et.to) {
+            return (ExecutionSource.USER, caller);
+        }
+        if (!hasRole(ROLE_TIMELOCK, caller)) revert UnauthorizedTimedExecutor(caller);
+        return (ExecutionSource.GOVERNANCE, caller);
+    }
+
+    function _authorizeTimedAction(EscrowTransfer storage et) internal view {
+        address caller = _msgSender();
+        if (caller == et.from || caller == et.to) return;
+        if (!hasRole(ROLE_TIMELOCK, caller)) revert UnauthorizedTimedExecutor(caller);
     }
 
     /// @notice Release escrow to recipient (core settlement action)
@@ -1245,7 +1246,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         // If module reports yield (amount > principal), escrow must hold it.
         if (amount > principalExpected) {
             uint256 bal = IERC20(token).balanceOf(address(this));
-            require(bal >= amount, "EscrowInsufficientBalance");
+            if (bal < amount) revert EscrowInsufficientBalance();
         }
 
         claimableBalances[workflowId][recipient] += amount;
@@ -1279,9 +1280,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
             // Unwind failed - try emergency unwind
             try IYieldModule(module).emergencyUnwind(workflowId, token, yieldPrincipal) returns (uint256 recovered) {
                 // INVARIANT: Reject partial recovery - must recover full principal or revert
-                if (recovered < yieldPrincipal) {
-                    revert("YieldModuleEmergency: PartialRecoveryNotAllowed");
-                }
+                if (recovered < yieldPrincipal) revert PartialRecoveryNotAllowed();
                 return (recovered, 0);
             } catch {
                 // Both unwind paths failed — tokens are stuck in yield module.
@@ -1300,82 +1299,27 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         address from = et.from;
         address token = et.token;
 
-        if (pendingSettlements[workflowId].exists) {
-            delete pendingSettlements[workflowId];
-            emit PendingSettlementCancelled(workflowId);
-        }
+        _clearPendingSettlementIfExists(workflowId);
 
         EscrowState oldStatus = StateManagementLibrary.transitionToRefunded(et, workflowId);
         emit EscrowStateChanged(workflowId, oldStatus, EscrowState.REFUNDED);
-        
-        (uint256 principal, uint256 yield) = _handleYieldModuleUnwind(workflowId, token, amount);
-        uint256 actualAmount = principal + yield;
-        
-        // CRITICAL: Update accounting based on FULL principal amount (amount, not principal)
-        // When module has loss: principal < amount
-        // The loss difference appears as "unaccounted" in the balance delta
-        // This makes losses visible in accounting for operators to detect and track
-        _updateEscrowBalance(token, amount, false);
-        
-        // Pull-only settlement: create entitlement, do not push transfer
-        _creditClaimable(workflowId, from, token, actualAmount, amount);
+
+        _finalizeClaimableSettlement(workflowId, token, amount, from);
         _emitEscrowTransferCancelled(workflowId, token, from, amount);
     }
 
-    /**
-     * @notice Best-effort check if strategy allows release (used by getActionStatus)
-     * @dev Uses staticcall to safely query strategy without reverting
-     * @return canRelease True if strategy returns allowed=true, false if call fails or not allowed
-     */
-    function _checkStrategyCanRelease(uint256 workflowId, EscrowTransfer storage et) internal view returns (bool canRelease) {
-        IReleaseStrategy strategy = _getReleaseStrategy(workflowId);
-        if (address(strategy) == address(0)) {
-            return false;
-        }
-
-        try this._staticCanRelease(
-            workflowId,
-            et.token,
-            et.from,
-            et.to,
-            et.amountAfterFee
-        ) returns (bool allowed) {
-            return allowed;
-        } catch {
-            // If strategy call fails, report as unavailable (safe default for UI)
-            return false;
-        }
-    }
-
-    /**
-     * @notice Wrapper for staticcall to strategy (internal helper for getActionStatus)
-     * @dev Takes individual escrow fields instead of storage pointer (required for external function)
-     */
-    function _staticCanRelease(
+    function _finalizeClaimableSettlement(
         uint256 workflowId,
         address token,
-        address sender,
-        address recipient,
-        uint256 amountAfterFee
-    ) external view returns (bool) {
-        IReleaseStrategy strategy = _getReleaseStrategy(workflowId);
-        if (address(strategy) == address(0)) {
-            return false;
-        }
+        uint256 amount,
+        address beneficiary
+    ) internal {
+        (uint256 principal, uint256 yield) = _handleYieldModuleUnwind(workflowId, token, amount);
+        uint256 actualAmount = principal + yield;
 
-        // Get releaseAddress from escrow settings
-        address releaseAddr = escrowSettings[workflowId].releaseAddress;
-
-        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(
-            token,
-            sender,
-            recipient,
-            amountAfterFee,
-            releaseAddr
-        );
-
-        (bool allowed, ) = strategy.canRelease(workflowId, address(this), _msgSender(), escrowData);
-        return allowed;
+        // Pull-only settlement: entitlement creation only
+        _updateEscrowBalance(token, amount, false);
+        _creditClaimable(workflowId, beneficiary, token, actualAmount, amount);
     }
 
     function _releaseEscrowTransfer(uint256 workflowId) internal {
@@ -1384,28 +1328,20 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         address to = et.to;
         address token = et.token;
 
+        _clearPendingSettlementIfExists(workflowId);
+
+        EscrowState oldStatus = StateManagementLibrary.transitionToReleased(et, workflowId);
+        emit EscrowStateChanged(workflowId, oldStatus, EscrowState.RELEASED);
+
+        _finalizeClaimableSettlement(workflowId, token, amount, to);
+        _emitEscrowTransferReleased(workflowId, token, to, amount);
+    }
+
+    function _clearPendingSettlementIfExists(uint256 workflowId) internal {
         if (pendingSettlements[workflowId].exists) {
             delete pendingSettlements[workflowId];
             emit PendingSettlementCancelled(workflowId);
         }
-
-        EscrowState oldStatus = StateManagementLibrary.transitionToReleased(et, workflowId);
-        emit EscrowStateChanged(workflowId, oldStatus, EscrowState.RELEASED);
-        
-        (uint256 principal, uint256 yield) = _handleYieldModuleUnwind(workflowId, token, amount);
-        uint256 actualAmount = principal + yield;
-        
-        // CRITICAL: Update accounting based on FULL principal amount (amount, not principal)
-        // When module has loss: principal < amount
-        // Example: amount=990e18, principal=890e18 (loss=100e18)
-        // We reduce totalHeldInEscrowPerToken by 990e18 (full amount)
-        // But only transfer out 890e18
-        // The 100e18 difference appears as "unaccounted" in the balance delta
-        // This makes losses visible in accounting: contractBalance - expected = loss
-        // Pull-only settlement: create entitlement, do not push transfer
-        _updateEscrowBalance(token, amount, false);
-        _creditClaimable(workflowId, to, token, actualAmount, amount);
-        _emitEscrowTransferReleased(workflowId, token, to, amount);
     }
 
     function _transferTokens(address token, address to, uint256 amount) internal virtual;

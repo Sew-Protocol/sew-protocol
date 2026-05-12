@@ -182,7 +182,7 @@ contract CancellationStrategyIntegrationTest is Test {
         
         // Release the escrow first
         vm.prank(sender);
-        vault.releaseEscrowTransfer(wid);
+        vault.release(wid);
         
         // Try to cancel - should fail
         vm.prank(sender);

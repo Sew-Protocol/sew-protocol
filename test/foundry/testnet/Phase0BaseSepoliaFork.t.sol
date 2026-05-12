@@ -37,7 +37,7 @@ interface IEscrowVaultPhase0 is IAccessControlMinimal {
         external
         returns (uint256 workflowId);
 
-    function releaseEscrowTransfer(uint256 workflowId) external returns (bool);
+    function release(uint256 workflowId) external returns (bool);
     function recipientCancel(uint256 workflowId) external returns (bool);
     function senderCancel(uint256 workflowId) external returns (bool);
 
@@ -180,7 +180,7 @@ contract Phase0BaseSepoliaForkTest is Test {
         token.approve(escrowVault, amount);
         uint256 wf1 = ev.createEscrow(address(token), seller, amount, settings);
         uint256 sellerBal0 = token.balanceOf(seller);
-        ev.releaseEscrowTransfer(wf1);
+        ev.release(wf1);
         vm.stopPrank();
         uint256 sellerBal1 = token.balanceOf(seller);
         assertTrue(sellerBal1 > sellerBal0, "release did not transfer to seller (expected increase)");
