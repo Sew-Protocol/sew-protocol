@@ -253,7 +253,7 @@ contract HalmosEscrowProperties is SymTest, Test {
 
         // Sender releases the escrow → state becomes RELEASED
         vm.prank(sender);
-        vault.releaseEscrowTransfer(0);
+        vault.release(0);
 
         // Verify state is RELEASED
         (,,,,,,, EscrowState st,,) = vault.escrowTransfers(0);

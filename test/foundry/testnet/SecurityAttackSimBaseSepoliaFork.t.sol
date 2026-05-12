@@ -21,7 +21,7 @@ interface IEscrowVaultAttackTarget {
         external
         returns (uint256 workflowId);
 
-    function releaseEscrowTransfer(uint256 workflowId) external returns (bool);
+    function release(uint256 workflowId) external returns (bool);
 
     function escrowTransfers(uint256 workflowId)
         external
@@ -178,7 +178,7 @@ contract SecurityAttackSimBaseSepoliaForkTest is Test {
 
     // ============
     // Attack 1: reenter during createEscrow transferFrom
-    // - token tries to call releaseEscrowTransfer(0) mid-create
+    // - token tries to call release(0) mid-create
     // - createEscrow is nonReentrant, so reentry should fail and not steal
     // ============
     function test_attack_reenter_during_create_does_not_break_or_steal() public {
@@ -200,7 +200,7 @@ contract SecurityAttackSimBaseSepoliaForkTest is Test {
 
         // Configure token: attempt to reenter escrow during transferFrom
         // (This should fail due to nonReentrant / invalid workflow id).
-        bytes memory data = abi.encodeWithSelector(IEscrowVaultAttackTarget.releaseEscrowTransfer.selector, uint256(0));
+        bytes memory data = abi.encodeWithSelector(IEscrowVaultAttackTarget.release.selector, uint256(0));
         tkn.setReentry(escrowVaultAddr, data, true);
 
         vm.startPrank(buyer);
@@ -259,7 +259,7 @@ contract SecurityAttackSimBaseSepoliaForkTest is Test {
         });
         uint256 wid = escrow.createEscrow(address(tkn), seller, 100e18, settings);
         // Release should succeed; reentrant withdrawFees attempt should fail (no role / nonReentrant)
-        escrow.releaseEscrowTransfer(wid);
+        escrow.release(wid);
         vm.stopPrank();
 
         // Funds should go to seller (push succeeds because token returns true).
@@ -305,7 +305,7 @@ contract SecurityAttackSimBaseSepoliaForkTest is Test {
 
         // Force push failure (return false) so escrow falls back to claimable.
         tkn.setReturnFalseOnTransfer(true);
-        escrow.releaseEscrowTransfer(wid);
+        escrow.release(wid);
         vm.stopPrank();
 
         // Claimable should be set for seller.

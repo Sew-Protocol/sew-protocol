@@ -43,7 +43,7 @@ interface IEscrowVaultPhase1 {
         external
         returns (uint256 workflowId);
 
-    function releaseEscrowTransfer(uint256 workflowId) external returns (bool);
+    function release(uint256 workflowId) external returns (bool);
     function recipientCancel(uint256 workflowId) external returns (bool);
     function senderCancel(uint256 workflowId) external returns (bool);
 
@@ -143,14 +143,14 @@ contract Phase1CoreJourneysBaseSepoliaForkTest is Test {
         vm.stopPrank();
         vm.prank(attacker);
         vm.expectRevert(); // NotSender
-        escrow.releaseEscrowTransfer(wf1);
+        escrow.release(wf1);
 
         // Release 2 escrows
         uint256 sellerBal0 = token.balanceOf(sellerA);
         vm.prank(buyerA);
-        escrow.releaseEscrowTransfer(wf1);
+        escrow.release(wf1);
         vm.prank(buyerA);
-        escrow.releaseEscrowTransfer(wf2);
+        escrow.release(wf2);
         uint256 sellerBal1 = token.balanceOf(sellerA);
         assertEq(sellerBal1 - sellerBal0, (amount - feeAmount) * 2, "sellerA release delta mismatch");
 
@@ -254,7 +254,7 @@ contract Phase1CoreJourneysBaseSepoliaForkTest is Test {
             if (st == EscrowState.PENDING) {
                 if (action == 0) {
                     vm.prank(from);
-                    escrow.releaseEscrowTransfer(wf);
+                    escrow.release(wf);
                 } else if (action == 1) {
                     vm.prank(to);
                     escrow.recipientCancel(wf);
@@ -265,7 +265,7 @@ contract Phase1CoreJourneysBaseSepoliaForkTest is Test {
                     // attacker tries to do something invalid; should revert
                     vm.prank(attacker);
                     vm.expectRevert();
-                    escrow.releaseEscrowTransfer(wf);
+                    escrow.release(wf);
                 } else if (action == 4) {
                     vm.prank(from);
                     escrow.raiseDispute(wf);
