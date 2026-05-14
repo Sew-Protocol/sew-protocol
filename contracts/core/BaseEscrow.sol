@@ -106,6 +106,9 @@ error AppealBondQueryFailed(uint256 workflowId);
 error InvalidBondMsgValue(uint256 workflowId, uint256 required, uint256 provided);
 error UnauthorizedTimedExecutor(address caller);
 error AppealsNotEnabledInV1();
+error DisputeAmountBelowMinimum(uint256 workflowId, uint256 amount, uint256 minimum);
+error DisputeRateLimitExceeded(address sender, uint32 count, uint32 maxCount);
+error EscalationCooldownActive(address sender, uint256 availableAt);
 error AlreadyPausedCannotRepause();
 error MaxPauseCyclesExceeded(uint256 currentCount, uint256 maxCycles);
 error PauseDurationExceeded(uint256 duration, uint256 maxDuration);
@@ -187,6 +190,18 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         bool active;
     }
     mapping(uint256 => SplitProposal) public splitProposals;
+
+    // Anti-spam: minimum escrow value to raise a dispute (0 = disabled)
+    uint256 public minDisputeEscrowValue;
+    // Anti-spam: per-sender dispute rate limit (0 = unlimited)
+    uint32 public maxDisputesPerSenderPerDay;
+    // Per-sender rolling window tracking for dispute rate limit
+    mapping(address => uint64) public senderDisputeWindowStart;
+    mapping(address => uint32) public senderDisputeCount;
+    // Anti-spam: per-sender escalation cooldown in seconds (0 = disabled)
+    uint64 public escalationCooldown;
+    mapping(address => uint64) public lastEscalationTimestamp;
+    mapping(address => uint32) public addressEscalationCount;
 
     struct EscrowTimeoutPolicySnapshot {
         bool pendingAutoCancelEnabled;
@@ -298,6 +313,9 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     );
     event YieldProtocolFeeBpsUpdated(uint256 oldFeeBps, uint256 newFeeBps);
     event AppealBondProtocolFeeBpsUpdated(uint256 oldFeeBps, uint256 newFeeBps);
+    event MinDisputeEscrowValueUpdated(uint256 newValue);
+    event MaxDisputesPerSenderPerDayUpdated(uint32 newMax);
+    event EscalationCooldownUpdated(uint64 newCooldown);
     // Consolidated: ProtocolFeeCollected now handles both yield and bond fees
     event ProtocolFeeCollected(
         uint8 indexed kind, // 0 = yield, 1 = appeal bond
@@ -423,6 +441,21 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     function setTimeoutConfig(TimeoutConfig calldata config) external onlyRole(ROLE_ADMIN_CONTRACT) {
         timeoutConfig = config;
         emit TimeoutConfigUpdated(config);
+    }
+
+    function setMinDisputeEscrowValue(uint256 value) external onlyRole(ROLE_ADMIN_CONTRACT) {
+        minDisputeEscrowValue = value;
+        emit MinDisputeEscrowValueUpdated(value);
+    }
+
+    function setMaxDisputesPerSenderPerDay(uint32 max) external onlyRole(ROLE_ADMIN_CONTRACT) {
+        maxDisputesPerSenderPerDay = max;
+        emit MaxDisputesPerSenderPerDayUpdated(max);
+    }
+
+    function setEscalationCooldown(uint64 cooldown) external onlyRole(ROLE_ADMIN_CONTRACT) {
+        escalationCooldown = cooldown;
+        emit EscalationCooldownUpdated(cooldown);
     }
 
     // ============ Ops Contract Wiring (Governance-controlled) ============
@@ -709,6 +742,27 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         EscrowTransfer storage et = escrowTransfers[workflowId];
         ModuleSnapshot storage snap = moduleSnapshots[workflowId];
 
+        // Fix 1: Reject dust disputes below governance-configured minimum
+        uint256 minValue = minDisputeEscrowValue;
+        if (minValue > 0 && et.amountAfterFee < minValue) {
+            revert DisputeAmountBelowMinimum(workflowId, et.amountAfterFee, minValue);
+        }
+
+        // Fix 2: Per-sender dispute rate limit
+        uint32 maxPerDay = maxDisputesPerSenderPerDay;
+        if (maxPerDay > 0) {
+            address raiser = _msgSender();
+            uint64 windowStart = senderDisputeWindowStart[raiser];
+            if (block.timestamp >= uint256(windowStart) + 1 days) {
+                senderDisputeWindowStart[raiser] = uint64(block.timestamp);
+                senderDisputeCount[raiser] = 1;
+            } else {
+                uint32 newCount = senderDisputeCount[raiser] + 1;
+                if (newCount > maxPerDay) revert DisputeRateLimitExceeded(raiser, newCount, maxPerDay);
+                senderDisputeCount[raiser] = newCount;
+            }
+        }
+
         DisputeOps.DisputeOpeningResult memory result = disputeOps.computeDisputeOpening(
             address(_getResolutionModule(workflowId)),
             address(this),
@@ -825,6 +879,31 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
             et.escrowState
         );
         if (!result.success) revert EscalationNotAllowed();
+
+        // Fix 3: Per-sender escalation cooldown + bond scaling
+        uint64 cooldown = escalationCooldown;
+        if (cooldown > 0) {
+            address escalator = _msgSender();
+            uint64 lastEsc = lastEscalationTimestamp[escalator];
+            if (lastEsc > 0 && block.timestamp < uint256(lastEsc) + cooldown) {
+                revert EscalationCooldownActive(escalator, uint256(lastEsc) + cooldown);
+            }
+            uint32 escCount;
+            if (block.timestamp >= uint256(lastEsc) + 30 days) {
+                escCount = 1;
+            } else {
+                escCount = addressEscalationCount[escalator] + 1;
+            }
+            addressEscalationCount[escalator] = escCount;
+            lastEscalationTimestamp[escalator] = uint64(block.timestamp);
+            // Scale bond by 10% per additional escalation in window (escCount > 1)
+            if (escCount > 1 && result.bondAmount > 0) {
+                uint256 scale100 = 100 + 10 * uint256(escCount - 1);
+                result.bondAmount = result.bondAmount * scale100 / 100;
+                result.bondToRecord = result.bondToRecord * scale100 / 100;
+                result.protocolFeeAmount = result.protocolFeeAmount * scale100 / 100;
+            }
+        }
 
         // Validate bond payment
         (bool msgValueValid, ) = DisputeEscalationLibrary.validateBondMsgValue(result.bondToken, result.bondAmount, msg.value);
