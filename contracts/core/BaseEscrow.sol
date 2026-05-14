@@ -64,6 +64,7 @@ enum FailureReason {
 bytes4 constant SEL_FINALIZE_DISPUTE = bytes4(keccak256("finalizeDispute(uint256)"));
 bytes4 constant SEL_RECORD_RESOLUTION = bytes4(keccak256("recordResolution(uint256,address,address,uint8,uint256)"));
 bytes4 constant SEL_CLOSE_BY_MUTUAL_AGREEMENT = bytes4(keccak256("closeByMutualAgreement(uint256)"));
+bytes4 constant SEL_DECREMENT_RESOLVER = bytes4(keccak256("decrementResolverActiveDisputes(address)"));
 
 error InvalidWorkflowId(uint256 workflowId, uint256 maxWorkflowId);
 error TransferNotPending(uint256 workflowId, EscrowState currentStatus);
@@ -1325,9 +1326,18 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
 
     function _finalizeDisputeInModule(uint256 workflowId) internal {
         IResolutionModule resolutionModule = _getResolutionModule(workflowId);
-        if (address(resolutionModule) != address(0)) {
-            (bool success, ) = address(resolutionModule).call(abi.encodeWithSelector(SEL_FINALIZE_DISPUTE, workflowId));
-            success; // Ignore failure
+        if (address(resolutionModule) == address(0)) return;
+        (bool success, ) = address(resolutionModule).call(abi.encodeWithSelector(SEL_FINALIZE_DISPUTE, workflowId));
+        success; // Ignore failure — module may not support finalization
+
+        // Decrement the resolver's concurrent-dispute counter so capacity is freed.
+        // Separate call so modules that don't implement this function don't block finalization.
+        address resolver = escrowTransfers[workflowId].disputeResolver;
+        if (resolver != address(0)) {
+            (bool dSuccess, ) = address(resolutionModule).call(
+                abi.encodeWithSelector(SEL_DECREMENT_RESOLVER, resolver)
+            );
+            dSuccess; // Ignore failure
         }
     }
 
