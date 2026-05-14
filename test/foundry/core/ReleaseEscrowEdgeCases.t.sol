@@ -406,7 +406,7 @@ contract ReleaseEscrowEdgeCasesTest is Test {
 
         // Release escrow - should REJECT partial recovery
         vm.prank(sender);
-        vm.expectRevert("YieldModuleEmergency: PartialRecoveryNotAllowed");
+        vm.expectRevert(PartialRecoveryNotAllowed.selector);
         vault.release(wid);
     }
 

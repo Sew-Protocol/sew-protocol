@@ -63,6 +63,7 @@ enum FailureReason {
 
 bytes4 constant SEL_FINALIZE_DISPUTE = bytes4(keccak256("finalizeDispute(uint256)"));
 bytes4 constant SEL_RECORD_RESOLUTION = bytes4(keccak256("recordResolution(uint256,address,address,uint8,uint256)"));
+bytes4 constant SEL_CLOSE_BY_MUTUAL_AGREEMENT = bytes4(keccak256("closeByMutualAgreement(uint256)"));
 
 error InvalidWorkflowId(uint256 workflowId, uint256 maxWorkflowId);
 error TransferNotPending(uint256 workflowId, EscrowState currentStatus);
@@ -86,6 +87,12 @@ error NotInDisputedState(uint256 workflowId, EscrowState currentState);
 error ExcessRefundTransferFailed(uint256 workflowId, address recipient, uint256 amount);
 error EscrowInsufficientBalance();
 error PartialRecoveryNotAllowed();
+error SplitProposalBlocked(uint256 workflowId);
+error SplitNotFound(uint256 workflowId);
+error SplitExpired(uint256 workflowId, uint64 expiry, uint64 currentTime);
+error NotCounterparty(uint256 workflowId, address caller);
+error SplitAmountMismatch(uint256 workflowId, uint256 buyerAmount, uint256 sellerAmount, uint256 expected);
+error EscrowNotSettleable(uint256 workflowId, EscrowState currentState);
 
 error InvalidState(uint256 workflowId, uint8 expected, uint8 actual);
 error InvalidConfig(uint8 code, uint256 value);
@@ -169,6 +176,16 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         bytes32 resolutionHash;
     }
     mapping(uint256 => PendingSettlement) public pendingSettlements;
+
+    // Mutual split settlement
+    struct SplitProposal {
+        address proposer;
+        uint256 buyerAmount;   // amount claimable by et.from
+        uint256 sellerAmount;  // amount claimable by et.to
+        uint64 expiry;
+        bool active;
+    }
+    mapping(uint256 => SplitProposal) public splitProposals;
 
     struct EscrowTimeoutPolicySnapshot {
         bool pendingAutoCancelEnabled;
@@ -264,6 +281,9 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     event PendingSettlementSet(uint256 indexed workflowId, bool isRelease, uint256 appealDeadline);
     event PendingSettlementCancelled(uint256 indexed workflowId);
     event PendingSettlementExecuted(uint256 indexed workflowId, bool isRelease);
+    event SplitProposed(uint256 indexed workflowId, address indexed proposer, uint256 buyerAmount, uint256 sellerAmount, uint64 expiry);
+    event SplitAccepted(uint256 indexed workflowId, address indexed accepter, uint256 buyerAmount, uint256 sellerAmount);
+    event SplitCancelled(uint256 indexed workflowId, address indexed cancelledBy);
     event TimeoutPolicySnapshotted(uint256 indexed workflowId, bool pendingAutoCancelEnabled, bool disputedTimeoutEnabled);
     event TimeoutConfigUpdated(TimeoutConfig config);
     // Consolidated auto-transfer event (replaces AutoCompleted + AutoFailed to save bytecode)
@@ -993,6 +1013,152 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         emit PendingSettlementExecuted(workflowId, isRelease);
     }
 
+    /**
+     * @notice Propose a mutual split settlement of an escrow.
+     * @dev Either participant may propose. A new proposal replaces any existing one.
+     *      Blocked if a resolver ruling is already in the pending settlement pipeline.
+     * @param workflowId Escrow ID
+     * @param buyerAmount Amount (in escrow token) to credit to the sender (et.from)
+     * @param sellerAmount Amount (in escrow token) to credit to the recipient (et.to)
+     * @param expiry Unix timestamp after which the proposal lapses; 0 = default 7 days
+     */
+    function proposeSplit(
+        uint256 workflowId,
+        uint256 buyerAmount,
+        uint256 sellerAmount,
+        uint64 expiry
+    ) external nonReentrant {
+        _validateWorkflowId(workflowId);
+        EscrowTransfer storage et = escrowTransfers[workflowId];
+
+        if (_msgSender() != et.from && _msgSender() != et.to)
+            revert NotParticipant(workflowId, _msgSender(), et.from, et.to);
+
+        EscrowState state = et.escrowState;
+        if (state != EscrowState.PENDING && state != EscrowState.DISPUTED)
+            revert EscrowNotSettleable(workflowId, state);
+
+        if (pendingSettlements[workflowId].exists)
+            revert SplitProposalBlocked(workflowId);
+
+        if (buyerAmount + sellerAmount != et.amountAfterFee)
+            revert SplitAmountMismatch(workflowId, buyerAmount, sellerAmount, et.amountAfterFee);
+
+        uint64 resolvedExpiry = expiry == 0 ? uint64(block.timestamp + 7 days) : expiry;
+        if (resolvedExpiry <= block.timestamp) revert InvalidConfig(0, resolvedExpiry);
+
+        // Cancel any existing proposal (new proposal supersedes old one)
+        if (splitProposals[workflowId].active) {
+            emit SplitCancelled(workflowId, splitProposals[workflowId].proposer);
+        }
+
+        splitProposals[workflowId] = SplitProposal({
+            proposer: _msgSender(),
+            buyerAmount: buyerAmount,
+            sellerAmount: sellerAmount,
+            expiry: resolvedExpiry,
+            active: true
+        });
+
+        emit SplitProposed(workflowId, _msgSender(), buyerAmount, sellerAmount, resolvedExpiry);
+    }
+
+    /**
+     * @notice Cancel an active split proposal.
+     * @dev Only the proposer (or guardian) may cancel.
+     */
+    function cancelSplit(uint256 workflowId) external nonReentrant {
+        _validateWorkflowId(workflowId);
+        SplitProposal storage proposal = splitProposals[workflowId];
+
+        if (!proposal.active) revert SplitNotFound(workflowId);
+
+        EscrowTransfer storage et = escrowTransfers[workflowId];
+        bool isProposer = proposal.proposer == _msgSender();
+        bool isGuardian = hasRole(ROLE_GUARDIAN, _msgSender());
+        if (!isProposer && !isGuardian)
+            revert NotParticipant(workflowId, _msgSender(), et.from, et.to);
+
+        delete splitProposals[workflowId];
+        emit SplitCancelled(workflowId, _msgSender());
+    }
+
+    /**
+     * @notice Accept an active split proposal, executing mutual settlement.
+     * @dev Only the counterparty (non-proposer participant) may accept.
+     *      If the escrow is DISPUTED, the active DRM dispute is closed by mutual agreement.
+     *      Principal is split per the agreed amounts; yield (if any) is split proportionally.
+     *      All settlement is pull-only — no automatic token transfers.
+     */
+    function acceptSplit(uint256 workflowId) external nonReentrant {
+        _validateWorkflowId(workflowId);
+        EscrowTransfer storage et = escrowTransfers[workflowId];
+        SplitProposal storage proposal = splitProposals[workflowId];
+
+        if (!proposal.active) revert SplitNotFound(workflowId);
+
+        // Only the counterparty may accept
+        address counterparty = (proposal.proposer == et.from) ? et.to : et.from;
+        if (_msgSender() != counterparty)
+            revert NotCounterparty(workflowId, _msgSender());
+
+        if (block.timestamp > proposal.expiry)
+            revert SplitExpired(workflowId, proposal.expiry, uint64(block.timestamp));
+
+        // Block if resolver ruling is already in settlement pipeline
+        if (pendingSettlements[workflowId].exists)
+            revert SplitProposalBlocked(workflowId);
+
+        EscrowState state = et.escrowState;
+        if (state != EscrowState.PENDING && state != EscrowState.DISPUTED)
+            revert EscrowNotSettleable(workflowId, state);
+
+        uint256 principal = et.amountAfterFee;
+        if (proposal.buyerAmount + proposal.sellerAmount != principal)
+            revert SplitAmountMismatch(workflowId, proposal.buyerAmount, proposal.sellerAmount, principal);
+
+        uint256 buyerAmount = proposal.buyerAmount;
+        uint256 sellerAmount = proposal.sellerAmount;
+        address token = et.token;
+        address buyer = et.from;
+        address seller = et.to;
+
+        // CEI: clear proposal before any state changes
+        delete splitProposals[workflowId];
+
+        // Close active dispute in the resolution module (ignores failure gracefully)
+        if (state == EscrowState.DISPUTED) {
+            _closeDisputeByMutualAgreement(workflowId);
+        }
+
+        EscrowState oldState = StateManagementLibrary.transitionToResolved(et, workflowId);
+        emit EscrowStateChanged(workflowId, oldState, EscrowState.RESOLVED);
+
+        // Unwind yield module if active; yield is split proportionally to the principal split
+        (uint256 principalOut, uint256 yieldOut) = _handleYieldModuleUnwind(workflowId, token, principal);
+        uint256 totalOut = principalOut + yieldOut;
+
+        _updateEscrowBalance(token, principal, false);
+
+        if (yieldOut == 0) {
+            if (buyerAmount > 0) _creditClaimable(workflowId, buyer, token, buyerAmount, buyerAmount);
+            if (sellerAmount > 0) _creditClaimable(workflowId, seller, token, sellerAmount, sellerAmount);
+        } else {
+            // Proportional yield split: buyer share = yieldOut * buyerAmount / principal
+            uint256 yieldToBuyer = principal > 0 ? (yieldOut * buyerAmount) / principal : 0;
+            uint256 yieldToSeller = yieldOut - yieldToBuyer;
+            uint256 totalBuyer = buyerAmount + yieldToBuyer;
+            uint256 totalSeller = sellerAmount + yieldToSeller;
+            if (totalBuyer > 0) _creditClaimable(workflowId, buyer, token, totalBuyer, buyerAmount);
+            if (totalSeller > 0) _creditClaimable(workflowId, seller, token, totalSeller, sellerAmount);
+        }
+
+        // Suppress unused warning for totalOut (used only when yield is active)
+        totalOut;
+
+        emit SplitAccepted(workflowId, _msgSender(), buyerAmount, sellerAmount);
+    }
+
     function _authorizeTimedActionAndSource(
         EscrowTransfer storage et
     ) internal view returns (ExecutionSource source, address caller) {
@@ -1162,6 +1328,16 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         if (address(resolutionModule) != address(0)) {
             (bool success, ) = address(resolutionModule).call(abi.encodeWithSelector(SEL_FINALIZE_DISPUTE, workflowId));
             success; // Ignore failure
+        }
+    }
+
+    function _closeDisputeByMutualAgreement(uint256 workflowId) internal {
+        IResolutionModule resolutionModule = _getResolutionModule(workflowId);
+        if (address(resolutionModule) != address(0)) {
+            (bool success, ) = address(resolutionModule).call(
+                abi.encodeWithSelector(SEL_CLOSE_BY_MUTUAL_AGREEMENT, workflowId)
+            );
+            success; // Ignore failure — module may not support mutual agreement closure
         }
     }
 

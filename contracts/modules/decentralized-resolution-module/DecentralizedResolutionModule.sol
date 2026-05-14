@@ -66,6 +66,7 @@ contract DecentralizedResolutionModule is
     event IncentiveModuleCallFailed(uint256 indexed workflowId, string functionName, string reason);
     event RoundRobinCounterAdvanced(bytes32 indexed category, bool seniorResolvers, uint256 newIndex);
     event AdminFacetUpdated(address indexed oldFacet, address indexed newFacet);
+    event DisputeClosedByMutualAgreement(uint256 indexed workflowId, address indexed escrowContract);
 
     // ============ Modifiers ============
     modifier onlyEscrowContract() {
@@ -502,6 +503,34 @@ contract DecentralizedResolutionModule is
                 emit IncentiveModuleCallFailed(workflowId, 'onDisputeFinalized', 'FAILED');
             }
         }
+    }
+
+    /**
+     * @notice Close a dispute by mutual agreement between escrow participants.
+     * @dev Called by the escrow contract when both parties have accepted a split settlement.
+     *      Bypasses the appeal-window timing check — mutual agreement is terminal regardless
+     *      of where the dispute was in the resolution process.
+     *      If no dispute record exists for this escrow (e.g. escrow was PENDING, not DISPUTED),
+     *      the call is a no-op.
+     * @param workflowId The escrow workflow ID
+     */
+    function closeByMutualAgreement(uint256 workflowId) external onlyEscrowContract {
+        DisputeMetadata storage dm = disputeMetadata[msg.sender][workflowId];
+
+        // No-op if never disputed or already finalized
+        if (dm.status == DisputeStatus.Final) return;
+
+        dm.status = DisputeStatus.Final;
+        uint8 finalRound = dm.currentRound;
+
+        if (address(incentiveModule) != address(0)) {
+            // Pass ResolutionOutcome.NONE — no resolver decision was reached
+            try incentiveModule.onDisputeFinalized(workflowId, msg.sender, finalRound, ResolutionOutcome.NONE) {} catch {
+                emit IncentiveModuleCallFailed(workflowId, 'onDisputeFinalized', 'MUTUAL_SETTLEMENT');
+            }
+        }
+
+        emit DisputeClosedByMutualAgreement(workflowId, msg.sender);
     }
 
     function forceProgress(uint256 workflowId, address escrowContract) external nonReentrant {
