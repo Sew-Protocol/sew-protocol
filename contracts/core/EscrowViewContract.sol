@@ -6,6 +6,7 @@ import '../types/EscrowTypes.sol';
 import '../types/YieldPresets.sol';
 import '../libraries/SettingsValidationLibrary.sol';
 import '../libraries/DisputeManagementLibrary.sol';
+import '@openzeppelin/contracts/utils/math/SafeCast.sol';
 
 /**
  * @title EscrowViewContract
@@ -650,7 +651,7 @@ contract EscrowViewContract {
             if (autoCancel > 0) return autoCancel;
         }
         if (state == EscrowState.DISPUTED && pendingExists) {
-            return uint64(appealDeadline);
+            return SafeCast.toUint64(appealDeadline);
         }
         return 0;
     }
@@ -669,7 +670,7 @@ contract EscrowViewContract {
             return _calculateNextDeadline(autoRelease, autoCancel, appealDeadline, pendingExists, state);
         }
         if (state == EscrowState.DISPUTED && pendingExists) {
-            return uint64(appealDeadline);
+            return SafeCast.toUint64(appealDeadline);
         }
         return 0;
     }
