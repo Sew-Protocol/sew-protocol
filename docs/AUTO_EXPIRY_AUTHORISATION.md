@@ -468,3 +468,95 @@ on the same escrow.
 **Zero means disabled:** A value of `0` for any timer field means that feature is
 inactive for that escrow. No automatic action will ever fire on a `0` timestamp
 (`autoReleaseTime == 0` is explicitly skipped in `computeTimedActions`).
+
+---
+
+## 9. Security Audit Findings (May 2026)
+
+A security audit of the auto-expiry and timed-action subsystem was conducted
+against commit `a34732a`. Three issues were found and fixed in commit `dfd4e0a`.
+
+---
+
+### Finding 1 — Appeal window not isolated from governance changes (HIGH)
+
+**Location:** `BaseEscrow._executeResolution` / `SettlementOps.computeResolutionExecution`
+
+**Description:**  
+`_executeResolution` passed the live `timeoutConfig` storage variable into
+`computeResolutionExecution`. The resolution module's `getAppealDeadlineAndRound`
+fallback path inside `computeResolutionExecution` uses `timeoutConfig.appealWindowDuration`
+when the module returns `appealDeadline == 0`. This means an admin could shorten
+or extend the effective appeal window for any in-flight escrow by updating
+`appealWindowDuration` after the escrow was created.
+
+**Impact:**  
+Retroactive reduction of the appeal window shortens the time a party has to
+challenge a resolver ruling — a meaningful trust-model violation. Extension is
+less critical but still inconsistent with the snapshot-isolation guarantee.
+
+**Fix:**  
+`_executeResolution` now builds a `TimeoutConfig` from `moduleSnapshots[workflowId]`
+(the per-escrow snapshot taken at creation) before calling `computeResolutionExecution`,
+mirroring the existing pattern in `automateTimedActions`.
+
+---
+
+### Finding 2 — Global defaults could set both auto-release and auto-cancel (MEDIUM)
+
+**Location:** `BaseEscrow.setTimeoutConfig` / `BaseEscrow._applyEscrowSettings`
+
+**Description:**  
+`SettingsValidationLibrary.validateEscrowSettings` enforces that a caller cannot
+set both `autoReleaseTime` and `autoCancelTime` on the same escrow. However,
+`setTimeoutConfig` had no equivalent guard. If an admin set both
+`defaultAutoReleaseDelay > 0` and `defaultAutoCancelDelay > 0`, any escrow
+created with both per-escrow times as `0` would have both timers populated by
+`_applyEscrowSettings` — violating the mutual-exclusion invariant.
+
+**Impact:**  
+`computeTimedActions` resolves the conflict by priority (auto-release wins), so
+no funds are lost, but the escrow enters a state that the validation layer is
+supposed to prevent. It also silently overrides the intended default behaviour.
+
+**Fix:**  
+`setTimeoutConfig` now reverts with `InvalidConfig(4, ...)` if both default
+delays are non-zero, mirroring the per-escrow mutual-exclusion check.
+
+---
+
+### Finding 3 — No dedicated keeper role; automation required ROLE_TIMELOCK (MEDIUM)
+
+**Location:** `BaseEscrow._authorizeTimedAction` / `BaseEscrow._authorizeTimedActionAndSource`
+
+**Description:**  
+Timed actions (auto-release, auto-cancel, appeal window expiry, dispute timeout)
+could only be triggered by `et.from`, `et.to`, or an address holding
+`ROLE_TIMELOCK`. `ROLE_TIMELOCK` also controls high-privilege ops-rewiring
+functions (`setCreateOps`, `setSettlementOps`, `setBondCollector`). The
+`ExecutionSource.KEEPER` enum variant existed but was unreachable — there was no
+code path that would return it.
+
+**Impact:**  
+An automation bot could not trigger timed actions without being granted
+`ROLE_TIMELOCK`, which is significantly over-privileged. Granting a keeper bot
+timelock privileges would expose protocol ops rewiring to operational key compromise.
+
+**Fix:**  
+A dedicated `ROLE_KEEPER` constant (`keccak256('ROLE_KEEPER')`) has been added.
+Both `_authorizeTimedAction` and `_authorizeTimedActionAndSource` now check for
+`ROLE_KEEPER` (returning `ExecutionSource.KEEPER`) before falling back to
+`ROLE_TIMELOCK`. Keepers can trigger expiry actions but cannot call any
+`onlyRole(ROLE_TIMELOCK)` governance functions.
+
+---
+
+### Items checked and cleared
+
+| Check | Result |
+|-------|--------|
+| Outsider bypass of timed-action auth | Not possible — callers not in `{from, to, KEEPER, TIMELOCK}` revert |
+| CRIT-3 guard (pending ruling vs dispute timeout) | Present — `resolveDisputeByTimeout` checks `pendingSettlements[workflowId].exists` |
+| Auto-release/auto-cancel gating to `PENDING` state | Confirmed — `computeTimedActions` returns `(0, false)` for non-`PENDING` state |
+| Zero `maxDisputeDuration` bypass | Safe — `disputedTimeoutEnabled` flag prevents `resolveDisputeByTimeout` when `maxDisputeDuration == 0` |
+| `uint64` cast overflow | Checked — `_applyEscrowSettings` reverts with `InvalidAutoTime` if value exceeds `type(uint64).max` |
