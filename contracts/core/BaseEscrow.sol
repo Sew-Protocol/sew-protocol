@@ -139,6 +139,8 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');
     bytes32 public constant ROLE_GUARDIAN = keccak256('ROLE_GUARDIAN');
     bytes32 public constant ROLE_ADMIN_CONTRACT = keccak256('ROLE_ADMIN_CONTRACT');
+    /// @dev Dedicated keeper role: may trigger timed actions but cannot rewire protocol ops.
+    bytes32 public constant ROLE_KEEPER = keccak256('ROLE_KEEPER');
 
     // Pause constraints removed for size optimization
     
@@ -439,6 +441,10 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     }
 
     function setTimeoutConfig(TimeoutConfig calldata config) external onlyRole(ROLE_ADMIN_CONTRACT) {
+        // Mirrors the per-escrow mutual exclusion enforced by SettingsValidationLibrary.
+        if (config.defaultAutoReleaseDelay > 0 && config.defaultAutoCancelDelay > 0) {
+            revert InvalidConfig(4, config.defaultAutoReleaseDelay);
+        }
         timeoutConfig = config;
         emit TimeoutConfigUpdated(config);
     }
@@ -1053,11 +1059,21 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
 
         if (address(settlementOps) == address(0)) revert ZeroSettlementOps();
 
+        // Use snapshotted appeal window so governance changes do not retroactively affect
+        // in-flight escrows.  Mirrors the approach in automateTimedActions().
+        ModuleSnapshot storage modSnap = moduleSnapshots[workflowId];
+        TimeoutConfig memory snappedTimeoutConfig = TimeoutConfig({
+            defaultAutoReleaseDelay: modSnap.defaultAutoReleaseDelay,
+            defaultAutoCancelDelay: modSnap.defaultAutoCancelDelay,
+            maxDisputeDuration: modSnap.maxDisputeDuration,
+            appealWindowDuration: modSnap.appealWindowDuration
+        });
+
         SettlementOps.ResolutionResult memory result = settlementOps.computeResolutionExecution(
             address(resolutionModule),
             workflowId,
             isRelease,
-            timeoutConfig
+            snappedTimeoutConfig
         );
         
         if (result.shouldExecute) {
@@ -1246,6 +1262,9 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         if (caller == et.from || caller == et.to) {
             return (ExecutionSource.USER, caller);
         }
+        if (hasRole(ROLE_KEEPER, caller)) {
+            return (ExecutionSource.KEEPER, caller);
+        }
         if (!hasRole(ROLE_TIMELOCK, caller)) revert UnauthorizedTimedExecutor(caller);
         return (ExecutionSource.GOVERNANCE, caller);
     }
@@ -1253,6 +1272,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     function _authorizeTimedAction(EscrowTransfer storage et) internal view {
         address caller = _msgSender();
         if (caller == et.from || caller == et.to) return;
+        if (hasRole(ROLE_KEEPER, caller)) return;
         if (!hasRole(ROLE_TIMELOCK, caller)) revert UnauthorizedTimedExecutor(caller);
     }
 
