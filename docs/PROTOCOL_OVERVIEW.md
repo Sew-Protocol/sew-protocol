@@ -1,7 +1,7 @@
 # Sew Protocol — Protocol Overview
 
 **Last Updated**: May 2026  
-**Status**: Production (DR v3 complete)
+**Status**: Active testnet deployment / pre-mainnet
 
 ---
 
