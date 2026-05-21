@@ -1,6 +1,6 @@
 # Current Technical Overview
 
-**Last Updated**: January 2026  
+**Last Updated**: May 2026  
 **Project**: Escrow Protocol with Dispute Resolution
 
 ---
@@ -99,11 +99,12 @@ A decentralized escrow protocol built on Base (Ethereum L2) that enables secure,
   - Bond refund/payment logic
   - Observability metrics
   
-- `ResolverIncentiveModuleV3` (DR v3) - 🚧 Planned
+- `ResolverIncentiveModuleV3` (DR v3) - ✅ Complete
   - All DR v2 features
-  - Resolver staking integration
-  - Slashing integration
-  - Fraud lane integration
+  - Resolver staking with mixed bond enforcement (≥80% stable / ≤20% SEW, 50% SEW haircut)
+  - Objective slashing schedule with epoch caps and freeze durations
+  - Senior resolver coverage and delegation
+  - Slashed SEW handled as burned
 
 **Module Governance**: All modules use the same governance pattern: module swaps via Slow lane (queue + activate, ~9 days total). Modules are immutable - upgrades are performed by deploying a new version and swapping via governance. Both queue and activate operations require Timelock execution (ROLE_TIMELOCK).
 
@@ -244,7 +245,7 @@ The protocol uses a **staged rollout approach** for decentralized dispute resolu
 | **IEO** | ✅ Ready | Centralized resolution (DefaultResolutionModule) | Governance only | Minimal surface area |
 | **DR v1** | ✅ Complete | Decentralize decisions (workload routing, EMA scoring) | Decision-making | No resolver capital at risk |
 | **DR v2** | ✅ Complete | Decentralize incentives (appeal bonds, cost curves) | Incentives | Users post bonds (not resolvers) |
-| **DR v3** | 🚧 Phase 1 | Decentralize capital (staking, slashing, fraud lane) | Capital | Resolver capital at risk |
+| **DR v3** | ✅ Complete | Decentralize capital (staking, slashing, senior backing) | Capital | Resolver capital at risk |
 
 ---
 

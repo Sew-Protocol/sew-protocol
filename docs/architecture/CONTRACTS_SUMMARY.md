@@ -72,7 +72,7 @@ Succinct overview of the major contracts and their roles.
 ### `DecentralizedResolutionModule.sol`
 
 **Purpose**: Advanced decentralized resolution with multiple resolvers and escalation  
-**Status**: In separate package (`contracts/decentralized-resolution-module/`), **not included in initial mainnet release**. When ready, it will be deployed and swapped in via Slow lane governance (queue + activate, ~9 days).  
+**Status**: ✅ Complete and production-ready. Lives in separate package (`contracts/decentralized-resolution-module/`). Deployed post-IEO via Slow lane governance (queue + activate, ~9 days). DR v3 (staking + slashing) is now fully implemented.  
 **Key Features**:
 
 - Resolver registry (standard and senior resolvers)

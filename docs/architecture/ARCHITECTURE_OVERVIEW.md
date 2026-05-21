@@ -131,7 +131,7 @@ Handle dispute resolution and escalation:
   - Governance-controlled resolver updates
   - Suitable for initial launch and simple disputes
 
-- **DecentralizedResolutionModule**: Advanced multi-resolver system with escalation (future swap-in)
+- **DecentralizedResolutionModule**: Advanced multi-resolver system with escalation — ✅ complete; activated post-IEO via Slow lane governance
   - Multi-resolver registry with round-robin selection
   - Three-level escalation: Standard → Senior → External resolver
   - Category-based dispute routing
