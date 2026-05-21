@@ -158,7 +158,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     uint256 public appealBondProtocolFeeBps; // Protocol fee on appeal bonds (0-3000 bps = 0-30%)
 
     address public disputeResolutionModule;
-    address public defaultCancellationStrategy;
 
     TimeoutConfig public timeoutConfig;
 
@@ -221,6 +220,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     enum ModuleType {
         RESOLUTION,
         RELEASE,
+        CANCELLATION,
         YIELD_GEN,
         YIELD_DIST
     }
@@ -270,7 +270,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         address indexed disputeResolver
     );
     event ResolutionModuleActivated(address indexed oldModule, address indexed newModule);
-    event DefaultCancellationStrategyUpdated(address indexed oldStrategy, address indexed newStrategy);
     event EscrowSettingsUpdated(uint256 indexed workflowId, EscrowSettings settings);
     event ClaimableBalanceSet(
         uint256 indexed workflowId,
@@ -430,14 +429,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         address oldModule = disputeResolutionModule;
         disputeResolutionModule = module;
         emit ResolutionModuleActivated(oldModule, module);
-    }
-
-    function setDefaultCancellationStrategy(address strategy) external onlyRole(ROLE_ADMIN_CONTRACT) {
-        if (strategy == address(0)) revert InvalidAddress(ADDR_GENERIC, strategy);
-        if (strategy.code.length == 0) revert ModuleNotContract(strategy);
-        address oldStrategy = defaultCancellationStrategy;
-        defaultCancellationStrategy = strategy;
-        emit DefaultCancellationStrategyUpdated(oldStrategy, strategy);
     }
 
     function setTimeoutConfig(TimeoutConfig calldata config) external onlyRole(ROLE_ADMIN_CONTRACT) {
@@ -1654,13 +1645,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     ) internal view virtual returns (IReleaseStrategy);
     function _getCancellationStrategy(
         uint256 workflowId
-    ) internal view virtual returns (address) {
-        address snap = moduleSnapshots[workflowId].cancellationStrategy;
-        if (snap != address(0)) {
-            return snap;
-        }
-        return defaultCancellationStrategy;
-    }
+    ) internal view virtual returns (address);
     function _getResolutionModule(
         uint256 workflowId
     ) internal view virtual returns (IResolutionModule) {

@@ -186,6 +186,12 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         return ModuleGetterConsolidationLibrary.getReleaseStrategy(moduleAddr);
     }
 
+    function _getCancellationStrategy(uint256 workflowId) internal view override returns (address) {
+        return ModuleGetterLibrary.getModuleAddress(
+            workflowId, ModuleType.CANCELLATION, moduleSnapshots, moduleManagement, address(this)
+        );
+    }
+
     function _getResolutionModule(uint256 workflowId) internal view override returns (IResolutionModule) {
         address moduleAddr = ModuleGetterLibrary.getModuleAddress(
             workflowId, ModuleType.RESOLUTION, moduleSnapshots, moduleManagement, address(this)

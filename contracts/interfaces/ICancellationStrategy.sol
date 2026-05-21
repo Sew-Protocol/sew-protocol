@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.33;
 
+import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import "../types/EscrowTypes.sol";
 
 /// @title ICancellationStrategy
 /// @notice Pluggable cancellation strategy for per-escrow customization
 /// @dev Determines WHO can CANCEL and WHEN
-interface ICancellationStrategy {
+interface ICancellationStrategy is IERC165 {
     /// @notice Determine if a cancellation request can be executed
     /// @dev Called by BaseEscrow.recipientCancel() and senderCancel()
     /// @param workflowId The escrow workflow ID

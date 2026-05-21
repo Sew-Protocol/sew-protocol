@@ -34,7 +34,7 @@ library ModuleGetterLibrary {
         ModuleSnapshot storage snapshot = moduleSnapshots[workflowId];
         
         assembly {
-            // Switch on moduleType (0=RESOLUTION, 1=RELEASE, 2=YIELD_GEN, 3=YIELD_DIST)
+            // Switch on moduleType (0=RESOLUTION, 1=RELEASE, 2=CANCELLATION, 3=YIELD_GEN, 4=YIELD_DIST)
             // Access struct fields via storage pointer offsets
             let slot := snapshot.slot
             switch moduleType
@@ -47,12 +47,16 @@ library ModuleGetterLibrary {
                 snapshotModule := sload(add(slot, 1))
             }
             case 2 {
-                // YIELD_GEN: snapshot.yieldGenerationModule (offset 2)
+                // CANCELLATION: snapshot.cancellationStrategy (offset 2)
                 snapshotModule := sload(add(slot, 2))
             }
             case 3 {
-                // YIELD_DIST: snapshot.yieldDistributionModule (offset 3)
+                // YIELD_GEN: snapshot.yieldGenerationModule (offset 3)
                 snapshotModule := sload(add(slot, 3))
+            }
+            case 4 {
+                // YIELD_DIST: snapshot.yieldDistributionModule (offset 4)
+                snapshotModule := sload(add(slot, 4))
             }
         }
 

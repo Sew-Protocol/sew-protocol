@@ -144,7 +144,7 @@ interface ISlashingModule {
 
     /**
      * @notice Propose a slash for a resolver
-     * @param workflowId Related dispute ID
+     * @param workflowId Escrow transfer ID (escrowId) for the disputed escrow
      * @param escrowContract Related escrow contract
      * @param resolver Resolver to slash
      * @param reason Reason for slash
@@ -193,7 +193,7 @@ interface ISlashingModule {
 
     /**
      * @notice Automatically slash for timeout
-     * @param workflowId Dispute ID
+     * @param workflowId Escrow transfer ID (escrowId) for the disputed escrow
      * @param escrowContract Related escrow contract
      * @param resolver Resolver who timed out
      * @param timeoutType Type of timeout (accept vs resolve)
@@ -207,7 +207,7 @@ interface ISlashingModule {
 
     /**
      * @notice Automatically slash for reversal
-     * @param workflowId Dispute ID
+     * @param workflowId Escrow transfer ID (escrowId) for the disputed escrow
      * @param escrowContract Related escrow contract
      * @param resolver Resolver whose decision was reversed
      * @param priorRound Round at which decision was made
@@ -221,7 +221,7 @@ interface ISlashingModule {
 
     /**
      * @notice Slash for proven fraud
-     * @param workflowId Dispute ID (may be 0 for off-chain fraud)
+     * @param workflowId Escrow transfer ID (escrowId) for the disputed escrow (may be 0 for off-chain fraud)
      * @param escrowContract Related escrow contract
      * @param resolver Resolver who committed fraud
      * @param evidence Fraud proof
@@ -315,7 +315,7 @@ interface ISlashingModule {
 
     /**
      * @notice Claim insurance payout (for users harmed by resolver misbehavior)
-     * @param workflowId Dispute ID
+     * @param workflowId Escrow transfer ID (escrowId) for the disputed escrow
      * @param to Address to send payout
      * @param amount Amount to claim
      */

@@ -342,7 +342,7 @@ contract EscrowGovernanceTimelockTest is Test {
     function test_setTimeoutConfig_success() public {
         TimeoutConfig memory config = TimeoutConfig({
             defaultAutoReleaseDelay: 10 days,
-            defaultAutoCancelDelay: 5 days,
+            defaultAutoCancelDelay: 0,
             maxDisputeDuration: 60 days,
             appealWindowDuration: 3 days
         });

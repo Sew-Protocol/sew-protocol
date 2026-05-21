@@ -56,23 +56,42 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     );
   }
 
-  // Set default cancellation strategy on EscrowVault
+  // Set default cancellation strategy on EscrowVault via ModuleSnapshotRegistry
   console.log(`\n   Setting default cancellation strategy on EscrowVault...`);
-  const escrowVaultContract = await ethers.getContractAt(
-    'EscrowVault',
-    escrowVaultDeployment.address,
+  const moduleManagementDeployment = await get('ModuleSnapshotRegistry');
+  const moduleManagement = await ethers.getContractAt(
+    'ModuleSnapshotRegistry',
+    moduleManagementDeployment.address,
   );
 
   try {
-    const currentStrategy = await escrowVaultContract.defaultCancellationStrategy();
+    const currentStrategy = await moduleManagement.getDefaultCancellationStrategy(escrowVaultDeployment.address);
     if (
       currentStrategy.toLowerCase() !== defaultCancellationStrategyDeployment.address.toLowerCase()
     ) {
-      const setStrategyTx = await escrowVaultContract.setDefaultCancellationStrategy(
+      // BaseEscrow.ModuleType.CANCELLATION = 2
+      const ModuleType = { CANCELLATION: 2 };
+      
+      console.log(`      Queuing DefaultCancellationStrategy...`);
+      const queueTx = await moduleManagement.queueModule(
+        escrowVaultDeployment.address,
+        ModuleType.CANCELLATION,
         defaultCancellationStrategyDeployment.address,
       );
-      await setStrategyTx.wait();
-      console.log(`   ✅ Default cancellation strategy set on EscrowVault`);
+      await queueTx.wait();
+
+      // If on localhost/hardhat, activate immediately
+      if (hre.network.name === 'hardhat' || hre.network.name === 'localhost') {
+        console.log(`      Activating DefaultCancellationStrategy (local)...`);
+        const activateTx = await moduleManagement.activateModule(
+          escrowVaultDeployment.address,
+          ModuleType.CANCELLATION,
+        );
+        await activateTx.wait();
+      } else {
+        console.log(`      Queued. Must wait 7 days to activate.`);
+      }
+      console.log(`   ✅ Default cancellation strategy process initiated on EscrowVault`);
     } else {
       console.log(`   ✅ Default cancellation strategy already set on EscrowVault`);
     }

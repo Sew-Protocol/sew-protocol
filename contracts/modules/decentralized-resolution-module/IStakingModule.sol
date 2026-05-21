@@ -135,7 +135,7 @@ interface IStakingModule {
 
     /**
      * @notice Called when a resolver is assigned to a dispute
-     * @param workflowId Dispute ID
+     * @param workflowId Escrow transfer ID (escrowId) for the disputed escrow
      * @param escrowContract Address of the vault
      * @param resolver Resolver address
      * @param stakeRequired Amount of stake required for this dispute
@@ -149,7 +149,7 @@ interface IStakingModule {
 
     /**
      * @notice Called when a resolver's decision is finalized
-     * @param workflowId Dispute ID
+     * @param workflowId Escrow transfer ID (escrowId) for the disputed escrow
      * @param escrowContract Address of the vault
      * @param resolver Resolver address
      * @param outcome Was the decision upheld (true) or reversed (false)
@@ -163,7 +163,7 @@ interface IStakingModule {
 
     /**
      * @notice Called when a dispute is escalated (unlock stake from prior round)
-     * @param workflowId Dispute ID
+     * @param workflowId Escrow transfer ID (escrowId) for the disputed escrow
      * @param escrowContract Address of the vault
      * @param resolver Resolver from prior round
      */
@@ -171,7 +171,7 @@ interface IStakingModule {
 
     /**
      * @notice Called when stake needs to be locked (e.g., during appeal period)
-     * @param workflowId Dispute ID
+     * @param workflowId Escrow transfer ID (escrowId) for the disputed escrow
      * @param escrowContract Address of the vault
      * @param resolver Resolver address
      * @param amount Amount to lock
@@ -187,7 +187,7 @@ interface IStakingModule {
 
     /**
      * @notice Called when stake should be unlocked
-     * @param workflowId Dispute ID
+     * @param workflowId Escrow transfer ID (escrowId) for the disputed escrow
      * @param escrowContract Address of the vault
      * @param resolver Resolver address
      */

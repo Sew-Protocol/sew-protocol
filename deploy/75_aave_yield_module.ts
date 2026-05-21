@@ -108,7 +108,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       );
 
       // Queue and activate the module for EscrowVault
-      const ModuleType = { YIELD_GEN: 2 };
+      const ModuleType = { YIELD_GEN: 3 };
       console.log(`      Queuing AaveYieldModule for EscrowVault...`);
       const queueTx = await moduleManagement.queueModule(
         escrowVaultDeployment.address,

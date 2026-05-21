@@ -6,7 +6,8 @@ import '../../modules/decentralized-resolution-module/DecentralizedResolverStruc
 /**
  * @title IIncentiveModule
  * @notice Interface for swappable incentive modules in decentralized resolution system
- * @dev Defines the contract between DecentralizedResolutionModule and incentive logic
+ * @dev Defines the contract between DecentralizedResolutionModule and incentive logic.
+ *      Dispute state is keyed by escrow transfer ID (workflowId); there is no separate disputeId in this interface.
  *      - V1: Performance-based workload routing (no appeal bonds)
  *      - V2: Appeal bonds + escalation cost curves (no resolver staking)
  *      - V3: Resolver staking, slashing, delegation (future)
@@ -16,7 +17,7 @@ interface IIncentiveModule {
 
     /**
      * @notice Called when a dispute is opened
-     * @param workflowId Unique identifier for the dispute
+     * @param workflowId Escrow transfer ID (escrowId) for the disputed escrow
      * @param escrowContract Address of the vault
      * @param token Token address for escrow
      * @param amount Escrow amount
@@ -34,7 +35,7 @@ interface IIncentiveModule {
 
     /**
      * @notice Called when a resolver is assigned to a dispute
-     * @param workflowId Unique identifier for the dispute
+     * @param workflowId Escrow transfer ID (escrowId) for the disputed escrow
      * @param escrowContract Address of the vault
      * @param resolver Address of assigned resolver
      * @param round Current round
@@ -48,7 +49,7 @@ interface IIncentiveModule {
 
     /**
      * @notice Called when a resolver submits a decision
-     * @param workflowId Unique identifier for the dispute
+     * @param workflowId Escrow transfer ID (escrowId) for the disputed escrow
      * @param escrowContract Address of the vault
      * @param resolver Address of resolver
      * @param round Current round
@@ -66,7 +67,7 @@ interface IIncentiveModule {
 
     /**
      * @notice Called when a dispute is escalated to the next round
-     * @param workflowId Unique identifier for the dispute
+     * @param workflowId Escrow transfer ID (escrowId) for the disputed escrow
      * @param escrowContract Address of the vault
      * @param fromRound Previous round
      * @param toRound Next round
@@ -82,7 +83,7 @@ interface IIncentiveModule {
 
     /**
      * @notice Called when a dispute is finalized (no more appeals)
-     * @param workflowId Unique identifier for the dispute
+     * @param workflowId Escrow transfer ID (escrowId) for the disputed escrow
      * @param escrowContract Address of the vault
      * @param finalRound Final round that decided the outcome
      * @param finalDecision Final resolution outcome
@@ -96,7 +97,7 @@ interface IIncentiveModule {
 
     /**
      * @notice Called when a resolver times out
-     * @param workflowId Unique identifier for the dispute
+     * @param workflowId Escrow transfer ID (escrowId) for the disputed escrow
      * @param escrowContract Address of the vault
      * @param resolver Address of resolver that timed out
      * @param round Round where timeout occurred
@@ -114,7 +115,7 @@ interface IIncentiveModule {
 
     /**
      * @notice Calculate and distribute resolver payments for a finalized dispute
-     * @param workflowId Unique identifier for the dispute
+     * @param workflowId Escrow transfer ID (escrowId) for the disputed escrow
      * @param escrowContract Address of the vault
      * @param token Token address for payment
      * @param totalFees Total fees available for distribution
@@ -128,7 +129,7 @@ interface IIncentiveModule {
 
     /**
      * @notice Get claimable payment for a resolver
-     * @param workflowId Unique identifier for the dispute
+     * @param workflowId Escrow transfer ID (escrowId) for the disputed escrow
      * @param escrowContract Address of the vault
      * @param resolver Resolver address
      * @return amount Claimable amount
@@ -157,7 +158,7 @@ interface IIncentiveModule {
 
     /**
      * @notice Get required appeal bond for escalation (V2+)
-     * @param workflowId Unique identifier for the dispute
+     * @param workflowId Escrow transfer ID (escrowId) for the disputed escrow
      * @param escrowContract Address of the vault
      * @param fromRound Current round
      * @param toRound Next round
@@ -174,7 +175,7 @@ interface IIncentiveModule {
 
     /**
      * @notice Record appeal bond payment (V2+)
-     * @param workflowId Unique identifier for the dispute
+     * @param workflowId Escrow transfer ID (escrowId) for the disputed escrow
      * @param escrowContract Address of the vault
      * @param depositor Address that deposited bond (for ERC20: escrow contract, for ETH: user/escalator)
      * @param escalatedBy Address that initiated the escalation (always the user/escalator)
@@ -201,7 +202,7 @@ interface IIncentiveModule {
 
     /**
      * @notice Distribute appeal bond based on outcome (V2+)
-     * @param workflowId Unique identifier for the dispute
+     * @param workflowId Escrow transfer ID (escrowId) for the disputed escrow
      * @param escrowContract Address of the vault
      * @param round Round that was appealed
      * @param outcomeFlipped Whether the appeal succeeded

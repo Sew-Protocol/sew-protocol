@@ -555,7 +555,7 @@ contract EscrowViewContractTest is Test {
     function test_getTimeoutConfig_afterUpdate() public {
         TimeoutConfig memory newConfig = TimeoutConfig({
             defaultAutoReleaseDelay: 10 days,
-            defaultAutoCancelDelay: 5 days,
+            defaultAutoCancelDelay: 0,
             maxDisputeDuration: 60 days,
             appealWindowDuration: 3 days
         });

@@ -15,6 +15,10 @@ library ModuleGetterConsolidationLibrary {
     function getReleaseStrategy(address moduleAddr) internal pure returns (IReleaseStrategy) {
         return IReleaseStrategy(moduleAddr);
     }
+
+    function getCancellationStrategy(address moduleAddr) internal pure returns (address) {
+        return moduleAddr;
+    }
     
     function getResolutionModule(address moduleAddr, address fallbackModule) internal pure returns (IResolutionModule) {
         return IResolutionModule(moduleAddr != address(0) ? moduleAddr : fallbackModule);

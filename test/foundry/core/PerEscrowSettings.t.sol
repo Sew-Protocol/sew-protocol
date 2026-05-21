@@ -240,10 +240,10 @@ contract PerEscrowSettingsTest is Test {
     function test_PerEscrow_DefaultTimeoutsApplied_WhenSettingsZero() public {
         uint256 amount = 100e18;
 
-        // Configure default auto times via admin
+        // Configure default auto times via admin (only one allowed)
         TimeoutConfig memory cfg = TimeoutConfig({
             defaultAutoReleaseDelay: 3 days,
-            defaultAutoCancelDelay: 7 days,
+            defaultAutoCancelDelay: 0,
             maxDisputeDuration: 90 days,
             appealWindowDuration: 2 days
         });
@@ -264,7 +264,7 @@ contract PerEscrowSettingsTest is Test {
         ( , , , , , uint64 autoReleaseOnTransfer, uint64 autoCancelOnTransfer, , , ) =
             vault.escrowTransfers(wid);
         assertEq(autoReleaseOnTransfer, uint64(block.timestamp + cfg.defaultAutoReleaseDelay));
-        assertEq(autoCancelOnTransfer, uint64(block.timestamp + cfg.defaultAutoCancelDelay));
+        assertEq(autoCancelOnTransfer, 0);
     }
 
     function test_PerEscrow_InvalidCustomResolver_RevertsAndDoesNotCreateEscrow() public {

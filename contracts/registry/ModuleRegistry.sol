@@ -6,6 +6,8 @@ import '@openzeppelin/contracts/utils/introspection/IERC165.sol';
 import '../interfaces/IModuleRegistry.sol';
 import '../interfaces/IYieldGenerationModule.sol';
 import '../interfaces/IYieldDistributionModule.sol';
+import '../interfaces/IReleaseStrategy.sol';
+import '../interfaces/ICancellationStrategy.sol';
 import '../shared/interfaces/IResolutionModule.sol';
 import '../types/EscrowTypes.sol';
 
@@ -107,6 +109,14 @@ contract ModuleRegistry is AccessControl, IModuleRegistry {
             }
         } else if (moduleType == ModuleType.RESOLUTION) {
             if (!IERC165(module).supportsInterface(type(IResolutionModule).interfaceId)) {
+                revert InvalidInterface(moduleType, module);
+            }
+        } else if (moduleType == ModuleType.RELEASE_STRATEGY) {
+            if (!IERC165(module).supportsInterface(type(IReleaseStrategy).interfaceId)) {
+                revert InvalidInterface(moduleType, module);
+            }
+        } else if (moduleType == ModuleType.CANCELLATION_STRATEGY) {
+            if (!IERC165(module).supportsInterface(type(ICancellationStrategy).interfaceId)) {
                 revert InvalidInterface(moduleType, module);
             }
         }

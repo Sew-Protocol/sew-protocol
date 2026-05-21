@@ -119,4 +119,11 @@ contract EscrowVault is BaseEscrow {
         return EscrowVaultModuleLibrary.getReleaseStrategy(moduleManagement, address(this));
     }
 
+    function _getCancellationStrategy(uint256 workflowId) internal view override returns (address) {
+        return EscrowVaultModuleLibrary.getCancellationStrategy(workflowId, moduleSnapshots, moduleManagement, address(this));
+    }
+
+    function _getResolutionModule(uint256 workflowId) internal view override returns (IResolutionModule) {
+        return EscrowVaultModuleLibrary.getResolutionModule(workflowId, moduleSnapshots, moduleManagement, address(this), disputeResolutionModule);
+    }
 }

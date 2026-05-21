@@ -8,12 +8,13 @@ import '../../types/EscrowTypes.sol';
  * @title IResolutionModule
  * @notice Interface for dispute resolution modules
  * @dev Handles resolution logic including escalation paths, resolver roles, and dynamic resolution
- *      All resolution modules must implement ERC-165 for interface detection
+ *      All resolution modules must implement ERC-165 for interface detection.
+ *      Dispute state is keyed by escrow transfer ID (workflowId); there is no separate disputeId in this interface.
  */
 interface IResolutionModule is IERC165 {
     /**
      * @notice Initialize a new dispute in the module
-     * @param workflowId The escrow transfer ID
+     * @param workflowId Escrow transfer ID (escrowId)
      * @param escrowContract Address of the vault
      * @param initialResolver Address of initial resolver
      * @param categoryKey Category identifier for round-robin assignment
@@ -27,7 +28,7 @@ interface IResolutionModule is IERC165 {
 
     /**
      * @notice Record a resolution outcome
-     * @param workflowId The escrow transfer ID
+     * @param workflowId Escrow transfer ID (escrowId)
      * @param escrowContract Address of the vault
      * @param resolver Address of resolver who made the decision
      * @param outcome The resolution outcome (RELEASE or CANCEL)
@@ -43,7 +44,7 @@ interface IResolutionModule is IERC165 {
 
     /**
      * @notice Check if an address is authorized to resolve a dispute
-     * @param workflowId The escrow transfer ID
+     * @param workflowId Escrow transfer ID (escrowId)
      * @param escrowContract Address of the vault
      * @param disputeResolver The address attempting to resolve
      * @param escrowData Encoded escrow data
@@ -59,7 +60,7 @@ interface IResolutionModule is IERC165 {
 
     /**
      * @notice Get the appropriate dispute resolver for a dispute
-     * @param workflowId The escrow transfer ID
+     * @param workflowId Escrow transfer ID (escrowId)
      * @param escrowContract Address of the vault
      * @param escrowData Encoded escrow data
      * @return disputeResolver The dispute resolver address
@@ -73,7 +74,7 @@ interface IResolutionModule is IERC165 {
 
     /**
      * @notice Check if escalation is allowed and get next resolver
-     * @param workflowId The escrow transfer ID
+     * @param workflowId Escrow transfer ID (escrowId)
      * @param escrowContract Address of the vault
      * @param currentLevel Current escalation level
      * @param escrowData Encoded escrow data
@@ -90,7 +91,7 @@ interface IResolutionModule is IERC165 {
 
     /**
      * @notice Execute escalation to next level
-     * @param workflowId The escrow transfer ID
+     * @param workflowId Escrow transfer ID (escrowId)
      * @param escrowContract Address of the vault
      * @param escrowData Encoded escrow data
      * @return success True if escalation was successful
@@ -105,7 +106,7 @@ interface IResolutionModule is IERC165 {
 
     /**
      * @notice Get required appeal bond for escalation (DR v2)
-     * @param workflowId The escrow transfer ID
+     * @param workflowId Escrow transfer ID (escrowId)
      * @param escrowContract Address of the vault
      * @param currentLevel Current escalation level
      * @param escrowData Encoded escrow data
@@ -121,7 +122,7 @@ interface IResolutionModule is IERC165 {
 
     /**
      * @notice Get decision at a specific round
-     * @param workflowId Dispute ID
+     * @param workflowId Escrow transfer ID (escrowId) for the disputed escrow
      * @param escrowContract Address of the vault
      * @param round Round to check
      * @return decision ResolutionOutcome enum value
@@ -130,7 +131,7 @@ interface IResolutionModule is IERC165 {
 
     /**
      * @notice Get appeal deadline and current round
-     * @param workflowId Dispute ID
+     * @param workflowId Escrow transfer ID (escrowId) for the disputed escrow
      * @param escrowContract Address of the vault
      * @return appealDeadline Appeal deadline for current round
      * @return currentRound Current round
@@ -143,7 +144,7 @@ interface IResolutionModule is IERC165 {
 
     /**
      * @notice Record a reversal
-     * @param workflowId Dispute ID
+     * @param workflowId Escrow transfer ID (escrowId) for the disputed escrow
      * @param escrowContract Address of the vault
      * @param priorRound Round where original decision was made
      */
@@ -151,7 +152,7 @@ interface IResolutionModule is IERC165 {
 
     /**
      * @notice Finalize a dispute
-     * @param workflowId Dispute ID
+     * @param workflowId Escrow transfer ID (escrowId) for the disputed escrow
      * @param escrowContract Address of the vault
      */
     function finalizeDispute(uint256 workflowId, address escrowContract) external;

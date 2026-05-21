@@ -3,6 +3,7 @@ pragma solidity ^0.8.33;
 
 import "forge-std/Test.sol";
 import "../../../contracts/modules/DefaultCancellationStrategy.sol";
+import "../../../contracts/modules/DefaultReleaseStrategy.sol";
 import "../../../contracts/core/EscrowVault.sol";
 import "../../../contracts/ops/CreateOps.sol";
 import "../../../contracts/ops/YieldOps.sol";
@@ -28,6 +29,7 @@ contract CancellationStrategyIntegrationTest is Test {
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
     DefaultCancellationStrategy public cancellationStrategy;
+    DefaultReleaseStrategy public releaseStrategy;
     
     ERC20Mock public token;
     
@@ -57,6 +59,9 @@ contract CancellationStrategyIntegrationTest is Test {
         // Deploy cancellation strategy
         cancellationStrategy = new DefaultCancellationStrategy();
         
+        // Deploy release strategy
+        releaseStrategy = new DefaultReleaseStrategy();
+        
         // Deploy EscrowVault
         vault = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
         
@@ -74,11 +79,22 @@ contract CancellationStrategyIntegrationTest is Test {
         vault.setSettlementOps(address(settlementOps));
         vault.setBondCollector(address(bondCollector));
         
+        // Set default release strategy (needed for release tests)
+        moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
+        vm.warp(block.timestamp + 7 days + 1);
+        moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
+
         // Setup roles
         vault.grantRole(vault.ROLE_FEE_RECIPIENT(), address(this));
         
         // Fund sender
         token.transfer(sender, 1000e18);
+    }
+
+    function _setStrategy(address strategy) internal {
+        moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.CANCELLATION, strategy);
+        vm.warp(block.timestamp + 7 days + 1);
+        moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.CANCELLATION);
     }
 
     // ============ Integration Tests ============
@@ -88,7 +104,7 @@ contract CancellationStrategyIntegrationTest is Test {
      */
     function test_escrow_uses_default_cancellation_strategy() public {
         // Set default cancellation strategy on vault
-        vault.setDefaultCancellationStrategy(address(cancellationStrategy));
+        _setStrategy(address(cancellationStrategy));
         
         vm.prank(sender);
         token.approve(address(vault), 100e18);
@@ -110,7 +126,7 @@ contract CancellationStrategyIntegrationTest is Test {
      */
     function test_mutual_cancellation_with_strategy() public {
         // Set default cancellation strategy on vault
-        vault.setDefaultCancellationStrategy(address(cancellationStrategy));
+        _setStrategy(address(cancellationStrategy));
         
         vm.prank(sender);
         token.approve(address(vault), 100e18);
@@ -145,7 +161,7 @@ contract CancellationStrategyIntegrationTest is Test {
      */
     function test_non_participant_cannot_cancel() public {
         // Set default cancellation strategy on vault
-        vault.setDefaultCancellationStrategy(address(cancellationStrategy));
+        _setStrategy(address(cancellationStrategy));
         
         vm.prank(sender);
         token.approve(address(vault), 100e18);
@@ -169,7 +185,7 @@ contract CancellationStrategyIntegrationTest is Test {
      */
     function test_cannot_cancel_non_pending_escrow() public {
         // Set default cancellation strategy on vault
-        vault.setDefaultCancellationStrategy(address(cancellationStrategy));
+        _setStrategy(address(cancellationStrategy));
         
         vm.prank(sender);
         token.approve(address(vault), 100e18);

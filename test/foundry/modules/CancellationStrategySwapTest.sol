@@ -71,13 +71,19 @@ contract CancellationStrategySwapTest is Test {
         token.transfer(sender, 1000e18);
     }
 
+    function _setStrategy(address strategy) internal {
+        moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.CANCELLATION, strategy);
+        vm.warp(block.timestamp + 7 days + 1);
+        moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.CANCELLATION);
+    }
+
     // ============ Test: Default Strategy (Mutual Consent) ============
 
     /**
      * @notice With default strategy, BOTH parties must agree to cancel
      */
     function test_default_strategy_requires_mutual_consent() public {
-        vault.setDefaultCancellationStrategy(address(defaultStrategy));
+        _setStrategy(address(defaultStrategy));
         
         vm.prank(sender);
         token.approve(address(vault), 100e18);
@@ -109,7 +115,7 @@ contract CancellationStrategySwapTest is Test {
      * @notice With default strategy, sender cannot cancel alone
      */
     function test_default_strategy_sender_cannot_cancel_alone() public {
-        vault.setDefaultCancellationStrategy(address(defaultStrategy));
+        _setStrategy(address(defaultStrategy));
         
         vm.prank(sender);
         token.approve(address(vault), 100e18);
@@ -135,7 +141,7 @@ contract CancellationStrategySwapTest is Test {
      * @notice With buyer-only strategy, buyer can cancel anytime
      */
     function test_buyer_only_strategy_buyer_can_cancel_alone() public {
-        vault.setDefaultCancellationStrategy(address(buyerOnlyStrategy));
+        _setStrategy(address(buyerOnlyStrategy));
         
         vm.prank(sender);
         token.approve(address(vault), 100e18);
@@ -159,7 +165,7 @@ contract CancellationStrategySwapTest is Test {
      * @notice With buyer-only strategy, seller CANNOT cancel
      */
     function test_buyer_only_strategy_sender_cannot_cancel() public {
-        vault.setDefaultCancellationStrategy(address(buyerOnlyStrategy));
+        _setStrategy(address(buyerOnlyStrategy));
         
         vm.prank(sender);
         token.approve(address(vault), 100e18);
@@ -183,7 +189,7 @@ contract CancellationStrategySwapTest is Test {
      */
     function test_different_escrows_different_strategies() public {
         // First escrow uses default (mutual)
-        vault.setDefaultCancellationStrategy(address(defaultStrategy));
+        _setStrategy(address(defaultStrategy));
         
         vm.prank(sender);
         token.approve(address(vault), 100e18);
@@ -195,7 +201,7 @@ contract CancellationStrategySwapTest is Test {
         uint256 wid1 = vault.createEscrow(address(token), recipient, 100e18, settings);
         
         // Second escrow - swap to buyer-only
-        vault.setDefaultCancellationStrategy(address(buyerOnlyStrategy));
+        _setStrategy(address(buyerOnlyStrategy));
         
         vm.prank(sender);
         token.approve(address(vault), 200e18);
@@ -226,7 +232,7 @@ contract CancellationStrategySwapTest is Test {
      */
     function test_strategy_snapshotted_at_creation() public {
         // Set default to buyer-only
-        vault.setDefaultCancellationStrategy(address(buyerOnlyStrategy));
+        _setStrategy(address(buyerOnlyStrategy));
         
         vm.prank(sender);
         token.approve(address(vault), 100e18);
@@ -238,7 +244,7 @@ contract CancellationStrategySwapTest is Test {
         uint256 wid = vault.createEscrow(address(token), recipient, 100e18, settings);
         
         // Now swap to default - escrow should still use buyer-only
-        vault.setDefaultCancellationStrategy(address(defaultStrategy));
+        _setStrategy(address(defaultStrategy));
         
         // Try to cancel as sender - should fail (still buyer-only)
         vm.prank(sender);
@@ -260,7 +266,7 @@ contract CancellationStrategySwapTest is Test {
      */
     function test_buyer_only_after_partial_default_flow() public {
         // Start with default strategy
-        vault.setDefaultCancellationStrategy(address(defaultStrategy));
+        _setStrategy(address(defaultStrategy));
         
         vm.prank(sender);
         token.approve(address(vault), 100e18);
@@ -272,7 +278,7 @@ contract CancellationStrategySwapTest is Test {
         uint256 wid = vault.createEscrow(address(token), recipient, 100e18, settings);
         
         // Swap to buyer-only BEFORE another escrow
-        vault.setDefaultCancellationStrategy(address(buyerOnlyStrategy));
+        _setStrategy(address(buyerOnlyStrategy));
         
         // Create another escrow with new strategy
         vm.prank(sender);
@@ -305,7 +311,7 @@ contract CancellationStrategySwapTest is Test {
         address attacker = address(0xDEAD);
         
         // Test with default
-        vault.setDefaultCancellationStrategy(address(defaultStrategy));
+        _setStrategy(address(defaultStrategy));
         
         vm.prank(sender);
         token.approve(address(vault), 100e18);
@@ -321,7 +327,7 @@ contract CancellationStrategySwapTest is Test {
         vault.senderCancel(wid);
         
         // Swap to buyer-only
-        vault.setDefaultCancellationStrategy(address(buyerOnlyStrategy));
+        _setStrategy(address(buyerOnlyStrategy));
         
         // Need to approve again for second escrow
         vm.prank(sender);

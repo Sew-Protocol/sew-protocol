@@ -9,6 +9,15 @@ import "../types/EscrowTypes.sol";
 /// @dev Both sender AND recipient must call cancel separately
 contract DefaultCancellationStrategy is ICancellationStrategy {
     
+    /**
+     * @notice ERC-165 interface detection
+     * @param interfaceId The interface identifier, as specified in ERC-165
+     * @return True if the contract implements interfaceId
+     */
+    function supportsInterface(bytes4 interfaceId) public view virtual override returns (bool) {
+        return interfaceId == type(ICancellationStrategy).interfaceId;
+    }
+
     /// @notice Track which party has initiated cancellation for each escrow
     /// @dev address(0) = no pending cancel, otherwise = address of initiating party
     mapping(uint256 => address) public pendingCancel;

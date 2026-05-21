@@ -10,7 +10,9 @@ interface IModuleRegistry {
     enum ModuleType {
         YIELD_GENERATION,
         YIELD_DISTRIBUTION,
-        RESOLUTION
+        RESOLUTION,
+        RELEASE_STRATEGY,
+        CANCELLATION_STRATEGY
     }
 
     enum ModuleStatus {

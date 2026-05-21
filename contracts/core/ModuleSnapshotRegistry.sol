@@ -12,15 +12,14 @@ import './BaseEscrow.sol';
 
 /**
  * @title ModuleSnapshotRegistry
- * @notice Registry for module snapshots frozen at escrow creation time.
- * @dev Extracted from EscrowVault/EscrowableERC20 to reduce contract size.
- *      Handles queue/activate pattern for default modules with slow lane activation.
+ * @notice Central registry for module configurations and slow-lane upgrades
+ * @dev Handles queuing and activating default modules with a 7-day delay.
+ *      Allows per-escrow contract module management.
  */
 contract ModuleSnapshotRegistry is AccessControl, SlowLaneQueueActivate {
-    bytes32 public constant ROLE_ESCROW_CONTRACT = keccak256('ROLE_ESCROW_CONTRACT');
     bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');
+    bytes32 public constant ROLE_ESCROW_CONTRACT = keccak256('ROLE_ESCROW_CONTRACT');
 
-    /// @notice Module state for each escrow contract
     struct ModuleState {
         IReleaseStrategy defaultReleaseStrategy;
         ICancellationStrategy defaultCancellationStrategy;
@@ -30,16 +29,8 @@ contract ModuleSnapshotRegistry is AccessControl, SlowLaneQueueActivate {
         mapping(BaseEscrow.ModuleType => PendingAddress) pendingModules;
     }
 
-    /// @notice Mapping from escrow contract to its module state
     mapping(address => ModuleState) public escrowModuleStates;
 
-    /// @notice Mapping from yield generation module to its assigned escrow contract
-    mapping(address => address) public yieldGenerationModuleToEscrow;
-
-    /// @notice Mapping from yield distribution module to its assigned escrow contract
-    mapping(address => address) public yieldDistributionModuleToEscrow;
-
-    /// @notice Events for module management
     event DefaultReleaseStrategyQueued(
         address indexed escrowContract,
         address indexed oldModule,
@@ -84,45 +75,52 @@ contract ModuleSnapshotRegistry is AccessControl, SlowLaneQueueActivate {
         address indexed oldModule,
         address indexed newModule
     );
+    event DefaultCancellationStrategyQueued(
+        address indexed escrowContract,
+        address indexed oldModule,
+        address indexed newModule,
+        uint64 eta
+    );
+    event DefaultCancellationStrategyActivated(
+        address indexed escrowContract,
+        address indexed oldModule,
+        address indexed newModule
+    );
 
     /// @notice Error when escrow contract is not registered
     error EscrowNotRegistered(address escrowContract);
     
     /// @notice Error when yield module is already assigned to another escrow contract
-    error YieldModuleAlreadyAssigned(address module, address currentEscrow, address newEscrow);
+    error YieldModuleAlreadyAssigned(address yieldModule, address assignedEscrow);
 
     /**
-     * @notice Deploy the ModuleSnapshotRegistry.
-     * @param initialAdmin Initial admin for bootstrap (expected to be replaced/managed by governance wiring).
-     * @dev Grants `DEFAULT_ADMIN_ROLE` and `ROLE_TIMELOCK` to `initialAdmin` for initial setup.
-     *      In production, `ROLE_TIMELOCK` should be held by the TimelockController.
+     * @notice Deploy ModuleSnapshotRegistry with initial admin
+     * @param initialAdmin Initial admin address (typically timelock)
      */
     constructor(address initialAdmin) {
-        if (initialAdmin == address(0)) revert InvalidValue();
+        if (initialAdmin == address(0)) revert InvalidAddress(ADDR_INITIAL_ADMIN, initialAdmin);
         _grantRole(DEFAULT_ADMIN_ROLE, initialAdmin);
-        // ROLE_TIMELOCK gates registerEscrowContract(), so initialAdmin must have it for initial setup.
         _grantRole(ROLE_TIMELOCK, initialAdmin);
     }
 
     /**
-     * @notice Register an escrow contract for module management
+     * @notice Register an escrow contract to allow configuration
      * @param escrowContract Address of the escrow contract
-     * @dev Only ROLE_TIMELOCK can register escrow contracts (governance-controlled)
      */
-    function registerEscrowContract(address escrowContract) external onlyRole(ROLE_TIMELOCK) {
+    function registerEscrowContract(address escrowContract) external {
+        if (!hasRole(DEFAULT_ADMIN_ROLE, msg.sender) && !hasRole(ROLE_TIMELOCK, msg.sender)) {
+            revert AccessControlUnauthorizedAccount(msg.sender, ROLE_TIMELOCK);
+        }
         if (escrowContract == address(0)) revert InvalidValue();
         _grantRole(ROLE_ESCROW_CONTRACT, escrowContract);
     }
 
     /**
-     * @notice Queue a new module
+     * @notice Queue a new default module for an escrow contract
      * @param escrowContract Address of the escrow contract
      * @param moduleType Type of module to queue
-     * @param module Address of the new module to queue
-     * @dev Only governance (ROLE_TIMELOCK) can queue modules directly.
-     *      Ensures the escrow contract is registered.
-     *      Enforces 7-day slow lane delay via SlowLaneQueueActivate.
-     *      For yield modules, prevents assignment if already assigned to another escrow.
+     * @param module Address of the new module
+     * @dev Only timelock can queue upgrades
      */
     function queueModule(
         address escrowContract,
@@ -133,25 +131,11 @@ contract ModuleSnapshotRegistry is AccessControl, SlowLaneQueueActivate {
             revert EscrowNotRegistered(escrowContract);
         }
         if (module == address(0)) revert InvalidValue();
+        if (module.code.length == 0) revert InvalidValue();
 
         ModuleState storage state = escrowModuleStates[escrowContract];
-        
-        // Validate yield module exclusivity
-        if (moduleType == BaseEscrow.ModuleType.YIELD_GEN) {
-            address currentEscrow = yieldGenerationModuleToEscrow[module];
-            if (currentEscrow != address(0) && currentEscrow != escrowContract) {
-                revert YieldModuleAlreadyAssigned(module, currentEscrow, escrowContract);
-            }
-        } else if (moduleType == BaseEscrow.ModuleType.YIELD_DIST) {
-            address currentEscrow = yieldDistributionModuleToEscrow[module];
-            if (currentEscrow != address(0) && currentEscrow != escrowContract) {
-                revert YieldModuleAlreadyAssigned(module, currentEscrow, escrowContract);
-            }
-        }
-        
         _queueAddress(state.pendingModules[moduleType], module);
 
-        // Emit appropriate event
         if (moduleType == BaseEscrow.ModuleType.RELEASE) {
             emit DefaultReleaseStrategyQueued(
                 escrowContract,
@@ -180,6 +164,13 @@ contract ModuleSnapshotRegistry is AccessControl, SlowLaneQueueActivate {
                 module,
                 state.pendingModules[moduleType].eta
             );
+        } else if (moduleType == BaseEscrow.ModuleType.CANCELLATION) {
+            emit DefaultCancellationStrategyQueued(
+                escrowContract,
+                address(state.defaultCancellationStrategy),
+                module,
+                state.pendingModules[moduleType].eta
+            );
         }
     }
 
@@ -187,19 +178,12 @@ contract ModuleSnapshotRegistry is AccessControl, SlowLaneQueueActivate {
      * @notice Activate the queued module
      * @param escrowContract Address of the escrow contract
      * @param moduleType Type of module to activate
-     * @dev Only governance (ROLE_TIMELOCK) can activate modules directly.
-     *      Ensures the escrow contract is registered.
-     *      Reverts if no module is queued for the given type, or if the ETA has not passed yet.
-     *      Enforces 7-day slow lane delay - cannot be bypassed.
+     * @dev Only timelock can activate after delay
      */
     function activateModule(
         address escrowContract,
         BaseEscrow.ModuleType moduleType
     ) external onlyRole(ROLE_TIMELOCK) {
-        if (!hasRole(ROLE_ESCROW_CONTRACT, escrowContract)) {
-            revert EscrowNotRegistered(escrowContract);
-        }
-
         ModuleState storage state = escrowModuleStates[escrowContract];
         address newModule = _activateAddress(state.pendingModules[moduleType]);
         address oldModule;
@@ -210,108 +194,71 @@ contract ModuleSnapshotRegistry is AccessControl, SlowLaneQueueActivate {
             emit DefaultReleaseStrategyActivated(escrowContract, oldModule, newModule);
         } else if (moduleType == BaseEscrow.ModuleType.YIELD_GEN) {
             oldModule = address(state.defaultYieldGenerationModule);
-            // Remove old module assignment
-            if (oldModule != address(0)) {
-                delete yieldGenerationModuleToEscrow[oldModule];
-            }
-            // Assign new module to this escrow
             state.defaultYieldGenerationModule = IYieldGenerationModule(newModule);
-            yieldGenerationModuleToEscrow[newModule] = escrowContract;
             emit DefaultYieldGenerationModuleActivated(escrowContract, oldModule, newModule);
         } else if (moduleType == BaseEscrow.ModuleType.YIELD_DIST) {
             oldModule = address(state.defaultYieldDistributionModule);
-            // Remove old module assignment
-            if (oldModule != address(0)) {
-                delete yieldDistributionModuleToEscrow[oldModule];
-            }
-            // Assign new module to this escrow
             state.defaultYieldDistributionModule = IYieldDistributionModule(newModule);
-            yieldDistributionModuleToEscrow[newModule] = escrowContract;
             emit DefaultYieldDistributionModuleActivated(escrowContract, oldModule, newModule);
         } else if (moduleType == BaseEscrow.ModuleType.RESOLUTION) {
             oldModule = address(state.defaultResolutionModule);
             state.defaultResolutionModule = IResolutionModule(newModule);
             emit DefaultResolutionModuleActivated(escrowContract, oldModule, newModule);
+        } else if (moduleType == BaseEscrow.ModuleType.CANCELLATION) {
+            oldModule = address(state.defaultCancellationStrategy);
+            state.defaultCancellationStrategy = ICancellationStrategy(newModule);
+            emit DefaultCancellationStrategyActivated(escrowContract, oldModule, newModule);
         }
     }
 
     /**
      * @notice Get pending module information
-     * @param escrowContract Address of the escrow contract
-     * @param moduleType Type of module to query
-     * @return value Pending module address
-     * @return eta Timestamp when activation becomes available
-     * @return exists Whether a pending module exists
      */
     function getPendingModule(
         address escrowContract,
         BaseEscrow.ModuleType moduleType
-    ) external view returns (address value, uint64 eta, bool exists) {
-        ModuleState storage state = escrowModuleStates[escrowContract];
-        return getPendingAddress(state.pendingModules[moduleType]);
+    ) external view returns (address pendingModule, uint64 eta, bool exists) {
+        PendingAddress storage pending = escrowModuleStates[escrowContract].pendingModules[moduleType];
+        return (pending.value, pending.eta, pending.exists);
     }
 
     /**
-     * @notice Get default release strategy for an escrow contract
-     * @param escrowContract Address of the escrow contract
-     * @return The default release strategy
+     * @notice Get current default release strategy for an escrow contract
      */
-    function getDefaultReleaseStrategy(
-        address escrowContract
-    ) external view virtual returns (IReleaseStrategy) {
+    function getDefaultReleaseStrategy(address escrowContract) external view returns (IReleaseStrategy) {
         return escrowModuleStates[escrowContract].defaultReleaseStrategy;
     }
 
     /**
-     * @notice Get default cancellation strategy for an escrow contract
-     * @param escrowContract Address of the escrow contract
-     * @return The default cancellation strategy
+     * @notice Get current default cancellation strategy for an escrow contract
      */
-    function getDefaultCancellationStrategy(
-        address escrowContract
-    ) external view virtual returns (ICancellationStrategy) {
+    function getDefaultCancellationStrategy(address escrowContract) external view returns (ICancellationStrategy) {
         return escrowModuleStates[escrowContract].defaultCancellationStrategy;
     }
 
     /**
-     * @notice Get default yield generation module for an escrow contract
-     * @param escrowContract Address of the escrow contract
-     * @return The default yield generation module
+     * @notice Get current default yield generation module for an escrow contract
      */
-    function getDefaultYieldGenerationModule(
-        address escrowContract
-    ) external view virtual returns (IYieldGenerationModule) {
+    function getDefaultYieldGenerationModule(address escrowContract) external view returns (IYieldGenerationModule) {
         return escrowModuleStates[escrowContract].defaultYieldGenerationModule;
     }
 
     /**
-     * @notice Get default yield distribution module for an escrow contract
-     * @param escrowContract Address of the escrow contract
-     * @return The default yield distribution module
+     * @notice Get current default yield distribution module for an escrow contract
      */
-    function getDefaultYieldDistributionModule(
-        address escrowContract
-    ) external view virtual returns (IYieldDistributionModule) {
+    function getDefaultYieldDistributionModule(address escrowContract) external view returns (IYieldDistributionModule) {
         return escrowModuleStates[escrowContract].defaultYieldDistributionModule;
     }
 
     /**
-     * @notice Get default resolution module for an escrow contract
-     * @param escrowContract Address of the escrow contract
-     * @return The default resolution module
+     * @notice Get current default resolution module for an escrow contract
      */
-    function getDefaultResolutionModule(
-        address escrowContract
-    ) external view virtual returns (IResolutionModule) {
+    function getDefaultResolutionModule(address escrowContract) external view returns (IResolutionModule) {
         return escrowModuleStates[escrowContract].defaultResolutionModule;
     }
 
     /**
-     * @notice Get module address for an escrow contract by type
-     * @param escrowContract Address of the escrow contract
-     * @param moduleType Type of module to retrieve
-     * @return The module address (address(0) if not set)
-     * @dev PRIORITY: Consolidated getter to reduce bytecode in escrow contracts
+     * @notice Get current module address by type
      */
     function getModule(
         address escrowContract,
@@ -326,24 +273,9 @@ contract ModuleSnapshotRegistry is AccessControl, SlowLaneQueueActivate {
             return address(state.defaultYieldDistributionModule);
         } else if (moduleType == BaseEscrow.ModuleType.RESOLUTION) {
             return address(state.defaultResolutionModule);
+        } else if (moduleType == BaseEscrow.ModuleType.CANCELLATION) {
+            return address(state.defaultCancellationStrategy);
         }
         return address(0);
-    }
-
-    /**
-     * @notice Set the default cancellation strategy for an escrow contract
-     * @param escrowContract Address of the escrow contract
-     * @param cancellationStrategy Address of the cancellation strategy
-     * @dev Only callable by ROLE_TIMELOCK (governance)
-     */
-    function setDefaultCancellationStrategy(
-        address escrowContract,
-        address cancellationStrategy
-    ) external onlyRole(ROLE_TIMELOCK) {
-        if (!hasRole(ROLE_ESCROW_CONTRACT, escrowContract)) {
-            revert EscrowNotRegistered(escrowContract);
-        }
-        if (cancellationStrategy == address(0)) revert InvalidValue();
-        escrowModuleStates[escrowContract].defaultCancellationStrategy = ICancellationStrategy(cancellationStrategy);
     }
 }

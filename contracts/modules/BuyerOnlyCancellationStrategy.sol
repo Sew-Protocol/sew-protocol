@@ -9,6 +9,15 @@ import "../types/EscrowTypes.sol";
 /// @dev Useful for scenarios where buyer has unilateral cancel rights
 contract BuyerOnlyCancellationStrategy is ICancellationStrategy {
     
+    /**
+     * @notice ERC-165 interface detection
+     * @param interfaceId The interface identifier, as specified in ERC-165
+     * @return True if the contract implements interfaceId
+     */
+    function supportsInterface(bytes4 interfaceId) public view virtual override returns (bool) {
+        return interfaceId == type(ICancellationStrategy).interfaceId;
+    }
+
     /// @notice Check if cancellation is allowed
     /// @dev Only buyer (recipient) can cancel at any time
     function canCancel(

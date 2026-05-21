@@ -31,4 +31,28 @@ library EscrowVaultModuleLibrary {
     ) internal view returns (IReleaseStrategy) {
         return moduleManagement.getDefaultReleaseStrategy(vaultAddress);
     }
+
+    function getCancellationStrategy(
+        uint256 workflowId,
+        mapping(uint256 => ModuleSnapshot) storage moduleSnapshots,
+        ModuleSnapshotRegistry moduleManagement,
+        address vaultAddress
+    ) internal view returns (address) {
+        address snap = moduleSnapshots[workflowId].cancellationStrategy;
+        if (snap != address(0)) return snap;
+        return address(moduleManagement.getDefaultCancellationStrategy(vaultAddress));
+    }
+
+    function getResolutionModule(
+        uint256 workflowId,
+        mapping(uint256 => ModuleSnapshot) storage moduleSnapshots,
+        ModuleSnapshotRegistry moduleManagement,
+        address vaultAddress,
+        address fallbackModule
+    ) internal view returns (IResolutionModule) {
+        address snap = moduleSnapshots[workflowId].resolutionModule;
+        if (snap != address(0)) return IResolutionModule(snap);
+        address def = address(moduleManagement.getDefaultResolutionModule(vaultAddress));
+        return IResolutionModule(def != address(0) ? def : fallbackModule);
+    }
 }

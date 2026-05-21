@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Removed `ROLE_MODULE_DEVELOPER` for governance consistency (all upgrades now via `ROLE_TIMELOCK`)
 - Simplified upgrade authorization in DecentralizedResolutionModule and ResolverIncentiveModule
+- Updated `BaseEscrow` configuration management: consolidated individual setter functions into atomic `ProtocolConfig` updates to optimize contract size
+- Unified all access control patterns to use `ROLE_TIMELOCK` (removed redundant `Ownable` ownership for proxy and aggregator contracts)
 - Updated contract structure: core contracts in `contracts/core/`, shared interfaces in `contracts/shared/`
 - Updated import paths across all contracts and tests
 - Updated documentation to reflect module extraction and role removal

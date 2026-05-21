@@ -155,7 +155,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
                 baseCost: BOND_AMOUNT,
                 stepSize: BOND_AMOUNT,
                 multiplier: 0,
-                bondToken: address(0), // ETH
+                bondToken: address(token), // Match escrow token
                 enabled: true
             });
 
@@ -202,8 +202,10 @@ contract EscalationDepthHistogramIntegrationTest is Test {
         // Note: Full escalation flow test would require more complex setup
         // For now, we test that when a bond is recorded during escalation, histogram updates
 
-        // Simulate escalation by recording bond directly (in real flow, BaseEscrow does this)
+        // Simulate escalation by recording bond directly
         vm.deal(address(escrow), BOND_AMOUNT);
+        vm.prank(user1);
+        token.approve(address(incentiveModule), BOND_AMOUNT);
         vm.prank(address(escrow));
         incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
             workflowId,
@@ -211,7 +213,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
             user1,
             user1,
             BOND_AMOUNT,
-            address(0),
+            address(token),
             1 // Round 1
         );
 
