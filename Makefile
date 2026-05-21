@@ -1,4 +1,4 @@
-.PHONY: install compile test hh forge coverage coverage-report format lint typecheck clean size size-check verify deploy deploy-local export help
+.PHONY: install compile test hh forge forge-invariants halmos-smoke formal-smoke coverage coverage-report format lint typecheck clean size size-check verify deploy deploy-local export help
 
 # Default target
 help:
@@ -8,6 +8,9 @@ help:
 	@echo "  test          - Run all tests (Hardhat + Foundry)"
 	@echo "  hh            - Run Hardhat tests only"
 	@echo "  forge         - Run Foundry tests only"
+	@echo "  forge-invariants - Run Foundry invariant suite only"
+	@echo "  halmos-smoke  - Run Halmos bounded symbolic smoke check"
+	@echo "  formal-smoke  - Run Foundry invariants + Halmos smoke"
 	@echo "  coverage      - Generate test coverage report"
 	@echo "  coverage-report - Generate coverage report (with fallback)"
 	@echo "  format        - Format code with Prettier"
@@ -38,6 +41,15 @@ hh:
 
 forge:
 	pnpm test:foundry
+
+forge-invariants:
+	pnpm test:foundry:invariants
+
+halmos-smoke:
+	pnpm test:halmos:smoke
+
+formal-smoke:
+	pnpm test:formal:smoke
 
 coverage:
 	pnpm coverage

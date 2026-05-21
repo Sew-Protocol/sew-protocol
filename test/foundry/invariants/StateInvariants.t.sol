@@ -13,11 +13,13 @@ import "../../../contracts/types/EscrowTypes.sol";
 ///   1. solvency          — vault token balance >= held + fees at all times
 ///   2. terminal_absorbing — once RELEASED/REFUNDED/RESOLVED, state never changes
 ///   3. fees_monotone      — totalFeesPerToken never decreases between withdrawFees calls
+///   4. pending-settlement-consistent — pending settlement may exist only on DISPUTED workflows
 ///
 /// These match the Clojure predicates:
 ///   - inv/solvency-holds?
 ///   - inv/terminal-states-unchanged?
 ///   - inv/fee-increased-or-equal?
+///   - inv/pending-settlement-consistency?
 ///
 /// Handler drives all lifecycle paths including the dispute/resolution branch
 /// that was absent from the prior AccountingInvariants.t.sol.
@@ -137,5 +139,33 @@ contract StateInvariants is Test {
             handler.ghostFeesBefore(),
             "FEE_MONOTONICITY: totalFeesPerToken decreased without a withdrawFees call"
         );
+    }
+
+    // -------------------------------------------------------------------------
+    // Invariant 4: Pending-settlement consistency
+    //
+    // Mirrors: inv/pending-settlement-consistency?
+    //
+    // Any workflow with an existing pending settlement must still be DISPUTED.
+    // Pending settlements are the intermediate post-resolution, pre-execution
+    // state in the dispute branch and should never coexist with terminal states.
+    // -------------------------------------------------------------------------
+    function invariant_pending_settlement_consistency() public view {
+        uint256 count = vault.getEscrowCount();
+
+        for (uint256 i = 0; i < count; i++) {
+            (bool exists,,,) = vault.pendingSettlements(i);
+            if (!exists) continue;
+
+            (,,,,,,, EscrowState st,,) = vault.escrowTransfers(i);
+            assertEq(
+                uint256(st),
+                uint256(EscrowState.DISPUTED),
+                string.concat(
+                    "PENDING_SETTLEMENT_CONSISTENCY: pending exists but state is not DISPUTED for workflowId ",
+                    vm.toString(i)
+                )
+            );
+        }
     }
 }

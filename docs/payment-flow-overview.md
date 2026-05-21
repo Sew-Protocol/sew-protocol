@@ -1,4 +1,4 @@
-# SEW Protocol — Payment Flow Overview
+# Sew Protocol — Payment Flow Overview
 
 *For review by payments counsel. Simplified for legal purposes; dispute resolution details are summarised.*
 
@@ -6,7 +6,7 @@
 
 ## What is SEW Protocol?
 
-**SEW** (Secure Escrow & Withdrawal) is a smart contract system for on-chain escrow payments. Funds are locked on-chain until agreed conditions are met — neither party can unilaterally access funds mid-flow. It operates on Base (an Ethereum L2).
+**Sew Protocol** is a smart contract system for on-chain escrow payments. Funds are locked on-chain until agreed conditions are met — neither party can unilaterally access funds mid-flow. It operates on Base (an Ethereum L2).
 
 ---
 

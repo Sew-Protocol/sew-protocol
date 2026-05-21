@@ -1,7 +1,7 @@
 # Certora Formal Verification — SEW Protocol
 
 This directory contains Certora CVL 2.x specifications for `EscrowVault`.  They form
-the highest-assurance layer of the SEW protocol safety programme, above Monte Carlo
+the highest-assurance layer of the Sew protocol safety programme, above Monte Carlo
 simulation, the Clojure contract model, Foundry invariant tests, and Halmos symbolic
 execution.
 

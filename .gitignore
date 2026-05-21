@@ -104,3 +104,7 @@ subgraph/sew-base-sepolia/build/
 subgraph/sew-base-sepolia/generated/
 subgraph/sew-base-sepolia/node_modules/
 subgraph/sew-base-sepolia/package-lock.json
+
+
+#Ignore vscode AI rules
+.github/instructions/codacy.instructions.md
