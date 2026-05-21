@@ -49,7 +49,7 @@ Round 2  ──► Kleros          (decentralised; final; no further escalation)
 ```
 
 Kleros is not the default path. It is the **final backstop** — the layer that handles
-disputes where two rounds of professional human resolution have failed to produce an
+disputes where two rounds of appointed resolver decisions have failed to produce an
 accepted outcome.
 
 This role is structurally important for two reasons:
@@ -76,9 +76,17 @@ not a custom fork.
 
 **Finality semantics match.** Kleros issues a terminal ruling after its internal appeal
 rounds complete. Sew needs exactly this — a single authoritative outcome that it can map to
-`RESOLVED` (buyer wins) or `REFUNDED` (seller wins). There is no ambiguity in the ruling
-mapping (`ruling == 1` → release to buyer, `ruling == 2` → refund to seller, `ruling == 0`
-→ liveness fallback via timeout).
+a final escrow state. The ruling mapping is unambiguous:
+
+| `_ruling` | Escrow outcome | Effect |
+|---|---|---|
+| `1` | Release to recipient (seller) | `releaseAsDisputeResolver` — funds go to `et.to` |
+| `2` | Cancel to sender (buyer) | `cancelAsDisputeResolver` — funds returned to `et.from` |
+| `0` | Refused to rule | No automatic settlement; liveness fallback via `resolveDisputeByTimeout` |
+
+These map directly to `ResolutionOutcome.RELEASE` and `ResolutionOutcome.CANCEL` in the DRM,
+the same outcome enum used at rounds 0 and 1. Kleros is slot-compatible with the internal
+resolver interface.
 
 **Sybil resistance.** Kleros court juries are drawn from staked PNK pools. Bribing a Kleros
 jury to overturn a well-founded resolver decision is significantly more expensive than bribing
@@ -92,7 +100,14 @@ operator-configurable.
 
 **Decentralization without custody.** Kleros never holds escrow funds. The `KlerosArbitrableProxy`
 receives only the arbitration fee (`msg.value`). The escrow funds remain in Sew contracts
-throughout.
+throughout. Kleros adjudicates; Sew escrows; neither controls both.
+
+**Governance independence.** Because the escalation configuration is snapshotted per escrow
+at creation, and active disputes cannot have their arbitration path altered by any subsequent
+governance action, Kleros does not need to trust the Sew team or governance process for the
+integrity of in-flight disputes. Once a round-2 escalation has been triggered, its resolution
+path is fully determined by the `KlerosArbitrableProxy` address frozen in that escrow's
+module snapshot. Governance cannot intervene.
 
 ---
 
