@@ -446,3 +446,14 @@ EvidenceModuleV1                   — on-chain evidence hash storage (optional,
 BondCollector                      — ERC-20 appeal bond custody
 BondHandlingLibrary                — ETH and ERC-20 bond handling helpers
 ```
+
+---
+
+## Evidence
+
+| Field | Value |
+|---|---|
+| **Contracts** | `sew-protocol` @ `85898db` |
+| **Simulation** | `sew-simulation` @ `5b33486` |
+| **Generated / reviewed** | 2026-05-21 |
+| **Verification status** | Architecture manually verified against contract source: escalation pipeline (`BaseEscrow.sol`, `DRMFacet.sol`, `DRMAdminFacet.sol`), round-2 Kleros integration (`KlerosArbitrableProxy.sol`), module snapshot isolation (`ModuleSnapshotRegistry.sol`), and library decomposition. Deterministic scenarios S01–S41 in `sew-simulation` cover the core dispute lifecycle and escalation paths. Multi-round reassignment timing and liveness edge cases are simulation-backed (Phase F/H); governance interaction during active disputes verified via scenario S26. Full formal verification of escalation state transitions not yet complete — needs follow-up. |
