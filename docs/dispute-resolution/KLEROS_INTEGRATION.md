@@ -437,3 +437,14 @@ blocked on-chain.
 **Kleros-level appeal rounds are opaque to Sew.** While Kleros internally supports multiple
 appeal rounds (jury doubling), Sew receives only the terminal Kleros ruling. Intermediate
 Kleros appeal dynamics, timing, and costs are not visible to Sew contracts.
+
+---
+
+## Evidence
+
+| Field | Value |
+|---|---|
+| **Contracts** | `sew-protocol` @ `644c37d` |
+| **Simulation** | `sew-simulation` @ `5b33486` |
+| **Generated / reviewed** | 2026-05-21 |
+| **Verification status** | Manually checked against `KlerosArbitrableProxy.sol`, `DRMAdminFacet.sol`, `IArbitrator.sol`, and the DR v3 round-2 integration paths in `BaseEscrow.sol`. Kleros `rule()` callback flow and fee handling verified against contract source. Open items: liveness bounds under Kleros congestion not yet simulation-backed; `extraData` court-ID enforcement not yet implemented on-chain (needs follow-up). |
