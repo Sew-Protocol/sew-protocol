@@ -430,7 +430,7 @@ These are accurately characterised risks — not defects.
 
 ## 12. Security contact and disclosure
 
-Vulnerability reports should be sent to **security@[DOMAIN]** and will receive an initial
+Vulnerability reports should be sent to **security@sew** and will receive an initial
 response within 48 hours. We follow a 90-day coordinated disclosure policy.
 
 See [`docs/SECURITY.md`](SECURITY.md) for the full responsible disclosure policy, scope
@@ -439,3 +439,14 @@ definition, and acknowledgement process.
 ---
 
 *Last updated: May 2026*
+
+---
+
+## Evidence
+
+| Field | Value |
+|---|---|
+| **Contracts** | `sew-protocol` @ `62fce3a` |
+| **Simulation** | `sew-simulation` @ `5b33486` |
+| **Generated / reviewed** | 2026-05-21 |
+| **Verification status** | Manually checked against `BaseEscrow.sol` (reentrancy guards, SafeERC20, CEI patterns), role constants, `ResolverSlashingModuleV1.sol` (slashing/burn), and `SECURITY_FIXES_COMPLETED.md` (all CRIT/HIGH/MED resolved). Threat model cross-referenced against known attack surfaces. Simulation covers adversarial economic scenarios (Phase F/H/AI). Formal verification of all security properties not yet complete — needs follow-up. |

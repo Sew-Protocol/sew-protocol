@@ -391,3 +391,14 @@ auditability.
 | Insurance payout (emergency) | `withdraw(to, amount, workflowId)` | `InsurancePoolVault` | `ROLE_TIMELOCK` | `withdrawalsEnabled` flag (off by default) |
 | Stranded Aave yield | `emergencyUnwindAavePosition(...)` | `GuardianOps` | `ROLE_GUARDIAN` | Rate-limited; proceeds go to escrow |
 | Stranded tokens in YieldOps | `recoverTokens(token, to, amount)` | `YieldOps` | `ROLE_GUARDIAN` | None |
+
+---
+
+## Evidence
+
+| Field | Value |
+|---|---|
+| **Contracts** | `sew-protocol` @ `62fce3a` |
+| **Simulation** | `sew-simulation` @ `5b33486` |
+| **Generated / reviewed** | 2026-05-21 |
+| **Verification status** | Manually checked against `YieldOps.sol`, `EscrowVault.sol`, `withdrawFees()`, and Aave unwind paths. CEI ordering fix for `withdrawFees` verified against `SECURITY_FIXES_COMPLETED.md`. Aave slippage protection verified against `AaveYieldModuleV1.sol`. Simulation does not yet cover Aave emergency unwind scenarios under stress — needs follow-up. |

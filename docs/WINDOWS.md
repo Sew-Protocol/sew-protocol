@@ -470,3 +470,14 @@ t+?     ├─► [Resolve deadline R2: 7 days from escalation]
 | DRM total dispute timeout | 1 second | 365 days | `DRMAdminFacet` |
 | Split proposal expiry | Must be future | No cap | Per proposal |
 | Slash appeal window | No min | No max | `SlashConfig` |
+
+---
+
+## Evidence
+
+| Field | Value |
+|---|---|
+| **Contracts** | `sew-protocol` @ `62fce3a` |
+| **Simulation** | `sew-simulation` @ `5b33486` |
+| **Generated / reviewed** | 2026-05-21 |
+| **Verification status** | Manually checked against `appealWindowDuration`, `maxDisputeDuration`, `defaultAutoReleaseDelay`, and `defaultAutoCancelDelay` parameter handling in `EscrowAdminContract.sol` and `ModuleSnapshotRegistry.sol`. Window enforcement verified against `automateTimedActions()` and `executePendingSettlement()`. Deterministic scenarios cover window boundary conditions. Parameter sweep coverage of edge-case window configurations is partial — needs follow-up. |

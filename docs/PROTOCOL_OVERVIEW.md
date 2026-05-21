@@ -393,3 +393,14 @@ Networks: **Base Mainnet** (production), **Base Sepolia** (testnet), **Hardhat**
 | Security model | [`docs/security/SECURITY_MODEL.md`](security/SECURITY_MODEL.md) |
 | Audit | [`docs/reviews/AUDIT.md`](reviews/AUDIT.md) |
 | Robustness framework (simulation) | [`sew-simulation/docs/ROBUSTNESS_FRAMEWORK.md`](../../sew-simulation/docs/ROBUSTNESS_FRAMEWORK.md) |
+
+---
+
+## Evidence
+
+| Field | Value |
+|---|---|
+| **Contracts** | `sew-protocol` @ `62fce3a` |
+| **Simulation** | `sew-simulation` @ `5b33486` |
+| **Generated / reviewed** | 2026-05-21 |
+| **Verification status** | Manually reviewed for accuracy against contract source and subsystem documentation. High-level flow verified against `BaseEscrow.sol`, `EscrowFactory.sol`, DR v3 contracts, and governance configuration. Intended as the primary entry-point document for external reviewers. All referenced subsystem docs exist and are consistent with this overview. |

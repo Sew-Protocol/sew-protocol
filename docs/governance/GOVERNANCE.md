@@ -405,3 +405,14 @@ Quorum is absolute (currently 4,000,000 tokens). If total delegated-and-voted su
 below this threshold, a proposal fails regardless of how unanimous the votes cast are. This
 provides a baseline participation requirement that cannot be satisfied by a small number of
 colluding holders alone.
+
+---
+
+## Evidence
+
+| Field | Value |
+|---|---|
+| **Contracts** | `sew-protocol` @ `62fce3a` |
+| **Simulation** | `sew-simulation` @ `5b33486` |
+| **Generated / reviewed** | 2026-05-21 |
+| **Verification status** | Manually checked against `TimelockController.sol`, `EscrowAdminContract.sol`, `Governor.sol`, and Guardian multisig configuration. Lane delays, parameter bounds, and role assignments verified against contract source and `GOVERNANCE_SURFACE_MAP.md`. Governance capture simulation covered in Phase G sweeps in `sew-simulation`. Emergency pause and Guardian down-only constraint verified via scenario S27. |

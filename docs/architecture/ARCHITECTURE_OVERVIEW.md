@@ -376,3 +376,14 @@ Sew Protocol's architecture is designed for:
 - **User Protection**: Snapshot immutability ensures predictable rules
 
 The protocol provides a solid foundation for trustless, reversible payments while maintaining the ability to evolve through governance-controlled module upgrades.
+
+---
+
+## Evidence
+
+| Field | Value |
+|---|---|
+| **Contracts** | `sew-protocol` @ `62fce3a` |
+| **Simulation** | `sew-simulation` @ `5b33486` |
+| **Generated / reviewed** | 2026-05-21 |
+| **Verification status** | Manually reviewed against contract directory structure and subsystem decomposition. Component boundaries verified against import graph and role assignments. Updated to reflect DR v3 implementation status. Formal architectural conformance (e.g., layer isolation) not automatically verified — needs follow-up. |

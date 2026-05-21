@@ -294,3 +294,14 @@ complicates aggregate analysis and fee projection.
 | Emergency recovery: approval → execution | 2 days | `EmergencyRecoveryProposal` |
 | Multi-L2 module coordinator activation | 48 hours minimum | `MultiL2ModuleCoordinator.MIN_ACTIVATION_DELAY` |
 | Escrow module snapshot | Permanent (creation-time freeze) | `BaseEscrow.moduleSnapshots` |
+
+---
+
+## Evidence
+
+| Field | Value |
+|---|---|
+| **Contracts** | `sew-protocol` @ `62fce3a` |
+| **Simulation** | `sew-simulation` @ `5b33486` |
+| **Generated / reviewed** | 2026-05-21 |
+| **Verification status** | Manually checked against upgrade mechanism contracts (`ForwardOnlyUpgrade.sol`, `EscrowFactory.sol`). No-proxy invariant and version-gate logic verified against source. Simulation does not directly cover upgrade paths — needs follow-up with formal invariant tests. |

@@ -349,3 +349,14 @@ does not enforce:
 - **Partial milestone releases.** A single escrow has one principal amount. Multi-
   milestone projects require either multiple escrows (one per milestone) or use of the
   `proposeSplit` mechanism at the point of partial completion.
+
+---
+
+## Evidence
+
+| Field | Value |
+|---|---|
+| **Contracts** | `sew-protocol` @ `62fce3a` |
+| **Simulation** | `sew-simulation` @ `5b33486` |
+| **Generated / reviewed** | 2026-05-21 |
+| **Verification status** | Manually checked against `BaseEscrow.sol` prepayment and deposit flows. Prepayment accounting verified against `_updateEscrowBalance()` and underflow fix in `SECURITY_FIXES_COMPLETED.md`. Incentive distribution logic verified against `IncentiveModuleV1.sol`. Prepayment-under-dispute edge cases partially covered in deterministic scenarios — needs follow-up. |

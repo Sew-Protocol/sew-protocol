@@ -72,3 +72,14 @@
 +   - Foundry invariants (`test/foundry/invariants/*`)
 +   - Halmos bounded checks on selected `check_*` functions.
 +3. Track `deferred` rows with explicit prerequisites (state exposure, symbolic harness constraints, or multi-module setup).
+
+---
+
+## Evidence
+
+| Field | Value |
+|---|---|
+| **Contracts** | `sew-protocol` @ `62fce3a` |
+| **Simulation** | `sew-simulation` @ `5b33486` |
+| **Generated / reviewed** | 2026-05-21 |
+| **Verification status** | Generated from static analysis of scenario registry and canonical ID mapping. Coverage figures derived from S01–S41 deterministic scenario set in `sew-simulation`. Reflects snapshot at `sew-simulation @ 5b33486`. Gap analysis is accurate as of this date; coverage will change as new scenarios are added. |

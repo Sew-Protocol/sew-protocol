@@ -322,3 +322,14 @@ The core DR v3 functionality is complete and ready for deployment:
 ---
 
 **Conclusion:** DR v3 core implementation is **complete and production-ready**. Remaining items are enhancements that can be added incrementally based on real-world usage patterns.
+
+---
+
+## Evidence
+
+| Field | Value |
+|---|---|
+| **Contracts** | `sew-protocol` @ `62fce3a` |
+| **Simulation** | `sew-simulation` @ `5b33486` |
+| **Generated / reviewed** | 2026-05-21 |
+| **Verification status** | Manually reviewed against DR v3 contract implementation (`DRMFacet.sol`, `DRMAdminFacet.sol`, `ResolverSlashingModuleV1.sol`, `KlerosArbitrableProxy.sol`). Implementation status flags verified against contract source. Deterministic scenarios S01–S41 provide regression coverage for implemented DR v3 paths. Items marked in-progress or pending require follow-up before production deployment. |

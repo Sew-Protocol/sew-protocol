@@ -560,3 +560,14 @@ Both `_authorizeTimedAction` and `_authorizeTimedActionAndSource` now check for
 | Auto-release/auto-cancel gating to `PENDING` state | Confirmed — `computeTimedActions` returns `(0, false)` for non-`PENDING` state |
 | Zero `maxDisputeDuration` bypass | Safe — `disputedTimeoutEnabled` flag prevents `resolveDisputeByTimeout` when `maxDisputeDuration == 0` |
 | `uint64` cast overflow | Checked — `_applyEscrowSettings` reverts with `InvalidAutoTime` if value exceeds `type(uint64).max` |
+
+---
+
+## Evidence
+
+| Field | Value |
+|---|---|
+| **Contracts** | `sew-protocol` @ `62fce3a` |
+| **Simulation** | `sew-simulation` @ `5b33486` |
+| **Generated / reviewed** | 2026-05-21 |
+| **Verification status** | Manually checked against `automateTimedActions()`, Keeper role authorisation, and auto-release/cancel delay configuration in `EscrowAdminContract.sol`. Expiry guard conditions verified against contract source. Simulation covers Keeper liveness edge cases in Phase H flooding scenarios. Batch size DoS fix verified against `SECURITY_FIXES_COMPLETED.md`. Adversarial Keeper scenarios not yet fully simulation-backed — needs follow-up. |

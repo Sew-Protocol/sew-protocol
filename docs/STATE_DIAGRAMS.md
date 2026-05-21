@@ -228,3 +228,14 @@ can win.
 
 `KlerosArbitrableProxy.canEscalate()` always returns `(false, _, _)`. Round 2 is
 structurally terminal: no further appeal path exists within the protocol.
+
+---
+
+## Evidence
+
+| Field | Value |
+|---|---|
+| **Contracts** | `sew-protocol` @ `62fce3a` |
+| **Simulation** | `sew-simulation` @ `5b33486` |
+| **Generated / reviewed** | 2026-05-21 |
+| **Verification status** | Mermaid diagrams derived from contract source: state enum from `EscrowTypes.sol`, transitions from `BaseEscrow.sol`, escalation rounds from `DRMFacet.sol` and `KlerosArbitrableProxy.sol`. Slashing schedule and bond cost curve verified against `ResolverSlashingModuleV1.sol`. Diagrams are manually verified to be consistent with `STATE_MACHINE.md` narrative. Formal diagram completeness not automatically checked — needs follow-up. |

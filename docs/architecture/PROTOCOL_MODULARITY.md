@@ -564,3 +564,14 @@ external library-style contracts used by `BaseEscrow` for compute-intensive oper
 They are upgradeable via governance (`setDisputeOps`, `setYieldOps`, etc.) but they are
 not module interfaces — they contain logic that belongs to the core, not to a pluggable
 extension point.
+
+---
+
+## Evidence
+
+| Field | Value |
+|---|---|
+| **Contracts** | `sew-protocol` @ `62fce3a` |
+| **Simulation** | `sew-simulation` @ `5b33486` |
+| **Generated / reviewed** | 2026-05-21 |
+| **Verification status** | Manually checked against `ModuleSnapshotRegistry.sol`, `BaseEscrow.sol` snapshot isolation, and slow-lane activation flow. Module snapshot field list verified against `EscrowTypes.sol`. Simulation covers snapshot isolation via scenarios S26 (governance sandwich) and S01–S10 lifecycle. Full cross-module interaction coverage not yet simulation-backed — needs follow-up. |

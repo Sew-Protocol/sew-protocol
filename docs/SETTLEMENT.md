@@ -432,3 +432,14 @@ settlement path is the module notification (e.g., `finalizeDispute`), which is w
 | Execute pending settlement | `executePendingSettlement()` | `DISPUTED` + `PendingSettlement` | `RELEASED` or `REFUNDED` | Either party, `ROLE_TIMELOCK` |
 | Timed automation | `automateTimedActions()` | `PENDING` or `DISPUTED` | `RELEASED` or `REFUNDED` | Either party, `ROLE_TIMELOCK` |
 | Dispute timeout | `resolveDisputeByTimeout()` | `DISPUTED` | `REFUNDED` | Either party, `ROLE_TIMELOCK` |
+
+---
+
+## Evidence
+
+| Field | Value |
+|---|---|
+| **Contracts** | `sew-protocol` @ `62fce3a` |
+| **Simulation** | `sew-simulation` @ `5b33486` |
+| **Generated / reviewed** | 2026-05-21 |
+| **Verification status** | Manually checked against `BaseEscrow.sol` settlement flow, `executePendingSettlement()`, and `automateTimedActions()`. Appeal deadline enforcement verified against contract arithmetic. Mutual split path verified against `resolveMutualAgreement()`. Simulation covers settlement lifecycle in S01–S10 and appeal window scenarios. Partial settlement edge cases not fully simulation-backed — needs follow-up. |

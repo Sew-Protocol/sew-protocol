@@ -186,3 +186,14 @@ Succinct overview of the major contracts and their roles.
                        └─> PaymentCalculationLibraryV1
 ```
 
+
+---
+
+## Evidence
+
+| Field | Value |
+|---|---|
+| **Contracts** | `sew-protocol` @ `62fce3a` |
+| **Simulation** | `sew-simulation` @ `5b33486` |
+| **Generated / reviewed** | 2026-05-21 |
+| **Verification status** | Generated from contract source enumeration and manually reviewed for accuracy. Contract descriptions verified against NatSpec and function signatures. Reflects contract set at `sew-protocol @ 62fce3a`. Will require update if new contracts are added. |

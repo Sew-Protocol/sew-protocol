@@ -272,3 +272,14 @@ The protocol uses a **staged rollout approach** for decentralized dispute resolu
 
 _For a complete documentation map, see [`docs/INDEX.md`](../INDEX.md) and the reference index in [`docs/reference/_DOCUMENT_INDEX.md`](../reference/_DOCUMENT_INDEX.md)._
 
+
+---
+
+## Evidence
+
+| Field | Value |
+|---|---|
+| **Contracts** | `sew-protocol` @ `62fce3a` |
+| **Simulation** | `sew-simulation` @ `5b33486` |
+| **Generated / reviewed** | 2026-05-21 |
+| **Verification status** | Manually reviewed and updated to reflect DR v3 implementation. Technical details (compiler version, `via_ir` rationale, role table, module snapshot model) verified against `foundry.toml` and contract source. Accurate as of `sew-protocol @ 62fce3a`. |

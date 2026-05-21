@@ -298,3 +298,14 @@ resolution, settlement, and timed-action logic throughout the escrow lifetime.
 
 This is what makes the Sew state machine governance-safe: an escrow's rules are
 fixed at creation time.
+
+---
+
+## Evidence
+
+| Field | Value |
+|---|---|
+| **Contracts** | `sew-protocol` @ `62fce3a` |
+| **Simulation** | `sew-simulation` @ `5b33486` |
+| **Generated / reviewed** | 2026-05-21 |
+| **Verification status** | Manually verified against `EscrowTypes.sol` state enum, transition guards in `BaseEscrow.sol`, and `PendingSettlement` sub-state mechanics. All 6 states and transition authority matrix checked against contract source. S01–S41 deterministic scenarios cover all reachable state transitions. Formal verification of state machine completeness not yet complete — needs follow-up. |
