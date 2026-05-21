@@ -159,7 +159,7 @@ The primary Kleros-specific document. Covers in full:
 - How `KlerosArbitrableProxy` implements `IArbitrable` to receive the Kleros
   `rule()` callback.
 - The `createDispute()` / `rule()` flow and how the Kleros ruling maps to Sew
-  escrow outcomes (RESOLVED or REFUNDED).
+  escrow outcomes (`ruling == 1` → release to recipient, `ruling == 2` → cancel to sender).
 - Arbitration fee forwarding and the `fundedBy` / `funder` accounting pattern.
 - Evidence submission (`submitEvidence` to `EvidenceModuleV1`).
 - Appeal windows: Kleros-internal appeal rounds are opaque to Sew; Sew receives
@@ -183,9 +183,29 @@ the balance-safety invariant is maintained, fee withdrawal, yield withdrawal,
 and the emergency unwind paths. Included in this packet because Kleros
 rulings ultimately result in one of the withdrawal paths being activated.
 
-**Relevant to Kleros:** Confirms that a Kleros ruling (RESOLVED to buyer or
-seller) maps to the standard `withdraw()` path with the same safety
+**Relevant to Kleros:** Confirms that a Kleros ruling (release to recipient or
+cancel to sender) maps to the standard `withdraw()` path with the same safety
 invariants as any other resolution outcome.
+
+---
+
+### 09 — Protocol Robustness Framework *(optional)*
+
+**File:** `09_PROTOCOL_ROBUSTNESS_FRAMEWORK.md`  
+**Source:** `docs/ROBUSTNESS_FRAMEWORK.md` (sew-simulation repo)  
+**Audience:** Researchers, simulation/mechanism design reviewers
+
+Optional deeper reference on the simulation workbench used to validate the
+protocol. Covers deterministic replay, the 37-invariant catalogue, the 48
+named scenarios (including S18–S23 for Kleros paths), Monte Carlo statistical
+modules, the ring attacker adversary model, and all known coverage gaps.
+
+Included because the simulation framework's protocol-adapter boundary was
+designed to be applicable to other dispute system models. Teams interested in
+using or adapting the workbench for Kleros-specific research are encouraged to
+read this document.
+
+**Not required for the core Kleros integration review.**
 
 ---
 
@@ -203,6 +223,9 @@ invariants as any other resolution outcome.
 8. `08` — Withdrawals *(settlement outcomes)*
 
 **For a 30-minute focused read:** `07` → `03` §4.4–4.5 → `05`.
+
+**Optional — simulation methodology and research:**  
+`09` — Protocol Robustness Framework *(escalation trap model, ring attacker, coverage gaps)*
 
 ---
 
