@@ -526,3 +526,14 @@ dispute economics:
 
 Simulation results are recorded in `results/` and replayed via the deterministic scenario
 runner. See the Protocol Robustness Framework repository for evidence reports.
+
+---
+
+## Evidence
+
+| Field | Value |
+|---|---|
+| **Contracts** | `sew-protocol` @ `763131d` |
+| **Simulation** | `sew-simulation` @ `5b33486` |
+| **Generated / reviewed** | 2026-05-21 |
+| **Verification status** | Bond composition, slashing schedule, and capacity gate manually verified against `ResolverSlashingModuleV1.sol` and `DRMAdminFacet.sol`. Appeal bond quadratic cost curve verified against contract arithmetic. Phase F/H/J/AI simulation phases are implemented in `sew-simulation`; parameter sweep results present in `results/`. Insurance pool yield-sourcing and floor mechanism are specified but not yet fully simulation-backed — needs follow-up. |
