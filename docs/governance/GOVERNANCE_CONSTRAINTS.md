@@ -152,6 +152,17 @@ override path.
 
 ---
 
+## Evidence
+
+| Field | Value |
+|---|---|
+| **Contracts** | `sew-protocol` @ `1c5d47b` |
+| **Simulation** | `sew-simulation` @ `5b33486` |
+| **Generated / reviewed** | 2026-05-21 |
+| **Verification status** | Manually checked against contract source; governance parameter bounds cross-referenced against `GOVERNANCE_SURFACE_MAP.md` and role constants in `BaseEscrow.sol` / `EscrowAdminContract.sol`. No automated coverage of all constraint paths yet — needs follow-up with formal verification or invariant tests. |
+
+---
+
 ## Related documents
 
 - [`docs/governance/governance.md`](governance/governance.md) — full governance model and operational runbooks
