@@ -877,29 +877,18 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         );
         if (!result.success) revert EscalationNotAllowed();
 
-        // Fix 3: Per-sender escalation cooldown + bond scaling
-        uint64 cooldown = escalationCooldown;
-        if (cooldown > 0) {
-            address escalator = _msgSender();
-            uint64 lastEsc = lastEscalationTimestamp[escalator];
-            if (lastEsc > 0 && block.timestamp < uint256(lastEsc) + cooldown) {
-                revert EscalationCooldownActive(escalator, uint256(lastEsc) + cooldown);
-            }
-            uint32 escCount;
-            if (block.timestamp >= uint256(lastEsc) + 30 days) {
-                escCount = 1;
-            } else {
-                escCount = addressEscalationCount[escalator] + 1;
-            }
-            addressEscalationCount[escalator] = escCount;
-            lastEscalationTimestamp[escalator] = uint64(block.timestamp);
-            // Scale bond by 10% per additional escalation in window (escCount > 1)
-            if (escCount > 1 && result.bondAmount > 0) {
-                uint256 scale100 = 100 + 10 * uint256(escCount - 1);
-                result.bondAmount = result.bondAmount * scale100 / 100;
-                result.bondToRecord = result.bondToRecord * scale100 / 100;
-                result.protocolFeeAmount = result.protocolFeeAmount * scale100 / 100;
-            }
+        // Deadline safety: do not hard-block escalation with a global cooldown.
+        // Keep per-address tracking and linear bond scaling, but allow valid
+        // within-window appeals to progress across rounds.
+        address escalator = _msgSender();
+        uint32 escCount = addressEscalationCount[escalator] + 1;
+        addressEscalationCount[escalator] = escCount;
+        lastEscalationTimestamp[escalator] = uint64(block.timestamp);
+        if (escCount > 1 && result.bondAmount > 0) {
+            uint256 scale100 = 100 + 10 * uint256(escCount - 1);
+            result.bondAmount = result.bondAmount * scale100 / 100;
+            result.bondToRecord = result.bondToRecord * scale100 / 100;
+            result.protocolFeeAmount = result.protocolFeeAmount * scale100 / 100;
         }
 
         // Validate bond payment

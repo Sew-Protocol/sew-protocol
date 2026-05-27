@@ -168,4 +168,38 @@ contract StateInvariants is Test {
             );
         }
     }
+
+    // -------------------------------------------------------------------------
+    // Invariant 5: Single-sided claimable payout on terminal escrows
+    //
+    // Mirrors: :single-resolution-payout-consistent (release/refund terminality)
+    //
+    // For RELEASED / REFUNDED / RESOLVED escrows, at most one of sender/recipient
+    // may have a positive claimable balance at a time.
+    // -------------------------------------------------------------------------
+    function invariant_single_sided_claimable_terminal() public view {
+        uint256 count = vault.getEscrowCount();
+
+        for (uint256 i = 0; i < count; i++) {
+            (address token_, address to, address from,,,,, EscrowState st,,) = vault.escrowTransfers(i);
+            token_; // silence unused var warning in case of compiler behavior differences
+
+            if (
+                st != EscrowState.RELEASED &&
+                st != EscrowState.REFUNDED &&
+                st != EscrowState.RESOLVED
+            ) continue;
+
+            uint256 senderClaim = vault.claimableBalances(i, from);
+            uint256 recipientClaim = vault.claimableBalances(i, to);
+
+            assertTrue(
+                !(senderClaim > 0 && recipientClaim > 0),
+                string.concat(
+                    "SINGLE_SIDED_PAYOUT: both sender and recipient claimable > 0 for workflowId ",
+                    vm.toString(i)
+                )
+            );
+        }
+    }
 }

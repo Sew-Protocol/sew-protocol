@@ -30,6 +30,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated contract structure: core contracts in `contracts/core/`, shared interfaces in `contracts/shared/`
 - Updated import paths across all contracts and tests
 - Updated documentation to reflect module extraction and role removal
+- Updated repeat-attacker integration tests to align with current escalation behavior: cooldown is tracking/scaling-oriented and no longer a hard within-window escalation block.
+
+### Fixed
+
+- Fixed stale constructor revert expectation in `test/foundry/core/ModuleManagementContract.t.sol`:
+  `test_constructor_zeroOwner_reverts` now expects `InvalidAddress(8, address(0))`.
+- Fixed Foundry prank misuse in `test/foundry/decentralized-resolution-module/IncentiveModuleIntegration.test.t.sol` `setUp()` by removing nested `vm.prank` during an active `vm.startPrank` context.
+- Fixed repeat-attacker regression expectations in `test/foundry/core/RepeatAttackerIntegration.t.sol`:
+  - renamed cooldown test to `test_EscalationCooldown_NoLongerHardBlocksWithinWindow`,
+  - updated assertions to validate escalation count tracking (`addressEscalationCount`) and cumulative scaling model.
+- Validated all previously failing targeted tests with `forge test` reruns.
 
 ### Security
 

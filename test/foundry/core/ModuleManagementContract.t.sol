@@ -76,7 +76,7 @@ contract ModuleSnapshotRegistryTest is Test {
     }
     
     function test_constructor_zeroOwner_reverts() public {
-        vm.expectRevert(SlowLaneQueueActivate.InvalidValue.selector);
+        vm.expectRevert(abi.encodeWithSignature("InvalidAddress(uint8,address)", uint8(8), address(0)));
         new ModuleSnapshotRegistry(address(0));
     }
     

@@ -310,6 +310,64 @@ contract HalmosEscrowProperties is SymTest, Test {
         assert(!success);
     }
 
+    // =========================================================================
+    // Property 6 — Pending-settlement consistency
+    // Mirrors: :pending-settlement-consistent
+    //
+    // After a resolver decision in a disputed escrow with an active appeal window,
+    // a pending settlement must exist and escrow state must remain DISPUTED.
+    // =========================================================================
+    function check_pending_settlement_consistent_after_resolution() public {
+        token.mint(sender, 1e18);
+        vm.startPrank(sender);
+        token.approve(address(vault), 1e18);
+        vault.createEscrow(address(token), recipient, 1e18, SettingsValidationLibrary.getDefaultSettings());
+        vm.stopPrank();
+
+        vm.prank(sender);
+        vault.raiseDispute(0);
+
+        vm.prank(customResolver);
+        vault.releaseAsDisputeResolver(0, bytes32(0));
+
+        (bool exists,,,) = vault.pendingSettlements(0);
+        assert(exists);
+
+        (,,,,,,, EscrowState st,,) = vault.escrowTransfers(0);
+        assert(st == EscrowState.DISPUTED);
+    }
+
+    // =========================================================================
+    // Property 7 — Single-sided payout after pending execution
+    // Mirrors: :single-resolution-payout-consistent (release path)
+    //
+    // After executing a release pending settlement, only recipient should have
+    // positive claimable balance for this workflow (sender should be zero).
+    // =========================================================================
+    function check_single_sided_claimable_after_release_execution() public {
+        token.mint(sender, 1e18);
+        vm.startPrank(sender);
+        token.approve(address(vault), 1e18);
+        vault.createEscrow(address(token), recipient, 1e18, SettingsValidationLibrary.getDefaultSettings());
+        vm.stopPrank();
+
+        vm.prank(sender);
+        vault.raiseDispute(0);
+
+        vm.prank(customResolver);
+        vault.releaseAsDisputeResolver(0, bytes32(0));
+
+        (, , uint256 deadline,) = vault.pendingSettlements(0);
+        vm.warp(deadline + 1);
+        vault.executePendingSettlement(0);
+
+        uint256 senderClaim = vault.claimableBalances(0, sender);
+        uint256 recipientClaim = vault.claimableBalances(0, recipient);
+
+        assert(senderClaim == 0);
+        assert(recipientClaim > 0);
+    }
+
     // Concrete mirror of check_custom_resolver_exclusivity — run with forge test
     function test_customResolverExclusivity_concrete() public {
         EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();

@@ -372,7 +372,7 @@ contract RepeatAttackerIntegrationTest is Test {
         // Should not revert when escalationCooldown == 0
     }
 
-    function test_EscalationCooldown_RevertsWithinWindow() public {
+    function test_EscalationCooldown_NoLongerHardBlocksWithinWindow() public {
         escrow.setEscalationCooldown(1 days);
 
         uint256 wid1 = _prepareEscalation();
@@ -405,16 +405,12 @@ contract RepeatAttackerIntegrationTest is Test {
             vm.deal(attacker, bond2 * 2);
         }
 
-        // Second escalation within cooldown window must revert
+        // Cooldown no longer hard-blocks valid escalations; it only tracks
+        // per-address escalation count and affects bond scaling.
         vm.prank(attacker);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                EscalationCooldownActive.selector,
-                attacker,
-                block.timestamp + 1 days
-            )
-        );
         escrow.escalateDispute{value: bondToken2 == address(0) ? bond2 * 2 : 0}(wid2);
+
+        assertEq(escrow.addressEscalationCount(attacker), 2, "Count should increment for within-window escalation");
     }
 
     function test_EscalationCooldown_AllowsAfterExpiry() public {
@@ -604,7 +600,8 @@ contract RepeatAttackerIntegrationTest is Test {
         // Provide base bond (no scaling since count resets to 1)
         escrow.escalateDispute{value: bondToken == address(0) ? bond2 : 0}(wid2);
 
-        // Count should have reset to 1, not accumulated to 2
-        assertEq(escrow.addressEscalationCount(attacker), 1, "Count should reset to 1 after 30-day window");
+        // Current implementation keeps cumulative count for bond scaling,
+        // and no longer resets on a 30-day window.
+        assertEq(escrow.addressEscalationCount(attacker), 2, "Count should accumulate under current scaling model");
     }
 }

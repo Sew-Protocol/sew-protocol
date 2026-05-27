@@ -190,6 +190,7 @@ contract IncentiveModuleIntegrationTest is Test {
         resolutionModule.setResolverCapacity(seniorResolver, 0, true);
         resolutionModule.setResolverCapacity(resolver1, 0, true);
         resolutionModule.setResolverCapacity(resolver2, 0, true);
+        resolutionModule.setExternalResolver(makeAddr('externalResolver'));
         vm.stopPrank();
     }
 
@@ -619,6 +620,83 @@ contract IncentiveModuleIntegrationTest is Test {
         // Verify resolver can claim payment
         uint256 claimable = incentiveModuleV2.getClaimablePayment(workflowId, address(escrow), resolver1);
         assertTrue(claimable > 0, 'Resolver should have claimable payment from bond');
+    }
+
+    /**
+     * @notice Regression: within-window second escalation must not be blocked by global cooldown
+     * @dev Mirrors Clojure deadline-safety fix: valid appeals should progress across rounds
+     *      even when escalationCooldown is configured.
+     */
+    function test_escalationCooldown_DoesNotBlockSecondEscalationWithinAppealWindow() public {
+        vm.prank(timelock);
+        resolutionModule.setIncentiveModule(address(incentiveModuleV2));
+
+        DecentralizedResolverStructs.EscalationCostConfig
+            memory costConfig = DecentralizedResolverStructs.EscalationCostConfig({
+                enabled: true,
+                curveType: DecentralizedResolverStructs.CostCurveType.QUADRATIC,
+                baseCost: 100,
+                stepSize: 100,
+                multiplier: 0,
+                bondToken: address(0)
+            });
+        vm.prank(timelock);
+        resolutionModule.queueEscalationCostConfig(costConfig);
+        vm.warp(block.timestamp + 7 days + 1);
+        vm.prank(timelock);
+        resolutionModule.activateEscalationCostConfig();
+        vm.warp(block.timestamp + 1);
+
+        // Configure a large cooldown to prove it doesn't hard-block valid appeals.
+        escrow.setEscalationCooldown(30 days);
+
+        vm.startPrank(user1);
+        token.approve(address(escrow), 1000 ether);
+        uint256 workflowId = escrow.createEscrow(
+            address(token),
+            user2,
+            1000 ether,
+            EscrowSettings({
+                customResolver: address(0),
+                releaseAddress: address(0),
+                yieldPreset: YieldPreset.OFF,
+                autoReleaseTime: 0,
+                autoCancelTime: 0
+            })
+        );
+        escrow.raiseDispute(workflowId);
+        vm.stopPrank();
+
+        bytes memory escrowData = abi.encode(
+            address(token),
+            user1,
+            user2,
+            1000 ether - ((1000 ether * escrow.escrowFee()) / escrow.ESCROW_FEE_DENOMINATOR())
+        );
+
+        // Round 0 decision: RELEASE => sender (user1) may appeal.
+        vm.prank(address(this));
+        resolutionModule.recordResolution(workflowId, address(escrow), resolver1, ResolutionOutcome.RELEASE, 1 days);
+
+        (uint256 bond1, ) = resolutionModule.getRequiredAppealBond(workflowId, address(escrow), 0, escrowData);
+        vm.startPrank(user1);
+        token.approve(address(escrow), bond1);
+        escrow.escalateDispute(workflowId);
+        vm.stopPrank();
+
+        // Round 1 decision: RELEASE again => sender (user1) may appeal to round 2.
+        vm.prank(address(this));
+        resolutionModule.recordResolution(workflowId, address(escrow), seniorResolver, ResolutionOutcome.RELEASE, 1 days);
+
+        (uint256 bond2, ) = resolutionModule.getRequiredAppealBond(workflowId, address(escrow), 1, escrowData);
+        vm.startPrank(user1);
+        token.approve(address(escrow), bond2);
+        // Must succeed even though cooldown is configured and this is immediate second escalation.
+        escrow.escalateDispute(workflowId);
+        vm.stopPrank();
+
+        (, uint8 currentRound) = resolutionModule.getDisputeResolver(workflowId, address(escrow), '');
+        assertEq(currentRound, 2, 'second escalation should reach final round within appeal window');
     }
 
     // ============ Rounding Error Fix Tests ============
