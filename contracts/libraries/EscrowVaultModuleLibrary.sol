@@ -3,8 +3,11 @@ pragma solidity ^0.8.33;
 
 import '../interfaces/IYieldModule.sol';
 import '../interfaces/IYieldDistributionModule.sol';
+import '../interfaces/IReleaseStrategy.sol';
 import '../types/EscrowTypes.sol';
+import '../core/BaseEscrow.sol';
 import '../core/ModuleSnapshotRegistry.sol';
+import './ModuleGetterLibrary.sol';
 
 library EscrowVaultModuleLibrary {
     function getYieldGenerationModule(
@@ -19,17 +22,35 @@ library EscrowVaultModuleLibrary {
     }
 
     function getYieldDistributionModule(
+        uint256 workflowId,
+        mapping(uint256 => ModuleSnapshot) storage moduleSnapshots,
         ModuleSnapshotRegistry moduleManagement,
         address vaultAddress
     ) internal view returns (IYieldDistributionModule) {
-        return IYieldDistributionModule(moduleManagement.getDefaultYieldDistributionModule(vaultAddress));
+        address moduleAddr = ModuleGetterLibrary.getModuleAddress(
+            workflowId,
+            BaseEscrow.ModuleType.YIELD_DIST,
+            moduleSnapshots,
+            moduleManagement,
+            vaultAddress
+        );
+        return IYieldDistributionModule(moduleAddr);
     }
 
     function getReleaseStrategy(
+        uint256 workflowId,
+        mapping(uint256 => ModuleSnapshot) storage moduleSnapshots,
         ModuleSnapshotRegistry moduleManagement,
         address vaultAddress
     ) internal view returns (IReleaseStrategy) {
-        return moduleManagement.getDefaultReleaseStrategy(vaultAddress);
+        address moduleAddr = ModuleGetterLibrary.getModuleAddress(
+            workflowId,
+            BaseEscrow.ModuleType.RELEASE,
+            moduleSnapshots,
+            moduleManagement,
+            vaultAddress
+        );
+        return IReleaseStrategy(moduleAddr);
     }
 
     function getCancellationStrategy(

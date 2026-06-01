@@ -105,12 +105,8 @@ contract EscrowVaultReleaseStrategyHarness is EscrowVault {
         return moduleSnapshots[workflowId].releaseStrategy;
     }
 
-    function resolvedReleaseStrategy(uint256 workflowId) external view returns (address) {
-        address snap = moduleSnapshots[workflowId].releaseStrategy;
-        if (snap != address(0)) {
-            return snap;
-        }
-        // If no snapshot, fall back to current default
+    /// @notice Production path used by BaseEscrow.release().
+    function productionReleaseStrategy(uint256 workflowId) external view returns (address) {
         return address(_getReleaseStrategy(workflowId));
     }
 }
@@ -193,32 +189,36 @@ contract ReleaseStrategyWiringTest is Test {
 
         uint256 wid0 = _createEscrow();
         assertEq(vault.snapReleaseStrategy(wid0), address(s1), "snapshot should capture default release strategy");
-        assertEq(vault.resolvedReleaseStrategy(wid0), address(s1), "resolved strategy should use snapshot");
+        assertEq(vault.productionReleaseStrategy(wid0), address(s1), "getter should use snapshot");
 
         _setDefaultReleaseStrategy(address(s2));
 
         // Existing escrow keeps the snapshotted strategy.
         assertEq(vault.snapReleaseStrategy(wid0), address(s1), "snapshot should not change");
-        assertEq(vault.resolvedReleaseStrategy(wid0), address(s1), "resolved strategy should remain snapshotted");
+        assertEq(vault.productionReleaseStrategy(wid0), address(s1), "getter should remain snapshotted");
 
         // New escrows snapshot the updated default.
         uint256 wid1 = _createEscrow();
         assertEq(vault.snapReleaseStrategy(wid1), address(s2), "new escrow should snapshot updated default");
-        assertEq(vault.resolvedReleaseStrategy(wid1), address(s2), "resolved strategy should use new snapshot");
+        assertEq(vault.productionReleaseStrategy(wid1), address(s2), "getter should use new snapshot");
     }
 
     function test_releaseStrategy_snapshot_zero_means_follow_future_default() public {
         // No default set at creation time -> snapshot stays 0.
         uint256 wid0 = _createEscrow();
         assertEq(vault.snapReleaseStrategy(wid0), address(0), "snapshot should be zero when default unset");
-        assertEq(vault.resolvedReleaseStrategy(wid0), address(0), "resolved strategy is zero when default unset");
+        assertEq(vault.productionReleaseStrategy(wid0), address(0), "getter is zero when default unset");
 
         // Later setting a default affects escrows whose snapshot was zero.
         ReleaseStrategyMockS1 s1 = new ReleaseStrategyMockS1();
         _setDefaultReleaseStrategy(address(s1));
 
         assertEq(vault.snapReleaseStrategy(wid0), address(0), "snapshot remains zero");
-        assertEq(vault.resolvedReleaseStrategy(wid0), address(s1), "resolved strategy follows current default if snapshot zero");
+        assertEq(
+            vault.productionReleaseStrategy(wid0),
+            address(s1),
+            "getter follows current default when snapshot zero"
+        );
     }
 
     function test_queueModule_release_requires_timelock() public {

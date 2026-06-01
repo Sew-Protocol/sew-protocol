@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- V2 Strategic Preparation: Defined semantic identity architecture (bytes32 derived IDs) to achieve cryptographic provenance and eliminate potential identity-confusion risks identified in simulation audits.
+- Operational Safety Roadmap: Specified delegated "create-blocked" guards for yield module health and resolver capacity to protect user funds from known operational stress states.
 
 - Security documentation (`SECURITY.md`) with responsible disclosure policy
 - Comprehensive security model (`docs/SECURITY_MODEL.md`)
@@ -53,6 +55,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0] - 2026-01-06
 
 ### Added
+- V2 Strategic Preparation: Defined semantic identity architecture (bytes32 derived IDs) to achieve cryptographic provenance and eliminate potential identity-confusion risks identified in simulation audits.
+- Operational Safety Roadmap: Specified delegated "create-blocked" guards for yield module health and resolver capacity to protect user funds from known operational stress states.
 
 - Initial release preparation
 - Core escrow contracts (BaseEscrow, EscrowVault, EscrowableERC20)
