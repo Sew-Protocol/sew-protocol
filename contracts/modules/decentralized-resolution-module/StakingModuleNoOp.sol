@@ -195,6 +195,10 @@ contract StakingModuleNoOp is IStakingModule, AccessControl {
         return _dummyStakeToken;
     }
 
+    function getMaxEscrowPerCase(address) external pure override returns (uint256 maxEscrow) {
+        return type(uint256).max;
+    }
+
     function isPaused() external view override returns (bool) {
         return paused;
     }

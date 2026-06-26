@@ -53,6 +53,7 @@ contract DRMAdminFacet is SlowLaneQueueActivate, AccessControl, ReentrancyGuard,
     event EscalationConfigQueued(uint8 level, EscalationConfig config, uint64 eta);
     event EscalationConfigActivated(uint8 level, EscalationConfig oldConfig, EscalationConfig newConfig);
     event IncentiveModuleUpdated(address indexed oldModule, address indexed newModule);
+    event StakingModuleUpdated(address indexed oldModule, address indexed newModule);
     event ResolverActiveStatusChanged(address indexed resolver, bool active);
     event ResolverCapacityUpdated(address indexed resolver, ResolverCapacity capacity);
     event ResolverAssignmentWeightUpdated(address indexed resolver, uint256 oldWeight, uint256 newWeight);
@@ -373,6 +374,12 @@ contract DRMAdminFacet is SlowLaneQueueActivate, AccessControl, ReentrancyGuard,
         address old = address(incentiveModule);
         incentiveModule = IIncentiveModule(m);
         emit IncentiveModuleUpdated(old, m);
+    }
+
+    function setStakingModule(address m) external onlyRole(ROLE_TIMELOCK) {
+        address old = stakingModule;
+        stakingModule = m;
+        emit StakingModuleUpdated(old, m);
     }
 
     // ============ Emergency Controls ============

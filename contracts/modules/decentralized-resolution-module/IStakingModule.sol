@@ -289,4 +289,11 @@ interface IStakingModule {
      * @notice Unpause staking operations
      */
     function unpause() external;
+
+    /**
+     * @notice Get max escrow value this resolver can handle based on stake
+     * @param resolver Resolver address
+     * @return maxEscrow Maximum escrow value (18 decimals)
+     */
+    function getMaxEscrowPerCase(address resolver) external view returns (uint256 maxEscrow);
 }

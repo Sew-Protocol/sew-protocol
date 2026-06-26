@@ -7,6 +7,7 @@ import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 import '../../governance/SlowLaneQueueActivate.sol';
 import '../../shared/interfaces/IIncentiveModule.sol';
 import './DRMStorageBase.sol';
+import './IStakingModule.sol';
 import './ResolutionAnalytics.sol';
 import './EscalationCostLibrary.sol';
 import '../../libraries/ResolutionTableLibrary.sol';
@@ -30,6 +31,7 @@ contract DecentralizedResolutionModule is
     // ============ Errors ============
     error NotRegisteredEscrowContract(address caller);
     error AlreadyInitialized(uint256 workflowId);
+    error InsufficientResolverStake(address resolver, uint256 escrowValue, uint256 maxEscrowValue);
     error ResolverInactive(address resolver);
     error ResolverNotAcceptingDisputes(address resolver);
     error ZeroAddress(string field);
@@ -153,6 +155,7 @@ contract DecentralizedResolutionModule is
     function registerEscrowContract(address) external { _delegateAdmin(); }
     function unregisterEscrowContract(address) external { _delegateAdmin(); }
     function setIncentiveModule(address) external { _delegateAdmin(); }
+    function setStakingModule(address) external { _delegateAdmin(); }
     function pauseNewAssignments(string memory) external { _delegateAdmin(); }
     function resumeNewAssignments() external { _delegateAdmin(); }
 
@@ -407,6 +410,65 @@ contract DecentralizedResolutionModule is
         resolverStats[resolver].casesAssigned++;
         _advanceRoundRobinCounter(categoryKey, false);
         emit ResolverAssigned(workflowId, resolver, categoryKey, 0);
+
+        if (address(incentiveModule) != address(0)) {
+            try incentiveModule.onResolverAssigned(workflowId, escrowContract, resolver, 0) {} catch {
+                emit IncentiveModuleCallFailed(workflowId, 'onResolverAssigned', 'FAILED');
+            }
+        }
+    }
+
+    function initializeDisputeWithCategory(
+        uint256 workflowId,
+        address escrowContract,
+        bytes calldata escrowData
+    ) external onlyEscrowContract {
+        (address token, address from, address to, uint256 amountAfterFee, ) = abi.decode(
+            escrowData, (address, address, address, uint256, address)
+        );
+
+        bytes32 cat = escrowCategory[escrowContract][workflowId];
+        DisputeMetadata storage dm = disputeMetadata[escrowContract][workflowId];
+        if (dm.resolverAtRound[0] != address(0)) revert AlreadyInitialized(workflowId);
+
+        address resolver;
+        if (cat != bytes32(0) && resolutionTable[cat].enabled) {
+            resolver = _selectResolverRoundRobin(cat, false);
+        }
+        if (resolver == address(0)) {
+            resolver = _selectResolverRoundRobin(bytes32(0), false);
+        }
+        if (resolver == address(0)) return;
+
+        if (!resolverActive[resolver]) revert ResolverInactive(resolver);
+        ResolverCapacity storage capacity = resolverCapacity[resolver];
+        if (!capacity.acceptsNewDisputes) revert ResolverNotAcceptingDisputes(resolver);
+        if (capacity.maxConcurrentDisputes > 0) {
+            if (capacity.currentDisputes >= capacity.maxConcurrentDisputes) {
+                revert ResolverCapacityExceeded(resolver, capacity.currentDisputes, capacity.maxConcurrentDisputes);
+            }
+        }
+
+        if (stakingModule != address(0)) {
+            uint256 maxEscrow = IStakingModule(stakingModule).getMaxEscrowPerCase(resolver);
+            if (amountAfterFee > maxEscrow) {
+                revert InsufficientResolverStake(resolver, amountAfterFee, maxEscrow);
+            }
+        }
+
+        capacity.currentDisputes++;
+        resolverActiveDisputes[resolver]++;
+
+        dm.currentRound = 0;
+        dm.status = DisputeStatus.Open;
+        dm.resolverAtRound[0] = resolver;
+        dm.assignedAt = block.timestamp;
+        dm.resolveBy = block.timestamp + resolveDeadlines[0];
+        escrowCategory[escrowContract][workflowId] = cat;
+
+        resolverStats[resolver].casesAssigned++;
+        _advanceRoundRobinCounter(cat, false);
+        emit ResolverAssigned(workflowId, resolver, cat, 0);
 
         if (address(incentiveModule) != address(0)) {
             try incentiveModule.onResolverAssigned(workflowId, escrowContract, resolver, 0) {} catch {

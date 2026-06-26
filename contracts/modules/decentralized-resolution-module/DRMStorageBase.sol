@@ -82,4 +82,11 @@ abstract contract DRMStorageBase is DecentralizedResolverStructs {
     // Defined here (not in DRM) so layout is identical between DRM and DRMAdminFacet.
     // DRMAdminFacet never reads this slot; DRM uses it for delegatecall routing.
     address public adminFacet;
+
+    // ============ DR v3: Staking Module ============
+    // Address of the resolver staking module for capacity enforcement.
+    // When set, initializeDisputeWithCategory checks escrow value against
+    // the resolver's maximum case capacity (getMaxEscrowPerCase).
+    // Only appended — do not reorder preceding slots.
+    address public stakingModule;
 }
