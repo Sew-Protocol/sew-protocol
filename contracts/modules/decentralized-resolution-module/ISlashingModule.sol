@@ -29,7 +29,8 @@ interface ISlashingModule {
         PENDING, // Slash proposed, can be appealed
         APPEALED, // Under appeal review
         EXECUTED, // Slash executed
-        REVERSED // Slash reversed after successful appeal
+        REVERSED, // Slash reversed after successful appeal
+        REVERSED_WITH_CREDIT // Slash reversed on vindication with stake credited back
     }
 
     // ============ Structs ============
@@ -120,6 +121,14 @@ interface ISlashingModule {
     );
 
     event SlashReversed(uint256 indexed slashId, address indexed resolver, uint256 amountRestored);
+
+    event SlashRestoredOnVindication(
+        uint256 indexed slashId,
+        address indexed resolver,
+        uint256 amountRestored,
+        uint8 vindicatedRound,
+        uint256 timestamp
+    );
 
     event SlashConfigUpdated(SlashReason reason, uint256 oldBps, uint256 newBps);
 
@@ -218,6 +227,23 @@ interface ISlashingModule {
         address resolver,
         uint8 priorRound
     ) external returns (uint256 slashId);
+
+    /**
+     * @notice Restore reversal slashes when a higher-level resolution vindicates a prior resolver.
+     * @dev Iterates prior rounds and credits resolver stake for reversals that are now vindicated.
+     *      Only affects Track 1 reversal slashes (status=EXECUTED, reason=REVERSAL, appealDeadline=0).
+     *      The slashed funds have already been distributed — this crediting represents a
+     *      protocol-backed liability restoration rather than a fund clawback.
+     * @param workflowId Escrow transfer ID (escrowId) for the disputed escrow
+     * @param currentIsRelease Whether the current resolution outcome is release (true) or cancel (false)
+     * @param priorDecisions Array of ResolutionOutcome for each prior round (indexed by round)
+     * @return restoredCount Number of slashes restored
+     */
+    function restoreReversalSlashOnVindication(
+        uint256 workflowId,
+        bool currentIsRelease,
+        uint8[] calldata priorDecisions
+    ) external returns (uint256 restoredCount);
 
     /**
      * @notice Slash for proven fraud

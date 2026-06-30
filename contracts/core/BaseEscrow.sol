@@ -611,7 +611,8 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
             et,
             pendingMem,
             snappedTimeoutConfig,
-            timeoutPolicy.pendingAutoCancelEnabled
+            timeoutPolicy.pendingAutoCancelEnabled,
+            disputeRaisedTimestamp[workflowId]
         );
         if (actionType == ACTION_NONE) return false;
 
@@ -639,6 +640,15 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
                                       escrowTransfers[workflowId].amountAfterFee,
                                       uint8(FailureReason.TIMEOUT));
             emit TimedActionTriggered(workflowId, ACTION_AUTO_CANCEL_DISPUTED, source, caller);
+            return true;
+        } else if (actionType == ACTION_DISPUTE_TIMEOUT) {
+            address from = et.from;
+            uint256 amt = et.amountAfterFee;
+            _finalizeDisputeInModule(workflowId);
+            _cancelAndRefund(workflowId);
+            delete disputeRaisedTimestamp[workflowId];
+            emit DisputeAutoCancelled(workflowId, from, amt, uint8(FailureReason.TIMEOUT));
+            emit TimedActionTriggered(workflowId, ACTION_DISPUTE_TIMEOUT, source, caller);
             return true;
         }
 

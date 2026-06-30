@@ -141,6 +141,7 @@ uint8 constant ACTION_AUTO_RELEASE = 1;
 uint8 constant ACTION_AUTO_CANCEL = 2;
 uint8 constant ACTION_EXECUTE_PENDING = 3;
 uint8 constant ACTION_AUTO_CANCEL_DISPUTED = 4;
+uint8 constant ACTION_DISPUTE_TIMEOUT = 5;
 
 enum UserRole { BUYER, SELLER, RESOLVER }
 

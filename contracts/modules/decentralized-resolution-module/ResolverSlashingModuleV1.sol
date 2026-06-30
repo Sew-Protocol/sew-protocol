@@ -119,6 +119,9 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
     mapping(address => uint256) public frozenUntil; // resolver => timestamp
     mapping(address => uint256) public freezeUntil; // resolver => timestamp (for insufficient bond)
 
+    // Reversal slash by round: workflowId => round => slashId
+    mapping(uint256 => mapping(uint8 => uint256)) public reversalSlashByRound;
+
     // Appeal bond custody: slashId => amount held in this contract pending resolveAppeal.
     // Non-zero only while a PENDING slash has an active (unresolved) appeal.
     mapping(uint256 => uint256) public appealBondsHeld;
@@ -606,6 +609,9 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
 
         uint256 totalSlashed = resolverSlashed + seniorSlashed;
 
+        // Track reversal slash by round for vindication checks
+        reversalSlashByRound[workflowId][priorRound] = slashId;
+
         // Mark as slashed
         workflowSlashed[escrowContract][workflowId][resolver] = true;
 
@@ -634,6 +640,81 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
             totalSlashed
         );
         return slashId;
+    }
+
+    /**
+     * @notice Restore reversal slashes when a higher-level resolution vindicates a prior resolver.
+     * @dev Iterates prior rounds and credits resolver stake for reversals that are now vindicated.
+     *      Only affects Track 1 reversal slashes (status=EXECUTED, reason=REVERSAL, appealDeadline=0).
+     *      The slashed funds have already been distributed — this crediting represents a
+     *      protocol-backed liability restoration rather than a fund clawback.
+     * @param workflowId Escrow transfer ID (escrowId) for the disputed escrow
+     * @param currentIsRelease Whether the current resolution outcome is release (true) or cancel (false)
+     * @param priorDecisions Array of ResolutionOutcome for each prior round (indexed by round)
+     * @return restoredCount Number of slashes restored
+     */
+    function restoreReversalSlashOnVindication(
+        uint256 workflowId,
+        bool currentIsRelease,
+        uint8[] calldata priorDecisions
+    ) external override onlyRole(ROLE_RESOLUTION_MODULE) returns (uint256 restoredCount) {
+        restoredCount = 0;
+
+        for (uint8 round = 0; round < priorDecisions.length; round++) {
+            uint256 slashId = reversalSlashByRound[workflowId][round];
+            if (slashId == 0) continue;
+
+            SlashEvent storage slashEvent = slashEvents[slashId];
+
+            // Only Track 1 automated reversal slashes (immediately executed, no appeal window)
+            if (
+                slashEvent.status != SlashStatus.EXECUTED ||
+                slashEvent.reason != SlashReason.REVERSAL
+            ) continue;
+
+            // Read prior round's decision and check if it was reversed
+            // priorDecisions[round] is the decision at this round
+            // A prior round was reversed if its decision differs from the next round's decision
+            uint8 priorDecision = priorDecisions[round];
+            if (priorDecisions.length <= round + 1) continue; // No next round to compare
+            uint8 nextDecision = priorDecisions[round + 1];
+
+            // Check if the prior round's decision was actually reversed (next round differs)
+            if (priorDecision == nextDecision) continue;
+
+            // Check vindication: does the current outcome agree with the prior decision?
+            // priorDecision maps: 0=NONE, 1=RELEASE, 2=CANCEL
+            // currentIsRelease: true=RELEASE, false=CANCEL
+            bool vindicated;
+            if (currentIsRelease) {
+                vindicated = (priorDecision == 1); // RELEASE
+            } else {
+                vindicated = (priorDecision == 2); // CANCEL
+            }
+
+            if (!vindicated) continue;
+
+            // Restore resolver's stake (protocol-backed credit, no token clawback)
+            uint256 restoreAmount = slashEvent.amount;
+            if (restoreAmount == 0) continue;
+
+            // Credit resolver's stake via staking module
+            if (address(stakingModule) != address(0)) {
+                stakingModule.creditStakeForVindication(slashEvent.resolver, restoreAmount);
+            }
+
+            // Mark slash as reversed-with-credit
+            slashEvent.status = SlashStatus.REVERSED_WITH_CREDIT;
+
+            emit SlashRestoredOnVindication(
+                slashId,
+                slashEvent.resolver,
+                restoreAmount,
+                round,
+                block.timestamp
+            );
+            restoredCount++;
+        }
     }
 
     /**

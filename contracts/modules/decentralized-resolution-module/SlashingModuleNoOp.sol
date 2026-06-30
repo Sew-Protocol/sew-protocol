@@ -139,6 +139,14 @@ contract SlashingModuleNoOp is ISlashingModule, AccessControl {
         return slashId;
     }
 
+    function restoreReversalSlashOnVindication(
+        uint256 /* workflowId */,
+        bool /* currentIsRelease */,
+        uint8[] calldata /* priorDecisions */
+    ) external override onlyRole(ROLE_RESOLUTION_MODULE) returns (uint256 restoredCount) {
+        return 0;
+    }
+
     function hasPendingSlash(address /* resolver */) external pure override returns (bool hasPending) {
         return false;
     }

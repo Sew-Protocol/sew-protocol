@@ -18,6 +18,7 @@ import '@openzeppelin/contracts/access/AccessControl.sol';
 contract StakingModuleNoOp is IStakingModule, AccessControl {
     bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');
     bytes32 public constant ROLE_RESOLUTION_MODULE = keccak256('ROLE_RESOLUTION_MODULE');
+    bytes32 public constant ROLE_SLASHING_MODULE = keccak256('ROLE_SLASHING_MODULE');
 
     bool public paused;
 
@@ -120,6 +121,10 @@ contract StakingModuleNoOp is IStakingModule, AccessControl {
         address resolver
     ) external override onlyRole(ROLE_RESOLUTION_MODULE) {
         emit StakeUnlocked(resolver, 0, workflowId);
+    }
+
+    function creditStakeForVindication(address /* resolver */, uint256 /* amount */) external override onlyRole(ROLE_SLASHING_MODULE) {
+        // No-op: In real implementation, would credit resolver's stake
     }
 
     // ============ Query Functions (No-Op - return dummy data) ============
@@ -234,6 +239,10 @@ contract StakingModuleNoOp is IStakingModule, AccessControl {
 
     function setResolutionModule(address module) external onlyRole(ROLE_TIMELOCK) {
         _grantRole(ROLE_RESOLUTION_MODULE, module);
+    }
+
+    function setSlashingModule(address module) external onlyRole(ROLE_TIMELOCK) {
+        _grantRole(ROLE_SLASHING_MODULE, module);
     }
 
     function setStakeToken(address token) external onlyRole(ROLE_TIMELOCK) {
