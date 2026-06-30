@@ -11,11 +11,23 @@ error InvariantViolationTransientStorage(ValuePerPosition[] transientStoragePerP
 abstract contract InvariantGuardInternal {
     using InvariantGuardHelper for *;
 
+    // Storage for before values used in modifier logic
+    bytes32 private _beforeCodeHash;
+    uint256 private _beforeBalance;
+
     modifier invariantCode() {
-        bytes32 beforeCodeHash = _getCodeHash();
+        _invariantCodeBefore();
         _;
+        _invariantCodeAfter();
+    }
+
+    function _invariantCodeBefore() internal {
+        _beforeCodeHash = _getCodeHash();
+    }
+
+    function _invariantCodeAfter() internal {
         bytes32 afterCodeHash = _getCodeHash();
-        _processInvariantCode(beforeCodeHash, afterCodeHash);
+        _processInvariantCode(_beforeCodeHash, afterCodeHash);
     }
 
     modifier invariantNonce() {
@@ -44,58 +56,118 @@ abstract contract InvariantGuardInternal {
     }
 
     modifier invariantBalance() {
-        uint256 beforeBalance = _getBalance();
+        _invariantBalanceBefore();
         _;
+        _invariantBalanceAfter();
+    }
+
+    function _invariantBalanceBefore() internal {
+        _beforeBalance = _getBalance();
+    }
+
+    function _invariantBalanceAfter() internal {
         uint256 afterBalance = _getBalance();
-        _processConstantBalance(beforeBalance, afterBalance);
+        _processConstantBalance(_beforeBalance, afterBalance);
     }
 
     modifier assertBalanceEquals(uint256 expected) {
         _;
+        _assertBalanceEquals(expected);
+    }
+
+    function _assertBalanceEquals(uint256 expected) internal {
         uint256 actualBalance = _getBalance();
         _processConstantBalance(expected, actualBalance);
     }
 
     modifier exactIncreaseBalance(uint256 exactIncrease) {
-        uint256 beforeBalance = _getBalance();
+        _exactIncreaseBalanceBefore(exactIncrease);
         _;
+        _exactIncreaseBalanceAfter(exactIncrease);
+    }
+
+    function _exactIncreaseBalanceBefore(uint256 exactIncrease) internal {
+        _beforeBalance = _getBalance();
+    }
+
+    function _exactIncreaseBalanceAfter(uint256 exactIncrease) internal {
         uint256 afterBalance = _getBalance();
-        _processExactIncreaseBalance(beforeBalance, afterBalance, exactIncrease);
+        _processExactIncreaseBalance(_beforeBalance, afterBalance, exactIncrease);
     }
 
     modifier maxIncreaseBalance(uint256 maxIncrease) {
-        uint256 beforeBalance = _getBalance();
+        _maxIncreaseBalanceBefore(maxIncrease);
         _;
+        _maxIncreaseBalanceAfter(maxIncrease);
+    }
+
+    function _maxIncreaseBalanceBefore(uint256 maxIncrease) internal {
+        _beforeBalance = _getBalance();
+    }
+
+    function _maxIncreaseBalanceAfter(uint256 maxIncrease) internal {
         uint256 afterBalance = _getBalance();
-        _processMaxIncreaseBalance(beforeBalance, afterBalance, maxIncrease);
+        _processMaxIncreaseBalance(_beforeBalance, afterBalance, maxIncrease);
     }
 
     modifier minIncreaseBalance(uint256 minIncrease) {
-        uint256 beforeBalance = _getBalance();
+        _minIncreaseBalanceBefore(minIncrease);
         _;
+        _minIncreaseBalanceAfter(minIncrease);
+    }
+
+    function _minIncreaseBalanceBefore(uint256 minIncrease) internal {
+        _beforeBalance = _getBalance();
+    }
+
+    function _minIncreaseBalanceAfter(uint256 minIncrease) internal {
         uint256 afterBalance = _getBalance();
-        _processMinIncreaseBalance(beforeBalance, afterBalance, minIncrease);
+        _processMinIncreaseBalance(_beforeBalance, afterBalance, minIncrease);
     }
 
     modifier exactDecreaseBalance(uint256 exactDecrease) {
-        uint256 beforeBalance = _getBalance();
+        _exactDecreaseBalanceBefore(exactDecrease);
         _;
+        _exactDecreaseBalanceAfter(exactDecrease);
+    }
+
+    function _exactDecreaseBalanceBefore(uint256 exactDecrease) internal {
+        _beforeBalance = _getBalance();
+    }
+
+    function _exactDecreaseBalanceAfter(uint256 exactDecrease) internal {
         uint256 afterBalance = _getBalance();
-        _processExactDecreaseBalance(beforeBalance, afterBalance, exactDecrease);
+        _processExactDecreaseBalance(_beforeBalance, afterBalance, exactDecrease);
     }
 
     modifier maxDecreaseBalance(uint256 maxDecrease) {
-        uint256 beforeBalance = _getBalance();
+        _maxDecreaseBalanceBefore(maxDecrease);
         _;
+        _maxDecreaseBalanceAfter(maxDecrease);
+    }
+
+    function _maxDecreaseBalanceBefore(uint256 maxDecrease) internal {
+        _beforeBalance = _getBalance();
+    }
+
+    function _maxDecreaseBalanceAfter(uint256 maxDecrease) internal {
         uint256 afterBalance = _getBalance();
-        _processMaxDecreaseBalance(beforeBalance, afterBalance, maxDecrease);
+        _processMaxDecreaseBalance(_beforeBalance, afterBalance, maxDecrease);
     }
 
     modifier minDecreaseBalance(uint256 minDecrease) {
-        uint256 beforeBalance = _getBalance();
+        _minDecreaseBalanceBefore(minDecrease);
         _;
+        _minDecreaseBalanceAfter(minDecrease);
+    }
+
+    function _minDecreaseBalanceBefore(uint256 minDecrease) internal {
+        _beforeBalance = _getBalance();
+    }
+
+    function _minDecreaseBalanceAfter(uint256 minDecrease) internal {
         uint256 afterBalance = _getBalance();
-        _processMinDecreaseBalance(beforeBalance, afterBalance, minDecrease);
+        _processMinDecreaseBalance(_beforeBalance, afterBalance, minDecrease);
     }
 
     modifier invariantStorage(bytes32[] memory positions) {

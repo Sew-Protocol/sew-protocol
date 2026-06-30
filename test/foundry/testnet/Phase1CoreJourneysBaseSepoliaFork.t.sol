@@ -5,11 +5,8 @@ import "forge-std/Test.sol";
 import "forge-std/StdJson.sol";
 
 import { ERC20Mock } from "../../../contracts/mocks/ERC20Mock.sol";
-import { EscrowSettings, EscrowTransfer, EscrowState } from "../../../contracts/types/EscrowTypes.sol";
-import { YieldPreset } from "../../../contracts/types/YieldPresets.sol";
-import { CreateOps } from "../../../contracts/ops/CreateOps.sol";
-import { EscrowVault } from "../../../contracts/core/EscrowVault.sol";
-import { BaseEscrow } from "../../../contracts/core/BaseEscrow.sol";
+import { EscrowSettings, EscrowState } from "../../../contracts/types/EscrowTypes.sol";
+    import { YieldPreset } from "../../../contracts/types/YieldPresets.sol";
 
 interface IEscrowVaultPhase1 {
     // Wiring / config

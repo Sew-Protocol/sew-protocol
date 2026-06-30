@@ -49,6 +49,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `_releaseEscrowTransfer` and `_cancelAndRefund` now subtract `amountReleased[workflowId]` from the settlement amount, so only the unreleased remainder is released or refunded
 - `withdrawEscrow` now accepts `PENDING` state in addition to `RELEASED`, `REFUNDED`, and `RESOLVED` — allows sellers to pull partial release funds while the escrow is still active
 
+### Build
+
+- **Minimal uberjar runner:** `prf-runner-sew-0.1.0-uber.jar` (18 MB) — self-contained scenario replay jar with no Clojure CLI, no source tree required. Source-only build (no AOT). Uses `java -jar ... -m resolver-sim.minimal-runner --scenario <file>` from any directory. Added `build.clj` + `bb build:sew`.
+
 ### Fixed
 
 - **StateManagementLibrary guards:** `transitionToReleased`, `transitionToRefunded`, `transitionToResolved`, and `transitionToDisputed` now revert `AlreadyTerminal` if called on a terminal escrow — prevents silent state corruption.

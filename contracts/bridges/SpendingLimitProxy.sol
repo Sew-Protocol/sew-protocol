@@ -194,8 +194,12 @@ contract SpendingLimitProxy is ReentrancyGuard {
     // ─── Modifiers ─────────────────────────────────────────────────────────────
 
     modifier onlyOwner() {
-        if (msg.sender != owner) revert NotOwner();
+        _onlyOwner();
         _;
+    }
+
+    function _onlyOwner() internal {
+        if (msg.sender != owner) revert NotOwner();
     }
 
     // ─── Constructor ───────────────────────────────────────────────────────────

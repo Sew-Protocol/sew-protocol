@@ -5,10 +5,7 @@ import "forge-std/Test.sol";
 import "forge-std/StdJson.sol";
 
 import { EscrowSettings, EscrowState } from "../../../contracts/types/EscrowTypes.sol";
-import { YieldPreset } from "../../../contracts/types/YieldPresets.sol";
-import { CreateOps } from "../../../contracts/ops/CreateOps.sol";
-import { EscrowVault } from "../../../contracts/core/EscrowVault.sol";
-import { BaseEscrow } from "../../../contracts/core/BaseEscrow.sol";
+    import { YieldPreset } from "../../../contracts/types/YieldPresets.sol";
 
 interface IEscrowVaultAttackTarget {
     function escrowFee() external view returns (uint256);

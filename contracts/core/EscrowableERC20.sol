@@ -88,6 +88,12 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         return createEscrow(address(this), seller, amount, settings);
     }
 
+    /// @dev STABILITY NOTE: This is a simplified alias that bypasses the
+    ///      IReleaseStrategy module to keep EscrowableERC20 deployable within
+    ///      the 24 KB EIP-170 limit. Only the sender (buyer) may call it;
+    ///      releaseAddress delegation is NOT supported. EscrowVault.partialRelease()
+    ///      is also not available on EscrowableERC20 — use EscrowVault deployments
+    ///      when custom strategy or partial release is required.
     function releaseEscrowTransfer(uint256 workflowId) public nonReentrant {
         _requirePending(workflowId);
         if (escrowTransfers[workflowId].from != _msgSender()) revert NotSender(workflowId, _msgSender(), escrowTransfers[workflowId].from);

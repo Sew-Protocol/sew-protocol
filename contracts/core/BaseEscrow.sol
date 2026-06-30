@@ -1626,6 +1626,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         emit EscrowStateChanged(workflowId, oldStatus, EscrowState.REFUNDED);
 
         delete disputeRaisedTimestamp[workflowId];
+        delete amountReleased[workflowId];
 
         _finalizeClaimableSettlement(workflowId, token, amount, from);
         _emitEscrowTransferCancelled(workflowId, token, from, amount);
@@ -1658,6 +1659,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         emit EscrowStateChanged(workflowId, oldStatus, EscrowState.RELEASED);
 
         delete disputeRaisedTimestamp[workflowId];
+        delete amountReleased[workflowId];
 
         _finalizeClaimableSettlement(workflowId, token, amount, to);
         _emitEscrowTransferReleased(workflowId, token, to, amount);

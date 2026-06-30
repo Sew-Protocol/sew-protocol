@@ -29,8 +29,12 @@ contract TestnetForwardingResolver is ERC165, IResolver {
     }
 
     modifier onlyOwner() {
-        if (msg.sender != owner) revert NotOwner(msg.sender);
+        _onlyOwner();
         _;
+    }
+
+    function _onlyOwner() internal view {
+        if (msg.sender != owner) revert NotOwner(msg.sender);
     }
 
     function supportsInterface(bytes4 interfaceId) public view override(ERC165) returns (bool) {
