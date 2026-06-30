@@ -249,6 +249,20 @@ contract EscrowViewContract {
         return escrowContract.canRelease(workflowId, caller);
     }
 
+    function canPartialRelease(uint256 workflowId, address caller) external view returns (bool allowed) {
+        if (workflowId >= escrowContract.getEscrowCount()) return false;
+        (
+            , , address from, , uint256 amountAfterFee,
+            , , EscrowState state, ,
+        ) = escrowContract.escrowTransfers(workflowId);
+        if (state != EscrowState.PENDING) return false;
+        (, address releaseAddress, , , ) = escrowContract.escrowSettings(workflowId);
+        if (caller != from && caller != releaseAddress) return false;
+        if (escrowContract.v25YieldModules(workflowId) != address(0)) return false;
+        if (escrowContract.amountReleased(workflowId) >= amountAfterFee) return false;
+        return true;
+    }
+
     /**
      * @notice Get wallet-friendly action status for an escrow
      * @param workflowId Unique escrow identifier
@@ -259,19 +273,21 @@ contract EscrowViewContract {
         if (workflowId >= escrowContract.getEscrowCount()) return (0, 0);
         
         (
-            address token,
-            address to,
-            address from,
-            ,
-            ,
-            , ,
-            EscrowState state,
-            ,
+            , address to, address from, , uint256 amountAfterFee,
+            , , EscrowState state, ,
         ) = escrowContract.escrowTransfers(workflowId);
         
         address caller = msg.sender;
         
         if (state == EscrowState.PENDING) {
+            (, address releaseAddress, , , ) = escrowContract.escrowSettings(workflowId);
+            if (caller == from || caller == releaseAddress) {
+                actionMask |= (1 << 0); // bit 0: release
+                if (escrowContract.v25YieldModules(workflowId) == address(0)
+                    && escrowContract.amountReleased(workflowId) < amountAfterFee) {
+                    actionMask |= (1 << 5); // bit 5: partialRelease
+                }
+            }
             if (caller == from) {
                 actionMask |= (1 << 1); // bit 1: senderCancel
             }

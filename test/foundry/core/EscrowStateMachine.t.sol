@@ -284,5 +284,110 @@ contract EscrowStateMachineTest is Test {
         vm.expectRevert(abi.encodeWithSignature("NoPendingSettlement(uint256)", wid));
         vault.executePendingSettlement(wid);
     }
+
+    function test_cancellation_mutex_terminal_states() public {
+        // Terminal states must have both senderStatus and recipientStatus as NONE.
+        // This mirrors the simulation's :cancellation-mutex invariant.
+
+        // --- Test 1: RELEASED terminal state ---
+        (uint256 wid1, ) = _create();
+        vm.prank(sender);
+        vault.release(wid1);
+        (, , , , , EscrowState st1, SenderStatus ss1, RecipientStatus rs1) = _load(wid1);
+        assertEq(uint8(st1), uint8(EscrowState.RELEASED), "state should be RELEASED after release");
+        assertEq(uint8(ss1), uint8(SenderStatus.NONE), "senderStatus must be NONE in RELEASED state");
+        assertEq(uint8(rs1), uint8(RecipientStatus.NONE), "recipientStatus must be NONE in RELEASED state");
+
+        // --- Test 2: REFUNDED terminal state (mutual cancel) ---
+        (uint256 wid2, ) = _create();
+        vm.prank(sender);
+        vault.senderCancel(wid2);
+        vm.prank(recipient);
+        vault.recipientCancel(wid2);
+        (, , , , , EscrowState st2, SenderStatus ss2, RecipientStatus rs2) = _load(wid2);
+        assertEq(uint8(st2), uint8(EscrowState.REFUNDED), "state should be REFUNDED after mutual cancel");
+        assertEq(uint8(ss2), uint8(SenderStatus.NONE), "senderStatus must be NONE in REFUNDED state");
+        assertEq(uint8(rs2), uint8(RecipientStatus.NONE), "recipientStatus must be NONE in REFUNDED state");
+    }
+
+    function test_status_leak_agree_cancel_over_dispute() public {
+        // Regression: S22 - agree-to-cancel status must be cleared when dispute is raised.
+        // If recipient set AGREE_TO_CANCEL, then sender raises dispute, the recipient's
+        // status must be cleared to NONE (not left stale as AGREE_TO_CANCEL).
+
+        (uint256 wid, ) = _create();
+
+        // Step 1: Recipient initiates cancel -> recipientStatus = AGREE_TO_CANCEL
+        vm.prank(recipient);
+        vault.recipientCancel(wid);
+        (, , , , , EscrowState st1, SenderStatus ss1, RecipientStatus rs1) = _load(wid);
+        assertEq(uint8(st1), uint8(EscrowState.PENDING), "state should remain PENDING after one cancel");
+        assertEq(uint8(ss1), uint8(SenderStatus.NONE), "senderStatus should still be NONE");
+        assertEq(uint8(rs1), uint8(RecipientStatus.AGREE_TO_CANCEL), "recipientStatus should be AGREE_TO_CANCEL");
+
+        // Step 2: Sender raises dispute - must clear recipient's AGREE_TO_CANCEL
+        vm.prank(sender);
+        vault.raiseDispute(wid);
+        (, , , , , EscrowState st2, SenderStatus ss2, RecipientStatus rs2) = _load(wid);
+        assertEq(uint8(st2), uint8(EscrowState.DISPUTED), "state should be DISPUTED after raiseDispute");
+        assertEq(uint8(ss2), uint8(SenderStatus.RAISE_DISPUTE), "senderStatus should be RAISE_DISPUTE");
+        // The fix: counterparty's AGREE_TO_CANCEL must be cleared
+        assertEq(uint8(rs2), uint8(RecipientStatus.NONE), "recipientStatus must be NONE (AGREE_TO_CANCEL cleared on dispute)");
+
+        // Step 3: Verify the reverse - sender sets AGREE_TO_CANCEL, recipient raises dispute
+        (uint256 wid2, ) = _create();
+
+        vm.prank(sender);
+        vault.senderCancel(wid2);
+        (, , , , , EscrowState st3, SenderStatus ss3, RecipientStatus rs3) = _load(wid2);
+        assertEq(uint8(ss3), uint8(SenderStatus.AGREE_TO_CANCEL), "senderStatus should be AGREE_TO_CANCEL");
+
+        vm.prank(recipient);
+        vault.raiseDispute(wid2);
+        (, , , , , EscrowState st4, SenderStatus ss4, RecipientStatus rs4) = _load(wid2);
+        assertEq(uint8(st4), uint8(EscrowState.DISPUTED), "state should be DISPUTED");
+        assertEq(uint8(rs4), uint8(RecipientStatus.RAISE_DISPUTE), "recipientStatus should be RAISE_DISPUTE");
+        assertEq(uint8(ss4), uint8(SenderStatus.NONE), "senderStatus must be NONE (AGREE_TO_CANCEL cleared on dispute)");
+    }
+
+    function test_auto_cancel_time_protects_against_frivolous_dispute() public {
+        // Griefing vector: a dispute raised before auto-cancel-time orphans the
+        // deadline because auto-cancel only fires for PENDING escrows.
+        // FIX: auto-cancel-time on a DISPUTED escrow now fires auto-cancel-on-disputed
+        // via the new ACTION_AUTO_CANCEL_DISPUTED dispatch in automateTimedActions.
+
+        uint256 amount = 100e18;
+        uint256 autoCancelTime = block.timestamp + 5 days;
+
+        vm.startPrank(sender);
+        token.approve(address(vault), amount);
+        EscrowSettings memory settings = _defaultSettings();
+        settings.autoCancelTime = autoCancelTime;
+        uint256 wid = vault.createEscrow(address(token), recipient, amount, settings);
+        vm.stopPrank();
+
+        // Dispute raised BEFORE auto-cancel-time (the attack vector)
+        vm.prank(sender);
+        vault.raiseDispute(wid);
+        (, , , , , EscrowState st1, , ) = _load(wid);
+        assertEq(uint8(st1), uint8(EscrowState.DISPUTED), "state should be DISPUTED after raiseDispute");
+
+        // Before auto-cancel-time arrives → automateTimedActions should NOT fire
+        vm.warp(autoCancelTime - 1);
+        assertFalse(vault.automateTimedActions(wid), "should not fire before auto-cancel-time");
+        (, , , , , EscrowState st2, , ) = _load(wid);
+        assertEq(uint8(st2), uint8(EscrowState.DISPUTED), "should still be DISPUTED before deadline");
+
+        // At auto-cancel-time → FIX: automateTimedActions fires auto-cancel-on-disputed
+        vm.warp(autoCancelTime);
+        assertTrue(vault.automateTimedActions(wid), "automateTimedActions should fire when auto-cancel-time reached on DISPUTED");
+        (, , , , , EscrowState st3, , ) = _load(wid);
+        assertEq(uint8(st3), uint8(EscrowState.REFUNDED), "escrow must be REFUNDED after auto-cancel-on-disputed");
+
+        // Verify claimable entitlement (no direct push transfer)
+        uint256 fee = (amount * ESCROW_FEE_BPS) / 10000;
+        uint256 expected = amount - fee;
+        assertEq(vault.claimableBalances(wid, sender), expected, "sender must have claimable refund entitlement");
+    }
 }
 

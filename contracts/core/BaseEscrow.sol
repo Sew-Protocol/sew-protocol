@@ -61,7 +61,7 @@ enum FailureReason {
 //   - 3 = pending settlement executed
 // - If success == false: reasonCode is a FailureReason value.
 
-bytes4 constant SEL_FINALIZE_DISPUTE = bytes4(keccak256("finalizeDispute(uint256)"));
+bytes4 constant SEL_FINALIZE_DISPUTE = bytes4(keccak256("finalizeDispute(uint256,address)"));
 bytes4 constant SEL_RECORD_RESOLUTION = bytes4(keccak256("recordResolution(uint256,address,address,uint8,uint256)"));
 bytes4 constant SEL_CLOSE_BY_MUTUAL_AGREEMENT = bytes4(keccak256("closeByMutualAgreement(uint256)"));
 bytes4 constant SEL_DECREMENT_RESOLVER = bytes4(keccak256("decrementResolverActiveDisputes(address)"));
@@ -94,6 +94,7 @@ error SplitExpired(uint256 workflowId, uint64 expiry, uint64 currentTime);
 error NotCounterparty(uint256 workflowId, address caller);
 error SplitAmountMismatch(uint256 workflowId, uint256 buyerAmount, uint256 sellerAmount, uint256 expected);
 error EscrowNotSettleable(uint256 workflowId, EscrowState currentState);
+error BothAutoTimesSet(uint256 workflowId, uint64 releaseTime, uint64 cancelTime);
 
 error InvalidState(uint256 workflowId, uint8 expected, uint8 actual);
 error InvalidConfig(uint8 code, uint256 value);
@@ -101,6 +102,7 @@ error InvalidConfig(uint8 code, uint256 value);
 error TransferFailed(uint8 kind, address token, address to, uint256 amount);
 error ResolutionModuleError(uint8 code);
 error ZeroBondCollector();
+error PendingDecisionAlreadyExists(uint256 workflowId);
 error EscalationNotAllowed();
 error AppealBondQueryFailed(uint256 workflowId);
 error InvalidBondMsgValue(uint256 workflowId, uint256 required, uint256 provided);
@@ -163,6 +165,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
 
     mapping(uint256 => uint256) public disputeRaisedTimestamp;
     mapping(uint256 => EscrowSettings) public escrowSettings;
+    mapping(uint256 => uint256) public amountReleased;
 
     mapping(uint256 => mapping(address => uint256)) public claimableBalances;
     mapping(address => uint256) public totalClaimableAssets;
@@ -366,6 +369,14 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         uint256 indexed workflowId,
         address indexed token,
         uint256 principal
+    );
+    event EscrowPartiallyReleased(
+        uint256 indexed workflowId,
+        address indexed token,
+        address indexed to,
+        uint256 amount,
+        uint256 totalReleased,
+        uint256 totalAmount
     );
 
     // Pause functionality removed for size optimization - stubs for backwards compatibility
@@ -620,6 +631,15 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
             _cancelAndRefund(workflowId);
             emit TimedActionTriggered(workflowId, ACTION_AUTO_CANCEL, source, caller);
             return true;
+        } else if (actionType == ACTION_AUTO_CANCEL_DISPUTED) {
+            _finalizeDisputeInModule(workflowId);
+            _cancelAndRefund(workflowId);
+            delete disputeRaisedTimestamp[workflowId];
+            emit DisputeAutoCancelled(workflowId, escrowTransfers[workflowId].from,
+                                      escrowTransfers[workflowId].amountAfterFee,
+                                      uint8(FailureReason.TIMEOUT));
+            emit TimedActionTriggered(workflowId, ACTION_AUTO_CANCEL_DISPUTED, source, caller);
+            return true;
         }
 
         return false;
@@ -726,11 +746,12 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         }
         address from = et.from;
         uint256 amt = et.amountAfterFee;
+        _finalizeDisputeInModule(workflowId);
         _cancelAndRefund(workflowId);
         delete disputeRaisedTimestamp[workflowId];
         emit DisputeAutoCancelled(workflowId, from, amt, uint8(FailureReason.TIMEOUT));
 
-        emit TimedActionTriggered(workflowId, ACTION_AUTO_CANCEL, source, caller);
+        emit TimedActionTriggered(workflowId, ACTION_AUTO_CANCEL_DISPUTED, source, caller);
     }
 
     // slither-disable-next-line reentrancy-no-eth
@@ -1057,9 +1078,13 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         );
         
         if (result.shouldExecute) {
+            _finalizeDisputeInModule(workflowId);
             if (isRelease) _releaseEscrowTransfer(workflowId);
             else _cancelAndRefund(workflowId);
             return true;
+        }
+        if (pendingSettlements[workflowId].exists) {
+            revert PendingDecisionAlreadyExists(workflowId);
         }
         pendingSettlements[workflowId] = PendingSettlement({exists: true, isRelease: isRelease, appealDeadline: result.appealDeadline, resolutionHash: resolutionHash});
         emit PendingSettlementSet(workflowId, isRelease, result.appealDeadline);
@@ -1189,6 +1214,9 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         if (state != EscrowState.PENDING && state != EscrowState.DISPUTED)
             revert EscrowNotSettleable(workflowId, state);
 
+        if (amountReleased[workflowId] > 0) {
+            revert SplitProposalBlocked(workflowId); // partial release prevents split
+        }
         uint256 principal = et.amountAfterFee;
         if (proposal.buyerAmount + proposal.sellerAmount != principal)
             revert SplitAmountMismatch(workflowId, proposal.buyerAmount, proposal.sellerAmount, principal);
@@ -1209,6 +1237,8 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
 
         EscrowState oldState = StateManagementLibrary.transitionToResolved(et, workflowId);
         emit EscrowStateChanged(workflowId, oldState, EscrowState.RESOLVED);
+
+        delete disputeRaisedTimestamp[workflowId];
 
         // Unwind yield module if active; yield is split proportionally to the principal split
         (uint256 principalOut, uint256 yieldOut) = _handleYieldModuleUnwind(workflowId, token, principal);
@@ -1385,6 +1415,12 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         if (cancTime > type(uint64).max) revert InvalidAutoTime(AUTO_TIME_TOO_LARGE, cancTime, block.timestamp);
         et.autoCancelTime = uint64(cancTime);
 
+        // Independent mutual-exclusion check (guards against setTimeoutConfig bypass
+        // or future code changes that could set both defaults simultaneously).
+        if (et.autoReleaseTime > 0 && et.autoCancelTime > 0) {
+            revert BothAutoTimesSet(workflowId, et.autoReleaseTime, et.autoCancelTime);
+        }
+
         escrowSettings[workflowId] = settings;
         emit EscrowSettingsUpdated(workflowId, settings);
     }
@@ -1406,8 +1442,10 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     function _finalizeDisputeInModule(uint256 workflowId) internal {
         IResolutionModule resolutionModule = _getResolutionModule(workflowId);
         if (address(resolutionModule) == address(0)) return;
-        (bool success, ) = address(resolutionModule).call(abi.encodeWithSelector(SEL_FINALIZE_DISPUTE, workflowId));
-        success; // Ignore failure — module may not support finalization
+        (bool success, ) = address(resolutionModule).call(abi.encodeWithSelector(SEL_FINALIZE_DISPUTE, workflowId, address(this)));
+        if (!success) {
+            emit OperationFailure(1, workflowId, address(resolutionModule), SEL_FINALIZE_DISPUTE, 0);
+        }
 
         // Decrement the resolver's concurrent-dispute counter so capacity is freed.
         // Separate call so modules that don't implement this function don't block finalization.
@@ -1416,7 +1454,9 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
             (bool dSuccess, ) = address(resolutionModule).call(
                 abi.encodeWithSelector(SEL_DECREMENT_RESOLVER, resolver)
             );
-            dSuccess; // Ignore failure
+            if (!dSuccess) {
+                emit OperationFailure(2, workflowId, address(resolutionModule), SEL_DECREMENT_RESOLVER, 0);
+            }
         }
     }
 
@@ -1428,6 +1468,8 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
             );
             success; // Ignore failure — module may not support mutual agreement closure
         }
+        // Finalize dispute and free resolver capacity (same as all other terminal paths)
+        _finalizeDisputeInModule(workflowId);
     }
 
 
@@ -1435,7 +1477,8 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
 
-        if (et.escrowState != EscrowState.RESOLVED &&
+        if (et.escrowState != EscrowState.PENDING &&
+            et.escrowState != EscrowState.RESOLVED &&
             et.escrowState != EscrowState.RELEASED &&
             et.escrowState != EscrowState.REFUNDED) {
             revert TransferNotFinalized(workflowId, et.escrowState);
@@ -1540,34 +1583,49 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         
         // Try normal unwind first
         try IYieldModule(module).unwindToEscrow(workflowId, token, yieldPrincipal) returns (uint256 principal, uint256 yield) {
+            delete v25YieldModules[workflowId];
+            delete v25YieldPrincipals[workflowId];
             return (principal, yield);
         } catch {
             // Unwind failed - try emergency unwind
             try IYieldModule(module).emergencyUnwind(workflowId, token, yieldPrincipal) returns (uint256 recovered) {
                 // INVARIANT: Reject partial recovery - must recover full principal or revert
                 if (recovered < yieldPrincipal) revert PartialRecoveryNotAllowed();
+                delete v25YieldModules[workflowId];
+                delete v25YieldPrincipals[workflowId];
                 return (recovered, 0);
             } catch {
                 // Both unwind paths failed — tokens are stuck in yield module.
-                // Complete the release lifecycle using principal so the escrow is not
-                // permanently frozen; admin must recover tokens from the yield module.
+                // Complete the release lifecycle using the remaining escrow balance so
+                // the escrow is not permanently frozen; admin must recover tokens from
+                // the yield module.  Using yieldPrincipal here would inflate claimable
+                // when partial release occurred (yieldPrincipal > remaining amount).
                 // Settlement remains claimable-only; admin must recover assets separately.
                 emit YieldUnwindFailed(workflowId, token, yieldPrincipal);
-                return (yieldPrincipal, 0);
+                delete v25YieldModules[workflowId];
+                delete v25YieldPrincipals[workflowId];
+                return (amount, 0);
             }
         }
     }
 
     function _cancelAndRefund(uint256 workflowId) internal {
         EscrowTransfer storage et = escrowTransfers[workflowId];
-        uint256 amount = et.amountAfterFee;
+        uint256 released = amountReleased[workflowId];
+        uint256 amount = released >= et.amountAfterFee ? 0 : et.amountAfterFee - released;
         address from = et.from;
         address token = et.token;
 
         _clearPendingSettlementIfExists(workflowId);
 
+        // Clear statuses to NONE for terminal state consistency (cancellation-mutex invariant)
+        et.senderStatus = SenderStatus.NONE;
+        et.recipientStatus = RecipientStatus.NONE;
+
         EscrowState oldStatus = StateManagementLibrary.transitionToRefunded(et, workflowId);
         emit EscrowStateChanged(workflowId, oldStatus, EscrowState.REFUNDED);
+
+        delete disputeRaisedTimestamp[workflowId];
 
         _finalizeClaimableSettlement(workflowId, token, amount, from);
         _emitEscrowTransferCancelled(workflowId, token, from, amount);
@@ -1589,7 +1647,8 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
 
     function _releaseEscrowTransfer(uint256 workflowId) internal {
         EscrowTransfer storage et = escrowTransfers[workflowId];
-        uint256 amount = et.amountAfterFee;
+        uint256 released = amountReleased[workflowId];
+        uint256 amount = released >= et.amountAfterFee ? 0 : et.amountAfterFee - released;
         address to = et.to;
         address token = et.token;
 
@@ -1597,6 +1656,8 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
 
         EscrowState oldStatus = StateManagementLibrary.transitionToReleased(et, workflowId);
         emit EscrowStateChanged(workflowId, oldStatus, EscrowState.RELEASED);
+
+        delete disputeRaisedTimestamp[workflowId];
 
         _finalizeClaimableSettlement(workflowId, token, amount, to);
         _emitEscrowTransferReleased(workflowId, token, to, amount);

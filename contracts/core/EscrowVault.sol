@@ -16,6 +16,8 @@ import '../libraries/FeeRecordingLibrary.sol';
 import '../libraries/EscrowVaultAccountingLibrary.sol';
 import '../libraries/EscrowVaultModuleLibrary.sol';
 import '../libraries/FeeWithdrawalLibrary.sol';
+import '../libraries/EscrowEncodingLibrary.sol';
+import '../libraries/StateManagementLibrary.sol';
 
 contract EscrowVault is BaseEscrow {
     using SafeERC20 for IERC20;
@@ -23,6 +25,8 @@ contract EscrowVault is BaseEscrow {
 
     mapping(address => uint256) public totalFeesPerToken;
     mapping(address => uint256) public totalHeldInEscrowPerToken;
+
+    error PartialReleaseNotAllowedWithYield();
 
     ModuleSnapshotRegistry public immutable moduleManagement;
 
@@ -135,5 +139,54 @@ contract EscrowVault is BaseEscrow {
 
     function _getResolutionModule(uint256 workflowId) internal view override returns (IResolutionModule) {
         return EscrowVaultModuleLibrary.getResolutionModule(workflowId, moduleSnapshots, moduleManagement, address(this), disputeResolutionModule);
+    }
+
+    function partialRelease(uint256 workflowId, uint256 amount) external nonReentrant {
+        _validateWorkflowId(workflowId);
+        EscrowTransfer storage et = escrowTransfers[workflowId];
+
+        if (et.escrowState != EscrowState.PENDING) {
+            revert TransferNotPending(workflowId, et.escrowState);
+        }
+
+        if (v25YieldModules[workflowId] != address(0)) {
+            revert PartialReleaseNotAllowedWithYield();
+        }
+
+        if (amount == 0) revert AmountZero();
+
+        uint256 remaining = et.amountAfterFee - amountReleased[workflowId];
+        if (amount > remaining) revert AmountExceedsBalance(amount, remaining);
+
+        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(
+            et.token, et.from, et.to, et.amountAfterFee, escrowSettings[workflowId].releaseAddress
+        );
+        IReleaseStrategy strategy = _getReleaseStrategy(workflowId);
+        if (address(strategy) == address(0)) {
+            revert ReleaseStrategyNotSet(workflowId);
+        }
+        (bool allowed, uint8 reasonCode) = strategy.canRelease(
+            workflowId, address(this), _msgSender(), escrowData
+        );
+        if (!allowed) {
+            if (reasonCode == 1) {
+                revert NotSender(workflowId, _msgSender(), et.from);
+            } else {
+                revert ReleaseNotAllowed(workflowId, reasonCode);
+            }
+        }
+
+        amountReleased[workflowId] += amount;
+
+        _finalizeClaimableSettlement(workflowId, et.token, amount, et.to);
+
+        if (amountReleased[workflowId] == et.amountAfterFee) {
+            _clearPendingSettlementIfExists(workflowId);
+            EscrowState oldStatus = StateManagementLibrary.transitionToReleased(et, workflowId);
+            emit EscrowStateChanged(workflowId, oldStatus, EscrowState.RELEASED);
+            _emitEscrowTransferReleased(workflowId, et.token, et.to, amount);
+        } else {
+            emit EscrowPartiallyReleased(workflowId, et.token, et.to, amount, amountReleased[workflowId], et.amountAfterFee);
+        }
     }
 }

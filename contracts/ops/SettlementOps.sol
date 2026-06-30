@@ -205,6 +205,15 @@ contract SettlementOps is AccessControl {
             return (3, pending.isRelease);
         }
 
+        // NEW: auto-cancel-time passed on DISPUTED escrow — griefing protection.
+        // Without this check a frivolous dispute raised before auto-cancel-time
+        // orphans the deadline, forcing escrow into longer max-dispute-duration path.
+        if (et.escrowState == EscrowState.DISPUTED && et.autoCancelTime > 0
+            && block.timestamp >= et.autoCancelTime && !pending.exists
+        ) {
+            return (ACTION_AUTO_CANCEL_DISPUTED, false);
+        }
+
         // Check for auto-release/auto-cancel (only for PENDING state)
         if (et.escrowState != EscrowState.PENDING) {
             return (0, false);

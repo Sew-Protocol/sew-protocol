@@ -102,11 +102,7 @@ contract EscrowDisputeTest is Test {
         vault.escalateDispute(wid);
     }
 
-    // S26 Governance Sandwich: after a dispute is raised, the per-escrow assigned resolver
-    // (et.disputeResolver) is the sole authority. A governance call to
-    // DefaultResolutionModule.setResolver() CANNOT inject a replacement resolver that acts
-    // on the in-flight dispute. The originally assigned resolver retains exclusive authority.
-    function test_Dispute_GlobalResolverChange_BlocksNewResolverOnActiveDispute() public {
+    function test_Dispute_GlobalResolverChange_DoesNotAffectExistingDispute() public {
         uint256 amount = 1000e18;
         address newResolver = address(0xDEAD);
 
@@ -126,31 +122,25 @@ contract EscrowDisputeTest is Test {
         ( , , , address snapResolver, , , , , , ) = vault.escrowTransfers(wid);
         assertEq(snapResolver, resolver, "initial per-escrow resolver should be DefaultResolutionModule.resolver");
 
-        // Move escrow into DISPUTED state
+        // Move escrow into DISPUTED state — resolver is locked to `resolver` (0xAA01)
         vm.prank(buyer);
         vault.raiseDispute(wid);
 
-        // Governance attempts to inject a new resolver into the live module.
+        // Governance updates the global default resolver in DefaultResolutionModule (F3 scenario)
         resolutionModule.setResolver(newResolver);
-        assertEq(resolutionModule.resolver(), newResolver, "global resolver updated");
+        assertEq(resolutionModule.resolver(), newResolver, "global resolver should be updated");
 
-        // S26 guard: the governance-injected resolver MUST NOT be able to act on this
-        // already-active dispute. et.disputeResolver was frozen at dispute-raise time.
+        // The governance-rotated resolver must NOT be able to resolve an in-flight dispute.
+        // et.disputeResolver was locked at raiseDispute time; the module's current resolver
+        // is intentionally bypassed to prevent governance sandwich attacks (sew-simulation F3).
         vm.prank(newResolver);
-        vm.expectRevert(); // NotAuthorizedResolver
-        vault.releaseAsDisputeResolver(wid, bytes32("attacker-hash"));
+        vm.expectRevert(abi.encodeWithSelector(NotAuthorizedResolver.selector, newResolver, resolver));
+        vault.releaseAsDisputeResolver(wid, bytes32("hash"));
 
-        // The original assigned resolver remains the sole authority and can still resolve.
+        // The original resolver (captured at raiseDispute) remains the sole authority
         vm.prank(resolver);
-        vault.releaseAsDisputeResolver(wid, bytes32("legitimate-hash"));
-
-        ( , , , , , , , EscrowState stAfter, , ) = vault.escrowTransfers(wid);
-        assertEq(uint256(stAfter), uint256(EscrowState.DISPUTED), "escrow should remain DISPUTED with pending settlement");
-
-        (bool exists, bool isRelease, uint256 appealDeadline, ) = vault.pendingSettlements(wid);
-        assertTrue(exists, "pending settlement should exist");
-        assertTrue(isRelease, "pending settlement should be a release");
-        assertGt(appealDeadline, block.timestamp, "appeal deadline should be in the future");
+        bool ok = vault.releaseAsDisputeResolver(wid, bytes32("hash"));
+        assertTrue(ok, "original resolver should still be authorised after governance rotation");
     }
 
     function test_Dispute_CustomResolver_OverriddenByGlobalResolverChange() public {

@@ -13,7 +13,7 @@ library EscrowManagementLibrary {
         IResolutionModule resolutionModule = getResolutionModule(workflowId);
         if (address(resolutionModule) != address(0)) {
             // Low-level call to finalize dispute
-            (bool success, ) = address(resolutionModule).call(abi.encodeWithSignature('finalizeDispute(uint256)', workflowId));
+            (bool success, ) = address(resolutionModule).call(abi.encodeWithSignature('finalizeDispute(uint256,address)', workflowId, address(this)));
             success; // Ignore success/failure
         }
     }

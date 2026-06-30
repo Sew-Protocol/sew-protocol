@@ -23,6 +23,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Governance documentation (`docs/governance.md`, `docs/GOVERNANCE_SURFACE_MAP.md`)
 - Module extraction: DecentralizedResolutionModule moved to separate package (`contracts/decentralized-resolution-module/`)
 
+- `partialRelease(workflowId, amount)` on `EscrowVault` — buyers can release a portion of escrowed funds to the seller while the escrow stays `PENDING` for the remainder; auto-finalizes to `RELEASED` when cumulatively released in full
+- `amountReleased` mapping on `BaseEscrow` tracking cumulative partial release amounts per escrow
+- `EscrowPartiallyReleased` event for indexing partial release activity
+- `canPartialRelease()` view on `EscrowViewContract` for wallet-accuracy checks
+- Release (bit 0) and partialRelease (bit 5) action bits in `getActionStatus()`
+
+- `initializeDisputeWithCategory()` in `DecentralizedResolutionModule` — staking-gated dispute initialization that verifies per-resolver maximum case capacity before assignment, ensuring liveness when resolvers are near capacity
+- `IStakingModule` interface and `StakingModuleNoOp` default implementation for resolver staking queries
+- `setStakingModule()` admin function on `DecentralizedResolutionModule` for configuring per-resolver staking limits
+- `InsufficientResolverStake` error raised when escrow value exceeds a resolver's staked capacity
+- `StakingModuleUpdated` event emitted on staking module changes
+
 ### Changed
 
 - Removed `ROLE_MODULE_DEVELOPER` for governance consistency (all upgrades now via `ROLE_TIMELOCK`)
@@ -34,7 +46,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated documentation to reflect module extraction and role removal
 - Updated repeat-attacker integration tests to align with current escalation behavior: cooldown is tracking/scaling-oriented and no longer a hard within-window escalation block.
 
+- `_releaseEscrowTransfer` and `_cancelAndRefund` now subtract `amountReleased[workflowId]` from the settlement amount, so only the unreleased remainder is released or refunded
+- `withdrawEscrow` now accepts `PENDING` state in addition to `RELEASED`, `REFUNDED`, and `RESOLVED` — allows sellers to pull partial release funds while the escrow is still active
+
 ### Fixed
+
+- **StateManagementLibrary guards:** `transitionToReleased`, `transitionToRefunded`, `transitionToResolved`, and `transitionToDisputed` now revert `AlreadyTerminal` if called on a terminal escrow — prevents silent state corruption.
+- **`disputeRaisedTimestamp` cleanup:** All terminal paths (`_cancelAndRefund`, `_releaseEscrowTransfer`, `acceptSplit`) now delete `disputeRaisedTimestamp[workflowId]` — fixes stale state leak.
+- **`_finalizeDisputeInModule` coverage:** Added calls from `_executeResolution` immediate path, `resolveDisputeByTimeout`, `autoCancelDisputedEscrow` via `ACTION_AUTO_CANCEL_DISPUTED`, and `_closeDisputeByMutualAgreement` — resolver capacity previously leaked on these paths.
+- **`SEL_FINALIZE_DISPUTE` selector fix:** Signature changed from `"finalizeDispute(uint256)"` (single param) to `"finalizeDispute(uint256,address)"` with `address(this)` passed — the wrong selector made all module finalization calls silent no-ops. Same fix in `EscrowManagementLibrary.sol`.
+- **Yield unwind double-failure:** Returns `amount` (remaining balance) instead of `yieldPrincipal` (full deposited amount) when both unwind paths fail — prevents claimable inflation when partial release occurred before yield failure.
+- **Yield module state cleanup:** `v25YieldModules` and `v25YieldPrincipals` deleted after successful unwind and on double-failure — prevents double-call double-counting.
+- **`_applyEscrowSettings` mutual exclusion:** Added independent `BothAutoTimesSet` guard — prevents both auto times being set simultaneously even if `setTimeoutConfig` is bypassed.
+- **`_executeResolution` pending settlement guard:** Added `PendingDecisionAlreadyExists` revert — prevents resolver from overwriting an existing pending settlement with a different decision.
+- **`acceptSplit` partial release guard:** Reject split if `amountReleased[workflowId] > 0` — prevents `BalanceUnderflow` when partial release occurred before split.
+- **`DisputeRaiseLibrary` denominator guard:** Added `if (escrowFee >= escrowFeeDenominator) return false` — prevents division by zero if escrow fee is misconfigured.
+- **`EscrowableERC20.withdrawFees` CEI fix:** `totalFees = 0` moved before `_transfer` — closes Checks-Effects-Interactions violation.
+- **`DisputeOps` escrowData encoding:** Switched from 4-element `abi.encode(token,from,to,amountAfterFee)` to 5-element `EscrowEncodingLibrary.encodeEscrowTransferData(...)` — matches CreateOps encoding so modules receive consistent data.
+- **`_finalizeDisputeInModule` event emission:** `OperationFailure` event emitted when `finalizeDispute` or `decrementResolverActiveDisputes` low-level calls fail — provides governance observability for module desync.
 
 - Fixed stale constructor revert expectation in `test/foundry/core/ModuleManagementContract.t.sol`:
   `test_constructor_zeroOwner_reverts` now expects `InvalidAddress(8, address(0))`.

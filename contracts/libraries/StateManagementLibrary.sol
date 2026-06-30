@@ -9,6 +9,9 @@ import '../types/EscrowTypes.sol';
  * @dev Extracted from BaseEscrow to reduce contract size
  */
 library StateManagementLibrary {
+    /// @dev Revert when attempting to transition from a terminal state.
+    error AlreadyTerminal(uint256 workflowId, EscrowState currentState);
+
     /**
      * @dev Transition escrow to RELEASED state
      * @param et EscrowTransfer storage reference
@@ -16,9 +19,12 @@ library StateManagementLibrary {
      */
     function transitionToReleased(
         EscrowTransfer storage et,
-        uint256 /* workflowId */
+        uint256 workflowId
     ) internal returns (EscrowState oldStatus) {
         oldStatus = et.escrowState;
+        if (oldStatus == EscrowState.RELEASED || oldStatus == EscrowState.REFUNDED) {
+            revert AlreadyTerminal(workflowId, oldStatus);
+        }
         et.escrowState = EscrowState.RELEASED;
         return oldStatus;
     }
@@ -30,9 +36,12 @@ library StateManagementLibrary {
      */
     function transitionToRefunded(
         EscrowTransfer storage et,
-        uint256 /* workflowId */
+        uint256 workflowId
     ) internal returns (EscrowState oldStatus) {
         oldStatus = et.escrowState;
+        if (oldStatus == EscrowState.RELEASED || oldStatus == EscrowState.REFUNDED) {
+            revert AlreadyTerminal(workflowId, oldStatus);
+        }
         et.escrowState = EscrowState.REFUNDED;
         return oldStatus;
     }
@@ -44,9 +53,12 @@ library StateManagementLibrary {
      */
     function transitionToResolved(
         EscrowTransfer storage et,
-        uint256 /* workflowId */
+        uint256 workflowId
     ) internal returns (EscrowState oldStatus) {
         oldStatus = et.escrowState;
+        if (oldStatus == EscrowState.RELEASED || oldStatus == EscrowState.REFUNDED) {
+            revert AlreadyTerminal(workflowId, oldStatus);
+        }
         et.escrowState = EscrowState.RESOLVED;
         return oldStatus;
     }
@@ -59,16 +71,21 @@ library StateManagementLibrary {
      */
     function transitionToDisputed(
         EscrowTransfer storage et,
-        uint256 /* workflowId */,
+        uint256 workflowId,
         bool isSender
     ) internal returns (EscrowState oldStatus) {
         oldStatus = et.escrowState;
+        if (oldStatus != EscrowState.PENDING) {
+            revert AlreadyTerminal(workflowId, oldStatus);
+        }
         et.escrowState = EscrowState.DISPUTED;
 
         if (isSender) {
             et.senderStatus = SenderStatus.RAISE_DISPUTE;
+            et.recipientStatus = RecipientStatus.NONE;
         } else {
             et.recipientStatus = RecipientStatus.RAISE_DISPUTE;
+            et.senderStatus = SenderStatus.NONE;
         }
 
         return oldStatus;

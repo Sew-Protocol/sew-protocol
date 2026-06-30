@@ -235,10 +235,8 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
             revert InsufficientContractBalance(address(this), feeAmount, balance);
         }
         
-        // Clear state AFTER successful transfer to prevent fee loss on failure
-        // Note: If transfer fails, revert will restore state (Solidity 0.8+ automatic)
-        _transfer(address(this), escrowFeeAddress, feeAmount);
         totalFees = 0;
+        _transfer(address(this), escrowFeeAddress, feeAmount);
         
         emit FeesWithdrawn(feeAmount);
         return true;

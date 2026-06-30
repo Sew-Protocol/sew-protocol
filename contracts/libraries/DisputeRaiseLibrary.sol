@@ -33,7 +33,12 @@ library DisputeRaiseLibrary {
         }
 
         IIncentiveModule incentiveMod = IIncentiveModule(incentiveModAddr);
-        
+
+        // Guard against fee >= denominator: the subtraction below would underflow
+        // or divide by zero.  This path should never be reached (fee is capped at
+        // MAX_FEE_BPS = 200, denominator = 10000) but defense-in-depth is cheap.
+        if (escrowFee >= escrowFeeDenominator) return false;
+
         // Calculate escrow fee: fee = amount * escrowFee / ESCROW_FEE_DENOMINATOR
         // Original amount = amountAfterFee + fee, so: fee = (amountAfterFee * escrowFee) / (ESCROW_FEE_DENOMINATOR - escrowFee)
         uint256 originalAmount = amountAfterFee +

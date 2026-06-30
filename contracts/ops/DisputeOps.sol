@@ -5,6 +5,7 @@ import '@openzeppelin/contracts/access/AccessControl.sol';
 import '@openzeppelin/contracts/utils/math/Math.sol';
 import '../shared/interfaces/IResolutionModule.sol';
 import '../types/EscrowTypes.sol';
+import '../libraries/EscrowEncodingLibrary.sol';
 
 /**
  * @title DisputeOps
@@ -103,7 +104,7 @@ contract DisputeOps is AccessControl {
 
         result.updatedResolver = currentResolver;
         if (resolutionModule != address(0) && resolutionModule.code.length > 0) {
-            bytes memory escrowData = abi.encode(token, from, to, amountAfterFee);
+            bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(token, from, to, amountAfterFee, address(0));
             try IResolutionModule(resolutionModule).getDisputeResolver(workflowId, escrowContract, escrowData) returns (
                 address updated,
                 uint8 /* level */
@@ -183,8 +184,8 @@ contract DisputeOps is AccessControl {
             return result;
         }
 
-        // Encode escrow data for module
-        bytes memory escrowData = abi.encode(token, from, to, amountAfterFee);
+        // Encode escrow data for module (5-element format matching EscrowEncodingLibrary)
+        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(token, from, to, amountAfterFee, address(0));
 
         // Get current level from module
         try IResolutionModule(resolutionModule).getDisputeResolver(workflowId, escrowContract, escrowData) returns (
