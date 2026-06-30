@@ -89,4 +89,11 @@ abstract contract DRMStorageBase is DecentralizedResolverStructs {
     // the resolver's maximum case capacity (getMaxEscrowPerCase).
     // Only appended — do not reorder preceding slots.
     address public stakingModule;
+
+    // ============ DR v3: Slashing Module ============
+    // Address of the resolver slashing module for penalty enforcement.
+    // When set, recordResolution and recordReversal automatically trigger
+    // reversal slashing and vindication restoration.
+    // Only appended — do not reorder preceding slots.
+    address public slashingModule;
 }

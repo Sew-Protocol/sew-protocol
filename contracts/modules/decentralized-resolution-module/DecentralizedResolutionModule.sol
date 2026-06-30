@@ -8,6 +8,7 @@ import '../../governance/SlowLaneQueueActivate.sol';
 import '../../shared/interfaces/IIncentiveModule.sol';
 import './DRMStorageBase.sol';
 import './IStakingModule.sol';
+import './ISlashingModule.sol';
 import './ResolutionAnalytics.sol';
 import './EscalationCostLibrary.sol';
 import '../../libraries/ResolutionTableLibrary.sol';
@@ -505,6 +506,24 @@ contract DecentralizedResolutionModule is
                 emit IncentiveModuleCallFailed(workflowId, 'onDecisionSubmitted', 'FAILED');
             }
         }
+
+        // After recording the new resolution, check for reversal-slash vindication.
+        // If a prior round was reversed (auto-slashed) and the current outcome agrees
+        // with the prior round's decision, restore the prior resolver's slashed stake.
+        if (slashingModule != address(0) && currentRound > 0) {
+            // Build prior decisions array for the slashing module to evaluate vindication
+            uint8[] memory priorDecisions = new uint8[](currentRound + 1); // index by round
+            for (uint8 r = 0; r < currentRound + 1; r++) {
+                priorDecisions[r] = uint8(dm.decisionAtRound[r]);
+            }
+            try ISlashingModule(slashingModule).restoreReversalSlashOnVindication(
+                workflowId,
+                outcome == ResolutionOutcome.RELEASE,
+                priorDecisions
+            ) {} catch {
+                emit IncentiveModuleCallFailed(workflowId, 'restoreReversalSlashOnVindication', 'FAILED');
+            }
+        }
     }
 
     function recordReversal(
@@ -535,6 +554,18 @@ contract DecentralizedResolutionModule is
 
             if (address(incentiveModule) != address(0)) {
                 try incentiveModule.distributeAppealBond(workflowId, escrowContract, priorRound, true) {} catch {}
+            }
+
+            // Execute automated reversal slash via slashing module (Track 1)
+            if (slashingModule != address(0)) {
+                try ISlashingModule(slashingModule).slashForReversal(
+                    workflowId,
+                    escrowContract,
+                    priorResolver,
+                    priorRound
+                ) {} catch {
+                    emit IncentiveModuleCallFailed(workflowId, 'slashForReversal', 'FAILED');
+                }
             }
         }
     }
@@ -634,10 +665,33 @@ contract DecentralizedResolutionModule is
         }
 
         if (newResolver != address(0) && newResolver != timedOutResolver) {
+            // Decrement old resolver's capacity (they timed out and are being replaced)
+            if (resolverActiveDisputes[timedOutResolver] > 0) resolverActiveDisputes[timedOutResolver]--;
+            if (resolverCapacity[timedOutResolver].currentDisputes > 0) resolverCapacity[timedOutResolver].currentDisputes--;
+            if (resolverStats[timedOutResolver].casesAssigned > 0) resolverStats[timedOutResolver].casesAssigned--;
+
+            // Increment new resolver's capacity
+            resolverCapacity[newResolver].currentDisputes++;
+            resolverActiveDisputes[newResolver]++;
+            resolverStats[newResolver].casesAssigned++;
+
+            // Unlock old resolver's stake via staking module
+            if (address(stakingModule) != address(0)) {
+                try IStakingModule(stakingModule).onDisputeEscalated(workflowId, escrowContract, timedOutResolver) {} catch {
+                    emit IncentiveModuleCallFailed(workflowId, 'onDisputeEscalated', 'FAILED');
+                }
+            }
+
+            // Lock new resolver's stake via staking module
+            if (address(stakingModule) != address(0)) {
+                try IStakingModule(stakingModule).onResolverAssigned(workflowId, escrowContract, newResolver, 0) {} catch {
+                    emit IncentiveModuleCallFailed(workflowId, 'onResolverAssigned', 'FAILED');
+                }
+            }
+
             dm.resolverAtRound[currentRound] = newResolver;
             dm.assignedAt = block.timestamp;
             dm.resolveBy = block.timestamp + resolveDeadlines[currentRound];
-            resolverStats[newResolver].casesAssigned++;
             emit ResolverAssigned(workflowId, newResolver, category, currentRound);
 
             if (address(incentiveModule) != address(0)) {
