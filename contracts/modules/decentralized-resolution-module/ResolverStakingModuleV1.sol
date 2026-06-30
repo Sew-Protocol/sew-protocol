@@ -1116,6 +1116,68 @@ contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGua
     }
 
     /**
+     * @notice Credit resolver's stake on vindication (protocol-backed liability, no token transfer)
+     * @dev Called by slashing module when a reversal slash is restored on vindication.
+     *      Increases the resolver's bond amounts proportionally to restore economic capacity.
+     *      No actual tokens are transferred — this represents a protocol liability.
+     * @param resolver Resolver to credit
+     * @param amount Amount to credit (in USD, 18 decimals)
+     */
+    function creditStakeForVindication(address resolver, uint256 amount) external onlyRole(ROLE_SLASHING_MODULE) {
+        if (amount == 0) return;
+
+        BondComposition storage bond = resolverBonds[resolver];
+
+        // Proportionally credit stable and SEW to match the slashed ratio
+        // If the resolver has no remaining bond, credit all as stable
+        uint256 totalBond = bond.effectiveBondUSD;
+        uint256 stableCredit;
+        uint256 sewCredit;
+
+        if (totalBond == 0) {
+            // No remaining bond — credit entirely as stable (protocol liability)
+            stableCredit = amount;
+        } else {
+            // Credit proportionally to existing composition
+            uint256 stableValueUSD = BondValuationLibrary.calculateEffectiveBondUSD(
+                bond.stableAmount,
+                0,
+                PRECISION,
+                SEW_HAIRCUT_BPS,
+                STABLE_DECIMALS,
+                SEW_DECIMALS
+            );
+
+            stableCredit = (amount * stableValueUSD) / totalBond;
+            sewCredit = amount - stableCredit;
+        }
+
+        // Convert stable value credit back to stable token units
+        // Since stable is USD-pegged (1:1 with 6 decimals), stableValueUSD ≈ bond.stableAmount in value
+        // We credit the proportional amount
+        if (stableCredit > 0) {
+            bond.stableAmount += stableCredit;
+        }
+        if (sewCredit > 0) {
+            bond.sewAmount += sewCredit;
+        }
+
+        // Recalculate effectiveBondUSD
+        bond.effectiveBondUSD = BondValuationLibrary.calculateEffectiveBondUSD(
+            bond.stableAmount,
+            bond.sewAmount,
+            PRECISION,
+            SEW_HAIRCUT_BPS,
+            STABLE_DECIMALS,
+            SEW_DECIMALS
+        );
+
+        bond.lastUpdated = block.timestamp;
+
+        emit StakeRestored(resolver, amount, 0, 'Vindication');
+    }
+
+    /**
      * @notice Check if resolver is frozen (by slashing module)
      * @param resolver Address to check
      * @return frozen True if frozen

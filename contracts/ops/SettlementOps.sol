@@ -184,7 +184,9 @@ contract SettlementOps is AccessControl {
      * @notice Compute timed actions (auto-release or auto-cancel)
      * @param et Escrow transfer data
      * @param pending Pending settlement data
-     * @return actionType 0 = none, 1 = auto-release, 2 = auto-cancel, 3 = pending settlement
+     * @param disputeRaisedTimestamp When the dispute was raised (0 if no dispute)
+     * @return actionType 0 = none, 1 = auto-release, 2 = auto-cancel, 3 = pending settlement,
+     *         4 = auto-cancel-disputed, 5 = dispute-timeout
      * @return isRelease True if release action, false if cancel
      * @dev This function is "compute-only" - it does NOT modify BaseEscrow state.
      *      Only authorized escrow contracts can call this function
@@ -193,8 +195,9 @@ contract SettlementOps is AccessControl {
         uint256 /* workflowId */,
         EscrowTransfer memory et,
         SettlementPendingSettlement memory pending,
-        TimeoutConfig memory /* timeoutConfig */,
-        bool pendingAutoCancelEnabled
+        TimeoutConfig memory timeoutConfig,
+        bool pendingAutoCancelEnabled,
+        uint256 disputeRaisedTimestamp
     ) external view returns (uint8 actionType, bool isRelease) {
         // Check for pending settlement execution (appeal window enforcement)
         if (
@@ -212,6 +215,17 @@ contract SettlementOps is AccessControl {
             && block.timestamp >= et.autoCancelTime && !pending.exists
         ) {
             return (ACTION_AUTO_CANCEL_DISPUTED, false);
+        }
+
+        // max-dispute-duration elapsed on DISPUTED escrow — liveness timeout.
+        if (
+            et.escrowState == EscrowState.DISPUTED &&
+            !pending.exists &&
+            timeoutConfig.maxDisputeDuration > 0 &&
+            disputeRaisedTimestamp > 0 &&
+            block.timestamp >= disputeRaisedTimestamp + timeoutConfig.maxDisputeDuration
+        ) {
+            return (ACTION_DISPUTE_TIMEOUT, false);
         }
 
         // Check for auto-release/auto-cancel (only for PENDING state)
@@ -239,6 +253,6 @@ contract SettlementOps is AccessControl {
         TimeoutConfig memory timeoutConfig
     ) external view returns (uint8 actionType, bool isRelease) {
         bool pendingAutoCancelEnabled = timeoutConfig.defaultAutoCancelDelay > 0;
-        return this.computeTimedActions(workflowId, et, pending, timeoutConfig, pendingAutoCancelEnabled);
+        return this.computeTimedActions(workflowId, et, pending, timeoutConfig, pendingAutoCancelEnabled, 0);
     }
 }

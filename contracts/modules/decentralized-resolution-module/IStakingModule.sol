@@ -193,6 +193,16 @@ interface IStakingModule {
      */
     function unlockStake(uint256 workflowId, address escrowContract, address resolver) external;
 
+    /**
+     * @notice Credit resolver's stake on vindication (protocol-backed liability, no token transfer)
+     * @dev Called by slashing module when a reversal slash is restored on vindication.
+     *      Increases the resolver's bond amounts proportionally to restore economic capacity.
+     *      No actual tokens are transferred — this represents a protocol liability.
+     * @param resolver Resolver to credit
+     * @param amount Amount to credit (in USD, 18 decimals)
+     */
+    function creditStakeForVindication(address resolver, uint256 amount) external;
+
     // ============ Query Functions ============
 
     /**

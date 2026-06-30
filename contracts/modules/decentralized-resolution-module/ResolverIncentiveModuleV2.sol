@@ -478,4 +478,30 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
             bond.token
         );
     }
+
+    /**
+     * @notice Clean up outstanding bonds when a dispute is finalized.
+     * @dev Any bond posted for a round <= finalRound that was never distributed
+     *      is forfeited to the protocol. This prevents bonds from being stuck
+     *      indefinitely when the dispute ends without going through the full
+     *      reversal/appeal path for every bonded round.
+     */
+    function onDisputeFinalized(
+        uint256 workflowId,
+        address escrowContract,
+        uint8 finalRound,
+        ResolutionOutcome /* finalDecision */
+    ) external override onlyEscrowContract {
+        // Forfeit any outstanding bonds for rounds 0 to finalRound
+        for (uint8 round = 0; round <= finalRound; round++) {
+            AppealBondRecord storage bond = appealBonds[escrowContract][workflowId][round];
+            if (bond.amount > 0 && !bond.distributed) {
+                bond.distributed = true;
+                uint256 amount = bond.amount;
+                bond.amount = 0;
+                totalBondsForfeited += amount;
+                emit AppealBondForfeited(workflowId, round, amount, bond.token, 'Finalize cleanup');
+            }
+        }
+    }
 }

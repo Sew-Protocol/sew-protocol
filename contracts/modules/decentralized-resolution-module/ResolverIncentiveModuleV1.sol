@@ -473,7 +473,7 @@ contract ResolverIncentiveModuleV1 is
             address /* escrowContract */,
             uint8 /* finalRound */,
             ResolutionOutcome /* finalDecision */
-        ) external override onlyEscrowContract {
+        ) external virtual override onlyEscrowContract {
             // V1 payments are calculated via onDisputeResolved
             // This hook is informational for V2+ appeal bond distribution
         }
