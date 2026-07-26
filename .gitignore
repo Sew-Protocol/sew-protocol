@@ -13,9 +13,7 @@ coverage/
 coverage.json
 *.tsbuildinfo
 
-# Lock files (package managers)
-pnpm-lock.yaml
-pnpm-workspace.yaml
+# Lock files (package managers) — lockfiles are tracked, only ignore alt lockfiles
 foundry.lock
 package-lock.json
 yarn.lock
@@ -45,6 +43,9 @@ Thumbs.db
 *.swp
 *.swo
 
+# Claude AI local settings (machine-specific paths)
+.claude/
+
 # Cursor AI
 .cursor/
 .cursorignore
@@ -66,11 +67,13 @@ analysis/
 slither.json
 slither.txt
 lcov.info
-aderyn.toml
 
 # Hardhat
 hardhat/
 ethers/
+
+# Certora internal run artifacts (date-stamped output dirs)
+.certora_internal/
 
 # Logs
 *.log
@@ -91,9 +94,6 @@ edr-cache
 archive/
 archived/
 
-# Hardhat
-hardhat/
-
 # Misc
 *.bak
 *.cache
@@ -105,6 +105,5 @@ subgraph/sew-base-sepolia/generated/
 subgraph/sew-base-sepolia/node_modules/
 subgraph/sew-base-sepolia/package-lock.json
 
-
-#Ignore vscode AI rules
+# Ignore vscode AI rules
 .github/instructions/codacy.instructions.md
