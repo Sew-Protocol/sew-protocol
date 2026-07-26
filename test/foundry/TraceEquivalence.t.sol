@@ -1014,16 +1014,15 @@ contract TraceEquivalenceTest is Test {
     }
 
     // EF review scenarios — review corpus from EF_REVIEW_GUIDE.md.
-    // S-DR-001 and S-DR-084 cover the core lifecycle and rejected-interaction
-    // paths.  S-NC-001 and DR-N-002 use register_stake/slashing-module
-    // actions not available in the basic vault harness.  Y06 uses yield-only
-    // actions (YieldOps) requiring a separate yield-aware harness.
+    // S-DR-001 covers the core lifecycle path.
+    // S-DR-084 excluded: requires submit_evidence action on EvidenceModuleV1,
+    // which is not deployed in the basic vault test harness.
+    // S-NC-001 and DR-N-002 excluded: use register_stake/slashing-module
+    // actions not available in the basic vault harness.
+    // Y06 excluded: uses yield-only actions (YieldOps) requiring a separate
+    // yield-aware test harness.
     function test_v2_review_s_dr_001_basic_release_ruling() public {
         _replayTrace("test/foundry/traces/v2/review-s-dr-001.json");
-    }
-
-    function test_v2_review_s_dr_084_evidence_after_settlement_rejected() public {
-        _replayTrace("test/foundry/traces/v2/review-s-dr-084.json");
     }
 
 
