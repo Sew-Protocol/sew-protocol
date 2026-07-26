@@ -23,7 +23,6 @@ jobs:
       matrix:
         language:
           - javascript-typescript
-          - python
 
     steps:
       - name: Checkout
@@ -36,10 +35,9 @@ jobs:
           version: 9
 
       - name: Setup Node
-        if: matrix.language == 'javascript-typescript'
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: pnpm
 
       - name: Initialize CodeQL
