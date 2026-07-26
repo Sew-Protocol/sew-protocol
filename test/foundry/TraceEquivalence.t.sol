@@ -950,6 +950,87 @@ contract TraceEquivalenceTest is Test {
     }
 
     // ====================================================================
+    // Manifest-bound v2 traces (synchronised from Clojure simulation)
+    // See etc/trace-solidity-manifest.edn in the Clojure repo.
+    // ====================================================================
+
+    // Sew domain reference — core protocol conflict scenarios
+    function test_v2_sew_001_same_block_dual_resolution() public {
+        _replayTrace("test/foundry/traces/v2/sew-001.json");
+    }
+
+    function test_v2_sew_002_pending_settlement_expiry() public {
+        _replayTrace("test/foundry/traces/v2/sew-002.json");
+    }
+
+    function test_v2_sew_003_escalation_after_terminal() public {
+        _replayTrace("test/foundry/traces/v2/sew-003.json");
+    }
+
+    function test_v2_sew_004_force_refund_illegal_release() public {
+        _replayTrace("test/foundry/traces/v2/sew-004.json");
+    }
+
+    function test_v2_sew_005_escalation_supersedes_pending() public {
+        _replayTrace("test/foundry/traces/v2/sew-005.json");
+    }
+
+    // Reference validation — adversarial / CI review paths
+    function test_v2_ref_001_governance_sandwich() public {
+        _replayTrace("test/foundry/traces/v2/ref-001.json");
+    }
+
+    function test_v2_ref_002_malicious_resolver_verdict() public {
+        _replayTrace("test/foundry/traces/v2/ref-002.json");
+    }
+
+    function test_v2_ref_003_dispute_flooding() public {
+        _replayTrace("test/foundry/traces/v2/ref-003.json");
+    }
+
+    function test_v2_ref_004_bond_withdrawal_race() public {
+        _replayTrace("test/foundry/traces/v2/ref-004.json");
+    }
+
+    function test_v2_ref_005_same_block_ordering() public {
+        _replayTrace("test/foundry/traces/v2/ref-005.json");
+    }
+
+    function test_v2_ref_006_autopush_settlement() public {
+        _replayTrace("test/foundry/traces/v2/ref-006.json");
+    }
+
+    function test_v2_ref_007_appeal_failure_cascade() public {
+        _replayTrace("test/foundry/traces/v2/ref-007.json");
+    }
+
+    function test_v2_ref_008_yield_accrual_efficiency() public {
+        _replayTrace("test/foundry/traces/v2/ref-008.json");
+    }
+
+    // EF review scenarios — review corpus from EF_REVIEW_GUIDE.md
+    function test_v2_review_s_dr_001_basic_release_ruling() public {
+        _replayTrace("test/foundry/traces/v2/review-s-dr-001.json");
+    }
+
+    function test_v2_review_s_dr_084_evidence_after_settlement_rejected() public {
+        _replayTrace("test/foundry/traces/v2/review-s-dr-084.json");
+    }
+
+    function test_v2_review_nc_001_freeze_active_dispute() public {
+        _replayTrace("test/foundry/traces/v2/review-nc-001.json");
+    }
+
+    function test_v2_review_y06_pro_rata_shortfall() public {
+        _replayTrace("test/foundry/traces/v2/review-y06.json");
+    }
+
+    function test_v2_review_dr_n_002_appeal_rejected() public {
+        _replayTrace("test/foundry/traces/v2/review-dr-n-002.json");
+    }
+
+
+    // ====================================================================
     // CDRS v0.2 Negative Tests
     // These tests verify that semantic violations are caught by TraceEquivalence
     // ====================================================================
