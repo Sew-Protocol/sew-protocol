@@ -1,6 +1,7 @@
 {"description":
  "Generated trace: s60-partial-withdraw-then-slash-ordering",
  "fee_bps":0,
+ "max_dispute_duration":300,
  "schema_version":"2",
  "resolutions":
  {"wf0":
@@ -133,6 +134,7 @@
   "participation":{"dispute_initiator":"buyer"},
   "timing":{"auto_cancel_triggered":true}},
  "trace_kind":["dispute-resolution", "timing"],
+ "appeal_window_duration":0,
  "step_count":5,
  "metadata":
  {"scenario_class":"baseline", "outcome_type":"normal-completion"},

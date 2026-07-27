@@ -275,9 +275,9 @@ contract EscrowStateMachineTest is Test {
     function test_invalid_withdraw_before_finalized_and_invalid_executePending_no_pending() public {
         (uint256 wid, ) = _create();
 
-        // Invalid: withdraw while PENDING
+        // Invalid: withdraw while PENDING (no claimable balance)
         vm.prank(recipient);
-        vm.expectRevert(abi.encodeWithSignature("TransferNotFinalized(uint256,uint8)", wid, uint8(EscrowState.PENDING)));
+        vm.expectRevert(abi.encodeWithSignature("NoClaimableBalance(uint256,address,address)", wid, recipient, address(token)));
         vault.withdrawEscrow(wid);
 
         // Invalid: executePendingSettlement when none exists

@@ -1,6 +1,7 @@
 {"description":
  "Generated trace: s-dr-084-evidence-after-settlement-rejected",
  "fee_bps":150,
+ "max_dispute_duration":0,
  "schema_version":"2",
  "resolutions":
  {"wf0":
@@ -155,6 +156,7 @@
    "pending_delay_seconds":130}},
  "trace_kind":
  ["dispute-resolution", "pending-settlement", "authorization"],
+ "appeal_window_duration":60,
  "step_count":5,
  "metadata":
  {"scenario_class":"edge-case", "outcome_type":"normal-completion"},

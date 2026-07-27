@@ -1,5 +1,6 @@
 {"description":"Generated trace: s20-dr3-kleros-max-escalation-guard",
  "fee_bps":100,
+ "max_dispute_duration":0,
  "schema_version":"2",
  "resolutions":
  {"wf0":
@@ -162,6 +163,7 @@
   "participation":{"dispute_initiator":"buyer"},
   "timing":{"auto_cancel_triggered":false}},
  "trace_kind":["dispute-resolution", "escalation"],
+ "appeal_window_duration":0,
  "step_count":6,
  "metadata":
  {"scenario_class":"baseline", "outcome_type":"normal-completion"},

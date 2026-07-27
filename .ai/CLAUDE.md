@@ -2,6 +2,27 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Cross-repository: Clojure Simulation
+
+This repo (sew-protocol) is the Solidity implementation side of a two-repo
+trace equivalence workflow.  The Clojure simulation lives in:
+
+    /home/user/Code/.workspaces/agent-c
+
+CDRS v0.2 trace fixtures are generated there and synced to
+`test/foundry/traces/` via:
+
+```bash
+# From the Clojure repo
+bb trace:solidity:sync --sew-repo ../sew-protocol
+bb trace:solidity:verify --sew-repo ../sew-protocol
+```
+
+The canonical trace manifest is `etc/trace-solidity-manifest.edn` in the
+Clojure repo.  It cryptographically binds each trace fixture to its source
+via SHA-256.  See `docs/review/EF_REVIEW_GUIDE.md` in the Clojure repo for
+the full review procedure.
+
 ## Commands
 
 ```bash

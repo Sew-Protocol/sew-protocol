@@ -1,6 +1,7 @@
 {"description":
  "Generated trace: dr-n-002-reversal-slash-appeal-rejected",
  "fee_bps":150,
+ "max_dispute_duration":2592000,
  "schema_version":"2",
  "resolutions":
  {"wf0":
@@ -354,6 +355,7 @@
   "timing":
   {"auto_cancel_triggered":false, "within_resolution_window":true}},
  "trace_kind":["dispute-resolution"],
+ "appeal_window_duration":120,
  "step_count":14,
  "metadata":
  {"scenario_class":"edge-case", "outcome_type":"normal-completion"},

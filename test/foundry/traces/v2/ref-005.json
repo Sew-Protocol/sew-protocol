@@ -1,6 +1,7 @@
 {"description":
  "Generated trace: s56-same-block-dual-resolution-order-invariant",
  "fee_bps":150,
+ "max_dispute_duration":2592000,
  "schema_version":"2",
  "resolutions":
  {"wf0":
@@ -128,6 +129,7 @@
   "timing":
   {"auto_cancel_triggered":false, "within_resolution_window":true}},
  "trace_kind":["dispute-resolution", "authorization"],
+ "appeal_window_duration":0,
  "step_count":4,
  "metadata":
  {"scenario_class":"baseline", "outcome_type":"normal-completion"},

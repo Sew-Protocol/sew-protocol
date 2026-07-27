@@ -149,10 +149,9 @@ contract WithdrawEscrowTest is Test {
         vm.prank(sender);
         uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT, settings);
 
-        // Recipient tries to withdraw while escrow is PENDING
-        // EscrowState.PENDING = 1 (enum starts at 1)
+        // Recipient tries to withdraw while escrow is PENDING (no claimable balance)
         vm.prank(recipient);
-        vm.expectRevert(abi.encodeWithSignature("TransferNotFinalized(uint256,uint8)", wid, uint8(1))); // 1 = PENDING
+        vm.expectRevert(abi.encodeWithSignature("NoClaimableBalance(uint256,address,address)", wid, recipient, address(token)));
         vault.withdrawEscrow(wid);
     }
 

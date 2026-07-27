@@ -105,14 +105,22 @@ contract SettlementOps is AccessControl {
         // For other modules, fall back to timeoutConfig.appealWindowDuration
         if (resolutionModule == address(0)) {
             // No resolution module - use global appeal window duration
-            result.appealDeadline = block.timestamp + timeoutConfig.appealWindowDuration;
+            if (timeoutConfig.appealWindowDuration == 0) {
+                result.shouldExecute = true;
+            } else {
+                result.appealDeadline = block.timestamp + timeoutConfig.appealWindowDuration;
+            }
             return result;
         }
 
         // Validate module is still a valid contract before calling
         if (resolutionModule.code.length == 0) {
             // Module no longer exists - fallback to global appeal window duration
-            result.appealDeadline = block.timestamp + timeoutConfig.appealWindowDuration;
+            if (timeoutConfig.appealWindowDuration == 0) {
+                result.shouldExecute = true;
+            } else {
+                result.appealDeadline = block.timestamp + timeoutConfig.appealWindowDuration;
+            }
             return result;
         }
 
@@ -127,17 +135,22 @@ contract SettlementOps is AccessControl {
             (result.appealDeadline, , result.isFinalRound) = abi.decode(data, (uint256, uint8, bool));
         } else {
             // Module doesn't support getAppealDeadlineAndRound - fallback to global config
-            result.appealDeadline = block.timestamp + timeoutConfig.appealWindowDuration;
+            if (timeoutConfig.appealWindowDuration == 0) {
+                result.shouldExecute = true;
+            } else {
+                result.appealDeadline = block.timestamp + timeoutConfig.appealWindowDuration;
+            }
         }
 
         // If final round (MAX_ROUND), execute immediately (no appeal window)
         if (result.isFinalRound) {
             result.shouldExecute = true;
-        } else if (result.appealDeadline == 0) {
-            // If not final and no deadline provided, use global config
-            result.appealDeadline = block.timestamp + timeoutConfig.appealWindowDuration;
-            if (result.appealDeadline == 0) {
+        } else if (result.appealDeadline == 0 && !result.shouldExecute) {
+            // Module returned 0 deadline - check global config as fallback
+            if (timeoutConfig.appealWindowDuration == 0) {
                 result.shouldExecute = true;
+            } else {
+                result.appealDeadline = block.timestamp + timeoutConfig.appealWindowDuration;
             }
         }
 

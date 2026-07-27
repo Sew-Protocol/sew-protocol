@@ -559,7 +559,8 @@ contract DRv1FuzzTest is Test {
         uint256 casesAssigned = stats.casesAssigned;
         uint256 casesDecided = stats.casesDecided;
 
-        assertTrue(casesAssigned >= numDisputes, 'Cases assigned should match');
+        // forceProgress decrements casesAssigned for timed-out resolvers on rotation
+        assertTrue(casesAssigned <= numDisputes, 'Cases assigned cannot exceed total disputes');
         assertTrue(casesDecided <= casesAssigned, 'Decided <= assigned');
         assertTrue(emaScore <= EMA_PRECISION, 'EMA score bounded');
     }
@@ -668,7 +669,10 @@ contract DRv1FuzzTest is Test {
             uint256 casesAssigned = stats.casesAssigned;
 
             assertTrue(emaScore <= EMA_PRECISION, 'EMA score bounded');
-            assertTrue(casesAssigned >= disputesPerResolver, 'Cases assigned should match');
+            // forceProgress rotates timed-out resolvers, incrementing the new resolver's
+            // count while decrementing the old one. casesAssigned per resolver depends
+            // on the random outcome — replaced-timeout assignments shift between resolvers.
+            assertTrue(stats.casesDecided <= casesAssigned, 'Decided cannot exceed assigned');
         }
     }
 }

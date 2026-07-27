@@ -1,5 +1,6 @@
 {"description":"Generated trace: s05-pending-settlement-execute",
  "fee_bps":150,
+ "max_dispute_duration":600,
  "schema_version":"2",
  "resolutions":
  {"wf0":
@@ -154,6 +155,7 @@
    "within_settlement_window":true,
    "pending_delay_seconds":120}},
  "trace_kind":["dispute-resolution", "pending-settlement"],
+ "appeal_window_duration":120,
  "step_count":5,
  "metadata":
  {"scenario_class":"baseline", "outcome_type":"normal-completion"},

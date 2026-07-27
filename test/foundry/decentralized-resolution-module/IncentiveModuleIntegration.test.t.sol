@@ -962,7 +962,7 @@ contract IncentiveModuleIntegrationTest is Test {
         resolutionModule.recordResolution(wf2, address(escrow), resolver1, ResolutionOutcome.CANCEL, 1 days);
         (uint256 b2, address t2) = resolutionModule.getRequiredAppealBond(wf2, address(escrow), 0, abi.encode(address(token), user1, user2, 1000e18 - ((1000e18 * escrow.escrowFee()) / escrow.ESCROW_FEE_DENOMINATOR())));
         vm.startPrank(user2);
-        token.approve(address(escrow), b2);
+        token.approve(address(escrow), b2 * 12 / 10); // account for escalation count scaling (10% per repeat)
         escrow.escalateDispute(wf2);
         vm.stopPrank();
 

@@ -1,5 +1,6 @@
 {"description":"Generated trace: s-dr-001-basic-release-ruling",
  "fee_bps":150,
+ "max_dispute_duration":2592000,
  "schema_version":"2",
  "resolutions":
  {"wf0":
@@ -132,6 +133,7 @@
    "within_settlement_window":false,
    "pending_delay_seconds":80}},
  "trace_kind":["dispute-resolution", "pending-settlement"],
+ "appeal_window_duration":60,
  "step_count":4,
  "metadata":
  {"scenario_class":"baseline", "outcome_type":"normal-completion"},
