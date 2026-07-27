@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Dispute liveness timeout (`ACTION_DISPUTE_TIMEOUT`, type 5) — auto-cancels escrows stuck in `DISPUTED` state when `maxDisputeDuration` elapses since `disputeRaisedTimestamp`. On trigger, finalizes the dispute and refunds the sender.
+- Slashing module integration (DR v3): `slashingModule` address in `DRMStorageBase`, wired into `recordResolution` (vindication credit via `restoreReversalSlashOnVindication`) and `recordReversal` (automated slash via `slashForReversal`).
+- `restoreReversalSlashOnVindication` in `ResolverSlashingModuleV1` — iterates prior rounds and credits resolver stake when a higher-level resolution vindicates a prior decision.
+- `creditStakeForVindication` in `ResolverStakingModuleV1` and `IStakingModule` for protocol-backed liability restoration.
+- `REVERSED_WITH_CREDIT` status and `SlashRestoredOnVindication` event in `ISlashingModule`.
+- Explicit CodeQL workflow (`.github/workflows/codeql.yml`) with pnpm pre-installed — fixes CI runner "pnpm not found" error on javascript-typescript analysis.
 - V2 Strategic Preparation: Defined semantic identity architecture (bytes32 derived IDs) to achieve cryptographic provenance and eliminate potential identity-confusion risks identified in simulation audits.
 - Operational Safety Roadmap: Specified delegated "create-blocked" guards for yield module health and resolver capacity to protect user funds from known operational stress states.
 
@@ -37,6 +43,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Updated CI node-version from 20 to 22 (Node 20 deprecated on GitHub Actions runners). Swapped `setup-node`/`setup-pnpm` order so pnpm is on PATH before store-cache resolution.
+- Removed stale `.eslintrc.cjs` — ESLint v9 uses flat config (`eslint.config.cjs`) exclusively.
+- Removed `pnpm-workspace.yaml` — single-package project, was causing `packages field missing` errors in CI.
+- Consolidated `docs/archive/` → `docs/archived/` and `docs/deployments/` → `docs/deployment/` to eliminate duplicate directories.
+- Added `pnpm-lock.yaml` and `pnpm-workspace.yaml` back to tracking (removed from `.gitignore`).
+- Added `.certora_internal/` and `.claude/` to `.gitignore` for local run artifacts and IDE config.
+- Moved `differential-setup.json` to `config/` and removed stray root-level `project.json` and `report.md`.
+
 - Removed `ROLE_MODULE_DEVELOPER` for governance consistency (all upgrades now via `ROLE_TIMELOCK`)
 - Simplified upgrade authorization in DecentralizedResolutionModule and ResolverIncentiveModule
 - Updated `BaseEscrow` configuration management: consolidated individual setter functions into atomic `ProtocolConfig` updates to optimize contract size
@@ -54,6 +68,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Minimal uberjar runner:** `prf-runner-sew-0.1.0-uber.jar` (18 MB) — self-contained scenario replay jar with no Clojure CLI, no source tree required. Source-only build (no AOT). Uses `java -jar ... -m resolver-sim.minimal-runner --scenario <file>` from any directory. Added `build.clj` + `bb build:sew`.
 
 ### Fixed
+
+- **Resolver rotation capacity leak in `forceProgress()`:** When a resolver times out and `forceProgress` rotates to a new resolver, the old resolver's `resolverActiveDisputes`, `resolverCapacity.currentDisputes`, and `resolverStats.casesAssigned` are now decremented (they were never cleaned up, causing capacity drift). The old resolver's stake is unlocked via `stakingModule.onDisputeEscalated()` and the new resolver's stake is locked via `stakingModule.onResolverAssigned()`.
+- **Escalation/challenge bond leak on `finalize`:** `ResolverIncentiveModuleV2.onDisputeFinalized` was inherited as a no-op from V1, so undistributed appeal/challenge bonds for finalized rounds accumulated indefinitely. The override now iterates rounds 0 to `finalRound` and forfeits any undistributed bonds via `AppealBondForfeited`.
+- **`onDisputeFinalized` made virtual in V1:** Allows V2 to override it for bond cleanup.
 
 - **StateManagementLibrary guards:** `transitionToReleased`, `transitionToRefunded`, `transitionToResolved`, and `transitionToDisputed` now revert `AlreadyTerminal` if called on a terminal escrow — prevents silent state corruption.
 - **`disputeRaisedTimestamp` cleanup:** All terminal paths (`_cancelAndRefund`, `_releaseEscrowTransfer`, `acceptSplit`) now delete `disputeRaisedTimestamp[workflowId]` — fixes stale state leak.
