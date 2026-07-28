@@ -1,5 +1,10 @@
 {"description":"Generated trace: s05-pending-settlement-execute",
  "fee_bps":150,
+ "invariant_profile":
+ {"id":"solidity-equivalence-core-v1",
+  "version":1,
+  "root":
+  "31d07038dcde86ac6f34b229fded0fce98b679c2bd83130b607f0b9a2a27e19f"},
  "max_dispute_duration":600,
  "schema_version":"2",
  "resolutions":
@@ -155,6 +160,8 @@
    "within_settlement_window":true,
    "pending_delay_seconds":120}},
  "trace_kind":["dispute-resolution", "pending-settlement"],
+ "terminal_projection_hash":
+ "d2969cfd821f995f2a2534f38bb36698bb4c50df6ef0603e70f7f8a0cc7fcb93",
  "appeal_window_duration":120,
  "step_count":5,
  "metadata":

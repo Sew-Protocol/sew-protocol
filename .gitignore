@@ -51,6 +51,9 @@ Thumbs.db
 .cursorignore
 .cursor/rules/
 
+# AI
+.ai
+
 # Temporary directories
 temp/
 work/

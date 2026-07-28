@@ -1,6 +1,11 @@
 {"description":
  "Generated trace: s61-governance-snapshot-mid-dispute-immutability",
  "fee_bps":150,
+ "invariant_profile":
+ {"id":"solidity-equivalence-core-v1",
+  "version":1,
+  "root":
+  "31d07038dcde86ac6f34b229fded0fce98b679c2bd83130b607f0b9a2a27e19f"},
  "max_dispute_duration":2592000,
  "schema_version":"2",
  "resolutions":
@@ -182,7 +187,7 @@
   {"auto_cancel_triggered":false, "within_resolution_window":true}},
  "trace_kind":["dispute-resolution"],
  "terminal_projection_hash":
- "88632503e1b180bfb3b12beab11de341142a21f2c952068106c08a6c9ebba9af",
+ "90eaf2fecd8f015ac8b75e7e50de9c59a239fde86cda1def3156b8d23c3ae5b5",
  "appeal_window_duration":0,
  "step_count":6,
  "metadata":

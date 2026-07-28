@@ -1,5 +1,10 @@
 {"description":"Generated trace: s88-yield-accrual-efficiency",
  "fee_bps":150,
+ "invariant_profile":
+ {"id":"solidity-equivalence-core-v1",
+  "version":1,
+  "root":
+  "31d07038dcde86ac6f34b229fded0fce98b679c2bd83130b607f0b9a2a27e19f"},
  "max_dispute_duration":0,
  "schema_version":"2",
  "resolutions":
@@ -82,6 +87,8 @@
    "actor":"buyer"}],
  "expected_semantics":{},
  "trace_kind":["lifecycle"],
+ "terminal_projection_hash":
+ "27ddcf89f024becc3c2db869cd1b769dc56ea7223c8c6bb4a90631e6ae8e5942",
  "appeal_window_duration":0,
  "step_count":3,
  "metadata":

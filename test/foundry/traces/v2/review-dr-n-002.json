@@ -1,6 +1,11 @@
 {"description":
  "Generated trace: dr-n-002-reversal-slash-appeal-rejected",
  "fee_bps":150,
+ "invariant_profile":
+ {"id":"solidity-equivalence-core-v1",
+  "version":1,
+  "root":
+  "31d07038dcde86ac6f34b229fded0fce98b679c2bd83130b607f0b9a2a27e19f"},
  "max_dispute_duration":2592000,
  "schema_version":"2",
  "resolutions":
@@ -355,6 +360,8 @@
   "timing":
   {"auto_cancel_triggered":false, "within_resolution_window":true}},
  "trace_kind":["dispute-resolution"],
+ "terminal_projection_hash":
+ "e624e86072b3f6f9ed1443534613d1b03d83a9519f6cefcad421b88fabfcda83",
  "appeal_window_duration":120,
  "step_count":14,
  "metadata":

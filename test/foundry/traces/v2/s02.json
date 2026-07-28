@@ -123,5 +123,10 @@
     "scenario_class": "baseline",
     "outcome_type": "normal-completion"
   },
-  "scenario_id": "s02-dr3-dispute-release"
+  "scenario_id": "s02-dr3-dispute-release",
+  "invariant_profile": {
+    "id": "solidity-equivalence-core-v1",
+    "version": 1,
+    "root": "31d07038dcde86ac6f34b229fded0fce98b679c2bd83130b607f0b9a2a27e19f"
+  }
 }

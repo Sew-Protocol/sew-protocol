@@ -18,6 +18,7 @@ import { ERC20Mock } from "../../contracts/mocks/ERC20Mock.sol";
 import { EscrowSettings, EscrowState, TimeoutConfig } from "../../contracts/types/EscrowTypes.sol";
 import { YieldPreset } from "../../contracts/types/YieldPresets.sol";
 import { SettingsValidationLibrary } from "../../contracts/libraries/SettingsValidationLibrary.sol";
+import { VaultSnapshot, EquivalenceInvariantProfileV1 } from "./invariants/EquivalenceInvariantProfileV1.sol";
 
 /**
  * @title TraceEquivalenceTest
@@ -112,6 +113,13 @@ contract TraceEquivalenceTest is Test {
     bool    internal _resolutionAccepted;
 
     // ====================================================================
+    // Conservation accounting accumulators (per-token, reset per trace)
+    // ====================================================================
+    uint256 internal _totalDeposited;
+    uint256 internal _totalReleased;
+    uint256 internal _totalRefunded;
+
+    // ====================================================================
     // setUp — full protocol stack, correct role grants
     // ====================================================================
     function setUp() public {
@@ -190,6 +198,9 @@ contract TraceEquivalenceTest is Test {
         _lastDisputeRaiser = address(0);
         _lastResolver = address(0);
         _resolutionAccepted = false;
+        _totalDeposited = 0;
+        _totalReleased = 0;
+        _totalRefunded = 0;
     }
 
     // ====================================================================
@@ -366,6 +377,19 @@ contract TraceEquivalenceTest is Test {
             vault.setTimeoutConfig(tc);
         }
 
+        // Verify invariant profile binding (mandatory for manifest-bound traces)
+        if (isV2) {
+            require(stdJson.keyExists(raw, ".invariant_profile"),
+                "manifest-bound trace requires invariant_profile");
+            string memory pId = stdJson.readString(raw, ".invariant_profile.id");
+            uint256 pVer = stdJson.readUint(raw, ".invariant_profile.version");
+            string memory pRoot = stdJson.readString(raw, ".invariant_profile.root");
+            require(
+                _isSupportedProfile(keccak256(bytes(pId)), pVer, pRoot),
+                "unsupported invariant profile - expected solidity-equivalence-core-v1/1"
+            );
+        }
+
         // Reset per-trace state (alias map, semantic tracking flags)
         _resetTraceState();
 
@@ -384,6 +408,65 @@ contract TraceEquivalenceTest is Test {
         if (isV2 && stdJson.keyExists(raw, ".expected_semantics")) {
             _assertSemantics(raw);
         }
+
+        // Terminal projection hash check (v0.2 only)
+        if (isV2 && stdJson.keyExists(raw, ".terminal_projection_hash") && _hasPrimaryWfId) {
+            string memory expectedHash = stdJson.readString(raw, ".terminal_projection_hash");
+            string memory actualHash = _computeTerminalProjectionHash();
+            assertEq(
+                keccak256(bytes(actualHash)),
+                keccak256(bytes(expectedHash)),
+                string.concat("terminal_projection_hash mismatch: ", actualHash, " != ", expectedHash)
+            );
+        }
+    }
+
+    // ── Invariant snapshot helper ────────────────────────────────────
+
+    function _snapshot(uint256 wfId) internal view returns (VaultSnapshot memory) {
+        EscrowState st = vault.getEscrowState(wfId);
+        (,,,, uint256 afa,,,,,) = vault.escrowTransfers(wfId);
+        uint256 held = vault.totalHeldInEscrowPerToken(address(token));
+        uint256 fees = vault.totalFeesPerToken(address(token));
+        (bool ps,,,) = vault.pendingSettlements(wfId);
+        (, uint8 dl,) = drModule.getAppealDeadlineAndRound(wfId, address(vault));
+        return VaultSnapshot({
+            escrowState: st,
+            disputeLevel: uint256(dl),
+            amountAfterFee: afa,
+            pendingSettlementExists: ps,
+            totalHeld: held,
+            totalFees: fees,
+            totalDeposited: _totalDeposited,
+            totalReleased: _totalReleased,
+            totalRefunded: _totalRefunded,
+            blockTimestamp: block.timestamp
+        });
+    }
+
+    function _computeTerminalProjectionHash() internal view returns (string memory) {
+        uint256 wfId = _primaryWfId;
+        EscrowState st = vault.getEscrowState(wfId);
+        (,,,, uint256 afa,,,,,) = vault.escrowTransfers(wfId);
+        (bool ps,,,) = vault.pendingSettlements(wfId);
+        (, uint8 dl,) = drModule.getAppealDeadlineAndRound(wfId, address(vault));
+
+        string memory data = string.concat(
+            vm.toString(uint256(st)), "|",
+            vm.toString(afa), "|",
+            vm.toString(ps ? 1 : 0), "|",
+            vm.toString(uint256(dl))
+        );
+        bytes32 hash = sha256(bytes(data));
+        // Strip 0x prefix: convert bytes32 to 64-char hex without prefix
+        bytes memory hexChars = "0123456789abcdef";
+        bytes memory result = new bytes(64);
+        for (uint256 i = 0; i < 32; i++) {
+            uint8 b = uint8(hash[i]);
+            result[i * 2] = hexChars[b >> 4];
+            result[i * 2 + 1] = hexChars[b & 0xf];
+        }
+        return string(result);
     }
 
     /// @dev External wrapper so negative tests can assert semantic-failure via try/catch.
@@ -442,6 +525,13 @@ contract TraceEquivalenceTest is Test {
             expectedRejectionReason = stdJson.readString(json, string.concat(expPrefix, ".rejection_reason"));
         }
 
+        // ── Invariant snapshots (before action) ─────────────────────────
+        VaultSnapshot memory before_;
+        bool snapshotsActive = wfId != 0 && expectedAccepted;
+        if (snapshotsActive) {
+            before_ = _snapshot(wfId);
+        }
+
         // ── Dispatch action ────────────────────────────────────────────────────
         // Note: vm.expectRevert() is called just before each dispatch for actions that may revert
         bytes32 actionHash = keccak256(bytes(action));
@@ -467,12 +557,15 @@ contract TraceEquivalenceTest is Test {
             if (stdJson.keyExists(json, string.concat(prefix, ".attributes.wf_alias"))) {
                 string memory aliasName2 = stdJson.readString(json, string.concat(prefix, ".attributes.wf_alias"));
                 wfAlias[aliasName2] = newWfId;
-                if (!_hasPrimaryWfId) {
-                    _primaryWfId = newWfId;
-                    _hasPrimaryWfId = true;
-                }
+            if (!_hasPrimaryWfId) {
+                _primaryWfId = newWfId;
+                _hasPrimaryWfId = true;
             }
-            wfId = newWfId;
+        }
+        wfId = newWfId;
+        // Track principal deposited for conservation equation
+        uint256 depositAmount = stdJson.readUint(json, string.concat(prefix, ".attributes.amount"));
+        _totalDeposited += depositAmount;
 
         } else if (actionHash == keccak256("release")) {
             if (!expectedAccepted) {
@@ -605,6 +698,21 @@ contract TraceEquivalenceTest is Test {
             }
         }
 
+        // ── Conservation accounting (track released/refunded amounts) ───
+        // After any action that may transition to a terminal state, read the
+        // escrow's amountAfterFee and accumulate the accounting counter.
+        if (expectedAccepted && wfId != 0) {
+            EscrowState st = vault.getEscrowState(wfId);
+            if (st == EscrowState.RELEASED || st == EscrowState.REFUNDED) {
+                (,,,, uint256 afa,,,,,) = vault.escrowTransfers(wfId);
+                if (st == EscrowState.RELEASED) {
+                    _totalReleased += afa;
+                } else {
+                    _totalRefunded += afa;
+                }
+            }
+        }
+
         // ── Assert projection matches simulation expected ────────────────
         if (!expectedAccepted) {
             // For rejected steps, just check that state didn't change unexpectedly
@@ -652,6 +760,14 @@ contract TraceEquivalenceTest is Test {
         (, uint8 currentRound,) = drModule.getAppealDeadlineAndRound(wfId, address(vault));
         assertEq(uint256(currentRound), expDispLevel,
             string.concat(stepLabel, " dispute_level mismatch"));
+
+        // ── Invariant checks (after action, on post-step state) ─────────
+        if (expectedAccepted && wfId != 0) {
+            VaultSnapshot memory after_ = _snapshot(wfId);
+            EquivalenceInvariantProfileV1.checkStateEquations(after_, wfId);
+            EquivalenceInvariantProfileV1.checkHeldReconstruction(after_, wfId);
+            EquivalenceInvariantProfileV1.checkTransitionEquations(before_, after_, action, wfId);
+        }
     }
 
     // ====================================================================
@@ -805,6 +921,20 @@ contract TraceEquivalenceTest is Test {
      * @dev Map v0.2 role names to addresses. Extended from _roleToAddress to include
      *      additional roles: l1resolver, keeper, executor, l2resolver, etc.
      */
+    function _isSupportedProfile(bytes32 profileId, uint256 profileVersion, string memory profileRoot) internal pure returns (bool) {
+        if (profileId != keccak256(bytes(EquivalenceInvariantProfileV1.PROFILE_ID))) return false;
+        if (profileVersion != EquivalenceInvariantProfileV1.PROFILE_VERSION) return false;
+        // Convert PROFILE_ROOT (bytes32) to lowercase hex string for string comparison
+        bytes memory hexChars = "0123456789abcdef";
+        bytes memory expectedRoot = new bytes(64);
+        for (uint256 i = 0; i < 32; i++) {
+            uint8 b = uint8(EquivalenceInvariantProfileV1.PROFILE_ROOT[i]);
+            expectedRoot[i * 2] = hexChars[b >> 4];
+            expectedRoot[i * 2 + 1] = hexChars[b & 0xf];
+        }
+        return keccak256(bytes(profileRoot)) == keccak256(expectedRoot);
+    }
+
     function _roleToAddressV2(string memory role) internal pure returns (address) {
         bytes32 h = keccak256(bytes(role));
         if (h == keccak256("buyer"))           return BUYER;
@@ -1102,5 +1232,74 @@ contract TraceEquivalenceTest is Test {
         try this.replayTraceExternal("test/foundry/traces/v2/negative/n07.json") {
             fail("expected semantic mismatch");
         } catch {}
+    }
+
+    // ====================================================================
+    // Failure-injection tests — each proves one invariant has detection power
+    // ====================================================================
+
+    function test_invariant_heldReconstruction_detects_corruptedHeld() public {
+        _replayTrace("test/foundry/traces/v2/review-s-dr-001.json");
+        _createBasicEscrow();
+        uint256 wfId = 1;
+        VaultSnapshot memory snap = _snapshot(wfId);
+        snap.totalHeld = snap.amountAfterFee + 1; // Corrupt: held exceeds amountAfterFee
+        try this.checkHeldReconstructionExternal(snap, wfId) {
+            fail("held-reconstruction should have failed");
+        } catch Error(string memory reason) {
+            assertEq(reason, "invariant: held-reconstruction [wf 1]");
+        }
+    }
+
+    function test_invariant_disputeLevelBounded_detects_excess() public {
+        _replayTrace("test/foundry/traces/v2/review-s-dr-001.json");
+        _createBasicEscrow();
+        uint256 wfId = 1;
+        vm.prank(BUYER);
+        vault.raiseDispute(wfId);
+        VaultSnapshot memory snap = _snapshot(wfId);
+        snap.disputeLevel = 99;
+        try this.checkStateEquationsExternal(snap, wfId) {
+            fail("dispute-level-bounded should have failed");
+        } catch Error(string memory reason) {
+            assertEq(reason, "invariant: dispute-level-bounded [wf 1]");
+        }
+    }
+
+    function test_invariant_stateTransition_detects_invalid() public {
+        _replayTrace("test/foundry/traces/v2/review-s-dr-001.json");
+        _createBasicEscrow();
+        uint256 wfId = 1;
+        VaultSnapshot memory before_;
+        before_.escrowState = EscrowState.NONE;
+        before_.disputeLevel = 0;
+        VaultSnapshot memory after_ = _snapshot(wfId);
+        after_.escrowState = EscrowState.DISPUTED;
+        try this.checkTransitionEquationsExternal(before_, after_, "raise_dispute", wfId) {
+            fail("state-transition-valid should have failed");
+        } catch Error(string memory reason) {
+            assertEq(reason, "invariant: state-transition-valid [wf 1 action raise_dispute]");
+        }
+    }
+
+    // External wrappers so try/catch works (Solidity requires external calls for try)
+    function checkHeldReconstructionExternal(VaultSnapshot memory snap, uint256 wfId) external pure {
+        EquivalenceInvariantProfileV1.checkHeldReconstruction(snap, wfId);
+    }
+
+    function checkStateEquationsExternal(VaultSnapshot memory snap, uint256 wfId) external pure {
+        EquivalenceInvariantProfileV1.checkStateEquations(snap, wfId);
+    }
+
+    function checkTransitionEquationsExternal(VaultSnapshot memory before_, VaultSnapshot memory after_, string memory action, uint256 wfId) external pure {
+        EquivalenceInvariantProfileV1.checkTransitionEquations(before_, after_, action, wfId);
+    }
+
+    function _createBasicEscrow() internal {
+        uint256 amount = 10_000 ether;
+        vm.startPrank(BUYER);
+        token.approve(address(vault), amount);
+        vault.createEscrow(address(token), SELLER, amount, SettingsValidationLibrary.getDefaultSettings());
+        vm.stopPrank();
     }
 }

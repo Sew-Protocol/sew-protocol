@@ -1,6 +1,11 @@
 {"description":
  "Generated trace: s25-profit-maximizer-slash-lifecycle",
  "fee_bps":150,
+ "invariant_profile":
+ {"id":"solidity-equivalence-core-v1",
+  "version":1,
+  "root":
+  "31d07038dcde86ac6f34b229fded0fce98b679c2bd83130b607f0b9a2a27e19f"},
  "max_dispute_duration":600,
  "schema_version":"2",
  "resolutions":
@@ -224,6 +229,8 @@
  "trace_kind":
  ["dispute-resolution", "pending-settlement", "authorization",
   "adversarial"],
+ "terminal_projection_hash":
+ "7fb349256cd199ec422a2d50c5f6729a3baa7dbbfbfd0decee6b3f1a2c08ab9c",
  "appeal_window_duration":120,
  "step_count":8,
  "metadata":

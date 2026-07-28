@@ -1,5 +1,10 @@
 {"description":"Generated trace: Y06_multi-party-pro-rata-shortfall",
  "fee_bps":100,
+ "invariant_profile":
+ {"id":"solidity-equivalence-core-v1",
+  "version":1,
+  "root":
+  "31d07038dcde86ac6f34b229fded0fce98b679c2bd83130b607f0b9a2a27e19f"},
  "max_dispute_duration":0,
  "schema_version":"2",
  "resolutions":{},
@@ -92,6 +97,7 @@
    "actor":"governance"}],
  "expected_semantics":{},
  "trace_kind":["lifecycle"],
+ "terminal_projection_hash":null,
  "appeal_window_duration":0,
  "step_count":4,
  "metadata":
