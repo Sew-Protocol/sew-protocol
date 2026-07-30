@@ -19,8 +19,17 @@ contract MockKlerosArbitrator is IArbitrator {
     Dispute[] public disputes;
     uint256 public arbitrationPrice;
 
+    // Custom dispute ID override (for sentinel overflow testing)
+    uint256 public customDisputeId;
+    bool public useCustomId;
+
     constructor(uint256 _arbitrationPrice) {
         arbitrationPrice = _arbitrationPrice;
+    }
+
+    function setNextDisputeId(uint256 id) external {
+        customDisputeId = id;
+        useCustomId = true;
     }
 
     function setArbitrationPrice(uint256 _arbitrationPrice) external {
@@ -33,7 +42,6 @@ contract MockKlerosArbitrator is IArbitrator {
     ) external payable override returns (uint256 disputeID) {
         require(msg.value >= arbitrationPrice, 'Insufficient payment');
 
-        disputeID = disputes.length;
         disputes.push(
             Dispute({
                 arbitrable: IArbitrable(msg.sender),
@@ -42,6 +50,13 @@ contract MockKlerosArbitrator is IArbitrator {
                 status: DisputeStatus.Waiting
             })
         );
+
+        if (useCustomId) {
+            disputeID = customDisputeId;
+            useCustomId = false;
+        } else {
+            disputeID = disputes.length - 1;
+        }
 
         emit DisputeCreation(disputeID, IArbitrable(msg.sender));
 
@@ -86,6 +101,12 @@ contract MockKlerosArbitrator is IArbitrator {
     function setDisputeStatus(uint256 _disputeID, DisputeStatus _status) external {
         require(_disputeID < disputes.length, 'Invalid dispute ID');
         disputes[_disputeID].status = _status;
+    }
+
+    function setRuling(uint256 _disputeID, uint256 _ruling) external {
+        require(_disputeID < disputes.length, 'Invalid dispute ID');
+        disputes[_disputeID].ruling = _ruling;
+        disputes[_disputeID].status = DisputeStatus.Solved;
     }
 
     function getDisputeCount() external view returns (uint256) {

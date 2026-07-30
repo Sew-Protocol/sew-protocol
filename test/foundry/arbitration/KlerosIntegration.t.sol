@@ -23,6 +23,75 @@ contract MockEscrow {
     receive() external payable {}
 }
 
+// Used in test_propagateRuling_escrowReverts_thenRetrySucceeds:
+// starts reverting, then toggles to accepting
+contract ToggleEscrow {
+    bool public shouldRevert = true;
+    mapping(uint256 => bool) public released;
+    mapping(uint256 => bool) public cancelled;
+
+    function setShouldRevert(bool v) external { shouldRevert = v; }
+
+    function releaseAsDisputeResolver(uint256 workflowId, bytes32) external returns (bool) {
+        if (shouldRevert) revert('Escrow paused');
+        released[workflowId] = true;
+        return true;
+    }
+
+    function cancelAsDisputeResolver(uint256 workflowId, bytes32) external returns (bool) {
+        if (shouldRevert) revert('Escrow paused');
+        cancelled[workflowId] = true;
+        return true;
+    }
+
+    receive() external payable {}
+}
+
+// Used in test_settlementReturnsFalse_notRevert
+contract SettlementReturnsFalseEscrow {
+    function releaseAsDisputeResolver(uint256, bytes32) external returns (bool) { return false; }
+    function cancelAsDisputeResolver(uint256, bytes32) external returns (bool) { return false; }
+    receive() external payable {}
+}
+
+// Used in test_refundFailure_reverts_createDispute: no receive() = can't get ETH back
+contract NoReceiveEscrow {
+    mapping(uint256 => bool) public released;
+    mapping(uint256 => bool) public cancelled;
+
+    function releaseAsDisputeResolver(uint256 workflowId, bytes32) external returns (bool) {
+        released[workflowId] = true;
+        return true;
+    }
+
+    function cancelAsDisputeResolver(uint256 workflowId, bytes32) external returns (bool) {
+        cancelled[workflowId] = true;
+        return true;
+    }
+
+    // Intentionally no receive() — reject ETH refunds
+}
+
+// Used in test_reentrancy_blocked_duringRule
+contract ReentrantEscrow {
+    KlerosArbitrableProxy public proxy;
+    bool public reentrancyWasBlocked;
+
+    constructor(KlerosArbitrableProxy _proxy) {
+        proxy = _proxy;
+    }
+
+    function releaseAsDisputeResolver(uint256, bytes32) external returns (bool) {
+        (bool success, ) = address(proxy).call(
+            abi.encodeWithSignature('propagateRuling(uint256,address)', 999, address(0))
+        );
+        reentrancyWasBlocked = !success;
+        return true;
+    }
+
+    receive() external payable {}
+}
+
 /**
  * @title KlerosIntegration Tests
  * @notice Comprehensive test suite for Kleros arbitration integration
@@ -454,5 +523,255 @@ contract KlerosIntegrationTest is Test {
     function test_edgeCase_largeWorkflow() public {
         (bool resolved, ) = klerosProxy.getRuling(type(uint256).max, address(mockEscrow));
         assertFalse(resolved);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // ROBUSTNESS TESTS (Sew-side failure modes even when Kleros works correctly)
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /**
+     * @notice Ruling 0 = Kleros refuses to rule.
+     *         _propagateRuling returns immediately. Escrow stays DISPUTED.
+     *         Only the global maxDisputeDuration timeout can settle it.
+     */
+    function test_ruling_zero_refusedToRule() public {
+        bytes memory escrowData = abi.encode(address(0), sender, recipient, AMOUNT, AMOUNT);
+        vm.prank(address(mockEscrow));
+        klerosProxy.createDispute{value: ARBITRATION_PRICE}(1, address(mockEscrow), 2, '0x', escrowData);
+
+        mockArbitrator.giveRuling(0, 0);
+
+        (bool resolved, uint256 ruling) = klerosProxy.getRuling(1, address(mockEscrow));
+        assertTrue(resolved);
+        assertEq(ruling, 0);
+
+        // Escrow was NOT settled — stuck until global timeout
+        assertFalse(mockEscrow.released(1));
+        assertFalse(mockEscrow.cancelled(1));
+    }
+
+    /**
+     * @notice Out-of-range ruling (3+) should never arrive from real Kleros, but if it does,
+     *         _propagateRuling silently does nothing. Dispute appears resolved but escrow
+     *         is never settled.
+     */
+    function test_ruling_outOfRange_silent() public {
+        bytes memory escrowData = abi.encode(address(0), sender, recipient, AMOUNT, AMOUNT);
+        vm.prank(address(mockEscrow));
+        klerosProxy.createDispute{value: ARBITRATION_PRICE}(1, address(mockEscrow), 2, '0x', escrowData);
+
+        // Use setRuling to bypass MockKlerosArbitrator's require(_ruling <= choices) guard
+        mockArbitrator.setRuling(0, 3);
+
+        klerosProxy.propagateRuling(1, address(mockEscrow));
+
+        (bool resolved, uint256 ruling) = klerosProxy.getRuling(1, address(mockEscrow));
+        assertTrue(resolved);
+        assertEq(ruling, 3);
+
+        // Ruling 3 is not 1 or 2 — no settlement happened
+        assertFalse(mockEscrow.released(1));
+        assertFalse(mockEscrow.cancelled(1));
+    }
+
+    /**
+     * @notice Escrow settlement reverts → try/catch swallows it → propagateRuling retry
+     *         works after the escrow state is fixed.
+     */
+    function test_propagateRuling_escrowReverts_thenRetrySucceeds() public {
+        ToggleEscrow toggleEscrow = new ToggleEscrow();
+        vm.deal(address(toggleEscrow), 10 ether);
+        klerosProxy.registerEscrowContract(address(toggleEscrow));
+
+        bytes memory escrowData = abi.encode(address(0), sender, recipient, AMOUNT, AMOUNT);
+        vm.prank(address(toggleEscrow));
+        klerosProxy.createDispute{value: ARBITRATION_PRICE}(1, address(toggleEscrow), 2, '0x', escrowData);
+
+        // Auto-propagation fails because escrow reverts
+        mockArbitrator.giveRuling(0, 1);
+
+        // Dispute IS resolved in the proxy
+        (bool resolved, ) = klerosProxy.getRuling(1, address(toggleEscrow));
+        assertTrue(resolved);
+
+        // But escrow NOT settled (auto-propagation failed silently)
+        assertFalse(toggleEscrow.released(1));
+
+        // Fix the escrow
+        toggleEscrow.setShouldRevert(false);
+
+        // Retry propagation
+        klerosProxy.propagateRuling(1, address(toggleEscrow));
+
+        // Now escrow IS settled
+        assertTrue(toggleEscrow.released(1));
+    }
+
+    /**
+     * @notice propagateRuling fallback: Kleros has a ruling but rule() was never called
+     *         (e.g. out-of-gas, off-chain delivery). Anyone can call propagateRuling to
+     *         read the ruling from the arbitrator and settle the escrow.
+     * @dev getRuling() reads from the arbitrator directly and returns the ruling even
+     *      before propagateRuling. Check the proxy's internal storage for resolved state.
+     */
+    function test_propagateRuling_fallback_afterMissingFirstCall() public {
+        bytes memory escrowData = abi.encode(address(0), sender, recipient, AMOUNT, AMOUNT);
+        vm.prank(address(mockEscrow));
+        klerosProxy.createDispute{value: ARBITRATION_PRICE}(1, address(mockEscrow), 2, '0x', escrowData);
+
+        // Set ruling without calling rule() — simulates Kleros having a ruling but
+        // the callback was never delivered
+        mockArbitrator.setRuling(0, 1);
+
+        // Proxy's internal storage: dispute is NOT yet resolved (rule() was never called)
+        (, , , , bool proxyResolved, , , , ) = klerosProxy.disputes(address(mockEscrow), 1);
+        assertFalse(proxyResolved);
+
+        // Verify the arbitrator does have a ruling available
+        (bool arbitratorHasRuling, ) = klerosProxy.getRuling(1, address(mockEscrow));
+        assertTrue(arbitratorHasRuling);
+        assertEq(klerosProxy.workflowToKlerosDispute(address(mockEscrow), 1), 1);
+
+        // Manual propagation reads from arbitrator and settles
+        klerosProxy.propagateRuling(1, address(mockEscrow));
+
+        // Now proxy storage shows resolved
+        (, , , , proxyResolved, , , , ) = klerosProxy.disputes(address(mockEscrow), 1);
+        assertTrue(proxyResolved);
+        assertTrue(mockEscrow.released(1));
+    }
+
+    /**
+     * @notice If msg.value > cost, the proxy refunds the excess to msg.sender.
+     *         If msg.sender cannot receive ETH (no receive()), the refund fails
+     *         and createDispute reverts atomically — the Kleros dispute is also rolled back.
+     *         EVM atomicity protects against orphaned disputes.
+     */
+    function test_refundFailure_reverts_createDispute() public {
+        NoReceiveEscrow noReceiveEscrow = new NoReceiveEscrow();
+        vm.deal(address(noReceiveEscrow), 10 ether);
+        klerosProxy.registerEscrowContract(address(noReceiveEscrow));
+
+        bytes memory escrowData = abi.encode(address(0), sender, recipient, AMOUNT, AMOUNT);
+        uint256 initialCount = mockArbitrator.getDisputeCount();
+
+        vm.prank(address(noReceiveEscrow));
+        vm.expectRevert('Refund failed');
+        klerosProxy.createDispute{value: ARBITRATION_PRICE * 2}(1, address(noReceiveEscrow), 2, '0x', escrowData);
+
+        // EVM atomicity: the Kleros dispute was rolled back with the refund failure
+        assertEq(mockArbitrator.getDisputeCount(), initialCount);
+
+        // Proxy has no record either
+        assertEq(klerosProxy.workflowToKlerosDispute(address(noReceiveEscrow), 1), 0);
+    }
+
+    /**
+     * @notice Sentinal overflow: workflowToKlerosDispute stores disputeId + 1 (0 = sentinel).
+     *         If Kleros returns type(uint256).max, +1 overflows. Solidity 0.8.x catches
+     *         this at runtime with an arithmetic overflow panic, reverting the entire
+     *         createDispute before any state change.
+     */
+    function test_disputeIdSentinel_overflow_safe() public {
+        bytes memory escrowData = abi.encode(address(0), sender, recipient, AMOUNT, AMOUNT);
+        uint256 initialCount = mockArbitrator.getDisputeCount();
+
+        // Tell mock to return max uint256 as the dispute ID
+        mockArbitrator.setNextDisputeId(type(uint256).max);
+
+        // Solidity 0.8.x catches the overflow in klerosDisputeId + 1
+        vm.prank(address(mockEscrow));
+        vm.expectRevert();
+        klerosProxy.createDispute{value: ARBITRATION_PRICE}(1, address(mockEscrow), 2, '0x', escrowData);
+
+        // No state was changed — atomic revert protects us
+        assertEq(mockArbitrator.getDisputeCount(), initialCount);
+        assertEq(klerosProxy.workflowToKlerosDispute(address(mockEscrow), 1), 0);
+    }
+
+    /**
+     * @notice Reentrancy: rule() and propagateRuling share the same nonReentrant guard.
+     *         If the escrow contract calls back into the proxy during settlement,
+     *         the guard blocks the reentrant call.
+     */
+    function test_reentrancy_blocked_duringRule() public {
+        ReentrantEscrow reentrantEscrow = new ReentrantEscrow(klerosProxy);
+        vm.deal(address(reentrantEscrow), 10 ether);
+        klerosProxy.registerEscrowContract(address(reentrantEscrow));
+
+        bytes memory escrowData = abi.encode(address(0), sender, recipient, AMOUNT, AMOUNT);
+        vm.prank(address(reentrantEscrow));
+        klerosProxy.createDispute{value: ARBITRATION_PRICE}(1, address(reentrantEscrow), 2, '0x', escrowData);
+
+        mockArbitrator.giveRuling(0, 1);
+
+        // During the settlement callback, the escrow tried to re-enter via propagateRuling
+        assertTrue(reentrantEscrow.reentrancyWasBlocked());
+    }
+
+    /**
+     * @notice Settlement returns false: _propagateRuling uses try/catch so a false
+     *         return does not cause a revert. The ruling is still recorded.
+     */
+    function test_settlementReturnsFalse_notRevert() public {
+        SettlementReturnsFalseEscrow falseEscrow = new SettlementReturnsFalseEscrow();
+        vm.deal(address(falseEscrow), 10 ether);
+        klerosProxy.registerEscrowContract(address(falseEscrow));
+
+        bytes memory escrowData = abi.encode(address(0), sender, recipient, AMOUNT, AMOUNT);
+        vm.prank(address(falseEscrow));
+        klerosProxy.createDispute{value: ARBITRATION_PRICE}(1, address(falseEscrow), 2, '0x', escrowData);
+
+        // Should NOT revert even though settlement returns false
+        mockArbitrator.giveRuling(0, 1);
+
+        (bool resolved, uint256 ruling) = klerosProxy.getRuling(1, address(falseEscrow));
+        assertTrue(resolved);
+        assertEq(ruling, 1);
+    }
+
+    /**
+     * @notice propagateRuling is idempotent: calling it after auto-propagation already
+     *         succeeded does not revert. The second call re-settles but the try/catch
+     *         protects against escrow-side failures.
+     */
+    function test_propagateRuling_idempotent_afterAutoPropagation() public {
+        bytes memory escrowData = abi.encode(address(0), sender, recipient, AMOUNT, AMOUNT);
+        vm.prank(address(mockEscrow));
+        klerosProxy.createDispute{value: ARBITRATION_PRICE}(1, address(mockEscrow), 2, '0x', escrowData);
+
+        // Auto-propagation succeeds
+        mockArbitrator.giveRuling(0, 1);
+        assertTrue(mockEscrow.released(1));
+
+        // Second call — should not revert
+        klerosProxy.propagateRuling(1, address(mockEscrow));
+
+        // State unchanged
+        assertTrue(mockEscrow.released(1));
+        assertFalse(mockEscrow.cancelled(1));
+    }
+
+    /**
+     * @notice Ruling delivery still works even after the escrow contract is unregistered.
+     *         unregisterEscrowContract only blocks future createDispute calls.
+     */
+    function test_rule_afterEscrowUnregistered() public {
+        bytes memory escrowData = abi.encode(address(0), sender, recipient, AMOUNT, AMOUNT);
+        vm.prank(address(mockEscrow));
+        klerosProxy.createDispute{value: ARBITRATION_PRICE}(1, address(mockEscrow), 2, '0x', escrowData);
+
+        // Unregister the escrow (revoke the role directly — no unregisterEscrowContract fn)
+        bytes32 escrowRole = klerosProxy.ROLE_ESCROW_CONTRACT();
+        klerosProxy.revokeRole(escrowRole, address(mockEscrow));
+        assertFalse(klerosProxy.hasRole(escrowRole, address(mockEscrow)));
+
+        // Ruling delivery should still work (rule() checks arbitrator auth, not escrow role)
+        mockArbitrator.giveRuling(0, 1);
+
+        (bool resolved, uint256 ruling) = klerosProxy.getRuling(1, address(mockEscrow));
+        assertTrue(resolved);
+        assertEq(ruling, 1);
+        assertTrue(mockEscrow.released(1));
     }
 }
