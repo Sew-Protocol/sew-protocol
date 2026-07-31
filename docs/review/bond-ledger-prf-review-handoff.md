@@ -140,9 +140,9 @@ outer wrapper reported `Command status: failed / Scenario outcome: unknown`
 due to `Cannot encode unsupported type` (a `LazySeq` in claim results reaching
 `canonical-bytes`).
 
-**Fixed** in `protocol-robustness-framework`
-`src/resolver_sim/commands/scenario_orchestration.clj`: `persisted-value` now
-normalises sequence types (`clojure.lang.ISeq`) to vectors before hashing.
+**Fixed and committed** in `protocol-robustness-framework` commit `633f19557`
+(`src/resolver_sim/commands/scenario_orchestration.clj`): `persisted-value`
+now normalises sequence types (`clojure.lang.ISeq`) to vectors before hashing.
 Verified: all DR-C-001..006 and DR-N-002 now report `Command status: completed
 / Scenario outcome: pass`. The fix only affects previously-failing
 serialization; no valid evidence depended on the old behaviour. PRF test
