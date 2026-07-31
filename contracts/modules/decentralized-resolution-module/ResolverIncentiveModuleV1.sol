@@ -233,6 +233,30 @@ contract ResolverIncentiveModuleV1 is
         _;
     }
 
+    /// @notice Resolution module authorised to distribute bond outcomes and record resolvers.
+    address public resolutionModule;
+
+    error NotResolutionModule(address caller);
+
+    /// @notice Allow calls from registered escrow contracts OR the authorised resolution module.
+    modifier onlyEscrowOrResolutionModule() {
+        if (!registeredEscrowContracts[_msgSender()]) {
+            if (_msgSender() != resolutionModule) {
+                revert NotResolutionModule(_msgSender());
+            }
+        }
+        _;
+    }
+
+    /// @notice Set the resolution module. Only ROLE_TIMELOCK may set.
+    event ResolutionModuleSet(address indexed oldModule, address indexed newModule);
+
+    function setResolutionModule(address addr) external onlyRole(ROLE_TIMELOCK) {
+        if (addr == address(0)) revert ZeroAddressField('resolutionModule');
+        emit ResolutionModuleSet(resolutionModule, addr);
+        resolutionModule = addr;
+    }
+
     // ============ Initialization ============
 
     /**
@@ -429,7 +453,7 @@ contract ResolverIncentiveModuleV1 is
         address escrowContract,
         address resolver,
         uint8 level
-    ) external override onlyEscrowContract {
+    ) external override onlyEscrowOrResolutionModule {
         _recordResolver(workflowId, escrowContract, resolver, level);
     }
 

@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **BondLedger custody primitive** (`contracts/shared/BondLedger.sol` + `IBondLedger.sol`) — narrow reusable custody and exact-settlement component extracted from Sew's appeal-bond lifecycle. Handles principal custody (ETH/ERC20), deterministic bond positions, one-time exact settlement via bounded allocation lists (`REFUND` / `RESOLVER_PAYOUT` / `FORFEIT`), pull-based claims, recipient claimables, `forfeitedBondReserve`, `AccessControl` authority, reentrancy guard, and balance-before/after ERC20 validation. Runtime size 5,194 B.
+- **`ResolverIncentiveModuleV2BondLedger`** — Sew-facing incentive-module facade that retains Sew-specific allocation computation, resolver tracking, metrics, and legacy events while delegating custody and settlement to `BondLedger`. Runtime size 24,300 B (276 B EIP-170 headroom; frozen).
+- **Appeal-bond behavioural correction suite** — `BondBehaviourCorrection.t.sol` (15 tests) covering refund-through-production-path, failed-appeal resolver payout, forfeiture reserve, atomic settlement, round/cohort ownership, idempotency, and `setResolutionModule` authority.
+- **BondLedger differential suite** — `BondLedgerDifferential.t.sol` (10 cases) proving semantic equivalence between the corrected embedded implementation and the BondLedger-backed implementation across refund, resolver allocations, rounding/remainder, forfeiture reserve, finalization cleanup, ETH/ERC20 bonds, net-principal-after-fee, double-resolution idempotency, and invalid-authority rejection.
+- **BondLedger unit tests** — `BondLedger.t.sol` (17 tests) covering posting, exact settlement, claims, reserve accounting, reentrancy, and authority.
+- **PRF appeal-bond scenarios** — `DR-C-003` refund-on-reversal, `DR-C-004` resolver-payout, `DR-C-005` forfeit-reserve, `DR-C-006` distribution-atomicity.
+- **PRF review handoff + topology** — `docs/review/bond-ledger-prf-review-handoff.md` and content-addressed `docs/review/bond-ledger-review-topology.json` (sha256 `dbb6087b...`).
+- **Contract size gate** — `scripts/check-bondledger-size.sh` and updated `scripts/print-contract-sizes.ts` freezing BondLedger and the review facade at committed sizes with explicit-approval policy.
+
 - Dispute liveness timeout (`ACTION_DISPUTE_TIMEOUT`, type 5) — auto-cancels escrows stuck in `DISPUTED` state when `maxDisputeDuration` elapses since `disputeRaisedTimestamp`. On trigger, finalizes the dispute and refunds the sender.
 - Slashing module integration (DR v3): `slashingModule` address in `DRMStorageBase`, wired into `recordResolution` (vindication credit via `restoreReversalSlashOnVindication`) and `recordReversal` (automated slash via `slashForReversal`).
 - `restoreReversalSlashOnVindication` in `ResolverSlashingModuleV1` — iterates prior rounds and credits resolver stake when a higher-level resolution vindicates a prior decision.
@@ -43,6 +52,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Appeal-bond distribution is now atomic in `recordResolution`** — for higher-round decisions the bond is settled as part of the resolution transition: a flipped decision refunds the bond to the escalator, a matching decision pays the prior-round resolvers. A settlement failure reverts the entire resolution (no silent `try/catch` swallow). `recordReversal` is reduced to reversal analytics + automated slashing; distribution is owned by `recordResolution`.
+- **Resolution-module authority** — `ResolverIncentiveModuleV1` gains `resolutionModule` + `setResolutionModule()` (`ROLE_TIMELOCK`). `distributeAppealBond`, `onDisputeFinalized`, and `onResolverAssigned` accept a registered escrow or the configured resolution module (`onlyEscrowOrResolutionModule`), fixing resolver-cohort population through the DRM production path.
+- **Forfeited principal is accounted** — explicit forfeiture, no-resolver payout paths, and finalization cleanup now credit `forfeitedBondReserve` instead of leaving tokens stranded with no liability destination. The reserve has no withdrawal authority in this phase.
+
 - Updated CI node-version from 20 to 22 (Node 20 deprecated on GitHub Actions runners). Swapped `setup-node`/`setup-pnpm` order so pnpm is on PATH before store-cache resolution.
 - Removed stale `.eslintrc.cjs` — ESLint v9 uses flat config (`eslint.config.cjs`) exclusively.
 - Removed `pnpm-workspace.yaml` — single-package project, was causing `packages field missing` errors in CI.
@@ -68,6 +81,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Minimal uberjar runner:** `prf-runner-sew-0.1.0-uber.jar` (18 MB) — self-contained scenario replay jar with no Clojure CLI, no source tree required. Source-only build (no AOT). Uses `java -jar ... -m resolver-sim.minimal-runner --scenario <file>` from any directory. Added `build.clj` + `bb build:sew`.
 
 ### Fixed
+
+- **Successful-appeal refund path was a silent no-op** — `DecentralizedResolutionModule.recordReversal` called `distributeAppealBond(..., true)` inside a `try/catch`, but the resolution module was not an authorised caller, so refunds never settled. Bond distribution now runs atomically from `recordResolution` with resolution-module authority.
+- **Failed-appeal resolver payout was unreachable** — `distributeAppealBond(..., false)` existed but was never invoked from any production path. `recordResolution` now calls it when a higher-round decision matches the prior round.
+- **Forfeited principal was stranded** — `forfeitAppealBond` and `onDisputeFinalized` marked principal distributed with no liability destination and no withdrawal path. Principal is now tracked in `forfeitedBondReserve`.
+- **Resolver cohorts not populated through the production path** — `onResolverAssigned` was `onlyEscrowContract`, so the DRM could not record round resolvers, leaving failed-appeal payouts to run against empty/incomplete sets. Now uses `onlyEscrowOrResolutionModule`.
 
 - **Resolver rotation capacity leak in `forceProgress()`:** When a resolver times out and `forceProgress` rotates to a new resolver, the old resolver's `resolverActiveDisputes`, `resolverCapacity.currentDisputes`, and `resolverStats.casesAssigned` are now decremented (they were never cleaned up, causing capacity drift). The old resolver's stake is unlocked via `stakingModule.onDisputeEscalated()` and the new resolver's stake is locked via `stakingModule.onResolverAssigned()`.
 - **Escalation/challenge bond leak on `finalize`:** `ResolverIncentiveModuleV2.onDisputeFinalized` was inherited as a no-op from V1, so undistributed appeal/challenge bonds for finalized rounds accumulated indefinitely. The override now iterates rounds 0 to `finalRound` and forfeits any undistributed bonds via `AppealBondForfeited`.

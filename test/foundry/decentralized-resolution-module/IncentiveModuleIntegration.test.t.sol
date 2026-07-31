@@ -604,10 +604,7 @@ contract IncentiveModuleIntegrationTest is Test {
             1 days
         );
 
-        // Distribute bond directly (appeal failed)
-        vm.prank(address(this));
-        incentiveModuleV2.distributeAppealBond(workflowId, address(escrow), 0, false);
-
+        // Bond distribution triggered by recordResolution above.
         // Verify bond was paid to resolvers (not refunded)
         ResolverIncentiveModuleV2.AppealBondRecord memory bond = incentiveModuleV2.getAppealBond(
             workflowId,
@@ -776,10 +773,7 @@ contract IncentiveModuleIntegrationTest is Test {
             1 days
         );
 
-        // Distribute bond (appeal failed)
-        vm.prank(address(this));
-        incentiveModuleV2.distributeAppealBond(workflowId, address(escrow), 0, false);
-
+        // Bond distribution triggered by recordResolution above.
         // Verify all 100 wei is distributed (no remainder lost)
         uint256 totalClaimable = incentiveModuleV2.getClaimablePayment(workflowId, address(escrow), resolver1) +
             incentiveModuleV2.getClaimablePayment(workflowId, address(escrow), resolver2) +

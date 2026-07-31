@@ -1,0 +1,73 @@
+{
+  "artifact": {
+    "id": "sew-bond-ledger-review-topology",
+    "version": "v1",
+    "description": "Canonical deployment topology and authority relationships for the BondLedger custody extraction, as submitted for PRF review.",
+    "reference_commit": "4959328",
+    "behaviour_reference_commit": "5f84818",
+    "status": "pre-deployment",
+    "deployment_addresses": {
+      "note": "Addresses TBD at deployment time. This manifest is the content-addressed topology reference; deployed addresses must be recorded in the PRF evidence bundle upon deployment."
+    }
+  },
+  "compiler": {
+    "solc": "0.8.33",
+    "optimizer": true,
+    "optimizer_runs": 200,
+    "via_ir": true
+  },
+  "contracts": {
+    "BondLedger": {
+      "source": "contracts/shared/BondLedger.sol",
+      "source_sha256": "68c38ed0f41f0d53a864e08c2b4b60db570e318f656fe91870a0fcb19914f31f",
+      "bytecode_sha256": "34123578b8dc58f3a6dae8bf244cd068fa4d8944e1444d2c9b1ad423f5677c16",
+      "runtime_bytes": 5194,
+      "role": "custody"
+    },
+    "ResolverIncentiveModuleV2BondLedger": {
+      "source": "contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV2BondLedger.sol",
+      "source_sha256": "842dac704ffd2fd6ed980298b67abeeaea7b097ff769adee33771716db66743c",
+      "bytecode_sha256": "dff65e5a1b7f49f8125804d81e035bddd65a58ce1005649597c5f34695e9c9c2",
+      "runtime_bytes": 24300,
+      "role": "sew-facing incentive facade"
+    },
+    "ResolverIncentiveModuleV2": {
+      "source": "contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV2.sol",
+      "source_sha256": "d3b6eb1159d44eaface4f9a529eb1b8a70b4dff09b98dee1af94aa356e03348b",
+      "bytecode_sha256": "b7b3647e8f1a0116d2c61871c2730f72541b5f00297283690771fafbbccd046b",
+      "runtime_bytes": 20396,
+      "role": "corrected embedded reference (fallback)"
+    },
+    "DecentralizedResolutionModule": {
+      "source": "contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol",
+      "source_sha256": "1cb93ec39897cb35619a78861d94363883541b3c4ecac54568a4b2133c5e95d0",
+      "bytecode_sha256": "924ef701ecdffd25e4e4ac3db4272bf999166310a3d82735859e4f32a3a58c83",
+      "runtime_bytes": 24533,
+      "role": "resolution"
+    },
+    "ResolverIncentiveModuleV1": {
+      "source": "contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV1.sol",
+      "source_sha256": "e654e366c22c11d1e0d529beb3d22d55216ecfc9fe47296dc936959c6abcc123",
+      "role": "base incentive lifecycle"
+    }
+  },
+  "authority": {
+    "BondLedger.AUTHORIZED_CALLER": ["ResolverIncentiveModuleV2BondLedger"],
+    "BondLedger.DEFAULT_ADMIN_ROLE": "governance timelock (post-deployment)",
+    "ResolverIncentiveModuleV1.resolutionModule": "DecentralizedResolutionModule",
+    "escrow_or_resolution_module_gated": [
+      "ResolverIncentiveModuleV2.distributeAppealBond",
+      "ResolverIncentiveModuleV2.onDisputeFinalized",
+      "ResolverIncentiveModuleV1.onResolverAssigned"
+    ]
+  },
+  "custody_flow": {
+    "post": "EscrowVault.escalateDispute -> ResolverIncentiveModuleV2BondLedger.recordAppealBond -> BondLedger.postBond (principal custody)",
+    "settle": "DecentralizedResolutionModule.recordResolution -> ResolverIncentiveModuleV2BondLedger.distributeAppealBond -> BondLedger.settleBond (exact allocation)",
+    "claim": "recipient -> BondLedger.claim / ResolverIncentiveModuleV2BondLedger claim facade -> BondLedger.claimFor",
+    "forfeit": "BondLedger.settleBond(FORFEIT) -> forfeitedBondReserve (no withdrawal authority in this phase)"
+  },
+  "accounting": {
+    "invariant": "custodied = pending principal + settled claimant liabilities + forfeited reserve"
+  }
+}
