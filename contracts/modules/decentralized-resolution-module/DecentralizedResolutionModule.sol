@@ -507,6 +507,23 @@ contract DecentralizedResolutionModule is
             }
         }
 
+        // Determine appeal bond outcome when this is a higher-round decision.
+        // If the new decision differs from the prior round, the appeal succeeded → refund.
+        // If it matches, the appeal failed → pay prior resolvers.
+        if (currentRound > 0) {
+            uint8 priorRound = currentRound - 1;
+            ResolutionOutcome priorDecision = dm.decisionAtRound[priorRound];
+            if (priorDecision != ResolutionOutcome.NONE) {
+                bool outcomeFlipped = priorDecision != outcome;
+                if (address(incentiveModule) != address(0)) {
+                    // Atomic: if bond distribution fails, the entire resolution reverts.
+                    incentiveModule.distributeAppealBond(
+                        workflowId, escrowContract, priorRound, outcomeFlipped
+                    );
+                }
+            }
+        }
+
         // After recording the new resolution, check for reversal-slash vindication.
         // If a prior round was reversed (auto-slashed) and the current outcome agrees
         // with the prior round's decision, restore the prior resolver's slashed stake.
@@ -531,6 +548,20 @@ contract DecentralizedResolutionModule is
         address escrowContract,
         uint8 priorRound
     ) external override onlyEscrowContract {
+        // Note: appeal bond distribution is handled by recordResolution when the
+        // reversal is detected during a higher-round resolution. If this function
+        // is called independently (e.g., retrospective governance action), the
+        // caller must ensure distribution has already occurred.
+        _recordReversalAnalytics(workflowId, escrowContract, priorRound);
+    }
+
+    /// @dev Internal: record reversal analytics and execute automated slash.
+    ///      Distribution of the appeal bond is handled by recordResolution.
+    function _recordReversalAnalytics(
+        uint256 workflowId,
+        address escrowContract,
+        uint8 priorRound
+    ) internal {
         DisputeMetadata storage dm = disputeMetadata[escrowContract][workflowId];
 
         if (priorRound >= dm.currentRound) revert InvalidRound(priorRound, dm.currentRound);
@@ -551,10 +582,6 @@ contract DecentralizedResolutionModule is
                 dm.currentRound,
                 emaAlphaBps
             );
-
-            if (address(incentiveModule) != address(0)) {
-                try incentiveModule.distributeAppealBond(workflowId, escrowContract, priorRound, true) {} catch {}
-            }
 
             // Execute automated reversal slash via slashing module (Track 1)
             if (slashingModule != address(0)) {

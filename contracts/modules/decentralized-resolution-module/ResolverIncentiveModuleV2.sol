@@ -43,6 +43,10 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
     uint256 public totalBondsPaidToResolvers;
     uint256 public totalBondsForfeited;
 
+    // Forfeited bond reserve: token => total principal that has no claimant
+    // Accounting rule: custodied = pending principal + claimable liabilities + forfeited reserve
+    mapping(address => uint256) public forfeitedBondReserve;
+
     // Escalation depth histogram: round => count
     mapping(uint8 => uint256) public escalationDepthHistogram;
 
@@ -170,7 +174,7 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
         uint256 amount,
         address token,
         uint8 round
-    ) external payable override onlyEscrowContract {
+    ) external payable virtual override onlyEscrowContract {
         require(depositor != address(0), 'Invalid depositor');
         require(escalatedBy != address(0), 'Invalid escalatedBy');
         require(amount > 0, 'Invalid amount');
@@ -234,7 +238,7 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
         address escrowContract,
         uint8 round,
         bool outcomeFlipped
-    ) external override onlyEscrowContract nonReentrant {
+    ) external virtual override onlyEscrowOrResolutionModule nonReentrant {
         // Validate round bounds
         require(round < 2, 'Invalid round - no higher round');
 
@@ -280,6 +284,7 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
         uint256 amount = bond.amount;
         bond.amount = 0;
         totalBondsForfeited += amount;
+        forfeitedBondReserve[bond.token] += amount;
 
         emit AppealBondForfeited(workflowId, round, amount, bond.token, reason);
     }
@@ -430,6 +435,7 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
         // If no resolvers in storage, bond is retained by protocol as revenue
         if (resolvers.length == 0) {
             totalBondsForfeited += bondAmount;
+            forfeitedBondReserve[bond.token] += bondAmount;
             emit AppealBondForfeited(workflowId, priorRound, bondAmount, bond.token, 'No resolvers recorded');
             return;
         }
@@ -448,6 +454,7 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
         // If no resolvers found at this round, bond is retained by protocol as revenue
         if (count == 0) {
             totalBondsForfeited += bondAmount;
+            forfeitedBondReserve[bond.token] += bondAmount;
             emit AppealBondForfeited(workflowId, priorRound, bondAmount, bond.token, 'No resolvers at round');
             return;
         }
@@ -491,7 +498,7 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
         address escrowContract,
         uint8 finalRound,
         ResolutionOutcome /* finalDecision */
-    ) external override onlyEscrowContract {
+    ) external virtual override onlyEscrowOrResolutionModule {
         // Forfeit any outstanding bonds for rounds 0 to finalRound
         for (uint8 round = 0; round <= finalRound; round++) {
             AppealBondRecord storage bond = appealBonds[escrowContract][workflowId][round];
@@ -500,6 +507,7 @@ contract ResolverIncentiveModuleV2 is ResolverIncentiveModuleV1 {
                 uint256 amount = bond.amount;
                 bond.amount = 0;
                 totalBondsForfeited += amount;
+                forfeitedBondReserve[bond.token] += amount;
                 emit AppealBondForfeited(workflowId, round, amount, bond.token, 'Finalize cleanup');
             }
         }
