@@ -1,0 +1,68 @@
+{
+  "cdrs_version": "0.2",
+  "schema_version": "2",
+  "scenario_id": "regression-inv-wf0-conservation",
+  "description": "Harness self-test: proves the post-step invariant gate executes for workflow 0 by corrupting the conservation accumulator (test_corrupt_deposited). Not part of the manifest-bound trace set.",
+  "fee_bps": 100,
+  "appeal_window_duration": 0,
+  "max_dispute_duration": 0,
+  "test_corrupt_deposited": 1,
+  "invariant_profile": {
+    "id": "solidity-equivalence-core-v1",
+    "version": 1,
+    "root": "31d07038dcde86ac6f34b229fded0fce98b679c2bd83130b607f0b9a2a27e19f"
+  },
+  "step_count": 2,
+  "steps": [
+    {
+      "seq": 0,
+      "cdrs_version": "0.2",
+      "event_type": "CREATE ESCROW",
+      "step_type": "protocol-transition",
+      "context_id": "wf0",
+      "actor": "buyer",
+      "timestamp": 1000,
+      "attributes": {
+        "action": "create_escrow",
+        "seq": 0,
+        "wf_alias": "wf0",
+        "to_role": "seller",
+        "amount": 1000
+      },
+      "expected": {
+        "accepted": true,
+        "state_changed": true,
+        "escrow_state": 1,
+        "escrow_amount_after_fee": 990,
+        "global_total_held": 990,
+        "global_total_fees": 10,
+        "pending_settlement_exists": false,
+        "dispute_level": 0
+      }
+    },
+    {
+      "seq": 1,
+      "cdrs_version": "0.2",
+      "event_type": "RELEASE",
+      "step_type": "protocol-transition",
+      "context_id": "wf0",
+      "actor": "buyer",
+      "timestamp": 1060,
+      "attributes": {
+        "action": "release",
+        "seq": 1,
+        "wf_alias": "wf0"
+      },
+      "expected": {
+        "accepted": true,
+        "state_changed": true,
+        "escrow_state": 2,
+        "escrow_amount_after_fee": 990,
+        "global_total_held": 0,
+        "global_total_fees": 10,
+        "pending_settlement_exists": false,
+        "dispute_level": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "cdrs_version": "0.3",
+  "schema_version": "2",
+  "scenario_id": "neg-version-unknown-cdrs",
+  "description": "Version-rejection negative: cdrs_version 0.3 is outside the supported registry.",
+  "step_count": 0,
+  "steps": []
+}

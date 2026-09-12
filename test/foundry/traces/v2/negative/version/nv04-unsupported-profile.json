@@ -1,0 +1,13 @@
+{
+  "cdrs_version": "0.2",
+  "schema_version": "2",
+  "scenario_id": "neg-version-unsupported-profile",
+  "description": "Version-rejection negative: invariant profile version 2 is not supported.",
+  "invariant_profile": {
+    "id": "solidity-equivalence-core-v1",
+    "version": 2,
+    "root": "31d07038dcde86ac6f34b229fded0fce98b679c2bd83130b607f0b9a2a27e19f"
+  },
+  "step_count": 0,
+  "steps": []
+}

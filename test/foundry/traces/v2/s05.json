@@ -86,7 +86,7 @@
       "timestamp": 1120,
       "context_id": "wf0",
       "attributes": {
-        "action": "execute_resolution",
+        "action": "release_as_dispute_resolver",
         "seq": 2,
         "wf_alias": "wf0",
         "type": "resolution",

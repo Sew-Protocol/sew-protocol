@@ -1,0 +1,7 @@
+{
+  "schema_version": "2",
+  "scenario_id": "neg-version-missing-cdrs",
+  "description": "Version-rejection negative: cdrs_version is missing (fail closed).",
+  "step_count": 0,
+  "steps": []
+}

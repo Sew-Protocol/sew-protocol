@@ -1,0 +1,8 @@
+{
+  "cdrs_version": "0.2",
+  "schema_version": "1",
+  "scenario_id": "neg-version-invalid-combo",
+  "description": "Version-rejection negative: cdrs 0.2 / schema 1 is not a supported combination.",
+  "step_count": 0,
+  "steps": []
+}

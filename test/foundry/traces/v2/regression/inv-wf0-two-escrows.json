@@ -1,0 +1,93 @@
+{
+  "cdrs_version": "0.2",
+  "schema_version": "2",
+  "scenario_id": "regression-inv-wf0-two-escrows",
+  "description": "Harness self-test: proves held-reconstruction executes for workflow 0 and is multi-escrow correct (global held == sum of per-escrow afa). Not part of the manifest-bound trace set.",
+  "fee_bps": 100,
+  "appeal_window_duration": 0,
+  "max_dispute_duration": 0,
+  "invariant_profile": {
+    "id": "solidity-equivalence-core-v1",
+    "version": 1,
+    "root": "31d07038dcde86ac6f34b229fded0fce98b679c2bd83130b607f0b9a2a27e19f"
+  },
+  "step_count": 3,
+  "steps": [
+    {
+      "seq": 0,
+      "cdrs_version": "0.2",
+      "event_type": "CREATE ESCROW",
+      "step_type": "protocol-transition",
+      "context_id": "wf0",
+      "actor": "buyer",
+      "timestamp": 1000,
+      "attributes": {
+        "action": "create_escrow",
+        "seq": 0,
+        "wf_alias": "wf0",
+        "to_role": "seller",
+        "amount": 1000
+      },
+      "expected": {
+        "accepted": true,
+        "state_changed": true,
+        "escrow_state": 1,
+        "escrow_amount_after_fee": 990,
+        "global_total_held": 990,
+        "global_total_fees": 10,
+        "pending_settlement_exists": false,
+        "dispute_level": 0
+      }
+    },
+    {
+      "seq": 1,
+      "cdrs_version": "0.2",
+      "event_type": "CREATE ESCROW",
+      "step_type": "protocol-transition",
+      "context_id": "wf1",
+      "actor": "buyer",
+      "timestamp": 1020,
+      "attributes": {
+        "action": "create_escrow",
+        "seq": 1,
+        "wf_alias": "wf1",
+        "to_role": "seller",
+        "amount": 2000
+      },
+      "expected": {
+        "accepted": true,
+        "state_changed": true,
+        "escrow_state": 1,
+        "escrow_amount_after_fee": 1980,
+        "global_total_held": 2970,
+        "global_total_fees": 30,
+        "pending_settlement_exists": false,
+        "dispute_level": 0
+      }
+    },
+    {
+      "seq": 2,
+      "cdrs_version": "0.2",
+      "event_type": "RELEASE",
+      "step_type": "protocol-transition",
+      "context_id": "wf0",
+      "actor": "buyer",
+      "timestamp": 1060,
+      "attributes": {
+        "action": "release",
+        "seq": 2,
+        "wf_alias": "wf0"
+      },
+      "expected": {
+        "accepted": true,
+        "state_changed": true,
+        "escrow_state": 2,
+        "escrow_amount_after_fee": 990,
+        "global_total_held": 1980,
+        "global_total_fees": 30,
+        "pending_settlement_exists": false,
+        "dispute_level": 0
+      }
+    }
+  ]
+}

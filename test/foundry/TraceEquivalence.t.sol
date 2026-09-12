@@ -92,13 +92,57 @@ contract TraceEquivalenceTest is Test {
     address constant GOVERNANCE = address(0x4000);
     address constant L0RESOLVER = address(0x1234);
     address constant L2RESOLVER = address(0x1238);
+    // Distinct non-authorised resolver address used by governance-sandwich
+    // traces (the "legacyresolver" role must NOT resolve to the active resolver).
+    address constant LEGACYRESOLVER = address(0x1239);
 
     // ====================================================================
     // Per-trace state (reset at start of each _replayTrace call)
     // ====================================================================
     mapping(string => uint256) internal wfAlias;
+    // Parallel "seen" set so alias → workflow 0 is distinguishable from an
+    // unset alias.  Workflow IDs are 0-based (escrowTransfers.length), so 0 is
+    // a VALID workflow id and must never be treated as "no workflow captured".
+    mapping(string => bool) internal wfAliasSeen;
     uint256 internal nextExpectedWfId;
     uint256 internal _vaultFeeBps;
+
+    // ====================================================================
+    // Replay receipt tracking (per _replayTrace, reset each call).
+    //
+    // Phase 0 (claim correctness): every fully replayed fixture emits a replay
+    // receipt under out/receipts/ so that equivalence claims can be derived
+    // from per-trace execution evidence rather than an assumed test-function
+    // inventory.  Profile activation is made observable: a v0.2 fixture must
+    // resolve AND apply the declared invariant profile with at least one
+    // invariant evaluation, or the replay fails closed.
+    // ====================================================================
+    // Phase 1 (negotiated compatibility): the harness identity.
+    string internal constant HARNESS_VERSION = "1";
+
+    // Supported fixture-spec combinations (cdrs_version, schema_version).
+    // This is the harness-side of the supported-combination registry, mirrored
+    // in scripts/reconcile.py and trace-solidity-verify.  Unknown or missing
+    // combinations fail closed; there is no autodetection or fallback.
+    bytes32 internal constant SPEC_LEGACY_V1 = keccak256(abi.encodePacked("0.1", "|", "1"));
+    bytes32 internal constant SPEC_CDRS_V2   = keccak256(abi.encodePacked("0.2", "|", "2"));
+
+    // Supported replay-spec ids (fixture-spec + profile + harness-version).
+    bytes32 internal constant REPLAY_SPEC_LEGACY =
+        keccak256(bytes("cdrs-0.1.schema-1.profile-none.harness-1"));
+    bytes32 internal constant REPLAY_SPEC_CDRS_V2 =
+        keccak256(bytes("cdrs-0.2.schema-2.profile-1.harness-1"));
+
+    // Phase 1 capability-aware frozen extension-resolution snapshot.  The root
+    // is the SHA-256 of the canonical serialisation of the built-in executable
+    // set — including each extension's SUPPORTED fixture-specs — so that the
+    // negotiated combination is only valid if every resolved extension declares
+    // support for it.  The harness recomputes this root (see
+    // _extensionResolutionRoot) and rejects drift.
+    string internal constant EXTENSION_RESOLUTION_ROOT = "sha256:091280b11d9fb3ae220517a7e8e3e4f23a985d650f89ea168a07b71863779e3d";
+
+    bool    internal _profileApplied;
+    uint256 internal _invariantEvaluations;
 
     // ====================================================================
     // CDRS v0.2 semantic tracking (reset at start of each _replayTrace call)
@@ -118,6 +162,9 @@ contract TraceEquivalenceTest is Test {
     uint256 internal _totalDeposited;
     uint256 internal _totalReleased;
     uint256 internal _totalRefunded;
+    // Per-workflow guard so terminal payouts are counted exactly once even when
+    // a workflow is observed in a terminal state across multiple accepted steps.
+    mapping(uint256 => bool) internal _terminalAccounted;
 
     // ====================================================================
     // setUp — full protocol stack, correct role grants
@@ -186,7 +233,9 @@ contract TraceEquivalenceTest is Test {
     }
 
     function _resetTraceState() internal {
-        // Clear per-trace state (note: wfAlias mapping will be overwritten per trace, no need to delete)
+        // Clear per-trace state (note: wfAlias/wfAliasSeen mappings are overwritten
+        // per trace and each forge test starts with a fresh contract instance, so no
+        // deletion is required)
         nextExpectedWfId = 0;
 
         // Reset semantic tracking state
@@ -201,6 +250,8 @@ contract TraceEquivalenceTest is Test {
         _totalDeposited = 0;
         _totalReleased = 0;
         _totalRefunded = 0;
+        _profileApplied = false;
+        _invariantEvaluations = 0;
     }
 
     // ====================================================================
@@ -274,6 +325,69 @@ contract TraceEquivalenceTest is Test {
         _assertTotalHeld(0, "after release");
     }
 
+
+    // ====================================================================
+    // appealWindowDuration == 0 immediate-finalisation behaviour
+    //
+    // Pins the contract behaviour that the regenerated zero-window traces
+    // rely on: with appealWindowDuration == 0 a resolver ruling finalises
+    // immediately (no pending settlement), matching SettlementOps
+    // computeResolutionExecution and the Clojure simulation's terminal state.
+    // ====================================================================
+
+    function test_window_zero_release_finalises_immediately() public {
+        // Apply the zero-window timeout config BEFORE the escrow is created so
+        // its module snapshot carries appealWindowDuration == 0.
+        TimeoutConfig memory tc = TimeoutConfig({
+            defaultAutoReleaseDelay: 0,
+            defaultAutoCancelDelay: 0,
+            maxDisputeDuration: 90 days,
+            appealWindowDuration: 0
+        });
+        vault.setTimeoutConfig(tc);
+
+        _createBasicEscrow();
+        uint256 wfId = 0;
+
+        vm.prank(BUYER);
+        vault.raiseDispute(wfId);
+        assertEq(uint256(vault.getEscrowState(wfId)), uint256(EscrowState.DISPUTED), "disputed");
+
+        // Zero appeal window: ruling finalises immediately, no pending settlement.
+        vm.prank(RESOLVER);
+        vault.releaseAsDisputeResolver(wfId, bytes32(0));
+
+        assertEq(uint256(vault.getEscrowState(wfId)), uint256(EscrowState.RELEASED), "immediate release at window 0");
+        (bool psExists,,,) = vault.pendingSettlements(wfId);
+        assertTrue(!psExists, "no pending settlement at window 0");
+        assertEq(vault.totalHeldInEscrowPerToken(address(token)), 0, "held zeroed on immediate release");
+    }
+
+    function test_window_zero_cancel_finalises_immediately() public {
+        TimeoutConfig memory tc = TimeoutConfig({
+            defaultAutoReleaseDelay: 0,
+            defaultAutoCancelDelay: 0,
+            maxDisputeDuration: 90 days,
+            appealWindowDuration: 0
+        });
+        vault.setTimeoutConfig(tc);
+
+        _createBasicEscrow();
+        uint256 wfId = 0;
+
+        vm.prank(BUYER);
+        vault.raiseDispute(wfId);
+
+        vm.prank(RESOLVER);
+        vault.cancelAsDisputeResolver(wfId, bytes32(0));
+
+        assertEq(uint256(vault.getEscrowState(wfId)), uint256(EscrowState.REFUNDED), "immediate refund at window 0");
+        (bool psExists,,,) = vault.pendingSettlements(wfId);
+        assertTrue(!psExists, "no pending settlement at window 0");
+        assertEq(vault.totalHeldInEscrowPerToken(address(token)), 0, "held zeroed on immediate refund");
+    }
+
+
     /**
      * Tier-0: create → raise dispute → resolver releases → pending → execute.
      */
@@ -345,9 +459,18 @@ contract TraceEquivalenceTest is Test {
      */
     function _replayTrace(string memory fixturePath) internal {
         string memory raw = vm.readFile(fixturePath);
-        
-        // Detect fixture version and dynamically update vault fee if needed
-        bool isV2 = stdJson.keyExists(raw, ".cdrs_version");
+
+        // Phase 1: negotiate the fixture-spec (cdrs_version + schema_version are
+        // mandatory; no key-presence autodetection, no fallback).  Unknown or
+        // missing combinations fail closed before any action is interpreted.
+        (bool isLegacy, bool isV2) = _negotiateSpec(raw);
+        require(isLegacy || isV2, "TraceEquivalence: unsupported fixture-spec combination");
+
+        // Every resolved extension must support the negotiated combination.
+        _assertResolutionSupportsSpec();
+
+        // Fail closed unless the negotiated replay-spec is a supported one.
+        _assertSupportedReplaySpec(_replaySpecId(isV2, raw));
         if (isV2 && stdJson.keyExists(raw, ".fee_bps")) {
             uint256 feeBps = stdJson.readUint(raw, ".fee_bps");
             if (feeBps != _vaultFeeBps) {
@@ -393,6 +516,20 @@ contract TraceEquivalenceTest is Test {
         // Reset per-trace state (alias map, semantic tracking flags)
         _resetTraceState();
 
+        // Profile resolution succeeded above (v2 only); record it AFTER the
+        // reset so the flag survives.  It is observed as "applied" only once
+        // the post-step invariant gate below evaluates the compiled profile.
+        if (isV2) {
+            _profileApplied = true;
+        }
+
+        // TEST-ONLY: deterministic conservation corruption used by the
+        // workflow-0 invariant regression to prove the post-step invariant
+        // gate executes for the primary workflow (whose id is 0).
+        if (isV2 && stdJson.keyExists(raw, ".test_corrupt_deposited")) {
+            _totalDeposited += stdJson.readUint(raw, ".test_corrupt_deposited");
+        }
+
         // Replay all steps
         uint256 stepCount = stdJson.readUint(raw, ".step_count");
         for (uint256 i = 0; i < stepCount; i++) {
@@ -402,6 +539,17 @@ contract TraceEquivalenceTest is Test {
             } else {
                 _replayStep(raw, prefix);
             }
+        }
+
+        // Profile activation must be observable (Phase 0).  A v0.2 fixture that
+        // declares an invariant profile must have had it RESOLVED and APPLIED,
+        // i.e. the post-step invariant gate evaluated at least once.  This
+        // closes the class of bug where replay "passes" while the profile never
+        // contributed any check (e.g. a fixture that never captured a workflow).
+        if (isV2) {
+            require(_profileApplied, "TraceEquivalence: invariant profile not resolved for fixture");
+            require(_invariantEvaluations > 0,
+                "TraceEquivalence: invariant profile not applied during replay (0 invariant evaluations)");
         }
 
         // Post-replay semantic assertions (v0.2 only)
@@ -419,13 +567,168 @@ contract TraceEquivalenceTest is Test {
                 string.concat("terminal_projection_hash mismatch: ", actualHash, " != ", expectedHash)
             );
         }
+
+        // Emit a replay receipt so attestation/equivalence claims can be
+        // derived from per-trace execution evidence (Phase 0).
+        _emitReceipt(fixturePath, raw, isV2);
+    }
+
+    // ── Spec negotiation + supported-registry helpers (Phase 1) ─────
+
+    /// @dev Negotiate the fixture-spec.  cdrs_version and schema_version are
+    ///      mandatory.  Returns (isLegacy, isV2); reverts on missing or
+    ///      unsupported combinations (fail closed).
+    function _negotiateSpec(string memory raw) internal view returns (bool, bool) {
+        require(stdJson.keyExists(raw, ".cdrs_version"),
+            "TraceEquivalence: missing cdrs_version (fail-closed spec negotiation)");
+        require(stdJson.keyExists(raw, ".schema_version"),
+            "TraceEquivalence: missing schema_version (fail-closed spec negotiation)");
+        string memory c = stdJson.readString(raw, ".cdrs_version");
+        string memory s = stdJson.readString(raw, ".schema_version");
+        bytes32 combo = keccak256(abi.encodePacked(c, "|", s));
+        if (combo == SPEC_LEGACY_V1) return (true, false);
+        if (combo == SPEC_CDRS_V2) return (false, true);
+        revert("TraceEquivalence: unsupported fixture-spec combination (see supported registry)");
+    }
+
+    /// @dev Reject a replay-spec id not in the supported registry.
+    function _assertSupportedReplaySpec(string memory specId) internal pure {
+        bytes32 h = keccak256(bytes(specId));
+        require(h == REPLAY_SPEC_LEGACY || h == REPLAY_SPEC_CDRS_V2,
+            string.concat("TraceEquivalence: unsupported replay-spec: ", specId));
+    }
+
+    /// @dev SHA-256 of the canonical built-in extension-resolution serialisation
+    ///      (sorted by id, each entry = id|version|kind|supported-fixture-specs).
+    ///      Mirrors scripts/reconcile.py and etc/trace-solidity-manifest.edn.
+    function _extensionResolutionRoot() internal pure returns (string memory) {
+        bytes32 digest = sha256(bytes(
+            "trace/action.resolve|1|trace/action|cdrs-0.1.schema-1,cdrs-0.2.schema-2\n"
+            "trace/profile.equivalence-v1|1|trace/invariant-profile|cdrs-0.2.schema-2\n"
+            "trace/projection.sew-v2|2|trace/state-projection|cdrs-0.2.schema-2"
+        ));
+        return string.concat("sha256:", _hex(digest));
+    }
+
+    /// @dev The negotiated combination is only valid if every resolved
+    ///      extension supports it.  The built-in matrix covers both legacy and
+    ///      v2 (action resolver: {0.1|1, 0.2|2}; profile+projection: {0.2|2}),
+    ///      and _negotiateSpec only admits these two combinations, so coverage
+    ///      is implied once the declared root matches the derived root.  If the
+    ///      built-in matrix changes, the root changes and this check fails
+    ///      closed until EXTENSION_RESOLUTION_ROOT is deliberately bumped.
+    function _assertResolutionSupportsSpec() internal view {
+        require(
+            keccak256(bytes(_extensionResolutionRoot())) == keccak256(bytes(EXTENSION_RESOLUTION_ROOT)),
+            "TraceEquivalence: extension-resolution root drift (built-in matrix changed)"
+        );
+    }
+
+    // ── Replay receipt helpers (Phase 0) ─────────────────────────────
+
+    /// @dev Lowercase hex encoding of a 32-byte value (no 0x prefix).
+    function _hex(bytes32 hash) internal pure returns (string memory) {
+        bytes memory hexChars = "0123456789abcdef";
+        bytes memory result = new bytes(64);
+        for (uint256 i = 0; i < 32; i++) {
+            uint8 b = uint8(hash[i]);
+            result[i * 2] = hexChars[b >> 4];
+            result[i * 2 + 1] = hexChars[b & 0xf];
+        }
+        return string(result);
+    }
+
+    /// @dev Sanitise a fixture path into a stable receipt filename (slashes,
+    ///      dots and spaces become underscores).
+    function _sanitizePath(string memory path) internal pure returns (string memory) {
+        bytes memory b = bytes(path);
+        bytes1 slash = '/';
+        bytes1 dot = '.';
+        bytes1 space = ' ';
+        bytes1 underscore = '_';
+        for (uint256 i = 0; i < b.length; i++) {
+            if (b[i] == slash || b[i] == dot || b[i] == space) {
+                b[i] = underscore;
+            }
+        }
+        return string(b);
+    }
+
+    /// @dev Negotiated replay-spec id for this fixture, derived from its
+    ///      declared cdrs/schema/profile versions and the harness version.
+    function _replaySpecId(bool isV2, string memory raw) internal view returns (string memory) {
+        if (!isV2) {
+            return "cdrs-0.1.schema-1.profile-none.harness-1";
+        }
+        string memory schemaVersion = "2";
+        if (stdJson.keyExists(raw, ".schema_version")) {
+            schemaVersion = stdJson.readString(raw, ".schema_version");
+        }
+        string memory profileVersion = "1";
+        if (stdJson.keyExists(raw, ".invariant_profile.version")) {
+            profileVersion = vm.toString(stdJson.readUint(raw, ".invariant_profile.version"));
+        }
+        return string.concat(
+            "cdrs-0.2.schema-", schemaVersion,
+            ".profile-", profileVersion,
+            ".harness-", HARNESS_VERSION
+        );
+    }
+
+    /// @dev Write a per-fixture replay receipt under out/receipts/.  The
+    ///      receipt binds the fixture content hash, the negotiated replay-spec,
+    ///      profile resolution/application observability, and the frozen
+    ///      extension-resolution root.  Contract/simulator commits are bound by
+    ///      the reconcile tool (Solidity cannot observe git state).
+    ///      isV2 is the NEGOTIATED value from _replayTrace, never re-derived by
+    ///      key presence (a legacy fixture legitimately carries cdrs_version).
+    function _emitReceipt(string memory fixturePath, string memory raw, bool isV2) internal {
+        string memory traceId = "";
+        if (stdJson.keyExists(raw, ".scenario_id")) {
+            traceId = stdJson.readString(raw, ".scenario_id");
+        }
+        string memory profileId = "equivalence-invariant-profile";
+        string memory profileVersion = "0";
+        if (isV2 && stdJson.keyExists(raw, ".invariant_profile.id")) {
+            profileId = stdJson.readString(raw, ".invariant_profile.id");
+        }
+        if (isV2 && stdJson.keyExists(raw, ".invariant_profile.version")) {
+            profileVersion = vm.toString(stdJson.readUint(raw, ".invariant_profile.version"));
+        }
+        string memory json = "{}";
+        json = vm.serializeString("", "trace_id", traceId);
+        json = vm.serializeString("", "fixture_path", fixturePath);
+        json = vm.serializeString("", "fixture_hash", _hex(keccak256(bytes(vm.readFile(fixturePath)))));
+        json = vm.serializeString("", "replay_spec_id", _replaySpecId(isV2, raw));
+        json = vm.serializeString("", "profile_id", profileId);
+        json = vm.serializeString("", "profile_version", profileVersion);
+        json = vm.serializeBool("", "profile_applied", _profileApplied);
+        json = vm.serializeString("", "replay_status", "pass");
+        json = vm.serializeUint("", "invariant_evaluations", _invariantEvaluations);
+        json = vm.serializeString("", "extension_resolution_root", EXTENSION_RESOLUTION_ROOT);
+        vm.writeJson(json, string.concat("out/receipts/", _sanitizePath(fixturePath), ".json"));
     }
 
     // ── Invariant snapshot helper ────────────────────────────────────
 
+
+    /// @notice Sum of amountAfterFee across every non-terminal escrow currently
+    ///         held by the vault.  Makes held-reconstruction valid for
+    ///         multi-escrow traces (totalHeld == sum of per-escrow afa) instead
+    ///         of assuming a single primary workflow.
+    function _sumHeldAfa() internal view returns (uint256 sum) {
+        uint256 n = vault.getEscrowCount();
+        for (uint256 i = 0; i < n; i++) {
+            EscrowState st = vault.getEscrowState(i);
+            if (st == EscrowState.PENDING || st == EscrowState.DISPUTED) {
+                (,,,, uint256 afa,,,,,) = vault.escrowTransfers(i);
+                sum += afa;
+            }
+        }
+    }
+
     function _snapshot(uint256 wfId) internal view returns (VaultSnapshot memory) {
         EscrowState st = vault.getEscrowState(wfId);
-        (,,,, uint256 afa,,,,,) = vault.escrowTransfers(wfId);
         uint256 held = vault.totalHeldInEscrowPerToken(address(token));
         uint256 fees = vault.totalFeesPerToken(address(token));
         (bool ps,,,) = vault.pendingSettlements(wfId);
@@ -433,7 +736,7 @@ contract TraceEquivalenceTest is Test {
         return VaultSnapshot({
             escrowState: st,
             disputeLevel: uint256(dl),
-            amountAfterFee: afa,
+            amountAfterFee: _sumHeldAfa(),
             pendingSettlementExists: ps,
             totalHeld: held,
             totalFees: fees,
@@ -507,12 +810,16 @@ contract TraceEquivalenceTest is Test {
         // ── Extract action and parameters from attributes ─────────────────
         string memory action = stdJson.readString(json, string.concat(prefix, ".attributes.action"));
         
-        // Resolve workflow ID from context_id (alias lookup)
+        // Resolve workflow ID from attributes.wf_alias.  A "seen" flag is used
+        // instead of the numeric value so that workflow 0 (valid, 0-based id)
+        // is not conflated with "no workflow captured".
         uint256 wfId = 0;
+        bool wfCaptured = false;
         if (stdJson.keyExists(json, string.concat(prefix, ".attributes.wf_alias"))) {
             string memory aliasName = stdJson.readString(json, string.concat(prefix, ".attributes.wf_alias"));
-            if (wfAlias[aliasName] != 0) {
+            if (wfAliasSeen[aliasName]) {
                 wfId = wfAlias[aliasName];
+                wfCaptured = true;
             }
         }
 
@@ -527,7 +834,7 @@ contract TraceEquivalenceTest is Test {
 
         // ── Invariant snapshots (before action) ─────────────────────────
         VaultSnapshot memory before_;
-        bool snapshotsActive = wfId != 0 && expectedAccepted;
+        bool snapshotsActive = wfCaptured && expectedAccepted;
         if (snapshotsActive) {
             before_ = _snapshot(wfId);
         }
@@ -557,15 +864,17 @@ contract TraceEquivalenceTest is Test {
             if (stdJson.keyExists(json, string.concat(prefix, ".attributes.wf_alias"))) {
                 string memory aliasName2 = stdJson.readString(json, string.concat(prefix, ".attributes.wf_alias"));
                 wfAlias[aliasName2] = newWfId;
-            if (!_hasPrimaryWfId) {
-                _primaryWfId = newWfId;
-                _hasPrimaryWfId = true;
+                wfAliasSeen[aliasName2] = true;
+                if (!_hasPrimaryWfId) {
+                    _primaryWfId = newWfId;
+                    _hasPrimaryWfId = true;
+                }
             }
-        }
-        wfId = newWfId;
-        // Track principal deposited for conservation equation
-        uint256 depositAmount = stdJson.readUint(json, string.concat(prefix, ".attributes.amount"));
-        _totalDeposited += depositAmount;
+            wfId = newWfId;
+            wfCaptured = true;
+            // Track principal deposited for conservation equation
+            uint256 depositAmount = stdJson.readUint(json, string.concat(prefix, ".attributes.amount"));
+            _totalDeposited += depositAmount;
 
         } else if (actionHash == keccak256("release")) {
             if (!expectedAccepted) {
@@ -600,14 +909,13 @@ contract TraceEquivalenceTest is Test {
             vault.raiseDispute(wfId);
 
         } else if (actionHash == keccak256("execute_resolution")) {
-            if (!expectedAccepted) {
-                vm.expectRevert();
-            }
-            
-            // Map to release_as_dispute_resolver or cancel_as_dispute_resolver
-            // For now, assume release (can enhance with params field)
-            vm.prank(caller);
-            vault.releaseAsDisputeResolver(wfId, bytes32(0));
+            // Ambiguous: the raw sim action does not carry the release/cancel
+            // direction.  The Clojure exporter rewrites this action to
+            // release_as_dispute_resolver or cancel_as_dispute_resolver before
+            // syncing, so a fixture that still contains bare execute_resolution
+            // is stale or hand-written and must be regenerated rather than
+            // silently dispatched as a release.
+            revert("TraceEquivalence: unsupported action 'execute_resolution' - export rewrites it to release_as_dispute_resolver/cancel_as_dispute_resolver");
 
         } else if (actionHash == keccak256("release_as_dispute_resolver")) {
             if (!expectedAccepted) {
@@ -644,24 +952,26 @@ contract TraceEquivalenceTest is Test {
             }
 
         } else if (actionHash == keccak256("execute_pending_settlement")) {
-            // For pending settlement execution, we need to respect the appeal deadline.
-            // Extract it from the vault and warp past it if the call is expected to succeed.
+            // Respect the appeal deadline.  A step that targets a workflow with
+            // no pending settlement is a legitimate rejected path
+            // (NoPendingSettlement) and must not blow up the harness.
             (bool psExists, bool isRelease, uint256 appealDeadline,) = vault.pendingSettlements(wfId);
-            require(psExists, "No pending settlement to execute");
-            
+
             // Check if appeal window has expired
             bool appealWindowExpired = block.timestamp >= appealDeadline;
-            
-            // If we're still in the appeal window and the test expects success, warp past it
-            if (expectedAccepted && !appealWindowExpired) {
+
+            if (!psExists) {
+                if (!expectedAccepted) {
+                    vm.expectRevert();
+                }
+            } else if (expectedAccepted && !appealWindowExpired) {
+                // Still inside the appeal window and the test expects success: warp past it
                 vm.warp(appealDeadline + 1);
-            }
-            
-            // If we're still in the appeal window and test expects failure, expect the revert
-            if (!expectedAccepted && !appealWindowExpired) {
+            } else if (!expectedAccepted && !appealWindowExpired) {
+                // Still inside the appeal window and test expects failure
                 vm.expectRevert();
             }
-            
+
             // Permissionless but we prank to track actor for semantics
             vm.prank(caller);
             vault.executePendingSettlement(wfId);
@@ -699,17 +1009,20 @@ contract TraceEquivalenceTest is Test {
         }
 
         // ── Conservation accounting (track released/refunded amounts) ───
-        // After any action that may transition to a terminal state, read the
-        // escrow's amountAfterFee and accumulate the accounting counter.
-        if (expectedAccepted && wfId != 0) {
+        // After any accepted action that may transition a workflow to a terminal
+        // state, credit its amountAfterFee exactly once.  The per-workflow guard
+        // keeps the accumulation idempotent across repeated accepted observations
+        // of an already-terminal workflow.
+        if (expectedAccepted && wfCaptured) {
             EscrowState st = vault.getEscrowState(wfId);
-            if (st == EscrowState.RELEASED || st == EscrowState.REFUNDED) {
+            if ((st == EscrowState.RELEASED || st == EscrowState.REFUNDED) && !_terminalAccounted[wfId]) {
                 (,,,, uint256 afa,,,,,) = vault.escrowTransfers(wfId);
                 if (st == EscrowState.RELEASED) {
                     _totalReleased += afa;
                 } else {
                     _totalRefunded += afa;
                 }
+                _terminalAccounted[wfId] = true;
             }
         }
 
@@ -719,8 +1032,11 @@ contract TraceEquivalenceTest is Test {
             return;
         }
 
+        // Projection assertions require a captured workflow.  Steps such as
+        // register_stake/withdraw_stake run before any escrow exists; without
+        // this guard getEscrowState(0) would revert on an empty vault.
         bool hasExpected = stdJson.keyExists(json, string.concat(expPrefix, ".escrow_state"));
-        if (!hasExpected) return;
+        if (!hasExpected || !wfCaptured) return;
 
         uint256 expectedState = stdJson.readUint(json, string.concat(expPrefix, ".escrow_state"));
         uint256 expectedAfa   = stdJson.readUint(json, string.concat(expPrefix, ".escrow_amount_after_fee"));
@@ -762,11 +1078,17 @@ contract TraceEquivalenceTest is Test {
             string.concat(stepLabel, " dispute_level mismatch"));
 
         // ── Invariant checks (after action, on post-step state) ─────────
-        if (expectedAccepted && wfId != 0) {
+        // Executes for the primary workflow even when its id is 0 (0-based
+        // workflow ids).  wfCaptured is true whenever a workflow was resolved
+        // for this step, so these checks are never silently skipped.
+        if (expectedAccepted && wfCaptured) {
             VaultSnapshot memory after_ = _snapshot(wfId);
             EquivalenceInvariantProfileV1.checkStateEquations(after_, wfId);
             EquivalenceInvariantProfileV1.checkHeldReconstruction(after_, wfId);
             EquivalenceInvariantProfileV1.checkTransitionEquations(before_, after_, action, wfId);
+            // Observable profile application: count every step where the
+            // invariant gate actually evaluated the compiled profile.
+            _invariantEvaluations += 1;
         }
     }
 
@@ -946,13 +1268,16 @@ contract TraceEquivalenceTest is Test {
         if (h == keccak256("keeper"))           return KEEPER;
         if (h == keccak256("executor"))         return EXECUTOR;
         if (h == keccak256("governance"))       return GOVERNANCE;
-        if (h == keccak256("legacyresolver"))   return RESOLVER;
+        if (h == keccak256("legacyresolver"))   return LEGACYRESOLVER;
         if (h == keccak256("resolver0"))        return RESOLVER;
         if (h == keccak256("flood_buyer") || h == keccak256("flood_buyers")) return BUYER;
         if (h == keccak256("0xAlice")) return BUYER;
         if (h == keccak256("0xBob"))   return SELLER;
         if (h == keccak256("0xseller0")) return SELLER;
-        revert(string.concat("TraceEquivalence: unknown v0.2 role: ", role));
+        // Fail loudly: an unmapped role means the fixture cannot be replayed
+        // faithfully.  Add the role to _roleToAddressV2 (and a well-known
+        // address constant) rather than silently aliasing it to another actor.
+        revert(string.concat("TraceEquivalence: unknown v0.2 role: ", role, " - add it to _roleToAddressV2"));
     }
 
     // ====================================================================
@@ -1113,7 +1438,7 @@ contract TraceEquivalenceTest is Test {
         if (h == keccak256("buyer"))    return BUYER;
         if (h == keccak256("seller"))   return SELLER;
         if (h == keccak256("resolver")) return RESOLVER;
-        revert(string.concat("TraceEquivalence: unknown role: ", role));
+        revert(string.concat("TraceEquivalence: unknown role: ", role, " - add it to _roleToAddress"));
     }
 
     // ====================================================================
@@ -1146,10 +1471,38 @@ contract TraceEquivalenceTest is Test {
         _replayTrace("test/foundry/traces/v2/sew-003.json");
     }
 
+    function test_v2_sew_001_same_block_dual_resolution() public {
+        _replayTrace("test/foundry/traces/v2/sew-001.json");
+    }
+
+    function test_v2_sew_002_pending_settlement_expiry() public {
+        _replayTrace("test/foundry/traces/v2/sew-002.json");
+    }
+
+    function test_v2_sew_004_force_refund_illegal_release() public {
+        _replayTrace("test/foundry/traces/v2/sew-004.json");
+    }
+
+
     // Reference validation — adversarial / CI review paths.
-    // ref-005 excluded: trace generated with legacy sim total_held semantics
-    // on pending settlement (same root cause as sew-001/sew-004).
-    // ref-008 excluded: uses yield-specific action "trigger-accrue".
+    // ref-002 not wired: requires propose_fraud_slash / slashing-module actions.
+    // ref-003 not wired: escrow amounts (500 wei) are below the contract's
+    // MIN_ESCROW_AMOUNT (1000), so the trace cannot be replayed faithfully;
+    // the sim does not enforce the same minimum.
+    // ref-008 not wired: uses yield-specific action "trigger-accrue".
+
+    function test_v2_ref_001_governance_sandwich() public {
+        _replayTrace("test/foundry/traces/v2/ref-001.json");
+    }
+
+    function test_v2_ref_004_bond_withdrawal_race() public {
+        _replayTrace("test/foundry/traces/v2/ref-004.json");
+    }
+
+    function test_v2_ref_005_same_block_ordering() public {
+        _replayTrace("test/foundry/traces/v2/ref-005.json");
+    }
+
     function test_v2_ref_006_autopush_settlement() public {
         _replayTrace("test/foundry/traces/v2/ref-006.json");
     }
@@ -1178,60 +1531,108 @@ contract TraceEquivalenceTest is Test {
     // These tests verify that semantic violations are caught by TraceEquivalence
     // ====================================================================
 
+    // Negative fixtures now carry an invariant profile and are required to
+    // replay fully (profile resolved + applied) and then revert at the semantic
+    // assertion layer.  _expectSemanticMismatch asserts that the replay got
+    // PAST the profile gate and failed on a "... mismatch" assertion — proving
+    // the negative test is non-vacuous (it no longer passes merely because the
+    // fixture lacked an invariant_profile and reverted at the profile require).
+    /// @dev Forge assertion failures revert with selector 0xeeaa9e6f followed by
+    ///      an ABI-encoded string (NOT a catchable Error(string)).  Strip the
+    ///      selector so the reason can be decoded.
+    function _stripSelector(bytes memory b) internal pure returns (bytes memory) {
+        bytes memory out = new bytes(b.length - 4);
+        for (uint256 i = 4; i < b.length; i++) out[i - 4] = b[i];
+        return out;
+    }
+
+    function _expectSemanticMismatch(string memory fixturePath) internal {
+        try this.replayTraceExternal(fixturePath) {
+            fail("expected semantic mismatch");
+        } catch (bytes memory b) {
+            require(b.length >= 4, "negative fixture reverted with no reason");
+            require(bytes4(b) == bytes4(0xeeaa9e6f),
+                "negative fixture did not fail on a forge assertion (likely reverted at the profile gate)");
+            string memory reason = abi.decode(_stripSelector(b), (string));
+            assertTrue(
+                _reasonContains(reason, " mismatch") && !_reasonContains(reason, "invariant profile"),
+                string.concat("expected a semantic-mismatch assertion past the profile gate, got: ", reason)
+            );
+        }
+    }
+
     function test_negative_n01_wrong_outcome() public {
         // N01: Expected outcome="refund" but actual is "release"
-        // Should fail when _assertResolutionSemantics checks outcome
-        try this.replayTraceExternal("test/foundry/traces/v2/negative/n01.json") {
-            fail("expected semantic mismatch");
-        } catch {}
+        _expectSemanticMismatch("test/foundry/traces/v2/negative/n01.json");
     }
 
     function test_negative_n02_unauthorized_resolver() public {
         // N02: Expected authorized_resolver=false but actual is true
-        // Should fail when _assertResolutionSemantics checks authorization
-        try this.replayTraceExternal("test/foundry/traces/v2/negative/n02.json") {
-            fail("expected semantic mismatch");
-        } catch {}
+        _expectSemanticMismatch("test/foundry/traces/v2/negative/n02.json");
     }
 
     function test_negative_n03_settlement_not_executed() public {
         // N03: Expected settlement_executed=false but actual is true
-        // Should fail when _assertResolutionSemantics checks settlement execution
-        try this.replayTraceExternal("test/foundry/traces/v2/negative/n03.json") {
-            fail("expected semantic mismatch");
-        } catch {}
+        _expectSemanticMismatch("test/foundry/traces/v2/negative/n03.json");
     }
 
     function test_negative_n04_wrong_escalation_level() public {
         // N04: Expected escalation.level=1 but actual is 0
-        // Should fail when _assertEscalationSemantics checks level
-        try this.replayTraceExternal("test/foundry/traces/v2/negative/n04.json") {
-            fail("expected semantic mismatch");
-        } catch {}
+        _expectSemanticMismatch("test/foundry/traces/v2/negative/n04.json");
     }
 
     function test_negative_n05_wrong_dispute_initiator() public {
         // N05: Expected dispute_initiator="seller" but actual is "buyer"
-        // Should fail when _assertParticipationSemantics checks initiator
-        try this.replayTraceExternal("test/foundry/traces/v2/negative/n05.json") {
-            fail("expected semantic mismatch");
-        } catch {}
+        _expectSemanticMismatch("test/foundry/traces/v2/negative/n05.json");
     }
 
     function test_negative_n06_auto_cancel_triggered() public {
         // N06: Expected auto_cancel_triggered=true but actual is false
-        // Should fail when _assertTimingSemantics checks auto-cancel
-        try this.replayTraceExternal("test/foundry/traces/v2/negative/n06.json") {
-            fail("expected semantic mismatch");
-        } catch {}
+        _expectSemanticMismatch("test/foundry/traces/v2/negative/n06.json");
     }
 
     function test_negative_n07_wrong_resolution_actor() public {
         // N07: Expected resolution_actor="buyer" but actual is "resolver"
-        // Should fail when _assertParticipationSemantics checks resolution actor
-        try this.replayTraceExternal("test/foundry/traces/v2/negative/n07.json") {
-            fail("expected semantic mismatch");
-        } catch {}
+        _expectSemanticMismatch("test/foundry/traces/v2/negative/n07.json");
+    }
+
+    // ====================================================================
+    // Version-rejection negative tests (Phase 1)
+    //
+    // Prove the harness negotiates fixture-specs fail-closed: missing or
+    // unsupported cdrs_version / schema_version combinations and unsupported
+    // replay-specs are rejected before any action is interpreted.  These are
+    // normal require reverts, so they are catchable as Error(string).
+    // ====================================================================
+    function _expectVersionReject(string memory fixturePath, string memory needle) internal {
+        try this.replayTraceExternal(fixturePath) {
+            fail("expected version rejection");
+        } catch Error(string memory reason) {
+            assertTrue(
+                _reasonContains(reason, needle),
+                string.concat("expected '", needle, "' in revert reason, got: ", reason)
+            );
+        }
+    }
+
+    function test_version_reject_unknown_cdrs() public {
+        _expectVersionReject("test/foundry/traces/v2/negative/version/nv01-unknown-cdrs.json",
+            "unsupported fixture-spec combination");
+    }
+
+    function test_version_reject_missing_cdrs() public {
+        _expectVersionReject("test/foundry/traces/v2/negative/version/nv02-missing-cdrs.json",
+            "missing cdrs_version");
+    }
+
+    function test_version_reject_invalid_combo() public {
+        _expectVersionReject("test/foundry/traces/v2/negative/version/nv03-invalid-combo.json",
+            "unsupported fixture-spec combination");
+    }
+
+    function test_version_reject_unsupported_profile() public {
+        _expectVersionReject("test/foundry/traces/v2/negative/version/nv04-unsupported-profile.json",
+            "unsupported replay-spec");
     }
 
     // ====================================================================
@@ -1280,6 +1681,80 @@ contract TraceEquivalenceTest is Test {
         } catch Error(string memory reason) {
             assertEq(reason, "invariant: state-transition-valid [wf 1 action raise_dispute]");
         }
+    }
+
+    // ====================================================================
+    // Workflow-0 invariant-coverage regression
+    //
+    // Workflow ids are 0-based (escrowTransfers.length), so the primary
+    // workflow of every single-escrow trace is id 0.  These regressions prove
+    // the invariant layer (before-snapshot capture, conservation accounting,
+    // state equations, held reconstruction, transition equations) actually
+    // executes for workflow 0 during trace replay.  Both fixtures are
+    // harness self-tests and are NOT part of the manifest-bound set.
+    // ====================================================================
+
+    /// @dev Substring check on a revert reason (reasons embed dynamic values).
+    function _reasonStartsWith(string memory reason, string memory prefix) internal pure returns (bool) {
+        bytes memory rb = bytes(reason);
+        bytes memory pb = bytes(prefix);
+        if (rb.length < pb.length) return false;
+        for (uint256 i = 0; i < pb.length; i++) {
+            if (rb[i] != pb[i]) return false;
+        }
+        return true;
+    }
+
+    /// @dev True iff `reason` contains `needle` anywhere.
+    function _reasonContains(string memory reason, string memory needle) internal pure returns (bool) {
+        bytes memory rb = bytes(reason);
+        bytes memory nb = bytes(needle);
+        if (nb.length == 0) return true;
+        if (rb.length < nb.length) return false;
+        for (uint256 i = 0; i + nb.length <= rb.length; i++) {
+            bool match_ = true;
+            for (uint256 j = 0; j < nb.length; j++) {
+                if (rb[i + j] != nb[j]) { match_ = false; break; }
+            }
+            if (match_) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Prove the post-step invariant gate executes for workflow 0.
+     *
+     * inv-wf0-conservation.json replays a create on the primary workflow
+     * (wf 0) while the harness conservation accumulator has been corrupted by
+     * `.test_corrupt_deposited`.  If checkStateEquations (conservation-of-funds)
+     * runs for wf 0, replay reverts with the conservation invariant reason.
+     * Before the wfId!=0 gating fix this fixture replayed without any invariant
+     * evaluation and the test failed.
+     */
+    function test_workflow0_invariant_checks_execute() public {
+        try this.replayTraceExternal("test/foundry/traces/v2/regression/inv-wf0-conservation.json") {
+            fail("invariant checks did not execute for workflow 0");
+        } catch Error(string memory reason) {
+            assertTrue(
+                _reasonStartsWith(reason, "invariant: conservation-of-funds [wf 0"),
+                string.concat("expected conservation-of-funds failure on wf 0, got: ", reason)
+            );
+        }
+    }
+
+    /**
+     * Prove held-reconstruction executes and is multi-escrow correct for
+     * workflow 0.  The fixture creates two simultaneously-held escrows (wf 0
+     * and wf 1) and takes an accepted step on wf 0 while both are PENDING.
+     * held-reconstruction then compares the GLOBAL totalHeld against the sum of
+     * per-escrow amountAfterFee; with the per-workflow-afa assumption it would
+     * revert (held != single wf afa).  Completing without revert proves the
+     * check ran for wf 0 and the sum-based reconstruction held.
+     */
+    function test_workflow0_held_reconstruction_multi_escrow() public {
+        _replayTrace("test/foundry/traces/v2/regression/inv-wf0-two-escrows.json");
+        // If replay completed, held-reconstruction evaluated for wf 0 and passed.
+        assertTrue(_hasPrimaryWfId, "primary workflow should have been captured");
     }
 
     // External wrappers so try/catch works (Solidity requires external calls for try)

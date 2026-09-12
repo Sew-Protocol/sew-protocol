@@ -72,5 +72,6 @@
         "dispute_level": 0
       }
     }
-  ]
+  ],
+  "cdrs_version": "0.1"
 }
