@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-01-21 (IEO vNext - Base Sepolia Testnet)
+
+### Security
+- Added reentrancy guards (`nonReentrant whenNotPaused`) to `recipientCancel` and `senderCancel` in `BaseEscrow`
+- Added zero-address validation to `setFeeRecipient` and `setResolutionModule` in `BaseEscrow`
+- Fixed accounting deficit vulnerability: `createEscrow` now reverts on fee-on-transfer tokens to prevent insolvency
+- Wired `CONTRACT_INSUFFICIENT_BALANCE` fault code in `_attemptAutoTransfer` for better telemetry
+
+### Fixed
+- Restored module swap wrapper functions (`queueDefaultReleaseStrategy`, `activateDefaultReleaseStrategy`) on `EscrowVault` and `EscrowableERC20` to enable post-deployment module swapping
+- Updated proposal threshold to 50k tokens (0.05% of 100M circulating supply) from 100k for more reasonable governance participation
+
+### Added
+- `ModuleSwapExecutable.t.sol`: Integration test for module swap execution flows
+- `SwapWrapperSurface.t.sol`: Compile-time guard to prevent regression of missing swap wrapper functions
+- Updated `EscrowEdgeCases.t.sol` to test `AccountingDeficit` revert for fee-on-transfer tokens
+
+### Changed
+- Updated `MainnetReleaseSequence.test.ts` to reflect new 50k proposal threshold
+- Updated deployment documentation to reflect vNext changes and status
+
+---
+
+## [Unreleased]
+
 ### Added
 
 - Security documentation (`SECURITY.md`) with responsible disclosure policy

@@ -1,6 +1,6 @@
 # Protocol Releases
 
-**Last Updated:** 2026-01-16  
+**Last Updated:** 2026-01-21  
 **Purpose:** Track all protocol releases, their status, and deployment information
 
 ---
@@ -9,7 +9,8 @@
 
 | Release | Status | Networks | Activation Date | Notes |
 |---------|--------|----------|----------------|-------|
-| **IEO** | ✅ Deployed (testnet) | Base Sepolia | 2026-01 | Core escrow + ops + governance infra deployed for integration testing |
+| **IEO vNext** | ✅ Ready (testnet) | Base Sepolia | Pending | Security hardening + module swap restoration (commit `c2b140d`, 2026-01-21) |
+| **IEO** | ✅ Deployed (testnet) | Base Sepolia | 2026-01-19 | Core escrow + ops + governance infra deployed for integration testing |
 | **DR v1** | ✅ Implemented | None | TBD | Decentralize Decisions - ready for activation |
 | **DR v2** | ✅ Implemented | None | TBD | Decentralize Incentives - ready for activation |
 | **DR v3** | 🚧 Phase 1-3 Complete | None | TBD | Decentralize Capital - interfaces + staking + slashing complete |
@@ -169,7 +170,8 @@
 
 | Release | Status | Contracts | Deployment Date | Notes |
 |---------|--------|-----------|----------------|-------|
-| **IEO** | ✅ Deployed | Core + Ops + Governance infra | 2026-01 | Integration test deployment (may redeploy) |
+| **IEO vNext** | ✅ Ready | Core + Ops + Governance infra | Pending | Security fixes + module swap restoration (commit `c2b140d`) |
+| **IEO** | ✅ Deployed | Core + Ops + Governance infra | 2026-01-19 | Integration test deployment (original, see known issues) |
 | **DR v1** | ⏸️ Not Deployed | - | - | Implemented, awaiting IEO stability |
 | **DR v2** | ⏸️ Not Deployed | - | - | Implemented, awaiting DR v1 activation |
 | **DR v3** | ⏸️ Not Deployed | - | - | Phase 1-3 complete, awaiting DR v2 activation |

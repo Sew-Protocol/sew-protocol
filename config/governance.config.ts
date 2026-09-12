@@ -114,7 +114,7 @@ export const GOVERNANCE_CONFIG = {
       45818, // blocks (~1 week)
       'VOTING_PERIOD',
     ),
-    proposalThreshold: process.env.PROPOSAL_THRESHOLD || '500000000000000000000000', // 500k tokens (0.05% of supply)
+    proposalThreshold: process.env.PROPOSAL_THRESHOLD || '50000000000000000000000', // 50k tokens (0.05% of circulating supply)
     absoluteQuorum:
       process.env.ABSOLUTE_QUORUM || '4000000000000000000000000', // 4M tokens (in wei)
   },

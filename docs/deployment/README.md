@@ -9,6 +9,12 @@ This folder contains deployment guides, release process notes, and network-speci
 - **Base Sepolia general deployment**: `BASE_SEPOLIA_DEPLOYMENT_GUIDE.md`
 - **IEO release process**: `ieo/IEO_RELEASE_GUIDE.md`
 
+## IEO vNext (2026-01-22 target deployment)
+- **vNext deployment checklist**: `ieo/IEO_VNEXT_DEPLOYMENT_CHECKLIST.md` - Step-by-step deployment guide
+- **Address migration guide**: `ieo/VNEXT_ADDRESS_MIGRATION.md` - Partner migration instructions
+- **vNext vs. original comparison**: `ieo/VNEXT_VS_ORIGINAL_COMPARISON.md` - Detailed change analysis
+- **Aave integration status**: `ieo/VNEXT_AAVE_INTEGRATION_STATUS.md` - Aave integration details and status
+
 ## Releases
 - `RELEASES.md`
 - `RELEASE_ORGANIZATION_PROPOSAL.md`
