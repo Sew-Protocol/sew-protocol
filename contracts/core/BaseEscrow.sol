@@ -228,6 +228,9 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     mapping(uint256 => ModuleSnapshot) public moduleSnapshots;
     mapping(uint256 => address) public appealBondFeeRecipients;
 
+    // Optional DRM config binding. Zero denotes a legacy module/config.
+    mapping(uint256 => uint256) public workflowResolutionConfigVersion;
+
     enum ModuleType {
         RESOLUTION,
         RELEASE,
@@ -605,6 +608,12 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
             maxDisputeDuration: timeoutConfig.maxDisputeDuration,
             appealWindowDuration: timeoutConfig.appealWindowDuration
         });
+        (bool versionRead, bytes memory versionData) = resModule.staticcall(
+            abi.encodeWithSignature('activeResolutionConfigVersion()')
+        );
+        if (versionRead && versionData.length >= 32) {
+            workflowResolutionConfigVersion[workflowId] = abi.decode(versionData, (uint256));
+        }
 
         bool pendingAutoCancelEnabled = timeoutConfig.defaultAutoCancelDelay > 0;
         bool disputedTimeoutEnabled = timeoutConfig.maxDisputeDuration > 0;
@@ -844,12 +853,14 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
             et.disputeResolver = result.updatedResolver;
         }
 
-        DisputeInitializationLibrary.initializeInModule(
+        uint256 configVersion = DisputeInitializationLibrary.initializeInModule(
             snap.resolutionModule,
             workflowId,
             et.disputeResolver,
+            workflowResolutionConfigVersion[workflowId],
             EscrowEncodingLibrary.encodeEscrowTransferData(et.token, et.from, et.to, et.amountAfterFee, escrowSettings[workflowId].releaseAddress)
         );
+        if (configVersion != 0 && configVersion != workflowResolutionConfigVersion[workflowId]) revert();
         DisputeInitializationLibrary.callResolverCallback(et.disputeResolver, workflowId);
 
         if (result.callIncentiveHook) {

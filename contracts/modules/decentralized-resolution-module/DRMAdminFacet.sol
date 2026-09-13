@@ -38,6 +38,9 @@ contract DRMAdminFacet is SlowLaneQueueActivate, AccessControl, ReentrancyGuard,
     error Unauthorized(address caller);
     error AlreadyPaused();
     error NotPaused();
+    error InvalidResolutionConfigVersion(uint256 version);
+    error InvalidRoutingPolicy(bytes32 algorithmId, uint256 algorithmVersion);
+    error InvalidRoutingMode(uint8 weightingMode, uint8 categoryRouteBehavior);
 
     // ============ Events ============
     event AdminFacetUpdated(address indexed oldFacet, address indexed newFacet);
@@ -64,6 +67,9 @@ contract DRMAdminFacet is SlowLaneQueueActivate, AccessControl, ReentrancyGuard,
     event BondTokenRegistryUpdated(address indexed oldRegistry, address indexed newRegistry);
     event NewAssignmentsPaused(address indexed pausedBy, string reason);
     event NewAssignmentsResumed(address indexed resumedBy);
+    event ResolutionConfigPublished(uint256 indexed version, bytes32 indexed root);
+    event ResolutionConfigActivated(uint256 indexed oldVersion, uint256 indexed newVersion, bytes32 root);
+    event ResolutionConfigDeprecated(uint256 indexed version, bytes32 indexed root);
 
     // ============ Modifiers ============
     modifier onlySeniorResolver() {
@@ -239,6 +245,11 @@ contract DRMAdminFacet is SlowLaneQueueActivate, AccessControl, ReentrancyGuard,
         emaAlphaBps = alphaBps;
         minEmaScoreThreshold = minScoreThreshold;
         maxTimeoutRateBps = maxTimeoutRate;
+
+        ResolutionConfig memory config = _resolutionConfigs[activeResolutionConfigVersion];
+        config.minEmaScoreThreshold = minScoreThreshold;
+        config.maxTimeoutRateBps = maxTimeoutRate;
+        _activateLegacySuccessor(config);
     }
 
     function setRoundTimeouts(
@@ -252,6 +263,11 @@ contract DRMAdminFacet is SlowLaneQueueActivate, AccessControl, ReentrancyGuard,
             resolveDeadlines[i] = roundResolveDeadlines[i];
             appealWindows[i] = roundAppealWindows[i];
         }
+
+        ResolutionConfig memory config = _resolutionConfigs[activeResolutionConfigVersion];
+        config.resolveDeadlines = roundResolveDeadlines;
+        config.appealWindows = roundAppealWindows;
+        _activateLegacySuccessor(config);
     }
 
     function setDisputeTimeout(uint256 t) external onlyRole(ROLE_TIMELOCK) {
@@ -259,6 +275,67 @@ contract DRMAdminFacet is SlowLaneQueueActivate, AccessControl, ReentrancyGuard,
             revert InvalidDisputeTimeout(t, 1, MAX_DISPUTE_TIMEOUT);
         }
         disputeTimeout = t;
+    }
+
+    // ============ Versioned Resolution Configuration ==========
+
+    function publishResolutionConfig(ResolutionConfig memory config) external onlyRole(ROLE_TIMELOCK) {
+        for (uint256 i = 0; i < 3; i++) {
+            if (config.resolveDeadlines[i] == 0 || config.resolveDeadlines[i] > MAX_DISPUTE_TIMEOUT) {
+                revert InvalidDisputeTimeout(config.resolveDeadlines[i], 1, MAX_DISPUTE_TIMEOUT);
+            }
+        }
+        if (config.escalationCostConfig.baseCost == 0 && config.escalationCostConfig.enabled) {
+            revert InvalidBaseCost(config.escalationCostConfig.baseCost, config.escalationCostConfig.enabled);
+        }
+        if (config.routingPolicyAlgorithmId != ROUTING_POLICY_ALGORITHM_ID
+            || config.routingPolicyAlgorithmVersion != ROUTING_POLICY_ALGORITHM_VERSION) {
+            revert InvalidRoutingPolicy(config.routingPolicyAlgorithmId, config.routingPolicyAlgorithmVersion);
+        }
+        if (uint8(config.weightingMode) > uint8(ResolverWeightingMode.MANUAL_WEIGHT_ONLY)
+            || uint8(config.categoryRouteBehavior) > uint8(CategoryRouteBehavior.CATEGORY_ONLY)) {
+            revert InvalidRoutingMode(uint8(config.weightingMode), uint8(config.categoryRouteBehavior));
+        }
+        if (config.minEmaScoreThreshold > ResolutionAnalytics.EMA_PRECISION) {
+            revert InvalidThreshold(config.minEmaScoreThreshold, ResolutionAnalytics.EMA_PRECISION);
+        }
+        if (config.maxTimeoutRateBps > BASIS_POINTS_DENOMINATOR) {
+            revert InvalidTimeoutRate(config.maxTimeoutRateBps, BASIS_POINTS_DENOMINATOR);
+        }
+        uint256 version = ++resolutionConfigCount;
+        _storeResolutionConfig(version, config);
+        emit ResolutionConfigPublished(version, _resolutionConfigs[version].root);
+    }
+
+    function activateResolutionConfig(uint256 version) public onlyRole(ROLE_TIMELOCK) {
+        if (version == 0 || version > resolutionConfigCount || _resolutionConfigs[version].deprecated) {
+            revert InvalidResolutionConfigVersion(version);
+        }
+        uint256 oldVersion = activeResolutionConfigVersion;
+        activeResolutionConfigVersion = version;
+        emit ResolutionConfigActivated(oldVersion, version, _resolutionConfigs[version].root);
+    }
+
+    function setDefaultResolutionConfigVersion(uint256 version) external onlyRole(ROLE_TIMELOCK) {
+        activateResolutionConfig(version);
+    }
+
+    function deprecateResolutionConfig(uint256 version) external onlyRole(ROLE_TIMELOCK) {
+        if (version == 0 || version > resolutionConfigCount || version == activeResolutionConfigVersion) {
+            revert InvalidResolutionConfigVersion(version);
+        }
+        _resolutionConfigs[version].deprecated = true;
+        emit ResolutionConfigDeprecated(version, _resolutionConfigs[version].root);
+    }
+
+    /// @dev Legacy governance entry points remain prospective by deriving a new immutable default.
+    function _activateLegacySuccessor(ResolutionConfig memory config) internal {
+        uint256 oldVersion = activeResolutionConfigVersion;
+        uint256 version = ++resolutionConfigCount;
+        _storeResolutionConfig(version, config);
+        activeResolutionConfigVersion = version;
+        emit ResolutionConfigPublished(version, _resolutionConfigs[version].root);
+        emit ResolutionConfigActivated(oldVersion, version, _resolutionConfigs[version].root);
     }
 
     // ============ Escalation Config Governance ============
@@ -279,6 +356,9 @@ contract DRMAdminFacet is SlowLaneQueueActivate, AccessControl, ReentrancyGuard,
         if (!pending.exists || block.timestamp < pending.eta) revert NoPending();
         EscalationConfig memory old = escalationConfig[level];
         escalationConfig[level] = pending.config;
+        ResolutionConfig memory config = _resolutionConfigs[activeResolutionConfigVersion];
+        config.escalationConfigs[level] = pending.config;
+        _activateLegacySuccessor(config);
         emit EscalationConfigActivated(level, old, pending.config);
         emit EscalationConfigUpdated(level, pending.config);
         delete _pendingEscalationConfig[level];
@@ -308,6 +388,9 @@ contract DRMAdminFacet is SlowLaneQueueActivate, AccessControl, ReentrancyGuard,
         if (!pending.exists || block.timestamp < pending.eta) revert NoPending();
         EscalationCostConfig memory oldConfig = escalationCostConfig;
         escalationCostConfig = pending.config;
+        ResolutionConfig memory config = _resolutionConfigs[activeResolutionConfigVersion];
+        config.escalationCostConfig = pending.config;
+        _activateLegacySuccessor(config);
         emit EscalationCostConfigActivated(oldConfig, pending.config);
         delete _pendingEscalationCostConfig;
     }
@@ -335,6 +418,10 @@ contract DRMAdminFacet is SlowLaneQueueActivate, AccessControl, ReentrancyGuard,
         externalResolver = resolver;
         escalationConfig[2].enabled = true;
         escalationConfig[2].resolver = resolver;
+        ResolutionConfig memory config = _resolutionConfigs[activeResolutionConfigVersion];
+        config.externalResolver = resolver;
+        config.escalationConfigs[2] = escalationConfig[2];
+        _activateLegacySuccessor(config);
         emit ExternalResolverUpdated(old, resolver);
     }
 

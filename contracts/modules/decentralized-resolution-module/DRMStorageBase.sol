@@ -23,6 +23,8 @@ abstract contract DRMStorageBase is DecentralizedResolverStructs {
     uint256 public constant DEFAULT_DISPUTE_TIMEOUT = 7 days;
     uint256 public constant MAX_DISPUTE_TIMEOUT = 365 days;
     uint256 public constant ACCEPT_DEADLINE = 30 minutes;
+    bytes32 public constant ROUTING_POLICY_ALGORITHM_ID = keccak256('DRM_ROUTING_POLICY');
+    uint256 public constant ROUTING_POLICY_ALGORITHM_VERSION = 1;
 
     // ============ EMA Parameters ============
     uint256 public emaAlphaBps = 1000;
@@ -96,4 +98,48 @@ abstract contract DRMStorageBase is DecentralizedResolverStructs {
     // reversal slashing and vindication restoration.
     // Only appended — do not reorder preceding slots.
     address public slashingModule;
+
+    // ============ Versioned Resolution Configurations ==========
+    // Append-only snapshots. Existing workflows retain their bound version even if deprecated.
+    mapping(uint256 => ResolutionConfig) internal _resolutionConfigs;
+    uint256 public resolutionConfigCount;
+    uint256 public activeResolutionConfigVersion;
+    mapping(address => mapping(uint256 => uint256)) public workflowResolutionConfigVersion;
+
+    function _resolutionConfig(address escrowContract, uint256 workflowId)
+        internal
+        view
+        returns (ResolutionConfig storage config)
+    {
+        uint256 version = workflowResolutionConfigVersion[escrowContract][workflowId];
+        if (version == 0) version = activeResolutionConfigVersion;
+        config = _resolutionConfigs[version];
+    }
+
+    function _resolutionConfigRoot(ResolutionConfig memory config) internal view returns (bytes32) {
+        return keccak256(abi.encode(
+            'DRM_RESOLUTION_CONFIG_V1',
+            block.chainid,
+            address(this),
+            config.resolveDeadlines,
+            config.appealWindows,
+            config.escalationConfigs,
+            config.escalationCostConfig,
+            config.externalResolver,
+            config.bondAssetFixed,
+            config.categoryKeys,
+            config.routingPolicyAlgorithmId,
+            config.routingPolicyAlgorithmVersion,
+            config.minEmaScoreThreshold,
+            config.maxTimeoutRateBps,
+            config.weightingMode,
+            config.categoryRouteBehavior
+        ));
+    }
+
+    function _storeResolutionConfig(uint256 version, ResolutionConfig memory config) internal {
+        config.deprecated = false;
+        config.root = _resolutionConfigRoot(config);
+        _resolutionConfigs[version] = config;
+    }
 }

@@ -400,6 +400,7 @@ contract DRv1FuzzTest is Test {
 
     function testFuzz_ReversalRecording(uint8 numDisputes, uint256 seed) public {
         numDisputes = uint8(bound(numDisputes, 1, 20));
+        bytes memory escrowData = abi.encode(address(1), address(2), address(3), uint256(1));
 
         uint256 expectedReversals = 0;
 
@@ -421,7 +422,7 @@ contract DRv1FuzzTest is Test {
             if (rand == 1) {
                 // Escalate to senior resolver
                 vm.prank(escrowContract);
-                resolutionModule.executeEscalation(workflowId, escrowContract, '');
+                resolutionModule.executeEscalation(workflowId, escrowContract, escrowData);
 
                 // Senior decides differently (reversal)
                 ResolutionOutcome outcome2 = ResolutionOutcome.CANCEL;
@@ -491,6 +492,7 @@ contract DRv1FuzzTest is Test {
 
     function testFuzz_RoundBasedDisputeFlow(uint8 numDisputes, uint256 seed) public {
         numDisputes = uint8(bound(numDisputes, 1, 30));
+        bytes memory escrowData = abi.encode(address(1), address(2), address(3), uint256(1));
 
         for (uint256 i = 0; i < numDisputes; i++) {
             uint256 workflowId = i + 1;
@@ -538,7 +540,7 @@ contract DRv1FuzzTest is Test {
                 );
 
                 vm.prank(escrowContract);
-                resolutionModule.executeEscalation(workflowId, escrowContract, '');
+                resolutionModule.executeEscalation(workflowId, escrowContract, escrowData);
 
                 dm = resolutionModule.getDisputeMetadata(workflowId, escrowContract);
                 currentRound = dm.currentRound;

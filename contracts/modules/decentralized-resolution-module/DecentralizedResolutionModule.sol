@@ -62,6 +62,7 @@ contract DecentralizedResolutionModule is
     error Unauthorized(address caller);
     error AlreadyPaused();
     error NotPaused();
+    error InvalidResolutionConfigVersion(uint256 version);
 
     // ============ Events ============
     event DecisionSubmitted(uint256 indexed workflowId, uint8 round, address indexed resolver, ResolutionOutcome decision);
@@ -95,6 +96,24 @@ contract DecentralizedResolutionModule is
             multiplier: 0,
             bondToken: address(0)
         });
+
+        ResolutionConfig memory initialConfig;
+        initialConfig.resolveDeadlines = resolveDeadlines;
+        initialConfig.appealWindows = appealWindows;
+        initialConfig.escalationConfigs[0] = escalationConfig[0];
+        initialConfig.escalationConfigs[1] = escalationConfig[1];
+        initialConfig.escalationConfigs[2] = escalationConfig[2];
+        initialConfig.escalationCostConfig = escalationCostConfig;
+        initialConfig.externalResolver = externalResolver;
+        initialConfig.routingPolicyAlgorithmId = ROUTING_POLICY_ALGORITHM_ID;
+        initialConfig.routingPolicyAlgorithmVersion = ROUTING_POLICY_ALGORITHM_VERSION;
+        initialConfig.minEmaScoreThreshold = minEmaScoreThreshold;
+        initialConfig.maxTimeoutRateBps = maxTimeoutRateBps;
+        initialConfig.weightingMode = ResolverWeightingMode.QUALITY_FILTERED;
+        initialConfig.categoryRouteBehavior = CategoryRouteBehavior.FALLBACK_TO_GLOBAL;
+        resolutionConfigCount = 1;
+        activeResolutionConfigVersion = 1;
+        _storeResolutionConfig(1, initialConfig);
     }
 
     // ============ Admin Facet Bootstrap ============
@@ -159,6 +178,10 @@ contract DecentralizedResolutionModule is
     function setStakingModule(address) external { _delegateAdmin(); }
     function pauseNewAssignments(string memory) external { _delegateAdmin(); }
     function resumeNewAssignments() external { _delegateAdmin(); }
+    function publishResolutionConfig(ResolutionConfig memory) external { _delegateAdmin(); }
+    function activateResolutionConfig(uint256) external { _delegateAdmin(); }
+    function setDefaultResolutionConfigVersion(uint256) external { _delegateAdmin(); }
+    function deprecateResolutionConfig(uint256) external { _delegateAdmin(); }
 
     // View/pure helpers — implemented directly (no delegation needed)
     function areNewAssignmentsPaused() external view returns (bool) { return newAssignmentsPaused; }
@@ -178,6 +201,14 @@ contract DecentralizedResolutionModule is
     function getPendingEscalationCostConfig() external view returns (EscalationCostConfig memory config, uint64 eta, bool exists) {
         PendingEscalationCostConfig storage p = _pendingEscalationCostConfig;
         return (p.config, p.eta, p.exists);
+    }
+    function getResolutionConfig(uint256 version) external view returns (ResolutionConfig memory) {
+        if (version == 0 || version > resolutionConfigCount) revert InvalidResolutionConfigVersion(version);
+        return _resolutionConfigs[version];
+    }
+    function resolutionConfigRoot(uint256 version) external view returns (bytes32) {
+        if (version == 0 || version > resolutionConfigCount) revert InvalidResolutionConfigVersion(version);
+        return _resolutionConfigs[version].root;
     }
     function generateCategoryKey(address token, uint256 amount, string memory t) external pure returns (bytes32) { return keccak256(abi.encode(token, amount, t)); }
     function autoCategorizeEscrow(bytes calldata d) external pure returns (bytes32) { return ResolutionTableLibrary.autoCategorize(d); }
@@ -272,12 +303,7 @@ contract DecentralizedResolutionModule is
         DisputeMetadata memory dm = disputeMetadata[escrowContract][workflowId];
         address currentResolver = dm.resolverAtRound[dm.currentRound];
         if (currentResolver != address(0)) return (currentResolver, dm.currentRound);
-        bytes32 cat = escrowCategory[escrowContract][workflowId];
-        if (cat != bytes32(0) && resolutionTable[cat].enabled) {
-            address selected = _selectResolverRoundRobin(cat, false);
-            if (selected != address(0)) return (selected, 0);
-        }
-        return (_selectResolverRoundRobin(bytes32(0), false), 0);
+        return (_selectResolverForWorkflow(escrowContract, workflowId, dm.categoryKey, false), 0);
     }
 
     function canEscalate(
@@ -330,15 +356,15 @@ contract DecentralizedResolutionModule is
         DisputeMetadata storage dm = disputeMetadata[escrowContract][workflowId];
         uint8 toRound = quote.successorRound;
         address nextRes = quote.successorResolver;
-        if (toRound == 1) _advanceRoundRobinCounter(escrowCategory[escrowContract][workflowId], true);
+        if (toRound == 1) _advanceRoundRobinCounterForWorkflow(escrowContract, workflowId, dm.categoryKey, true);
 
         dm.currentRound = toRound;
         dm.resolverAtRound[toRound] = nextRes;
         dm.assignedAt = block.timestamp;
-        dm.resolveBy = block.timestamp + resolveDeadlines[toRound];
+        dm.resolveBy = block.timestamp + _resolutionConfig(escrowContract, workflowId).resolveDeadlines[toRound];
         resolverStats[nextRes].casesAssigned++;
 
-        emit ResolverAssigned(workflowId, nextRes, escrowCategory[escrowContract][workflowId], toRound);
+        emit ResolverAssigned(workflowId, nextRes, dm.categoryKey, toRound);
 
         if (address(incentiveModule) != address(0)) {
             try incentiveModule.onResolverAssigned(workflowId, escrowContract, nextRes, toRound) {} catch {
@@ -368,21 +394,19 @@ contract DecentralizedResolutionModule is
         ));
 
         if (!quote.finalRound && dm.status == DisputeStatus.Decided && quote.appealedDecision != ResolutionOutcome.NONE
-            && quote.appealDeadline > block.timestamp && escalationConfig[quote.successorRound].enabled) {
+            && quote.appealDeadline > block.timestamp
+            && _resolutionConfig(escrowContract, workflowId).escalationConfigs[quote.successorRound].enabled) {
+            ResolutionConfig storage config = _resolutionConfig(escrowContract, workflowId);
             if (quote.successorRound == 1) {
-                quote.successorResolver = _selectResolverRoundRobin(escrowCategory[escrowContract][workflowId], true);
+                quote.successorResolver = _selectResolverForWorkflow(escrowContract, workflowId, dm.categoryKey, true);
             } else if (quote.successorRound == 2) {
-                quote.successorResolver = externalResolver;
+                quote.successorResolver = config.externalResolver;
             }
             quote.appealable = quote.successorResolver != address(0);
-            if (quote.appealable && escalationCostConfig.enabled
-                && !(quote.successorRound == 2 && externalResolver != address(0))) {
-                quote.baseBondAmount = EscalationCostLibrary.calculateEscalationCost(quote.predecessorRound, escalationCostConfig);
-                (address escrowToken, , , ) = abi.decode(escrowData, (address, address, address, uint256));
-                quote.baseBondAsset = escrowToken;
-                if (address(bondTokenRegistry) != address(0) && !bondTokenRegistry.isAccepted(quote.baseBondAsset)) {
-                    quote.baseBondAsset = bondTokenRegistry.defaultBondToken();
-                }
+            if (quote.appealable && config.escalationCostConfig.enabled
+                && !(quote.successorRound == 2 && config.externalResolver != address(0))) {
+                quote.baseBondAmount = EscalationCostLibrary.calculateEscalationCost(quote.predecessorRound, config.escalationCostConfig);
+                quote.baseBondAsset = _bondAsset(config, escrowData);
             }
         }
         quote.resolutionQuoteRoot = keccak256(abi.encode(
@@ -394,23 +418,19 @@ contract DecentralizedResolutionModule is
     }
 
     function getRequiredAppealBond(
-        uint256, // workflowId
-        address, // escrowContract
+        uint256 workflowId,
+        address escrowContract,
         uint8 currentLevel,
         bytes calldata escrowData
     ) external view override returns (uint256 amount, address token) {
         uint8 nextRound = currentLevel + 1;
-        if (nextRound == 2 && externalResolver != address(0)) return (0, address(0));
-        if (!escalationCostConfig.enabled) return (0, address(0));
+        ResolutionConfig storage config = _resolutionConfig(escrowContract, workflowId);
+        if (nextRound == 2 && config.externalResolver != address(0)) return (0, address(0));
+        if (!config.escalationCostConfig.enabled) return (0, address(0));
 
-        uint256 bondAmount = EscalationCostLibrary.calculateEscalationCost(currentLevel, escalationCostConfig);
+        uint256 bondAmount = EscalationCostLibrary.calculateEscalationCost(currentLevel, config.escalationCostConfig);
 
-        (address escrowToken, , , ) = abi.decode(escrowData, (address, address, address, uint256));
-        address bondToken = escrowToken;
-        if (address(bondTokenRegistry) != address(0) && !bondTokenRegistry.isAccepted(bondToken)) {
-            bondToken = bondTokenRegistry.defaultBondToken();
-        }
-        return (bondAmount, bondToken);
+        return (bondAmount, _bondAsset(config, escrowData));
     }
 
     function moduleName() external pure override returns (string memory) { return 'DecentralizedResolution'; }
@@ -457,11 +477,12 @@ contract DecentralizedResolutionModule is
         dm.status = DisputeStatus.Open;
         dm.resolverAtRound[0] = resolver;
         dm.assignedAt = block.timestamp;
-        dm.resolveBy = block.timestamp + resolveDeadlines[0];
+        dm.resolveBy = block.timestamp + _resolutionConfig(escrowContract, workflowId).resolveDeadlines[0];
+        dm.categoryKey = categoryKey;
         escrowCategory[escrowContract][workflowId] = categoryKey;
 
         resolverStats[resolver].casesAssigned++;
-        _advanceRoundRobinCounter(categoryKey, false);
+        _advanceRoundRobinCounterForWorkflow(escrowContract, workflowId, categoryKey, false);
         emit ResolverAssigned(workflowId, resolver, categoryKey, 0);
 
         if (address(incentiveModule) != address(0)) {
@@ -476,7 +497,29 @@ contract DecentralizedResolutionModule is
         address escrowContract,
         bytes calldata escrowData
     ) external onlyEscrowContract {
-        (address token, address from, address to, uint256 amountAfterFee, ) = abi.decode(
+        _initializeDisputeWithCategory(workflowId, escrowContract, escrowData);
+    }
+
+    /// @dev Optional extension selected by BaseEscrow without changing IResolutionModule.
+    function initializeDisputeWithCategoryAndConfig(
+        uint256 workflowId,
+        address escrowContract,
+        bytes calldata escrowData,
+        uint256 configVersion
+    ) external onlyEscrowContract {
+        if (configVersion == 0 || configVersion > resolutionConfigCount || _resolutionConfigs[configVersion].deprecated) {
+            revert InvalidResolutionConfigVersion(configVersion);
+        }
+        workflowResolutionConfigVersion[escrowContract][workflowId] = configVersion;
+        _initializeDisputeWithCategory(workflowId, escrowContract, escrowData);
+    }
+
+    function _initializeDisputeWithCategory(
+        uint256 workflowId,
+        address escrowContract,
+        bytes calldata escrowData
+    ) internal {
+        (, , , uint256 amountAfterFee, ) = abi.decode(
             escrowData, (address, address, address, uint256, address)
         );
 
@@ -485,12 +528,7 @@ contract DecentralizedResolutionModule is
         if (dm.resolverAtRound[0] != address(0)) revert AlreadyInitialized(workflowId);
 
         address resolver;
-        if (cat != bytes32(0) && resolutionTable[cat].enabled) {
-            resolver = _selectResolverRoundRobin(cat, false);
-        }
-        if (resolver == address(0)) {
-            resolver = _selectResolverRoundRobin(bytes32(0), false);
-        }
+        resolver = _selectResolverForWorkflow(escrowContract, workflowId, cat, false);
         if (resolver == address(0)) return;
 
         if (!resolverActive[resolver]) revert ResolverInactive(resolver);
@@ -516,11 +554,12 @@ contract DecentralizedResolutionModule is
         dm.status = DisputeStatus.Open;
         dm.resolverAtRound[0] = resolver;
         dm.assignedAt = block.timestamp;
-        dm.resolveBy = block.timestamp + resolveDeadlines[0];
+        dm.resolveBy = block.timestamp + _resolutionConfig(escrowContract, workflowId).resolveDeadlines[0];
+        dm.categoryKey = cat;
         escrowCategory[escrowContract][workflowId] = cat;
 
         resolverStats[resolver].casesAssigned++;
-        _advanceRoundRobinCounter(cat, false);
+        _advanceRoundRobinCounterForWorkflow(escrowContract, workflowId, cat, false);
         emit ResolverAssigned(workflowId, resolver, cat, 0);
 
         if (address(incentiveModule) != address(0)) {
@@ -547,7 +586,7 @@ contract DecentralizedResolutionModule is
 
         dm.decisionAtRound[currentRound] = outcome;
         dm.decidedAtRound[currentRound] = block.timestamp;
-        dm.appealDeadline[currentRound] = block.timestamp + appealWindows[currentRound];
+        dm.appealDeadline[currentRound] = block.timestamp + _resolutionConfig(escrowContract, workflowId).appealWindows[currentRound];
         dm.status = DisputeStatus.Decided;
 
         ResolutionAnalytics.recordSuccessfulResolution(resolverStats[resolver], resolver, resolutionTime, emaAlphaBps);
@@ -732,15 +771,15 @@ contract DecentralizedResolutionModule is
             }
         }
 
-        bytes32 category = escrowCategory[escrowContract][workflowId];
+        bytes32 category = dm.categoryKey;
         address newResolver;
 
         if (currentRound == 0) {
-            newResolver = _selectResolverRoundRobin(category, false);
-            if (newResolver != address(0)) _advanceRoundRobinCounter(category, false);
+            newResolver = _selectResolverForWorkflow(escrowContract, workflowId, category, false);
+            if (newResolver != address(0)) _advanceRoundRobinCounterForWorkflow(escrowContract, workflowId, category, false);
         } else if (currentRound == 1) {
-            newResolver = _selectResolverRoundRobin(category, true);
-            if (newResolver != address(0)) _advanceRoundRobinCounter(category, true);
+            newResolver = _selectResolverForWorkflow(escrowContract, workflowId, category, true);
+            if (newResolver != address(0)) _advanceRoundRobinCounterForWorkflow(escrowContract, workflowId, category, true);
         }
 
         if (newResolver != address(0) && newResolver != timedOutResolver) {
@@ -770,7 +809,7 @@ contract DecentralizedResolutionModule is
 
             dm.resolverAtRound[currentRound] = newResolver;
             dm.assignedAt = block.timestamp;
-            dm.resolveBy = block.timestamp + resolveDeadlines[currentRound];
+            dm.resolveBy = block.timestamp + _resolutionConfig(escrowContract, workflowId).resolveDeadlines[currentRound];
             emit ResolverAssigned(workflowId, newResolver, category, currentRound);
 
             if (address(incentiveModule) != address(0)) {
@@ -821,6 +860,25 @@ contract DecentralizedResolutionModule is
 
     // ============ Internal Helpers ============
 
+    function _categoryEnabled(ResolutionConfig storage config, bytes32 category) internal view returns (bool) {
+        uint256 len = config.categoryKeys.length;
+        if (len == 0) return resolutionTable[category].enabled;
+        for (uint256 i = 0; i < len; i++) {
+            if (config.categoryKeys[i] == category) return true;
+        }
+        return false;
+    }
+
+    function _bondAsset(ResolutionConfig storage config, bytes calldata escrowData) internal view returns (address) {
+        if (config.bondAssetFixed) return config.escalationCostConfig.bondToken;
+
+        (address escrowToken, , , ) = abi.decode(escrowData, (address, address, address, uint256));
+        if (address(bondTokenRegistry) != address(0) && !bondTokenRegistry.isAccepted(escrowToken)) {
+            return bondTokenRegistry.defaultBondToken();
+        }
+        return escrowToken;
+    }
+
     function _selectResolverRoundRobin(bytes32 category, bool useSenior) internal view returns (address) {
         if (newAssignmentsPaused) return address(0);
 
@@ -845,6 +903,69 @@ contract DecentralizedResolutionModule is
             ) return cand;
         }
         return address(0);
+    }
+
+    function _selectResolverForWorkflow(address escrowContract, uint256 workflowId, bytes32 category, bool useSenior)
+        internal
+        view
+        returns (address)
+    {
+        uint256 version = workflowResolutionConfigVersion[escrowContract][workflowId];
+        if (version == 0) {
+            // Legacy workflows deliberately retain the mutable global routing policy.
+            if (category != bytes32(0) && resolutionTable[category].enabled) {
+                address selected = _selectResolverRoundRobin(category, useSenior);
+                if (selected != address(0)) return selected;
+            }
+            return _selectResolverRoundRobin(bytes32(0), useSenior);
+        }
+
+        ResolutionConfig storage config = _resolutionConfigs[version];
+        bool categoryAllowed = category != bytes32(0) && _categoryEnabled(config, category);
+        if (categoryAllowed) {
+            address selected = _selectResolverWithConfig(config, version, category, useSenior);
+            if (selected != address(0)) return selected;
+        }
+        if (config.categoryRouteBehavior == CategoryRouteBehavior.CATEGORY_ONLY && category != bytes32(0)) return address(0);
+        return _selectResolverWithConfig(config, version, bytes32(0), useSenior);
+    }
+
+    function _selectResolverWithConfig(ResolutionConfig storage config, uint256, bytes32 category, bool useSenior)
+        internal
+        view
+        returns (address)
+    {
+        if (newAssignmentsPaused) return address(0);
+        address[] storage list = useSenior ? approvedSeniorResolvers : approvedResolvers;
+        uint256 len = list.length;
+        if (len == 0) return address(0);
+        bytes32 cursorCategory = category;
+        uint256 curIdx = useSenior ? categorySeniorResolverIndex[cursorCategory] : categoryResolverIndex[cursorCategory];
+        bytes32 blockHash = block.number >= 256 ? blockhash(block.number - 256) : blockhash(0);
+        uint256 offset = uint256(keccak256(abi.encodePacked(blockHash, cursorCategory, curIdx))) % len;
+        for (uint256 i = 0; i < len; i++) {
+            address cand = list[(curIdx + offset + i) % len];
+            if (resolverStats[cand].assignmentWeight == 0) continue;
+            if (config.weightingMode == ResolverWeightingMode.QUALITY_FILTERED) {
+                if (ResolutionAnalytics.calculateWorkloadWeight(resolverStats[cand], config.minEmaScoreThreshold) == 0) continue;
+                if (ResolutionAnalytics.getTimeoutRate(resolverStats[cand]) > config.maxTimeoutRateBps) continue;
+            }
+            if (resolverActive[cand] && resolverCapacity[cand].acceptsNewDisputes
+                && (resolverCapacity[cand].maxConcurrentDisputes == 0
+                    || resolverCapacity[cand].currentDisputes < resolverCapacity[cand].maxConcurrentDisputes)) return cand;
+        }
+        return address(0);
+    }
+
+    function _advanceRoundRobinCounterForWorkflow(address escrowContract, uint256 workflowId, bytes32 category, bool useSenior)
+        internal
+    {
+        uint256 version = workflowResolutionConfigVersion[escrowContract][workflowId];
+        if (version != 0) {
+            _advanceRoundRobinCounter(category, useSenior);
+            return;
+        }
+        _advanceRoundRobinCounter(category, useSenior);
     }
 
     function _advanceRoundRobinCounter(bytes32 category, bool useSenior) internal {

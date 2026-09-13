@@ -26,6 +26,18 @@ interface DecentralizedResolverStructs {
         Final // 3 - No further appeals possible
     }
 
+    /// @notice Selection policy for config-bound resolver routing.
+    enum ResolverWeightingMode {
+        QUALITY_FILTERED,
+        MANUAL_WEIGHT_ONLY
+    }
+
+    /// @notice Whether a configured category may fall back to the global live roster.
+    enum CategoryRouteBehavior {
+        FALLBACK_TO_GLOBAL,
+        CATEGORY_ONLY
+    }
+
     // ============ Structs ============
 
     struct ResolverMetadata {
@@ -55,6 +67,8 @@ interface DecentralizedResolverStructs {
         uint256 escalationTimestamp; // When current escalation happened
         uint256 assignedAt; // When current resolver was assigned
         uint256 resolveBy; // Deadline for current resolver to submit decision
+        // Immutable at assignment so later escrow-category writes cannot reroute this dispute.
+        bytes32 categoryKey;
         bytes resolutionData; // Additional resolution data
     }
 
@@ -134,5 +148,26 @@ interface DecentralizedResolverStructs {
         EscalationCostConfig config;
         uint64 eta;
         bool exists;
+    }
+
+    /// @notice Immutable semantic policy used by one workflow from dispute opening onward.
+    struct ResolutionConfig {
+        uint256[3] resolveDeadlines;
+        uint256[3] appealWindows;
+        EscalationConfig[3] escalationConfigs;
+        EscalationCostConfig escalationCostConfig;
+        address externalResolver;
+        bool bondAssetFixed;
+        // Category identifiers are policy inputs only; resolver membership remains live.
+        bytes32[] categoryKeys;
+        // Policy governing live-roster selection for workflows bound to this config.
+        bytes32 routingPolicyAlgorithmId;
+        uint256 routingPolicyAlgorithmVersion;
+        uint256 minEmaScoreThreshold;
+        uint256 maxTimeoutRateBps;
+        ResolverWeightingMode weightingMode;
+        CategoryRouteBehavior categoryRouteBehavior;
+        bool deprecated;
+        bytes32 root;
     }
 }

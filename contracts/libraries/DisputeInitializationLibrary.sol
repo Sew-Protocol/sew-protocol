@@ -17,16 +17,30 @@ library DisputeInitializationLibrary {
      * @param workflowId Escrow workflow ID
      * @param disputeResolver Dispute resolver address
      * @param escrowData Encoded escrow data
-     * @return updatedDisputeResolver Updated dispute resolver address (may be different if module reassigns)
+     * @return configVersion Bound DRM config version, or zero for legacy modules
      */
     function initializeInModule(
         address disputeResolutionModule,
         uint256 workflowId,
         address disputeResolver,
+        uint256 configVersion,
         bytes memory escrowData
-    ) internal returns (address updatedDisputeResolver) {
+    ) internal returns (uint256) {
         if (disputeResolutionModule == address(0)) {
-            return disputeResolver;
+            return 0;
+        }
+
+        if (configVersion != 0) {
+                (bool configInitialized, ) = disputeResolutionModule.call(
+                    abi.encodeWithSignature(
+                        'initializeDisputeWithCategoryAndConfig(uint256,address,bytes,uint256)',
+                        workflowId,
+                        address(this),
+                        escrowData,
+                        configVersion
+                    )
+                );
+                if (configInitialized) return configVersion;
         }
 
         // Try initializeDisputeWithCategory first
@@ -49,10 +63,10 @@ library DisputeInitializationLibrary {
                 )
             returns (address moduleDisputeResolver, uint8) {
                 if (moduleDisputeResolver != address(0)) {
-                    return moduleDisputeResolver;
+                    return 0;
                 }
             } catch {}
-            return disputeResolver;
+            return 0;
         }
 
         // Fallback: try initializeDispute
@@ -75,12 +89,12 @@ library DisputeInitializationLibrary {
                 )
             returns (address moduleDisputeResolver, uint8) {
                 if (moduleDisputeResolver != address(0)) {
-                    return moduleDisputeResolver;
+                    return 0;
                 }
             } catch {}
         }
 
-        return disputeResolver;
+        return 0;
     }
 
     /**
