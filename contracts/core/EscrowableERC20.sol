@@ -88,6 +88,24 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         return createEscrow(address(this), seller, amount, settings);
     }
 
+    /// @notice Creates a token escrow bound to a selectable config in this token's DRM.
+    function createEscrowWithResolutionConfig(
+        address seller,
+        uint256 amount,
+        uint256 autoReleaseTime,
+        uint256 autoCancelTime,
+        uint256 resolutionConfigVersion
+    ) external nonReentrant returns (uint256) {
+        EscrowSettings memory settings = EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: autoReleaseTime,
+            autoCancelTime: autoCancelTime
+        });
+        return _createEscrow(address(this), seller, amount, settings, resolutionConfigVersion, true);
+    }
+
     /// @dev STABILITY NOTE: This is a simplified alias that bypasses the
     ///      IReleaseStrategy module to keep EscrowableERC20 deployable within
     ///      the 24 KB EIP-170 limit. Only the sender (buyer) may call it;

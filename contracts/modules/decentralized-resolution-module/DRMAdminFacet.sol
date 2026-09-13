@@ -70,6 +70,7 @@ contract DRMAdminFacet is SlowLaneQueueActivate, AccessControl, ReentrancyGuard,
     event ResolutionConfigPublished(uint256 indexed version, bytes32 indexed root);
     event ResolutionConfigActivated(uint256 indexed oldVersion, uint256 indexed newVersion, bytes32 root);
     event ResolutionConfigDeprecated(uint256 indexed version, bytes32 indexed root);
+    event ResolutionConfigSelectableSet(uint256 indexed version, bool selectable);
 
     // ============ Modifiers ============
     modifier onlySeniorResolver() {
@@ -304,11 +305,13 @@ contract DRMAdminFacet is SlowLaneQueueActivate, AccessControl, ReentrancyGuard,
         }
         uint256 version = ++resolutionConfigCount;
         _storeResolutionConfig(version, config);
+        resolutionConfigSelectable[version] = true;
         emit ResolutionConfigPublished(version, _resolutionConfigs[version].root);
     }
 
     function activateResolutionConfig(uint256 version) public onlyRole(ROLE_TIMELOCK) {
-        if (version == 0 || version > resolutionConfigCount || _resolutionConfigs[version].deprecated) {
+        if (version == 0 || version > resolutionConfigCount || _resolutionConfigs[version].deprecated
+            || !resolutionConfigSelectable[version]) {
             revert InvalidResolutionConfigVersion(version);
         }
         uint256 oldVersion = activeResolutionConfigVersion;
@@ -325,7 +328,20 @@ contract DRMAdminFacet is SlowLaneQueueActivate, AccessControl, ReentrancyGuard,
             revert InvalidResolutionConfigVersion(version);
         }
         _resolutionConfigs[version].deprecated = true;
+        resolutionConfigSelectable[version] = false;
         emit ResolutionConfigDeprecated(version, _resolutionConfigs[version].root);
+    }
+
+    function setResolutionConfigSelectable(uint256 version, bool selectable) external onlyRole(ROLE_TIMELOCK) {
+        if (version == 0 || version > resolutionConfigCount || _resolutionConfigs[version].deprecated) {
+            revert InvalidResolutionConfigVersion(version);
+        }
+        // The active default must remain available to legacy creation callers.
+        if (!selectable && version == activeResolutionConfigVersion) {
+            revert InvalidResolutionConfigVersion(version);
+        }
+        resolutionConfigSelectable[version] = selectable;
+        emit ResolutionConfigSelectableSet(version, selectable);
     }
 
     /// @dev Legacy governance entry points remain prospective by deriving a new immutable default.

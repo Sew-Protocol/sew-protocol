@@ -31,7 +31,7 @@ library DisputeInitializationLibrary {
         }
 
         if (configVersion != 0) {
-                (bool configInitialized, ) = disputeResolutionModule.call(
+                (bool configInitialized, bytes memory returnData) = disputeResolutionModule.call(
                     abi.encodeWithSignature(
                         'initializeDisputeWithCategoryAndConfig(uint256,address,bytes,uint256)',
                         workflowId,
@@ -41,6 +41,11 @@ library DisputeInitializationLibrary {
                     )
                 );
                 if (configInitialized) return configVersion;
+                // A config-bound workflow must never silently initialize against a
+                // different/default policy, including after its policy is deprecated.
+                assembly ("memory-safe") {
+                    revert(add(returnData, 32), mload(returnData))
+                }
         }
 
         // Try initializeDisputeWithCategory first

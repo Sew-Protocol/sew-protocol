@@ -114,6 +114,7 @@ contract DecentralizedResolutionModule is
         resolutionConfigCount = 1;
         activeResolutionConfigVersion = 1;
         _storeResolutionConfig(1, initialConfig);
+        resolutionConfigSelectable[1] = true;
     }
 
     // ============ Admin Facet Bootstrap ============
@@ -182,6 +183,7 @@ contract DecentralizedResolutionModule is
     function activateResolutionConfig(uint256) external { _delegateAdmin(); }
     function setDefaultResolutionConfigVersion(uint256) external { _delegateAdmin(); }
     function deprecateResolutionConfig(uint256) external { _delegateAdmin(); }
+    function setResolutionConfigSelectable(uint256, bool) external { _delegateAdmin(); }
 
     // View/pure helpers — implemented directly (no delegation needed)
     function areNewAssignmentsPaused() external view returns (bool) { return newAssignmentsPaused; }
@@ -209,6 +211,20 @@ contract DecentralizedResolutionModule is
     function resolutionConfigRoot(uint256 version) external view returns (bytes32) {
         if (version == 0 || version > resolutionConfigCount) revert InvalidResolutionConfigVersion(version);
         return _resolutionConfigs[version].root;
+    }
+    function isResolutionConfigSelectable(uint256 version) external view returns (bool) {
+        return version != 0 && version <= resolutionConfigCount && resolutionConfigSelectable[version]
+            && !_resolutionConfigs[version].deprecated;
+    }
+    function resolutionConfigStatus(uint256 version)
+        external
+        view
+        returns (bool exists, bool selectable, bool deprecated, bytes32 root)
+    {
+        exists = version != 0 && version <= resolutionConfigCount;
+        if (!exists) return (false, false, false, bytes32(0));
+        ResolutionConfig storage config = _resolutionConfigs[version];
+        return (true, resolutionConfigSelectable[version] && !config.deprecated, config.deprecated, config.root);
     }
     function generateCategoryKey(address token, uint256 amount, string memory t) external pure returns (bytes32) { return keccak256(abi.encode(token, amount, t)); }
     function autoCategorizeEscrow(bytes calldata d) external pure returns (bytes32) { return ResolutionTableLibrary.autoCategorize(d); }
@@ -507,7 +523,9 @@ contract DecentralizedResolutionModule is
         bytes calldata escrowData,
         uint256 configVersion
     ) external onlyEscrowContract {
-        if (configVersion == 0 || configVersion > resolutionConfigCount || _resolutionConfigs[configVersion].deprecated) {
+        // A workflow may open a dispute after its already-bound config is deprecated.
+        // Deprecation blocks new selection, not the frozen workflow semantics.
+        if (configVersion == 0 || configVersion > resolutionConfigCount) {
             revert InvalidResolutionConfigVersion(configVersion);
         }
         workflowResolutionConfigVersion[escrowContract][workflowId] = configVersion;

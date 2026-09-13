@@ -131,6 +131,8 @@ error InsufficientContractBalance(address token, uint256 required, uint256 avail
 error AmountExceedsAvailable(address token, uint256 requestedAmount, uint256 availableAmount);
 error AccountingDeficit(address token, uint256 deficit);
 error ZeroAddress(uint8 which);
+error ResolutionConfigUnavailable(address resolutionModule, uint256 version);
+error ResolutionConfigWithCustomResolver(address customResolver);
 
 /// @notice Resolution mode for dispute handling
 enum ResolutionMode {
@@ -303,6 +305,12 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     );
     event ResolutionModuleActivated(address indexed oldModule, address indexed newModule);
     event EscrowSettingsUpdated(uint256 indexed workflowId, EscrowSettings settings);
+    event ResolutionConfigBound(
+        uint256 indexed workflowId,
+        address indexed resolutionModule,
+        uint256 indexed version,
+        bytes32 resolutionConfigRoot
+    );
     event ClaimableBalanceSet(
         uint256 indexed workflowId,
         address indexed recipient,
@@ -520,11 +528,27 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         uint256 amount,
         EscrowSettings memory settings
     ) public nonReentrant returns (uint256) {
+        return _createEscrow(token, to, amount, settings, 0, false);
+    }
+
+    /// @dev All product-specific creation entry points converge here.
+    function _createEscrow(
+        address token,
+        address to,
+        uint256 amount,
+        EscrowSettings memory settings,
+        uint256 requestedResolutionConfigVersion,
+        bool explicitResolutionConfigSelection
+    ) internal returns (uint256) {
         uint256 workflowId = escrowTransfers.length; // Array index IS the workflowId
-        
+
         // CreateOps is mandatory (removed inline fallback to save >1KB bytecode)
         if (address(createOps) == address(0)) revert ZeroCreateOps();
         IResolutionModule resolutionModule = _getResolutionModule(workflowId);
+        uint256 resolutionConfigVersion = _resolveResolutionConfigVersion(
+            address(resolutionModule), requestedResolutionConfigVersion, settings.customResolver,
+            explicitResolutionConfigSelection
+        );
         CreateOps.CreateResult memory result = createOps.computeEscrowCreation(
             token,
             to,
@@ -557,7 +581,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         _updateEscrowBalance(token, result.amountAfterFee, true);
         _recordFee(token, result.fee);
         _applyEscrowSettings(workflowId, settings);
-        _snapshotModulesForEscrow(workflowId);
+        _snapshotModulesForEscrow(workflowId, resolutionConfigVersion);
 
         if (result.yieldEnabled && result.shouldDepositYield) {
             _depositYieldForEscrow(workflowId, token, result.amountAfterFee);
@@ -572,6 +596,46 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         // YieldDepositAttempted event will indicate success/failure
 
         return workflowId;
+    }
+
+    function _resolveResolutionConfigVersion(
+        address resolutionModule,
+        uint256 requestedVersion,
+        address customResolver,
+        bool explicitSelection
+    ) internal view returns (uint256 version) {
+        if (explicitSelection && customResolver != address(0)) {
+            revert ResolutionConfigWithCustomResolver(customResolver);
+        }
+        if (explicitSelection && requestedVersion == 0) {
+            revert ResolutionConfigUnavailable(resolutionModule, requestedVersion);
+        }
+        if (resolutionModule == address(0) || resolutionModule.code.length == 0) {
+            if (requestedVersion != 0) revert ResolutionConfigUnavailable(resolutionModule, requestedVersion);
+            return 0;
+        }
+
+        if (requestedVersion == 0) {
+            (bool activeRead, bytes memory activeData) = resolutionModule.staticcall(
+                abi.encodeWithSignature('activeResolutionConfigVersion()')
+            );
+            // Non-DRM modules retain the legacy zero-version behavior.
+            if (!activeRead || activeData.length < 32) return 0;
+            version = abi.decode(activeData, (uint256));
+        } else {
+            version = requestedVersion;
+        }
+
+        // Legacy creation records the active version without applying the
+        // selectable-for-new-escrows gate used by explicit selection.
+        if (!explicitSelection) return version;
+
+        (bool selectableRead, bytes memory selectableData) = resolutionModule.staticcall(
+            abi.encodeWithSignature('isResolutionConfigSelectable(uint256)', version)
+        );
+        if (!selectableRead || selectableData.length < 32 || !abi.decode(selectableData, (bool))) {
+            revert ResolutionConfigUnavailable(resolutionModule, version);
+        }
     }
 
     function _pullTokens(address token, address from, uint256 amount) internal virtual;
@@ -590,7 +654,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         uint256 amount
     ) internal virtual {}
 
-    function _snapshotModulesForEscrow(uint256 workflowId) internal {
+    function _snapshotModulesForEscrow(uint256 workflowId, uint256 resolutionConfigVersion) internal {
         address resModule = address(_getResolutionModule(workflowId));
         address incentiveMod = ModuleSnapshotLibrary.getIncentiveModule(resModule);
         moduleSnapshots[workflowId] = ModuleSnapshot({
@@ -608,11 +672,13 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
             maxDisputeDuration: timeoutConfig.maxDisputeDuration,
             appealWindowDuration: timeoutConfig.appealWindowDuration
         });
-        (bool versionRead, bytes memory versionData) = resModule.staticcall(
-            abi.encodeWithSignature('activeResolutionConfigVersion()')
-        );
-        if (versionRead && versionData.length >= 32) {
-            workflowResolutionConfigVersion[workflowId] = abi.decode(versionData, (uint256));
+        if (resolutionConfigVersion != 0) {
+            workflowResolutionConfigVersion[workflowId] = resolutionConfigVersion;
+            (bool rootRead, bytes memory rootData) = resModule.staticcall(
+                abi.encodeWithSignature('resolutionConfigRoot(uint256)', resolutionConfigVersion)
+            );
+            bytes32 configRoot = rootRead && rootData.length >= 32 ? abi.decode(rootData, (bytes32)) : bytes32(0);
+            emit ResolutionConfigBound(workflowId, resModule, resolutionConfigVersion, configRoot);
         }
 
         bool pendingAutoCancelEnabled = timeoutConfig.defaultAutoCancelDelay > 0;

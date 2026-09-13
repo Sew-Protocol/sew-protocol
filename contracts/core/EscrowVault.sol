@@ -66,6 +66,17 @@ contract EscrowVault is BaseEscrow {
     function _pullTokens(address token, address from, uint256 amount) internal override {
         IERC20(token).safeTransferFrom(from, address(this), amount);
     }
+
+    /// @notice Creates an escrow bound to a selectable config in this vault's DRM.
+    function createEscrowWithResolutionConfig(
+        address token,
+        address to,
+        uint256 amount,
+        EscrowSettings memory settings,
+        uint256 resolutionConfigVersion
+    ) external nonReentrant returns (uint256) {
+        return _createEscrow(token, to, amount, settings, resolutionConfigVersion, true);
+    }
     function _recordFee(address token, uint256 amount) internal override {
         FeeRecordingLibrary.recordFee(totalFeesPerToken, token, amount);
     }

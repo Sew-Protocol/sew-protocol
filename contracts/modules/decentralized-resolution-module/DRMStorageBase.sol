@@ -105,6 +105,8 @@ abstract contract DRMStorageBase is DecentralizedResolverStructs {
     uint256 public resolutionConfigCount;
     uint256 public activeResolutionConfigVersion;
     mapping(address => mapping(uint256 => uint256)) public workflowResolutionConfigVersion;
+    // Governance may keep a published policy unavailable for new workflows.
+    mapping(uint256 => bool) public resolutionConfigSelectable;
 
     function _resolutionConfig(address escrowContract, uint256 workflowId)
         internal

@@ -242,4 +242,51 @@ contract VersionedResolutionConfigTest is Test {
         drm.initializeDisputeWithCategoryAndConfig(75, ESCROW, escrowData, 2);
         assertEq(drm.getDisputeMetadata(75, ESCROW).resolverAtRound[0], address(0));
     }
+
+    function test_selectableStatusDistinguishesPublishedAndDeprecatedConfigs() public {
+        DecentralizedResolverStructs.ResolutionConfig memory config = drm.getResolutionConfig(1);
+        drm.publishResolutionConfig(config);
+
+        (bool exists, bool selectable, bool deprecated, bytes32 root) = drm.resolutionConfigStatus(2);
+        assertTrue(exists);
+        assertTrue(selectable);
+        assertFalse(deprecated);
+        assertEq(root, drm.resolutionConfigRoot(2));
+
+        drm.setResolutionConfigSelectable(2, false);
+        assertFalse(drm.isResolutionConfigSelectable(2));
+        drm.setResolutionConfigSelectable(2, true);
+        drm.activateResolutionConfig(2);
+
+        DecentralizedResolverStructs.ResolutionConfig memory successor = drm.getResolutionConfig(2);
+        successor.resolveDeadlines[0] = 3 hours;
+        drm.publishResolutionConfig(successor);
+        drm.activateResolutionConfig(3);
+        drm.deprecateResolutionConfig(2);
+
+        (, selectable, deprecated,) = drm.resolutionConfigStatus(2);
+        assertFalse(selectable);
+        assertTrue(deprecated);
+    }
+
+    function test_deprecatedBoundConfigStillInitializesWithItsFrozenSemantics() public {
+        DecentralizedResolverStructs.ResolutionConfig memory config = drm.getResolutionConfig(1);
+        config.resolveDeadlines[0] = 3 hours;
+        drm.publishResolutionConfig(config);
+        drm.activateResolutionConfig(2);
+
+        DecentralizedResolverStructs.ResolutionConfig memory successor = drm.getResolutionConfig(2);
+        successor.resolveDeadlines[0] = 4 hours;
+        drm.publishResolutionConfig(successor);
+        drm.activateResolutionConfig(3);
+        drm.deprecateResolutionConfig(2);
+
+        bytes memory escrowData = abi.encode(address(0x1234), address(1), address(2), 100 ether, address(0));
+        uint256 openedAt = block.timestamp;
+        vm.prank(ESCROW);
+        drm.initializeDisputeWithCategoryAndConfig(99, ESCROW, escrowData, 2);
+
+        assertEq(drm.workflowResolutionConfigVersion(ESCROW, 99), 2);
+        assertEq(drm.getDisputeMetadata(99, ESCROW).resolveBy, openedAt + 3 hours);
+    }
 }
