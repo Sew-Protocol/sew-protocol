@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.33;
+pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
 import 'contracts/core/EscrowVault.sol'; // Or EscrowableERC20, depending on which is more representative

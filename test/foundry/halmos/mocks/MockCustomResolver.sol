@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.33;
+pragma solidity ^0.8.37;
 
 /// @dev Minimal deployed contract used as a per-escrow customResolver in
 ///      HalmosEscrowProperties property tests.  CreateOps requires customResolver

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.37;
 
 import { IMulticall3 } from "../interfaces/IMulticall3.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";

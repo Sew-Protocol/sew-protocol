@@ -47,7 +47,7 @@ function accountsOrThrow(networkName: string, privateKeyOverride?: string) {
 
 const config: HardhatUserConfig = {
   solidity: {
-    version: '0.8.33',
+    version: '0.8.37',
     settings: {
       optimizer: {
         enabled: true,

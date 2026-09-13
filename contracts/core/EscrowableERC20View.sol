@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.33;
+pragma solidity ^0.8.37;
 
 import './EscrowViewContract.sol';
 import './EscrowableERC20.sol';

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.33;
+pragma solidity ^0.8.37;
 
 /**
  * @notice Minimal ERC20-like token that does not return booleans from `transfer`/`transferFrom`.

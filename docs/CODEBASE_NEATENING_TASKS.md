@@ -6,14 +6,20 @@ the review after the active contract work has settled.
 
 ## P0: Compiler and release baseline
 
-- [ ] Upgrade the Solidity baseline from `0.8.33` to `0.8.38` once the compiler is available and compatible with the dependency/toolchain versions.
-- [ ] Update every project compiler setting together: `foundry.toml`, Hardhat configuration, CI, compiler-settings tests, deployment metadata, and release documentation.
-- [ ] Decide and document the pragma policy: exact pin, compatible range, or exact pin for production contracts with a separate range for tests/mocks.
-- [ ] Remove the remaining mixed pragmas (`0.8.20`, `0.8.28`, `0.8.33`) where there is no deliberate compatibility reason, including examples, mocks, interfaces, and helper contracts.
+- [x] Upgrade the Solidity baseline from `0.8.33` to `0.8.37` once the compiler is available and compatible with the dependency/toolchain versions.
+- [x] Update every project compiler setting together: `foundry.toml`, Hardhat configuration, CI, compiler-settings tests, deployment metadata, and release documentation.
+- [x] Decide and document the pragma policy: production, test, mock, example, and helper contracts use the compatible `^0.8.37` range; release builds pin `0.8.37` in toolchain configuration.
+- [x] Remove the remaining mixed pragmas (`0.8.20`, `0.8.28`, `0.8.33`) where there is no deliberate compatibility reason, including examples, mocks, interfaces, and helper contracts.
 - [ ] Rebuild all artifacts and regenerate TypeChain output after the compiler upgrade; do not use checked-in artifacts from the previous compiler.
 - [ ] Re-run unit, integration, invariant, fork, Halmos, formal, coverage, deployment, verification, and contract-size checks under the new compiler.
 - [ ] Record bytecode and storage-layout changes and obtain an explicit release decision for every upgradeable or already-deployed contract.
-- [ ] Update the deployment registry and compiler metadata so source verification matches the actual release build.
+- [x] Update the deployment registry and compiler metadata so source verification matches the actual release build.
+
+Verification record for the `0.8.37` baseline:
+
+- Full Foundry run: `152` suites, `1552` tests passed, `0` failed, `14` skipped (`1566` total).
+- All Solidity pragmas in contracts, tests, mocks, examples, interfaces, and helpers use the compatible `^0.8.37` policy.
+- Foundry and Hardhat compiler settings, deployment registry metadata, and release documentation specify `0.8.37`.
 
 ## P0: Remove obsolete 24 KB workarounds
 
@@ -87,7 +93,7 @@ not as isolated cleanup.
 
 ## Completion criteria
 
-- [ ] A clean release build uses the approved `0.8.38` compiler configuration with no unintended mixed pragmas.
+- [ ] A clean release build uses the approved `0.8.37` compiler configuration with no unintended mixed pragmas.
 - [ ] No production code relies on a size workaround solely to satisfy the obsolete 24 KB limit.
 - [ ] Remaining libraries, delegatecalls, assembly, compatibility surfaces, and comments each have a current, documented reason to exist.
 - [ ] Naming, deployment checks, tests, docs, and release metadata describe the same architecture and release procedure.

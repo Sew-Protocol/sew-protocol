@@ -33,7 +33,7 @@
 - [x] **INITIAL_SUPPLY minted** ✅
 
 ### Constructor Overflow Protection
-- [x] **Solidity 0.8.33**: Automatic overflow checks ✅
+- [x] **Solidity 0.8.37**: Automatic overflow checks ✅
 - [x] **Fee calculations**: `(amount * escrowFee) / ESCROW_FEE_DENOMINATOR` - safe if escrowFee <= 200
 - 📝 **Action**: Add fuzz test for constructor parameters to verify overflow protection
 
@@ -320,7 +320,7 @@ function test_createEscrow_overflow_maxAmount_maxFee() public // NEW - check ove
 
 ## 📝 Notes
 
-- **Constructor overflow protection**: Solidity 0.8.33 provides automatic overflow checks, but explicit tests are recommended for edge cases.
+- **Constructor overflow protection**: Solidity 0.8.37 provides automatic overflow checks, but explicit tests are recommended for edge cases.
 - **Fee calculation overflow**: `(amount * escrowFee) / ESCROW_FENOMINATOR` is safe for normal values, but test maximum values explicitly.
 - **Minimum escrow amount**: `MIN_ESCROW_AMOUNT = 1000 wei` - ensure this is appropriate for all tokens (consider 18-decimal tokens).
 - **Test priority**: Focus on constructor and createEscrow validations first, then add comprehensive tests post-launch.

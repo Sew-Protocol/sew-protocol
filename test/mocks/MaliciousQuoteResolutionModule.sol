@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.33;
+pragma solidity ^0.8.37;
 
 import '../../contracts/shared/interfaces/IResolutionModule.sol';
 import '../../contracts/shared/interfaces/IIncentiveModule.sol';

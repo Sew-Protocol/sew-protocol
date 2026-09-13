@@ -19,7 +19,7 @@
         "core",
         "module-management"
       ],
-      "compilerVersion": "0.8.33",
+      "compilerVersion": "0.8.37",
       "optimizationRuns": 1000,
       "proxyType": "none"
     },
@@ -40,7 +40,7 @@
         "core",
         "yield"
       ],
-      "compilerVersion": "0.8.33",
+      "compilerVersion": "0.8.37",
       "optimizationRuns": 1000,
       "proxyType": "none"
     },
@@ -61,7 +61,7 @@
         "core",
         "dispute"
       ],
-      "compilerVersion": "0.8.33",
+      "compilerVersion": "0.8.37",
       "optimizationRuns": 1000,
       "proxyType": "none"
     },
@@ -82,7 +82,7 @@
         "core",
         "settlement"
       ],
-      "compilerVersion": "0.8.33",
+      "compilerVersion": "0.8.37",
       "optimizationRuns": 1000,
       "proxyType": "none"
     },
@@ -103,7 +103,7 @@
         "core",
         "create"
       ],
-      "compilerVersion": "0.8.33",
+      "compilerVersion": "0.8.37",
       "optimizationRuns": 1000,
       "proxyType": "none"
     },
@@ -124,7 +124,7 @@
         "core",
         "bond"
       ],
-      "compilerVersion": "0.8.33",
+      "compilerVersion": "0.8.37",
       "optimizationRuns": 1000,
       "proxyType": "none"
     },
@@ -145,7 +145,7 @@
         "escrow-admin",
         "governance"
       ],
-      "compilerVersion": "0.8.33",
+      "compilerVersion": "0.8.37",
       "optimizationRuns": 1000,
       "proxyType": "none"
     },
@@ -169,7 +169,7 @@
         "token",
         "governance"
       ],
-      "compilerVersion": "0.8.33",
+      "compilerVersion": "0.8.37",
       "optimizationRuns": 1000,
       "proxyType": "none"
     },
@@ -195,7 +195,7 @@
         "timelock",
         "governance"
       ],
-      "compilerVersion": "0.8.33",
+      "compilerVersion": "0.8.37",
       "optimizationRuns": 1000,
       "proxyType": "none"
     },
@@ -213,7 +213,7 @@
       "tags": [
         "release-strategy"
       ],
-      "compilerVersion": "0.8.33",
+      "compilerVersion": "0.8.37",
       "optimizationRuns": 1000,
       "proxyType": "none"
     },
@@ -240,7 +240,7 @@
         "governor",
         "governance"
       ],
-      "compilerVersion": "0.8.33",
+      "compilerVersion": "0.8.37",
       "optimizationRuns": 1000,
       "proxyType": "none"
     },
@@ -265,7 +265,7 @@
         "core",
         "escrow"
       ],
-      "compilerVersion": "0.8.33",
+      "compilerVersion": "0.8.37",
       "optimizationRuns": 1000,
       "proxyType": "none"
     }

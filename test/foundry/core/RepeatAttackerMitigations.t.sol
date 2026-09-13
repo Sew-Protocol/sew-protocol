@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.33;
+pragma solidity ^0.8.37;
 
 import "forge-std/Test.sol";
 import "../../../contracts/core/BaseEscrow.sol";

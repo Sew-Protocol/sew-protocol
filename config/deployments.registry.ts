@@ -213,7 +213,7 @@ export async function registerDeployment(
     tags: deployment.tags,
     // Phase 3: Enhanced metadata
     contractVersion: deployment.contractVersion,
-    compilerVersion: deployment.compilerVersion || '0.8.33',
+    compilerVersion: deployment.compilerVersion || '0.8.37',
     optimizationRuns: deployment.optimizationRuns || 1000,
     gasUsed: deployment.gasUsed || receipt?.gasUsed?.toString(),
     contractSize: deployment.contractSize,

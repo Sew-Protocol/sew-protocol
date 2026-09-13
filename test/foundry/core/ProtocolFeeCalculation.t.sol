@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import "../../../contracts/types/YieldPresets.sol";
-pragma solidity ^0.8.33;
+pragma solidity ^0.8.37;
 
 import '../../../lib/forge-std/src/Test.sol';
 import '../../../contracts/core/EscrowVault.sol';

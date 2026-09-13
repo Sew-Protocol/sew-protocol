@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 import "../../../contracts/types/YieldPresets.sol";
-pragma solidity ^0.8.33;
+pragma solidity ^0.8.37;
 import 'forge-std/Test.sol';
 contract Test_upgradeableBox_test is Test {
     function setUp() public {}
