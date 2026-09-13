@@ -12,7 +12,6 @@ import '../types/EscrowTypes.sol';
 /**
  * @title BondCollector
  * @notice External contract for collecting escalation bonds (ETH or ERC20)
- * @dev Extracted from BaseEscrow to reduce contract size (Priority 2 optimization)
  * 
  *      Handles:
  *      - ETH bond collection with protocol fee deduction

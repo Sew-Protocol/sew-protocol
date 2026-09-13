@@ -4,7 +4,6 @@ pragma solidity ^0.8.33;
 /**
  * @title ModuleSnapshotLibrary
  * @notice Library for module snapshot operations
- * @dev Extracted from BaseEscrow to reduce contract size
  */
 library ModuleSnapshotLibrary {
     bytes4 constant SEL_INCENTIVE_MODULE = bytes4(keccak256("incentiveModule()"));

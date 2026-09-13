@@ -44,8 +44,8 @@ not as isolated cleanup.
 - [ ] Remove comments describing removed pause behavior, removed auto-transfer behavior, compatibility shims, and old size limits after the corresponding code is settled.
 - [ ] Preserve and improve only comments that explain externally observable behavior, security assumptions, storage invariants, delegatecall context, rounding, lifecycle constraints, or non-obvious protocol economics.
 - [ ] Normalize NatSpec on all public/external contracts and interfaces: consistent `@title`, `@notice`, `@dev`, `@param`, `@return`, and event documentation.
-- [ ] Remove stale “production ready”, “complete”, and phase-delivery claims from docs unless they are backed by the current release checklist and test evidence.
-- [ ] Resolve the outstanding TODO in `test/foundry/token/ERC20EdgeCases.t.sol` or turn it into a tracked test task with an owner and acceptance criteria.
+- [x] Remove stale “production ready”, “complete”, and phase-delivery claims from the reviewed phase-delivery reports unless they are backed by the current release checklist and test evidence.
+- [x] Remove the untracked TODO from `test/foundry/token/ERC20EdgeCases.t.sol`; add the missing integration coverage as a separately tracked test task before release.
 - [ ] Review changelog and phase-delivery documents for duplicated, contradictory, or historical material that should be archived rather than presented as current guidance.
 
 ## P1: Naming and repository consistency

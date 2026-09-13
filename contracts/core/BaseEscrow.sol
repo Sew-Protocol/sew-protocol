@@ -141,7 +141,6 @@ enum ResolutionMode {
     DIRECT               // No resolver configured (fallback)
 }
 
-/// @notice Pause state tracking removed for size optimization
 
 abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -153,7 +152,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     /// @dev Dedicated keeper role: may trigger timed actions but cannot rewire protocol ops.
     bytes32 public constant ROLE_KEEPER = keccak256('ROLE_KEEPER');
 
-    // Pause constraints removed for size optimization
     
     uint256 public escrowFee;
     uint256 public constant ESCROW_FEE_DENOMINATOR = 10000;
@@ -185,7 +183,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     // user => native ETH refundable excess amounts (no auto-push)
     mapping(address => uint256) public claimableExcessEthRefunds;
 
-    // Phase 1: Pending settlement storage (appeal window enforcement)
     struct PendingSettlement {
         bool exists;
         bool isRelease;
@@ -416,7 +413,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         uint256 totalAmount
     );
 
-    // Pause functionality removed for size optimization - stubs for backwards compatibility
     function pause(string calldata) external pure {
         revert PausedNotSupported();
     }
@@ -974,10 +970,10 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     /**
      * @notice Escalate a dispute to the next resolution level
      * @dev V1: Appeals are disabled. This function will revert if called for v1 escrows
-     *      (incentiveModule snapshot is null). Appeals are enabled in Phase 2 via
+     *      (incentiveModule snapshot is null).
      *      resolution module + incentive module swap through governance.
      *      
-     *      For Phase 2: Requires payment of appeal bond (amount/token determined by resolution module).
+     *      Requires payment of an appeal bond (amount/token determined by resolution module).
      *      Bonds are recorded in the snapshotted incentive module for later distribution.
      *      
      * @param workflowId The escrow workflow ID to escalate
@@ -1742,7 +1738,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
             || super.supportsInterface(interfaceId);
     }
 
-    // View functions moved to EscrowViewContract for size optimization:
     // - getResolutionMode() 
     // - getActiveDisputeHandler()
     // - canRelease()

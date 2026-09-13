@@ -7,7 +7,6 @@ import '../core/BaseEscrow.sol';
 /**
  * @title BalanceUpdateLibrary
  * @notice Library for updating escrow balance tracking with validation
- * @dev Extracted from EscrowVault to reduce contract size
  */
 library BalanceUpdateLibrary {
 

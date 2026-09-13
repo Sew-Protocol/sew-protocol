@@ -7,7 +7,6 @@ import '../core/BaseEscrow.sol';
 /**
  * @title DisputeRaiseLibrary
  * @notice Library for raiseDispute logic extraction
- * @dev Extracted from BaseEscrow to reduce contract size (Phase 1 size optimization)
  */
 library DisputeRaiseLibrary {
     /**

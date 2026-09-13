@@ -9,7 +9,6 @@ import '../libraries/EscrowEncodingLibrary.sol';
 /**
  * @title DisputeOps
  * @notice External contract for dispute escalation orchestration
- * @dev Extracted from BaseEscrow to reduce contract size (Phase 2 size optimization)
  *
  *      Key design principles (from updated plan):
  *      - Compute → Apply: Returns escalation result, BaseEscrow applies to state

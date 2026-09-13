@@ -4,7 +4,6 @@ pragma solidity ^0.8.33;
 /**
  * @title EscrowEncodingLibrary
  * @notice Library for encoding/decoding escrow-related data
- * @dev Extracted from BaseEscrow to reduce contract size
  */
 library EscrowEncodingLibrary {
     /**

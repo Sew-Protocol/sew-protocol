@@ -8,7 +8,6 @@ import '../types/EscrowTypes.sol';
 /**
  * @title TokenRecoveryLibrary
  * @notice Library for token recovery logic extraction
- * @dev Extracted from EscrowVault to reduce contract size
  */
 library TokenRecoveryLibrary {
     using SafeERC20 for IERC20;

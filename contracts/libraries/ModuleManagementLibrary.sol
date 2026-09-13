@@ -8,7 +8,6 @@ import '../types/EscrowTypes.sol';
 /**
  * @title ModuleManagementLibrary
  * @notice Library for validating and managing module operations
- * @dev Extracted from EscrowVault and EscrowableERC20 to reduce contract size
  *      Provides validation functions - actual queue/activate handled by contract
  */
 library ModuleManagementLibrary {

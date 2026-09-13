@@ -6,10 +6,9 @@ import '../types/EscrowTypes.sol';
 /**
  * @title SettingsValidationLibrary
  * @notice Library for validating escrow settings with bounds enforcement
- * @dev Extracted from BaseEscrow to reduce contract size. Phase 6: Added bounds validation.
+ * @dev Validates protocol configuration bounds.
  */
 library SettingsValidationLibrary {
-    // Phase 6: Bounds constants
     uint256 public constant MAX_AUTO_TIME_DAYS = 30 days;
     uint256 public constant MAX_ATTACHMENTS = 20;
     uint256 public constant MAX_FEE_BPS = 200; // 2%
@@ -23,7 +22,6 @@ library SettingsValidationLibrary {
     uint256 public constant MIN_ESCROW_AMOUNT = 1000; // Minimum escrow amount (1000 wei)
     uint256 public constant MAX_ESCROW_DURATION = 365 days; // Maximum escrow duration (1 year)
 
-    // Phase 6: Custom errors (using different names to avoid conflicts with EscrowTypes)
     error InvalidArrayLength(uint256 a, uint256 b);
     error InvalidBpsSum(uint256 sum);
     error TooManyRecipients(uint256 n, uint256 max);
@@ -158,7 +156,6 @@ library SettingsValidationLibrary {
             });
     }
 
-    // ============ Phase 6: Bounds Validation Functions ============
 
     /**
      * @notice Validate auto cancel delay (default setting)

@@ -9,7 +9,6 @@ import './YieldHandlingLibrary.sol';
 /**
  * @title ResolverActionLibrary
  * @notice Library for resolver action execution (full release/cancel only)
- * @dev Extracted from BaseEscrow to reduce contract size
  *      Note: Partial operations removed - escrow amounts are now immutable
  */
 library ResolverActionLibrary {

@@ -38,8 +38,8 @@ contract EvidenceModuleV1 is IEvidenceModule, AccessControlUpgradeable, Reentran
 
     // Configuration
     uint256 public maxEvidencePerDispute; // Max evidence submissions per dispute (default: 20)
-    bool public allowAnyoneSubmit; // If true, anyone can submit (default: false)
-    bool public allowPostResolution; // If true, evidence allowed after resolution (default: false)
+    bool public allowAnyoneSubmit;
+    bool public allowPostResolution;
 
     // Escrow contract reference (for participant validation)
     address public escrowContract;
@@ -121,16 +121,13 @@ contract EvidenceModuleV1 is IEvidenceModule, AccessControlUpgradeable, Reentran
         bytes32 evidenceHash,
         string calldata metadata
     ) external nonReentrant override returns (uint256 evidenceId) {
-        // Check access control
         // Note: escrowData not available here, will check via other means
         (bool allowed, string memory reason) = _canSubmitEvidenceInternal(workflowId, _escrowContract, _msgSender());
         require(allowed, reason);
 
-        // Check limit
         uint256 currentCount = disputeEvidence[_escrowContract][workflowId].length;
         require(currentCount < maxEvidencePerDispute, 'Evidence limit reached');
 
-        // Check for duplicates (same hash by same submitter)
         // Note: Different submitters can submit same hash (e.g., same document)
         for (uint256 i = 0; i < currentCount; i++) {
             if (

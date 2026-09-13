@@ -4,7 +4,6 @@ pragma solidity ^0.8.33;
 /**
  * @title ModuleProposalLibrary
  * @notice Library for module proposal and activation pattern
- * @dev Extracted from BaseEscrow for contract size reduction
  *      Returns values instead of modifying storage (caller updates storage)
  */
 library ModuleProposalLibrary {

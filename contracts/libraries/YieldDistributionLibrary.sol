@@ -6,7 +6,6 @@ import '../types/EscrowTypes.sol';
 /**
  * @title YieldDistributionLibrary
  * @notice Library for yield distribution validation, encoding, and fallback distribution
- * @dev Extracted from BaseEscrow to reduce contract size
  */
 library YieldDistributionLibrary {
     /// @notice Fee denominator (10000 = 100% in basis points)

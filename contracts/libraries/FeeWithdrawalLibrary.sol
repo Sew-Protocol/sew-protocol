@@ -9,7 +9,6 @@ import '../core/BaseEscrow.sol';
 /**
  * @title FeeWithdrawalLibrary
  * @notice Library for fee withdrawal logic
- * @dev Extracted from EscrowVault to reduce contract size
  */
 library FeeWithdrawalLibrary {
     using SafeERC20 for IERC20;

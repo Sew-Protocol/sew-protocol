@@ -1,7 +1,7 @@
 # Kleros Integration Guide
 
 **Date**: 2026-04-03  
-**Status**: ✅ **PRODUCTION READY**  
+**Status**: Implementation guide; current release readiness must be confirmed separately.
 **Version**: 1.1.0 (Fixed DR3 Integration)
 
 ---

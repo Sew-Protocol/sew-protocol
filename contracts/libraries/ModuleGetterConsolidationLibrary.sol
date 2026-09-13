@@ -9,7 +9,6 @@ import '../interfaces/IYieldDistributionModule.sol';
 /**
  * @title ModuleGetterConsolidationLibrary
  * @notice Library for optimized module type casting
- * @dev Extracted from EscrowVault to reduce contract size by consolidating type casting logic
  */
 library ModuleGetterConsolidationLibrary {
     function getReleaseStrategy(address moduleAddr) internal pure returns (IReleaseStrategy) {

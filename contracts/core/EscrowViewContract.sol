@@ -11,7 +11,6 @@ import '@openzeppelin/contracts/utils/math/SafeCast.sol';
 /**
  * @title EscrowViewContract
  * @notice External view contract for frontend consumption
- * @dev PRIORITY 4: Extracted view getters from BaseEscrow to reduce contract size
  * 
  *      This contract reads BaseEscrow/EscrowVault via public storage/getters
  *      and repackages results for frontend consumption.

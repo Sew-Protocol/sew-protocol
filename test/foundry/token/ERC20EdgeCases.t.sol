@@ -51,6 +51,4 @@ contract ERC20EdgeCasesTest is Test {
         assertEq(supplyAfter, supplyBefore + 500 ether);
     }
 
-    // TODO: integrate these mocks with the system contracts (Escrow, Vault, etc.) and verify
-    // acceptance/rejection policies. Add more thorough edge-case tests per TESTING_ADHERENCE_PLAN.
 }

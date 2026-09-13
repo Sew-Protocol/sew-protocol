@@ -5,7 +5,6 @@ import './EscrowVault.sol';
 
 /**
  * @title EscrowVaultHelper
- * @notice View and administrative helper functions extracted from EscrowVault to reduce contract size.
  */
 contract EscrowVaultHelper {
     EscrowVault public immutable vault;

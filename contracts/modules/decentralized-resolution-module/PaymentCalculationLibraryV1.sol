@@ -26,11 +26,9 @@ contract PaymentCalculationLibraryV1 is IPaymentCalculationLibrary {
     function calculatePayments(
         PaymentInput memory input
     ) external pure override returns (PaymentOutput memory output) {
-        // Validate input (Phase 1: Task 1.8)
         require(input.resolvers.length > 0, 'No resolvers');
         require(input.resolverSharePercentage <= BASIS_POINTS_DENOMINATOR, 'Invalid percentage');
 
-        // Validate resolver addresses are not zero (Phase 1: Task 1.8)
         for (uint256 i = 0; i < input.resolvers.length; i++) {
             require(input.resolvers[i].resolver != address(0), 'Zero resolver address');
         }
@@ -68,7 +66,6 @@ contract PaymentCalculationLibraryV1 is IPaymentCalculationLibrary {
             paymentSum += payments[i];
         }
 
-        // Phase 3: Task 3.4 - Distribute remainder proportionally instead of all to first resolver
         if (paymentSum < resolverShare && payments.length > 0) {
             uint256 remainder = resolverShare - paymentSum;
             uint256 distributed = 0;

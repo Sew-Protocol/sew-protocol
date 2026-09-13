@@ -16,7 +16,6 @@ import '../ops/YieldOps.sol';
 /**
  * @title AaveYieldHandlingLibrary
  * @notice Library for Aave V3 yield handling operations (deposit, withdrawal, distribution)
- * @dev Extracted from BaseEscrow to reduce contract size
  *      Handles Aave-specific yield operations using the library pattern (delegatecall)
  */
 library AaveYieldHandlingLibrary {

@@ -6,7 +6,7 @@
 **Total Tests**: 25 (all passing)  
 **Total Gas**: ~23.2M  
 **Success Rate**: 100%  
-**Deployment Status**: 🟢 **PRODUCTION READY**
+**Deployment status**: Historical test summary; not a current production-release approval.
 
 ---
 

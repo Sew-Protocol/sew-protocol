@@ -2,7 +2,7 @@
 
 **Date**: 2026-01-09  
 **Developer**: GitHub Copilot CLI  
-**Status**: ✅ **PRODUCTION READY**
+**Status**: Historical implementation summary; not a current production-release approval.
 
 ---
 
@@ -341,7 +341,7 @@ DecentralizedResolutionModule
 ### Status Update
 
 **Original Status**: ⚠️ PARTIALLY COMPLETE (infrastructure ready)  
-**New Status**: ✅ **PRODUCTION READY** (full implementation)
+**New status**: Full implementation was recorded at the time of this summary.
 
 ---
 
@@ -395,7 +395,7 @@ DecentralizedResolutionModule
 
 ## Conclusion
 
-The Kleros integration is **production-ready** and provides a complete external dispute resolution solution for the hardhat-deploy-hybrid escrow system. The implementation:
+The Kleros integration provides an external dispute resolution solution for the escrow system. Confirm current deployment and release requirements before relying on this summary. The implementation:
 
 1. ✅ Follows ERC-792 standard
 2. ✅ Integrates seamlessly with BaseEscrow

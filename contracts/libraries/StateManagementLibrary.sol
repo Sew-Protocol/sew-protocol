@@ -6,7 +6,6 @@ import '../types/EscrowTypes.sol';
 /**
  * @title StateManagementLibrary
  * @notice Library for escrow state transitions and event emission
- * @dev Extracted from BaseEscrow to reduce contract size
  */
 library StateManagementLibrary {
     /// @dev Revert when attempting to transition from a terminal state.

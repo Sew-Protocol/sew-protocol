@@ -8,7 +8,6 @@ import '../types/EscrowTypes.sol';
 /**
  * @title RecoveryLibrary
  * @notice Library for recovering native ETH and ERC20 tokens sent directly to contracts
- * @dev Extracted from BaseEscrow for contract size reduction
  */
 library RecoveryLibrary {
     using SafeERC20 for IERC20;

@@ -6,7 +6,6 @@ import '../types/EscrowTypes.sol';
 /**
  * @title FeeRecordingLibrary
  * @notice Library for recording fees with overflow protection
- * @dev Extracted from EscrowVault to reduce contract size
  */
 library FeeRecordingLibrary {
 

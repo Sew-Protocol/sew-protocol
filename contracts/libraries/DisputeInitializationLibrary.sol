@@ -8,7 +8,6 @@ import '@openzeppelin/contracts/utils/introspection/IERC165.sol';
 /**
  * @title DisputeInitializationLibrary
  * @notice Library for dispute initialization logic
- * @dev Extracted from BaseEscrow to reduce contract size
  */
 library DisputeInitializationLibrary {
     /**

@@ -166,7 +166,6 @@ contract ResolverIncentiveModuleV1 is
         uint256 timestamp
     );
 
-    // Phase 3: Task 3.3 - Event completeness
     event ZeroPaymentSkipped(uint256 indexed workflowId, address indexed resolver);
 
     event ResolverSharePercentageQueued(uint256 oldPercentage, uint256 newPercentage, uint64 eta);

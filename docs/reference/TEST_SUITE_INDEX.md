@@ -174,7 +174,7 @@ Before deploying, verify:
 - [ ] Understand emergency recovery from [PHASE3_SUMMARY.md](PHASE3_SUMMARY.md)
 - [ ] Understand dust/deficit mechanism from [PHASE4_SUMMARY.md](PHASE4_SUMMARY.md)
 - [ ] Review critical findings in each phase summary
-- [ ] Confirm deployment readiness status: ✅ PRODUCTION READY
+- [ ] Confirm deployment readiness against the current release checklist.
 
 ---
 
@@ -234,7 +234,7 @@ Phase 4: Dust & Deficit Unit Tests
 CUMULATIVE:
 └─ Total: 25 tests passing ✅
    Gas: ~23.2M
-   Status: PRODUCTION READY 🚀
+   Status: Historical test status; confirm current release readiness separately.
 ```
 
 ---

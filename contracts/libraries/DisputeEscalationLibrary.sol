@@ -11,7 +11,6 @@ import '../types/EscrowTypes.sol';
 /**
  * @title DisputeEscalationLibrary
  * @notice Library for escalateDispute logic extraction
- * @dev Extracted from BaseEscrow to reduce contract size (Phase 1 size optimization)
  */
 library DisputeEscalationLibrary {
     /**

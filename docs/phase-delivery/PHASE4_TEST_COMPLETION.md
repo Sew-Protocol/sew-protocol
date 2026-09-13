@@ -254,7 +254,7 @@ if (excess > 0 && excess <= dustThreshold) {
 
 ## Deployment Readiness
 
-**Phase 4 Status**: ✅ **PRODUCTION READY**
+**Historical test status**: This report is not a current production-release approval.
 
 - All 12 tests passing
 - Dust/deficit mechanisms validated
@@ -305,7 +305,8 @@ The dust and deficit mechanisms are precisely implemented with clear thresholds 
 
 ## Conclusion
 
-Phase 4 (Dust & Deficit Unit Tests) is complete with all 12 tests passing successfully. The dust and deficit mechanisms are precisely implemented and thoroughly tested. The system correctly handles small amounts around the 5 wei threshold while maintaining position isolation and consistent accounting.
+The Phase 4 dust and deficit test snapshot recorded 12 passing tests. Re-run the
+current test and release suites before relying on these results.
 
 **Risk Level**: 🟢 LOW  
 **Deployment Status**: ✅ READY  

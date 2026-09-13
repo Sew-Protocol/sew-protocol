@@ -10,7 +10,6 @@ import '../types/EscrowTypes.sol';
 /**
  * @title ResolverLogicLibrary
  * @notice Library for resolver payout calculations and yield handling
- * @dev Extracted from BaseEscrow to reduce contract size
  */
 library ResolverLogicLibrary {
     /**

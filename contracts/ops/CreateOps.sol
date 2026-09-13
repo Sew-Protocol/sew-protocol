@@ -13,7 +13,6 @@ import '../interfaces/IYieldGenerationModule.sol';
 /**
  * @title CreateOps
  * @notice External contract for escrow creation validation and computation
- * @dev Extracted from BaseEscrow to reduce contract size (Phase 3 size optimization)
  *
  *      Key design principles:
  *      - Compute → Apply: Returns creation result, BaseEscrow applies to state

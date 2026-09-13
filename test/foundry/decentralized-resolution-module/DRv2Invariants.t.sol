@@ -491,6 +491,7 @@ contract DRv2FuzzTest is Test {
     function testFuzz_BondRefund(uint256 workflowId, address depositor, uint128 amount) public {
         workflowId = bound(workflowId, 1, type(uint128).max);
         vm.assume(depositor != address(0));
+        vm.assume(depositor != address(incentiveModuleV2));
         amount = uint128(bound(amount, 1, type(uint128).max));
 
         // Setup

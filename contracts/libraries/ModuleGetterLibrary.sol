@@ -8,7 +8,7 @@ import '../core/BaseEscrow.sol'; // For ModuleType enum
 /**
  * @title ModuleGetterLibrary
  * @notice Library for optimized module address retrieval
- * @dev Extracted from EscrowVault to reduce contract size. Uses assembly for efficient storage lookups.
+ * @dev Uses assembly for efficient storage lookups.
  */
 library ModuleGetterLibrary {
     /**

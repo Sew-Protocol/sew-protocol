@@ -8,7 +8,6 @@ import '../types/EscrowTypes.sol';
 /**
  * @title SettlementOps
  * @notice External contract for settlement execution operations
- * @dev Extracted from BaseEscrow to reduce contract size
  *
  *      Key design principles:
  *      - Compute → Apply: Returns settlement result, BaseEscrow applies to state
