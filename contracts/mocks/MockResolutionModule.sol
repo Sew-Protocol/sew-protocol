@@ -65,6 +65,18 @@ contract MockResolutionModule is IResolutionModule, ERC165 {
         return (false, address(0), 0); // Cannot escalate
     }
 
+    function quoteAppealTransition(uint256, address, bytes calldata)
+        external pure override returns (ResolutionAppealQuote memory quote)
+    {
+        return quote;
+    }
+
+    function executeEscalationWithQuote(uint256, address, bytes calldata, bytes32)
+        external pure override returns (bool success, address newResolver, uint8 newLevel)
+    {
+        return (false, address(0), 0);
+    }
+
     function getRequiredAppealBond(
         uint256 workflowId,
         address escrowContract,

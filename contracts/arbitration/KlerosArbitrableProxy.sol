@@ -348,6 +348,18 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
         revert('No escalation from Kleros');
     }
 
+    function quoteAppealTransition(uint256, address, bytes calldata)
+        external pure override returns (ResolutionAppealQuote memory quote)
+    {
+        return quote;
+    }
+
+    function executeEscalationWithQuote(uint256, address, bytes calldata, bytes32)
+        external pure override returns (bool, address, uint8)
+    {
+        revert('No escalation from Kleros');
+    }
+
     /**
      * @notice Get required appeal bond for escalation (DR v2)
      * @dev Kleros is final level - no bonds required (returns 0)

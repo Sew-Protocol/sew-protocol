@@ -9,6 +9,7 @@ import '../../../contracts/ops/DisputeOps.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/types/YieldPresets.sol';
+import '../../../contracts/shared/interfaces/IResolutionModule.sol';
 
 contract OpsCoverageTest is Test {
     CreateOps public createOps;
@@ -648,7 +649,7 @@ contract OpsCoverageTest is Test {
         vm.prank(timelock);
         disputeOps.registerEscrowContract(escrowContract);
 
-        mockModule.setRevert(true); // Fails getDisputeResolver
+        mockModule.setRevert(true); // Fails authoritative quote derivation
 
         vm.prank(escrowContract);
         DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
@@ -667,7 +668,7 @@ contract OpsCoverageTest is Test {
         );
 
         assertFalse(result.success);
-        assertEq(result.failureReason, 'Failed to get current level');
+        assertEq(result.failureReason, 'Failed to quote appeal transition');
     }
 
     function test_DisputeOps_computeEscalation_ExecFailed() public {
@@ -725,7 +726,7 @@ contract OpsCoverageTest is Test {
         );
 
         assertFalse(result.success);
-        assertEq(result.failureReason, 'Escalation not allowed by module');
+        assertEq(result.failureReason, 'Quote has no successor resolver');
     }
 
     function test_DisputeOps_encodeEscrowData() public {
@@ -799,19 +800,7 @@ contract OpsCoverageTest is Test {
         // Set valid decision
         mockModule.setDecision(1); // RELEASE
         
-        // Make canEscalate revert by setting revert flag
-        // But we need to make it fail only for canEscalate, not getDisputeResolver
-        // Looking at mock, shouldRevert affects both. We need a different approach.
-        // Actually, the mock's canEscalate will revert if shouldRevert is true
-        // But getDisputeResolver also reverts. 
-        // For this test, we can't easily trigger only canEscalate failure with current mock
-        // Let's create a scenario where canEscalate tries to call but fails
-        
-        // Actually, looking at DisputeOps.sol line 177-179, the catch block sets
-        // 'Failed to check escalation eligibility'. This happens when canEscalate() reverts.
-        // We need getDisputeResolver to succeed but canEscalate to fail.
-        
-        // Create a new mock for this specific case
+        // The quote is now the sole escalation authority; a quote failure fails closed.
         MockResolutionModuleCanEscalateFails mockSpecial = new MockResolutionModuleCanEscalateFails();
         mockSpecial.setDecision(1);
 
@@ -832,7 +821,7 @@ contract OpsCoverageTest is Test {
         );
 
         assertFalse(result.success);
-        assertEq(result.failureReason, 'Failed to check escalation eligibility');
+        assertEq(result.failureReason, 'Failed to quote appeal transition');
     }
 
     function test_DisputeOps_computeEscalation_ExecuteEscalationCallFails() public {
@@ -1576,6 +1565,23 @@ contract MockResolutionModule {
         return (execSuccess, execNewResolver, execNewLevel);
     }
 
+    function quoteAppealTransition(uint256, address, bytes calldata)
+        external view returns (IResolutionModule.ResolutionAppealQuote memory quote)
+    {
+        if (shouldRevert) revert("Revert");
+        quote.appealable = shouldEscalate;
+        quote.predecessorRound = 0;
+        quote.successorRound = 1;
+        quote.predecessorResolver = address(0x123);
+        quote.successorResolver = nextResolver;
+        quote.appealedDecision = ResolutionOutcome(decision);
+        quote.appealDeadline = type(uint256).max;
+        quote.baseBondAmount = bondAmount;
+        quote.baseBondAsset = bondToken;
+        quote.appealedDecisionRoot = keccak256(abi.encode(decision));
+        quote.resolutionQuoteRoot = keccak256(abi.encode(shouldEscalate, nextResolver, bondAmount, bondToken, decision));
+    }
+
     function getDisputeResolver(
         uint256,
         address,
@@ -1626,6 +1632,12 @@ contract MockResolutionModuleCanEscalateFails {
         return (true, address(0x999), 1);
     }
 
+    function quoteAppealTransition(uint256, address, bytes calldata)
+        external pure returns (IResolutionModule.ResolutionAppealQuote memory)
+    {
+        revert("quote failed");
+    }
+
     function isAuthorizedDisputeResolver(uint256, address, bytes calldata) external pure returns (bool, uint8) {
         return (true, 0);
     }
@@ -1669,6 +1681,20 @@ contract MockResolutionModuleExecuteFails {
 
     function executeEscalation(uint256, address, bytes calldata) external pure returns (bool, address, uint8) {
         revert("executeEscalation failed");
+    }
+
+    function quoteAppealTransition(uint256, address, bytes calldata)
+        external view returns (IResolutionModule.ResolutionAppealQuote memory quote)
+    {
+        quote.appealable = shouldEscalate;
+        quote.predecessorRound = 0;
+        quote.successorRound = 1;
+        quote.predecessorResolver = address(0x123);
+        quote.successorResolver = nextResolver;
+        quote.appealedDecision = ResolutionOutcome(decision);
+        quote.appealDeadline = type(uint256).max;
+        quote.appealedDecisionRoot = keccak256(abi.encode(decision));
+        quote.resolutionQuoteRoot = keccak256(abi.encode(shouldEscalate, nextResolver, decision));
     }
 
     function isAuthorizedDisputeResolver(uint256, address, bytes calldata) external pure returns (bool, uint8) {

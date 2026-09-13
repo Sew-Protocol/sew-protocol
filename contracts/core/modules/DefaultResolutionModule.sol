@@ -104,6 +104,18 @@ contract DefaultResolutionModule is AccessControl, IResolutionModule {
         return (false, address(0), 0);
     }
 
+    function quoteAppealTransition(uint256, address, bytes calldata)
+        external pure virtual override returns (ResolutionAppealQuote memory quote)
+    {
+        return quote;
+    }
+
+    function executeEscalationWithQuote(uint256, address, bytes calldata, bytes32)
+        external pure virtual override returns (bool success, address newResolver, uint8 newLevel)
+    {
+        return (false, address(0), 0);
+    }
+
     /**
      * @notice Get required appeal bond for escalation (DR v2)
      * @dev Default implementation: no bonds required (returns 0)

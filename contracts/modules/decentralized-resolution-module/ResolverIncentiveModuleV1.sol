@@ -555,7 +555,7 @@ contract ResolverIncentiveModuleV1 is
         ) external payable virtual override {
             revert('V1 does not support appeal bonds');
         }
-    
+
         /**
          * @notice Distribute appeal bond based on outcome (V2+)
          * @dev V1 doesn't support appeal bonds - reverts

@@ -9,12 +9,19 @@ import '../../../../contracts/modules/decentralized-resolution-module/Decentrali
  * @notice Minimal mock for Foundry tests that need to assert incentive hooks were called
  */
 contract MockIncentiveModule is IIncentiveModule {
+    error RecordAppealBondReverted();
+
     mapping(uint256 => bool) public onDisputeOpenedCalled;
     mapping(uint256 => uint256) public recordedWorkflowId;
     mapping(uint256 => address) public recordedToken;
     mapping(uint256 => uint256) public recordedAmount;
     mapping(uint256 => uint256) public recordedEscrowFee;
     mapping(uint256 => uint8) public recordedRound;
+    bool public revertOnRecordAppealBond;
+
+    function setRevertOnRecordAppealBond(bool shouldRevert) external {
+        revertOnRecordAppealBond = shouldRevert;
+    }
 
     function onDisputeOpened(
         uint256 workflowId,
@@ -71,7 +78,9 @@ contract MockIncentiveModule is IIncentiveModule {
         return (0, address(0));
     }
 
-    function recordAppealBond(uint256, address, address, address, uint256, address, uint8) external payable override {}
+    function recordAppealBond(uint256, address, address, address, uint256, address, uint8) external payable override {
+        if (revertOnRecordAppealBond) revert RecordAppealBondReverted();
+    }
 
     function supportsFeature(bytes4) external pure override returns (bool) {
         return false;

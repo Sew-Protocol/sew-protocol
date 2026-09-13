@@ -311,4 +311,3 @@ contract FeeScenarioFlowsTest is Test {
         assertEq(address(incentive).balance, expectedToRecord, "incentive module should receive net bond");
     }
 }
-

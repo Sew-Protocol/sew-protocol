@@ -12,6 +12,23 @@ import '../../types/EscrowTypes.sol';
  *      Dispute state is keyed by escrow transfer ID (workflowId); there is no separate disputeId in this interface.
  */
 interface IResolutionModule is IERC165 {
+    /// @notice Canonical module-owned facts for one appealable decision.
+    /// @dev `appealedDecisionRoot` commits to the recorded on-chain decision
+    ///      state, not off-chain evidence content.
+    struct ResolutionAppealQuote {
+        bool appealable;
+        uint8 predecessorRound;
+        uint8 successorRound;
+        address predecessorResolver;
+        address successorResolver;
+        ResolutionOutcome appealedDecision;
+        uint256 appealDeadline;
+        bool finalRound;
+        address baseBondAsset;
+        uint256 baseBondAmount;
+        bytes32 appealedDecisionRoot;
+        bytes32 resolutionQuoteRoot;
+    }
     /**
      * @notice Initialize a new dispute in the module
      * @param workflowId Escrow transfer ID (escrowId)
@@ -102,6 +119,21 @@ interface IResolutionModule is IERC165 {
         uint256 workflowId,
         address escrowContract,
         bytes calldata escrowData
+    ) external returns (bool success, address newDisputeResolver, uint8 newLevel);
+
+    /// @notice Quote all authoritative dispute-domain facts for an appeal.
+    function quoteAppealTransition(
+        uint256 workflowId,
+        address escrowContract,
+        bytes calldata escrowData
+    ) external view returns (ResolutionAppealQuote memory quote);
+
+    /// @notice Revalidate the exact quote immediately before mutating round state.
+    function executeEscalationWithQuote(
+        uint256 workflowId,
+        address escrowContract,
+        bytes calldata escrowData,
+        bytes32 expectedResolutionQuoteRoot
     ) external returns (bool success, address newDisputeResolver, uint8 newLevel);
 
     /**

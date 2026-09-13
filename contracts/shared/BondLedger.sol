@@ -10,14 +10,26 @@ import './interfaces/IBondLedger.sol';
 contract BondLedger is IBondLedger, AccessControl, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
+    /// @notice Versioned identity of the canonical EVM realization projection.
+    /// @dev A realized distribution is a map from unique payout recipients to
+    ///      exact amounts. Rows are sorted by recipient only for canonicalization;
+    ///      upstream allocation artifacts may retain richer, differently ordered
+    ///      claimant or obligation semantics and must aggregate before projection.
+    bytes32 public constant REALIZED_DISTRIBUTION_V1 = keccak256('REALIZED_DISTRIBUTION_V1');
+    bytes32 public constant REALIZED_DISTRIBUTION_LEAF_V1 = keccak256('REALIZED_DISTRIBUTION_LEAF_V1');
+
     bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');
     bytes32 public constant AUTHORIZED_CALLER = keccak256('AUTHORIZED_CALLER');
 
     uint256 public constant MAX_ALLOCATIONS = 50;
 
     mapping(bytes32 => BondPosition) private _positions;
+    mapping(bytes32 => PositionRoles) private _positionRoles;
     mapping(bytes32 => mapping(address => uint256)) private _claimable;
     mapping(bytes32 => Allocation[]) private _settlementAllocations;
+    mapping(bytes32 => bytes32) private _realizedDistributionRoots;
+    mapping(bytes32 => bytes32) private _authoritativeCauseRoots;
+    mapping(bytes32 => DispositionCauseType) private _dispositionCauseTypes;
     mapping(address => uint256) public forfeitedBondReserve;
 
     error NotAuthorized();
@@ -74,6 +86,14 @@ contract BondLedger is IBondLedger, AccessControl, ReentrancyGuard {
             status: uint8(BondStatus.PENDING),
             allocationCount: 0
         });
+        _positionRoles[bondId] = PositionRoles({
+            funder: funder,
+            // Legacy posting API has no distinct action caller. The authorized
+            // application is therefore recorded as the operator until callers
+            // migrate to a dedicated position-opening entry point.
+            operator: application,
+            beneficiary: payer
+        });
 
         emit BondPosted(bondId, application, payer, funder, asset, principal, contextId, termsHash);
     }
@@ -83,6 +103,26 @@ contract BondLedger is IBondLedger, AccessControl, ReentrancyGuard {
         Allocation[] calldata allocations,
         SettlementKind kind
     ) external onlyAuthorized nonReentrant {
+        _settleBond(bondId, allocations, kind, DispositionCauseType.EXPLICIT_FORFEIT, bytes32(0));
+    }
+
+    function settleBondWithRoot(
+        bytes32 bondId,
+        Allocation[] calldata allocations,
+        SettlementKind kind,
+        DispositionCauseType causeType,
+        bytes32 causeRoot
+    ) external onlyAuthorized nonReentrant {
+        _settleBond(bondId, allocations, kind, causeType, causeRoot);
+    }
+
+    function _settleBond(
+        bytes32 bondId,
+        Allocation[] calldata allocations,
+        SettlementKind kind,
+        DispositionCauseType causeType,
+        bytes32 causeRoot
+    ) internal {
         BondPosition storage pos = _positions[bondId];
         if (pos.status != uint8(BondStatus.PENDING)) revert InvalidStatus();
 
@@ -91,9 +131,12 @@ contract BondLedger is IBondLedger, AccessControl, ReentrancyGuard {
         if (len > MAX_ALLOCATIONS) revert InvalidAllocations();
 
         uint256 sum;
+        address previousRecipient;
         for (uint256 i = 0; i < len; i++) {
             if (allocations[i].recipient == address(0)) revert InvalidAllocations();
             if (allocations[i].amount == 0) revert InvalidAllocations();
+            if (i > 0 && allocations[i].recipient <= previousRecipient) revert InvalidAllocations();
+            previousRecipient = allocations[i].recipient;
             sum += allocations[i].amount;
         }
 
@@ -117,6 +160,11 @@ contract BondLedger is IBondLedger, AccessControl, ReentrancyGuard {
         }
 
         emit BondSettled(bondId, allocations, kind);
+        bytes32 distributionRoot = _allocationRoot(allocations);
+        _realizedDistributionRoots[bondId] = distributionRoot;
+        _authoritativeCauseRoots[bondId] = causeRoot;
+        _dispositionCauseTypes[bondId] = causeType;
+        emit RealizedDistribution(bondId, distributionRoot, causeRoot, causeType, pos.termsHash, pos.principal, len);
     }
 
     function claim(bytes32 bondId, address recipient) external nonReentrant {
@@ -161,6 +209,40 @@ contract BondLedger is IBondLedger, AccessControl, ReentrancyGuard {
 
     function getSettlementAllocations(bytes32 bondId) external view returns (Allocation[] memory) {
         return _settlementAllocations[bondId];
+    }
+
+    function getPositionRoles(bytes32 bondId) external view returns (PositionRoles memory) {
+        if (_positions[bondId].status == uint8(BondStatus.NONE)) revert InvalidStatus();
+        return _positionRoles[bondId];
+    }
+
+    function getRealizedDistributionRoot(bytes32 bondId) external view returns (bytes32) {
+        if (_positions[bondId].status == uint8(BondStatus.NONE)) revert InvalidStatus();
+        return _realizedDistributionRoots[bondId];
+    }
+
+    function getAuthoritativeCauseRoot(bytes32 bondId) external view returns (bytes32) {
+        if (_positions[bondId].status == uint8(BondStatus.NONE)) revert InvalidStatus();
+        return _authoritativeCauseRoots[bondId];
+    }
+
+    function getDispositionCauseType(bytes32 bondId) external view returns (DispositionCauseType) {
+        if (_positions[bondId].status == uint8(BondStatus.NONE)) revert InvalidStatus();
+        return _dispositionCauseTypes[bondId];
+    }
+
+    function realizedDistributionRoot(Allocation[] calldata allocations) external pure returns (bytes32) {
+        return _allocationRoot(allocations);
+    }
+
+    function _allocationRoot(Allocation[] calldata allocations) private pure returns (bytes32 root) {
+        bytes32[] memory leaves = new bytes32[](allocations.length);
+        for (uint256 i = 0; i < allocations.length; i++) {
+            leaves[i] = keccak256(
+                abi.encode(REALIZED_DISTRIBUTION_LEAF_V1, allocations[i].recipient, allocations[i].amount)
+            );
+        }
+        return keccak256(abi.encode(REALIZED_DISTRIBUTION_V1, allocations.length, leaves));
     }
 
     // ── errors ──

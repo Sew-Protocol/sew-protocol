@@ -99,7 +99,11 @@ contract ResolverIncentiveModuleV2BondLedger is ResolverIncentiveModuleV2 {
             // Appeal succeeded - refund to economic payer (escalator)
             IBondLedger.Allocation[] memory allocs = new IBondLedger.Allocation[](1);
             allocs[0] = IBondLedger.Allocation(pos.payer, pos.principal);
-            bondLedger.settleBond(bondId, allocs, IBondLedger.SettlementKind.REFUND);
+            bondLedger.settleBondWithRoot(
+                bondId, allocs, IBondLedger.SettlementKind.REFUND,
+                IBondLedger.DispositionCauseType.RULING_OUTCOME,
+                _rulingCauseRoot(escrowContract, workflowId, round, true)
+            );
             totalBondsRefunded += pos.principal;
             emit AppealBondRefundClaimable(workflowId, bondRound, pos.payer, pos.principal, pos.asset);
         } else {
@@ -108,7 +112,11 @@ contract ResolverIncentiveModuleV2BondLedger is ResolverIncentiveModuleV2 {
             if (count == 0) {
                 IBondLedger.Allocation[] memory allocs = new IBondLedger.Allocation[](1);
                 allocs[0] = IBondLedger.Allocation(FORFEIT_DESTINATION, pos.principal);
-                bondLedger.settleBond(bondId, allocs, IBondLedger.SettlementKind.FORFEIT);
+                bondLedger.settleBondWithRoot(
+                    bondId, allocs, IBondLedger.SettlementKind.FORFEIT,
+                    IBondLedger.DispositionCauseType.RULING_OUTCOME,
+                    _rulingCauseRoot(escrowContract, workflowId, round, false)
+                );
                 totalBondsForfeited += pos.principal;
                 emit AppealBondForfeited(workflowId, round, pos.principal, pos.asset, 'No resolvers');
             } else {
@@ -120,7 +128,12 @@ contract ResolverIncentiveModuleV2BondLedger is ResolverIncentiveModuleV2 {
                     if (i < remainder) payment += 1;
                     allocs[i] = IBondLedger.Allocation(resolvers[i], payment);
                 }
-                bondLedger.settleBond(bondId, allocs, IBondLedger.SettlementKind.RESOLVER_PAYOUT);
+                _sortAllocationsByRecipient(allocs);
+                bondLedger.settleBondWithRoot(
+                    bondId, allocs, IBondLedger.SettlementKind.RESOLVER_PAYOUT,
+                    IBondLedger.DispositionCauseType.RULING_OUTCOME,
+                    _rulingCauseRoot(escrowContract, workflowId, round, false)
+                );
                 totalBondsPaidToResolvers += pos.principal;
                 emit AppealBondPaidToResolvers(workflowId, round, resolvers, pos.principal, pos.asset);
             }
@@ -139,7 +152,11 @@ contract ResolverIncentiveModuleV2BondLedger is ResolverIncentiveModuleV2 {
 
         IBondLedger.Allocation[] memory allocs = new IBondLedger.Allocation[](1);
         allocs[0] = IBondLedger.Allocation(FORFEIT_DESTINATION, pos.principal);
-        bondLedger.settleBond(bondId, allocs, IBondLedger.SettlementKind.FORFEIT);
+        bondLedger.settleBondWithRoot(
+            bondId, allocs, IBondLedger.SettlementKind.FORFEIT,
+            IBondLedger.DispositionCauseType.EXPLICIT_FORFEIT,
+            keccak256(abi.encode("EXPLICIT_FORFEIT", escrowContract, workflowId, round, reason))
+        );
 
         totalBondsForfeited += pos.principal;
         emit AppealBondForfeited(workflowId, round, pos.principal, pos.asset, reason);
@@ -149,7 +166,7 @@ contract ResolverIncentiveModuleV2BondLedger is ResolverIncentiveModuleV2 {
         uint256 workflowId,
         address escrowContract,
         uint8 finalRound,
-        ResolutionOutcome /* finalDecision */
+        ResolutionOutcome finalDecision
     ) external override onlyEscrowOrResolutionModule {
         for (uint8 round = 0; round <= finalRound; round++) {
             bytes32 bondId = _bondId(escrowContract, workflowId, round);
@@ -159,7 +176,11 @@ contract ResolverIncentiveModuleV2BondLedger is ResolverIncentiveModuleV2 {
 
             IBondLedger.Allocation[] memory allocs = new IBondLedger.Allocation[](1);
             allocs[0] = IBondLedger.Allocation(FORFEIT_DESTINATION, pos.principal);
-            bondLedger.settleBond(bondId, allocs, IBondLedger.SettlementKind.FORFEIT);
+            bondLedger.settleBondWithRoot(
+                bondId, allocs, IBondLedger.SettlementKind.FORFEIT,
+                IBondLedger.DispositionCauseType.DISPUTE_FINALIZED,
+                keccak256(abi.encode("DISPUTE_FINALIZED", escrowContract, workflowId, finalRound, finalDecision))
+            );
 
             totalBondsForfeited += pos.principal;
             emit AppealBondForfeited(workflowId, round, pos.principal, pos.asset, 'Finalize cleanup');
@@ -201,6 +222,27 @@ contract ResolverIncentiveModuleV2BondLedger is ResolverIncentiveModuleV2 {
 
     function _bondId(address escrowContract, uint256 workflowId, uint8 round) internal pure returns (bytes32) {
         return keccak256(abi.encode(escrowContract, workflowId, round));
+    }
+
+    function _rulingCauseRoot(
+        address escrowContract,
+        uint256 workflowId,
+        uint8 priorRound,
+        bool outcomeFlipped
+    ) internal pure returns (bytes32) {
+        return keccak256(abi.encode("RULING_OUTCOME", escrowContract, workflowId, priorRound, outcomeFlipped));
+    }
+
+    function _sortAllocationsByRecipient(IBondLedger.Allocation[] memory allocations) internal pure {
+        for (uint256 i = 1; i < allocations.length; i++) {
+            IBondLedger.Allocation memory current = allocations[i];
+            uint256 j = i;
+            while (j > 0 && allocations[j - 1].recipient > current.recipient) {
+                allocations[j] = allocations[j - 1];
+                j--;
+            }
+            allocations[j] = current;
+        }
     }
 
     function _eligibleResolvers(

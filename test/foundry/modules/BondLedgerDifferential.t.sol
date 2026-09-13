@@ -70,6 +70,19 @@ contract BondLedgerDifferential is Test {
         _assertMetricsEqual(a, b);
     }
 
+    function test_bondLedgerOutcome_hasRootedForensicLineage() public {
+        Stack memory s = _deploy(true);
+        _runRefundScenario(s);
+
+        bytes32 bondId = _bondId(address(s.escrow), WID, 1);
+        IBondLedger.Allocation[] memory allocations = s.ledger.getSettlementAllocations(bondId);
+        assertEq(allocations.length, 1);
+        assertEq(allocations[0].recipient, buyer);
+        assertEq(allocations[0].amount, BOND);
+        assertTrue(s.ledger.getRealizedDistributionRoot(bondId) != bytes32(0));
+        assertTrue(s.ledger.getAuthoritativeCauseRoot(bondId) != bytes32(0));
+    }
+
     function test_diff_failedAppeal_resolverAllocations() public {
         Stack memory a = _deploy(false);
         Stack memory b = _deploy(true);

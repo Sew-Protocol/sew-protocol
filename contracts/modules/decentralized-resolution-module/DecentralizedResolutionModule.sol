@@ -284,45 +284,53 @@ contract DecentralizedResolutionModule is
         uint256 workflowId,
         address escrowContract,
         uint8 currentLevel,
-        bytes calldata
+        bytes calldata escrowData
     ) external view override returns (bool allowed, address nextResolver, uint256 escalationFee) {
-        uint8 nextRound = currentLevel + 1;
-        if (nextRound > MAX_ROUND || !escalationConfig[nextRound].enabled)
-            return (false, address(0), 0);
-        if (nextRound == 1)
-            nextResolver = _selectResolverRoundRobin(escrowCategory[escrowContract][workflowId], true);
-        else if (nextRound == 2) nextResolver = externalResolver;
-        if (nextResolver == address(0)) return (false, address(0), 0);
-
-        uint256 bondAmount = 0;
-        if (escalationCostConfig.enabled) {
-            bondAmount = EscalationCostLibrary.calculateEscalationCost(currentLevel, escalationCostConfig);
-        }
-        return (true, nextResolver, bondAmount);
+        IResolutionModule.ResolutionAppealQuote memory quote = _quoteAppealTransition(workflowId, escrowContract, escrowData);
+        if (quote.predecessorRound != currentLevel) return (false, address(0), 0);
+        return (quote.appealable, quote.successorResolver, quote.baseBondAmount);
     }
 
     function executeEscalation(
         uint256 workflowId,
         address escrowContract,
-        bytes calldata
+        bytes calldata escrowData
     ) external override nonReentrant returns (bool success, address newResolver, uint8 newLevel) {
+        return _executeEscalation(workflowId, escrowContract, escrowData, bytes32(0));
+    }
+
+    function quoteAppealTransition(
+        uint256 workflowId,
+        address escrowContract,
+        bytes calldata escrowData
+    ) external view override returns (IResolutionModule.ResolutionAppealQuote memory quote) {
+        return _quoteAppealTransition(workflowId, escrowContract, escrowData);
+    }
+
+    function executeEscalationWithQuote(
+        uint256 workflowId,
+        address escrowContract,
+        bytes calldata escrowData,
+        bytes32 expectedResolutionQuoteRoot
+    ) external override nonReentrant returns (bool success, address newResolver, uint8 newLevel) {
+        return _executeEscalation(workflowId, escrowContract, escrowData, expectedResolutionQuoteRoot);
+    }
+
+    function _executeEscalation(
+        uint256 workflowId,
+        address escrowContract,
+        bytes calldata escrowData,
+        bytes32 expectedResolutionQuoteRoot
+    ) internal returns (bool success, address newResolver, uint8 newLevel) {
+        IResolutionModule.ResolutionAppealQuote memory quote = _quoteAppealTransition(workflowId, escrowContract, escrowData);
+        if (expectedResolutionQuoteRoot != bytes32(0) && quote.resolutionQuoteRoot != expectedResolutionQuoteRoot) {
+            revert('Stale appeal quote');
+        }
+        if (!quote.appealable) return (false, address(0), quote.predecessorRound);
         DisputeMetadata storage dm = disputeMetadata[escrowContract][workflowId];
-        uint8 fromRound = dm.currentRound;
-        uint8 toRound = fromRound + 1;
-
-        if (toRound > MAX_ROUND || !escalationConfig[toRound].enabled) {
-            return (false, address(0), dm.currentRound);
-        }
-
-        address nextRes;
-        if (toRound == 1) {
-            nextRes = _selectResolverRoundRobin(escrowCategory[escrowContract][workflowId], true);
-            if (nextRes != address(0)) _advanceRoundRobinCounter(escrowCategory[escrowContract][workflowId], true);
-        } else if (toRound == 2) {
-            nextRes = externalResolver;
-        }
-
-        if (nextRes == address(0)) return (false, address(0), dm.currentRound);
+        uint8 toRound = quote.successorRound;
+        address nextRes = quote.successorResolver;
+        if (toRound == 1) _advanceRoundRobinCounter(escrowCategory[escrowContract][workflowId], true);
 
         dm.currentRound = toRound;
         dm.resolverAtRound[toRound] = nextRes;
@@ -339,6 +347,50 @@ contract DecentralizedResolutionModule is
         }
 
         return (true, nextRes, toRound);
+    }
+
+    function _quoteAppealTransition(
+        uint256 workflowId,
+        address escrowContract,
+        bytes calldata escrowData
+    ) internal view returns (IResolutionModule.ResolutionAppealQuote memory quote) {
+        DisputeMetadata storage dm = disputeMetadata[escrowContract][workflowId];
+        quote.predecessorRound = dm.currentRound;
+        quote.successorRound = dm.currentRound + 1;
+        quote.predecessorResolver = dm.resolverAtRound[dm.currentRound];
+        quote.appealedDecision = dm.decisionAtRound[dm.currentRound];
+        quote.appealDeadline = dm.appealDeadline[dm.currentRound];
+        quote.finalRound = dm.currentRound >= MAX_ROUND;
+        quote.appealedDecisionRoot = keccak256(abi.encode(
+            'APPEALED_DECISION_V1', block.chainid, address(this), escrowContract, workflowId,
+            quote.predecessorRound, quote.predecessorResolver, quote.appealedDecision,
+            dm.decidedAtRound[dm.currentRound], quote.appealDeadline
+        ));
+
+        if (!quote.finalRound && dm.status == DisputeStatus.Decided && quote.appealedDecision != ResolutionOutcome.NONE
+            && quote.appealDeadline > block.timestamp && escalationConfig[quote.successorRound].enabled) {
+            if (quote.successorRound == 1) {
+                quote.successorResolver = _selectResolverRoundRobin(escrowCategory[escrowContract][workflowId], true);
+            } else if (quote.successorRound == 2) {
+                quote.successorResolver = externalResolver;
+            }
+            quote.appealable = quote.successorResolver != address(0);
+            if (quote.appealable && escalationCostConfig.enabled
+                && !(quote.successorRound == 2 && externalResolver != address(0))) {
+                quote.baseBondAmount = EscalationCostLibrary.calculateEscalationCost(quote.predecessorRound, escalationCostConfig);
+                (address escrowToken, , , ) = abi.decode(escrowData, (address, address, address, uint256));
+                quote.baseBondAsset = escrowToken;
+                if (address(bondTokenRegistry) != address(0) && !bondTokenRegistry.isAccepted(quote.baseBondAsset)) {
+                    quote.baseBondAsset = bondTokenRegistry.defaultBondToken();
+                }
+            }
+        }
+        quote.resolutionQuoteRoot = keccak256(abi.encode(
+            'RESOLUTION_APPEAL_QUOTE_V1', block.chainid, address(this), escrowContract, workflowId,
+            quote.appealedDecisionRoot, quote.appealable, quote.predecessorRound, quote.successorRound,
+            quote.predecessorResolver, quote.successorResolver, quote.appealDeadline, quote.finalRound,
+            quote.baseBondAsset, quote.baseBondAmount
+        ));
     }
 
     function getRequiredAppealBond(

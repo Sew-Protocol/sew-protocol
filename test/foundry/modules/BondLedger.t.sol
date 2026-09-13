@@ -7,6 +7,8 @@ import '../../../contracts/shared/BondLedger.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 
 contract BondLedgerTest is Test {
+    bytes32 constant REALIZED_DISTRIBUTION_V1 = keccak256('REALIZED_DISTRIBUTION_V1');
+    bytes32 constant REALIZED_DISTRIBUTION_LEAF_V1 = keccak256('REALIZED_DISTRIBUTION_LEAF_V1');
     BondLedger public ledger;
     ERC20Mock public token;
 
@@ -62,6 +64,45 @@ contract BondLedgerTest is Test {
         ledger.settleBond(BOND_ID, allocs, IBondLedger.SettlementKind.REFUND);
 
         assertEq(ledger.getClaimable(BOND_ID, payer), PRINCIPAL);
+    }
+
+    function test_settleBondWithRoot_recordsCanonicalDistributionAndCause() public {
+        _postBond();
+        IBondLedger.Allocation[] memory allocs = new IBondLedger.Allocation[](2);
+        allocs[0] = IBondLedger.Allocation(payer, PRINCIPAL / 2);
+        allocs[1] = IBondLedger.Allocation(recipient, PRINCIPAL - PRINCIPAL / 2);
+        _sortAllocations(allocs);
+        bytes32 causeRoot = keccak256("final-ruling");
+
+        vm.prank(authorized);
+        ledger.settleBondWithRoot(
+            BOND_ID,
+            allocs,
+            IBondLedger.SettlementKind.RESOLVER_PAYOUT,
+            IBondLedger.DispositionCauseType.RULING_OUTCOME,
+            causeRoot
+        );
+
+        bytes32[] memory leaves = new bytes32[](2);
+        leaves[0] = keccak256(abi.encode(REALIZED_DISTRIBUTION_LEAF_V1, allocs[0].recipient, allocs[0].amount));
+        leaves[1] = keccak256(abi.encode(REALIZED_DISTRIBUTION_LEAF_V1, allocs[1].recipient, allocs[1].amount));
+        assertEq(
+            ledger.getRealizedDistributionRoot(BOND_ID),
+            keccak256(abi.encode(REALIZED_DISTRIBUTION_V1, 2, leaves))
+        );
+        assertEq(ledger.getAuthoritativeCauseRoot(BOND_ID), causeRoot);
+        assertEq(
+            uint256(ledger.getDispositionCauseType(BOND_ID)),
+            uint256(IBondLedger.DispositionCauseType.RULING_OUTCOME)
+        );
+    }
+
+    function test_positionRoles_preserveFunderBeneficiaryAndApplicationOperator() public {
+        _postBond();
+        IBondLedger.PositionRoles memory roles = ledger.getPositionRoles(BOND_ID);
+        assertEq(roles.funder, funder);
+        assertEq(roles.beneficiary, payer);
+        assertEq(roles.operator, app);
     }
 
     function test_settleBond_multiResolver() public {
@@ -142,6 +183,34 @@ contract BondLedgerTest is Test {
         ledger.settleBond(BOND_ID, allocs, IBondLedger.SettlementKind.REFUND);
     }
 
+    function test_terminalPosition_hasExactlyOneConservingDisposition() public {
+        _postBond();
+        IBondLedger.Allocation[] memory allocs = new IBondLedger.Allocation[](2);
+        allocs[0] = IBondLedger.Allocation(payer, PRINCIPAL / 3);
+        allocs[1] = IBondLedger.Allocation(recipient, PRINCIPAL - PRINCIPAL / 3);
+        _sortAllocations(allocs);
+
+        vm.prank(authorized);
+        ledger.settleBondWithRoot(
+            BOND_ID,
+            allocs,
+            IBondLedger.SettlementKind.RESOLVER_PAYOUT,
+            IBondLedger.DispositionCauseType.RULING_OUTCOME,
+            keccak256("ruling-artifact")
+        );
+
+        IBondLedger.BondPosition memory pos = ledger.getBond(BOND_ID);
+        IBondLedger.Allocation[] memory realized = ledger.getSettlementAllocations(BOND_ID);
+        assertEq(uint256(pos.status), uint256(IBondLedger.BondStatus.SETTLED));
+        assertEq(realized.length, 2);
+        assertEq(realized[0].amount + realized[1].amount, pos.principal);
+        assertTrue(ledger.getRealizedDistributionRoot(BOND_ID) != bytes32(0));
+
+        vm.prank(authorized);
+        vm.expectRevert();
+        ledger.settleBond(BOND_ID, allocs, IBondLedger.SettlementKind.RESOLVER_PAYOUT);
+    }
+
     function test_duplicateBondIdReverts() public {
         _postBond();
         token.mint(funder, PRINCIPAL);
@@ -204,6 +273,57 @@ contract BondLedgerTest is Test {
         ledger.settleBond(BOND_ID, allocs, IBondLedger.SettlementKind.REFUND);
     }
 
+    function test_duplicateOrUnorderedRecipientsRevert() public {
+        _postBond();
+        IBondLedger.Allocation[] memory allocs = new IBondLedger.Allocation[](2);
+        allocs[0] = IBondLedger.Allocation(payer, PRINCIPAL / 2);
+        allocs[1] = IBondLedger.Allocation(recipient, PRINCIPAL - PRINCIPAL / 2);
+        _sortAllocations(allocs);
+        (allocs[0], allocs[1]) = (allocs[1], allocs[0]);
+        vm.prank(authorized);
+        vm.expectRevert();
+        ledger.settleBond(BOND_ID, allocs, IBondLedger.SettlementKind.RESOLVER_PAYOUT);
+    }
+
+    function test_goldenDistributionRoots_areStableAcrossCases() public {
+        IBondLedger.Allocation[] memory single = new IBondLedger.Allocation[](1);
+        single[0] = IBondLedger.Allocation(payer, PRINCIPAL);
+        assertEq(
+            ledger.realizedDistributionRoot(single),
+            0x1e9aaaa8d91a44a2296c61fa0111fb7e59a9e5334a59237b887e4e0f4d957700
+        );
+
+        IBondLedger.Allocation[] memory split = new IBondLedger.Allocation[](2);
+        split[0] = IBondLedger.Allocation(payer, 1);
+        split[1] = IBondLedger.Allocation(recipient, type(uint256).max - 1);
+        assertEq(
+            ledger.realizedDistributionRoot(split),
+            0xf0191ab9d770849c7a22889c654612ae1737003ee2b0b8061650d5f9ab91c337
+        );
+
+        IBondLedger.Allocation[] memory unsortedInput = new IBondLedger.Allocation[](3);
+        unsortedInput[0] = IBondLedger.Allocation(address(0x03), 30);
+        unsortedInput[1] = IBondLedger.Allocation(address(0x01), 10);
+        unsortedInput[2] = IBondLedger.Allocation(address(0x02), 20);
+        _sortThreeAllocations(unsortedInput);
+        assertEq(unsortedInput[0].recipient, address(0x01));
+        assertEq(unsortedInput[1].recipient, address(0x02));
+        assertEq(unsortedInput[2].recipient, address(0x03));
+        assertEq(
+            ledger.realizedDistributionRoot(unsortedInput),
+            0x0246c46f4482380a744f7c44d9a995b9d6cd843b30482e0374e48885ff0ae841
+        );
+
+        IBondLedger.Allocation[] memory remainder = new IBondLedger.Allocation[](3);
+        remainder[0] = IBondLedger.Allocation(address(0x01), 34);
+        remainder[1] = IBondLedger.Allocation(address(0x02), 33);
+        remainder[2] = IBondLedger.Allocation(address(0x03), 33);
+        assertEq(
+            ledger.realizedDistributionRoot(remainder),
+            0x5391c32b10d15e5648ff0cc32e8da0a881455b474727c7312be9db138f8f51bc
+        );
+    }
+
     function test_emptyAllocationsReverts() public {
         _postBond();
         IBondLedger.Allocation[] memory allocs = new IBondLedger.Allocation[](0);
@@ -227,5 +347,23 @@ contract BondLedgerTest is Test {
         allocs[0] = IBondLedger.Allocation(payer, PRINCIPAL);
         vm.prank(authorized);
         ledger.settleBond(BOND_ID, allocs, IBondLedger.SettlementKind.REFUND);
+    }
+
+    function _sortAllocations(IBondLedger.Allocation[] memory allocs) internal pure {
+        if (allocs.length == 2 && allocs[0].recipient > allocs[1].recipient) {
+            (allocs[0], allocs[1]) = (allocs[1], allocs[0]);
+        }
+    }
+
+    function _sortThreeAllocations(IBondLedger.Allocation[] memory allocs) internal pure {
+        for (uint256 i = 1; i < allocs.length; i++) {
+            IBondLedger.Allocation memory current = allocs[i];
+            uint256 j = i;
+            while (j > 0 && allocs[j - 1].recipient > current.recipient) {
+                allocs[j] = allocs[j - 1];
+                j--;
+            }
+            allocs[j] = current;
+        }
     }
 }

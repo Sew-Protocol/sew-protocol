@@ -23,6 +23,11 @@ import '@openzeppelin/contracts/utils/Address.sol';
 import '../interfaces/IResolver.sol';
 import '../interfaces/ICancellationStrategy.sol';
 import '../interfaces/IReleaseStrategy.sol';
+import '../interfaces/IEscrowLifecycle.sol';
+import '../interfaces/IEscrowDispute.sol';
+import '../interfaces/IEscrowAppeal.sol';
+import '../interfaces/IEscrowSettlement.sol';
+import '../interfaces/IEscrowViews.sol';
 import '../shared/interfaces/IResolutionModule.sol';
 import '../interfaces/IYieldModule.sol';
 import '../libraries/EscrowEncodingLibrary.sol';
@@ -115,6 +120,8 @@ error AlreadyPausedCannotRepause();
 error MaxPauseCyclesExceeded(uint256 currentCount, uint256 maxCycles);
 error PauseDurationExceeded(uint256 duration, uint256 maxDuration);
 error PausedNotSupported();
+    error EscalationResultMismatch(uint8 expectedLevel, uint8 actualLevel, address expectedResolver, address actualResolver);
+    error AppealsUnsupportedForCustomResolver(uint256 workflowId, address customResolver);
 
 // Errors used by child contracts (EscrowVault, EscrowableERC20)
 error BalanceUnderflow(address token, uint256 currentBalance, uint256 requestedAmount);
@@ -219,6 +226,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     mapping(uint256 => uint256) public v25YieldPrincipals;        // workflowId -> accepted principal amount
 
     mapping(uint256 => ModuleSnapshot) public moduleSnapshots;
+    mapping(uint256 => address) public appealBondFeeRecipients;
 
     enum ModuleType {
         RESOLUTION,
@@ -260,6 +268,24 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         uint8 toLevel,
         address indexed newDisputeResolver,
         address indexed escalatedBy
+    );
+    event AppealRequested(
+        uint256 indexed workflowId,
+        bytes32 indexed requestRoot,
+        address indexed operator,
+        address funder,
+        address refundRecipient
+    );
+    event AppealTransitionDerived(
+        uint256 indexed workflowId,
+        bytes32 indexed requestRoot,
+        bytes32 indexed transitionRoot,
+        bytes32 resolutionQuoteRoot,
+        bytes32 appealedDecisionRoot,
+        uint256 grossBond,
+        uint256 protocolFee,
+        uint256 netBond,
+        address feeRecipient
     );
     event DisputeAutoCancelled(
         uint256 indexed workflowId,
@@ -586,6 +612,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
             pendingAutoCancelEnabled: pendingAutoCancelEnabled,
             disputedTimeoutEnabled: disputedTimeoutEnabled
         });
+        appealBondFeeRecipients[workflowId] = escrowFeeAddress;
         emit TimeoutPolicySnapshotted(workflowId, pendingAutoCancelEnabled, disputedTimeoutEnabled);
     }
 
@@ -881,25 +908,53 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
      * @return newDisputeResolver Address of the resolver assigned to the next level
      * @return newLevel New escalation level
      */
-    function escalateDispute(
-        uint256 workflowId
-    )
-        external
-        payable
-        nonReentrant
-        returns (bool success, address newDisputeResolver, uint8 newLevel)
+    struct AppealRequest {
+        address funder;
+        address operator;
+        address refundRecipient;
+    }
+
+    error InvalidAppealRequestRole(uint8 role, address provided, address expected);
+
+    function escalateDispute(uint256 workflowId)
+        external payable nonReentrant returns (bool success, address newDisputeResolver, uint8 newLevel)
     {
+        AppealRequest memory request = AppealRequest({
+            funder: _msgSender(), operator: _msgSender(), refundRecipient: _msgSender()
+        });
+        return _appealDispute(workflowId, request);
+    }
+
+    function appealDispute(uint256 workflowId, AppealRequest calldata request)
+        external payable nonReentrant returns (bool success, address newDisputeResolver, uint8 newLevel)
+    {
+        return _appealDispute(workflowId, request);
+    }
+
+    function _appealDispute(uint256 workflowId, AppealRequest memory request)
+        internal returns (bool success, address newDisputeResolver, uint8 newLevel)
+    {
+        address caller = _msgSender();
+        if (request.operator != caller) revert InvalidAppealRequestRole(1, request.operator, caller);
+        if (request.funder != caller) revert InvalidAppealRequestRole(2, request.funder, caller);
+        if (request.refundRecipient == address(0)) revert InvalidAppealRequestRole(3, request.refundRecipient, address(1));
+        if (request.refundRecipient != request.operator) revert InvalidAppealRequestRole(3, request.refundRecipient, request.operator);
         (EscrowTransfer storage et, IResolutionModule resolutionModule) = _validateAndPrepareEscalation(workflowId);
+        if (escrowSettings[workflowId].customResolver != address(0)) {
+            revert AppealsUnsupportedForCustomResolver(workflowId, escrowSettings[workflowId].customResolver);
+        }
         ModuleSnapshot storage snap = moduleSnapshots[workflowId];
+        address feeRecipient = appealBondFeeRecipients[workflowId];
+        if (feeRecipient == address(0)) feeRecipient = escrowFeeAddress;
 
         DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
             address(resolutionModule),
             address(this),
             snap.incentiveModule,
             snap.appealBondProtocolFeeBps,
-            escrowFeeAddress,
+            feeRecipient,
             workflowId,
-            _msgSender(),
+            request.operator,
             et.from,
             et.to,
             et.token,
@@ -907,20 +962,42 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
             et.escrowState
         );
         if (!result.success) revert EscalationNotAllowed();
+        bytes32 requestRoot = keccak256(abi.encode(
+            "APPEAL_REQUEST_V1",
+            block.chainid,
+            address(this),
+            workflowId,
+            result.appealedDecisionRoot,
+            request.operator,
+            request.funder,
+            request.refundRecipient
+        ));
 
         // Deadline safety: do not hard-block escalation with a global cooldown.
         // Keep per-address tracking and linear bond scaling, but allow valid
         // within-window appeals to progress across rounds.
-        address escalator = _msgSender();
-        uint32 escCount = addressEscalationCount[escalator] + 1;
+        address escalator = request.operator;
+        uint32 priorEscCount = addressEscalationCount[escalator];
+        uint32 escCount = priorEscCount + 1;
         addressEscalationCount[escalator] = escCount;
         lastEscalationTimestamp[escalator] = uint64(block.timestamp);
-        if (escCount > 1 && result.bondAmount > 0) {
-            uint256 scale100 = 100 + 10 * uint256(escCount - 1);
-            result.bondAmount = result.bondAmount * scale100 / 100;
-            result.bondToRecord = result.bondToRecord * scale100 / 100;
-            result.protocolFeeAmount = result.protocolFeeAmount * scale100 / 100;
+        if (result.bondAmount > 0) {
+            if (escCount > 1) {
+                uint256 scale100 = 100 + 10 * uint256(escCount - 1);
+                result.bondAmount = result.bondAmount * scale100 / 100;
+            }
+            result.protocolFeeAmount =
+                (result.bondAmount * snap.appealBondProtocolFeeBps) / ESCROW_FEE_DENOMINATOR;
+            result.bondToRecord = result.bondAmount - result.protocolFeeAmount;
         }
+        bytes32 policyRoot = keccak256(abi.encode(
+            "ESCROW_APPEAL_POLICY_V1", snap.appealBondProtocolFeeBps, feeRecipient, priorEscCount
+        ));
+        bytes32 transitionRoot = keccak256(abi.encode(
+            "APPEAL_TRANSITION_V1", requestRoot, result.resolutionQuoteRoot,
+            result.currentLevel, result.newLevel, result.predecessorResolver, result.newResolver,
+            result.bondToken, result.bondAmount, result.protocolFeeAmount, result.bondToRecord, policyRoot
+        ));
 
         // Validate bond payment
         (bool msgValueValid, ) = DisputeEscalationLibrary.validateBondMsgValue(result.bondToken, result.bondAmount, msg.value);
@@ -929,54 +1006,37 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         if (result.bondAmount > 0) {
             if (result.protocolFeeAmount > 0) {
                 // Pull-only protocol fee handling: credit claimable ledger instead of auto-push.
-                claimableBondProtocolFees[result.bondToken][escrowFeeAddress] += result.protocolFeeAmount;
-                emit BondProtocolFeeClaimableCredited(result.bondToken, escrowFeeAddress, result.protocolFeeAmount, workflowId);
+                claimableBondProtocolFees[result.bondToken][feeRecipient] += result.protocolFeeAmount;
+                emit BondProtocolFeeClaimableCredited(result.bondToken, feeRecipient, result.protocolFeeAmount, workflowId);
                 emit ProtocolFeeCollected(1, workflowId, result.bondToken, result.bondAmount, snap.appealBondProtocolFeeBps, result.protocolFeeAmount);
             }
 
             IIncentiveModule incentiveMod = IIncentiveModule(result.incentiveModule);
             if (result.bondToken == address(0)) {
-                BondHandlingLibrary.handleETHBond(
-                    incentiveMod,
-                    workflowId,
-                    _msgSender(),
-                    result.bondToRecord,
-                    result.bondToken,
-                    result.newLevel,
-                    escrowFeeAddress,
-                    result.protocolFeeAmount
-                );
+                BondHandlingLibrary.handleETHBond(incentiveMod, workflowId, request.operator,
+                    result.bondToRecord, result.bondToken, result.newLevel,
+                    feeRecipient, result.protocolFeeAmount);
             } else {
                 if (address(bondCollector) == address(0)) revert ZeroBondCollector();
-                
                 uint256 balBefore = IERC20(result.bondToken).balanceOf(address(this));
-                _pullTokens(result.bondToken, _msgSender(), result.bondAmount);
+                _pullTokens(result.bondToken, request.funder, result.bondAmount);
                 uint256 received = IERC20(result.bondToken).balanceOf(address(this)) - balBefore;
                 if (received < result.bondAmount) revert AccountingDeficit(result.bondToken, result.bondAmount - received);
-
-                BondHandlingLibrary.handleERC20BondAfterPull(
-                    incentiveMod,
-                    bondCollector,
-                    workflowId,
-                    _msgSender(),
-                    result.bondToken,
-                    result.bondToRecord,
-                    result.newLevel,
-                    escrowFeeAddress,
-                    result.protocolFeeAmount
-                );
+                BondHandlingLibrary.handleERC20BondAfterPull(incentiveMod, bondCollector, workflowId,
+                    request.operator, result.bondToken, result.bondToRecord, result.newLevel,
+                    feeRecipient, result.protocolFeeAmount);
             }
         }
 
         // Execute escalation in module (modifies module state)
         bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(et.token, et.from, et.to, et.amountAfterFee, escrowSettings[workflowId].releaseAddress);
-        (bool escSuccess, bytes memory escData) = address(resolutionModule).call(
-            abi.encodeWithSelector(IResolutionModule.executeEscalation.selector, workflowId, address(this), escrowData)
+        (bool modSuccess, address newRes, uint8 newLvl) = resolutionModule.executeEscalationWithQuote(
+            workflowId, address(this), escrowData, result.resolutionQuoteRoot
         );
-        if (!escSuccess) revert EscalationNotAllowed();
-        
-        (bool modSuccess, address newRes, uint8 newLvl) = abi.decode(escData, (bool, address, uint8));
         if (!modSuccess || newRes == address(0)) revert EscalationNotAllowed();
+        if (newLvl != result.newLevel || newRes != result.newResolver) {
+            revert EscalationResultMismatch(result.newLevel, newLvl, result.newResolver, newRes);
+        }
 
         et.disputeResolver = newRes;
         
@@ -987,7 +1047,65 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         }
 
         emit DisputeEscalated(workflowId, result.currentLevel, newLvl, newRes, _msgSender());
+        emit AppealRequested(workflowId, requestRoot, request.operator, request.funder, request.refundRecipient);
+        emit AppealTransitionDerived(
+            workflowId, requestRoot, transitionRoot, result.resolutionQuoteRoot, result.appealedDecisionRoot,
+            result.bondAmount, result.protocolFeeAmount, result.bondToRecord, feeRecipient
+        );
         return (true, newRes, newLvl);
+    }
+
+    /// @notice Return module-authoritative appeal facts with the frozen escrow economics.
+    /// @dev The quote deliberately does not pre-authorize a caller: authorization and
+    ///      module quote revalidation remain part of appeal execution.
+    function getAppealQuote(uint256 workflowId, address operator)
+        external view returns (IEscrowAppeal.AppealQuote memory quote)
+    {
+        _validateWorkflowId(workflowId);
+        if (escrowSettings[workflowId].customResolver != address(0)) return quote;
+
+        IResolutionModule resolutionModule = _getResolutionModule(workflowId);
+        if (address(resolutionModule) == address(0)) return quote;
+
+        EscrowTransfer storage et = escrowTransfers[workflowId];
+        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(
+            et.token, et.from, et.to, et.amountAfterFee, escrowSettings[workflowId].releaseAddress
+        );
+        IResolutionModule.ResolutionAppealQuote memory resolutionQuote =
+            resolutionModule.quoteAppealTransition(workflowId, address(this), escrowData);
+        ModuleSnapshot storage snap = moduleSnapshots[workflowId];
+        uint256 bondAmount = resolutionQuote.baseBondAmount;
+        uint32 priorEscalationCount = addressEscalationCount[operator];
+
+        // Execution increments the operator's count before applying this same scale.
+        if (bondAmount > 0 && priorEscalationCount > 0) {
+            bondAmount = bondAmount * (100 + 10 * uint256(priorEscalationCount)) / 100;
+        }
+
+        address feeRecipient = appealBondFeeRecipients[workflowId];
+        if (feeRecipient == address(0)) feeRecipient = escrowFeeAddress;
+        uint256 protocolFeeAmount = bondAmount * snap.appealBondProtocolFeeBps / ESCROW_FEE_DENOMINATOR;
+
+        quote = IEscrowAppeal.AppealQuote({
+            supported: true,
+            appealable: resolutionQuote.appealable,
+            predecessorRound: resolutionQuote.predecessorRound,
+            successorRound: resolutionQuote.successorRound,
+            predecessorResolver: resolutionQuote.predecessorResolver,
+            successorResolver: resolutionQuote.successorResolver,
+            appealedDecision: resolutionQuote.appealedDecision,
+            appealDeadline: resolutionQuote.appealDeadline,
+            finalRound: resolutionQuote.finalRound,
+            bondAsset: resolutionQuote.baseBondAsset,
+            baseBondAmount: resolutionQuote.baseBondAmount,
+            bondAmount: bondAmount,
+            protocolFeeAmount: protocolFeeAmount,
+            bondToRecord: bondAmount - protocolFeeAmount,
+            protocolFeeBps: snap.appealBondProtocolFeeBps,
+            protocolFeeRecipient: feeRecipient,
+            appealedDecisionRoot: resolutionQuote.appealedDecisionRoot,
+            resolutionQuoteRoot: resolutionQuote.resolutionQuoteRoot
+        });
     }
 
     /**
@@ -1536,6 +1654,15 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     function getEscrowState(uint256 workflowId) external view returns (EscrowState state) {
         _validateWorkflowId(workflowId);
         return escrowTransfers[workflowId].escrowState;
+    }
+
+    function supportsInterface(bytes4 interfaceId) public view virtual override returns (bool) {
+        return interfaceId == type(IEscrowLifecycle).interfaceId
+            || interfaceId == type(IEscrowDispute).interfaceId
+            || interfaceId == type(IEscrowAppeal).interfaceId
+            || interfaceId == type(IEscrowSettlement).interfaceId
+            || interfaceId == type(IEscrowViews).interfaceId
+            || super.supportsInterface(interfaceId);
     }
 
     // View functions moved to EscrowViewContract for size optimization:

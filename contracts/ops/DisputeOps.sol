@@ -2,7 +2,6 @@
 pragma solidity ^0.8.33;
 
 import '@openzeppelin/contracts/access/AccessControl.sol';
-import '@openzeppelin/contracts/utils/math/Math.sol';
 import '../shared/interfaces/IResolutionModule.sol';
 import '../types/EscrowTypes.sol';
 import '../libraries/EscrowEncodingLibrary.sol';
@@ -24,7 +23,6 @@ import '../libraries/EscrowEncodingLibrary.sol';
  *      BaseEscrow applies: Updates state and collects fees
  */
 contract DisputeOps is AccessControl {
-    using Math for uint256;
     // ============ Role Constants ============
     bytes32 public constant ROLE_ESCROW_CONTRACT = keccak256('ROLE_ESCROW_CONTRACT');
     bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');
@@ -132,6 +130,10 @@ contract DisputeOps is AccessControl {
         address incentiveModule; // Incentive module for this escrow
         uint256 bondToRecord; // Net bond amount after fee
         uint256 protocolFeeAmount; // Fee collected by protocol
+        address predecessorResolver;
+        uint256 appealDeadline;
+        bytes32 appealedDecisionRoot;
+        bytes32 resolutionQuoteRoot;
         string failureReason; // Reason if escalation not allowed
     }
 
@@ -164,6 +166,10 @@ contract DisputeOps is AccessControl {
         uint256 amountAfterFee,
         EscrowState escrowState
     ) external view onlyRole(ROLE_ESCROW_CONTRACT) returns (EscalationResult memory result) {
+        // Escrow owns all fee and net-bond derivation. Keep these inputs in the
+        // stable helper ABI, but do not compose economics outside BaseEscrow.
+        bondFeeBps;
+        feeRecipient;
         result.success = false;
 
         // Validate caller is participant
@@ -187,82 +193,58 @@ contract DisputeOps is AccessControl {
         // Encode escrow data for module (5-element format matching EscrowEncodingLibrary)
         bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(token, from, to, amountAfterFee, address(0));
 
-        // Get current level from module
-        try IResolutionModule(resolutionModule).getDisputeResolver(workflowId, escrowContract, escrowData) returns (
-            address /* currentResolver */,
-            uint8 currentLevel
+        // The resolution module owns all dispute-domain facts. Do not compose
+        // independent round/resolver/bond queries in this layer.
+        IResolutionModule.ResolutionAppealQuote memory quote;
+        try IResolutionModule(resolutionModule).quoteAppealTransition(workflowId, escrowContract, escrowData) returns (
+            IResolutionModule.ResolutionAppealQuote memory returnedQuote
         ) {
-            result.currentLevel = currentLevel;
+            quote = returnedQuote;
         } catch {
-            result.failureReason = 'Failed to get current level';
+            result.failureReason = 'Failed to quote appeal transition';
             return result;
         }
+        result.currentLevel = quote.predecessorRound;
+        result.newLevel = quote.successorRound;
+        result.newResolver = quote.successorResolver;
+        result.predecessorResolver = quote.predecessorResolver;
+        result.appealDeadline = quote.appealDeadline;
+        result.appealedDecisionRoot = quote.appealedDecisionRoot;
+        result.resolutionQuoteRoot = quote.resolutionQuoteRoot;
 
         // Validate only the disagreed-with participant can appeal
-        (bool decisionSuccess, bytes memory decisionData) = resolutionModule.staticcall(
-            abi.encodeWithSignature('getDecisionAtRound(uint256,address,uint8)', workflowId, escrowContract, result.currentLevel)
-        );
-        
-        if (decisionSuccess && decisionData.length >= 32) {
-            uint8 decision;
-            assembly {
-                decision := and(mload(add(decisionData, 0x20)), 0xff)
-            }
-            
-            if (decision == 1 && caller != from) { // RELEASE -> Recipient wins, Sender must appeal
+        if (quote.appealedDecision != ResolutionOutcome.NONE) {
+            if (quote.appealedDecision == ResolutionOutcome.RELEASE && caller != from) {
                 result.failureReason = 'Only sender can appeal RELEASE decision';
                 return result;
-            } else if (decision == 2 && caller != to) { // CANCEL -> Sender wins, Recipient must appeal
+            } else if (quote.appealedDecision == ResolutionOutcome.CANCEL && caller != to) {
                 result.failureReason = 'Only recipient can appeal CANCEL decision';
                 return result;
-            } else if (decision == 0) {
-                result.failureReason = 'No decision to appeal';
-                return result;
             }
-        }
-
-        // Check if escalation is allowed and get next resolver/bond
-        try IResolutionModule(resolutionModule).canEscalate(workflowId, escrowContract, result.currentLevel, escrowData)
-        returns (bool canEscalate, address nextResolver, uint256 /* dummyFee */) {
-            if (!canEscalate) {
-                result.failureReason = 'Escalation not allowed by module';
-                return result;
-            }
-            if (nextResolver == address(0)) {
-                result.failureReason = 'Escalation not allowed by module';
-                return result;
-            }
-            result.newResolver = nextResolver;
-            result.newLevel = result.currentLevel + 1;
-        } catch {
-            result.failureReason = 'Failed to check escalation eligibility';
+        } else {
+            result.failureReason = 'No decision to appeal';
             return result;
         }
 
-        // Get required appeal bond
-        try IResolutionModule(resolutionModule).getRequiredAppealBond(workflowId, escrowContract, result.currentLevel, escrowData)
-        returns (uint256 bondAmount, address bondToken) {
-            result.bondAmount = bondAmount;
-            result.bondToken = bondToken;
-        } catch {
-            result.failureReason = 'Failed to query appeal bond';
+        if (!quote.appealable) {
+            result.failureReason = 'Escalation not allowed by module';
             return result;
         }
+        if (quote.successorResolver == address(0)) {
+            result.failureReason = 'Quote has no successor resolver';
+            return result;
+        }
+        result.bondAmount = quote.baseBondAmount;
+        result.bondToken = quote.baseBondAsset;
 
-        // Calculate fees if bond is required
+        // Bond presence still requires the snapshotted incentive module. BaseEscrow
+        // applies scaling and calculates fee/net after this authoritative quote.
         if (result.bondAmount > 0) {
             if (incentiveModule == address(0)) {
                 result.failureReason = 'Appeals not enabled in V1';
                 return result;
             }
             result.incentiveModule = incentiveModule;
-            
-            if (bondFeeBps > 0 && feeRecipient != address(0)) {
-                result.protocolFeeAmount = Math.mulDiv(result.bondAmount, bondFeeBps, 10000);
-                result.bondToRecord = result.bondAmount - result.protocolFeeAmount;
-            } else {
-                result.bondToRecord = result.bondAmount;
-            }
         }
 
         result.success = true;
