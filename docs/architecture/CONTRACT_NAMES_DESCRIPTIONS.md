@@ -1,6 +1,10 @@
 # Contract Names & One-Sentence Descriptions
 
-## Proposed Renames (3 contracts)
+## Historical Rename Notes
+
+The proposed renames below are retained as migration history. The current
+source names are authoritative and should be used in new code and deployment
+configuration.
 
 | Current Name | Proposed Name | One-Sentence Description |
 |--------------|---------------|--------------------------|
@@ -125,4 +129,3 @@
 ✅ Clear separation of singletons vs multi-instance  
 ✅ Consistent naming for similar contracts  
 ✅ Future contracts follow established patterns  
-

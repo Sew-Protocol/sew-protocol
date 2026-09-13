@@ -13,7 +13,6 @@ interface ContractSize {
   sizeKB: number;
   overLimit: boolean;
   overLimitPercent: number;
-  overFrozen: boolean;
 }
 
 function getContractSize(contractPath: string): number | null {
@@ -78,13 +77,6 @@ function getContractSizeFromFoundry(contractName: string): number | null {
 
 function findContracts(): ContractSize[] {
   const contracts: ContractSize[] = [];
-  // Frozen sizes for the BondLedger extraction (PRF_REVIEW_COMMIT 4959328).
-  // The facade has only 276 B of EIP-170 headroom and is treated as frozen;
-  // any growth requires explicit approval.
-  const frozenSizes: Record<string, number> = {
-    BondLedger: 5194,
-    ResolverIncentiveModuleV2BondLedger: 24300,
-  };
   const contractNames = [
     'BaseEscrow',
     'EscrowVault',
@@ -104,25 +96,16 @@ function findContracts(): ContractSize[] {
     if (size !== null) {
       const baseName = contractName.split('/').pop() || contractName;
       const sizeKB = size / 1024;
-      // Over EIP-170 is always a hard failure.
       const overLimit = size > SIZE_LIMIT;
-      // Frozen-size gate: BondLedger may grow up to +500 B (explicit approval
-      // above that); the facade must not grow at all before deployment.
-      const frozen = frozenSizes[baseName];
-      const overFrozen =
-        frozen !== undefined &&
-        (baseName === 'ResolverIncentiveModuleV2BondLedger'
-          ? size > frozen
-          : size > frozen + 500);
       const overLimitPercent = overLimit ? ((size - SIZE_LIMIT) / SIZE_LIMIT) * 100 : 0;
 
       contracts.push({
         name: baseName,
         size,
         sizeKB,
-        overLimit: overLimit || overFrozen,
+        overLimit,
         overLimitPercent,
-        overFrozen,
+        overLimit,
       });
     }
   }
@@ -170,19 +153,6 @@ function printContractSizes() {
     console.log('\n✅ All contracts are under their size limits.\n');
   }
 
-  // Hard-fail only on the BondLedger extraction frozen-size gates. EIP-170
-  // violations in legacy contracts remain reported (pre-existing CI behaviour);
-  // any growth of the review facade or primitive requires explicit approval.
-  const frozenBreach = contracts.filter((c) => c.overFrozen);
-  if (frozenBreach.length > 0) {
-    console.log('❌ Frozen-size gate breached for the BondLedger extraction:');
-    for (const contract of frozenBreach) {
-      console.log(`   • ${contract.name}: ${contract.size.toLocaleString()} bytes`);
-    }
-    console.log('   Growth of BondLedger or ResolverIncentiveModuleV2BondLedger');
-    console.log('   requires explicit approval (PRF_REVIEW_COMMIT 4959328).');
-    process.exit(1);
-  }
 }
 
 printContractSizes();

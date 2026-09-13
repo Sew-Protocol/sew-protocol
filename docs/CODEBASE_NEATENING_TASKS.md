@@ -57,7 +57,7 @@ not as isolated cleanup.
 ## P1: Naming and repository consistency
 
 - [ ] Rename the package from `hardhat-deploy-hybrid` if that is no longer the product/repository name, or document why the historical name is retained.
-- [ ] Correct and standardize environment/RPC names, including the apparent `RPC_BASE_SEPROLIA` typo versus `base_sepolia`.
+- [x] Correct and standardize environment/RPC names, including the `RPC_BASE_SEPROLIA` typo in `foundry.toml`.
 - [ ] Choose one convention for version suffixes and apply it consistently: `V1`/`V2` versus `v1`/`v2`, including contracts, interfaces, folders, deployment names, and docs.
 - [ ] Choose one naming convention for module roles (`Module`, `Library`, `Ops`, `Helper`, `Facade`, `Proxy`, `Aggregator`) and rename misleading names, especially contracts that are no longer merely size-extraction helpers.
 - [ ] Resolve terminology drift among `EscrowVault`, `BaseEscrow`, `EscrowableERC20`, `BasicEscrowVault`, and `BasicEscrowableERC20`; document the intended hierarchy and use it consistently.
@@ -83,7 +83,7 @@ not as isolated cleanup.
 
 ## P2: Test and tooling cleanup
 
-- [ ] Make `pnpm test` fail on coverage-command failures instead of masking them with `|| true`; apply the same review to report and validation scripts.
+- [x] Make coverage commands fail on coverage-command failures instead of masking them with `|| true`; apply the same review to report and validation scripts.
 - [ ] Remove duplicate Hardhat/Foundry test coverage where one canonical test gives the same assurance, while retaining cross-tool tests for compiler/deployment compatibility.
 - [ ] Replace broad test selections and shell scripts with named, reproducible profiles for unit, core, module, invariant, fork, formal, and release tests.
 - [ ] Remove unused imports, dead test helpers, stale traces, obsolete deployment fixtures, and generated artifacts that are not required to reproduce a test.

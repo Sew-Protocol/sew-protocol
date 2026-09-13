@@ -1,5 +1,9 @@
 # Contract Naming Review: Auditor Clarity
 
+This is a historical naming review. Its proposed renames are not instructions
+to rename deployed contracts; use the current Solidity identifiers and treat
+the review as background for future, compatibility-safe changes.
+
 **Goal**: Each contract name should immediately convey:
 1. What it does
 2. Whether it's mutable/immutable
@@ -331,4 +335,3 @@ git revert <commit>    # After commit
 1. Contract renames (which ones?)
 2. Do renames before or after directory reorg?
 3. Combine into single PR or separate?
-

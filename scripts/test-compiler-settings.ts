@@ -1,4 +1,3 @@
-import { ethers } from 'hardhat';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -13,8 +12,6 @@ interface CompilerTestResult {
     sizeKB: string;
   }[];
 }
-
-const SIZE_LIMIT_BYTES = 24 * 1024; // 24 KB
 
 async function testCompilerSettings() {
   const contractNames = ['EscrowVault', 'EscrowableERC20', 'DecentralizedResolutionModule'];
