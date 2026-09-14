@@ -31,6 +31,8 @@ import '../interfaces/IEscrowViews.sol';
 import '../shared/interfaces/IResolutionModule.sol';
 import '../interfaces/IYieldModule.sol';
 import '../libraries/EscrowEncodingLibrary.sol';
+import '../arbitration/IKlerosArbitrableProxy.sol';
+import '../modules/decentralized-resolution-module/IKlerosHandoffResolutionModule.sol';
 import '../libraries/ResolverLogicLibrary.sol';
 import '../libraries/RecoveryLibrary.sol';
 import '../libraries/ModuleProposalLibrary.sol';
@@ -988,6 +990,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     }
 
     error InvalidAppealRequestRole(uint8 role, address provided, address expected);
+    error InvalidKlerosArbitrationFee(uint256 workflowId, uint256 required, uint256 supplied);
 
     function escalateDispute(uint256 workflowId)
         external payable nonReentrant returns (bool success, address newDisputeResolver, uint8 newLevel)
@@ -1072,8 +1075,30 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
             result.bondToken, result.bondAmount, result.protocolFeeAmount, result.bondToRecord, policyRoot
         ));
 
-        // Validate bond payment
-        (bool msgValueValid, ) = DisputeEscalationLibrary.validateBondMsgValue(result.bondToken, result.bondAmount, msg.value);
+        // Kleros is an external execution cost, not appeal-bond principal. Requote
+        // immediately before invoking it so a fee change cannot leave a phantom round.
+        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(
+            et.token, et.from, et.to, et.amountAfterFee, escrowSettings[workflowId].releaseAddress
+        );
+        uint256 klerosCost;
+        bytes32 klerosConfigRoot;
+        if (result.newLevel == 2) {
+            try IKlerosArbitrableProxy(result.newResolver).getArbitrationCost('') returns (uint256 cost) {
+                klerosCost = cost;
+            } catch {
+                revert EscalationNotAllowed();
+            }
+            klerosConfigRoot = IKlerosArbitrableProxy(result.newResolver).getKlerosHandoffConfigRoot();
+        }
+
+        // Validate independent bond and external arbitration payments.
+        uint256 bondValue = result.bondToken == address(0) ? result.bondAmount : 0;
+        if (msg.value < bondValue + klerosCost) {
+            revert InvalidKlerosArbitrationFee(workflowId, klerosCost, msg.value - bondValue);
+        }
+        (bool msgValueValid, ) = DisputeEscalationLibrary.validateBondMsgValue(
+            result.bondToken, result.bondAmount, result.bondToken == address(0) ? msg.value : 0
+        );
         if (!msgValueValid) revert InvalidBondMsgValue(workflowId, result.bondAmount, msg.value);
 
         if (result.bondAmount > 0) {
@@ -1101,11 +1126,27 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
             }
         }
 
-        // Execute escalation in module (modifies module state)
-        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(et.token, et.from, et.to, et.amountAfterFee, escrowSettings[workflowId].releaseAddress);
-        (bool modSuccess, address newRes, uint8 newLvl) = resolutionModule.executeEscalationWithQuote(
-            workflowId, address(this), escrowData, result.resolutionQuoteRoot
-        );
+        bytes32 handoffRoot;
+        if (result.newLevel == 2) {
+            handoffRoot = IKlerosHandoffResolutionModule(address(resolutionModule)).prepareKlerosHandoff(
+                workflowId, address(this), escrowData, result.resolutionQuoteRoot, klerosConfigRoot
+            );
+        }
+
+        // Kleros remains only a prepared successor while this call runs. A failure
+        // anywhere below rolls back both the preparation and external dispute.
+        uint256 klerosDisputeId;
+        if (klerosCost > 0 || result.newLevel == 2) {
+            klerosDisputeId = IKlerosArbitrableProxy(result.newResolver).createDispute{value: klerosCost}(
+                workflowId, address(this), 2, '', escrowData
+            );
+        }
+
+        (bool modSuccess, address newRes, uint8 newLvl) = result.newLevel == 2
+            ? IKlerosHandoffResolutionModule(address(resolutionModule)).commitKlerosHandoff(
+                workflowId, address(this), escrowData, result.resolutionQuoteRoot, handoffRoot, klerosConfigRoot, klerosDisputeId
+            )
+            : resolutionModule.executeEscalationWithQuote(workflowId, address(this), escrowData, result.resolutionQuoteRoot);
         if (!modSuccess || newRes == address(0)) revert EscalationNotAllowed();
         if (newLvl != result.newLevel || newRes != result.newResolver) {
             revert EscalationResultMismatch(result.newLevel, newLvl, result.newResolver, newRes);
@@ -1113,8 +1154,8 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
 
         et.disputeResolver = newRes;
         
-        if (result.bondToken == address(0) && msg.value > result.bondAmount) {
-            uint256 excess = msg.value - result.bondAmount;
+        if (msg.value > bondValue + klerosCost) {
+            uint256 excess = msg.value - bondValue - klerosCost;
             claimableExcessEthRefunds[_msgSender()] += excess;
             emit ExcessEthRefundCredited(workflowId, _msgSender(), excess);
         }
@@ -1179,6 +1220,13 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
             appealedDecisionRoot: resolutionQuote.appealedDecisionRoot,
             resolutionQuoteRoot: resolutionQuote.resolutionQuoteRoot
         });
+    }
+
+    /// @notice Returns the resolution module snapshotted for a workflow.
+    /// @dev External resolvers use this to verify workflow-specific handoff bindings.
+    function getResolutionModule(uint256 workflowId) external view returns (address) {
+        _validateWorkflowId(workflowId);
+        return moduleSnapshots[workflowId].resolutionModule;
     }
 
     /**
