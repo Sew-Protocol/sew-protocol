@@ -108,6 +108,21 @@ abstract contract DRMStorageBase is DecentralizedResolverStructs {
     // Governance may keep a published policy unavailable for new workflows.
     mapping(uint256 => bool) public resolutionConfigSelectable;
 
+    // Prepared handoffs are transient authority only. They do not change the
+    // active resolver until the escrow commits the returned Kleros dispute ID.
+    struct PreparedKlerosHandoff {
+        bytes32 handoffRoot;
+        bytes32 resolutionQuoteRoot;
+        bytes32 klerosConfigRoot;
+        address successorResolver;
+        uint8 predecessorRound;
+        bool exists;
+    }
+    mapping(address => mapping(uint256 => PreparedKlerosHandoff)) internal _preparedKlerosHandoffs;
+    // Stored as id + 1 so a valid external dispute id of zero is distinguishable.
+    mapping(address => mapping(uint256 => uint256)) public klerosDisputeIdForWorkflow;
+    mapping(address => mapping(uint256 => bytes32)) internal _klerosConfigRootForWorkflow;
+
     function _resolutionConfig(address escrowContract, uint256 workflowId)
         internal
         view

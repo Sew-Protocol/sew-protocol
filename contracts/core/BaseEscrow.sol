@@ -1094,7 +1094,8 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         // Validate independent bond and external arbitration payments.
         uint256 bondValue = result.bondToken == address(0) ? result.bondAmount : 0;
         if (msg.value < bondValue + klerosCost) {
-            revert InvalidKlerosArbitrationFee(workflowId, klerosCost, msg.value - bondValue);
+            uint256 suppliedKlerosCost = msg.value > bondValue ? msg.value - bondValue : 0;
+            revert InvalidKlerosArbitrationFee(workflowId, klerosCost, suppliedKlerosCost);
         }
         (bool msgValueValid, ) = DisputeEscalationLibrary.validateBondMsgValue(
             result.bondToken, result.bondAmount, result.bondToken == address(0) ? msg.value : 0

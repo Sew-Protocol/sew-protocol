@@ -22,6 +22,9 @@ contract MockKlerosArbitrator is IArbitrator {
     // Custom dispute ID override (for sentinel overflow testing)
     uint256 public customDisputeId;
     bool public useCustomId;
+    bool public synchronousRuleEnabled;
+    bool public synchronousRuleRejected;
+    uint256 public synchronousRuling;
 
     constructor(uint256 _arbitrationPrice) {
         arbitrationPrice = _arbitrationPrice;
@@ -34,6 +37,12 @@ contract MockKlerosArbitrator is IArbitrator {
 
     function setArbitrationPrice(uint256 _arbitrationPrice) external {
         arbitrationPrice = _arbitrationPrice;
+    }
+
+    function setSynchronousRule(uint256 _ruling) external {
+        synchronousRuleEnabled = true;
+        synchronousRuleRejected = false;
+        synchronousRuling = _ruling;
     }
 
     function createDispute(
@@ -59,6 +68,14 @@ contract MockKlerosArbitrator is IArbitrator {
         }
 
         emit DisputeCreation(disputeID, IArbitrable(msg.sender));
+
+        if (synchronousRuleEnabled) {
+            (bool success, ) = msg.sender.call(
+                abi.encodeWithSelector(IArbitrable.rule.selector, disputeID, synchronousRuling)
+            );
+            synchronousRuleRejected = !success;
+            synchronousRuleEnabled = false;
+        }
 
         return disputeID;
     }

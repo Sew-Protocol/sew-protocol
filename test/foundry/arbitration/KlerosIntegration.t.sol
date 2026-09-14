@@ -259,6 +259,22 @@ contract KlerosIntegrationTest is Test {
         klerosProxy.createDispute{value: ARBITRATION_PRICE}(1, address(mockEscrow), 2, '0x', escrowData);
     }
 
+    function test_createDispute_rejectsCallerSuppliedDifferentEscrow() public {
+        bytes memory escrowData = abi.encode(address(0), sender, recipient, AMOUNT, AMOUNT);
+        address otherEscrow = makeAddr('otherEscrow');
+
+        vm.prank(address(mockEscrow));
+        vm.expectRevert('Escrow identity mismatch');
+        klerosProxy.createDispute{value: ARBITRATION_PRICE}(1, otherEscrow, 2, '0x', escrowData);
+    }
+
+    function test_klerosHandoffConfigRoot_bindsImmutableV1Configuration() public {
+        assertEq(
+            klerosProxy.getKlerosHandoffConfigRoot(),
+            keccak256(abi.encode('KLEROS_HANDOFF_CONFIG_V1', address(mockArbitrator), uint256(2), keccak256('')))
+        );
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════════
     // EVIDENCE TESTS
     // ═══════════════════════════════════════════════════════════════════════════════

@@ -4,6 +4,7 @@ pragma solidity ^0.8.37;
 import './IArbitrator.sol';
 import './IArbitrable.sol';
 import '../shared/interfaces/IResolutionModule.sol';
+import '../modules/decentralized-resolution-module/IKlerosHandoffResolutionModule.sol';
 import '@openzeppelin/contracts/access/AccessControl.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 import '@openzeppelin/contracts/utils/introspection/IERC165.sol';
@@ -11,6 +12,10 @@ import '@openzeppelin/contracts/utils/introspection/IERC165.sol';
 interface IBaseEscrowSettlement {
     function releaseAsDisputeResolver(uint256 workflowId, bytes32 resolutionHash) external returns (bool);
     function cancelAsDisputeResolver(uint256 workflowId, bytes32 resolutionHash) external returns (bool);
+}
+
+interface IBaseEscrowResolutionModule {
+    function getResolutionModule(uint256 workflowId) external view returns (address);
 }
 
 /**
@@ -22,6 +27,9 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
     bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');
     bytes32 public constant ROLE_ESCROW_CONTRACT = keccak256('ROLE_ESCROW_CONTRACT');
 
+    /// @dev V1 arbitrator and handoff configuration are immutable. If either becomes
+    /// mutable, committed dispute identity must include arbitrator/config lineage and
+    /// rulings must validate that lineage before settlement.
     IArbitrator public arbitrator;
 
     // Mapping: escrowContract => workflowId => klerosDisputeID + 1 (0 means no dispute)
@@ -108,6 +116,7 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
         returns (uint256 klerosDisputeId)
     {
         require(hasRole(ROLE_ESCROW_CONTRACT, _msgSender()), 'Only registered escrow contracts');
+        require(escrowContract == _msgSender(), 'Escrow identity mismatch');
         require(workflowToKlerosDispute[escrowContract][workflowId] == 0, 'Dispute already exists');
 
         // Decode escrow data (supplied by the trusted escrow contract)
@@ -181,6 +190,8 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
         
         uint256 workflowId = klerosDisputeToWorkflow[_disputeID];
 
+        _requireCommittedHandoff(escrowContract, workflowId, _disputeID);
+
         DisputeMetadata storage dispute = disputes[escrowContract][workflowId];
         require(!dispute.resolved, 'Already resolved');
 
@@ -202,6 +213,7 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
     function propagateRuling(uint256 workflowId, address escrowContract) external nonReentrant {
         require(workflowToKlerosDispute[escrowContract][workflowId] != 0, 'Dispute does not exist');
         DisputeMetadata storage dispute = disputes[escrowContract][workflowId];
+        _requireCommittedHandoff(escrowContract, workflowId, dispute.klerosDisputeId);
         
         if (!dispute.resolved) {
             // Check if arbitrator has ruled but hasn't called rule() yet (unlikely but possible in some arbitrator implementations)
@@ -239,6 +251,25 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
         }
     }
 
+    function _requireCommittedHandoff(address escrowContract, uint256 workflowId, uint256 klerosDisputeId) internal view {
+        // Legacy test and integration escrows do not expose a resolution-module snapshot.
+        // Real BaseEscrow instances do, and must bind both external identity and configuration.
+        (bool hasSnapshot, bytes memory snapshotData) = escrowContract.staticcall(
+            abi.encodeWithSelector(IBaseEscrowResolutionModule.getResolutionModule.selector, workflowId)
+        );
+        if (hasSnapshot && snapshotData.length == 32) {
+            address resolutionModule = abi.decode(snapshotData, (address));
+            (bool committed, uint256 committedDisputeId) =
+                IKlerosHandoffResolutionModule(resolutionModule).getCommittedKlerosDisputeId(escrowContract, workflowId);
+            require(committed && committedDisputeId == klerosDisputeId, 'Uncommitted Kleros dispute');
+            require(
+                IKlerosHandoffResolutionModule(resolutionModule).getCommittedKlerosConfigRoot(escrowContract, workflowId)
+                    == getKlerosHandoffConfigRoot(),
+                'Kleros config changed'
+            );
+        }
+    }
+
     /**
      * @notice Get the current ruling for a workflow
      * @param workflowId The escrow workflow ID
@@ -272,6 +303,10 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
      */
     function getArbitrationCost(bytes calldata extraData) external view returns (uint256) {
         return arbitrator.arbitrationCost(extraData);
+    }
+
+    function getKlerosHandoffConfigRoot() public view returns (bytes32) {
+        return keccak256(abi.encode('KLEROS_HANDOFF_CONFIG_V1', address(arbitrator), uint256(2), keccak256('')));
     }
 
     // ========== IResolutionModule Implementation ==========

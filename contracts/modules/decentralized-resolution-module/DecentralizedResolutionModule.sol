@@ -11,6 +11,7 @@ import './IStakingModule.sol';
 import './ISlashingModule.sol';
 import './ResolutionAnalytics.sol';
 import './EscalationCostLibrary.sol';
+import './IKlerosHandoffResolutionModule.sol';
 import '../../libraries/ResolutionTableLibrary.sol';
 
 /**
@@ -27,6 +28,7 @@ contract DecentralizedResolutionModule is
     AccessControl,
     ReentrancyGuard,
     IResolutionModule,
+    IKlerosHandoffResolutionModule,
     DRMStorageBase
 {
     // ============ Errors ============
@@ -356,6 +358,83 @@ contract DecentralizedResolutionModule is
         bytes32 expectedResolutionQuoteRoot
     ) external override nonReentrant returns (bool success, address newResolver, uint8 newLevel) {
         return _executeEscalation(workflowId, escrowContract, escrowData, expectedResolutionQuoteRoot);
+    }
+
+    function prepareKlerosHandoff(
+        uint256 workflowId,
+        address escrowContract,
+        bytes calldata escrowData,
+        bytes32 resolutionQuoteRoot,
+        bytes32 klerosConfigRoot
+    ) external override onlyEscrowContract nonReentrant returns (bytes32 handoffRoot) {
+        if (escrowContract != _msgSender()) revert NotRegisteredEscrowContract(_msgSender());
+        IResolutionModule.ResolutionAppealQuote memory quote = _quoteAppealTransition(workflowId, escrowContract, escrowData);
+        if (!quote.appealable || quote.successorRound != 2 || quote.resolutionQuoteRoot != resolutionQuoteRoot) {
+            revert('Invalid Kleros handoff quote');
+        }
+        PreparedKlerosHandoff storage prepared = _preparedKlerosHandoffs[escrowContract][workflowId];
+        if (prepared.exists) revert('Kleros handoff already prepared');
+
+        handoffRoot = keccak256(abi.encode(
+            'KLEROS_HANDOFF_V1', block.chainid, address(this), escrowContract, workflowId,
+            quote.predecessorRound, quote.predecessorResolver, quote.successorRound,
+            quote.successorResolver, quote.appealedDecisionRoot, quote.resolutionQuoteRoot, klerosConfigRoot
+        ));
+        _preparedKlerosHandoffs[escrowContract][workflowId] = PreparedKlerosHandoff({
+            handoffRoot: handoffRoot,
+            resolutionQuoteRoot: quote.resolutionQuoteRoot,
+            klerosConfigRoot: klerosConfigRoot,
+            successorResolver: quote.successorResolver,
+            predecessorRound: quote.predecessorRound,
+            exists: true
+        });
+    }
+
+    function commitKlerosHandoff(
+        uint256 workflowId,
+        address escrowContract,
+        bytes calldata escrowData,
+        bytes32 resolutionQuoteRoot,
+        bytes32 handoffRoot,
+        bytes32 klerosConfigRoot,
+        uint256 klerosDisputeId
+    ) external override onlyEscrowContract nonReentrant returns (bool success, address newResolver, uint8 newLevel) {
+        if (escrowContract != _msgSender()) revert NotRegisteredEscrowContract(_msgSender());
+        PreparedKlerosHandoff memory prepared = _preparedKlerosHandoffs[escrowContract][workflowId];
+        if (!prepared.exists || prepared.handoffRoot != handoffRoot || prepared.resolutionQuoteRoot != resolutionQuoteRoot
+            || prepared.klerosConfigRoot != klerosConfigRoot) {
+            revert('Invalid prepared Kleros handoff');
+        }
+        IResolutionModule.ResolutionAppealQuote memory quote = _quoteAppealTransition(workflowId, escrowContract, escrowData);
+        if (!quote.appealable || quote.successorRound != 2 || quote.resolutionQuoteRoot != prepared.resolutionQuoteRoot
+            || quote.successorResolver != prepared.successorResolver || quote.predecessorRound != prepared.predecessorRound) {
+            revert('Stale Kleros handoff');
+        }
+        delete _preparedKlerosHandoffs[escrowContract][workflowId];
+        klerosDisputeIdForWorkflow[escrowContract][workflowId] = klerosDisputeId + 1;
+        _klerosConfigRootForWorkflow[escrowContract][workflowId] = klerosConfigRoot;
+        return _executeEscalation(workflowId, escrowContract, escrowData, resolutionQuoteRoot);
+    }
+
+    function getPreparedKlerosHandoff(address escrowContract, uint256 workflowId)
+        external view returns (bytes32 handoffRoot, bytes32 resolutionQuoteRoot, address successorResolver, uint8 predecessorRound, bool exists)
+    {
+        PreparedKlerosHandoff storage prepared = _preparedKlerosHandoffs[escrowContract][workflowId];
+        return (prepared.handoffRoot, prepared.resolutionQuoteRoot, prepared.successorResolver, prepared.predecessorRound, prepared.exists);
+    }
+
+    function getCommittedKlerosDisputeId(address escrowContract, uint256 workflowId)
+        external view override returns (bool committed, uint256 klerosDisputeId)
+    {
+        uint256 stored = klerosDisputeIdForWorkflow[escrowContract][workflowId];
+        if (stored == 0) return (false, 0);
+        return (true, stored - 1);
+    }
+
+    function getCommittedKlerosConfigRoot(address escrowContract, uint256 workflowId)
+        external view override returns (bytes32)
+    {
+        return _klerosConfigRootForWorkflow[escrowContract][workflowId];
     }
 
     function _executeEscalation(

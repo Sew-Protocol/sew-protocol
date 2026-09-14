@@ -18,6 +18,8 @@ import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
 import '../../../contracts/libraries/EscrowEncodingLibrary.sol'; // Added import
+import '../../../contracts/arbitration/KlerosArbitrableProxy.sol';
+import '../../../contracts/arbitration/mocks/MockKlerosArbitrator.sol';
 
 /**
  * @title AppealWindowEnforcementTest
@@ -37,6 +39,8 @@ contract AppealWindowEnforcementTest is Test {
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
     EscrowGovernanceTimelock public adminContract;
+    KlerosArbitrableProxy public klerosProxy;
+    MockKlerosArbitrator public klerosArbitrator;
 
     address public deployer;
     address public timelock;
@@ -50,6 +54,7 @@ contract AppealWindowEnforcementTest is Test {
     uint256 public constant INITIAL_BALANCE = 10000 ether;
     uint256 public constant ESCROW_AMOUNT = 1000 ether;
     uint256 public constant ESCROW_FEE = 100; // 1%
+    uint256 public constant KLEROS_ARBITRATION_COST = 0.1 ether;
 
     function setUp() public {
         deployer = address(this);
@@ -74,6 +79,8 @@ contract AppealWindowEnforcementTest is Test {
         // Deploy resolution module
         resolutionModule = new DecentralizedResolutionModule(deployer);
         { DRMAdminFacet drmAdminFacet_ = new DRMAdminFacet(); resolutionModule.setAdminFacet(address(drmAdminFacet_)); }
+        klerosArbitrator = new MockKlerosArbitrator(KLEROS_ARBITRATION_COST);
+        klerosProxy = new KlerosArbitrableProxy(address(klerosArbitrator), address(this));
 
         // Deploy escrow
         yieldOps = new YieldOps(address(this));
@@ -120,6 +127,8 @@ contract AppealWindowEnforcementTest is Test {
         // Register escrow contract in resolution module
         resolutionModule.registerEscrowContract(address(escrow));
         resolutionModule.registerEscrowContract(address(this)); // Register self because we call setEscrowCategory
+        klerosProxy.grantRole(klerosProxy.ROLE_TIMELOCK(), address(this));
+        klerosProxy.registerEscrowContract(address(escrow));
 
         // Register escrow contract in incentive module
         incentiveModule.registerEscrowContract(address(escrow));
@@ -157,10 +166,9 @@ contract AppealWindowEnforcementTest is Test {
         uint256[3] memory appealWindows = [uint256(2 days), 3 days, 0];
         resolutionModule.setRoundTimeouts(resolveDeadlines, appealWindows);
 
-        // Enable round 2 escalation for testing final round behavior
-        // Setting external resolver enables round 2 escalation
+        // Enable the real external resolver handoff for round 2.
         vm.prank(timelock);
-        resolutionModule.setExternalResolver(seniorResolver);
+        resolutionModule.setExternalResolver(address(klerosProxy));
     }
 
     // ============ Helper Functions ============
@@ -259,19 +267,12 @@ contract AppealWindowEnforcementTest is Test {
         vm.prank(round1Resolver);
         escrow.releaseAsDisputeResolver(workflowId, bytes32(0));
 
-        // Escalate to round 2 (final round) - cost is 0.02 ether (baseCost + stepSize * escalationCount)
-        (uint256 bond1, ) = resolutionModule.getRequiredAppealBond(workflowId, address(escrow), 1, escrowData);
+        // The appellant separately funds the external Kleros invocation.
         vm.prank(buyer);
-        token.approve(address(escrow), bond1);
-        vm.prank(buyer);
-        escrow.escalateDispute(workflowId);
+        escrow.escalateDispute{value: KLEROS_ARBITRATION_COST}(workflowId);
 
-        // Get senior resolver for round 2 (after escalation, resolver is updated)
-        (address seniorRes, ) = resolutionModule.getDisputeResolver(workflowId, address(escrow), escrowData);
-
-        // Senior resolver resolves (release) at final round
-        vm.prank(seniorRes);
-        escrow.releaseAsDisputeResolver(workflowId, bytes32(0));
+        // The external arbitrator resolves the exact dispute created by the handoff.
+        klerosArbitrator.giveRuling(0, 1);
 
         // Check no pending settlement (executed immediately)
         (bool exists, , , ) = escrow.pendingSettlements(workflowId);
@@ -289,6 +290,179 @@ contract AppealWindowEnforcementTest is Test {
         // Settlement is pull-only: claimable must be credited
         uint256 sellerClaimable = escrow.claimableBalances(workflowId, seller);
         assertTrue(sellerClaimable > 0, 'Seller should have claimable balance after settlement');
+    }
+
+    function test_KlerosHandoff_BindsDisputeAndSeparatesArbitrationCost() public {
+        uint256 workflowId = createEscrow();
+        raiseDispute(workflowId);
+        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(
+            address(token), buyer, seller, ESCROW_AMOUNT, address(0)
+        );
+
+        (address resolver, ) = resolutionModule.getDisputeResolver(workflowId, address(escrow), escrowData);
+        vm.prank(resolver);
+        escrow.releaseAsDisputeResolver(workflowId, bytes32(0));
+        (uint256 roundOneBond, ) = resolutionModule.getRequiredAppealBond(workflowId, address(escrow), 0, escrowData);
+        vm.prank(buyer);
+        token.approve(address(escrow), roundOneBond);
+        vm.prank(buyer);
+        escrow.escalateDispute(workflowId);
+
+        (resolver, ) = resolutionModule.getDisputeResolver(workflowId, address(escrow), escrowData);
+        vm.prank(resolver);
+        escrow.cancelAsDisputeResolver(workflowId, bytes32(0));
+
+        vm.deal(seller, KLEROS_ARBITRATION_COST);
+        uint256 sellerEthBefore = seller.balance;
+        vm.prank(seller);
+        escrow.escalateDispute{value: KLEROS_ARBITRATION_COST}(workflowId);
+
+        (address activeResolver, uint8 round) = resolutionModule.getDisputeResolver(workflowId, address(escrow), escrowData);
+        assertEq(activeResolver, address(klerosProxy));
+        assertEq(round, 2);
+        (bool committed, uint256 disputeId) = resolutionModule.getCommittedKlerosDisputeId(address(escrow), workflowId);
+        assertTrue(committed);
+        assertEq(disputeId, 0);
+        assertEq(klerosProxy.workflowToKlerosDispute(address(escrow), workflowId), disputeId + 1);
+        assertEq(sellerEthBefore - seller.balance, KLEROS_ARBITRATION_COST);
+        assertEq(address(klerosArbitrator).balance, KLEROS_ARBITRATION_COST);
+
+        // The round-two external fee creates no additional ERC-20 appeal bond.
+        assertEq(token.balanceOf(address(klerosProxy)), 0);
+        klerosArbitrator.giveRuling(disputeId, 2);
+        assertGt(escrow.claimableBalances(workflowId, buyer), 0);
+    }
+
+    function test_KlerosHandoff_RejectsSynchronousRuleBeforeCommit() public {
+        uint256 workflowId = createEscrow();
+        raiseDispute(workflowId);
+        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(
+            address(token), buyer, seller, ESCROW_AMOUNT, address(0)
+        );
+
+        (address resolver, ) = resolutionModule.getDisputeResolver(workflowId, address(escrow), escrowData);
+        vm.prank(resolver);
+        escrow.releaseAsDisputeResolver(workflowId, bytes32(0));
+        (uint256 roundOneBond, ) = resolutionModule.getRequiredAppealBond(workflowId, address(escrow), 0, escrowData);
+        vm.prank(buyer);
+        token.approve(address(escrow), roundOneBond);
+        vm.prank(buyer);
+        escrow.escalateDispute(workflowId);
+
+        (resolver, ) = resolutionModule.getDisputeResolver(workflowId, address(escrow), escrowData);
+        vm.prank(resolver);
+        escrow.cancelAsDisputeResolver(workflowId, bytes32(0));
+
+        klerosArbitrator.setSynchronousRule(2);
+        vm.deal(seller, KLEROS_ARBITRATION_COST);
+        vm.prank(seller);
+        escrow.escalateDispute{value: KLEROS_ARBITRATION_COST}(workflowId);
+
+        assertTrue(klerosArbitrator.synchronousRuleRejected(), 'pre-commit callback must be rejected');
+        (bool committed, uint256 disputeId) = resolutionModule.getCommittedKlerosDisputeId(address(escrow), workflowId);
+        assertTrue(committed);
+        assertEq(disputeId, 0);
+        assertEq(escrow.claimableBalances(workflowId, buyer), 0, 'callback cannot settle before commit');
+
+        klerosArbitrator.giveRuling(disputeId, 2);
+        assertGt(escrow.claimableBalances(workflowId, buyer), 0, 'committed dispute can settle');
+    }
+
+    function test_KlerosHandoff_DirectDrmAuthorizationAndReplayProtection() public {
+        uint256 workflowId = createEscrow();
+        raiseDispute(workflowId);
+        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(
+            address(token), buyer, seller, ESCROW_AMOUNT, address(0)
+        );
+
+        (address resolver, ) = resolutionModule.getDisputeResolver(workflowId, address(escrow), escrowData);
+        vm.prank(resolver);
+        escrow.releaseAsDisputeResolver(workflowId, bytes32(0));
+        (uint256 roundOneBond, ) = resolutionModule.getRequiredAppealBond(workflowId, address(escrow), 0, escrowData);
+        vm.prank(buyer);
+        token.approve(address(escrow), roundOneBond);
+        vm.prank(buyer);
+        escrow.escalateDispute(workflowId);
+
+        (resolver, ) = resolutionModule.getDisputeResolver(workflowId, address(escrow), escrowData);
+        vm.prank(resolver);
+        escrow.cancelAsDisputeResolver(workflowId, bytes32(0));
+        IResolutionModule.ResolutionAppealQuote memory quote =
+            resolutionModule.quoteAppealTransition(workflowId, address(escrow), escrowData);
+        bytes32 configRoot = klerosProxy.getKlerosHandoffConfigRoot();
+
+        vm.expectRevert();
+        resolutionModule.prepareKlerosHandoff(
+            workflowId, address(escrow), escrowData, quote.resolutionQuoteRoot, configRoot
+        );
+
+        vm.prank(address(escrow));
+        bytes32 handoffRoot = resolutionModule.prepareKlerosHandoff(
+            workflowId, address(escrow), escrowData, quote.resolutionQuoteRoot, configRoot
+        );
+        vm.prank(address(escrow));
+        vm.expectRevert('Kleros handoff already prepared');
+        resolutionModule.prepareKlerosHandoff(
+            workflowId, address(escrow), escrowData, quote.resolutionQuoteRoot, configRoot
+        );
+        vm.prank(address(escrow));
+        vm.expectRevert('Invalid prepared Kleros handoff');
+        resolutionModule.commitKlerosHandoff(
+            workflowId, address(escrow), escrowData, quote.resolutionQuoteRoot, handoffRoot, bytes32(0), 11
+        );
+
+        vm.prank(address(escrow));
+        resolutionModule.commitKlerosHandoff(
+            workflowId, address(escrow), escrowData, quote.resolutionQuoteRoot, handoffRoot, configRoot, 11
+        );
+        (bool committed, uint256 disputeId) = resolutionModule.getCommittedKlerosDisputeId(address(escrow), workflowId);
+        assertTrue(committed);
+        assertEq(disputeId, 11);
+
+        vm.prank(address(escrow));
+        vm.expectRevert('Invalid prepared Kleros handoff');
+        resolutionModule.commitKlerosHandoff(
+            workflowId, address(escrow), escrowData, quote.resolutionQuoteRoot, handoffRoot, configRoot, 11
+        );
+    }
+
+    function test_KlerosHandoff_LiveCostIncreaseRollsBackBeforeCustodyOrTransition() public {
+        uint256 workflowId = createEscrow();
+        raiseDispute(workflowId);
+        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(
+            address(token), buyer, seller, ESCROW_AMOUNT, address(0)
+        );
+
+        (address resolver, ) = resolutionModule.getDisputeResolver(workflowId, address(escrow), escrowData);
+        vm.prank(resolver);
+        escrow.releaseAsDisputeResolver(workflowId, bytes32(0));
+        (uint256 roundOneBond, ) = resolutionModule.getRequiredAppealBond(workflowId, address(escrow), 0, escrowData);
+        vm.prank(buyer);
+        token.approve(address(escrow), roundOneBond);
+        vm.prank(buyer);
+        escrow.escalateDispute(workflowId);
+
+        (resolver, ) = resolutionModule.getDisputeResolver(workflowId, address(escrow), escrowData);
+        vm.prank(resolver);
+        escrow.cancelAsDisputeResolver(workflowId, bytes32(0));
+
+        uint256 quotedCost = klerosProxy.getArbitrationCost('');
+        uint256 liveCost = quotedCost + 1;
+        klerosArbitrator.setArbitrationPrice(liveCost);
+        uint256 disputeCount = klerosArbitrator.getDisputeCount();
+        vm.deal(seller, quotedCost);
+        vm.prank(seller);
+        vm.expectRevert(abi.encodeWithSelector(
+            BaseEscrow.InvalidKlerosArbitrationFee.selector, workflowId, liveCost, quotedCost
+        ));
+        escrow.escalateDispute{value: quotedCost}(workflowId);
+
+        assertEq(klerosArbitrator.getDisputeCount(), disputeCount);
+        (address activeResolver, uint8 round) = resolutionModule.getDisputeResolver(workflowId, address(escrow), escrowData);
+        assertEq(activeResolver, resolver);
+        assertEq(round, 1);
+        (bool committed, ) = resolutionModule.getCommittedKlerosDisputeId(address(escrow), workflowId);
+        assertFalse(committed);
     }
 
     // ============ Test: Appeal Window Expires - Settlement Can Be Executed ============
