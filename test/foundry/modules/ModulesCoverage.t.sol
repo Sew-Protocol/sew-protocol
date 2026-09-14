@@ -176,12 +176,6 @@ contract ModulesCoverageTest is Test {
         assertEq(reasonCode, 0);  // REASON_ALLOWED
     }
 
-    function test_DefaultRelease_executeRelease() public {
-        // executeRelease is not implemented in v1, should revert
-        vm.expectRevert();
-        relStrategy.executeRelease(1, address(this), "");
-    }
-
     function test_DefaultRelease_Metadata() public {
         assertEq(relStrategy.moduleName(), "DefaultBuyerRelease");
         assertEq(relStrategy.strategyName(), "DefaultBuyerRelease");

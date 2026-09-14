@@ -15,14 +15,9 @@ import "../../../contracts/mocks/ERC20Mock.sol";
 import "../../../contracts/libraries/SettingsValidationLibrary.sol";
 
 contract SimpleReleaseStrategy is IReleaseStrategy {
-    bool public isV2;
-    constructor(bool _isV2) { isV2 = _isV2; }
     
     function canRelease(uint256, address, address, bytes calldata) external pure override returns (bool, uint8) {
         return (true, 0);
-    }
-    function executeRelease(uint256, address, bytes calldata) external pure override returns (bool) {
-        return true;
     }
     function strategyName() external pure override returns (string memory) { return "Simple"; }
     function moduleName() external pure override returns (string memory) { return "Simple"; }
@@ -35,8 +30,8 @@ contract SimpleReleaseStrategy is IReleaseStrategy {
 contract ModuleSnapshotRaceConditionTest is Test {
     EscrowVault public vault;
     ModuleSnapshotRegistry public mm;
-    SimpleReleaseStrategy public strategyV1;
-    SimpleReleaseStrategy public strategyV2;
+    SimpleReleaseStrategy public strategyA;
+    SimpleReleaseStrategy public strategyB;
     ERC20Mock public token;
 
     address public owner = address(this);
@@ -45,16 +40,16 @@ contract ModuleSnapshotRaceConditionTest is Test {
 
     function setUp() public {
         mm = new ModuleSnapshotRegistry(owner);
-        strategyV1 = new SimpleReleaseStrategy(false);
-        strategyV2 = new SimpleReleaseStrategy(true);
+        strategyA = new SimpleReleaseStrategy();
+        strategyB = new SimpleReleaseStrategy();
         token = new ERC20Mock("Token", "TKN", owner, 1000e18);
 
         vault = new EscrowVault(0, address(0xFEE), address(new YieldOps(owner)), address(new DisputeOps(owner)), address(mm));
         
         mm.registerEscrowContract(address(vault));
         
-        // Setup initial default strategy
-        mm.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(strategyV1));
+        // Setup initial default strategy.
+        mm.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(strategyA));
         vm.warp(block.timestamp + 7 days + 1);
         mm.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
 
@@ -70,28 +65,28 @@ contract ModuleSnapshotRaceConditionTest is Test {
     }
 
     function test_snapshot_preserves_module_after_swap() public {
-        // 1. Create escrow while V1 is active
+        // 1. Create escrow while strategy A is active.
         vm.startPrank(buyer);
         token.mint(buyer, 100e18);
         token.approve(address(vault), 100e18);
         uint256 wid = vault.createEscrow(address(token), seller, 100e18, SettingsValidationLibrary.getDefaultSettings());
         vm.stopPrank();
 
-        // 2. Verify snapshot for wid is V1
+        // 2. Verify the escrow snapshots strategy A.
         // struct ModuleSnapshot: resolution, release, cancellation, yieldGen, yieldDist, incentive, yieldFee, appealFee, escrowFee, autoRelease, autoCancel, maxDispute, appealWindow
         (, address snapRelease, , , , , , , , , , , ) = vault.moduleSnapshots(wid);
-        assertEq(snapRelease, address(strategyV1));
+        assertEq(snapRelease, address(strategyA));
 
-        // 3. Swap default strategy to V2
-        mm.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(strategyV2));
+        // 3. Swap the default to strategy B.
+        mm.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(strategyB));
         vm.warp(block.timestamp + 7 days + 1);
         mm.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
 
-        // 4. Verify new default is V2
-        assertEq(mm.getModule(address(vault), BaseEscrow.ModuleType.RELEASE), address(strategyV2));
+        // 4. Verify new default is strategy B.
+        assertEq(mm.getModule(address(vault), BaseEscrow.ModuleType.RELEASE), address(strategyB));
 
-        // 5. Verify snapshotted module for wid is STILL V1
+        // 5. Verify the original escrow remains bound to strategy A.
         (, snapRelease, , , , , , , , , , , ) = vault.moduleSnapshots(wid);
-        assertEq(snapRelease, address(strategyV1));
+        assertEq(snapRelease, address(strategyA));
     }
 }

@@ -18,12 +18,14 @@ import '../../../contracts/ops/SettlementOps.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
 import '../../../contracts/core/BondCollector.sol';
+import '../helpers/KlerosHandoffFixture.sol';
+
 /**
  * @title IncentiveModuleIntegrationTest
  * @notice Comprehensive integration tests for incentive module lifecycle hooks
  * @dev Tests the integration between BaseEscrow, DecentralizedResolutionModule, and IncentiveModule
  */
-contract IncentiveModuleIntegrationTest is Test {
+contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
     EscrowVault public escrow;
     DecentralizedResolutionModule public resolutionModule;
     ResolverIncentiveModuleV1 public incentiveModuleV1;
@@ -190,7 +192,10 @@ contract IncentiveModuleIntegrationTest is Test {
         resolutionModule.setResolverCapacity(seniorResolver, 0, true);
         resolutionModule.setResolverCapacity(resolver1, 0, true);
         resolutionModule.setResolverCapacity(resolver2, 0, true);
-        resolutionModule.setExternalResolver(makeAddr('externalResolver'));
+        vm.stopPrank();
+        (KlerosArbitrableProxy proxy, ) = _deployKlerosHandoffProxy(address(escrow), address(this), 0);
+        vm.startPrank(timelock);
+        resolutionModule.setExternalResolver(address(proxy));
         vm.stopPrank();
     }
 

@@ -128,7 +128,7 @@ contract AppealWindowEnforcementTest is Test {
         resolutionModule.registerEscrowContract(address(escrow));
         resolutionModule.registerEscrowContract(address(this)); // Register self because we call setEscrowCategory
         klerosProxy.grantRole(klerosProxy.ROLE_TIMELOCK(), address(this));
-        klerosProxy.registerEscrowContract(address(escrow));
+        klerosProxy.registerKlerosHandoffEscrow(address(escrow));
 
         // Register escrow contract in incentive module
         incentiveModule.registerEscrowContract(address(escrow));

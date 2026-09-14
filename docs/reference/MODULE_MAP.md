@@ -6,7 +6,7 @@ Complete mapping of module interfaces to implementations, including how to chang
 
 The protocol uses a modular architecture where core functionality is split into swappable modules:
 
-1. **Release Strategy** - Determines when and how escrow funds can be released
+1. **Release Strategy** - Determines whether escrow funds may be released
 2. **Resolution Module** - Handles dispute resolution and escalation
 3. **Yield Generation Module** - Generates yield on escrowed funds
 4. **Yield Distribution Module** - Distributes generated yield to recipients
@@ -25,14 +25,14 @@ Each module type has an interface, and multiple implementations can exist. The p
 
 **Interface Methods**:
 
-- `canRelease(uint256 workflowId, address caller, bytes calldata escrowData) → (bool, string)`
-- `executeRelease(uint256 workflowId, bytes calldata escrowData) → (bool, address, uint256)`
+- `canRelease(uint256 workflowId, address escrowContract, address caller, bytes calldata escrowData) → (bool, uint8)`
 - `strategyName() → string`
+- `moduleName() → string`
+- `moduleVersion() → string`
 
 **Change Function**:
 
-- `EscrowableERC20.queueDefaultReleaseStrategy(address)` / `activateDefaultReleaseStrategy()`
-- `EscrowVault.queueDefaultReleaseStrategy(address)` / `activateDefaultReleaseStrategy()` (Phase 8: Lane consistency fix)
+- `ModuleSnapshotRegistry.queueModule(escrowContract, RELEASE, strategy)` / `activateModule(escrowContract, RELEASE)`
 
 ---
 

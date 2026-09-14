@@ -5,7 +5,20 @@ import 'forge-std/Test.sol';
 import '../../../contracts/arbitration/KlerosArbitrableProxy.sol';
 import '../../../contracts/arbitration/mocks/MockKlerosArbitrator.sol';
 
-contract MockEscrow {
+contract TestHandoffEscrow {
+    bytes32 private handoffConfigRoot;
+
+    function setHandoffConfigRoot(bytes32 root) external { handoffConfigRoot = root; }
+    function getResolutionModule(uint256) external view returns (address) { return address(this); }
+    function getCommittedKlerosDisputeId(address, uint256 workflowId)
+        external pure returns (bool committed, uint256 disputeId)
+    { return (true, workflowId - 1); }
+    function getCommittedKlerosConfigRoot(address, uint256) external view returns (bytes32) {
+        return handoffConfigRoot;
+    }
+}
+
+contract MockEscrow is TestHandoffEscrow {
     mapping(uint256 => bool) public released;
     mapping(uint256 => bool) public cancelled;
 
@@ -25,7 +38,7 @@ contract MockEscrow {
 
 // Used in test_propagateRuling_escrowReverts_thenRetrySucceeds:
 // starts reverting, then toggles to accepting
-contract ToggleEscrow {
+contract ToggleEscrow is TestHandoffEscrow {
     bool public shouldRevert = true;
     mapping(uint256 => bool) public released;
     mapping(uint256 => bool) public cancelled;
@@ -48,14 +61,14 @@ contract ToggleEscrow {
 }
 
 // Used in test_settlementReturnsFalse_notRevert
-contract SettlementReturnsFalseEscrow {
+contract SettlementReturnsFalseEscrow is TestHandoffEscrow {
     function releaseAsDisputeResolver(uint256, bytes32) external returns (bool) { return false; }
     function cancelAsDisputeResolver(uint256, bytes32) external returns (bool) { return false; }
     receive() external payable {}
 }
 
 // Used in test_refundFailure_reverts_createDispute: no receive() = can't get ETH back
-contract NoReceiveEscrow {
+contract NoReceiveEscrow is TestHandoffEscrow {
     mapping(uint256 => bool) public released;
     mapping(uint256 => bool) public cancelled;
 
@@ -73,7 +86,7 @@ contract NoReceiveEscrow {
 }
 
 // Used in test_reentrancy_blocked_duringRule
-contract ReentrantEscrow {
+contract ReentrantEscrow is TestHandoffEscrow {
     KlerosArbitrableProxy public proxy;
     bool public reentrancyWasBlocked;
 
@@ -133,7 +146,8 @@ contract KlerosIntegrationTest is Test {
         klerosProxy.grantRole(ROLE_TIMELOCK, owner);
         
         // Register mockEscrow
-        klerosProxy.registerEscrowContract(address(mockEscrow));
+        klerosProxy.registerKlerosHandoffEscrow(address(mockEscrow));
+        mockEscrow.setHandoffConfigRoot(klerosProxy.getKlerosHandoffConfigRoot());
 
         // Fund test addresses for dispute creation
         vm.deal(address(mockEscrow), 10 ether);
@@ -184,6 +198,17 @@ contract KlerosIntegrationTest is Test {
     function test_registerEscrowContract_rejectsZeroAddress() public {
         vm.expectRevert('Invalid escrow address');
         klerosProxy.registerEscrowContract(address(0));
+    }
+
+    function test_createDispute_rejectsGenericEscrowRoleWithoutHandoffRole() public {
+        address genericEscrow = makeAddr('genericEscrow');
+        klerosProxy.registerEscrowContract(genericEscrow);
+        bytes memory escrowData = abi.encode(address(0), sender, recipient, AMOUNT, AMOUNT);
+        vm.deal(genericEscrow, ARBITRATION_PRICE);
+
+        vm.prank(genericEscrow);
+        vm.expectRevert('Only registered Kleros handoff escrows');
+        klerosProxy.createDispute{value: ARBITRATION_PRICE}(1, genericEscrow, 2, '0x', escrowData);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -255,7 +280,7 @@ contract KlerosIntegrationTest is Test {
         bytes memory escrowData = abi.encode(address(0), sender, recipient, AMOUNT, AMOUNT);
 
         vm.prank(other);
-        vm.expectRevert('Only registered escrow contracts');
+        vm.expectRevert('Only registered Kleros handoff escrows');
         klerosProxy.createDispute{value: ARBITRATION_PRICE}(1, address(mockEscrow), 2, '0x', escrowData);
     }
 
@@ -597,7 +622,8 @@ contract KlerosIntegrationTest is Test {
     function test_propagateRuling_escrowReverts_thenRetrySucceeds() public {
         ToggleEscrow toggleEscrow = new ToggleEscrow();
         vm.deal(address(toggleEscrow), 10 ether);
-        klerosProxy.registerEscrowContract(address(toggleEscrow));
+        klerosProxy.registerKlerosHandoffEscrow(address(toggleEscrow));
+        toggleEscrow.setHandoffConfigRoot(klerosProxy.getKlerosHandoffConfigRoot());
 
         bytes memory escrowData = abi.encode(address(0), sender, recipient, AMOUNT, AMOUNT);
         vm.prank(address(toggleEscrow));
@@ -630,7 +656,7 @@ contract KlerosIntegrationTest is Test {
      * @dev getRuling() reads from the arbitrator directly and returns the ruling even
      *      before propagateRuling. Check the proxy's internal storage for resolved state.
      */
-    function test_propagateRuling_fallback_afterMissingFirstCall() public {
+    function test_propagateRuling_afterMissingFirstCallback() public {
         bytes memory escrowData = abi.encode(address(0), sender, recipient, AMOUNT, AMOUNT);
         vm.prank(address(mockEscrow));
         klerosProxy.createDispute{value: ARBITRATION_PRICE}(1, address(mockEscrow), 2, '0x', escrowData);
@@ -666,7 +692,8 @@ contract KlerosIntegrationTest is Test {
     function test_refundFailure_reverts_createDispute() public {
         NoReceiveEscrow noReceiveEscrow = new NoReceiveEscrow();
         vm.deal(address(noReceiveEscrow), 10 ether);
-        klerosProxy.registerEscrowContract(address(noReceiveEscrow));
+        klerosProxy.registerKlerosHandoffEscrow(address(noReceiveEscrow));
+        noReceiveEscrow.setHandoffConfigRoot(klerosProxy.getKlerosHandoffConfigRoot());
 
         bytes memory escrowData = abi.encode(address(0), sender, recipient, AMOUNT, AMOUNT);
         uint256 initialCount = mockArbitrator.getDisputeCount();
@@ -713,7 +740,8 @@ contract KlerosIntegrationTest is Test {
     function test_reentrancy_blocked_duringRule() public {
         ReentrantEscrow reentrantEscrow = new ReentrantEscrow(klerosProxy);
         vm.deal(address(reentrantEscrow), 10 ether);
-        klerosProxy.registerEscrowContract(address(reentrantEscrow));
+        klerosProxy.registerKlerosHandoffEscrow(address(reentrantEscrow));
+        reentrantEscrow.setHandoffConfigRoot(klerosProxy.getKlerosHandoffConfigRoot());
 
         bytes memory escrowData = abi.encode(address(0), sender, recipient, AMOUNT, AMOUNT);
         vm.prank(address(reentrantEscrow));
@@ -732,7 +760,8 @@ contract KlerosIntegrationTest is Test {
     function test_settlementReturnsFalse_notRevert() public {
         SettlementReturnsFalseEscrow falseEscrow = new SettlementReturnsFalseEscrow();
         vm.deal(address(falseEscrow), 10 ether);
-        klerosProxy.registerEscrowContract(address(falseEscrow));
+        klerosProxy.registerKlerosHandoffEscrow(address(falseEscrow));
+        falseEscrow.setHandoffConfigRoot(klerosProxy.getKlerosHandoffConfigRoot());
 
         bytes memory escrowData = abi.encode(address(0), sender, recipient, AMOUNT, AMOUNT);
         vm.prank(address(falseEscrow));
@@ -769,16 +798,15 @@ contract KlerosIntegrationTest is Test {
     }
 
     /**
-     * @notice Ruling delivery still works even after the escrow contract is unregistered.
-     *         unregisterEscrowContract only blocks future createDispute calls.
+     * @notice Ruling delivery still works after handoff creation authority is revoked.
      */
     function test_rule_afterEscrowUnregistered() public {
         bytes memory escrowData = abi.encode(address(0), sender, recipient, AMOUNT, AMOUNT);
         vm.prank(address(mockEscrow));
         klerosProxy.createDispute{value: ARBITRATION_PRICE}(1, address(mockEscrow), 2, '0x', escrowData);
 
-        // Unregister the escrow (revoke the role directly — no unregisterEscrowContract fn)
-        bytes32 escrowRole = klerosProxy.ROLE_ESCROW_CONTRACT();
+        // Revoke handoff creation authority; this cannot invalidate an existing dispute.
+        bytes32 escrowRole = klerosProxy.ROLE_KLEROS_HANDOFF_ESCROW();
         klerosProxy.revokeRole(escrowRole, address(mockEscrow));
         assertFalse(klerosProxy.hasRole(escrowRole, address(mockEscrow)));
 

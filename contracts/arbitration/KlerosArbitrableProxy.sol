@@ -26,6 +26,7 @@ interface IBaseEscrowResolutionModule {
 contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, IResolutionModule {
     bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');
     bytes32 public constant ROLE_ESCROW_CONTRACT = keccak256('ROLE_ESCROW_CONTRACT');
+    bytes32 public constant ROLE_KLEROS_HANDOFF_ESCROW = keccak256('ROLE_KLEROS_HANDOFF_ESCROW');
 
     /// @dev V1 arbitrator and handoff configuration are immutable. If either becomes
     /// mutable, committed dispute identity must include arbitrator/config lineage and
@@ -91,13 +92,19 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
         _grantRole(ROLE_ESCROW_CONTRACT, escrow);
     }
 
+    /// @notice Register an escrow permitted to create authenticated Kleros handoff disputes.
+    function registerKlerosHandoffEscrow(address escrow) external onlyRole(ROLE_TIMELOCK) {
+        require(escrow != address(0), 'Invalid escrow address');
+        _grantRole(ROLE_KLEROS_HANDOFF_ESCROW, escrow);
+    }
+
     /**
      * @notice Create a dispute in Kleros for an escrow workflow
      * @param workflowId The escrow workflow ID
      * @param choices Number of ruling choices (typically 2: release or cancel)
      * @param extraData Additional data for Kleros
      * @param escrowData Encoded escrow data (token, from, to, amount) for Kleros metadata
-     * @dev Only registered escrow contracts (ROLE_ESCROW_CONTRACT) may call this function.
+     * @dev Only explicitly registered Kleros handoff escrows may call this function.
      *      Allowing arbitrary callers to supply escrowData would let anyone attach fabricated
      *      participant metadata to a real workflowId, corrupting the Kleros evidence record
      *      and enabling third-party griefing. Dispute initiation by end-users is handled via
@@ -115,7 +122,7 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
         nonReentrant
         returns (uint256 klerosDisputeId)
     {
-        require(hasRole(ROLE_ESCROW_CONTRACT, _msgSender()), 'Only registered escrow contracts');
+        require(hasRole(ROLE_KLEROS_HANDOFF_ESCROW, _msgSender()), 'Only registered Kleros handoff escrows');
         require(escrowContract == _msgSender(), 'Escrow identity mismatch');
         require(workflowToKlerosDispute[escrowContract][workflowId] == 0, 'Dispute already exists');
 
@@ -252,22 +259,15 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
     }
 
     function _requireCommittedHandoff(address escrowContract, uint256 workflowId, uint256 klerosDisputeId) internal view {
-        // Legacy test and integration escrows do not expose a resolution-module snapshot.
-        // Real BaseEscrow instances do, and must bind both external identity and configuration.
-        (bool hasSnapshot, bytes memory snapshotData) = escrowContract.staticcall(
-            abi.encodeWithSelector(IBaseEscrowResolutionModule.getResolutionModule.selector, workflowId)
+        address resolutionModule = IBaseEscrowResolutionModule(escrowContract).getResolutionModule(workflowId);
+        (bool committed, uint256 committedDisputeId) =
+            IKlerosHandoffResolutionModule(resolutionModule).getCommittedKlerosDisputeId(escrowContract, workflowId);
+        require(committed && committedDisputeId == klerosDisputeId, 'Uncommitted Kleros dispute');
+        require(
+            IKlerosHandoffResolutionModule(resolutionModule).getCommittedKlerosConfigRoot(escrowContract, workflowId)
+                == getKlerosHandoffConfigRoot(),
+            'Kleros config changed'
         );
-        if (hasSnapshot && snapshotData.length == 32) {
-            address resolutionModule = abi.decode(snapshotData, (address));
-            (bool committed, uint256 committedDisputeId) =
-                IKlerosHandoffResolutionModule(resolutionModule).getCommittedKlerosDisputeId(escrowContract, workflowId);
-            require(committed && committedDisputeId == klerosDisputeId, 'Uncommitted Kleros dispute');
-            require(
-                IKlerosHandoffResolutionModule(resolutionModule).getCommittedKlerosConfigRoot(escrowContract, workflowId)
-                    == getKlerosHandoffConfigRoot(),
-                'Kleros config changed'
-            );
-        }
     }
 
     /**

@@ -269,6 +269,36 @@ contract VersionedResolutionConfigTest is Test {
         assertTrue(deprecated);
     }
 
+    function test_activeConfigCannotBeDisabledOrDeprecated() public {
+        vm.expectRevert();
+        drm.setResolutionConfigSelectable(1, false);
+
+        vm.expectRevert();
+        drm.deprecateResolutionConfig(1);
+
+        assertTrue(drm.isResolutionConfigSelectable(1));
+    }
+
+    function test_boundConfigRemainsFrozenAfterSelectabilityChanges() public {
+        DecentralizedResolverStructs.ResolutionConfig memory config = _policyConfig(BOND_A);
+        drm.publishResolutionConfig(config);
+        drm.activateResolutionConfig(2);
+
+        bytes memory escrowData = abi.encode(address(0x1234), address(1), address(2), 100 ether, address(0));
+        vm.prank(ESCROW);
+        drm.initializeDisputeWithCategoryAndConfig(76, ESCROW, escrowData, 2);
+        bytes32 root = drm.resolutionConfigRoot(2);
+
+        DecentralizedResolverStructs.ResolutionConfig memory successor = _policyConfig(BOND_B);
+        drm.publishResolutionConfig(successor);
+        drm.setResolutionConfigSelectable(3, false);
+
+        assertEq(drm.workflowResolutionConfigVersion(ESCROW, 76), 2);
+        assertEq(drm.resolutionConfigRoot(2), root);
+        (, address bondAsset) = drm.getRequiredAppealBond(76, ESCROW, 0, escrowData);
+        assertEq(bondAsset, BOND_A);
+    }
+
     function test_deprecatedBoundConfigStillInitializesWithItsFrozenSemantics() public {
         DecentralizedResolverStructs.ResolutionConfig memory config = drm.getResolutionConfig(1);
         config.resolveDeadlines[0] = 3 hours;

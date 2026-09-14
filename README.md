@@ -51,6 +51,8 @@ See **[docs/INDEX.md](./docs/INDEX.md)** for complete documentation index with 1
 
 ## Quick Start
 
+> **Foundry dependency prerequisite:** Foundry commands require both `lib/forge-std` and `lib/halmos-cheatcodes`. In a normal Git checkout, run `git submodule update --init --recursive`. In a JJ workspace, make sure `lib/forge-std` is a symlink or directory containing forge-std and that the Halmos cheatcodes source is present under `lib/halmos-cheatcodes`. `pnpm test` and `pnpm build` check these paths and print a setup error before running Foundry.
+
 ```bash
 # Install dependencies
 pnpm install

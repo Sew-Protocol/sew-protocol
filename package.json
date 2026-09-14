@@ -6,7 +6,7 @@
   "scripts": {
     "test": "pnpm test:hardhat && pnpm test:foundry",
     "test:hardhat": "hardhat test",
-    "test:foundry": "forge test -vvv",
+    "test:foundry": "bash scripts/check-foundry-deps.sh && forge test -vvv",
     "test:foundry:invariants": "forge test --match-path 'test/foundry/invariants/*.t.sol' -vvv",
     "test:foundry:core": "forge test --match-path 'test/foundry/core/*.t.sol' --no-match-path '*disabled*' -vvv",
     "test:foundry:modules": "forge test test/foundry/core/ModuleMetadataSimple.t.sol test/foundry/decentralized-resolution-module -vvv",
@@ -16,7 +16,7 @@
     "coverage": "forge coverage --report lcov --ir-minimum && node scripts/filter-coverage.js",
     "coverage:summary": "bash scripts/coverage-summary.sh",
     "coverage:report": "bash scripts/coverage-summary.sh > report 2>&1",
-    "compile": "hardhat compile && forge build",
+    "compile": "hardhat compile && bash scripts/check-foundry-deps.sh && forge build",
     "deploy": "hardhat deploy",
     "deploy:local": "hardhat deploy --network hardhat",
     "export": "hardhat run scripts/export-ledger.ts",

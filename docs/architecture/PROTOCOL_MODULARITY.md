@@ -126,7 +126,6 @@ enforces the answer; the strategy itself has no ability to transfer funds.
 | Function | Called when |
 |----------|-------------|
 | `canRelease(workflowId, escrow, caller, escrowData)` | `BaseEscrow.release()` is called |
-| `executeRelease(workflowId, escrow, escrowData)` | Reserved for v2; current implementations revert |
 | `moduleName() / strategyName()` | Introspection |
 
 `escrowData` is encoded as `abi.encode(token, sender, recipient, amountAfterFee, releaseAddress)`.

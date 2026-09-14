@@ -18,9 +18,10 @@ import '../../../contracts/modules/decentralized-resolution-module/DRMAdminFacet
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
 import '../../../contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV2.sol';
 import '../../../contracts/modules/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
+import '../helpers/KlerosHandoffFixture.sol';
 
 /// @notice Product-level coverage for direct DRM config selection entry points.
-contract DirectResolutionConfigSelectionIntegrationTest is Test {
+contract DirectResolutionConfigSelectionIntegrationTest is Test, KlerosHandoffFixture {
     EscrowVault internal vault;
     EscrowableERC20 internal escrowToken;
     ERC20Mock internal paymentToken;
@@ -31,7 +32,7 @@ contract DirectResolutionConfigSelectionIntegrationTest is Test {
     address internal constant SELLER = address(0xA11CE);
     address internal constant RESOLVER = address(0xBEEF);
     address internal constant SENIOR = address(0xCAFE);
-    address internal constant EXTERNAL_BACKSTOP = address(0xD00D);
+    address internal externalBackstop;
     address internal constant FEE_RECIPIENT = address(0xFEE);
     bytes32 internal constant DIRECT_CATEGORY = keccak256('direct-policy-category');
 
@@ -49,6 +50,8 @@ contract DirectResolutionConfigSelectionIntegrationTest is Test {
         escrowToken = new EscrowableERC20('Escrow', 'ESC', 0, FEE_RECIPIENT, address(yieldOps), address(disputeOps), address(registry));
         paymentToken = new ERC20Mock('Payment', 'PAY', BUYER, 1_000 ether);
         bondToken = new ERC20Mock('Bond', 'BOND', BUYER, 1_000 ether);
+        (KlerosArbitrableProxy proxy, ) = _deployKlerosHandoffProxy(address(vault), address(this), 0);
+        externalBackstop = address(proxy);
 
         _wireEscrow(address(vault), registry, yieldOps, disputeOps, createOps, settlementOps, bondCollector);
         _wireEscrow(address(escrowToken), registry, yieldOps, disputeOps, createOps, settlementOps, bondCollector);
@@ -120,7 +123,7 @@ contract DirectResolutionConfigSelectionIntegrationTest is Test {
         config.escalationCostConfig.stepSize = 0;
         config.escalationCostConfig.bondToken = address(bondToken);
         config.bondAssetFixed = true;
-        config.externalResolver = EXTERNAL_BACKSTOP;
+        config.externalResolver = externalBackstop;
         config.categoryKeys = new bytes32[](1);
         config.categoryKeys[0] = DIRECT_CATEGORY;
         config.categoryRouteBehavior = DecentralizedResolverStructs.CategoryRouteBehavior.CATEGORY_ONLY;
@@ -221,14 +224,14 @@ contract DirectResolutionConfigSelectionIntegrationTest is Test {
         vault.releaseAsDisputeResolver(workflowId, bytes32('round-one'));
         IEscrowAppeal.AppealQuote memory backstopQuote = vault.getAppealQuote(workflowId, BUYER);
         assertTrue(backstopQuote.appealable);
-        assertEq(backstopQuote.successorResolver, EXTERNAL_BACKSTOP);
+        assertEq(backstopQuote.successorResolver, externalBackstop);
         assertEq(backstopQuote.bondAmount, 0);
         assertEq(backstopQuote.bondAsset, address(0));
 
         vm.prank(BUYER);
         (bool success, address resolver, uint8 level) = vault.escalateDispute(workflowId);
         assertTrue(success);
-        assertEq(resolver, EXTERNAL_BACKSTOP);
+        assertEq(resolver, externalBackstop);
         assertEq(level, 2);
     }
 
@@ -263,6 +266,19 @@ contract DirectResolutionConfigSelectionIntegrationTest is Test {
         vm.stopPrank();
         assertEq(vault.getEscrowCount(), 0);
         assertEq(escrowToken.getEscrowCount(), 0);
+    }
+
+    function test_explicitSelectionSupportsCompleteVaultLifecycle() public {
+        uint256 policyB = _publishPolicyB();
+        uint256 workflowId = _createVault(policyB);
+
+        vm.prank(BUYER);
+        vault.raiseDispute(workflowId);
+        vm.prank(RESOLVER);
+        vault.releaseAsDisputeResolver(workflowId, bytes32('release'));
+
+        assertEq(vault.workflowResolutionConfigVersion(workflowId), policyB);
+        assertEq(uint8(vault.getEscrowState(workflowId)), uint8(EscrowState.DISPUTED));
     }
 
     function test_customResolverCannotBeCombinedWithConfigSelectionAndHasNoEffects() public {

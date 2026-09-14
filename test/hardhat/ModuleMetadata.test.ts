@@ -1,6 +1,3 @@
-before(function () {
-  this.skip();
-}); // Migrated to Forge: test/foundry/migrated/ModuleMetadata.test.t.sol
 /**
  * Module Metadata Tests
  *
@@ -42,9 +39,8 @@ describe('Module Metadata', function () {
 
     // Deploy DecentralizedResolutionModule
     const DecentralizedFactory = await ethers.getContractFactory('DecentralizedResolutionModule');
-    decentralizedModule = await DecentralizedFactory.deploy();
-    await decentralizedModule.waitForDeployment();
-    await decentralizedModule.initialize(deployer.address);
+     decentralizedModule = await DecentralizedFactory.deploy(deployer.address);
+     await decentralizedModule.waitForDeployment();
 
     // Deploy DefaultResolutionModule
     const DefaultResolutionFactory = await ethers.getContractFactory('DefaultResolutionModule');
@@ -99,11 +95,19 @@ describe('Module Metadata', function () {
     it('Should support IResolutionModule interface', async function () {
       // Calculate interface ID from function selectors (XOR of all function selectors)
       const isAuthorizedSelector = ethers
-        .id('isAuthorizedDisputeResolver(uint256,address,bytes)')
+        .id('isAuthorizedDisputeResolver(uint256,address,address,bytes)')
         .slice(0, 10);
-      const getResolverSelector = ethers.id('getDisputeResolver(uint256,bytes)').slice(0, 10);
-      const canEscalateSelector = ethers.id('canEscalate(uint256,uint8,bytes)').slice(0, 10);
-      const executeEscalationSelector = ethers.id('executeEscalation(uint256,bytes)').slice(0, 10);
+      const getResolverSelector = ethers.id('getDisputeResolver(uint256,address,bytes)').slice(0, 10);
+      const canEscalateSelector = ethers.id('canEscalate(uint256,address,uint8,bytes)').slice(0, 10);
+      const executeEscalationSelector = ethers.id('executeEscalation(uint256,address,bytes)').slice(0, 10);
+      const recordResolutionSelector = ethers.id('recordResolution(uint256,address,address,uint8,uint256)').slice(0, 10);
+      const quoteAppealSelector = ethers.id('quoteAppealTransition(uint256,address,bytes)').slice(0, 10);
+      const executeEscalationQuoteSelector = ethers.id('executeEscalationWithQuote(uint256,address,bytes,bytes32)').slice(0, 10);
+      const appealBondSelector = ethers.id('getRequiredAppealBond(uint256,address,uint8,bytes)').slice(0, 10);
+      const decisionSelector = ethers.id('getDecisionAtRound(uint256,address,uint8)').slice(0, 10);
+      const deadlineSelector = ethers.id('getAppealDeadlineAndRound(uint256,address)').slice(0, 10);
+      const reversalSelector = ethers.id('recordReversal(uint256,address,uint8)').slice(0, 10);
+      const finalizeSelector = ethers.id('finalizeDispute(uint256,address)').slice(0, 10);
       const moduleNameSelector = ethers.id('moduleName()').slice(0, 10);
       const moduleVersionSelector = ethers.id('moduleVersion()').slice(0, 10);
 
@@ -114,6 +118,8 @@ describe('Module Metadata', function () {
         getResolverSelector,
         canEscalateSelector,
         executeEscalationSelector,
+        recordResolutionSelector, quoteAppealSelector, executeEscalationQuoteSelector,
+        appealBondSelector, decisionSelector, deadlineSelector, reversalSelector, finalizeSelector,
         moduleNameSelector,
         moduleVersionSelector,
       ]) {
@@ -153,11 +159,19 @@ describe('Module Metadata', function () {
     it('Should support IResolutionModule interface', async function () {
       // Calculate interface ID from function selectors (XOR of all function selectors)
       const isAuthorizedSelector = ethers
-        .id('isAuthorizedDisputeResolver(uint256,address,bytes)')
+        .id('isAuthorizedDisputeResolver(uint256,address,address,bytes)')
         .slice(0, 10);
-      const getResolverSelector = ethers.id('getDisputeResolver(uint256,bytes)').slice(0, 10);
-      const canEscalateSelector = ethers.id('canEscalate(uint256,uint8,bytes)').slice(0, 10);
-      const executeEscalationSelector = ethers.id('executeEscalation(uint256,bytes)').slice(0, 10);
+      const getResolverSelector = ethers.id('getDisputeResolver(uint256,address,bytes)').slice(0, 10);
+      const canEscalateSelector = ethers.id('canEscalate(uint256,address,uint8,bytes)').slice(0, 10);
+      const executeEscalationSelector = ethers.id('executeEscalation(uint256,address,bytes)').slice(0, 10);
+      const recordResolutionSelector = ethers.id('recordResolution(uint256,address,address,uint8,uint256)').slice(0, 10);
+      const quoteAppealSelector = ethers.id('quoteAppealTransition(uint256,address,bytes)').slice(0, 10);
+      const executeEscalationQuoteSelector = ethers.id('executeEscalationWithQuote(uint256,address,bytes,bytes32)').slice(0, 10);
+      const appealBondSelector = ethers.id('getRequiredAppealBond(uint256,address,uint8,bytes)').slice(0, 10);
+      const decisionSelector = ethers.id('getDecisionAtRound(uint256,address,uint8)').slice(0, 10);
+      const deadlineSelector = ethers.id('getAppealDeadlineAndRound(uint256,address)').slice(0, 10);
+      const reversalSelector = ethers.id('recordReversal(uint256,address,uint8)').slice(0, 10);
+      const finalizeSelector = ethers.id('finalizeDispute(uint256,address)').slice(0, 10);
       const moduleNameSelector = ethers.id('moduleName()').slice(0, 10);
       const moduleVersionSelector = ethers.id('moduleVersion()').slice(0, 10);
 
@@ -167,6 +181,8 @@ describe('Module Metadata', function () {
         getResolverSelector,
         canEscalateSelector,
         executeEscalationSelector,
+        recordResolutionSelector, quoteAppealSelector, executeEscalationQuoteSelector,
+        appealBondSelector, decisionSelector, deadlineSelector, reversalSelector, finalizeSelector,
         moduleNameSelector,
         moduleVersionSelector,
       ]) {
@@ -204,8 +220,9 @@ describe('Module Metadata', function () {
 
     it('Should support IReleaseStrategy interface', async function () {
       // Calculate interface ID from function selectors (XOR of all function selectors)
-      const canReleaseSelector = ethers.id('canRelease(uint256,address,bytes)').slice(0, 10);
-      const executeReleaseSelector = ethers.id('executeRelease(uint256,bytes)').slice(0, 10);
+      const canReleaseSelector = ethers
+        .id('canRelease(uint256,address,address,bytes)')
+        .slice(0, 10);
       const strategyNameSelector = ethers.id('strategyName()').slice(0, 10);
       const moduleNameSelector = ethers.id('moduleName()').slice(0, 10);
       const moduleVersionSelector = ethers.id('moduleVersion()').slice(0, 10);
@@ -213,7 +230,6 @@ describe('Module Metadata', function () {
       let calculatedInterfaceId = BigInt(0);
       for (const selector of [
         canReleaseSelector,
-        executeReleaseSelector,
         strategyNameSelector,
         moduleNameSelector,
         moduleVersionSelector,

@@ -32,14 +32,6 @@ contract ReleaseStrategyMockS1 is ERC165, IReleaseStrategy {
         return (true, 0);  // REASON_ALLOWED
     }
 
-    function executeRelease(
-        uint256,
-        address,
-        bytes calldata
-    ) external pure override returns (bool success) {
-        revert('ReleaseStrategyMockS1: executeRelease not implemented in v1');
-    }
-
     function strategyName() external pure override returns (string memory name) {
         return "S1";
     }
@@ -65,14 +57,6 @@ contract ReleaseStrategyMockS2 is ERC165, IReleaseStrategy {
         bytes calldata
     ) external pure override returns (bool allowed, uint8 reasonCode) {
         return (true, 0);  // REASON_ALLOWED
-    }
-
-    function executeRelease(
-        uint256,
-        address,
-        bytes calldata
-    ) external pure override returns (bool success) {
-        revert('ReleaseStrategyMockS2: executeRelease not implemented in v1');
     }
 
     function strategyName() external pure override returns (string memory name) {
@@ -231,4 +215,3 @@ contract ReleaseStrategyWiringTest is Test {
         mm.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(s1));
     }
 }
-

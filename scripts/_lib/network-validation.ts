@@ -70,6 +70,16 @@ export async function validateNetworkForDeployment(
 ): Promise<void> {
   await validateNetwork(hre);
 
+  const configuredAccounts = hre.network.config.accounts;
+  if (hre.network.name !== 'hardhat' && hre.network.name !== 'localhost') {
+    if (!Array.isArray(configuredAccounts) || configuredAccounts.length === 0) {
+      throw new Error(
+        `Missing deployment key for network: ${hre.network.name}. ` +
+          'Set PRIVATE_KEY or the network-specific deployment key.',
+      );
+    }
+  }
+
   const chainConfig = getChainConfig(hre);
 
   // Additional deployment checks

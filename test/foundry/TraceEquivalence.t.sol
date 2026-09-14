@@ -683,6 +683,7 @@ contract TraceEquivalenceTest is Test {
     ///      isV2 is the NEGOTIATED value from _replayTrace, never re-derived by
     ///      key presence (a legacy fixture legitimately carries cdrs_version).
     function _emitReceipt(string memory fixturePath, string memory raw, bool isV2) internal {
+        vm.createDir("out/receipts", true);
         string memory traceId = "";
         if (stdJson.keyExists(raw, ".scenario_id")) {
             traceId = stdJson.readString(raw, ".scenario_id");

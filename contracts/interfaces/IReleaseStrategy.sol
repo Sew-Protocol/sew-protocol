@@ -22,10 +22,10 @@ interface IReleaseStrategy is IERC165 {
      * @param workflowId The escrow transfer ID
      * @param escrowContract Address of the escrow contract
      * @param caller The address attempting to release
-     * @param escrowData Encoded escrow data (token, sender, recipient, amountAfterFee)
+     * @param escrowData Encoded escrow data (token, sender, recipient, amountAfterFee, releaseAddress)
      * @return allowed True if release is allowed
      * @return reasonCode Compact reason code if not allowed (0 = allowed, see contract for codes)
-     * @dev escrowData MUST be encoded as: abi.encode(token, sender, recipient, amountAfterFee)
+     * @dev escrowData MUST be encoded as: abi.encode(token, sender, recipient, amountAfterFee, releaseAddress)
      * @dev reasonCode is append-only; implementers should document their codes
      */
     function canRelease(
@@ -34,17 +34,6 @@ interface IReleaseStrategy is IERC165 {
         address caller,
         bytes calldata escrowData
     ) external view returns (bool allowed, uint8 reasonCode);
-
-    /**
-     * @notice Execute the release logic (reserved for future use in v2)
-     * @dev For v1, release() is handled entirely by BaseEscrow
-     * @dev Implementers should revert to prevent reliance on this unimplemented method
-     */
-    function executeRelease(
-        uint256 workflowId,
-        address escrowContract,
-        bytes calldata escrowData
-    ) external view returns (bool success);
 
     /**
      * @notice Get the strategy name/identifier

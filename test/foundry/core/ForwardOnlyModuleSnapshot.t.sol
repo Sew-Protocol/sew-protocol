@@ -209,15 +209,6 @@ contract AlwaysRejectReleaseStrategy is ERC165, IReleaseStrategy {
         return (false, 1);
     }
 
-    function executeRelease(
-        uint256,
-        address,
-        bytes calldata
-    ) external pure override returns (bool success) {
-        success;
-        revert("AlwaysRejectReleaseStrategy: executeRelease not implemented");
-    }
-
     function strategyName() external pure override returns (string memory) {
         return "AlwaysReject";
     }

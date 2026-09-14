@@ -120,7 +120,6 @@ contract ModuleRegistry {
 **IReleaseStrategy:**
 
 - `canRelease()`
-- `executeRelease()`
 - `strategyName()` - Returns strategy identifier (backward compatibility)
 - `moduleName()` - Returns module identifier (alias for strategyName)
 - `moduleVersion()` - Returns semantic version (e.g., "1.0.0")

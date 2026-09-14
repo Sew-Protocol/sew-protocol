@@ -154,15 +154,7 @@ contract StrategyDrivenReleaseTest is Test {
         assertEq(reasonCode, 1, "Should return REASON_NOT_AUTHORIZED");
     }
 
-    // ============ Test 5: executeRelease Reverts (v1) ============
-
-    function test_strategy_executeReleaseReverts() public {
-        // In v1, executeRelease is not implemented, should revert
-        vm.expectRevert();
-        defaultStrategy.executeRelease(0, address(this), "");
-    }
-
-    // ============ Test 6: Strategy Metadata ============
+    // ============ Test 5: Strategy Metadata ============
 
     function test_strategy_metadata() public {
         assertEq(defaultStrategy.moduleName(), "DefaultBuyerRelease");
@@ -170,7 +162,7 @@ contract StrategyDrivenReleaseTest is Test {
         assertEq(defaultStrategy.moduleVersion(), "1.0.0");
     }
 
-    // ============ Test 7: ERC-165 Interface Support ============
+    // ============ Test 6: ERC-165 Interface Support ============
 
     function test_strategy_supportsIReleaseStrategy() public {
         assertTrue(
@@ -179,7 +171,7 @@ contract StrategyDrivenReleaseTest is Test {
         );
     }
 
-    // ============ Test 8: Multiple escrows with different senders ============
+    // ============ Test 7: Multiple escrows with different senders ============
 
     function test_strategy_multipleEscrows() public {
         address sender1 = address(0x100);
@@ -238,14 +230,6 @@ contract AlwaysRejectStrategy is ERC165, IReleaseStrategy {
         bytes calldata
     ) external pure override returns (bool allowed, uint8 reasonCode) {
         return (false, 1);  // Not authorized
-    }
-
-    function executeRelease(
-        uint256,
-        address,
-        bytes calldata
-    ) external pure override returns (bool success) {
-        revert('AlwaysRejectStrategy: executeRelease not implemented');
     }
 
     function strategyName() external pure override returns (string memory) {

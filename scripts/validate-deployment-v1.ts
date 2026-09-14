@@ -235,7 +235,7 @@ async function validateDefaultReleaseStrategy(): Promise<{
     result.exists = true;
 
     const strategyAbi = [
-      'function shouldRelease(address token, uint256 amount) view returns (bool)',
+      'function canRelease(uint256 workflowId, address escrowContract, address caller, bytes escrowData) view returns (bool,uint8)',
       'function strategyName() view returns (string)',
     ];
 

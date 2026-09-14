@@ -36,11 +36,12 @@ function rpc(envKey: string) {
   return process.env[envKey] || '';
 }
 
-function accountsOrThrow(networkName: string, privateKeyOverride?: string) {
+function accountsFor(networkName: string, privateKeyOverride?: string) {
   const key = privateKeyOverride || PRIVATE_KEY;
   if (!key) {
-    const suffix = privateKeyOverride ? ' (override provided but empty)' : '';
-    throw new Error(`Missing PRIVATE_KEY for network: ${networkName}${suffix}`);
+    // Allow Hardhat and local test tasks to load without remote deployment secrets.
+    // Deployment preflight remains responsible for rejecting an empty account list.
+    return [];
   }
   return [key];
 }
@@ -76,11 +77,11 @@ const config: HardhatUserConfig = {
       url: rpc('RPC_BASE_SEPOLIA'),
       // Allow a dedicated deploy key for Base Sepolia testnet deployments.
       // This is useful if you want governance infra deployed from one EOA and core escrow from another.
-      accounts: accountsOrThrow('baseSepolia', SEPOLIA_DEPLOY_KEY || undefined),
+      accounts: accountsFor('baseSepolia', SEPOLIA_DEPLOY_KEY || undefined),
       chainId: 84532,
     },
-    base: { url: rpc('RPC_BASE_MAINNET'), accounts: accountsOrThrow('base'), chainId: 8453 },
-    ethereum: { url: rpc('RPC_ETHEREUM'), accounts: accountsOrThrow('ethereum'), chainId: 1 },
+    base: { url: rpc('RPC_BASE_MAINNET'), accounts: accountsFor('base'), chainId: 8453 },
+    ethereum: { url: rpc('RPC_ETHEREUM'), accounts: accountsFor('ethereum'), chainId: 1 },
   },
   sourcify: {
     enabled: true,
