@@ -3,19 +3,45 @@ pragma solidity ^0.8.37;
 
 /**
  * @title BaseEscrow
- * @notice v2.5: Core escrow logic with externalized yield module system
- * 
- * VERSIONING NOTES:
- * - v2.0: Initial escrow implementation with Aave integration
- * - v2.5: Extracted Aave logic to modular AaveYieldModule contract
- *         Removed: AaveYieldGenerationModule functions, detailed Aave position handling
- *         Added: v25YieldModules mapping, generic IYieldModule delegation
- *         Result: Smaller contract bytecode via module externalization
+ * @notice Authoritative escrow orchestration and state-machine root shared by the
+ *         token- and vault-backed escrow products.
+ *
+ * @dev ARCHITECTURAL INTENT — deliberate, not an incomplete refactor:
+ *
+ *      BaseEscrow is the single authoritative owner of escrow workflow state and
+ *      coordinates the domain components that derive or execute its lifecycle
+ *      transitions. Cohesive, low-coupling concerns live in inherited,
+ *      storage-free support components. Everything that defines what an escrow
+ *      *is* — the authoritative state transitions — stays in this contract so it
+ *      is locally auditable.
+ *
+ *      Inherited support components (declare no storage of their own):
+ *        - EscrowConfiguration : governance-controlled policy and ops wiring
+ *        - EscrowCreation      : creation entrypoint, settings, module snapshots
+ *        - EscrowYield         : yield module deposit/unwind
+ *        - EscrowAccounting    : claimable entitlements and pull withdrawals
+ *        - EscrowSettlement    : pending-settlement execution and mutual splits
+ *
+ *      Retained directly in BaseEscrow, on purpose:
+ *        - Lifecycle orchestration (release, cancel, timed actions)
+ *        - Dispute orchestration (opening, resolver authorization, timeout)
+ *        - Appeal / Kleros authority transitions
+ *        - Shared transition helpers and canonical escrow data
+ *        - Framework views and product adapter hooks
+ *
+ *      Rationale: an auditor should be able to read this file and see every
+ *      authoritative state transition — especially the atomic appeal -> Kleros
+ *      handoff -> resolver mutation sequence — in one place. Splitting the
+ *      orchestration across superclasses would trade auditability for a smaller
+ *      file. Apply this rule before extracting anything further: extract a
+ *      concern only if it reduces the number of concepts a reader must hold
+ *      simultaneously WITHOUT adding indirection required to understand an
+ *      authoritative state transition.
+ *
+ *      The section banners below indicate the intended reading order.
  */
 
 import '@openzeppelin/contracts/utils/Context.sol';
-import '@openzeppelin/contracts/access/AccessControl.sol';
-import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 import '@openzeppelin/contracts/utils/Pausable.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
@@ -34,25 +60,30 @@ import '../libraries/EscrowEncodingLibrary.sol';
 import '../arbitration/IKlerosArbitrableProxy.sol';
 import '../modules/decentralized-resolution-module/IKlerosHandoffResolutionModule.sol';
 import '../libraries/ResolverLogicLibrary.sol';
-import '../libraries/RecoveryLibrary.sol';
-import '../libraries/ModuleProposalLibrary.sol';
-import '../libraries/ResolverActionLibrary.sol';
 import '../libraries/StateManagementLibrary.sol';
 import '../libraries/DisputeInitializationLibrary.sol';
-import '../libraries/DisputeManagementLibrary.sol';
 import '../libraries/DisputeRaiseLibrary.sol';
 import '../libraries/DisputeEscalationLibrary.sol';
 import '../types/EscrowTypes.sol';
 import '../types/YieldPresets.sol';
 import '../libraries/YieldPresetLibrary.sol';
 import '../ops/YieldOps.sol';
-import '../ops/DisputeOps.sol';
-import '../ops/SettlementOps.sol';
 import '../ops/CreateOps.sol';
 import '../shared/interfaces/IIncentiveModule.sol';
 import './BondCollector.sol';
 import '../libraries/ModuleSnapshotLibrary.sol';
 import '../libraries/BondHandlingLibrary.sol';
+import '../libraries/EscrowSettlementLogic.sol';
+import '../libraries/EscrowDisputeLogic.sol';
+import './EscrowStorage.sol';
+import './EscrowConfiguration.sol';
+import './EscrowCreation.sol';
+import './EscrowYield.sol';
+import './EscrowAccounting.sol';
+import './EscrowSettlement.sol';
+import './EscrowDisputes.sol';
+import './EscrowAppeals.sol';
+import './EscrowLifecycle.sol';
 
 enum FailureReason {
     UNKNOWN, CALL_FAILED, MALFORMED_RETURN_DATA, MODULE_NOT_SET, MODULE_NOT_CONTRACT,
@@ -68,8 +99,8 @@ enum FailureReason {
 //   - 3 = pending settlement executed
 // - If success == false: reasonCode is a FailureReason value.
 
-bytes4 constant SEL_FINALIZE_DISPUTE = bytes4(keccak256("finalizeDispute(uint256,address)"));
-bytes4 constant SEL_RECORD_RESOLUTION = bytes4(keccak256("recordResolution(uint256,address,address,uint8,uint256)"));
+bytes4 constant SEL_FINALIZE_DISPUTE = IResolutionModule.finalizeDispute.selector;
+bytes4 constant SEL_RECORD_RESOLUTION = IResolutionModule.recordResolution.selector;
 bytes4 constant SEL_CLOSE_BY_MUTUAL_AGREEMENT = bytes4(keccak256("closeByMutualAgreement(uint256)"));
 bytes4 constant SEL_DECREMENT_RESOLVER = bytes4(keccak256("decrementResolverActiveDisputes(address)"));
 
@@ -80,35 +111,18 @@ error ReleaseNotAllowed(uint256 workflowId, uint8 reasonCode);
 error YieldWithdrawalUnreasonable(uint256 actualAmount, uint256 maxAmount);
 error NotAuthorizedResolver(address caller, address expectedResolver);
 error TransferNotInDispute(uint256 workflowId, EscrowState currentStatus);
-error NotParticipant(uint256 workflowId, address caller, address sender, address recipient);
 error NotSender(uint256 workflowId, address caller, address expectedSender);
 error NotAuthorizedToCancelYet(uint256 workflowId, address caller);
 error NotRecipient(uint256 workflowId, address caller, address expectedRecipient);
 error InvalidEscrowFee(uint256 fee, uint256 maxFee);
 error FeeExceedsMaximum(uint256 feeBps, uint256 maxFeeBps);
-error NoClaimableBalance(uint256 workflowId, address recipient, address token);
-error NoClaimableBondProtocolFee(address token, address recipient);
-error TransferNotFinalized(uint256 workflowId, EscrowState currentState);
-error NoPendingSettlement(uint256 workflowId);
-error AppealWindowNotExpired(uint256 workflowId, uint256 appealDeadline, uint256 currentTime);
-error NotInDisputedState(uint256 workflowId, EscrowState currentState);
-error ExcessRefundTransferFailed(uint256 workflowId, address recipient, uint256 amount);
-error EscrowInsufficientBalance();
-error PartialRecoveryNotAllowed();
-error SplitProposalBlocked(uint256 workflowId);
-error SplitNotFound(uint256 workflowId);
-error SplitExpired(uint256 workflowId, uint64 expiry, uint64 currentTime);
-error NotCounterparty(uint256 workflowId, address caller);
-error SplitAmountMismatch(uint256 workflowId, uint256 buyerAmount, uint256 sellerAmount, uint256 expected);
-error EscrowNotSettleable(uint256 workflowId, EscrowState currentState);
-error BothAutoTimesSet(uint256 workflowId, uint64 releaseTime, uint64 cancelTime);
+
 
 error InvalidState(uint256 workflowId, uint8 expected, uint8 actual);
 error InvalidConfig(uint8 code, uint256 value);
 // InvalidAddress already defined in EscrowTypes.sol
 error TransferFailed(uint8 kind, address token, address to, uint256 amount);
 error ResolutionModuleError(uint8 code);
-error ZeroBondCollector();
 error PendingDecisionAlreadyExists(uint256 workflowId);
 error EscalationNotAllowed();
 error AppealBondQueryFailed(uint256 workflowId);
@@ -131,8 +145,8 @@ error NotFeeAddress(address caller, address expectedFeeAddress);
 error NoFeesToWithdraw(address token, uint256 availableFees);
 error InsufficientContractBalance(address token, uint256 required, uint256 available);
 error AmountExceedsAvailable(address token, uint256 requestedAmount, uint256 availableAmount);
-error AccountingDeficit(address token, uint256 deficit);
 error ZeroAddress(uint8 which);
+error AccountingDeficit(address token, uint256 deficit);
 error ResolutionConfigUnavailable(address resolutionModule, uint256 version);
 error ResolutionConfigWithCustomResolver(address customResolver);
 
@@ -144,123 +158,13 @@ enum ResolutionMode {
 }
 
 
-abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
+abstract contract BaseEscrow is EscrowLifecycle {
     using SafeERC20 for IERC20;
 
-
-    bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');
-    bytes32 public constant ROLE_GUARDIAN = keccak256('ROLE_GUARDIAN');
-    bytes32 public constant ROLE_ADMIN_CONTRACT = keccak256('ROLE_ADMIN_CONTRACT');
-    /// @dev Dedicated keeper role: may trigger timed actions but cannot rewire protocol ops.
-    bytes32 public constant ROLE_KEEPER = keccak256('ROLE_KEEPER');
-
-    
-    uint256 public escrowFee;
-    uint256 public constant ESCROW_FEE_DENOMINATOR = 10000;
-    uint256 public constant MAX_ESCROW_FEE_BPS = 200; // 2% maximum escrow fee
-    uint256 public constant MAX_AUTOMATION_RANGE = 100;
-    uint256 public constant MAX_PROTOCOL_FEE_BPS = 3000; // 30% maximum
-    uint256 public constant DEFAULT_YIELD_PROTOCOL_FEE_BPS = 3000; // 30% default
-    EscrowTransfer[] public escrowTransfers; // Array index IS the workflowId
-    address public escrowFeeAddress;
-
-    // Protocol fees (in basis points)
-    uint256 public yieldProtocolFeeBps; // Protocol fee on yield (0-3000 bps = 0-30%)
-    uint256 public appealBondProtocolFeeBps; // Protocol fee on appeal bonds (0-3000 bps = 0-30%)
-
-    address public disputeResolutionModule;
-
-    TimeoutConfig public timeoutConfig;
-
-    mapping(uint256 => uint256) public disputeRaisedTimestamp;
-    mapping(uint256 => EscrowSettings) public escrowSettings;
-    mapping(uint256 => uint256) public amountReleased;
-
-    mapping(uint256 => mapping(address => uint256)) public claimableBalances;
-    mapping(address => uint256) public totalClaimableAssets;
-
-    // token => feeRecipient => claimable protocol fee amount (from appeal bonds)
-    mapping(address => mapping(address => uint256)) public claimableBondProtocolFees;
-
-    // user => native ETH refundable excess amounts (no auto-push)
-    mapping(address => uint256) public claimableExcessEthRefunds;
-
-    struct PendingSettlement {
-        bool exists;
-        bool isRelease;
-        uint256 appealDeadline;
-        bytes32 resolutionHash;
-    }
-    mapping(uint256 => PendingSettlement) public pendingSettlements;
-
-    // Mutual split settlement
-    struct SplitProposal {
-        address proposer;
-        uint256 buyerAmount;   // amount claimable by et.from
-        uint256 sellerAmount;  // amount claimable by et.to
-        uint64 expiry;
-        bool active;
-    }
-    mapping(uint256 => SplitProposal) public splitProposals;
-
-    // Anti-spam: minimum escrow value to raise a dispute (0 = disabled)
-    uint256 public minDisputeEscrowValue;
-    // Anti-spam: per-sender dispute rate limit (0 = unlimited)
-    uint32 public maxDisputesPerSenderPerDay;
-    // Per-sender rolling window tracking for dispute rate limit
-    mapping(address => uint64) public senderDisputeWindowStart;
-    mapping(address => uint32) public senderDisputeCount;
-    // Anti-spam: per-sender escalation cooldown in seconds (0 = disabled)
-    uint64 public escalationCooldown;
-    mapping(address => uint64) public lastEscalationTimestamp;
-    mapping(address => uint32) public addressEscalationCount;
-
-    struct EscrowTimeoutPolicySnapshot {
-        bool pendingAutoCancelEnabled;
-        bool disputedTimeoutEnabled;
-    }
-    mapping(uint256 => EscrowTimeoutPolicySnapshot) public timeoutPolicySnapshots;
-    
-    // ========== v2.5 Yield Module Storage (NEW) ==========
-    // Separate from existing yield system for independent operation
-    mapping(uint256 => address) public v25YieldModules;           // workflowId -> module address
-    mapping(uint256 => uint256) public v25YieldPrincipals;        // workflowId -> accepted principal amount
-
-    mapping(uint256 => ModuleSnapshot) public moduleSnapshots;
-    mapping(uint256 => address) public appealBondFeeRecipients;
-
-    // Optional DRM config binding. Zero denotes a legacy module/config.
-    mapping(uint256 => uint256) public workflowResolutionConfigVersion;
-
-    enum ModuleType {
-        RESOLUTION,
-        RELEASE,
-        CANCELLATION,
-        YIELD_GEN,
-        YIELD_DIST
-    }
-
-    YieldOps public yieldOps;
-    DisputeOps public disputeOps;
-    SettlementOps public settlementOps;
-    BondCollector public bondCollector;
-    CreateOps public createOps;
+    // Kept here as a source/API compatibility type; it has no storage impact.
+    enum ModuleType { RESOLUTION, RELEASE, CANCELLATION, YIELD_GEN, YIELD_DIST }
 
 
-    event EscrowStateChanged(
-        uint256 indexed workflowId,
-        EscrowState oldStatus,
-        EscrowState newStatus
-    );
-    event EscrowCreated(
-        uint256 indexed workflowId,
-        address indexed token,
-        address indexed from,
-        address to,
-        uint256 amount,
-        uint256 amountAfterFee,
-        uint256 fee
-    );
     event EscrowResolved(
         uint256 indexed workflowId,
         address indexed disputeResolver,
@@ -302,20 +206,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         address indexed by,
         address indexed disputeResolver
     );
-    event ResolutionModuleActivated(address indexed oldModule, address indexed newModule);
-    event EscrowSettingsUpdated(uint256 indexed workflowId, EscrowSettings settings);
-    event ResolutionConfigBound(
-        uint256 indexed workflowId,
-        address indexed resolutionModule,
-        uint256 indexed version,
-        bytes32 resolutionConfigRoot
-    );
-    event ClaimableBalanceSet(
-        uint256 indexed workflowId,
-        address indexed recipient,
-        address indexed token,
-        uint256 amount
-    );
 
     /// @notice Emitted when a time-based action is triggered (auto-release/cancel/settle)
     /// @param workflowId The escrow ID
@@ -328,20 +218,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         ExecutionSource source,
         address indexed executor
     );
-    event EscrowWithdrawn(
-        uint256 indexed workflowId,
-        address indexed recipient,
-        address indexed token,
-        uint256 amount
-    );
-    event PendingSettlementSet(uint256 indexed workflowId, bool isRelease, uint256 appealDeadline);
-    event PendingSettlementCancelled(uint256 indexed workflowId);
-    event PendingSettlementExecuted(uint256 indexed workflowId, bool isRelease);
-    event SplitProposed(uint256 indexed workflowId, address indexed proposer, uint256 buyerAmount, uint256 sellerAmount, uint64 expiry);
-    event SplitAccepted(uint256 indexed workflowId, address indexed accepter, uint256 buyerAmount, uint256 sellerAmount);
-    event SplitCancelled(uint256 indexed workflowId, address indexed cancelledBy);
-    event TimeoutPolicySnapshotted(uint256 indexed workflowId, bool pendingAutoCancelEnabled, bool disputedTimeoutEnabled);
-    event TimeoutConfigUpdated(TimeoutConfig config);
+
     // Consolidated auto-transfer event (replaces AutoCompleted + AutoFailed to save bytecode)
     event EscrowTransferAutoResult(
         uint256 indexed workflowId,
@@ -351,11 +228,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         bool success,
         uint8 reasonCode
     );
-    event YieldProtocolFeeBpsUpdated(uint256 oldFeeBps, uint256 newFeeBps);
-    event AppealBondProtocolFeeBpsUpdated(uint256 oldFeeBps, uint256 newFeeBps);
-    event MinDisputeEscrowValueUpdated(uint256 newValue);
-    event MaxDisputesPerSenderPerDayUpdated(uint32 newMax);
-    event EscalationCooldownUpdated(uint64 newCooldown);
     // Consolidated: ProtocolFeeCollected now handles both yield and bond fees
     event ProtocolFeeCollected(
         uint8 indexed kind, // 0 = yield, 1 = appeal bond
@@ -371,13 +243,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         uint256 amount,
         uint256 indexed workflowId
     );
-    event BondProtocolFeeClaimed(
-        address indexed token,
-        address indexed feeRecipient,
-        uint256 amount
-    );
     event ExcessEthRefundCredited(uint256 indexed workflowId, address indexed account, uint256 amount);
-    event ExcessEthRefundClaimed(address indexed account, uint256 amount);
 
     // op codes (append-only):
     // 1 = yield deposit
@@ -401,11 +267,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     event SystemResumed(
         uint256 timestamp
     );
-    event YieldUnwindFailed(
-        uint256 indexed workflowId,
-        address indexed token,
-        uint256 principal
-    );
     event EscrowPartiallyReleased(
         uint256 indexed workflowId,
         address indexed token,
@@ -415,288 +276,37 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         uint256 totalAmount
     );
 
-    function pause(string calldata) external pure {
-        revert PausedNotSupported();
-    }
-
-    function unpause() external pure {
-        revert PausedNotSupported();
-    }
-
-    function paused() external pure returns (bool) {
-        return false;
-    }
-
-    // Stub for backwards compatibility with existing tests
-    function pauseState() external pure returns (uint256, uint256, uint256, uint256) {
-        return (0, 0, 0, 0);
-    }
-
-    function pauseCycleCount() external pure returns (uint256) {
-        return 0;
-    }
-
-    function setFeeRecipient(address newAddr) external onlyRole(ROLE_ADMIN_CONTRACT) {
-        if (newAddr == address(0)) revert InvalidAddress(ADDR_FEE_RECIPIENT, newAddr);
-        escrowFeeAddress = newAddr;
-    }
-
-    function setEscrowFeeBps(uint256 feeBps) external onlyRole(ROLE_ADMIN_CONTRACT) {
-        if (feeBps > MAX_ESCROW_FEE_BPS) revert InvalidEscrowFee(feeBps, MAX_ESCROW_FEE_BPS);
-        escrowFee = feeBps;
-    }
-
-    function setYieldProtocolFeeBps(uint256 feeBps) external onlyRole(ROLE_ADMIN_CONTRACT) {
-        if (feeBps > MAX_PROTOCOL_FEE_BPS) revert FeeExceedsMaximum(feeBps, MAX_PROTOCOL_FEE_BPS);
-        
-        // CRIT-2: Validate fee recipient is set when fees are non-zero
-        // This ensures yield can be recovered if distribution fails
-        if (feeBps > 0 && escrowFeeAddress == address(0)) {
-            revert InvalidAddress(ADDR_FEE_RECIPIENT, address(0));
-        }
-        
-        uint256 oldFee = yieldProtocolFeeBps;
-        yieldProtocolFeeBps = feeBps;
-        emit YieldProtocolFeeBpsUpdated(oldFee, feeBps);
-    }
-
-    function setAppealBondProtocolFeeBps(uint256 feeBps) external onlyRole(ROLE_ADMIN_CONTRACT) {
-        if (feeBps > MAX_PROTOCOL_FEE_BPS) revert FeeExceedsMaximum(feeBps, MAX_PROTOCOL_FEE_BPS);
-        
-        if (feeBps > 0 && escrowFeeAddress == address(0)) revert InvalidAddress(ADDR_FEE_RECIPIENT, address(0));
-        uint256 oldFee = appealBondProtocolFeeBps;
-        appealBondProtocolFeeBps = feeBps;
-        emit AppealBondProtocolFeeBpsUpdated(oldFee, feeBps);
-    }
-
-    function setResolutionModule(address module) external onlyRole(ROLE_ADMIN_CONTRACT) {
-        if (module == address(0)) revert InvalidAddress(ADDR_GENERIC, module);
-        if (module.code.length == 0) revert ModuleNotContract(module);
-        address oldModule = disputeResolutionModule;
-        disputeResolutionModule = module;
-        emit ResolutionModuleActivated(oldModule, module);
-    }
-
-    function setTimeoutConfig(TimeoutConfig calldata config) external onlyRole(ROLE_ADMIN_CONTRACT) {
-        // Mirrors the per-escrow mutual exclusion enforced by SettingsValidationLibrary.
-        if (config.defaultAutoReleaseDelay > 0 && config.defaultAutoCancelDelay > 0) {
-            revert InvalidConfig(4, config.defaultAutoReleaseDelay);
-        }
-        timeoutConfig = config;
-        emit TimeoutConfigUpdated(config);
-    }
-
-    function setMinDisputeEscrowValue(uint256 value) external onlyRole(ROLE_ADMIN_CONTRACT) {
-        minDisputeEscrowValue = value;
-        emit MinDisputeEscrowValueUpdated(value);
-    }
-
-    function setMaxDisputesPerSenderPerDay(uint32 max) external onlyRole(ROLE_ADMIN_CONTRACT) {
-        maxDisputesPerSenderPerDay = max;
-        emit MaxDisputesPerSenderPerDayUpdated(max);
-    }
-
-    function setEscalationCooldown(uint64 cooldown) external onlyRole(ROLE_ADMIN_CONTRACT) {
-        escalationCooldown = cooldown;
-        emit EscalationCooldownUpdated(cooldown);
-    }
-
-    // ============ Ops Contract Wiring (Governance-controlled) ============
-    // These are operational wiring changes and should be callable directly by governance (Timelock).
-    function setCreateOps(address ops) external onlyRole(ROLE_TIMELOCK) {
-        if (ops == address(0)) revert ZeroCreateOps();
-        createOps = CreateOps(ops);
-    }
-
-    function setSettlementOps(address ops) external onlyRole(ROLE_TIMELOCK) {
-        if (ops == address(0)) revert ZeroSettlementOps();
-        settlementOps = SettlementOps(ops);
-    }
-
-    function setBondCollector(address collector) external onlyRole(ROLE_TIMELOCK) {
-        if (collector == address(0)) revert ZeroBondCollector();
-        bondCollector = BondCollector(collector);
-    }
-
     // emergencyUnwindAavePosition REMOVED - now handled by GuardianOps contract
 
-    function createEscrow(
-        address token,
-        address to,
-        uint256 amount,
-        EscrowSettings memory settings
-    ) public nonReentrant returns (uint256) {
-        return _createEscrow(token, to, amount, settings, 0, false);
-    }
-
-    /// @dev All product-specific creation entry points converge here.
-    function _createEscrow(
-        address token,
-        address to,
-        uint256 amount,
-        EscrowSettings memory settings,
-        uint256 requestedResolutionConfigVersion,
-        bool explicitResolutionConfigSelection
-    ) internal returns (uint256) {
-        uint256 workflowId = escrowTransfers.length; // Array index IS the workflowId
-
-        // CreateOps is mandatory (removed inline fallback to save >1KB bytecode)
-        if (address(createOps) == address(0)) revert ZeroCreateOps();
-        IResolutionModule resolutionModule = _getResolutionModule(workflowId);
-        uint256 resolutionConfigVersion = _resolveResolutionConfigVersion(
-            address(resolutionModule), requestedResolutionConfigVersion, settings.customResolver,
-            explicitResolutionConfigSelection
-        );
-        CreateOps.CreateResult memory result = createOps.computeEscrowCreation(
-            token,
-            to,
-            _msgSender(),
-            amount,
-            settings,
-            escrowFee,
-            workflowId,
-            address(resolutionModule)
-        );
-
-        uint256 balBefore = IERC20(token).balanceOf(address(this));
-        _pullTokens(token, _msgSender(), amount);
-        uint256 received = IERC20(token).balanceOf(address(this)) - balBefore;
-        if (received < amount) revert AccountingDeficit(token, amount - received);
-
-        escrowTransfers.push(EscrowTransfer({
-            token: token,
-            to: to,
-            from: _msgSender(),
-            amountAfterFee: result.amountAfterFee,
-            escrowState: EscrowState.PENDING,
-            senderStatus: SenderStatus.NONE,
-            recipientStatus: RecipientStatus.NONE,
-            disputeResolver: result.resolver,
-            autoReleaseTime: 0,
-            autoCancelTime: 0
-        }));
-
-        _updateEscrowBalance(token, result.amountAfterFee, true);
-        _recordFee(token, result.fee);
-        _applyEscrowSettings(workflowId, settings);
-        _snapshotModulesForEscrow(workflowId, resolutionConfigVersion);
-
-        if (result.yieldEnabled && result.shouldDepositYield) {
-            _depositYieldForEscrow(workflowId, token, result.amountAfterFee);
-        }
-
-        emit EscrowCreated(workflowId, token, _msgSender(), to, amount, result.amountAfterFee, result.fee);
-        emit EscrowStateChanged(workflowId, EscrowState.NONE, EscrowState.PENDING);
-        _emitEscrowTransferCreated(workflowId, token, _msgSender(), to, amount);
-
-        // CRIT-3: Note: If yield deposit fails, escrowInYield[workflowId][token] remains false
-        // Users can check yield status via escrowInYield(workflowId, token) public getter
-        // YieldDepositAttempted event will indicate success/failure
-
-        return workflowId;
-    }
-
-    function _resolveResolutionConfigVersion(
-        address resolutionModule,
-        uint256 requestedVersion,
-        address customResolver,
-        bool explicitSelection
-    ) internal view returns (uint256 version) {
-        if (explicitSelection && customResolver != address(0)) {
-            revert ResolutionConfigWithCustomResolver(customResolver);
-        }
-        if (explicitSelection && requestedVersion == 0) {
-            revert ResolutionConfigUnavailable(resolutionModule, requestedVersion);
-        }
-        if (resolutionModule == address(0) || resolutionModule.code.length == 0) {
-            if (requestedVersion != 0) revert ResolutionConfigUnavailable(resolutionModule, requestedVersion);
-            return 0;
-        }
-
-        if (requestedVersion == 0) {
-            (bool activeRead, bytes memory activeData) = resolutionModule.staticcall(
-                abi.encodeWithSignature('activeResolutionConfigVersion()')
-            );
-            // Non-DRM modules retain the legacy zero-version behavior.
-            if (!activeRead || activeData.length < 32) return 0;
-            version = abi.decode(activeData, (uint256));
-        } else {
-            version = requestedVersion;
-        }
-
-        // Legacy creation records the active version without applying the
-        // selectable-for-new-escrows gate used by explicit selection.
-        if (!explicitSelection) return version;
-
-        (bool selectableRead, bytes memory selectableData) = resolutionModule.staticcall(
-            abi.encodeWithSignature('isResolutionConfigSelectable(uint256)', version)
-        );
-        if (!selectableRead || selectableData.length < 32 || !abi.decode(selectableData, (bool))) {
-            revert ResolutionConfigUnavailable(resolutionModule, version);
-        }
-    }
-
-    function _pullTokens(address token, address from, uint256 amount) internal virtual;
-    function _recordFee(address token, uint256 amount) internal virtual;
-    function _depositForYield(
-        IYieldModule genModule,
-        uint256 workflowId,
-        address token,
-        uint256 amount
-    ) internal virtual;
+    // =====================================================================
+    // PRODUCT ADAPTER HOOKS
+    // Implemented by concrete escrow products (EscrowVault, EscrowableERC20).
+    // =====================================================================
+    function _pullTokens(address token, address from, uint256 amount) internal virtual override;
+    function _recordFee(address token, uint256 amount) internal virtual override;
     function _emitEscrowTransferCreated(
         uint256 workflowId,
         address token,
         address from,
         address to,
         uint256 amount
-    ) internal virtual {}
-
-    function _snapshotModulesForEscrow(uint256 workflowId, uint256 resolutionConfigVersion) internal {
-        address resModule = address(_getResolutionModule(workflowId));
-        address incentiveMod = ModuleSnapshotLibrary.getIncentiveModule(resModule);
-        moduleSnapshots[workflowId] = ModuleSnapshot({
-            resolutionModule: resModule,
-            releaseStrategy: address(_getReleaseStrategy(workflowId)),
-            cancellationStrategy: _getCancellationStrategy(workflowId),
-            yieldGenerationModule: address(_getYieldGenerationModule(workflowId)),
-            yieldDistributionModule: address(_getYieldDistributionModule(workflowId)),
-            incentiveModule: incentiveMod,
-            yieldProtocolFeeBps: yieldProtocolFeeBps,
-            appealBondProtocolFeeBps: appealBondProtocolFeeBps,
-            escrowFeeBps: escrowFee,
-            defaultAutoReleaseDelay: timeoutConfig.defaultAutoReleaseDelay,
-            defaultAutoCancelDelay: timeoutConfig.defaultAutoCancelDelay,
-            maxDisputeDuration: timeoutConfig.maxDisputeDuration,
-            appealWindowDuration: timeoutConfig.appealWindowDuration
-        });
-        if (resolutionConfigVersion != 0) {
-            workflowResolutionConfigVersion[workflowId] = resolutionConfigVersion;
-            (bool rootRead, bytes memory rootData) = resModule.staticcall(
-                abi.encodeWithSignature('resolutionConfigRoot(uint256)', resolutionConfigVersion)
-            );
-            bytes32 configRoot = rootRead && rootData.length >= 32 ? abi.decode(rootData, (bytes32)) : bytes32(0);
-            emit ResolutionConfigBound(workflowId, resModule, resolutionConfigVersion, configRoot);
-        }
-
-        bool pendingAutoCancelEnabled = timeoutConfig.defaultAutoCancelDelay > 0;
-        bool disputedTimeoutEnabled = timeoutConfig.maxDisputeDuration > 0;
-        timeoutPolicySnapshots[workflowId] = EscrowTimeoutPolicySnapshot({
-            pendingAutoCancelEnabled: pendingAutoCancelEnabled,
-            disputedTimeoutEnabled: disputedTimeoutEnabled
-        });
-        appealBondFeeRecipients[workflowId] = escrowFeeAddress;
-        emit TimeoutPolicySnapshotted(workflowId, pendingAutoCancelEnabled, disputedTimeoutEnabled);
+    ) internal virtual override {}
+    function _emitEscrowStateChanged(uint256 workflowId, EscrowState oldStatus, EscrowState newStatus) internal virtual override {
+        emit EscrowStateChanged(workflowId, oldStatus, newStatus);
     }
+
+    // =====================================================================
+    // AUTHORITATIVE LIFECYCLE
+    // Timed actions and participant-initiated cancellation.
+    // =====================================================================
 
     function automateTimedActions(uint256 workflowId) external nonReentrant returns (bool) {
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
         (ExecutionSource source, address caller) = _authorizeTimedActionAndSource(et);
         ModuleSnapshot storage snap = moduleSnapshots[workflowId];
-        if (address(settlementOps) == address(0)) return false;
-        SettlementOps.SettlementPendingSettlement memory pendingMem = _convertPendingSettlement(pendingSettlements[workflowId]);
-        
+        EscrowSettlementLogic.SettlementPendingSettlement memory pendingMem = _convertPendingSettlement(pendingSettlements[workflowId]);
+
         // Use snapshotted timeout config
         TimeoutConfig memory snappedTimeoutConfig = TimeoutConfig({
             defaultAutoReleaseDelay: snap.defaultAutoReleaseDelay,
@@ -704,9 +314,9 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
             maxDisputeDuration: snap.maxDisputeDuration,
             appealWindowDuration: snap.appealWindowDuration
         });
-        
+
         EscrowTimeoutPolicySnapshot memory timeoutPolicy = timeoutPolicySnapshots[workflowId];
-        (uint8 actionType, bool isRelease) = settlementOps.computeTimedActions(
+        (uint8 actionType, bool isRelease) = EscrowSettlementLogic.computeTimedActions(
             workflowId,
             et,
             pendingMem,
@@ -761,11 +371,11 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         if (et.to != _msgSender()) revert NotRecipient(workflowId, _msgSender(), et.to);
         if (et.escrowState != EscrowState.PENDING)
             revert TransferNotPending(workflowId, et.escrowState);
-        
+
         ModuleSnapshot storage snap = moduleSnapshots[workflowId];
-        
+
         bool unilateralCancel = false;
-        
+
         // Use cancellation strategy if configured
         if (snap.cancellationStrategy != address(0)) {
             ICancellationStrategy strategy = ICancellationStrategy(snap.cancellationStrategy);
@@ -775,13 +385,13 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
             unilateralCancel = strategy.canCancelUnilaterally(workflowId, _msgSender(), et);
             strategy.onCancelAttempt(workflowId, _msgSender(), true);
         }
-        
+
         // If strategy allows unilateral cancellation, cancel immediately
         if (unilateralCancel) {
             _cancelAndRefund(workflowId);
             return true;
         }
-        
+
         // Otherwise require mutual consent
         et.recipientStatus = RecipientStatus.AGREE_TO_CANCEL;
         if (et.senderStatus == SenderStatus.AGREE_TO_CANCEL) {
@@ -796,11 +406,11 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         if (et.from != _msgSender()) revert NotSender(workflowId, _msgSender(), et.from);
         if (et.escrowState != EscrowState.PENDING)
             revert TransferNotPending(workflowId, et.escrowState);
-        
+
         ModuleSnapshot storage snap = moduleSnapshots[workflowId];
-        
+
         bool unilateralCancel = false;
-        
+
         // Use cancellation strategy if configured
         if (snap.cancellationStrategy != address(0)) {
             ICancellationStrategy strategy = ICancellationStrategy(snap.cancellationStrategy);
@@ -811,13 +421,13 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
             // Notify strategy of attempt
             strategy.onCancelAttempt(workflowId, _msgSender(), true);
         }
-        
+
         // If strategy allows unilateral cancellation, cancel immediately
         if (unilateralCancel) {
             _cancelAndRefund(workflowId);
             return true;
         }
-        
+
         // Otherwise require mutual consent
         et.senderStatus = SenderStatus.AGREE_TO_CANCEL;
         if (et.recipientStatus == RecipientStatus.AGREE_TO_CANCEL) {
@@ -827,6 +437,11 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     }
 
     // slither-disable-next-line reentrancy-no-eth
+    // =====================================================================
+    // DISPUTES
+    // Dispute opening, resolver authorization, timeout and ruling execution.
+    // =====================================================================
+
     function autoCancelDisputedEscrow(uint256 workflowId) external {
         resolveDisputeByTimeout(workflowId);
     }
@@ -844,7 +459,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         if (et.escrowState != EscrowState.DISPUTED) {
             revert TransferNotInDispute(workflowId, et.escrowState);
         }
-        
+
         // CRIT-3: Prevent overriding a resolver's decision that is pending settlement
         if (pendingSettlements[workflowId].exists) {
             revert InvalidState(workflowId, uint8(EscrowState.DISPUTED), uint8(et.escrowState)); // Has pending settlement
@@ -891,7 +506,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
             }
         }
 
-        DisputeOps.DisputeOpeningResult memory result = disputeOps.computeDisputeOpening(
+        EscrowDisputeLogic.DisputeOpeningResult memory result = EscrowDisputeLogic.computeDisputeOpening(
             address(_getResolutionModule(workflowId)),
             address(this),
             snap.incentiveModule,
@@ -904,12 +519,12 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
             et.escrowState,
             et.disputeResolver
         );
-        
+
         if (!result.success) revert TransferNotPending(workflowId, et.escrowState);
 
         StateManagementLibrary.transitionToDisputed(et, workflowId, (_msgSender() == et.from));
         disputeRaisedTimestamp[workflowId] = block.timestamp;
-        
+
         emit EscrowStateChanged(workflowId, EscrowState.PENDING, EscrowState.DISPUTED);
         emit DisputeOpened(workflowId, _msgSender(), result.updatedResolver);
 
@@ -952,12 +567,16 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
      * @return et EscrowTransfer storage reference
      * @return resolutionModule Resolution module for this escrow
      */
+    // =====================================================================
+    // APPEALS & AUTHORITY TRANSITIONS
+    // Appeal quote, payment, and the atomic Kleros handoff / resolver mutation.
+    // =====================================================================
+
     function _validateAndPrepareEscalation(
         uint256 workflowId
     ) internal returns (EscrowTransfer storage et, IResolutionModule resolutionModule) {
         _validateWorkflowId(workflowId);
         et = escrowTransfers[workflowId];
-        if (address(disputeOps) == address(0)) revert ZeroDisputeOps();
         resolutionModule = _getResolutionModule(workflowId);
 
         if (pendingSettlements[workflowId].exists) {
@@ -974,10 +593,10 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
      * @dev V1: Appeals are disabled. This function will revert if called for v1 escrows
      *      (incentiveModule snapshot is null).
      *      resolution module + incentive module swap through governance.
-     *      
+     *
      *      Requires payment of an appeal bond (amount/token determined by resolution module).
      *      Bonds are recorded in the snapshotted incentive module for later distribution.
-     *      
+     *
      * @param workflowId The escrow workflow ID to escalate
      * @return success True if escalation succeeded
      * @return newDisputeResolver Address of the resolver assigned to the next level
@@ -1023,7 +642,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         address feeRecipient = appealBondFeeRecipients[workflowId];
         if (feeRecipient == address(0)) feeRecipient = escrowFeeAddress;
 
-        DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
+        EscrowDisputeLogic.EscalationResult memory result = EscrowDisputeLogic.computeEscalation(
             address(resolutionModule),
             address(this),
             snap.incentiveModule,
@@ -1154,7 +773,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         }
 
         et.disputeResolver = newRes;
-        
+
         if (msg.value > bondValue + klerosCost) {
             uint256 excess = msg.value - bondValue - klerosCost;
             claimableExcessEthRefunds[_msgSender()] += excess;
@@ -1225,54 +844,13 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
 
     /// @notice Returns the resolution module snapshotted for a workflow.
     /// @dev External resolvers use this to verify workflow-specific handoff bindings.
+    // =====================================================================
+    // RESOLUTION EXECUTION & RESOLVER AUTHORIZATION
+    // =====================================================================
+
     function getResolutionModule(uint256 workflowId) external view returns (address) {
         _validateWorkflowId(workflowId);
         return moduleSnapshots[workflowId].resolutionModule;
-    }
-
-    /**
-     * @notice Claim accrued bond protocol fees via explicit pull.
-     * @param token Token address (address(0) for ETH)
-     * @param recipient Recipient to receive claimed amount
-     * @return claimed Amount claimed
-     * @dev CEI + nonReentrant + transfer-last.
-     */
-    function claimBondProtocolFees(address token, address recipient) external nonReentrant returns (uint256 claimed) {
-        if (recipient != _msgSender()) revert InvalidAddress(ADDR_RECIPIENT, recipient);
-
-        uint256 amount = claimableBondProtocolFees[token][recipient];
-        if (amount == 0) revert NoClaimableBondProtocolFee(token, recipient);
-
-        // Effects first
-        claimableBondProtocolFees[token][recipient] = 0;
-
-        // Interactions last
-        if (token == address(0)) {
-            (bool success, ) = payable(recipient).call{value: amount}("");
-            if (!success) {
-                // Restore state on failed transfer
-                claimableBondProtocolFees[token][recipient] = amount;
-                revert InvalidAddress(ADDR_RECIPIENT, recipient);
-            }
-        } else {
-            _transferTokens(token, recipient, amount);
-        }
-
-        emit BondProtocolFeeClaimed(token, recipient, amount);
-        return amount;
-    }
-
-    function claimExcessEthRefund() external nonReentrant returns (uint256 claimed) {
-        uint256 amount = claimableExcessEthRefunds[_msgSender()];
-        if (amount == 0) revert NoClaimableBondProtocolFee(address(0), _msgSender());
-        claimableExcessEthRefunds[_msgSender()] = 0;
-        (bool success, ) = payable(_msgSender()).call{value: amount}("");
-        if (!success) {
-            claimableExcessEthRefunds[_msgSender()] = amount;
-            revert ExcessRefundTransferFailed(0, _msgSender(), amount);
-        }
-        emit ExcessEthRefundClaimed(_msgSender(), amount);
-        return amount;
     }
 
     // ============ Resolution ============
@@ -1308,8 +886,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
             revert NotAContract(1, address(resolutionModule));
         }
 
-        if (address(settlementOps) == address(0)) revert ZeroSettlementOps();
-
         // Use snapshotted appeal window so governance changes do not retroactively affect
         // in-flight escrows.  Mirrors the approach in automateTimedActions().
         ModuleSnapshot storage modSnap = moduleSnapshots[workflowId];
@@ -1320,13 +896,14 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
             appealWindowDuration: modSnap.appealWindowDuration
         });
 
-        SettlementOps.ResolutionResult memory result = settlementOps.computeResolutionExecution(
+        EscrowSettlementLogic.ResolutionResult memory result = EscrowSettlementLogic.computeResolutionExecution(
             address(resolutionModule),
             workflowId,
             isRelease,
-            snappedTimeoutConfig
+            snappedTimeoutConfig,
+            address(this)
         );
-        
+
         if (result.shouldExecute) {
             _finalizeDisputeInModule(workflowId);
             if (isRelease) _releaseEscrowTransfer(workflowId);
@@ -1339,180 +916,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         pendingSettlements[workflowId] = PendingSettlement({exists: true, isRelease: isRelease, appealDeadline: result.appealDeadline, resolutionHash: resolutionHash});
         emit PendingSettlementSet(workflowId, isRelease, result.appealDeadline);
         return true;
-    }
-
-    function executePendingSettlement(uint256 workflowId) external nonReentrant {
-        _validateWorkflowId(workflowId);
-        EscrowTransfer storage et = escrowTransfers[workflowId];
-        _authorizeTimedAction(et);
-        PendingSettlement storage pending = pendingSettlements[workflowId];
-
-        if (address(settlementOps) == address(0)) revert ZeroSettlementOps();
-        SettlementOps.SettlementPendingSettlement memory pendingMem = _convertPendingSettlement(pending);
-        (bool canExecute, bool isRelease) = settlementOps.computePendingSettlementExecution(workflowId, pendingMem, et.escrowState);
-        if (!canExecute) {
-            if (!pending.exists) revert NoPendingSettlement(workflowId);
-            if (block.timestamp < pending.appealDeadline) revert AppealWindowNotExpired(workflowId, pending.appealDeadline, block.timestamp);
-            revert NotInDisputedState(workflowId, et.escrowState);
-        }
-        delete pendingSettlements[workflowId];
-        IResolutionModule resolutionModule = _getResolutionModule(workflowId);
-        if (address(resolutionModule) != address(0)) _finalizeDisputeInModule(workflowId);
-        if (isRelease) _releaseEscrowTransfer(workflowId);
-        else _cancelAndRefund(workflowId);
-
-        emit PendingSettlementExecuted(workflowId, isRelease);
-    }
-
-    /**
-     * @notice Propose a mutual split settlement of an escrow.
-     * @dev Either participant may propose. A new proposal replaces any existing one.
-     *      Blocked if a resolver ruling is already in the pending settlement pipeline.
-     * @param workflowId Escrow ID
-     * @param buyerAmount Amount (in escrow token) to credit to the sender (et.from)
-     * @param sellerAmount Amount (in escrow token) to credit to the recipient (et.to)
-     * @param expiry Unix timestamp after which the proposal lapses; 0 = default 7 days
-     */
-    function proposeSplit(
-        uint256 workflowId,
-        uint256 buyerAmount,
-        uint256 sellerAmount,
-        uint64 expiry
-    ) external nonReentrant {
-        _validateWorkflowId(workflowId);
-        EscrowTransfer storage et = escrowTransfers[workflowId];
-
-        if (_msgSender() != et.from && _msgSender() != et.to)
-            revert NotParticipant(workflowId, _msgSender(), et.from, et.to);
-
-        EscrowState state = et.escrowState;
-        if (state != EscrowState.PENDING && state != EscrowState.DISPUTED)
-            revert EscrowNotSettleable(workflowId, state);
-
-        if (pendingSettlements[workflowId].exists)
-            revert SplitProposalBlocked(workflowId);
-
-        if (buyerAmount + sellerAmount != et.amountAfterFee)
-            revert SplitAmountMismatch(workflowId, buyerAmount, sellerAmount, et.amountAfterFee);
-
-        uint64 resolvedExpiry = expiry == 0 ? uint64(block.timestamp + 7 days) : expiry;
-        if (resolvedExpiry <= block.timestamp) revert InvalidConfig(0, resolvedExpiry);
-
-        // Cancel any existing proposal (new proposal supersedes old one)
-        if (splitProposals[workflowId].active) {
-            emit SplitCancelled(workflowId, splitProposals[workflowId].proposer);
-        }
-
-        splitProposals[workflowId] = SplitProposal({
-            proposer: _msgSender(),
-            buyerAmount: buyerAmount,
-            sellerAmount: sellerAmount,
-            expiry: resolvedExpiry,
-            active: true
-        });
-
-        emit SplitProposed(workflowId, _msgSender(), buyerAmount, sellerAmount, resolvedExpiry);
-    }
-
-    /**
-     * @notice Cancel an active split proposal.
-     * @dev Only the proposer (or guardian) may cancel.
-     */
-    function cancelSplit(uint256 workflowId) external nonReentrant {
-        _validateWorkflowId(workflowId);
-        SplitProposal storage proposal = splitProposals[workflowId];
-
-        if (!proposal.active) revert SplitNotFound(workflowId);
-
-        EscrowTransfer storage et = escrowTransfers[workflowId];
-        bool isProposer = proposal.proposer == _msgSender();
-        bool isGuardian = hasRole(ROLE_GUARDIAN, _msgSender());
-        if (!isProposer && !isGuardian)
-            revert NotParticipant(workflowId, _msgSender(), et.from, et.to);
-
-        delete splitProposals[workflowId];
-        emit SplitCancelled(workflowId, _msgSender());
-    }
-
-    /**
-     * @notice Accept an active split proposal, executing mutual settlement.
-     * @dev Only the counterparty (non-proposer participant) may accept.
-     *      If the escrow is DISPUTED, the active DRM dispute is closed by mutual agreement.
-     *      Principal is split per the agreed amounts; yield (if any) is split proportionally.
-     *      All settlement is pull-only — no automatic token transfers.
-     */
-    function acceptSplit(uint256 workflowId) external nonReentrant {
-        _validateWorkflowId(workflowId);
-        EscrowTransfer storage et = escrowTransfers[workflowId];
-        SplitProposal storage proposal = splitProposals[workflowId];
-
-        if (!proposal.active) revert SplitNotFound(workflowId);
-
-        // Only the counterparty may accept
-        address counterparty = (proposal.proposer == et.from) ? et.to : et.from;
-        if (_msgSender() != counterparty)
-            revert NotCounterparty(workflowId, _msgSender());
-
-        if (block.timestamp > proposal.expiry)
-            revert SplitExpired(workflowId, proposal.expiry, uint64(block.timestamp));
-
-        // Block if resolver ruling is already in settlement pipeline
-        if (pendingSettlements[workflowId].exists)
-            revert SplitProposalBlocked(workflowId);
-
-        EscrowState state = et.escrowState;
-        if (state != EscrowState.PENDING && state != EscrowState.DISPUTED)
-            revert EscrowNotSettleable(workflowId, state);
-
-        if (amountReleased[workflowId] > 0) {
-            revert SplitProposalBlocked(workflowId); // partial release prevents split
-        }
-        uint256 principal = et.amountAfterFee;
-        if (proposal.buyerAmount + proposal.sellerAmount != principal)
-            revert SplitAmountMismatch(workflowId, proposal.buyerAmount, proposal.sellerAmount, principal);
-
-        uint256 buyerAmount = proposal.buyerAmount;
-        uint256 sellerAmount = proposal.sellerAmount;
-        address token = et.token;
-        address buyer = et.from;
-        address seller = et.to;
-
-        // CEI: clear proposal before any state changes
-        delete splitProposals[workflowId];
-
-        // Close active dispute in the resolution module (ignores failure gracefully)
-        if (state == EscrowState.DISPUTED) {
-            _closeDisputeByMutualAgreement(workflowId);
-        }
-
-        EscrowState oldState = StateManagementLibrary.transitionToResolved(et, workflowId);
-        emit EscrowStateChanged(workflowId, oldState, EscrowState.RESOLVED);
-
-        delete disputeRaisedTimestamp[workflowId];
-
-        // Unwind yield module if active; yield is split proportionally to the principal split
-        (uint256 principalOut, uint256 yieldOut) = _handleYieldModuleUnwind(workflowId, token, principal);
-        uint256 totalOut = principalOut + yieldOut;
-
-        _updateEscrowBalance(token, principal, false);
-
-        if (yieldOut == 0) {
-            if (buyerAmount > 0) _creditClaimable(workflowId, buyer, token, buyerAmount, buyerAmount);
-            if (sellerAmount > 0) _creditClaimable(workflowId, seller, token, sellerAmount, sellerAmount);
-        } else {
-            // Proportional yield split: buyer share = yieldOut * buyerAmount / principal
-            uint256 yieldToBuyer = principal > 0 ? (yieldOut * buyerAmount) / principal : 0;
-            uint256 yieldToSeller = yieldOut - yieldToBuyer;
-            uint256 totalBuyer = buyerAmount + yieldToBuyer;
-            uint256 totalSeller = sellerAmount + yieldToSeller;
-            if (totalBuyer > 0) _creditClaimable(workflowId, buyer, token, totalBuyer, buyerAmount);
-            if (totalSeller > 0) _creditClaimable(workflowId, seller, token, totalSeller, sellerAmount);
-        }
-
-        // Suppress unused warning for totalOut (used only when yield is active)
-        totalOut;
-
-        emit SplitAccepted(workflowId, _msgSender(), buyerAmount, sellerAmount);
     }
 
     function _authorizeTimedActionAndSource(
@@ -1529,7 +932,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         return (ExecutionSource.GOVERNANCE, caller);
     }
 
-    function _authorizeTimedAction(EscrowTransfer storage et) internal view {
+    function _authorizeTimedAction(EscrowTransfer storage et) internal view override {
         address caller = _msgSender();
         if (caller == et.from || caller == et.to) return;
         if (hasRole(ROLE_KEEPER, caller)) return;
@@ -1543,6 +946,11 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     /// @dev Creates claimable entitlement only (no automatic payout delivery)
     /// @dev Part of IEscrowCore interface for wallet adoption
     /// @dev Callable even when paused (release strategy may further restrict)
+    // =====================================================================
+    // AUTHORITATIVE LIFECYCLE (TERMINAL RELEASE)
+    // Release strategy evaluation followed by escrow terminalization.
+    // =====================================================================
+
     function release(uint256 workflowId) public nonReentrant {
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
@@ -1563,7 +971,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
 
         // Load release strategy from snapshot
         IReleaseStrategy strategy = _getReleaseStrategy(workflowId);
-        
+
         // Check strategy is configured (revert if not; don't silently bypass policy)
         if (address(strategy) == address(0)) {
             revert ReleaseStrategyNotSet(workflowId);
@@ -1646,50 +1054,12 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         return false;
     }
 
-    function _applyEscrowSettings(uint256 workflowId, EscrowSettings memory settings) internal {
-        EscrowTransfer storage et = escrowTransfers[workflowId];
-        if (settings.customResolver != address(0)) et.disputeResolver = settings.customResolver;
-        bool useDefaults = (settings.autoReleaseTime == 0 && settings.autoCancelTime == 0);
-        
-        uint256 relTime = settings.autoReleaseTime;
-        if (relTime == 0 && useDefaults && timeoutConfig.defaultAutoReleaseDelay > 0) {
-            relTime = block.timestamp + timeoutConfig.defaultAutoReleaseDelay;
-        }
-        if (relTime > type(uint64).max) revert InvalidAutoTime(AUTO_TIME_TOO_LARGE, relTime, block.timestamp);
-        et.autoReleaseTime = uint64(relTime);
+    // =====================================================================
+    // SHARED TRANSITION HELPERS
+    // Terminal-state finalization used by the orchestration paths above.
+    // =====================================================================
 
-        uint256 cancTime = settings.autoCancelTime;
-        if (cancTime == 0 && useDefaults && timeoutConfig.defaultAutoCancelDelay > 0) {
-            cancTime = block.timestamp + timeoutConfig.defaultAutoCancelDelay;
-        }
-        if (cancTime > type(uint64).max) revert InvalidAutoTime(AUTO_TIME_TOO_LARGE, cancTime, block.timestamp);
-        et.autoCancelTime = uint64(cancTime);
-
-        // Independent mutual-exclusion check (guards against setTimeoutConfig bypass
-        // or future code changes that could set both defaults simultaneously).
-        if (et.autoReleaseTime > 0 && et.autoCancelTime > 0) {
-            revert BothAutoTimesSet(workflowId, et.autoReleaseTime, et.autoCancelTime);
-        }
-
-        escrowSettings[workflowId] = settings;
-        emit EscrowSettingsUpdated(workflowId, settings);
-    }
-
-    /**
-     * @notice Convert PendingSettlement storage to memory (consolidated helper)
-     * @param pending Storage reference
-     * @return pendingMem Memory struct
-     */
-    function _convertPendingSettlement(PendingSettlement storage pending) internal view returns (SettlementOps.SettlementPendingSettlement memory pendingMem) {
-        return SettlementOps.SettlementPendingSettlement({
-            exists: pending.exists,
-            isRelease: pending.isRelease,
-            appealDeadline: pending.appealDeadline,
-            resolutionHash: pending.resolutionHash
-        });
-    }
-
-    function _finalizeDisputeInModule(uint256 workflowId) internal {
+    function _finalizeDisputeInModule(uint256 workflowId) internal override {
         IResolutionModule resolutionModule = _getResolutionModule(workflowId);
         if (address(resolutionModule) == address(0)) return;
         (bool success, ) = address(resolutionModule).call(abi.encodeWithSelector(SEL_FINALIZE_DISPUTE, workflowId, address(this)));
@@ -1710,7 +1080,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         }
     }
 
-    function _closeDisputeByMutualAgreement(uint256 workflowId) internal {
+    function _closeDisputeByMutualAgreement(uint256 workflowId) internal override {
         IResolutionModule resolutionModule = _getResolutionModule(workflowId);
         if (address(resolutionModule) != address(0)) {
             (bool success, ) = address(resolutionModule).call(
@@ -1723,32 +1093,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     }
 
 
-    function withdrawEscrow(uint256 workflowId) external nonReentrant returns (uint256) {
-        _validateWorkflowId(workflowId);
-        EscrowTransfer storage et = escrowTransfers[workflowId];
-
-        if (et.escrowState != EscrowState.PENDING &&
-            et.escrowState != EscrowState.RESOLVED &&
-            et.escrowState != EscrowState.RELEASED &&
-            et.escrowState != EscrowState.REFUNDED) {
-            revert TransferNotFinalized(workflowId, et.escrowState);
-        }
-
-        address token = et.token; // Single token per escrow
-        uint256 amount = claimableBalances[workflowId][_msgSender()];
-        if (amount == 0) revert NoClaimableBalance(workflowId, _msgSender(), token);
-
-        claimableBalances[workflowId][_msgSender()] = 0;
-        totalClaimableAssets[token] -= amount;
-
-        _transferTokens(token, _msgSender(), amount);
-
-        emit EscrowWithdrawn(workflowId, _msgSender(), token, amount);
-        return amount;
-    }
-
-
-    function _validateWorkflowId(uint256 workflowId) internal view {
+    function _validateWorkflowId(uint256 workflowId) internal view virtual override {
         if (workflowId >= escrowTransfers.length) {
             revert InvalidWorkflowId(workflowId, escrowTransfers.length);
         }
@@ -1759,17 +1104,29 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
      * @return count Total number of escrows
      * @dev Added for EscrowViewContract to check bounds without reverting
      */
+    // =====================================================================
+    // FRAMEWORK VIEWS
+    // =====================================================================
+
     function getEscrowCount() external view returns (uint256 count) {
         return escrowTransfers.length;
     }
 
-    /// @notice Check if release is allowed - simplified for size
+    /// @notice Check the configured release strategy for a workflow.
     function canRelease(uint256 workflowId, address caller) external view returns (bool allowed) {
         if (workflowId >= escrowTransfers.length) return false;
         EscrowTransfer storage et = escrowTransfers[workflowId];
         if (et.escrowState != EscrowState.PENDING) return false;
-        if (caller != et.from) return false;
-        return true;
+        IReleaseStrategy strategy = _getReleaseStrategy(workflowId);
+        if (address(strategy) == address(0)) return false;
+        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(
+            et.token,
+            et.from,
+            et.to,
+            et.amountAfterFee,
+            escrowSettings[workflowId].releaseAddress
+        );
+        (allowed, ) = strategy.canRelease(workflowId, address(this), caller, escrowData);
     }
 
     // Stub for backwards compatibility - returns state directly
@@ -1787,7 +1144,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
             || super.supportsInterface(interfaceId);
     }
 
-    // - getResolutionMode() 
+    // - getResolutionMode()
     // - getActiveDisputeHandler()
     // - canRelease()
     // - getActionStatus()
@@ -1800,74 +1157,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         }
     }
 
-    function _creditClaimable(
-        uint256 workflowId,
-        address recipient,
-        address token,
-        uint256 amount,
-        uint256 principalExpected
-    ) internal {
-        if (amount == 0) return;
-
-        // If module reports yield (amount > principal), escrow must hold it.
-        if (amount > principalExpected) {
-            uint256 bal = IERC20(token).balanceOf(address(this));
-            if (bal < amount) revert EscrowInsufficientBalance();
-        }
-
-        claimableBalances[workflowId][recipient] += amount;
-        totalClaimableAssets[token] += amount;
-        emit ClaimableBalanceSet(workflowId, recipient, token, amount);
-    }
-
-
-
-    /**
-     * @notice Handle v2.5 yield module unwind on release/cancel
-     * @dev If no module or no initialized yield, returns original amount
-     * @dev Otherwise delegates to module for unwind (which handles all recovery)
-     * @dev If unwind reverts, tries emergencyUnwind as fallback
-     */
-    function _handleYieldModuleUnwind(
-        uint256 workflowId,
-        address token,
-        uint256 amount
-    ) internal virtual returns (uint256 principalOut, uint256 yieldOut) {
-        address module = v25YieldModules[workflowId];
-        if (module == address(0)) return (amount, 0);
-        
-        uint256 yieldPrincipal = v25YieldPrincipals[workflowId];
-        if (yieldPrincipal == 0) return (amount, 0);
-        
-        // Try normal unwind first
-        try IYieldModule(module).unwindToEscrow(workflowId, token, yieldPrincipal) returns (uint256 principal, uint256 yield) {
-            delete v25YieldModules[workflowId];
-            delete v25YieldPrincipals[workflowId];
-            return (principal, yield);
-        } catch {
-            // Unwind failed - try emergency unwind
-            try IYieldModule(module).emergencyUnwind(workflowId, token, yieldPrincipal) returns (uint256 recovered) {
-                // INVARIANT: Reject partial recovery - must recover full principal or revert
-                if (recovered < yieldPrincipal) revert PartialRecoveryNotAllowed();
-                delete v25YieldModules[workflowId];
-                delete v25YieldPrincipals[workflowId];
-                return (recovered, 0);
-            } catch {
-                // Both unwind paths failed — tokens are stuck in yield module.
-                // Complete the release lifecycle using the remaining escrow balance so
-                // the escrow is not permanently frozen; admin must recover tokens from
-                // the yield module.  Using yieldPrincipal here would inflate claimable
-                // when partial release occurred (yieldPrincipal > remaining amount).
-                // Settlement remains claimable-only; admin must recover assets separately.
-                emit YieldUnwindFailed(workflowId, token, yieldPrincipal);
-                delete v25YieldModules[workflowId];
-                delete v25YieldPrincipals[workflowId];
-                return (amount, 0);
-            }
-        }
-    }
-
-    function _cancelAndRefund(uint256 workflowId) internal {
+    function _cancelAndRefund(uint256 workflowId) internal override {
         EscrowTransfer storage et = escrowTransfers[workflowId];
         uint256 released = amountReleased[workflowId];
         uint256 amount = released >= et.amountAfterFee ? 0 : et.amountAfterFee - released;
@@ -1890,21 +1180,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         _emitEscrowTransferCancelled(workflowId, token, from, amount);
     }
 
-    function _finalizeClaimableSettlement(
-        uint256 workflowId,
-        address token,
-        uint256 amount,
-        address beneficiary
-    ) internal {
-        (uint256 principal, uint256 yield) = _handleYieldModuleUnwind(workflowId, token, amount);
-        uint256 actualAmount = principal + yield;
-
-        // Pull-only settlement: entitlement creation only
-        _updateEscrowBalance(token, amount, false);
-        _creditClaimable(workflowId, beneficiary, token, actualAmount, amount);
-    }
-
-    function _releaseEscrowTransfer(uint256 workflowId) internal {
+    function _releaseEscrowTransfer(uint256 workflowId) internal override {
         EscrowTransfer storage et = escrowTransfers[workflowId];
         uint256 released = amountReleased[workflowId];
         uint256 amount = released >= et.amountAfterFee ? 0 : et.amountAfterFee - released;
@@ -1923,15 +1199,6 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         _emitEscrowTransferReleased(workflowId, token, to, amount);
     }
 
-    function _clearPendingSettlementIfExists(uint256 workflowId) internal {
-        if (pendingSettlements[workflowId].exists) {
-            delete pendingSettlements[workflowId];
-            emit PendingSettlementCancelled(workflowId);
-        }
-    }
-
-    function _transferTokens(address token, address to, uint256 amount) internal virtual;
-    function _updateEscrowBalance(address token, uint256 amount, bool add) internal virtual;
     function _emitEscrowTransferCancelled(
         uint256 workflowId,
         address token,
@@ -1944,38 +1211,31 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
         address to,
         uint256 amount
     ) internal virtual {}
+    // =====================================================================
+    // MODULE RESOLUTION HOOKS
+    // Snapshot-first module lookup with registry-default fallback.
+    // =====================================================================
+
     function _getYieldGenerationModule(
         uint256 workflowId
-    ) internal view virtual returns (IYieldModule);
+    ) internal view virtual override returns (IYieldModule);
     function _getYieldDistributionModule(
         uint256 workflowId
-    ) internal view virtual returns (IYieldDistributionModule);
+    ) internal view virtual override returns (IYieldDistributionModule);
     function _getReleaseStrategy(
         uint256 workflowId
-    ) internal view virtual returns (IReleaseStrategy);
+    ) internal view virtual override returns (IReleaseStrategy);
     function _getCancellationStrategy(
         uint256 workflowId
-    ) internal view virtual returns (address);
+    ) internal view virtual override returns (address);
     function _getResolutionModule(
         uint256 workflowId
-    ) internal view virtual returns (IResolutionModule) {
+    ) internal view virtual override returns (IResolutionModule) {
         address snap = moduleSnapshots[workflowId].resolutionModule;
         if (snap != address(0)) {
             return IResolutionModule(snap);
         }
         return IResolutionModule(disputeResolutionModule);
-    }
-
-    function _depositYieldForEscrow(uint256 workflowId, address token, uint256 amount) internal virtual {
-        IYieldModule genModule = _getYieldGenerationModule(workflowId);
-        if (address(genModule) != address(0)) {
-            (bool supported, ) = genModule.canHandle(token, YieldPreset.OFF, amount);
-            if (supported) {
-                // Call _depositForYield which is overridden in child contracts (EscrowVault/EscrowableERC20)
-                // This allows child contracts to set approvals before calling the module
-                _depositForYield(genModule, workflowId, token, amount);
-            }
-        }
     }
 
     // ResolutionOutcome enum removed - using version from EscrowTypes.sol

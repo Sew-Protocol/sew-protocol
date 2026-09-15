@@ -13,8 +13,6 @@ import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/types/YieldPresets.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/DisputeOps.sol';
-import '../../../contracts/ops/SettlementOps.sol';
 import '../../../contracts/ops/CreateOps.sol';
 import '../../../contracts/ops/GuardianOps.sol';
 import '../../../contracts/governance/EmergencyRecoveryProposal.sol';
@@ -33,8 +31,6 @@ contract EmergencyRecoveryProposalTest is Test {
     DefaultResolutionModule public resolutionModule;
     DefaultReleaseStrategy public releaseStrategy;
     YieldOps public yieldOps;
-    DisputeOps public disputeOps;
-    SettlementOps public settlementOps;
     CreateOps public createOps;
     GuardianOps public guardianOps;
     EmergencyRecoveryProposal public recoveryProposal;
@@ -73,13 +69,11 @@ contract EmergencyRecoveryProposalTest is Test {
 
         // Deploy ops contracts
         yieldOps = new YieldOps(owner);
-        disputeOps = new DisputeOps(owner);
-        settlementOps = new SettlementOps(owner);
         createOps = new CreateOps(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
 
         // Deploy vault
-        vault = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
+        vault = new EscrowVault(ESCROW_FEE,feeAddress,address(yieldOps),address(moduleManagement));
 
         // Deploy admin contract
         adminContract = new EscrowGovernanceTimelock(owner);
@@ -94,13 +88,10 @@ contract EmergencyRecoveryProposalTest is Test {
 
         // Wire ops contracts
         yieldOps.registerEscrowContract(address(vault));
-        disputeOps.registerEscrowContract(address(vault));
-        settlementOps.registerEscrowContract(address(vault));
         createOps.registerEscrowContract(address(vault));
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), owner);
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(adminContract));
         vault.setCreateOps(address(createOps));
-        vault.setSettlementOps(address(settlementOps));
 
         moduleManagement.registerEscrowContract(address(vault));
         adminContract.registerEscrowContract(address(vault));

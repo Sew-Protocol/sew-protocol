@@ -12,8 +12,6 @@ import "../../../contracts/modules/decentralized-resolution-module/PaymentCalcul
 import "../../../contracts/mocks/ERC20Mock.sol";
 import "../../../contracts/types/EscrowTypes.sol";
 import "../../../contracts/ops/YieldOps.sol";
-import "../../../contracts/ops/DisputeOps.sol";
-import "../../../contracts/ops/SettlementOps.sol";
 import "../../../contracts/ops/CreateOps.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
@@ -38,8 +36,6 @@ contract RepeatAttackerIntegrationTest is Test {
     PaymentCalculationLibraryV1 public paymentLib;
     ERC20Mock public token;
     YieldOps public yieldOps;
-    DisputeOps public disputeOps;
-    SettlementOps public settlementOps;
     CreateOps public createOps;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
@@ -73,25 +69,19 @@ contract RepeatAttackerIntegrationTest is Test {
         { DRMAdminFacet f = new DRMAdminFacet(); resolutionModule.setAdminFacet(address(f)); }
 
         yieldOps = new YieldOps(deployer);
-        disputeOps = new DisputeOps(deployer);
-        settlementOps = new SettlementOps(deployer);
         createOps = new CreateOps(deployer);
         bondCollector = new BondCollector(deployer);
         moduleManagement = new ModuleSnapshotRegistry(deployer);
         adminContract = new EscrowGovernanceTimelock(deployer);
 
-        escrow = new EscrowVault(0, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
+        escrow = new EscrowVault(0,feeAddress,address(yieldOps),address(moduleManagement));
 
         moduleManagement.registerEscrowContract(address(escrow));
         yieldOps.registerEscrowContract(address(escrow));
-        disputeOps.registerEscrowContract(address(escrow));
-        settlementOps.registerEscrowContract(address(escrow));
         createOps.registerEscrowContract(address(escrow));
         bondCollector.registerEscrowContract(address(escrow));
 
         // Allow test contract to call ops directly (for forceProgress via escrow)
-        disputeOps.registerEscrowContract(address(this));
-        settlementOps.registerEscrowContract(address(this));
         createOps.registerEscrowContract(address(this));
         bondCollector.registerEscrowContract(address(this));
 
@@ -99,7 +89,6 @@ contract RepeatAttackerIntegrationTest is Test {
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(adminContract));
         escrow.grantRole(escrow.ROLE_TIMELOCK(), address(this));
         escrow.setCreateOps(address(createOps));
-        escrow.setSettlementOps(address(settlementOps));
         escrow.setBondCollector(address(bondCollector));
 
         resolutionModule.grantRole(resolutionModule.ROLE_TIMELOCK(), address(this));

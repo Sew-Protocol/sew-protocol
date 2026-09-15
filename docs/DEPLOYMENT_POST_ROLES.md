@@ -11,8 +11,6 @@ This document lists critical post-deployment steps that must be executed after d
 **Contracts Affected**:
 - `CreateOps` - requires EscrowVault to have `ROLE_ESCROW_CONTRACT`
 - `YieldOps` - requires EscrowVault to have `ROLE_ESCROW_CONTRACT` (if used)
-- `SettlementOps` - requires EscrowVault to have `ROLE_ESCROW_CONTRACT` (if used)
-- `DisputeOps` - requires EscrowVault to have `ROLE_ESCROW_CONTRACT` (if used)
 
 **How to Fix**:
 ```bash

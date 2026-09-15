@@ -4,7 +4,6 @@ pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
 import 'contracts/ops/YieldOps.sol';
-import 'contracts/ops/DisputeOps.sol';
 import 'contracts/core/ModuleSnapshotRegistry.sol';
 import 'contracts/core/EscrowVault.sol';
 import '../TestConfig.sol';
@@ -12,7 +11,6 @@ import '../TestConfig.sol';
 contract Test_04_GuardianControls_test is Test {
     EscrowVault vault;
     YieldOps public yieldOps;
-    DisputeOps public disputeOps;
     ModuleSnapshotRegistry public moduleManagement;
     address timelock = address(0x1);
     address guardian = address(0x2);
@@ -21,9 +19,8 @@ contract Test_04_GuardianControls_test is Test {
     function setUp() public {
         vm.skip(!TestConfig.RUN_PAUSE_TESTS);
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
-        vault = new EscrowVault(100, address(this), address(yieldOps), address(disputeOps), address(moduleManagement));
+        vault = new EscrowVault(100,address(this),address(yieldOps),address(moduleManagement));
         vault.grantRole(vault.ROLE_TIMELOCK(), timelock);
         vault.grantRole(vault.ROLE_GUARDIAN(), guardian);
     }

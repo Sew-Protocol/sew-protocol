@@ -1,14 +1,22 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.37;
 
+// ============================================================================
+// TEST-ONLY REFERENCE IMPLEMENTATION.
+// Preserved solely for differential testing of EscrowDisputeLogic.
+// Not part of the protocol architecture or deployment.
+// ============================================================================
+
 import '@openzeppelin/contracts/access/AccessControl.sol';
-import '../shared/interfaces/IResolutionModule.sol';
-import '../types/EscrowTypes.sol';
-import '../libraries/EscrowEncodingLibrary.sol';
+import '../../../contracts/shared/interfaces/IResolutionModule.sol';
+import '../../../contracts/types/EscrowTypes.sol';
+import '../../../contracts/libraries/EscrowEncodingLibrary.sol';
 
 /**
- * @title DisputeOps
- * @notice External contract for dispute escalation orchestration
+ * @title DisputeOpsReference
+ * @notice Formerly the externally deployed DisputeOps contract, retained as a
+ *         test oracle only. Its compute semantics are the reference against
+ *         which EscrowDisputeLogic is differentially fuzzed.
  *
  *      Key design principles (from updated plan):
  *      - Compute → Apply: Returns escalation result, BaseEscrow applies to state
@@ -21,7 +29,7 @@ import '../libraries/EscrowEncodingLibrary.sol';
  *      DisputeOps returns: (newResolver, newLevel, escalationFee)
  *      BaseEscrow applies: Updates state and collects fees
  */
-contract DisputeOps is AccessControl {
+contract DisputeOpsReference is AccessControl {
     // ============ Role Constants ============
     bytes32 public constant ROLE_ESCROW_CONTRACT = keccak256('ROLE_ESCROW_CONTRACT');
     bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');

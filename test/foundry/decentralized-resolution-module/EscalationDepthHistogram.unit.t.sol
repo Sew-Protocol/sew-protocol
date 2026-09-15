@@ -7,7 +7,6 @@ import '../../../contracts/modules/decentralized-resolution-module/PaymentCalcul
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/DisputeOps.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
@@ -23,7 +22,6 @@ contract EscalationDepthHistogramTest is Test {
     ERC20Mock public token;
     EscrowVault public escrow;
     YieldOps public yieldOps;
-    DisputeOps public disputeOps;
     ModuleSnapshotRegistry public moduleManagement;
     EscrowGovernanceTimelock public adminContract;
 
@@ -51,10 +49,9 @@ contract EscalationDepthHistogramTest is Test {
         incentiveModule.grantRole(incentiveModule.ROLE_TIMELOCK(), address(this));
         incentiveModule.registerEscrowContract(address(this));
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));
-        escrow = new EscrowVault(100, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
+        escrow = new EscrowVault(100,feeAddress,address(yieldOps),address(moduleManagement));
 
         // Setup tokens
         token.mint(depositor, INITIAL_BALANCE);

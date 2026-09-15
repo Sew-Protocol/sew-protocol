@@ -15,9 +15,7 @@ import "../../../contracts/types/EscrowTypes.sol";
 import "../../../contracts/types/YieldPresets.sol";
 import "../../../contracts/libraries/SettingsValidationLibrary.sol";
 import "../../../contracts/ops/YieldOps.sol";
-import "../../../contracts/ops/DisputeOps.sol";
 import "../../../contracts/ops/CreateOps.sol";
-import "../../../contracts/ops/SettlementOps.sol";
 import "../../../contracts/core/BondCollector.sol";
 
 contract PerEscrowSettingsHarness is EscrowVault {
@@ -25,9 +23,8 @@ contract PerEscrowSettingsHarness is EscrowVault {
         uint256 escrowFeeBps,
         address feeAddress,
         address yieldOpsAddress,
-        address disputeOpsAddress,
         address moduleManagementAddress
-    ) EscrowVault(escrowFeeBps, feeAddress, yieldOpsAddress, disputeOpsAddress, moduleManagementAddress) {}
+    ) EscrowVault(escrowFeeBps, feeAddress, yieldOpsAddress, moduleManagementAddress) {}
 
     function getReleaseStrategyAddr(uint256 workflowId) external view returns (address) {
         return moduleSnapshots[workflowId].releaseStrategy;
@@ -78,7 +75,6 @@ contract PerEscrowSettingsTest is Test {
             100, // 1%
             feeAddress,
             address(new YieldOps(owner)),
-            address(new DisputeOps(owner)),
             address(moduleManagement)
         );
         vault.grantRole(vault.ROLE_TIMELOCK(), owner);
@@ -91,9 +87,6 @@ contract PerEscrowSettingsTest is Test {
         createOps.registerEscrowContract(address(vault));
         vault.setCreateOps(address(createOps));
 
-        SettlementOps settlementOps = new SettlementOps(owner);
-        settlementOps.registerEscrowContract(address(vault));
-        vault.setSettlementOps(address(settlementOps));
 
         BondCollector bondCollector = new BondCollector(owner);
         bondCollector.registerEscrowContract(address(vault));

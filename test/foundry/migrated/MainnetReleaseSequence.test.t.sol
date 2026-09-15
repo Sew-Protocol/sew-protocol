@@ -4,7 +4,6 @@ pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
 import 'contracts/ops/YieldOps.sol';
-import 'contracts/ops/DisputeOps.sol';
 import 'contracts/core/ModuleSnapshotRegistry.sol';
 import 'contracts/token/SewToken.sol';
 import 'contracts/core/EscrowableERC20.sol';
@@ -16,7 +15,6 @@ import 'contracts/modules/DefaultYieldDistributionModule.sol';
 contract Test_MainnetReleaseSequence_test is Test {
     SewToken public governanceToken;
     YieldOps public yieldOps;
-    DisputeOps public disputeOps;
     ModuleSnapshotRegistry public moduleManagement;
     EscrowableERC20 public escrowable;
     EscrowVault public vault;
@@ -33,7 +31,6 @@ contract Test_MainnetReleaseSequence_test is Test {
 
     function setUp() public {
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         // Deploy governance token
         governanceToken = new SewToken('Sew Token', 'SEW', deployer, INITIAL_TOKEN_SUPPLY);
@@ -44,16 +41,8 @@ contract Test_MainnetReleaseSequence_test is Test {
         yieldDist = new DefaultYieldDistributionModule();
 
         // Deploy main contracts
-        escrowable = new EscrowableERC20(
-            'Escrowable Token',
-            'EUSD',
-            100,
-            feeAddress,
-            address(yieldOps),
-            address(disputeOps),
-            address(moduleManagement)
-        );
-        vault = new EscrowVault(100, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
+        escrowable = new EscrowableERC20('Escrowable Token','EUSD',100,feeAddress,address(yieldOps),address(moduleManagement));
+        vault = new EscrowVault(100,feeAddress,address(yieldOps),address(moduleManagement));
     }
 
     function test_stage0_and_stage1_deployments_and_role_transfers() public {

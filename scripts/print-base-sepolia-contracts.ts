@@ -64,8 +64,6 @@ async function main() {
     GuardianSafe: 'Guardian multisig (testnet; may be same as governance safe)',
 
     YieldOps: 'Yield ops router (yield deposit/withdraw orchestration)',
-    DisputeOps: 'Dispute ops router (dispute flow orchestration)',
-    SettlementOps: 'Settlement ops router (release/cancel/settlement orchestration)',
     CreateOps: 'Create ops router (escrow creation orchestration)',
     BondCollector: 'Bond/fee collector helper (as configured)',
 
@@ -92,7 +90,7 @@ async function main() {
     },
     {
       title: 'Ops contracts',
-      names: ['CreateOps', 'SettlementOps', 'DisputeOps', 'YieldOps', 'BondCollector'],
+      names: ['CreateOps', 'YieldOps', 'BondCollector'],
     },
     {
       title: 'Core escrow',

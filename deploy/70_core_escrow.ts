@@ -5,7 +5,7 @@
  * - EscrowVault: Main escrow contract for ERC20 tokens
  * - EscrowableERC20: ERC20 token with built-in escrow functionality
  *
- * These contracts require YieldOps and DisputeOps to be deployed first.
+ * These contracts require YieldOps to be deployed first.
  */
 
 import { HardhatRuntimeEnvironment } from 'hardhat/types';
@@ -29,8 +29,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   // Get dependencies
   const yieldOpsDeployment = await get('YieldOps');
-  const disputeOpsDeployment = await get('DisputeOps');
-  const settlementOpsDeployment = await get('SettlementOps');
   const createOpsDeployment = await get('CreateOps');
   const bondCollectorDeployment = await get('BondCollector');
   const moduleManagementDeployment = await get('ModuleSnapshotRegistry');
@@ -49,8 +47,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   console.log(`      Escrow Fee: ${escrowFeeBps} bps (${(escrowFeeBps / 100).toFixed(2)}%)`);
   console.log(`      Fee Recipient: ${feeRecipient}`);
   console.log(`      YieldOps: ${yieldOpsDeployment.address}`);
-  console.log(`      DisputeOps: ${disputeOpsDeployment.address}`);
-  console.log(`      SettlementOps: ${settlementOpsDeployment.address}`);
   console.log(`      CreateOps: ${createOpsDeployment.address}`);
   console.log(`      BondCollector: ${bondCollectorDeployment.address}`);
   console.log(`      ModuleManagement: ${moduleManagementDeployment.address}`);
@@ -65,7 +61,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       escrowFee, // fee (in fee denominator units, 10000 = 100%)
       feeRecipient, // feeAddress
       yieldOpsDeployment.address, // yieldOps
-      disputeOpsDeployment.address, // disputeOps
       moduleManagementDeployment.address, // moduleManagement
     ],
     log: true,
@@ -87,7 +82,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
           escrowFee,
           feeRecipient,
           yieldOpsDeployment.address,
-          disputeOpsDeployment.address,
           moduleManagementDeployment.address,
         ],
         tags: ['core', 'escrow'],
@@ -103,8 +97,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   
   // Get ops contracts
   const createOpsContract = await ethers.getContractAt('CreateOps', createOpsDeployment.address);
-  const settlementOpsContract = await ethers.getContractAt('SettlementOps', settlementOpsDeployment.address);
-  const disputeOpsContract = await ethers.getContractAt('DisputeOps', disputeOpsDeployment.address);
   const yieldOpsContract = await ethers.getContractAt('YieldOps', yieldOpsDeployment.address);
   const bondCollectorContract = await ethers.getContractAt('BondCollector', bondCollectorDeployment.address);
 
@@ -116,32 +108,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   } catch (error: any) {
     if (error.message?.includes('AccessControlUnauthorizedAccount') || error.message?.includes('already has role')) {
       console.log(`   ℹ️  EscrowVault already registered with CreateOps`);
-    } else {
-      throw error;
-    }
-  }
-
-  // Register with SettlementOps
-  try {
-    const settlementOpsTx = await settlementOpsContract.registerEscrowContract(escrowVaultDeployment.address);
-    await settlementOpsTx.wait();
-    console.log(`   ✅ Registered EscrowVault with SettlementOps`);
-  } catch (error: any) {
-    if (error.message?.includes('AccessControlUnauthorizedAccount') || error.message?.includes('already has role')) {
-      console.log(`   ℹ️  EscrowVault already registered with SettlementOps`);
-    } else {
-      throw error;
-    }
-  }
-
-  // Register with DisputeOps
-  try {
-    const disputeOpsTx = await disputeOpsContract.registerEscrowContract(escrowVaultDeployment.address);
-    await disputeOpsTx.wait();
-    console.log(`   ✅ Registered EscrowVault with DisputeOps`);
-  } catch (error: any) {
-    if (error.message?.includes('AccessControlUnauthorizedAccount') || error.message?.includes('already has role')) {
-      console.log(`   ℹ️  EscrowVault already registered with DisputeOps`);
     } else {
       throw error;
     }
@@ -202,15 +168,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       console.log(`   ✅ CreateOps already set in EscrowVault`);
     }
 
-    const currentSettlementOps = await escrowVaultContract.settlementOps();
-    if (currentSettlementOps.toLowerCase() !== settlementOpsDeployment.address.toLowerCase()) {
-      const setSettlementOpsTx = await escrowVaultContract.setSettlementOps(settlementOpsDeployment.address);
-      await setSettlementOpsTx.wait();
-      console.log(`   ✅ Set SettlementOps in EscrowVault`);
-    } else {
-      console.log(`   ✅ SettlementOps already set in EscrowVault`);
-    }
-
     const currentBondCollector = await escrowVaultContract.bondCollector();
     if (currentBondCollector.toLowerCase() !== bondCollectorDeployment.address.toLowerCase()) {
       const setBondCollectorTx = await escrowVaultContract.setBondCollector(bondCollectorDeployment.address);
@@ -246,7 +203,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
         escrowFee, // fee
         feeRecipient, // feeAddress
         yieldOpsDeployment.address, // yieldOps
-        disputeOpsDeployment.address, // disputeOps
         moduleManagementDeployment.address, // moduleManagement
       ],
       log: true,
@@ -270,7 +226,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
             escrowFee,
             feeRecipient,
             yieldOpsDeployment.address,
-            disputeOpsDeployment.address,
             moduleManagementDeployment.address,
           ],
           tags: ['core', 'escrow', 'token'],
@@ -292,32 +247,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     } catch (error: any) {
       if (error.message?.includes('AccessControlUnauthorizedAccount') || error.message?.includes('already has role')) {
         console.log(`   ℹ️  EscrowableERC20 already registered with CreateOps`);
-      } else {
-        throw error;
-      }
-    }
-
-    // Register with SettlementOps
-    try {
-      const settlementOpsTx = await settlementOpsContract.registerEscrowContract(escrowableERC20Deployment.address);
-      await settlementOpsTx.wait();
-      console.log(`   ✅ Registered EscrowableERC20 with SettlementOps`);
-    } catch (error: any) {
-      if (error.message?.includes('AccessControlUnauthorizedAccount') || error.message?.includes('already has role')) {
-        console.log(`   ℹ️  EscrowableERC20 already registered with SettlementOps`);
-      } else {
-        throw error;
-      }
-    }
-
-    // Register with DisputeOps
-    try {
-      const disputeOpsTx = await disputeOpsContract.registerEscrowContract(escrowableERC20Deployment.address);
-      await disputeOpsTx.wait();
-      console.log(`   ✅ Registered EscrowableERC20 with DisputeOps`);
-    } catch (error: any) {
-      if (error.message?.includes('AccessControlUnauthorizedAccount') || error.message?.includes('already has role')) {
-        console.log(`   ℹ️  EscrowableERC20 already registered with DisputeOps`);
       } else {
         throw error;
       }
@@ -361,11 +290,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
         const setCreateOpsTx = await escrowableERC20Contract.setCreateOps(createOpsDeployment.address);
         await setCreateOpsTx.wait();
         console.log(`   ✅ Set CreateOps in EscrowableERC20`);
-
-        // Set SettlementOps
-        const setSettlementOpsTx = await escrowableERC20Contract.setSettlementOps(settlementOpsDeployment.address);
-        await setSettlementOpsTx.wait();
-        console.log(`   ✅ Set SettlementOps in EscrowableERC20`);
 
         // Set BondCollector
         const setBondCollectorTx = await escrowableERC20Contract.setBondCollector(bondCollectorDeployment.address);

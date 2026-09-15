@@ -3,7 +3,6 @@ pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
 import 'contracts/ops/YieldOps.sol';
-import 'contracts/ops/DisputeOps.sol';
 import 'contracts/core/ModuleSnapshotRegistry.sol';
 import 'contracts/core/EscrowVault.sol';
 import 'contracts/mocks/ERC20Mock.sol';
@@ -12,26 +11,22 @@ import 'contracts/types/YieldPresets.sol';
 import 'contracts/admin/EscrowGovernanceTimelock.sol';
 import 'contracts/types/EscrowTypes.sol';
 import 'contracts/ops/CreateOps.sol';
-import 'contracts/ops/SettlementOps.sol';
 import 'contracts/core/BondCollector.sol';
 
 contract Test_05_ModuleSnapshotting_test is Test {
     EscrowVault vault;
     EscrowGovernanceTimelock adminContract;
     YieldOps public yieldOps;
-    DisputeOps public disputeOps;
     ModuleSnapshotRegistry public moduleManagement;
     CreateOps public createOps;
-    SettlementOps public settlementOps;
     BondCollector public bondCollector;
     address deployer = address(this);
     address timelock = address(0x1);
 
     function setUp() public {
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
-        vault = new EscrowVault(100, address(this), address(yieldOps), address(disputeOps), address(moduleManagement));
+        vault = new EscrowVault(100,address(this),address(yieldOps),address(moduleManagement));
         adminContract = new EscrowGovernanceTimelock(address(this));
         vault.grantRole(vault.ROLE_TIMELOCK(), timelock);
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(adminContract));
@@ -43,8 +38,6 @@ contract Test_05_ModuleSnapshotting_test is Test {
         createOps.grantRole(createOps.ROLE_TIMELOCK(), address(this));
         createOps.registerEscrowContract(address(vault));
 
-        settlementOps = new SettlementOps(address(this));
-        settlementOps.registerEscrowContract(address(vault));
 
         bondCollector = new BondCollector(address(this));
         bondCollector.registerEscrowContract(address(vault));
@@ -52,7 +45,6 @@ contract Test_05_ModuleSnapshotting_test is Test {
         // Grant this test admin-contract role to set ops addresses
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.setCreateOps(address(createOps));
-        vault.setSettlementOps(address(settlementOps));
         vault.setBondCollector(address(bondCollector));
 
         // deploy and activate a default resolution module so createEscrow can succeed

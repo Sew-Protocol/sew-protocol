@@ -5,12 +5,10 @@ import 'forge-std/Test.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/DisputeOps.sol';
 import '../../../contracts/core/modules/DefaultResolutionModule.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
 import '../../../contracts/ops/CreateOps.sol';
-import '../../../contracts/ops/SettlementOps.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/mocks/MockRevertingERC20.sol';
 import '../../../contracts/types/EscrowTypes.sol';
@@ -23,10 +21,8 @@ import '../../../contracts/modules/DefaultReleaseStrategy.sol';
 contract EscrowVaultAccountingTest is Test {
     EscrowVault public vault;
     YieldOps public yieldOps;
-    DisputeOps public disputeOps;
     ModuleSnapshotRegistry public mm;
     CreateOps public createOps;
-    SettlementOps public settlementOps;
     BondCollector public bondCollector;
     DefaultResolutionModule public resolutionModule;
     DefaultReleaseStrategy internal defaultReleaseStrategy;
@@ -48,26 +44,21 @@ contract EscrowVaultAccountingTest is Test {
         revertingToken = new MockRevertingERC20("Reverting", "REVERT", address(this), 1000000e18);
 
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps(address(this));
         mm = new ModuleSnapshotRegistry(address(this));
         createOps = new CreateOps(address(this));
-        settlementOps = new SettlementOps(address(this));
         bondCollector = new BondCollector(address(this));
         resolutionModule = new DefaultResolutionModule(address(this), resolver);
         defaultReleaseStrategy = new DefaultReleaseStrategy();
 
-        vault = new EscrowVault(FEE_BPS, feeAddress, address(yieldOps), address(disputeOps), address(mm));
+        vault = new EscrowVault(FEE_BPS,feeAddress,address(yieldOps),address(mm));
 
         yieldOps.registerEscrowContract(address(vault));
-        disputeOps.registerEscrowContract(address(vault));
         mm.registerEscrowContract(address(vault));
         createOps.registerEscrowContract(address(vault));
-        settlementOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
 
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.setCreateOps(address(createOps));
-        vault.setSettlementOps(address(settlementOps));
         vault.setBondCollector(address(bondCollector));
         vault.setResolutionModule(address(resolutionModule));
         

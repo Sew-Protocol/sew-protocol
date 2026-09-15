@@ -11,9 +11,7 @@ import '../../../contracts/core/BaseEscrow.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/DisputeOps.sol';
 import '../../../contracts/ops/CreateOps.sol';
-import '../../../contracts/ops/SettlementOps.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
@@ -30,9 +28,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
     PaymentCalculationLibraryV1 public paymentLib;
     ERC20Mock public token;
     YieldOps public yieldOps;
-    DisputeOps public disputeOps;
     CreateOps public createOps;
-    SettlementOps public settlementOps;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
 
@@ -76,24 +72,19 @@ contract EscalationDepthHistogramIntegrationTest is Test {
 
         // Deploy escrow
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
-        escrow = new EscrowVault(100, makeAddr('feeAddress'), address(yieldOps), address(disputeOps), address(moduleManagement));
+        escrow = new EscrowVault(100,makeAddr('feeAddress'),address(yieldOps),address(moduleManagement));
 
         // Deploy and wire required ops (BaseEscrow now requires these)
         createOps = new CreateOps(address(this));
-        settlementOps = new SettlementOps(address(this));
         bondCollector = new BondCollector(address(this));
         createOps.registerEscrowContract(address(escrow));
-        settlementOps.registerEscrowContract(address(escrow));
         bondCollector.registerEscrowContract(address(escrow));
-        disputeOps.registerEscrowContract(address(escrow));
         yieldOps.registerEscrowContract(address(escrow));
 
         // Grant admin-contract role so this test can configure ops
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(this));
         escrow.setCreateOps(address(createOps));
-        escrow.setSettlementOps(address(settlementOps));
         escrow.setBondCollector(address(bondCollector));
 
         // Setup roles - deployer has DEFAULT_ADMIN_ROLE from constructors

@@ -8,8 +8,6 @@ import '../../../contracts/core/modules/DefaultResolutionModule.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/types/YieldPresets.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/DisputeOps.sol';
-import '../../../contracts/ops/SettlementOps.sol';
 import '../../../contracts/ops/CreateOps.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
@@ -27,8 +25,6 @@ contract EscrowVaultUniqueCoverageTest is Test {
     ERC20Mock public token2;
     DefaultResolutionModule public resolutionModule;
     YieldOps public yieldOps;
-    DisputeOps public disputeOps;
-    SettlementOps public settlementOps;
     CreateOps public createOps;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
@@ -55,19 +51,15 @@ contract EscrowVaultUniqueCoverageTest is Test {
         token1 = new ERC20Mock('Token 1', 'TKN1', owner, 10000000e18);
         token2 = new ERC20Mock('Token 2', 'TKN2', owner, 10000000e18);
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps(address(this));
-        settlementOps = new SettlementOps(address(this));
         createOps = new CreateOps(address(this));
         bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));
-        vault = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
+        vault = new EscrowVault(ESCROW_FEE,feeAddress,address(yieldOps),address(moduleManagement));
         moduleManagement.registerEscrowContract(address(vault));
 
         // Register escrow contract with all ops contracts
         yieldOps.registerEscrowContract(address(vault));
-        disputeOps.registerEscrowContract(address(vault));
-        settlementOps.registerEscrowContract(address(vault));
         createOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
 
@@ -81,7 +73,6 @@ contract EscrowVaultUniqueCoverageTest is Test {
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), owner);
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(adminContract));
         vault.setCreateOps(address(createOps));
-        vault.setSettlementOps(address(settlementOps));
         vault.setBondCollector(address(bondCollector));
 
         // Queue and activate resolution module

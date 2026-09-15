@@ -8,7 +8,6 @@ import '../../../contracts/modules/decentralized-resolution-module/Decentralized
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/DisputeOps.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV1.sol';
 /**
@@ -22,7 +21,6 @@ contract AppealBondDistributionTest is Test {
     EscrowVault public escrow;
     ERC20Mock public token;
     YieldOps public yieldOps;
-    DisputeOps public disputeOps;
     ModuleSnapshotRegistry public moduleManagement;
 
     address public deployer;
@@ -51,9 +49,8 @@ contract AppealBondDistributionTest is Test {
         incentiveModule.grantRole(incentiveModule.ROLE_TIMELOCK(), address(this));
         incentiveModule.registerEscrowContract(address(this));
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
-        escrow = new EscrowVault(100, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
+        escrow = new EscrowVault(100,feeAddress,address(yieldOps),address(moduleManagement));
 
         // Setup tokens
         token.mint(depositor, INITIAL_BALANCE);

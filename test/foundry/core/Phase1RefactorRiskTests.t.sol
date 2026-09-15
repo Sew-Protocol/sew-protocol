@@ -5,8 +5,6 @@ import 'forge-std/Test.sol';
 import 'contracts/core/EscrowVault.sol';
 import 'contracts/core/BaseEscrow.sol';
 import 'contracts/ops/YieldOps.sol';
-import 'contracts/ops/DisputeOps.sol';
-import 'contracts/ops/SettlementOps.sol';
 import 'contracts/ops/CreateOps.sol';
 import 'contracts/core/ModuleSnapshotRegistry.sol';
 import 'contracts/types/EscrowTypes.sol';
@@ -27,8 +25,6 @@ contract Phase1RefactorRiskTests is Test {
     ERC20Mock public token;
     CreateOps public createOps;
     YieldOps public yieldOps;
-    DisputeOps public disputeOps;
-    SettlementOps public settlementOps;
     ModuleSnapshotRegistry public moduleManagement;
     
     DefaultResolutionModule public resolutionModule;
@@ -55,18 +51,10 @@ contract Phase1RefactorRiskTests is Test {
         // Deploy ops contracts
         createOps = new CreateOps(address(this));
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps(address(this));
-        settlementOps = new SettlementOps(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         
         // Deploy vault
-        vault = new EscrowVault(
-            ESCROW_FEE_BPS,
-            feeRecipient,
-            address(yieldOps),
-            address(disputeOps),
-            address(moduleManagement)
-        );
+        vault = new EscrowVault(ESCROW_FEE_BPS,feeRecipient,address(yieldOps),address(moduleManagement));
         
         // Grant roles for vault setup
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
@@ -78,12 +66,9 @@ contract Phase1RefactorRiskTests is Test {
         
         // Register vault with other ops
         yieldOps.registerEscrowContract(address(vault));
-        disputeOps.registerEscrowContract(address(vault));
-        settlementOps.registerEscrowContract(address(vault));
         
         // Set CreateOps
         vault.setCreateOps(address(createOps));
-        vault.setSettlementOps(address(settlementOps));
         
         // Register modules
         moduleManagement.registerEscrowContract(address(vault));

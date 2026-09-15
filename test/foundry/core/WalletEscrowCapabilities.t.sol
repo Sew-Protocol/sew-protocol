@@ -20,9 +20,7 @@ contract WalletEscrowCapabilitiesTest is AppealWindowEnforcementTest {
     }
 
     function test_escrowableERC20_supportsWalletCapabilityInterfaces() public {
-        EscrowableERC20 escrowToken = new EscrowableERC20(
-            'Escrow Token', 'ESC', ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement)
-        );
+        EscrowableERC20 escrowToken = new EscrowableERC20('Escrow Token','ESC',ESCROW_FEE,feeAddress,address(yieldOps),address(moduleManagement));
         assertTrue(escrowToken.supportsInterface(type(IEscrowLifecycle).interfaceId));
         assertTrue(escrowToken.supportsInterface(type(IEscrowDispute).interfaceId));
         assertTrue(escrowToken.supportsInterface(type(IEscrowAppeal).interfaceId));

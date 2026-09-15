@@ -1,42 +1,40 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.37;
 
-import '@openzeppelin/contracts/access/AccessControl.sol';
-import '../shared/interfaces/IResolutionModule.sol';
 import '../types/EscrowTypes.sol';
 
 /**
- * @title SettlementOps
- * @notice External contract for settlement execution operations
+ * @title EscrowSettlementLogic
+ * @notice Compile-time settlement derivation, internalized from the formerly
+ *         externally deployed SettlementOps contract.
  *
- *      Key design principles:
- *      - Compute → Apply: Returns settlement result, BaseEscrow applies to state
- *      - No callbacks: Does not write to BaseEscrow state
- *      - View-ish: Could be view functions but may query modules
+ * @dev Preserves the SettlementOps separation of concerns:
+ *      - derive only: returns a result/plan, never mutates escrow state
+ *      - no callbacks, no escrow storage access
+ *      - all inputs are explicit
  *
- *      Pattern:
- *      BaseEscrow calls: executeResolution(...) or executePendingSettlement(...)
- *      SettlementOps returns: (shouldExecute, isRelease, appealDeadline, isFinalRound)
- *      BaseEscrow applies: Updates state and executes transfer
+ *      The escrow remains the sole authoritative mutator: it calls these
+ *      functions, then applies the derived result to escrow state. This keeps
+ *      the derive -> result -> apply boundary while removing the runtime trust
+ *      and deployment boundary.
+ *
+ *      INTENTIONAL SEMANTIC DELTA (2a):
+ *      The refactored contract has no "settlement calculator unconfigured"
+ *      state. All domain behavior is equivalent when the previous SettlementOps
+ *      dependency was correctly configured. Differential tests assert exactly
+ *      that equivalence and must not attempt to recreate the obsolete
+ *      unconfigured state.
  */
-contract SettlementOps is AccessControl {
-    // ============ Role Constants ============
-    bytes32 public constant ROLE_ESCROW_CONTRACT = keccak256('ROLE_ESCROW_CONTRACT');
-    bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');
-
-    // ============ Custom Errors ============
-    error ZeroOwner();
+library EscrowSettlementLogic {
     // PendingSettlement struct (matches BaseEscrow.PendingSettlement)
-    // Note: This must match BaseEscrow.PendingSettlement exactly
     struct SettlementPendingSettlement {
         bool exists;
         bool isRelease;
         uint256 appealDeadline;
         bytes32 resolutionHash;
     }
-    /**
-     * @dev Result of resolution execution computation
-     */
+
+    /// @dev Result of resolution execution computation.
     struct ResolutionResult {
         bool shouldExecute; // Whether resolution should execute immediately
         bool isRelease; // True to release, false to cancel
@@ -44,31 +42,7 @@ contract SettlementOps is AccessControl {
         bool isFinalRound; // Whether this is the final round (no appeal window)
     }
 
-    /**
-     * @notice Constructor for SettlementOps
-     * @param initialOwner Address that will receive DEFAULT_ADMIN_ROLE (for initial setup only)
-     */
-    constructor(address initialOwner) {
-        if (initialOwner == address(0)) revert ZeroOwner();
-        _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
-        // ROLE_TIMELOCK gates registerEscrowContract(), so initialOwner must have it for initial setup.
-        _grantRole(ROLE_TIMELOCK, initialOwner);
-    }
-
-    /**
-     * @notice Register an escrow contract (grants it ROLE_ESCROW_CONTRACT)
-     * @param escrowContract Address of the escrow contract
-     * @dev Only ROLE_TIMELOCK can register escrow contracts (governance-controlled)
-     */
-    function registerEscrowContract(address escrowContract) external onlyRole(ROLE_TIMELOCK) {
-        if (escrowContract == address(0)) revert InvalidAddress(ADDR_ESCROW_CONTRACT, escrowContract);
-        _grantRole(ROLE_ESCROW_CONTRACT, escrowContract);
-    }
-
-    /**
-     * @notice Action plan for settlement automation
-     * @dev Returned by computeNextAction() to guide BaseEscrow._applyActionPlan()
-     */
+    /// @notice Action plan for settlement automation.
     struct ActionPlan {
         uint8 action; // 0 = none, 1 = release, 2 = cancel, 3 = set pending
         bool isRelease; // If action == 3 (set pending)
@@ -78,22 +52,22 @@ contract SettlementOps is AccessControl {
     }
 
     /**
-     * @notice Compute resolution execution parameters
+     * @notice Compute resolution execution parameters.
      * @param resolutionModule Address of the resolution module
      * @param workflowId Escrow workflow ID
      * @param isRelease True to release to recipient, false to cancel/refund to sender
-     * @param timeoutConfig Global timeout configuration
+     * @param timeoutConfig Timeout configuration (snapshotted by the escrow)
+     * @param escrowContract Address reported to the resolution module as the escrow
      * @return result Resolution execution result
-     * @dev This function is "compute-only" - it does NOT modify BaseEscrow state.
-     *      BaseEscrow will apply the result after receiving it.
-     *      Only authorized escrow contracts can call this function
+     * @dev Compute-only: does not modify escrow state.
      */
     function computeResolutionExecution(
         address resolutionModule,
         uint256 workflowId,
         bool isRelease,
-        TimeoutConfig memory timeoutConfig
-    ) external view onlyRole(ROLE_ESCROW_CONTRACT) returns (ResolutionResult memory result) {
+        TimeoutConfig memory timeoutConfig,
+        address escrowContract
+    ) internal view returns (ResolutionResult memory result) {
         result.isRelease = isRelease;
         result.shouldExecute = false;
         result.appealDeadline = 0;
@@ -126,7 +100,7 @@ contract SettlementOps is AccessControl {
         // Try to get appeal deadline and current round from module
         // Use staticcall to query view function
         (bool success, bytes memory data) = resolutionModule.staticcall(
-            abi.encodeWithSignature('getAppealDeadlineAndRound(uint256,address)', workflowId, _msgSender())
+            abi.encodeWithSignature('getAppealDeadlineAndRound(uint256,address)', workflowId, escrowContract)
         );
 
         if (success && data.length > 0) {
@@ -157,20 +131,19 @@ contract SettlementOps is AccessControl {
     }
 
     /**
-     * @notice Compute pending settlement execution check
-     * @param workflowId Escrow workflow ID
+     * @notice Compute pending settlement execution check.
+     * @param workflowId Escrow workflow ID (unused; kept for interface parity)
      * @param pending Pending settlement data
      * @param escrowState Current escrow state
      * @return canExecute Whether settlement can be executed
      * @return isRelease True if pending release, false if pending cancel
-     * @dev This function is "compute-only" - it does NOT modify BaseEscrow state.
-     *      Only authorized escrow contracts can call this function
+     * @dev Compute-only: does not modify escrow state.
      */
     function computePendingSettlementExecution(
         uint256 workflowId,
         SettlementPendingSettlement memory pending,
         EscrowState escrowState
-    ) external view onlyRole(ROLE_ESCROW_CONTRACT) returns (bool canExecute, bool isRelease) {
+    ) internal view returns (bool canExecute, bool isRelease) {
         // Intentionally unused (kept for interface/telemetry parity with other ops functions)
         workflowId;
 
@@ -193,15 +166,16 @@ contract SettlementOps is AccessControl {
     }
 
     /**
-     * @notice Compute timed actions (auto-release or auto-cancel)
+     * @notice Compute timed actions (auto-release or auto-cancel).
      * @param et Escrow transfer data
      * @param pending Pending settlement data
+     * @param timeoutConfig Snapshotted timeout configuration
+     * @param pendingAutoCancelEnabled Snapshotted pending auto-cancel policy
      * @param disputeRaisedTimestamp When the dispute was raised (0 if no dispute)
      * @return actionType 0 = none, 1 = auto-release, 2 = auto-cancel, 3 = pending settlement,
      *         4 = auto-cancel-disputed, 5 = dispute-timeout
      * @return isRelease True if release action, false if cancel
-     * @dev This function is "compute-only" - it does NOT modify BaseEscrow state.
-     *      Only authorized escrow contracts can call this function
+     * @dev Compute-only: does not modify escrow state.
      */
     function computeTimedActions(
         uint256 /* workflowId */,
@@ -210,17 +184,17 @@ contract SettlementOps is AccessControl {
         TimeoutConfig memory timeoutConfig,
         bool pendingAutoCancelEnabled,
         uint256 disputeRaisedTimestamp
-    ) external view returns (uint8 actionType, bool isRelease) {
+    ) internal view returns (uint8 actionType, bool isRelease) {
         // Check for pending settlement execution (appeal window enforcement)
         if (
             pending.exists &&
             block.timestamp >= pending.appealDeadline &&
             et.escrowState == EscrowState.DISPUTED
         ) {
-            return (3, pending.isRelease);
+            return (ACTION_EXECUTE_PENDING, pending.isRelease);
         }
 
-        // NEW: auto-cancel-time passed on DISPUTED escrow — griefing protection.
+        // auto-cancel-time passed on DISPUTED escrow — griefing protection.
         // Without this check a frivolous dispute raised before auto-cancel-time
         // orphans the deadline, forcing escrow into longer max-dispute-duration path.
         if (et.escrowState == EscrowState.DISPUTED && et.autoCancelTime > 0
@@ -242,29 +216,29 @@ contract SettlementOps is AccessControl {
 
         // Check for auto-release/auto-cancel (only for PENDING state)
         if (et.escrowState != EscrowState.PENDING) {
-            return (0, false);
+            return (ACTION_NONE, false);
         }
 
         if (et.autoReleaseTime > 0 && block.timestamp >= et.autoReleaseTime) {
-            return (1, true);
+            return (ACTION_AUTO_RELEASE, true);
         } else if ((pendingAutoCancelEnabled || et.autoCancelTime > 0) && et.autoCancelTime > 0 && block.timestamp >= et.autoCancelTime) {
-            return (2, false);
+            return (ACTION_AUTO_CANCEL, false);
         }
 
-        return (0, false);
+        return (ACTION_NONE, false);
     }
 
     /**
      * @notice Backward-compatible overload using timeout config to infer pending auto-cancel policy.
-     * @dev Preserves existing call sites while allowing explicit policy calls from upgraded BaseEscrow.
+     * @dev Preserves existing call sites while allowing explicit policy calls from upgraded escrow.
      */
     function computeTimedActions(
         uint256 workflowId,
         EscrowTransfer memory et,
         SettlementPendingSettlement memory pending,
         TimeoutConfig memory timeoutConfig
-    ) external view returns (uint8 actionType, bool isRelease) {
+    ) internal view returns (uint8 actionType, bool isRelease) {
         bool pendingAutoCancelEnabled = timeoutConfig.defaultAutoCancelDelay > 0;
-        return this.computeTimedActions(workflowId, et, pending, timeoutConfig, pendingAutoCancelEnabled, 0);
+        return computeTimedActions(workflowId, et, pending, timeoutConfig, pendingAutoCancelEnabled, 0);
     }
 }

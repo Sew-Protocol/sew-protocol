@@ -6,8 +6,6 @@ import "../../../contracts/core/EscrowVault.sol";
 import "../../../contracts/core/BaseEscrow.sol";
 import "../../../contracts/ops/CreateOps.sol";
 import "../../../contracts/ops/YieldOps.sol";
-import "../../../contracts/ops/DisputeOps.sol";
-import "../../../contracts/ops/SettlementOps.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
@@ -19,7 +17,6 @@ contract NewHardeningTests is Test {
     EscrowVault public vault;
     CreateOps public createOps;
     YieldOps public yieldOps;
-    DisputeOps public disputeOps;
     ModuleSnapshotRegistry public moduleManagement;
     ERC20Mock public token;
     DefaultResolutionModule public resolutionModule;
@@ -34,10 +31,9 @@ contract NewHardeningTests is Test {
         vm.startPrank(owner);
         createOps = new CreateOps(owner);
         yieldOps = new YieldOps(owner);
-        disputeOps = new DisputeOps(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
         
-        vault = new EscrowVault(100, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
+        vault = new EscrowVault(100,feeAddress,address(yieldOps),address(moduleManagement));
         vault.setCreateOps(address(createOps));
         vault.grantRole(vault.ROLE_TIMELOCK(), timelock);
         

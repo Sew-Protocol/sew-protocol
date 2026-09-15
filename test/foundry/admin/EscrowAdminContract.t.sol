@@ -9,7 +9,6 @@ import '../../../contracts/core/modules/DefaultResolutionModule.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/governance/SlowLaneQueueActivate.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/DisputeOps.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 
 /**
@@ -32,7 +31,6 @@ contract EscrowGovernanceTimelockTest is Test {
     DefaultResolutionModule public resolutionModule2;
     
     YieldOps public yieldOps;
-    DisputeOps public disputeOps;
     ModuleSnapshotRegistry public moduleManagement;
     
     address public owner;
@@ -51,10 +49,9 @@ contract EscrowGovernanceTimelockTest is Test {
         unauthorized = address(0x9999);
         
         yieldOps = new YieldOps(owner);
-        disputeOps = new DisputeOps(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
         
-        vault = new EscrowVault(ESCROW_FEE, feeAddress1, address(yieldOps), address(disputeOps), address(moduleManagement));
+        vault = new EscrowVault(ESCROW_FEE,feeAddress1,address(yieldOps),address(moduleManagement));
         
         resolutionModule1 = new DefaultResolutionModule(owner, address(0x2222));
         resolutionModule2 = new DefaultResolutionModule(owner, address(0x3333));
@@ -520,7 +517,7 @@ contract EscrowGovernanceTimelockTest is Test {
     // ============ Multiple Escrow Contracts Tests ============
     
     function test_multipleEscrowContracts() public {
-        EscrowVault vault2 = new EscrowVault(ESCROW_FEE, feeAddress1, address(yieldOps), address(disputeOps), address(moduleManagement));
+        EscrowVault vault2 = new EscrowVault(ESCROW_FEE,feeAddress1,address(yieldOps),address(moduleManagement));
         vault2.grantRole(vault2.ROLE_ADMIN_CONTRACT(), address(adminContract));
         
         vm.prank(timelock);

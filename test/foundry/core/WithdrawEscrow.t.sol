@@ -9,8 +9,6 @@ import 'contracts/mocks/ERC20Mock.sol';
 import 'contracts/core/modules/DefaultResolutionModule.sol';
 import 'contracts/types/EscrowTypes.sol';
 import 'contracts/ops/YieldOps.sol';
-import 'contracts/ops/DisputeOps.sol';
-import 'contracts/ops/SettlementOps.sol';
 import 'contracts/ops/CreateOps.sol';
 import 'contracts/core/BondCollector.sol';
 import 'contracts/core/ModuleSnapshotRegistry.sol';
@@ -24,8 +22,6 @@ contract WithdrawEscrowTest is Test {
     DefaultResolutionModule rm;
     DefaultReleaseStrategy releaseStrategy;
     YieldOps yieldOps;
-    DisputeOps disputeOps;
-    SettlementOps settlementOps;
     CreateOps createOps;
     BondCollector bondCollector;
     ModuleSnapshotRegistry moduleManagement;
@@ -41,14 +37,12 @@ contract WithdrawEscrowTest is Test {
 
     function setUp() public {
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps(address(this));
-        settlementOps = new SettlementOps(address(this));
         createOps = new CreateOps(address(this));
         bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));
         releaseStrategy = new DefaultReleaseStrategy();
-        vault = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
+        vault = new EscrowVault(ESCROW_FEE,feeAddress,address(yieldOps),address(moduleManagement));
         moduleManagement.registerEscrowContract(address(vault));
         moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
         vm.warp(block.timestamp + 8 days);
@@ -57,8 +51,6 @@ contract WithdrawEscrowTest is Test {
 
         // Register escrow contract with all ops contracts
         yieldOps.registerEscrowContract(address(vault));
-        disputeOps.registerEscrowContract(address(vault));
-        settlementOps.registerEscrowContract(address(vault));
         createOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
 
@@ -67,7 +59,6 @@ contract WithdrawEscrowTest is Test {
         // Allow EscrowGovernanceTimelock to apply queued changes on the vault
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(adminContract));
         vault.setCreateOps(address(createOps));
-        vault.setSettlementOps(address(settlementOps));
         vault.setBondCollector(address(bondCollector));
 
         token = new ERC20Mock('Test', 'TST', address(this), 1e24);

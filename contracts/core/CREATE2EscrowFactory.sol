@@ -25,7 +25,6 @@ contract CREATE2EscrowFactory {
         uint256 escrowFeeBps,
         address feeAddress,
         address yieldOpsAddress,
-        address disputeOpsAddress,
         address moduleManagementAddress,
         bytes32 salt
     ) external view returns (address predictedAddress) {
@@ -35,7 +34,6 @@ contract CREATE2EscrowFactory {
                 escrowFeeBps,
                 feeAddress,
                 yieldOpsAddress,
-                disputeOpsAddress,
                 moduleManagementAddress
             )
         );
@@ -47,7 +45,6 @@ contract CREATE2EscrowFactory {
         uint256 escrowFeeBps,
         address feeAddress,
         address yieldOpsAddress,
-        address disputeOpsAddress,
         address moduleManagementAddress,
         bytes32 salt
     ) external returns (EscrowVault escrowVault) {
@@ -55,7 +52,6 @@ contract CREATE2EscrowFactory {
             escrowFeeBps,
             feeAddress,
             yieldOpsAddress,
-            disputeOpsAddress,
             moduleManagementAddress
         );
 
@@ -90,7 +86,6 @@ contract CREATE2EscrowFactory {
         uint256 escrowFeeBps,
         address feeAddress,
         address yieldOpsAddress,
-        address disputeOpsAddress,
         address moduleManagementAddress,
         bytes32 salt
     ) external view returns (bool deployed) {
@@ -98,7 +93,6 @@ contract CREATE2EscrowFactory {
             escrowFeeBps,
             feeAddress,
             yieldOpsAddress,
-            disputeOpsAddress,
             moduleManagementAddress,
             salt
         );

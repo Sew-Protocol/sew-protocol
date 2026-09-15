@@ -6,6 +6,7 @@ import '../types/EscrowTypes.sol';
 import '../types/YieldPresets.sol';
 import '../libraries/SettingsValidationLibrary.sol';
 import '../libraries/DisputeManagementLibrary.sol';
+import '../libraries/EscrowSettlementLogic.sol';
 import '@openzeppelin/contracts/utils/math/SafeCast.sol';
 
 /**
@@ -468,7 +469,7 @@ contract EscrowViewContract {
             RecipientStatus recipientStatus
         ) = escrowContract.escrowTransfers(workflowId);
 
-        // Map to memory struct for SettlementOps
+        // Map to memory struct for EscrowSettlementLogic
         EscrowTransfer memory et = EscrowTransfer({
             token: token,
             to: to,
@@ -490,16 +491,12 @@ contract EscrowViewContract {
             bytes32 resolutionHash
         ) = escrowContract.pendingSettlements(workflowId);
 
-        SettlementOps.SettlementPendingSettlement memory pending = SettlementOps.SettlementPendingSettlement({
+        EscrowSettlementLogic.SettlementPendingSettlement memory pending = EscrowSettlementLogic.SettlementPendingSettlement({
             exists: exists,
             isRelease: isReleasePending,
             appealDeadline: appealDeadline,
             resolutionHash: resolutionHash
         });
-
-        // Query settlement ops (made public previously)
-        SettlementOps settlementOps = SettlementOps(address(escrowContract.settlementOps()));
-        if (address(settlementOps) == address(0)) return (false, 0, false, 0, 0);
 
         (
             uint256 dar,
@@ -508,7 +505,7 @@ contract EscrowViewContract {
             uint256 awd
         ) = escrowContract.timeoutConfig();
 
-        (actionType, isRelease) = settlementOps.computeTimedActions(
+        (actionType, isRelease) = EscrowSettlementLogic.computeTimedActions(
             workflowId, 
             et, 
             pending, 

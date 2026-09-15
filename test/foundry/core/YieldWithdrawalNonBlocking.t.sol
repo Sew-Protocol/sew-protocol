@@ -8,8 +8,6 @@ import "../../../contracts/modules/DefaultReleaseStrategy.sol";
 import "contracts/core/ModuleSnapshotRegistry.sol";
 import "contracts/admin/EscrowGovernanceTimelock.sol";
 import "contracts/core/modules/DefaultResolutionModule.sol";
-import "contracts/ops/DisputeOps.sol";
-import "contracts/ops/SettlementOps.sol";
 import "contracts/ops/CreateOps.sol";
 import "contracts/core/BondCollector.sol";
 import "contracts/mocks/ERC20Mock.sol";
@@ -47,8 +45,6 @@ contract YieldWithdrawalNonBlockingTest is Test {
     ModuleSnapshotRegistry moduleManagement;
     EscrowGovernanceTimelock adminContract;
     DefaultResolutionModule rm;
-    DisputeOps disputeOps;
-    SettlementOps settlementOps;
     CreateOps createOps;
     BondCollector bondCollector;
     DefaultReleaseStrategy releaseStrategy;
@@ -64,8 +60,6 @@ contract YieldWithdrawalNonBlockingTest is Test {
     uint256 constant AMOUNT = 10 ether;
 
     function setUp() public {
-        disputeOps = new DisputeOps(address(this));
-        settlementOps = new SettlementOps(address(this));
         createOps = new CreateOps(address(this));
         bondCollector = new BondCollector(address(this));
         releaseStrategy = new DefaultReleaseStrategy();
@@ -73,15 +67,13 @@ contract YieldWithdrawalNonBlockingTest is Test {
         adminContract = new EscrowGovernanceTimelock(address(this));
 
         badYieldOps = new BadYieldOps();
-        vault = new EscrowVault(ESCROW_FEE, feeAddress, address(badYieldOps), address(disputeOps), address(moduleManagement));
+        vault = new EscrowVault(ESCROW_FEE,feeAddress,address(badYieldOps),address(moduleManagement));
         moduleManagement.registerEscrowContract(address(vault));
         moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
         vm.warp(block.timestamp + 7 days + 1);
         moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
 
         // Register escrow contract with ops contracts
-        disputeOps.registerEscrowContract(address(vault));
-        settlementOps.registerEscrowContract(address(vault));
         createOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
         badYieldOps.registerEscrowContract(address(vault));
@@ -90,7 +82,6 @@ contract YieldWithdrawalNonBlockingTest is Test {
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(adminContract));
         vault.setCreateOps(address(createOps));
-        vault.setSettlementOps(address(settlementOps));
         vault.setBondCollector(address(bondCollector));
 
         // Activate a resolution module so escrow creation succeeds.

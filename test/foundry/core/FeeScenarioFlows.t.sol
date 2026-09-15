@@ -11,8 +11,6 @@ import "../../../contracts/types/EscrowTypes.sol";
 import "../../../contracts/libraries/SettingsValidationLibrary.sol";
 
 import "../../../contracts/ops/YieldOps.sol";
-import "../../../contracts/ops/DisputeOps.sol";
-import "../../../contracts/ops/SettlementOps.sol";
 import "../../../contracts/ops/CreateOps.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
@@ -90,8 +88,6 @@ contract FeeScenarioFlowsTest is Test {
     ERC20Mock public token;
     DefaultResolutionModule public resolutionModule;
     YieldOps public yieldOps;
-    DisputeOps public disputeOps;
-    SettlementOps public settlementOps;
     CreateOps public createOps;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
@@ -124,15 +120,13 @@ contract FeeScenarioFlowsTest is Test {
         releaseStrategy = new DefaultReleaseStrategy();
         token = new ERC20Mock("Token", "TKN", owner, 10000000e18);
         yieldOps = new YieldOps(owner);
-        disputeOps = new DisputeOps(owner);
-        settlementOps = new SettlementOps(owner);
         createOps = new CreateOps(owner);
         bondCollector = new BondCollector(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
         adminContract = new EscrowGovernanceTimelock(owner);
 
         // Vault starts with 0% fee; we'll slow-lane set to 1% in tests.
-        vault = new EscrowVault(INITIAL_ESCROW_FEE_BPS, treasury, address(yieldOps), address(disputeOps), address(moduleManagement));
+        vault = new EscrowVault(INITIAL_ESCROW_FEE_BPS,treasury,address(yieldOps),address(moduleManagement));
         moduleManagement.registerEscrowContract(address(vault));
         moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
         vm.warp(block.timestamp + 8 days);
@@ -140,8 +134,6 @@ contract FeeScenarioFlowsTest is Test {
 
         // Register vault on ops contracts
         yieldOps.registerEscrowContract(address(vault));
-        disputeOps.registerEscrowContract(address(vault));
-        settlementOps.registerEscrowContract(address(vault));
         createOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
 
@@ -158,7 +150,6 @@ contract FeeScenarioFlowsTest is Test {
 
         // Ops wiring (timelock-gated on the vault)
         vault.setCreateOps(address(createOps));
-        vault.setSettlementOps(address(settlementOps));
         vault.setBondCollector(address(bondCollector));
 
         // Activate a resolution module so create flows have a valid default resolver path.

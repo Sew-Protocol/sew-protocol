@@ -150,7 +150,6 @@ contract SecurityAttackSimBaseSepoliaForkTest is Test {
 
         // --- UPGRADE CORE ON FORK ---
         address yieldOps = _dep("YieldOps");
-        address disputeOps = _dep("DisputeOps");
         address moduleManagement = _dep("ModuleSnapshotRegistry");
         address safeMultisig = _dep("Safe_Multisig");
         address createOps = _dep("CreateOps");

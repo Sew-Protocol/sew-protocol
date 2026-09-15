@@ -7,7 +7,6 @@ import '../../../contracts/modules/decentralized-resolution-module/PaymentCalcul
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/DisputeOps.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
@@ -23,7 +22,6 @@ contract EscalationDepthHistogramInvariantsTest is Test {
     ERC20Mock public token;
     EscrowVault public escrow;
     YieldOps public yieldOps;
-    DisputeOps public disputeOps;
     ModuleSnapshotRegistry public moduleManagement;
     EscrowGovernanceTimelock public adminContract;
 
@@ -49,10 +47,9 @@ contract EscalationDepthHistogramInvariantsTest is Test {
         incentiveModule = new ResolverIncentiveModuleV2(deployer, address(paymentLib));
         token = new ERC20Mock('Test Token', 'TEST', address(this), 0);
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));
-        escrow = new EscrowVault(100, makeAddr('feeAddress'), address(yieldOps), address(disputeOps), address(moduleManagement));
+        escrow = new EscrowVault(100,makeAddr('feeAddress'),address(yieldOps),address(moduleManagement));
 
         // Setup roles
         incentiveModule.grantRole(incentiveModule.ROLE_TIMELOCK(), timelock);

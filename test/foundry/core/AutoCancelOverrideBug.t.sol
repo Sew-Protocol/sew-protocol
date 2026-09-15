@@ -6,8 +6,6 @@ import "../../../contracts/core/EscrowVault.sol";
 import "../../../contracts/core/modules/DefaultResolutionModule.sol";
 import "../../../contracts/types/EscrowTypes.sol";
 import "../../../contracts/ops/YieldOps.sol";
-import "../../../contracts/ops/DisputeOps.sol";
-import "../../../contracts/ops/SettlementOps.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
@@ -37,8 +35,6 @@ contract AutoCancelOverrideBugTest is Test {
     ERC20Mock public token;
     MockAppealModule public resolutionModule;
     YieldOps public yieldOps;
-    DisputeOps public disputeOps;
-    SettlementOps public settlementOps;
     CreateOps public createOps;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
@@ -53,25 +49,20 @@ contract AutoCancelOverrideBugTest is Test {
         owner = address(this);
         token = new ERC20Mock("Token", "TKN", owner, 0);
         yieldOps = new YieldOps(owner);
-        disputeOps = new DisputeOps(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
         createOps = new CreateOps(owner);
-        settlementOps = new SettlementOps(owner);
         bondCollector = new BondCollector(owner);
         resolutionModule = new MockAppealModule(owner, resolver);
 
-        escrow = new EscrowVault(0, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
+        escrow = new EscrowVault(0,feeAddress,address(yieldOps),address(moduleManagement));
         
         yieldOps.registerEscrowContract(address(escrow));
-        disputeOps.registerEscrowContract(address(escrow));
         moduleManagement.registerEscrowContract(address(escrow));
         createOps.registerEscrowContract(address(escrow));
-        settlementOps.registerEscrowContract(address(escrow));
         bondCollector.registerEscrowContract(address(escrow));
 
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), owner);
         escrow.setCreateOps(address(createOps));
-        escrow.setSettlementOps(address(settlementOps));
         escrow.setBondCollector(address(bondCollector));
         escrow.setResolutionModule(address(resolutionModule));
 

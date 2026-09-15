@@ -34,8 +34,6 @@ error InvalidAmount(uint8 code);
 error ArrayLengthMismatch(uint256 expectedLength, uint256 actualLength);
 
 // Specific errors without string parameters (saves bytecode)
-error ZeroDisputeOps();
-error ZeroSettlementOps();
 error ZeroCreateOps();
 error InvalidResolutionModule(address module);
 error ModuleNotContract(address module);

@@ -7,8 +7,6 @@ import "../../../contracts/modules/DefaultReleaseStrategy.sol";
 import "../../../contracts/core/modules/DefaultResolutionModule.sol";
 import "../../../contracts/types/EscrowTypes.sol";
 import "../../../contracts/ops/YieldOps.sol";
-import "../../../contracts/ops/DisputeOps.sol";
-import "../../../contracts/ops/SettlementOps.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/admin/EscrowGovernanceTimelock.sol";
@@ -45,8 +43,6 @@ contract EscrowableERC20BugsTest is Test {
     ERC20Mock public otherToken;
     DefaultResolutionModule public resolutionModule;
     YieldOps public yieldOps;
-    DisputeOps public disputeOps;
-    SettlementOps public settlementOps;
     CreateOps public createOps;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
@@ -62,34 +58,26 @@ contract EscrowableERC20BugsTest is Test {
     function setUp() public {
         owner = address(this);
         yieldOps = new YieldOps(owner);
-        disputeOps = new DisputeOps(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
         createOps = new CreateOps(owner);
-        settlementOps = new SettlementOps(owner);
         bondCollector = new BondCollector(owner);
         resolutionModule = new DefaultResolutionModule(owner, resolver);
         adminContract = new EscrowGovernanceTimelock(owner);
         releaseStrategy = new DefaultReleaseStrategy();
         silentModule = new SilentFailureModule();
 
-        escrowToken = new EscrowableERC20(
-            "EscrowToken", "ESC", 0, feeAddress, 
-            address(yieldOps), address(disputeOps), address(moduleManagement)
-        );
+        escrowToken = new EscrowableERC20("EscrowToken","ESC",0,feeAddress,address(yieldOps),address(moduleManagement));
         
         otherToken = new ERC20Mock("Other", "OTH", owner, 1000 ether);
 
         yieldOps.registerEscrowContract(address(escrowToken));
-        disputeOps.registerEscrowContract(address(escrowToken));
         moduleManagement.registerEscrowContract(address(escrowToken));
         createOps.registerEscrowContract(address(escrowToken));
-        settlementOps.registerEscrowContract(address(escrowToken));
         bondCollector.registerEscrowContract(address(escrowToken));
         adminContract.registerEscrowContract(address(escrowToken));
 
         escrowToken.grantRole(escrowToken.ROLE_TIMELOCK(), owner);
         escrowToken.setCreateOps(address(createOps));
-        escrowToken.setSettlementOps(address(settlementOps));
         escrowToken.setBondCollector(address(bondCollector));
 
         // Configure silent module via Registry

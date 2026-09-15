@@ -7,9 +7,7 @@ import "forge-std/console.sol";
 import { EscrowVault } from "../../../contracts/core/EscrowVault.sol";
 import { ModuleSnapshotRegistry } from "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import { YieldOps } from "../../../contracts/ops/YieldOps.sol";
-import { DisputeOps } from "../../../contracts/ops/DisputeOps.sol";
 import { CreateOps } from "../../../contracts/ops/CreateOps.sol";
-import { SettlementOps } from "../../../contracts/ops/SettlementOps.sol";
 import { BondCollector } from "../../../contracts/core/BondCollector.sol";
 import { DefaultResolutionModule } from "../../../contracts/core/modules/DefaultResolutionModule.sol";
 import { ERC20Mock } from "../../../contracts/mocks/ERC20Mock.sol";
@@ -81,9 +79,8 @@ contract EscrowVaultReleaseStrategyHarness is EscrowVault {
         uint256 escrowFeeBps,
         address feeAddress,
         address yieldOpsAddress,
-        address disputeOpsAddress,
         address moduleManagementAddress
-    ) EscrowVault(escrowFeeBps, feeAddress, yieldOpsAddress, disputeOpsAddress, moduleManagementAddress) {}
+    ) EscrowVault(escrowFeeBps, feeAddress, yieldOpsAddress, moduleManagementAddress) {}
 
     function snapReleaseStrategy(uint256 workflowId) external view returns (address) {
         return moduleSnapshots[workflowId].releaseStrategy;
@@ -99,9 +96,7 @@ contract ReleaseStrategyWiringTest is Test {
     ModuleSnapshotRegistry internal mm;
     EscrowVaultReleaseStrategyHarness internal vault;
     YieldOps internal yieldOps;
-    DisputeOps internal disputeOps;
     CreateOps internal createOps;
-    SettlementOps internal settlementOps;
     BondCollector internal bondCollector;
     DefaultResolutionModule internal resolutionModule;
 
@@ -111,10 +106,9 @@ contract ReleaseStrategyWiringTest is Test {
 
     function setUp() public {
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps(address(this));
         mm = new ModuleSnapshotRegistry(address(this));
 
-        vault = new EscrowVaultReleaseStrategyHarness(0, FEE, address(yieldOps), address(disputeOps), address(mm));
+        vault = new EscrowVaultReleaseStrategyHarness(0, FEE, address(yieldOps), address(mm));
 
         // Register escrow contract so it can queue/activate modules (msg.sender must be the escrow itself).
         mm.registerEscrowContract(address(vault));
@@ -124,15 +118,12 @@ contract ReleaseStrategyWiringTest is Test {
         createOps.grantRole(createOps.ROLE_TIMELOCK(), address(this));
         createOps.registerEscrowContract(address(vault));
 
-        settlementOps = new SettlementOps(address(this));
-        settlementOps.registerEscrowContract(address(vault));
 
         bondCollector = new BondCollector(address(this));
         bondCollector.registerEscrowContract(address(vault));
 
         // EscrowVault setters are timelock-gated; deployer has ROLE_TIMELOCK in constructor.
         vault.setCreateOps(address(createOps));
-        vault.setSettlementOps(address(settlementOps));
         vault.setBondCollector(address(bondCollector));
 
         // Ensure createEscrow can choose a dispute resolver (resolution module must be configured).

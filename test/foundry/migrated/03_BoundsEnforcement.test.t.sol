@@ -4,7 +4,6 @@ pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
 import 'contracts/ops/YieldOps.sol';
-import 'contracts/ops/DisputeOps.sol';
 import 'contracts/core/ModuleSnapshotRegistry.sol';
 import 'contracts/core/EscrowVault.sol';
 import 'contracts/admin/EscrowGovernanceTimelock.sol';
@@ -13,16 +12,14 @@ import 'contracts/types/EscrowTypes.sol';
 contract Test_03_BoundsEnforcement_test is Test {
     EscrowVault vault;
     YieldOps public yieldOps;
-    DisputeOps public disputeOps;
     ModuleSnapshotRegistry public moduleManagement;
     EscrowGovernanceTimelock public adminContract;
     address timelock = address(0x1);
 
     function setUp() public {
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
-        vault = new EscrowVault(100, address(this), address(yieldOps), address(disputeOps), address(moduleManagement));
+        vault = new EscrowVault(100,address(this),address(yieldOps),address(moduleManagement));
         vault.grantRole(vault.ROLE_TIMELOCK(), timelock);
         adminContract = new EscrowGovernanceTimelock(address(this));
         adminContract.grantRole(adminContract.ROLE_TIMELOCK(), timelock);

@@ -8,8 +8,6 @@ import 'contracts/core/modules/DefaultResolutionModule.sol';
 import 'contracts/modules/DefaultReleaseStrategy.sol';
 import 'contracts/types/EscrowTypes.sol';
 import 'contracts/ops/YieldOps.sol';
-import 'contracts/ops/DisputeOps.sol';
-import 'contracts/ops/SettlementOps.sol';
 import 'contracts/ops/CreateOps.sol';
 import 'contracts/core/BondCollector.sol';
 import 'contracts/core/ModuleSnapshotRegistry.sol';
@@ -26,8 +24,6 @@ contract AutoTransferTest is Test {
     DefaultResolutionModule rm;
     DefaultReleaseStrategy defaultReleaseStrategy;
     YieldOps yieldOps;
-    DisputeOps disputeOps;
-    SettlementOps settlementOps;
     CreateOps createOps;
     BondCollector bondCollector;
     ModuleSnapshotRegistry moduleManagement;
@@ -43,14 +39,12 @@ contract AutoTransferTest is Test {
 
     function setUp() public {
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps(address(this));
-        settlementOps = new SettlementOps(address(this));
         createOps = new CreateOps(address(this));
         bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));
         defaultReleaseStrategy = new DefaultReleaseStrategy();
-        vault = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
+        vault = new EscrowVault(ESCROW_FEE,feeAddress,address(yieldOps),address(moduleManagement));
         moduleManagement.registerEscrowContract(address(vault));
 
         moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(defaultReleaseStrategy));
@@ -59,8 +53,6 @@ contract AutoTransferTest is Test {
         moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
 
         yieldOps.registerEscrowContract(address(vault));
-        disputeOps.registerEscrowContract(address(vault));
-        settlementOps.registerEscrowContract(address(vault));
         createOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
 
@@ -71,7 +63,6 @@ contract AutoTransferTest is Test {
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(adminContract));
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.setCreateOps(address(createOps));
-        vault.setSettlementOps(address(settlementOps));
         vault.setBondCollector(address(bondCollector));
         adminContract.queueResolutionModule(address(vault), address(rm));
         vm.warp(block.timestamp + 7 days + 1);

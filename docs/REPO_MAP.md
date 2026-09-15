@@ -73,8 +73,6 @@ Stateless facet contracts. `BaseEscrow` delegates specific operations to these v
 | File | Role |
 |---|---|
 | `CreateOps.sol` | Escrow creation, yield deposit on creation, yield-deposit resume/pause. |
-| `SettlementOps.sol` | Mutual split proposals, split execution, settlement flow. |
-| `DisputeOps.sol` | Dispute initiation, resolver decision submission, finalization. |
 | `YieldOps.sol` | Yield withdrawal and distribution. |
 | `GuardianOps.sol` | Guardian-only emergency operations (forced Aave unwind). |
 

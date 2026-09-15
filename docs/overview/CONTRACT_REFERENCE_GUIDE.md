@@ -166,15 +166,15 @@
 - **Description**: External contract for yield withdrawal and distribution operations.
 - **Handles**: Yield module calls, distribution logic, withdrawal orchestration
 
-### DisputeOps
-- **Type**: ✅ Singleton (Library)
-- **Description**: External contract for dispute escalation orchestration.
-- **Handles**: Appeal bond collection, round management, incentive module integration
+### EscrowDisputeLogic (internal library)
+- **Location**: `contracts/libraries/EscrowDisputeLogic.sol`
+- **Description**: Compile-time dispute derivation (`computeDisputeOpening`, `computeEscalation`), internalized from the former DisputeOps contract.
+- **Handles**: Resolver selection, escalation levels, appealability/deadlines, bond asset/amount, predecessor/successor facts
 
-### SettlementOps
-- **Type**: ✅ Singleton (Library)
-- **Description**: External contract for settlement execution operations.
-- **Handles**: Final settlement logic, fund distribution
+### EscrowSettlementLogic (internal library)
+- **Location**: `contracts/libraries/EscrowSettlementLogic.sol`
+- **Description**: Compile-time settlement derivation, internalized from the former SettlementOps contract.
+- **Handles**: Timed actions, pending-settlement execution, resolution execution
 
 ### GuardianOps
 - **Type**: ✅ Singleton (Library)
@@ -244,7 +244,7 @@
 | Escrow Implementations | 🔄 Multi-Instance | 2 | EscrowVault, EscrowableERC20 |
 | Yield Modules | ✅ Singleton | 3 | AaveYieldGenerationModule, DefaultYieldGenerationModule, DefaultYieldDistributionModule |
 | Resolution Modules | ✅ Singleton | 2+ | DefaultResolutionModule, DefaultReleaseStrategy, DR modules |
-| Ops Libraries | ✅ Singleton | 5 | CreateOps, YieldOps, DisputeOps, SettlementOps, GuardianOps |
+| Ops Libraries | ✅ Singleton | 4 | CreateOps, YieldOps, BondCollector, GuardianOps (dispute/settlement derivation is now internal) |
 | Pure Libraries | No deployment | 20+ | Various libraries in `contracts/libraries/` |
 
 ### Table 2: Contract Renames (for Reference)

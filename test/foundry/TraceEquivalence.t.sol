@@ -9,9 +9,7 @@ import { EscrowViewContract } from "../../contracts/core/EscrowViewContract.sol"
 import { DefaultResolutionModule } from "../../contracts/core/modules/DefaultResolutionModule.sol";
 import { DefaultReleaseStrategy } from "../../contracts/modules/DefaultReleaseStrategy.sol";
 import { CreateOps } from "../../contracts/ops/CreateOps.sol";
-import { SettlementOps } from "../../contracts/ops/SettlementOps.sol";
 import { YieldOps } from "../../contracts/ops/YieldOps.sol";
-import { DisputeOps } from "../../contracts/ops/DisputeOps.sol";
 import { BondCollector } from "../../contracts/core/BondCollector.sol";
 import { ModuleSnapshotRegistry } from "../../contracts/core/ModuleSnapshotRegistry.sol";
 import { ERC20Mock } from "../../contracts/mocks/ERC20Mock.sol";
@@ -71,9 +69,7 @@ contract TraceEquivalenceTest is Test {
     DefaultResolutionModule drModule;
     DefaultReleaseStrategy  releaseStrategy;
     CreateOps        createOps;
-    SettlementOps    settlementOps;
     YieldOps         yieldOps;
-    DisputeOps       disputeOps;
     BondCollector    bondCollector;
     ModuleSnapshotRegistry moduleManagement;
     ERC20Mock        token;
@@ -180,28 +176,23 @@ contract TraceEquivalenceTest is Test {
         token = new ERC20Mock("Trace USDC", "TUSDC", owner, 0);
 
         yieldOps       = new YieldOps(owner);
-        disputeOps     = new DisputeOps(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
         createOps      = new CreateOps(owner);
-        settlementOps  = new SettlementOps(owner);
         bondCollector  = new BondCollector(owner);
         drModule       = new DefaultResolutionModule(owner, RESOLVER);
         releaseStrategy = new DefaultReleaseStrategy();
 
         // EscrowVault constructor grants ROLE_TIMELOCK + DEFAULT_ADMIN to address(this)
-        vault = new EscrowVault(_vaultFeeBps, FEE_ADDR, address(yieldOps), address(disputeOps), address(moduleManagement));
+        vault = new EscrowVault(_vaultFeeBps,FEE_ADDR,address(yieldOps),address(moduleManagement));
 
         // Register vault with every ops contract (required before calls)
         yieldOps.registerEscrowContract(address(vault));
-        disputeOps.registerEscrowContract(address(vault));
         moduleManagement.registerEscrowContract(address(vault));
         createOps.registerEscrowContract(address(vault));
-        settlementOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
 
         // Wire ops into vault (requires ROLE_TIMELOCK which address(this) already has)
         vault.setCreateOps(address(createOps));
-        vault.setSettlementOps(address(settlementOps));
         vault.setBondCollector(address(bondCollector));
         // Keep trace executor authorized for timed actions in fixture replays
         vault.grantRole(vault.ROLE_TIMELOCK(), EXECUTOR);
@@ -331,7 +322,7 @@ contract TraceEquivalenceTest is Test {
     //
     // Pins the contract behaviour that the regenerated zero-window traces
     // rely on: with appealWindowDuration == 0 a resolver ruling finalises
-    // immediately (no pending settlement), matching SettlementOps
+    // immediately (no pending settlement), matching EscrowSettlementLogic
     // computeResolutionExecution and the Clojure simulation's terminal state.
     // ====================================================================
 
@@ -1466,7 +1457,7 @@ contract TraceEquivalenceTest is Test {
     // Sew domain reference — core protocol conflict scenarios.
     // sew-001, sew-004 excluded: traces generated with legacy sim behavior
     // that set total_held=0 on pending settlement creation.  Solidity vault
-    // keeps funds locked until executePendingSettlement.  The SettlementOps
+    // keeps funds locked until executePendingSettlement.  The settlement derivation
     // appeal-window-duration=0 fix is correct; traces need regeneration.
     function test_v2_sew_003_escalation_after_terminal() public {
         _replayTrace("test/foundry/traces/v2/sew-003.json");

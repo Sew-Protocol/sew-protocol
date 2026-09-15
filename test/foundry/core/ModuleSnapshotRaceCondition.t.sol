@@ -6,9 +6,7 @@ import "../../../contracts/core/EscrowVault.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/modules/DefaultReleaseStrategy.sol";
 import "../../../contracts/ops/YieldOps.sol";
-import "../../../contracts/ops/DisputeOps.sol";
 import "../../../contracts/ops/CreateOps.sol";
-import "../../../contracts/ops/SettlementOps.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/core/modules/DefaultResolutionModule.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
@@ -44,7 +42,7 @@ contract ModuleSnapshotRaceConditionTest is Test {
         strategyB = new SimpleReleaseStrategy();
         token = new ERC20Mock("Token", "TKN", owner, 1000e18);
 
-        vault = new EscrowVault(0, address(0xFEE), address(new YieldOps(owner)), address(new DisputeOps(owner)), address(mm));
+        vault = new EscrowVault(0,address(0xFEE),address(new YieldOps(owner)),address(mm));
         
         mm.registerEscrowContract(address(vault));
         

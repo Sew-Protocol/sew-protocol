@@ -9,9 +9,7 @@ import '../../../contracts/modules/decentralized-resolution-module/PaymentCalcul
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/DisputeOps.sol';
 import '../../../contracts/ops/CreateOps.sol';
-import '../../../contracts/ops/SettlementOps.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/types/EscrowTypes.sol';
@@ -57,23 +55,18 @@ contract BondBehaviourCorrectionTest is Test {
         drm.registerEscrowContract(address(this));
 
         YieldOps yOps = new YieldOps(address(this));
-        DisputeOps dOps = new DisputeOps(address(this));
         moduleMgmt = new ModuleSnapshotRegistry(address(this));
-        escrow = new EscrowVault(100, feeAddr, address(yOps), address(dOps), address(moduleMgmt));
+        escrow = new EscrowVault(100,feeAddr,address(yOps),address(moduleMgmt));
 
         CreateOps cOps = new CreateOps(address(this));
-        SettlementOps sOps = new SettlementOps(address(this));
         bondCollector = new BondCollector(address(this));
 
         cOps.registerEscrowContract(address(escrow));
-        sOps.registerEscrowContract(address(escrow));
         bondCollector.registerEscrowContract(address(escrow));
-        dOps.registerEscrowContract(address(escrow));
         yOps.registerEscrowContract(address(escrow));
 
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(this));
         escrow.setCreateOps(address(cOps));
-        escrow.setSettlementOps(address(sOps));
         escrow.setBondCollector(address(bondCollector));
 
         // Wire modules

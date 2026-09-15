@@ -4,7 +4,6 @@ pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
 import 'contracts/ops/YieldOps.sol';
-import 'contracts/ops/DisputeOps.sol';
 import 'contracts/core/ModuleSnapshotRegistry.sol';
 import 'contracts/core/EscrowableERC20.sol';
 import 'contracts/core/EscrowVault.sol';
@@ -15,7 +14,6 @@ import '../TestConfig.sol';
 contract Test_01_AccessControl_test is Test {
     EscrowableERC20 escrowable;
     YieldOps public yieldOps;
-    DisputeOps public disputeOps;
     ModuleSnapshotRegistry public moduleManagement;
     EscrowVault escrowVault;
     EscrowGovernanceTimelock public adminContract;
@@ -27,18 +25,9 @@ contract Test_01_AccessControl_test is Test {
     function setUp() public {
         vm.skip(!TestConfig.RUN_PAUSE_TESTS);
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
-        escrowable = new EscrowableERC20(
-            'Test Token',
-            'TEST',
-            100,
-            feeAddr,
-            address(yieldOps),
-            address(disputeOps),
-            address(moduleManagement)
-        );
-        escrowVault = new EscrowVault(100, feeAddr, address(yieldOps), address(disputeOps), address(moduleManagement));
+        escrowable = new EscrowableERC20('Test Token','TEST',100,feeAddr,address(yieldOps),address(moduleManagement));
+        escrowVault = new EscrowVault(100,feeAddr,address(yieldOps),address(moduleManagement));
         adminContract = new EscrowGovernanceTimelock(address(this));
         adminContract.grantRole(adminContract.ROLE_TIMELOCK(), timelock);
         escrowable.grantRole(escrowable.ROLE_ADMIN_CONTRACT(), address(adminContract));

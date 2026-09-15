@@ -7,8 +7,6 @@ import "../../../contracts/modules/BuyerOnlyCancellationStrategy.sol";
 import "../../../contracts/core/EscrowVault.sol";
 import "../../../contracts/ops/CreateOps.sol";
 import "../../../contracts/ops/YieldOps.sol";
-import "../../../contracts/ops/DisputeOps.sol";
-import "../../../contracts/ops/SettlementOps.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/types/EscrowTypes.sol";
@@ -38,8 +36,6 @@ contract SlowLaneCancellationStrategyTest is Test {
         token = new ERC20Mock("Test", "TST", address(this), 10000e18);
         
         YieldOps yieldOps = new YieldOps(address(this));
-        DisputeOps disputeOps = new DisputeOps(address(this));
-        SettlementOps settlementOps = new SettlementOps(address(this));
         CreateOps createOps = new CreateOps(address(this));
         BondCollector bondCollector = new BondCollector(address(this));
         
@@ -48,18 +44,15 @@ contract SlowLaneCancellationStrategyTest is Test {
         defaultStrategy = new DefaultCancellationStrategy();
         buyerOnlyStrategy = new BuyerOnlyCancellationStrategy();
         
-        vault = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
+        vault = new EscrowVault(ESCROW_FEE,feeAddress,address(yieldOps),address(moduleManagement));
         
         moduleManagement.registerEscrowContract(address(vault));
         yieldOps.registerEscrowContract(address(vault));
-        disputeOps.registerEscrowContract(address(vault));
-        settlementOps.registerEscrowContract(address(vault));
         createOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
         
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.setCreateOps(address(createOps));
-        vault.setSettlementOps(address(settlementOps));
         vault.setBondCollector(address(bondCollector));
         
         token.transfer(sender, 1000e18);

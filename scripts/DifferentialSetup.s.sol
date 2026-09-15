@@ -8,7 +8,6 @@ import { EscrowVault } from "../contracts/core/EscrowVault.sol";
 import { EscrowViewContract } from "../contracts/core/EscrowViewContract.sol";
 import { DefaultResolutionModule } from "../contracts/core/modules/DefaultResolutionModule.sol";
 import { YieldOps } from "../contracts/ops/YieldOps.sol";
-import { DisputeOps } from "../contracts/ops/DisputeOps.sol";
 import { ModuleSnapshotRegistry } from "../contracts/core/ModuleSnapshotRegistry.sol";
 
 /**
@@ -17,7 +16,7 @@ import { ModuleSnapshotRegistry } from "../contracts/core/ModuleSnapshotRegistry
  *
  * Deploys:
  *   1. MockERC20 token
- *   2. YieldOps, DisputeOps (ops infrastructure)
+ *   2. YieldOps (ops infrastructure)
  *   3. ModuleSnapshotRegistry
  *   4. EscrowVault
  *   5. EscrowViewContract (oracle)
@@ -36,7 +35,6 @@ contract DifferentialSetup is Script {
 
     MockERC20 token;
     YieldOps yieldOps;
-    DisputeOps disputeOps;
     ModuleSnapshotRegistry moduleRegistry;
     EscrowVault vault;
     EscrowViewContract oracle;
@@ -57,10 +55,6 @@ contract DifferentialSetup is Script {
         yieldOps = new YieldOps(DEPLOYER);
         console.log("Deployed YieldOps:", address(yieldOps));
 
-        // Deploy DisputeOps (this handles dispute operations)
-        disputeOps = new DisputeOps(DEPLOYER);
-        console.log("Deployed DisputeOps:", address(disputeOps));
-
         // Deploy ModuleSnapshotRegistry
         moduleRegistry = new ModuleSnapshotRegistry(DEPLOYER);
         console.log("Deployed ModuleSnapshotRegistry:", address(moduleRegistry));
@@ -70,7 +64,6 @@ contract DifferentialSetup is Script {
             ESCROW_FEE_BPS,           // escrowFeeBps
             DEPLOYER,                 // feeAddress
             address(yieldOps),        // yieldOpsAddress
-            address(disputeOps),      // disputeOpsAddress
             address(moduleRegistry)   // moduleManagementAddress
         );
         console.log("Deployed EscrowVault:", address(vault));
@@ -97,7 +90,6 @@ contract DifferentialSetup is Script {
             '"oracle":"', addressToString(address(oracle)), '",',
             '"drModule":"', addressToString(address(drModule)), '",',
             '"yieldOps":"', addressToString(address(yieldOps)), '",',
-            '"disputeOps":"', addressToString(address(disputeOps)), '",',
             '"moduleRegistry":"', addressToString(address(moduleRegistry)), '",',
             '"deployer":"', addressToString(DEPLOYER), '",',
             '"buyer":"', addressToString(BUYER), '",',

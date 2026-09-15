@@ -8,9 +8,7 @@ import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/DisputeOps.sol';
 import '../../../contracts/ops/CreateOps.sol';
-import '../../../contracts/ops/SettlementOps.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol';
@@ -40,28 +38,24 @@ contract DirectResolutionConfigSelectionIntegrationTest is Test, KlerosHandoffFi
 
     function setUp() public {
         YieldOps yieldOps = new YieldOps(address(this));
-        DisputeOps disputeOps = new DisputeOps(address(this));
         CreateOps createOps = new CreateOps(address(this));
-        SettlementOps settlementOps = new SettlementOps(address(this));
         BondCollector bondCollector = new BondCollector(address(this));
         ModuleSnapshotRegistry registry = new ModuleSnapshotRegistry(address(this));
 
-        vault = new EscrowVault(0, FEE_RECIPIENT, address(yieldOps), address(disputeOps), address(registry));
-        escrowToken = new EscrowableERC20('Escrow', 'ESC', 0, FEE_RECIPIENT, address(yieldOps), address(disputeOps), address(registry));
+        vault = new EscrowVault(0,FEE_RECIPIENT,address(yieldOps),address(registry));
+        escrowToken = new EscrowableERC20('Escrow','ESC',0,FEE_RECIPIENT,address(yieldOps),address(registry));
         paymentToken = new ERC20Mock('Payment', 'PAY', BUYER, 1_000 ether);
         bondToken = new ERC20Mock('Bond', 'BOND', BUYER, 1_000 ether);
         (KlerosArbitrableProxy proxy, ) = _deployKlerosHandoffProxy(address(vault), address(this), 0);
         externalBackstop = address(proxy);
 
-        _wireEscrow(address(vault), registry, yieldOps, disputeOps, createOps, settlementOps, bondCollector);
-        _wireEscrow(address(escrowToken), registry, yieldOps, disputeOps, createOps, settlementOps, bondCollector);
+        _wireEscrow(address(vault), registry, yieldOps, createOps, bondCollector);
+        _wireEscrow(address(escrowToken), registry, yieldOps, createOps, bondCollector);
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.setCreateOps(address(createOps));
-        vault.setSettlementOps(address(settlementOps));
         vault.setBondCollector(address(bondCollector));
         escrowToken.grantRole(escrowToken.ROLE_ADMIN_CONTRACT(), address(this));
         escrowToken.setCreateOps(address(createOps));
-        escrowToken.setSettlementOps(address(settlementOps));
         escrowToken.setBondCollector(address(bondCollector));
 
         drm = new DecentralizedResolutionModule(address(this));
@@ -98,16 +92,12 @@ contract DirectResolutionConfigSelectionIntegrationTest is Test, KlerosHandoffFi
         address escrow,
         ModuleSnapshotRegistry registry,
         YieldOps yieldOps,
-        DisputeOps disputeOps,
         CreateOps createOps,
-        SettlementOps settlementOps,
         BondCollector bondCollector
     ) internal {
         registry.registerEscrowContract(escrow);
         yieldOps.registerEscrowContract(escrow);
-        disputeOps.registerEscrowContract(escrow);
         createOps.registerEscrowContract(escrow);
-        settlementOps.registerEscrowContract(escrow);
         bondCollector.registerEscrowContract(escrow);
     }
 

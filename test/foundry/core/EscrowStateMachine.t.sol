@@ -10,8 +10,6 @@ import { DefaultResolutionModule } from "../../../contracts/core/modules/Default
 import { EscrowSettings, EscrowState, SenderStatus, RecipientStatus } from "../../../contracts/types/EscrowTypes.sol";
 import { YieldPreset } from "../../../contracts/types/YieldPresets.sol";
 import { YieldOps } from "../../../contracts/ops/YieldOps.sol";
-import { DisputeOps } from "../../../contracts/ops/DisputeOps.sol";
-import { SettlementOps } from "../../../contracts/ops/SettlementOps.sol";
 import { CreateOps } from "../../../contracts/ops/CreateOps.sol";
 import { BondCollector } from "../../../contracts/core/BondCollector.sol";
 import { ModuleSnapshotRegistry } from "../../../contracts/core/ModuleSnapshotRegistry.sol";
@@ -30,8 +28,6 @@ contract EscrowStateMachineTest is Test {
     DefaultResolutionModule internal rm;
     DefaultReleaseStrategy internal defaultReleaseStrategy;
     YieldOps internal yieldOps;
-    DisputeOps internal disputeOps;
-    SettlementOps internal settlementOps;
     CreateOps internal createOps;
     BondCollector internal bondCollector;
     ModuleSnapshotRegistry internal moduleManagement;
@@ -47,15 +43,13 @@ contract EscrowStateMachineTest is Test {
 
     function setUp() public {
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps(address(this));
-        settlementOps = new SettlementOps(address(this));
         createOps = new CreateOps(address(this));
         bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));
         defaultReleaseStrategy = new DefaultReleaseStrategy();
 
-        vault = new EscrowVault(ESCROW_FEE_BPS, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
+        vault = new EscrowVault(ESCROW_FEE_BPS,feeAddress,address(yieldOps),address(moduleManagement));
         moduleManagement.registerEscrowContract(address(vault));
 
         moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(defaultReleaseStrategy));
@@ -64,8 +58,6 @@ contract EscrowStateMachineTest is Test {
 
         // Register escrow contract with all ops contracts
         yieldOps.registerEscrowContract(address(vault));
-        disputeOps.registerEscrowContract(address(vault));
-        settlementOps.registerEscrowContract(address(vault));
         createOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
 
@@ -73,7 +65,6 @@ contract EscrowStateMachineTest is Test {
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(adminContract));
         vault.setCreateOps(address(createOps));
-        vault.setSettlementOps(address(settlementOps));
         vault.setBondCollector(address(bondCollector));
 
         // Resolution module (single resolver)

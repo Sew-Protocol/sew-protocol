@@ -6,8 +6,6 @@ import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/core/modules/DefaultResolutionModule.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/DisputeOps.sol';
-import '../../../contracts/ops/SettlementOps.sol';
 import '../../../contracts/ops/CreateOps.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
@@ -26,8 +24,6 @@ contract DRv3CrossModuleInvariantsTest is Test {
     ERC20Mock        public token;
     DefaultResolutionModule public resolutionModule;
     YieldOps         public yieldOps;
-    DisputeOps       public disputeOps;
-    SettlementOps    public settlementOps;
     CreateOps        public createOps;
     BondCollector    public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
@@ -43,27 +39,22 @@ contract DRv3CrossModuleInvariantsTest is Test {
 
     function setUp() public {
         yieldOps      = new YieldOps(owner);
-        disputeOps    = new DisputeOps(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
         createOps     = new CreateOps(owner);
-        settlementOps = new SettlementOps(owner);
         bondCollector = new BondCollector(owner);
         resolutionModule = new DefaultResolutionModule(owner, resolver);
 
-        vault = new EscrowVault(FEE_BPS, feeAddr, address(yieldOps), address(disputeOps), address(moduleManagement));
+        vault = new EscrowVault(FEE_BPS,feeAddr,address(yieldOps),address(moduleManagement));
 
         yieldOps.registerEscrowContract(address(vault));
-        disputeOps.registerEscrowContract(address(vault));
         moduleManagement.registerEscrowContract(address(vault));
         createOps.registerEscrowContract(address(vault));
-        settlementOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
 
         vault.grantRole(vault.ROLE_TIMELOCK(), owner);
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), owner);
 
         vault.setCreateOps(address(createOps));
-        vault.setSettlementOps(address(settlementOps));
         vault.setBondCollector(address(bondCollector));
         vault.setResolutionModule(address(resolutionModule));
 

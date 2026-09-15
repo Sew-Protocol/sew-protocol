@@ -37,7 +37,6 @@ contract EscrowVault is BaseEscrow {
         uint256 escrowFeeBps,
         address feeAddress,
         address yieldOpsAddress,
-        address disputeOpsAddress,
         address moduleManagementAddress
     ) {
         address deployer = _msgSender();
@@ -46,16 +45,13 @@ contract EscrowVault is BaseEscrow {
         if (escrowFeeBps > MAX_ESCROW_FEE_BPS) revert InvalidEscrowFee(escrowFeeBps, MAX_ESCROW_FEE_BPS);
         if (feeAddress == address(0)) revert ZeroAddress(1);
         if (yieldOpsAddress == address(0)) revert ZeroAddress(2);
-        if (disputeOpsAddress == address(0)) revert ZeroAddress(3);
         if (moduleManagementAddress == address(0)) revert ZeroAddress(4);
         if (yieldOpsAddress.code.length == 0) revert ZeroAddress(2);
-        if (disputeOpsAddress.code.length == 0) revert ZeroAddress(3);
         if (moduleManagementAddress.code.length == 0) revert ZeroAddress(4);
         escrowFee = escrowFeeBps;
         escrowFeeAddress = feeAddress;
         moduleManagement = ModuleSnapshotRegistry(moduleManagementAddress);
         yieldOps = YieldOps(yieldOpsAddress);
-        disputeOps = DisputeOps(disputeOpsAddress);
         yieldProtocolFeeBps = DEFAULT_YIELD_PROTOCOL_FEE_BPS;
         appealBondProtocolFeeBps = 0;
         timeoutConfig.defaultAutoReleaseDelay = 0;

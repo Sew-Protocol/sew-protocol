@@ -41,8 +41,6 @@ async function main() {
     { name: 'EscrowVault', address: registry.contracts.EscrowVault.address },
     { name: 'CreateOps', address: registry.contracts.CreateOps.address },
     { name: 'YieldOps', address: registry.contracts.YieldOps.address },
-    { name: 'SettlementOps', address: registry.contracts.SettlementOps.address },
-    { name: 'DisputeOps', address: registry.contracts.DisputeOps.address },
   ];
 
   let granted = 0;

@@ -4,7 +4,6 @@ pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
 import 'contracts/ops/YieldOps.sol';
-import 'contracts/ops/DisputeOps.sol';
 import 'contracts/core/ModuleSnapshotRegistry.sol';
 import 'contracts/core/EscrowVault.sol';
 import 'contracts/core/EscrowableERC20.sol';
@@ -14,7 +13,6 @@ import 'contracts/admin/EscrowGovernanceTimelock.sol';
 contract Test_06_TimelockIntegration_test is Test {
     EscrowableERC20 token;
     YieldOps public yieldOps;
-    DisputeOps public disputeOps;
     ModuleSnapshotRegistry public moduleManagement;
     EscrowGovernanceTimelock public adminContract;
     EscrowVault vault;
@@ -24,19 +22,10 @@ contract Test_06_TimelockIntegration_test is Test {
 
     function setUp() public {
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
-        token = new EscrowableERC20(
-            'Test',
-            'TST',
-            100,
-            address(this),
-            address(yieldOps),
-            address(disputeOps),
-            address(moduleManagement)
-        );
+        token = new EscrowableERC20('Test','TST',100,address(this),address(yieldOps),address(moduleManagement));
         adminContract = new EscrowGovernanceTimelock(address(this));
-        vault = new EscrowVault(100, address(this), address(yieldOps), address(disputeOps), address(moduleManagement));
+        vault = new EscrowVault(100,address(this),address(yieldOps),address(moduleManagement));
         token.grantRole(token.ROLE_TIMELOCK(), timelock);
         token.grantRole(token.ROLE_ADMIN_CONTRACT(), address(adminContract));
         vault.grantRole(vault.ROLE_TIMELOCK(), timelock);

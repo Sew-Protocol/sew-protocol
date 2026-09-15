@@ -3,8 +3,8 @@
  *
  * These are utility contracts required by the core escrow contracts.
  * - YieldOps: Handles yield withdrawal and distribution
- * - DisputeOps: Handles dispute escalation orchestration
- * - SettlementOps: Handles settlement execution operations
+ * - (Dispute derivation now lives in EscrowDisputeLogic; no deployed DisputeOps)
+ * - (Settlement derivation now lives in EscrowSettlementLogic; no deployed SettlementOps)
  * - CreateOps: Handles escrow creation validation and computation
  * - BondCollector: Handles escalation bond collection
  */
@@ -86,66 +86,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     console.log(`   ✅ YieldOps already deployed at: ${yieldOpsDeployment.address}`);
   }
 
-  // Deploy DisputeOps
-  console.log(`\n   Deploying DisputeOps...`);
-  const disputeOpsDeployment = await deploy('DisputeOps', {
-    contract: 'DisputeOps',
-    from: deployer,
-    args: [deployer], // initialOwner
-    ...txOverrides,
-    log: true,
-  });
-
-  if (disputeOpsDeployment.newlyDeployed) {
-    const explorerUrl = getBlockExplorerUrl(hre, disputeOpsDeployment.address);
-    console.log(`   ✅ DisputeOps deployed at: ${disputeOpsDeployment.address}`);
-    if (explorerUrl) {
-      console.log(`      📊 View on ${chainConfig.blockExplorer.name}: ${explorerUrl}`);
-    }
-
-    if (disputeOpsDeployment.receipt) {
-      await registerDeployment(hre, 'DisputeOps', {
-        address: disputeOpsDeployment.address,
-        txHash: disputeOpsDeployment.receipt.hash,
-        blockNumber: disputeOpsDeployment.receipt.blockNumber,
-        constructorArgs: [deployer],
-        tags: ['core', 'dispute'],
-      });
-    }
-  } else {
-    console.log(`   ✅ DisputeOps already deployed at: ${disputeOpsDeployment.address}`);
-  }
-
-  // Deploy SettlementOps
-  console.log(`\n   Deploying SettlementOps...`);
-  const settlementOpsDeployment = await deploy('SettlementOps', {
-    contract: 'SettlementOps',
-    from: deployer,
-    args: [deployer], // initialOwner
-    ...txOverrides,
-    log: true,
-  });
-
-  if (settlementOpsDeployment.newlyDeployed) {
-    const explorerUrl = getBlockExplorerUrl(hre, settlementOpsDeployment.address);
-    console.log(`   ✅ SettlementOps deployed at: ${settlementOpsDeployment.address}`);
-    if (explorerUrl) {
-      console.log(`      📊 View on ${chainConfig.blockExplorer.name}: ${explorerUrl}`);
-    }
-
-    if (settlementOpsDeployment.receipt) {
-      await registerDeployment(hre, 'SettlementOps', {
-        address: settlementOpsDeployment.address,
-        txHash: settlementOpsDeployment.receipt.hash,
-        blockNumber: settlementOpsDeployment.receipt.blockNumber,
-        constructorArgs: [deployer],
-        tags: ['core', 'settlement'],
-      });
-    }
-  } else {
-    console.log(`   ✅ SettlementOps already deployed at: ${settlementOpsDeployment.address}`);
-  }
-
   // Deploy CreateOps
   console.log(`\n   Deploying CreateOps...`);
   const createOpsDeployment = await deploy('CreateOps', {
@@ -215,8 +155,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
     const opsContracts = [
       { name: 'YieldOps', deployment: yieldOpsDeployment },
-      { name: 'DisputeOps', deployment: disputeOpsDeployment },
-      { name: 'SettlementOps', deployment: settlementOpsDeployment },
       { name: 'CreateOps', deployment: createOpsDeployment },
       { name: 'BondCollector', deployment: bondCollectorDeployment },
     ];

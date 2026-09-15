@@ -9,8 +9,6 @@ import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/core/modules/DefaultResolutionModule.sol';
 import '../../../contracts/modules/DefaultReleaseStrategy.sol';
 import '../../../contracts/ops/CreateOps.sol';
-import '../../../contracts/ops/DisputeOps.sol';
-import '../../../contracts/ops/SettlementOps.sol';
 import '../../../contracts/ops/YieldOps.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
@@ -35,8 +33,6 @@ contract DeferredFundingBridgeTest is Test {
     DefaultResolutionModule public resolutionModule;
     DefaultReleaseStrategy  public releaseStrategy;
     CreateOps         public createOps;
-    DisputeOps        public disputeOps;
-    SettlementOps     public settlementOps;
     YieldOps          public yieldOps;
     BondCollector     public bondCollector;
 
@@ -71,8 +67,6 @@ contract DeferredFundingBridgeTest is Test {
 
         // 1. Deploy ops infrastructure
         yieldOps      = new YieldOps(admin);
-        disputeOps    = new DisputeOps(admin);
-        settlementOps = new SettlementOps(admin);
         createOps     = new CreateOps(admin);
         bondCollector = new BondCollector(admin);
         moduleRegistry = new ModuleSnapshotRegistry(admin);
@@ -80,25 +74,16 @@ contract DeferredFundingBridgeTest is Test {
         releaseStrategy  = new DefaultReleaseStrategy();
 
         // 2. Deploy vault
-        vault = new EscrowVault(
-            FEE_BPS,
-            feeWallet,
-            address(yieldOps),
-            address(disputeOps),
-            address(moduleRegistry)
-        );
+        vault = new EscrowVault(FEE_BPS,feeWallet,address(yieldOps),address(moduleRegistry));
 
         // 3. Wire ops to vault
         yieldOps.registerEscrowContract(address(vault));
-        disputeOps.registerEscrowContract(address(vault));
-        settlementOps.registerEscrowContract(address(vault));
         createOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
         moduleRegistry.registerEscrowContract(address(vault));
 
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), admin);
         vault.setCreateOps(address(createOps));
-        vault.setSettlementOps(address(settlementOps));
         vault.setBondCollector(address(bondCollector));
         vault.setResolutionModule(address(resolutionModule));
 

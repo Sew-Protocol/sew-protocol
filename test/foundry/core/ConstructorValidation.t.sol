@@ -7,7 +7,6 @@ import '../../../contracts/core/EscrowableERC20.sol';
 import '../../../contracts/core/BaseEscrow.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/DisputeOps.sol';
 
 /**
  * @title ConstructorValidation
@@ -17,7 +16,6 @@ import '../../../contracts/ops/DisputeOps.sol';
 contract ConstructorValidation is Test {
     address public feeAddress;
     YieldOps public yieldOps;
-    DisputeOps public disputeOps;
     ModuleSnapshotRegistry public moduleManagement;
 
     uint256 public constant MAX_ESCROW_FEE_BPS = 200; // 2% maximum
@@ -27,7 +25,6 @@ contract ConstructorValidation is Test {
     function setUp() public {
         feeAddress = address(0xFEE);
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
     }
 
@@ -40,35 +37,17 @@ contract ConstructorValidation is Test {
             abi.encodeWithSignature('InvalidEscrowFee(uint256,uint256)', invalidFee, MAX_ESCROW_FEE_BPS)
         );
         
-        new EscrowVault(
-            invalidFee,
-            feeAddress,
-            address(yieldOps),
-            address(disputeOps),
-            address(moduleManagement)
-        );
+        new EscrowVault(invalidFee,feeAddress,address(yieldOps),address(moduleManagement));
     }
 
     function test_EscrowVault_constructor_succeeds_escrowFeeZero() public {
-        EscrowVault vault = new EscrowVault(
-            0,
-            feeAddress,
-            address(yieldOps),
-            address(disputeOps),
-            address(moduleManagement)
-        );
+        EscrowVault vault = new EscrowVault(0,feeAddress,address(yieldOps),address(moduleManagement));
         
         assertEq(vault.escrowFee(), 0);
     }
 
     function test_EscrowVault_constructor_succeeds_escrowFeeMax() public {
-        EscrowVault vault = new EscrowVault(
-            MAX_ESCROW_FEE_BPS,
-            feeAddress,
-            address(yieldOps),
-            address(disputeOps),
-            address(moduleManagement)
-        );
+        EscrowVault vault = new EscrowVault(MAX_ESCROW_FEE_BPS,feeAddress,address(yieldOps),address(moduleManagement));
         
         assertEq(vault.escrowFee(), MAX_ESCROW_FEE_BPS);
     }
@@ -76,47 +55,18 @@ contract ConstructorValidation is Test {
     function test_EscrowVault_constructor_reverts_zeroFeeAddress() public {
         vm.expectRevert(abi.encodeWithSignature('ZeroAddress(uint8)', 1));
         
-        new EscrowVault(
-            100,
-            address(0),
-            address(yieldOps),
-            address(disputeOps),
-            address(moduleManagement)
-        );
+        new EscrowVault(100,address(0),address(yieldOps),address(moduleManagement));
     }
 
     function test_EscrowVault_constructor_reverts_zeroYieldOpsAddress() public {
         vm.expectRevert(abi.encodeWithSignature('ZeroAddress(uint8)', 2));
         
-        new EscrowVault(
-            100,
-            feeAddress,
-            address(0),
-            address(disputeOps),
-            address(moduleManagement)
-        );
-    }
-
-    function test_EscrowVault_constructor_reverts_zeroDisputeOpsAddress() public {
-        vm.expectRevert(abi.encodeWithSignature('ZeroAddress(uint8)', 3));
-        
-        new EscrowVault(
-            100,
-            feeAddress,
-            address(yieldOps),
-            address(0),
-            address(moduleManagement)
-        );
+        new EscrowVault(100,feeAddress,address(0),address(moduleManagement));
     }
 
     function test_EscrowVault_constructor_succeeds_validParameters() public {
-        EscrowVault vault = new EscrowVault(
-            100, // 1%
-            feeAddress,
-            address(yieldOps),
-            address(disputeOps),
-            address(moduleManagement)
-        );
+        EscrowVault vault = new EscrowVault(100,// 1%
+            feeAddress,address(yieldOps),address(moduleManagement));
         
         assertEq(vault.escrowFee(), 100);
         assertEq(vault.escrowFeeAddress(), feeAddress);
@@ -125,13 +75,7 @@ contract ConstructorValidation is Test {
     }
 
     function test_EscrowVault_constructor_protocolFeeInitialized() public {
-        EscrowVault vault = new EscrowVault(
-            100,
-            feeAddress,
-            address(yieldOps),
-            address(disputeOps),
-            address(moduleManagement)
-        );
+        EscrowVault vault = new EscrowVault(100,feeAddress,address(yieldOps),address(moduleManagement));
         
         // Verify protocol fees are initialized correctly
         assertEq(vault.yieldProtocolFeeBps(), DEFAULT_YIELD_PROTOCOL_FEE_BPS);
@@ -151,41 +95,17 @@ contract ConstructorValidation is Test {
             abi.encodeWithSignature('InvalidEscrowFee(uint256,uint256)', invalidFee, MAX_ESCROW_FEE_BPS)
         );
         
-        new EscrowableERC20(
-            'Test Token',
-            'TEST',
-            invalidFee,
-            feeAddress,
-            address(yieldOps),
-            address(disputeOps),
-            address(moduleManagement)
-        );
+        new EscrowableERC20('Test Token','TEST',invalidFee,feeAddress,address(yieldOps),address(moduleManagement));
     }
 
     function test_EscrowableERC20_constructor_succeeds_escrowFeeZero() public {
-        EscrowableERC20 token = new EscrowableERC20(
-            'Test Token',
-            'TEST',
-            0,
-            feeAddress,
-            address(yieldOps),
-            address(disputeOps),
-            address(moduleManagement)
-        );
+        EscrowableERC20 token = new EscrowableERC20('Test Token','TEST',0,feeAddress,address(yieldOps),address(moduleManagement));
         
         assertEq(token.escrowFee(), 0);
     }
 
     function test_EscrowableERC20_constructor_succeeds_escrowFeeMax() public {
-        EscrowableERC20 token = new EscrowableERC20(
-            'Test Token',
-            'TEST',
-            MAX_ESCROW_FEE_BPS,
-            feeAddress,
-            address(yieldOps),
-            address(disputeOps),
-            address(moduleManagement)
-        );
+        EscrowableERC20 token = new EscrowableERC20('Test Token','TEST',MAX_ESCROW_FEE_BPS,feeAddress,address(yieldOps),address(moduleManagement));
         
         assertEq(token.escrowFee(), MAX_ESCROW_FEE_BPS);
     }
@@ -193,55 +113,18 @@ contract ConstructorValidation is Test {
     function test_EscrowableERC20_constructor_reverts_zeroFeeAddress() public {
         vm.expectRevert(abi.encodeWithSignature('ZeroAddress(uint8)', 1));
         
-        new EscrowableERC20(
-            'Test Token',
-            'TEST',
-            100,
-            address(0),
-            address(yieldOps),
-            address(disputeOps),
-            address(moduleManagement)
-        );
+        new EscrowableERC20('Test Token','TEST',100,address(0),address(yieldOps),address(moduleManagement));
     }
 
     function test_EscrowableERC20_constructor_reverts_zeroYieldOpsAddress() public {
         vm.expectRevert(abi.encodeWithSignature('ZeroAddress(uint8)', 2));
         
-        new EscrowableERC20(
-            'Test Token',
-            'TEST',
-            100,
-            feeAddress,
-            address(0),
-            address(disputeOps),
-            address(moduleManagement)
-        );
-    }
-
-    function test_EscrowableERC20_constructor_reverts_zeroDisputeOpsAddress() public {
-        vm.expectRevert(abi.encodeWithSignature('ZeroAddress(uint8)', 3));
-        
-        new EscrowableERC20(
-            'Test Token',
-            'TEST',
-            100,
-            feeAddress,
-            address(yieldOps),
-            address(0),
-            address(moduleManagement)
-        );
+        new EscrowableERC20('Test Token','TEST',100,feeAddress,address(0),address(moduleManagement));
     }
 
     function test_EscrowableERC20_constructor_succeeds_validParameters() public {
-        EscrowableERC20 token = new EscrowableERC20(
-            'Test Token',
-            'TEST',
-            100, // 1%
-            feeAddress,
-            address(yieldOps),
-            address(disputeOps),
-            address(moduleManagement)
-        );
+        EscrowableERC20 token = new EscrowableERC20('Test Token','TEST',100,// 1%
+            feeAddress,address(yieldOps),address(moduleManagement));
         
         assertEq(token.escrowFee(), 100);
         assertEq(token.escrowFeeAddress(), feeAddress);
@@ -255,13 +138,7 @@ contract ConstructorValidation is Test {
         // Bound fee to valid range (0 to MAX_ESCROW_FEE_BPS)
         feeBps = bound(feeBps, 0, MAX_ESCROW_FEE_BPS);
         
-        EscrowVault vault = new EscrowVault(
-            feeBps,
-            feeAddress,
-            address(yieldOps),
-            address(disputeOps),
-            address(moduleManagement)
-        );
+        EscrowVault vault = new EscrowVault(feeBps,feeAddress,address(yieldOps),address(moduleManagement));
         
         assertEq(vault.escrowFee(), feeBps);
     }
@@ -274,28 +151,14 @@ contract ConstructorValidation is Test {
             abi.encodeWithSignature('InvalidEscrowFee(uint256,uint256)', feeBps, MAX_ESCROW_FEE_BPS)
         );
         
-        new EscrowVault(
-            feeBps,
-            feeAddress,
-            address(yieldOps),
-            address(disputeOps),
-            address(moduleManagement)
-        );
+        new EscrowVault(feeBps,feeAddress,address(yieldOps),address(moduleManagement));
     }
 
     function test_EscrowableERC20_constructor_fuzz_validRange(uint256 feeBps) public {
         // Bound fee to valid range (0 to MAX_ESCROW_FEE_BPS)
         feeBps = bound(feeBps, 0, MAX_ESCROW_FEE_BPS);
         
-        EscrowableERC20 token = new EscrowableERC20(
-            'Test Token',
-            'TEST',
-            feeBps,
-            feeAddress,
-            address(yieldOps),
-            address(disputeOps),
-            address(moduleManagement)
-        );
+        EscrowableERC20 token = new EscrowableERC20('Test Token','TEST',feeBps,feeAddress,address(yieldOps),address(moduleManagement));
         
         assertEq(token.escrowFee(), feeBps);
     }

@@ -8,7 +8,6 @@ import '../../../contracts/modules/decentralized-resolution-module/Decentralized
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/DisputeOps.sol';
 
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 /**
@@ -22,7 +21,6 @@ contract BondRoundingTest is Test {
     EscrowVault public escrow;
     ERC20Mock public token;
     YieldOps public yieldOps;
-    DisputeOps public disputeOps;
     ModuleSnapshotRegistry public moduleManagement;
 
     address public deployer;
@@ -44,9 +42,8 @@ contract BondRoundingTest is Test {
         incentiveModule.grantRole(incentiveModule.ROLE_TIMELOCK(), address(this));
         incentiveModule.registerEscrowContract(address(this));
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
-        escrow = new EscrowVault(100, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
+        escrow = new EscrowVault(100,feeAddress,address(yieldOps),address(moduleManagement));
 
         // Grant roles
         incentiveModule.grantRole(incentiveModule.ROLE_TIMELOCK(), timelock);

@@ -7,9 +7,7 @@ import { EscrowVault } from "../../contracts/core/EscrowVault.sol";
 import { EscrowViewContract } from "../../contracts/core/EscrowViewContract.sol";
 import { DefaultResolutionModule } from "../../contracts/core/modules/DefaultResolutionModule.sol";
 import { CreateOps } from "../../contracts/ops/CreateOps.sol";
-import { SettlementOps } from "../../contracts/ops/SettlementOps.sol";
 import { YieldOps } from "../../contracts/ops/YieldOps.sol";
-import { DisputeOps } from "../../contracts/ops/DisputeOps.sol";
 import { BondCollector } from "../../contracts/core/BondCollector.sol";
 import { ModuleSnapshotRegistry } from "../../contracts/core/ModuleSnapshotRegistry.sol";
 import { ERC20Mock } from "../../contracts/mocks/ERC20Mock.sol";
@@ -47,9 +45,7 @@ contract TraceRegressionTest is Test {
     EscrowViewContract      oracle;
     DefaultResolutionModule drModule;
     CreateOps               createOps;
-    SettlementOps           settlementOps;
     YieldOps                yieldOps;
-    DisputeOps              disputeOps;
     BondCollector           bondCollector;
     ModuleSnapshotRegistry  moduleManagement;
     ERC20Mock               token;
@@ -77,24 +73,19 @@ contract TraceRegressionTest is Test {
         token = new ERC20Mock("Regression USDC", "RUSDC", owner, 0);
 
         yieldOps         = new YieldOps(owner);
-        disputeOps       = new DisputeOps(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
         createOps        = new CreateOps(owner);
-        settlementOps    = new SettlementOps(owner);
         bondCollector    = new BondCollector(owner);
         drModule         = new DefaultResolutionModule(owner, RESOLVER);
 
-        vault = new EscrowVault(100, FEE_ADDR, address(yieldOps), address(disputeOps), address(moduleManagement));
+        vault = new EscrowVault(100,FEE_ADDR,address(yieldOps),address(moduleManagement));
 
         yieldOps.registerEscrowContract(address(vault));
-        disputeOps.registerEscrowContract(address(vault));
         moduleManagement.registerEscrowContract(address(vault));
         createOps.registerEscrowContract(address(vault));
-        settlementOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
 
         vault.setCreateOps(address(createOps));
-        vault.setSettlementOps(address(settlementOps));
         vault.setBondCollector(address(bondCollector));
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), owner);
         vault.setResolutionModule(address(drModule));

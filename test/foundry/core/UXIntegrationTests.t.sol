@@ -7,8 +7,6 @@ import "../../../contracts/core/BaseEscrow.sol";
 import "../../../contracts/core/EscrowViewContract.sol";
 import "../../../contracts/ops/CreateOps.sol";
 import "../../../contracts/ops/YieldOps.sol";
-import "../../../contracts/ops/DisputeOps.sol";
-import "../../../contracts/ops/SettlementOps.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
@@ -21,8 +19,6 @@ contract UXIntegrationTests is Test {
     EscrowViewContract public escrowView;
     CreateOps public createOps;
     YieldOps public yieldOps;
-    DisputeOps public disputeOps;
-    SettlementOps public settlementOps;
     ModuleSnapshotRegistry public moduleManagement;
     ERC20Mock public token;
     DefaultResolutionModule public resolutionModule;
@@ -45,20 +41,16 @@ contract UXIntegrationTests is Test {
         vm.startPrank(owner);
         createOps = new CreateOps(owner);
         yieldOps = new YieldOps(owner);
-        disputeOps = new DisputeOps(owner);
-        settlementOps = new SettlementOps(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
         
-        vault = new EscrowVault(100, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
+        vault = new EscrowVault(100,feeAddress,address(yieldOps),address(moduleManagement));
         vault.setCreateOps(address(createOps));
-        vault.setSettlementOps(address(settlementOps));
         vault.grantRole(vault.ROLE_TIMELOCK(), timelock);
         vault.grantRole(vault.ROLE_TIMELOCK(), address(0x999));
         
         resolutionModule = new DefaultResolutionModule(owner, resolverAddr);
         moduleManagement.registerEscrowContract(address(vault));
         createOps.registerEscrowContract(address(vault));
-        settlementOps.registerEscrowContract(address(vault));
         
         token = new ERC20Mock("Test", "TEST", buyer, 10000e18);
         escrowView = new EscrowViewContract(address(vault));

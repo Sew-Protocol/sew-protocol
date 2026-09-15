@@ -31,22 +31,18 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         uint256 escrowFeeBps,
         address feeAddress,
         address yieldOpsAddress,
-        address disputeOpsAddress,
         address moduleManagementAddress
     ) ERC20(name, symbol) {
         if (escrowFeeBps > MAX_ESCROW_FEE_BPS) revert InvalidEscrowFee(escrowFeeBps, MAX_ESCROW_FEE_BPS);
         if (feeAddress == address(0)) revert ZeroAddress(1);
         if (yieldOpsAddress == address(0)) revert ZeroAddress(2);
-        if (disputeOpsAddress == address(0)) revert ZeroAddress(3);
         if (moduleManagementAddress == address(0)) revert ZeroAddress(4);
         if (yieldOpsAddress.code.length == 0) revert ZeroAddress(2);
-        if (disputeOpsAddress.code.length == 0) revert ZeroAddress(3);
         if (moduleManagementAddress.code.length == 0) revert ZeroAddress(4);
 
         escrowFee = escrowFeeBps;
         escrowFeeAddress = feeAddress;
         yieldOps = YieldOps(yieldOpsAddress);
-        disputeOps = DisputeOps(disputeOpsAddress);
         moduleManagement = ModuleSnapshotRegistry(moduleManagementAddress);
         
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
@@ -268,7 +264,6 @@ contract EscrowableERC20Factory {
         uint256 escrowFee,
         address escrowFeeAddress,
         address yieldOps,
-        address disputeOps,
         address moduleManagement
     ) public returns (address) {
         return
@@ -279,7 +274,6 @@ contract EscrowableERC20Factory {
                     escrowFee,
                     escrowFeeAddress,
                     yieldOps,
-                    disputeOps,
                     moduleManagement
                 )
             );

@@ -30,8 +30,6 @@ contract StateInvariants is Test {
     EscrowInvariantHandler  internal handler;
 
     YieldOps     internal yieldOps;
-    DisputeOps   internal disputeOps;
-    SettlementOps internal settlementOps;
     CreateOps    internal createOps;
     BondCollector internal bondCollector;
     ModuleSnapshotRegistry internal mm;
@@ -45,25 +43,20 @@ contract StateInvariants is Test {
         token = new ERC20Mock("Token", "TKN", address(this), 0);
 
         yieldOps     = new YieldOps(address(this));
-        disputeOps   = new DisputeOps(address(this));
-        settlementOps = new SettlementOps(address(this));
         createOps    = new CreateOps(address(this));
         bondCollector = new BondCollector(address(this));
         mm           = new ModuleSnapshotRegistry(address(this));
         resModule    = new DefaultResolutionModule(address(this), resolver);
 
-        vault = new EscrowVault(FEE_BPS, feeAddr, address(yieldOps), address(disputeOps), address(mm));
+        vault = new EscrowVault(FEE_BPS,feeAddr,address(yieldOps),address(mm));
 
         yieldOps.registerEscrowContract(address(vault));
-        disputeOps.registerEscrowContract(address(vault));
-        settlementOps.registerEscrowContract(address(vault));
         createOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
         mm.registerEscrowContract(address(vault));
 
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.setCreateOps(address(createOps));
-        vault.setSettlementOps(address(settlementOps));
         vault.setBondCollector(address(bondCollector));
         vault.setResolutionModule(address(resModule));
         vault.grantRole(vault.ROLE_FEE_RECIPIENT(), feeAddr);

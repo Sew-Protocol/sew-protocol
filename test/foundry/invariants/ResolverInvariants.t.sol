@@ -32,8 +32,6 @@ contract ResolverInvariants is Test {
     EscrowInvariantHandler  internal handler4;
 
     YieldOps     internal y4;
-    DisputeOps   internal d4;
-    SettlementOps internal s4;
     CreateOps    internal c4;
     BondCollector internal b4;
     ModuleSnapshotRegistry internal mm4;
@@ -49,24 +47,19 @@ contract ResolverInvariants is Test {
     function _setupVault4() internal {
         token4 = new ERC20Mock("Token4", "TKN4", address(this), 0);
         y4 = new YieldOps(address(this));
-        d4 = new DisputeOps(address(this));
-        s4 = new SettlementOps(address(this));
         c4 = new CreateOps(address(this));
         b4 = new BondCollector(address(this));
         mm4 = new ModuleSnapshotRegistry(address(this));
         resModule4 = new DefaultResolutionModule(address(this), resolver4);
 
-        vault4 = new EscrowVault(100, feeAddr4, address(y4), address(d4), address(mm4));
+        vault4 = new EscrowVault(100,feeAddr4,address(y4),address(mm4));
         y4.registerEscrowContract(address(vault4));
-        d4.registerEscrowContract(address(vault4));
-        s4.registerEscrowContract(address(vault4));
         c4.registerEscrowContract(address(vault4));
         b4.registerEscrowContract(address(vault4));
         mm4.registerEscrowContract(address(vault4));
 
         vault4.grantRole(vault4.ROLE_ADMIN_CONTRACT(), address(this));
         vault4.setCreateOps(address(c4));
-        vault4.setSettlementOps(address(s4));
         vault4.setBondCollector(address(b4));
         vault4.setResolutionModule(address(resModule4));
         vault4.grantRole(vault4.ROLE_FEE_RECIPIENT(), feeAddr4);
@@ -139,8 +132,6 @@ contract AppealWindowInvariants is Test {
     EscrowInvariantHandler  internal handler;
 
     YieldOps     internal yieldOps;
-    DisputeOps   internal disputeOps;
-    SettlementOps internal settlementOps;
     CreateOps    internal createOps;
     BondCollector internal bondCollector;
     ModuleSnapshotRegistry internal mm;
@@ -152,25 +143,20 @@ contract AppealWindowInvariants is Test {
         token = new ERC20Mock("AppealToken", "ATP", address(this), 0);
 
         yieldOps     = new YieldOps(address(this));
-        disputeOps   = new DisputeOps(address(this));
-        settlementOps = new SettlementOps(address(this));
         createOps    = new CreateOps(address(this));
         bondCollector = new BondCollector(address(this));
         mm           = new ModuleSnapshotRegistry(address(this));
         resModule    = new DefaultResolutionModule(address(this), resolver);
 
-        vault = new EscrowVault(100, feeAddr, address(yieldOps), address(disputeOps), address(mm));
+        vault = new EscrowVault(100,feeAddr,address(yieldOps),address(mm));
 
         yieldOps.registerEscrowContract(address(vault));
-        disputeOps.registerEscrowContract(address(vault));
-        settlementOps.registerEscrowContract(address(vault));
         createOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
         mm.registerEscrowContract(address(vault));
 
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.setCreateOps(address(createOps));
-        vault.setSettlementOps(address(settlementOps));
         vault.setBondCollector(address(bondCollector));
         vault.setResolutionModule(address(resModule));
         vault.grantRole(vault.ROLE_FEE_RECIPIENT(), feeAddr);

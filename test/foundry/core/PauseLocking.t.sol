@@ -13,8 +13,6 @@ import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/types/YieldPresets.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/DisputeOps.sol';
-import '../../../contracts/ops/SettlementOps.sol';
 import '../../../contracts/ops/CreateOps.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../TestConfig.sol';
@@ -36,8 +34,6 @@ contract PauseLocking is Test {
     
     // Ops contracts
     YieldOps public yieldOps;
-    DisputeOps public disputeOps;
-    SettlementOps public settlementOps;
     CreateOps public createOps;
     BondCollector public bondCollector;
     
@@ -73,8 +69,6 @@ contract PauseLocking is Test {
         
         // Deploy ops contracts with owner
         yieldOps = new YieldOps(owner);
-        disputeOps = new DisputeOps(owner);
-        settlementOps = new SettlementOps(owner);
         createOps = new CreateOps(owner);
         
         // Deploy bond collector
@@ -86,8 +80,8 @@ contract PauseLocking is Test {
         // Deploy release strategy
         releaseStrategy = new DefaultReleaseStrategy();
         
-        // Deploy escrow vault (fee, feeAddress, yieldOps, disputeOps, moduleManagement)
-        escrow = new EscrowVault(ESCROW_FEE, owner, address(yieldOps), address(disputeOps), address(snapshotRegistry));
+        // Deploy escrow vault (fee, feeAddress, yieldOps, moduleManagement)
+        escrow = new EscrowVault(ESCROW_FEE,owner,address(yieldOps),address(snapshotRegistry));
         
         // Grant necessary roles
         vm.startPrank(owner);
@@ -97,15 +91,11 @@ contract PauseLocking is Test {
         
         // Grant ROLE_TIMELOCK to owner in all ops so we can register escrow contract
         yieldOps.grantRole(yieldOps.ROLE_TIMELOCK(), owner);
-        disputeOps.grantRole(disputeOps.ROLE_TIMELOCK(), owner);
-        settlementOps.grantRole(settlementOps.ROLE_TIMELOCK(), owner);
         createOps.grantRole(createOps.ROLE_TIMELOCK(), owner);
         snapshotRegistry.grantRole(snapshotRegistry.ROLE_TIMELOCK(), owner);
         
         // Register escrow contract with all ops
         yieldOps.registerEscrowContract(address(escrow));
-        disputeOps.registerEscrowContract(address(escrow));
-        settlementOps.registerEscrowContract(address(escrow));
         createOps.registerEscrowContract(address(escrow));
         snapshotRegistry.registerEscrowContract(address(escrow));
         
@@ -116,7 +106,6 @@ contract PauseLocking is Test {
         
         // Set ops addresses in vault
         escrow.setCreateOps(address(createOps));
-        escrow.setSettlementOps(address(settlementOps));
         
         // Transfer tokens to sender
         token.transfer(sender, INITIAL_BALANCE);

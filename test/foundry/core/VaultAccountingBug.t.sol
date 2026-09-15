@@ -8,9 +8,7 @@ import '../../../contracts/core/EscrowVaultAnalytics.sol';
 import "../../../contracts/core/modules/DefaultResolutionModule.sol";
 import "../../../contracts/types/EscrowTypes.sol";
 import "../../../contracts/ops/YieldOps.sol";
-import "../../../contracts/ops/DisputeOps.sol";
 import "../../../contracts/ops/CreateOps.sol";
-import "../../../contracts/ops/SettlementOps.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
@@ -38,8 +36,6 @@ contract VaultAccountingBugTest is Test {
     RevertingERC20 public token;
     DefaultResolutionModule public resolutionModule;
     YieldOps public yieldOps;
-    DisputeOps public disputeOps;
-    SettlementOps public settlementOps;
     CreateOps public createOps;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
@@ -54,29 +50,24 @@ contract VaultAccountingBugTest is Test {
         owner = address(this);
         token = new RevertingERC20();
         yieldOps = new YieldOps(owner);
-        disputeOps = new DisputeOps(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
         createOps = new CreateOps(owner);
-        settlementOps = new SettlementOps(owner);
         bondCollector = new BondCollector(owner);
         resolutionModule = new DefaultResolutionModule(owner, resolver);
         releaseStrategy = new DefaultReleaseStrategy();
 
-        escrow = new EscrowVault(0, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
+        escrow = new EscrowVault(0,feeAddress,address(yieldOps),address(moduleManagement));
         
         yieldOps.registerEscrowContract(address(escrow));
-        disputeOps.registerEscrowContract(address(escrow));
         moduleManagement.registerEscrowContract(address(escrow));
         moduleManagement.queueModule(address(escrow), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
         vm.warp(block.timestamp + 8 days);
         moduleManagement.activateModule(address(escrow), BaseEscrow.ModuleType.RELEASE);
         createOps.registerEscrowContract(address(escrow));
-        settlementOps.registerEscrowContract(address(escrow));
         bondCollector.registerEscrowContract(address(escrow));
 
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), owner);
         escrow.setCreateOps(address(createOps));
-        escrow.setSettlementOps(address(settlementOps));
         escrow.setBondCollector(address(bondCollector));
         escrow.setResolutionModule(address(resolutionModule));
 

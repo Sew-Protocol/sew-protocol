@@ -12,9 +12,7 @@ import "../../../contracts/types/EscrowTypes.sol";
 import "../../../contracts/types/YieldPresets.sol";
 import "../../../contracts/libraries/SettingsValidationLibrary.sol";
 import "../../../contracts/ops/YieldOps.sol";
-import "../../../contracts/ops/DisputeOps.sol";
 import "../../../contracts/ops/CreateOps.sol";
-import "../../../contracts/ops/SettlementOps.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/interfaces/IReleaseStrategy.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
@@ -26,9 +24,8 @@ contract EscrowVaultModuleGetterHarness is EscrowVault {
         uint256 escrowFeeBps,
         address feeAddress,
         address yieldOpsAddress,
-        address disputeOpsAddress,
         address moduleManagementAddress
-    ) EscrowVault(escrowFeeBps, feeAddress, yieldOpsAddress, disputeOpsAddress, moduleManagementAddress) {}
+    ) EscrowVault(escrowFeeBps, feeAddress, yieldOpsAddress, moduleManagementAddress) {}
 
     function effectiveReleaseStrategy(uint256 workflowId) external view returns (address) {
         return address(_getReleaseStrategy(workflowId));
@@ -75,7 +72,6 @@ contract ForwardOnlyModuleSnapshotTest is Test {
 
     function setUp() public {
         YieldOps yieldOps = new YieldOps(address(this));
-        DisputeOps disputeOps = new DisputeOps(address(this));
         mm = new ModuleSnapshotRegistry(address(this));
 
         allowRelease = new DefaultReleaseStrategy();
@@ -85,21 +81,18 @@ contract ForwardOnlyModuleSnapshotTest is Test {
         resolution = new DefaultResolutionModule(address(this), address(0x1234));
 
         vault = new EscrowVaultModuleGetterHarness(
-            0, FEE, address(yieldOps), address(disputeOps), address(mm)
+            0, FEE, address(yieldOps), address(mm)
         );
 
         mm.registerEscrowContract(address(vault));
 
         CreateOps createOps = new CreateOps(address(this));
         createOps.registerEscrowContract(address(vault));
-        SettlementOps settlementOps = new SettlementOps(address(this));
-        settlementOps.registerEscrowContract(address(vault));
         BondCollector bondCollector = new BondCollector(address(this));
         bondCollector.registerEscrowContract(address(vault));
 
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.setCreateOps(address(createOps));
-        vault.setSettlementOps(address(settlementOps));
         vault.setBondCollector(address(bondCollector));
         vault.setResolutionModule(address(resolution));
 

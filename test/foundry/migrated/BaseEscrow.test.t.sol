@@ -5,29 +5,18 @@ pragma solidity ^0.8.37;
 import 'forge-std/Test.sol';
 import 'contracts/core/EscrowableERC20.sol';
 import 'contracts/ops/YieldOps.sol';
-import 'contracts/ops/DisputeOps.sol';
 import 'contracts/core/ModuleSnapshotRegistry.sol';
 
 contract Test_BaseEscrow_test is Test {
     EscrowableERC20 token;
     YieldOps yieldOps;
-    DisputeOps disputeOps;
     ModuleSnapshotRegistry moduleManagement;
 
     function setUp() public {
         // Deploy EscrowableERC20 with this contract as owner
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
-        token = new EscrowableERC20(
-            'Test Token',
-            'TEST',
-            100,
-            address(this),
-            address(yieldOps),
-            address(disputeOps),
-            address(moduleManagement)
-        );
+        token = new EscrowableERC20('Test Token','TEST',100,address(this),address(yieldOps),address(moduleManagement));
     }
 
     function test_supports_IERC165_interface() public {

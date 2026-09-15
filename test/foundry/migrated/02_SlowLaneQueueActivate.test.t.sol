@@ -4,7 +4,6 @@ pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
 import 'contracts/ops/YieldOps.sol';
-import 'contracts/ops/DisputeOps.sol';
 import 'contracts/core/ModuleSnapshotRegistry.sol';
 import 'contracts/admin/EscrowGovernanceTimelock.sol';
 import 'contracts/core/EscrowVault.sol';
@@ -12,7 +11,6 @@ import 'contracts/core/EscrowVault.sol';
 contract Test_02_SlowLaneQueueActivate_test is Test {
     EscrowVault vault;
     YieldOps public yieldOps;
-    DisputeOps public disputeOps;
     ModuleSnapshotRegistry public moduleManagement;
     EscrowGovernanceTimelock public adminContract;
     address timelock = address(0x1);
@@ -20,10 +18,9 @@ contract Test_02_SlowLaneQueueActivate_test is Test {
 
     function setUp() public {
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));
-        vault = new EscrowVault(100, address(this), address(yieldOps), address(disputeOps), address(moduleManagement));
+        vault = new EscrowVault(100,address(this),address(yieldOps),address(moduleManagement));
         // grant timelock role to timelock address
         vault.grantRole(vault.ROLE_TIMELOCK(), timelock);
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(adminContract));

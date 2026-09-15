@@ -9,8 +9,6 @@ import '../../../contracts/modules/decentralized-resolution-module/DRMAdminFacet
 import '../../../contracts/modules/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/DisputeOps.sol';
-import '../../../contracts/ops/SettlementOps.sol';
 import '../../../contracts/ops/CreateOps.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
@@ -34,8 +32,6 @@ contract ReentrancyProtectionTest is Test {
     PaymentCalculationLibraryV1 public paymentLib;
     ERC20Mock public token;
     YieldOps public yieldOps;
-    DisputeOps public disputeOps;
-    SettlementOps public settlementOps;
     CreateOps public createOps;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
@@ -60,19 +56,15 @@ contract ReentrancyProtectionTest is Test {
 
         // Deploy infrastructure
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps(address(this));
-        settlementOps = new SettlementOps(address(this));
         createOps = new CreateOps(address(this));
         bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));
-        escrow = new EscrowVault(100, makeAddr('feeAddress'), address(yieldOps), address(disputeOps), address(moduleManagement));
+        escrow = new EscrowVault(100,makeAddr('feeAddress'),address(yieldOps),address(moduleManagement));
         moduleManagement.registerEscrowContract(address(escrow));
 
         // Register escrow contract callers on ops contracts
         yieldOps.registerEscrowContract(address(escrow));
-        disputeOps.registerEscrowContract(address(escrow));
-        settlementOps.registerEscrowContract(address(escrow));
         createOps.registerEscrowContract(address(escrow));
         bondCollector.registerEscrowContract(address(escrow));
 
@@ -80,7 +72,6 @@ contract ReentrancyProtectionTest is Test {
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(this));
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(adminContract));
         escrow.setCreateOps(address(createOps));
-        escrow.setSettlementOps(address(settlementOps));
         escrow.setBondCollector(address(bondCollector));
 
         // Deploy modules

@@ -12,9 +12,7 @@ import '../../../contracts/modules/decentralized-resolution-module/DRMAdminFacet
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/DisputeOps.sol';
 import '../../../contracts/ops/CreateOps.sol';
-import '../../../contracts/ops/SettlementOps.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
 import '../../../contracts/core/BondCollector.sol';
@@ -33,9 +31,7 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
     PaymentCalculationLibraryV1 public paymentLib;
     ERC20Mock public token;
     YieldOps public yieldOps;
-    DisputeOps public disputeOps;
     CreateOps public createOps;
-    SettlementOps public settlementOps;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
     EscrowGovernanceTimelock public adminContract;
@@ -91,26 +87,16 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
 
         // Deploy escrow
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));
-        escrow = new EscrowVault(
-            100,
-            feeRecipient,
-            address(yieldOps),
-            address(disputeOps),
-            address(moduleManagement)
-        );
-        disputeOps.registerEscrowContract(address(escrow));
+        escrow = new EscrowVault(100,feeRecipient,address(yieldOps),address(moduleManagement));
         incentiveModuleV1.registerEscrowContract(address(escrow));
         incentiveModuleV2.registerEscrowContract(address(escrow));
 
         // Deploy and wire required ops (BaseEscrow now requires these)
         createOps = new CreateOps(address(this));
-        settlementOps = new SettlementOps(address(this));
         bondCollector = new BondCollector(address(this));
         createOps.registerEscrowContract(address(escrow));
-        settlementOps.registerEscrowContract(address(escrow));
         bondCollector.registerEscrowContract(address(escrow));
 
         // Grant admin-contract role so this test can configure ops,
@@ -118,7 +104,6 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(this));
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(adminContract));
         escrow.setCreateOps(address(createOps));
-        escrow.setSettlementOps(address(settlementOps));
         escrow.setBondCollector(address(bondCollector));
 
         // Setup roles
@@ -132,9 +117,7 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
         // Register escrow contract in resolution module
         vm.prank(timelock);
         resolutionModule.registerEscrowContract(address(escrow));
-        // DisputeOps calls into the resolution module during escalation, so it must be registered too
-        vm.prank(timelock);
-        resolutionModule.registerEscrowContract(address(disputeOps));
+        // Escrow calls into the resolution module during escalation; registration is handled above.
         vm.prank(timelock);
         resolutionModule.registerEscrowContract(address(this));
 
@@ -314,7 +297,7 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
         escrow.raiseDispute(workflowId);
         vm.stopPrank();
 
-        // DisputeOps enforces "decision exists before appeal"
+        // EscrowDisputeLogic enforces "decision exists before appeal"
         vm.prank(address(this));
         resolutionModule.recordResolution(workflowId, address(escrow),
             resolver1,
@@ -398,7 +381,7 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
         escrow.raiseDispute(workflowId);
         vm.stopPrank();
 
-        // DisputeOps enforces "decision exists before appeal"
+        // EscrowDisputeLogic enforces "decision exists before appeal"
         vm.prank(address(this));
         resolutionModule.recordResolution(workflowId, address(escrow),
             resolver1,

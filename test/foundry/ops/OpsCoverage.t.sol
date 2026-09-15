@@ -4,8 +4,8 @@ pragma solidity ^0.8.37;
 import 'forge-std/Test.sol';
 import '../../../contracts/ops/CreateOps.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/SettlementOps.sol';
-import '../../../contracts/ops/DisputeOps.sol';
+import '../../mocks/legacy/SettlementOpsReference.sol';
+import '../../mocks/legacy/DisputeOpsReference.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/types/YieldPresets.sol';
@@ -14,8 +14,8 @@ import '../../../contracts/shared/interfaces/IResolutionModule.sol';
 contract OpsCoverageTest is Test {
     CreateOps public createOps;
     YieldOps public yieldOps;
-    SettlementOps public settlementOps;
-    DisputeOps public disputeOps;
+    SettlementOpsReference public settlementOps;
+    DisputeOpsReference public disputeOps;
     ERC20Mock public token;
 
     address public owner;
@@ -36,8 +36,8 @@ contract OpsCoverageTest is Test {
         // Deploy Ops contracts
         createOps = new CreateOps(owner);
         yieldOps = new YieldOps(owner);
-        settlementOps = new SettlementOps(owner);
-        disputeOps = new DisputeOps(owner);
+        settlementOps = new SettlementOpsReference(owner);
+        disputeOps = new DisputeOpsReference(owner);
 
         token = new ERC20Mock('Test Token', 'TEST', owner, 10000e18);
 
@@ -49,10 +49,10 @@ contract OpsCoverageTest is Test {
         yieldOps.grantRole(yieldOps.ROLE_TIMELOCK(), timelock);
         yieldOps.grantRole(yieldOps.ROLE_GUARDIAN(), guardian);
 
-        // Setup roles for SettlementOps
+        // Setup roles for SettlementOpsReference
         settlementOps.grantRole(settlementOps.ROLE_TIMELOCK(), timelock);
 
-        // Setup roles for DisputeOps
+        // Setup roles for DisputeOpsReference
         disputeOps.grantRole(disputeOps.ROLE_TIMELOCK(), timelock);
     }
 
@@ -365,7 +365,7 @@ contract OpsCoverageTest is Test {
         assertEq(result.yieldDistributed, 0);
     }
 
-    // ============ SettlementOps Tests ============
+    // ============ SettlementOpsReference Tests ============
 
     function test_SettlementOps_registerEscrowContract() public {
         vm.prank(timelock);
@@ -398,7 +398,7 @@ contract OpsCoverageTest is Test {
         );
     }
 
-    // ============ DisputeOps Tests ============
+    // ============ DisputeOpsReference Tests ============
 
     function test_DisputeOps_registerEscrowContract() public {
         vm.prank(timelock);
@@ -431,7 +431,7 @@ contract OpsCoverageTest is Test {
 
         vm.prank(escrowContract);
         // Should execute (result.success might be false due to inputs, but call shouldn't revert with access control)
-        DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
+        DisputeOpsReference.EscalationResult memory result = disputeOps.computeEscalation(
             address(0),
             escrowContract,
             address(0),
@@ -449,7 +449,7 @@ contract OpsCoverageTest is Test {
         assertEq(result.failureReason, 'Caller not participant'); // First check in logic
     }
 
-    // ============ DisputeOps Extended Tests ============
+    // ============ DisputeOpsReference Extended Tests ============
 
     MockResolutionModule public mockModule;
 
@@ -475,7 +475,7 @@ contract OpsCoverageTest is Test {
         mockModule.setDecision(1); 
 
         vm.prank(escrowContract);
-        DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
+        DisputeOpsReference.EscalationResult memory result = disputeOps.computeEscalation(
             address(mockModule),
             escrowContract,
             address(0x9999), // dummy incentive module
@@ -504,7 +504,7 @@ contract OpsCoverageTest is Test {
         disputeOps.registerEscrowContract(escrowContract);
 
         vm.prank(escrowContract);
-        DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
+        DisputeOpsReference.EscalationResult memory result = disputeOps.computeEscalation(
             address(0),
             escrowContract,
             address(0),
@@ -537,7 +537,7 @@ contract OpsCoverageTest is Test {
         mockModule.setExecution(true, address(0x999), 1);
 
         vm.prank(escrowContract);
-        DisputeOps.EscalationResult memory resultSender = disputeOps.computeEscalation(
+        DisputeOpsReference.EscalationResult memory resultSender = disputeOps.computeEscalation(
             address(mockModule),
             escrowContract,
             address(0x9999),
@@ -555,7 +555,7 @@ contract OpsCoverageTest is Test {
 
         // Case 2: RELEASE decision, Recipient tries to appeal (should fail)
         vm.prank(escrowContract);
-        DisputeOps.EscalationResult memory resultRecipient = disputeOps.computeEscalation(
+        DisputeOpsReference.EscalationResult memory resultRecipient = disputeOps.computeEscalation(
             address(mockModule),
             escrowContract,
             address(0x9999),
@@ -625,7 +625,7 @@ contract OpsCoverageTest is Test {
         mockModule.setEscalation(false, address(0), 0);
 
         vm.prank(escrowContract);
-        DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
+        DisputeOpsReference.EscalationResult memory result = disputeOps.computeEscalation(
             address(mockModule),
             escrowContract,
             address(0x9999),
@@ -652,7 +652,7 @@ contract OpsCoverageTest is Test {
         mockModule.setRevert(true); // Fails authoritative quote derivation
 
         vm.prank(escrowContract);
-        DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
+        DisputeOpsReference.EscalationResult memory result = disputeOps.computeEscalation(
             address(mockModule),
             escrowContract,
             address(0),
@@ -681,7 +681,7 @@ contract OpsCoverageTest is Test {
         mockModule.setExecution(false, address(0), 0); // Exec fails - but computeEscalation doesn't call executeEscalation anymore
 
         vm.prank(escrowContract);
-        DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
+        DisputeOpsReference.EscalationResult memory result = disputeOps.computeEscalation(
             address(mockModule),
             escrowContract,
             address(0x9999),
@@ -696,7 +696,7 @@ contract OpsCoverageTest is Test {
             EscrowState.DISPUTED
         );
 
-        // Since executeEscalation is removed from DisputeOps, this test needs to be adjusted
+        // Since executeEscalation is removed from DisputeOpsReference, this test needs to be adjusted
         // or it might just succeed if other checks pass.
         assertTrue(result.success);
     }
@@ -710,7 +710,7 @@ contract OpsCoverageTest is Test {
         mockModule.setEscalation(true, address(0), 0); // Next resolver is zero
         
         vm.prank(escrowContract);
-        DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
+        DisputeOpsReference.EscalationResult memory result = disputeOps.computeEscalation(
             address(mockModule),
             escrowContract,
             address(0x9999),
@@ -745,7 +745,7 @@ contract OpsCoverageTest is Test {
         disputeOps.registerEscrowContract(escrowContract);
 
         vm.prank(escrowContract);
-        DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
+        DisputeOpsReference.EscalationResult memory result = disputeOps.computeEscalation(
             address(0), // No resolution module
             escrowContract,
             address(0),
@@ -773,7 +773,7 @@ contract OpsCoverageTest is Test {
         mockModule.setDecision(0);
 
         vm.prank(escrowContract);
-        DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
+        DisputeOpsReference.EscalationResult memory result = disputeOps.computeEscalation(
             address(mockModule),
             escrowContract,
             address(0),
@@ -805,7 +805,7 @@ contract OpsCoverageTest is Test {
         mockSpecial.setDecision(1);
 
         vm.prank(escrowContract);
-        DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
+        DisputeOpsReference.EscalationResult memory result = disputeOps.computeEscalation(
             address(mockSpecial),
             escrowContract,
             address(0),
@@ -839,7 +839,7 @@ contract OpsCoverageTest is Test {
         mockSpecial.setEscalation(true, address(0x999), 0);
 
         vm.prank(escrowContract);
-        DisputeOps.EscalationResult memory result = disputeOps.computeEscalation(
+        DisputeOpsReference.EscalationResult memory result = disputeOps.computeEscalation(
             address(mockSpecial),
             escrowContract,
             address(0),
@@ -1300,13 +1300,13 @@ contract OpsCoverageTest is Test {
         );
     }
 
-    // ============ SettlementOps Extended Tests ============
+    // ============ SettlementOpsReference Extended Tests ============
 
     function test_SettlementOps_computePendingSettlementExecution() public {
         vm.prank(timelock);
         settlementOps.registerEscrowContract(escrowContract);
 
-        SettlementOps.SettlementPendingSettlement memory pending;
+        SettlementOpsReference.SettlementPendingSettlement memory pending;
         
         vm.prank(escrowContract);
         // Not exists
@@ -1341,7 +1341,7 @@ contract OpsCoverageTest is Test {
         settlementOps.registerEscrowContract(escrowContract);
 
         EscrowTransfer memory et;
-        SettlementOps.SettlementPendingSettlement memory pending;
+        SettlementOpsReference.SettlementPendingSettlement memory pending;
         TimeoutConfig memory config;
         config.defaultAutoCancelDelay = 1;
 
@@ -1407,7 +1407,7 @@ contract OpsCoverageTest is Test {
 
         vm.prank(escrowContract);
         // Address 0 module
-        SettlementOps.ResolutionResult memory result = settlementOps.computeResolutionExecution(
+        SettlementOpsReference.ResolutionResult memory result = settlementOps.computeResolutionExecution(
             address(0),
             1,
             true,
@@ -1428,7 +1428,7 @@ contract OpsCoverageTest is Test {
         assertEq(result.appealDeadline, block.timestamp + 1 days);
     }
 
-    // ============ DisputeOps Extended Tests ============
+    // ============ DisputeOpsReference Extended Tests ============
 
     function test_DisputeOps_validateEscalationFee() public {
         (bool valid, uint256 excess) = disputeOps.validateEscalationFee(100, 50);

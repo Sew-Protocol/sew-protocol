@@ -35,12 +35,6 @@ async function main() {
     { name: 'EscrowVault', address: registry.contracts.EscrowVault.address, needsTimelock: false },
     { name: 'CreateOps', address: registry.contracts.CreateOps.address, needsTimelock: true },
     { name: 'YieldOps', address: registry.contracts.YieldOps.address, needsTimelock: true },
-    {
-      name: 'SettlementOps',
-      address: registry.contracts.SettlementOps.address,
-      needsTimelock: false,
-    },
-    { name: 'DisputeOps', address: registry.contracts.DisputeOps.address, needsTimelock: false },
   ];
 
   let hasGuardian = 0;

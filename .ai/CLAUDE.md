@@ -68,7 +68,7 @@ pnpm coverage:summary
 
 ### Core Contracts
 
-**`BaseEscrow`** (`contracts/core/BaseEscrow.sol`) is the heart of the protocol. It implements the full escrow lifecycle and delegates computation to a set of stateless **Ops contracts** (CreateOps, YieldOps, DisputeOps, SettlementOps, GuardianOps). The pattern is: Ops contract computes the result (pure/view), BaseEscrow applies state changes. This exists to keep BaseEscrow under the EIP-170 bytecode limit given `via_ir=true, optimizer_runs=1`.
+**`BaseEscrow`** (`contracts/core/BaseEscrow.sol`) is the heart of the protocol. It implements the full escrow lifecycle and remains the visible authoritative orchestrator. Deterministic settlement and dispute derivation are compiled-in internal libraries (`EscrowSettlementLogic`, `EscrowDisputeLogic`) — the derive → result → apply boundary is preserved without a runtime/deployment trust boundary. Some computation is still delegated to externally deployed stateless **Ops contracts** (CreateOps, YieldOps, BondCollector, GuardianOps): the ops contract computes the result (pure/view) and BaseEscrow applies state changes. This split exists to keep BaseEscrow under the EIP-170 bytecode limit given `via_ir=true, optimizer_runs=1`.
 
 **`EscrowVault`** (`contracts/core/EscrowVault.sol`) is the concrete implementation. It holds ERC20 tokens and tracks per-token balances (`totalHeldInEscrowPerToken`, `totalFeesPerToken`, `totalClaimableAssets`).
 
@@ -115,7 +115,7 @@ All shared structs and enums live in `contracts/types/`:
 ### Dispute Flow
 
 1. Either party calls `raiseDispute()` → state: `PENDING → DISPUTED`
-2. `DisputeOps` initialises the dispute in the resolution module
+2. `EscrowDisputeLogic` derives the dispute opening; BaseEscrow initialises the dispute in the resolution module
 3. Resolver calls `releaseAsDisputeResolver()` or `cancelAsDisputeResolver()` → state: `DISPUTED → PENDING_SETTLEMENT`
 4. A 2-day appeal window runs; anyone calls `executePendingSettlement()` after expiry → final state
 5. If a dispute sits unresolved for 90 days, `autoCancelDisputedEscrow()` refunds the sender
@@ -142,7 +142,7 @@ After editing any `.sol` or `.ts` file, run `codacy_cli_analyze` (Codacy MCP too
 test/foundry/
   core/          # BaseEscrow, EscrowVault, state transitions, reentrancy
   modules/       # Yield, resolution, strategy tests
-  ops/           # CreateOps, YieldOps, DisputeOps, SettlementOps
+  ops/           # CreateOps, YieldOps (DisputeOps/SettlementOps removed; see EscrowDisputeLogic/EscrowSettlementLogic)
   registry/      # ModuleRegistry, ModuleSnapshotRegistry
   integration/   # Multi-escrow, cross-module workflows
   halmos/        # Symbolic execution (run with Halmos profile)

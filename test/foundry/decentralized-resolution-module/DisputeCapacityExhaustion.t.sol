@@ -9,9 +9,7 @@ import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/core/BaseEscrow.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/DisputeOps.sol';
 import '../../../contracts/ops/CreateOps.sol';
-import '../../../contracts/ops/SettlementOps.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
 import '../../../contracts/core/BondCollector.sol';
@@ -38,9 +36,7 @@ contract DisputeCapacityExhaustionTest is Test {
     DRMAdminFacet public drmAdmin;
     ERC20Mock public token;
     YieldOps public yieldOps;
-    DisputeOps public disputeOps;
     CreateOps public createOps;
-    SettlementOps public settlementOps;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
     EscrowGovernanceTimelock public adminContract;
@@ -77,9 +73,7 @@ contract DisputeCapacityExhaustionTest is Test {
 
         // Ops
         yieldOps = new YieldOps(deployer);
-        disputeOps = new DisputeOps(deployer);
         createOps = new CreateOps(deployer);
-        settlementOps = new SettlementOps(deployer);
         bondCollector = new BondCollector(deployer);
         moduleManagement = new ModuleSnapshotRegistry(deployer);
         adminContract = new EscrowGovernanceTimelock(deployer);
@@ -90,25 +84,21 @@ contract DisputeCapacityExhaustionTest is Test {
         drm.setAdminFacet(address(drmAdmin));
 
         // Escrow vault
-        escrow = new EscrowVault(FEE_BPS, feeRecipient, address(yieldOps), address(disputeOps), address(moduleManagement));
+        escrow = new EscrowVault(FEE_BPS,feeRecipient,address(yieldOps),address(moduleManagement));
 
         // Wire ops
-        disputeOps.registerEscrowContract(address(escrow));
         createOps.registerEscrowContract(address(escrow));
-        settlementOps.registerEscrowContract(address(escrow));
         bondCollector.registerEscrowContract(address(escrow));
 
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), deployer);
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(adminContract));
         escrow.setCreateOps(address(createOps));
-        escrow.setSettlementOps(address(settlementOps));
         escrow.setBondCollector(address(bondCollector));
 
         // DRM roles & escrow registration
         drm.grantRole(ROLE_TIMELOCK, timelock);
         vm.startPrank(timelock);
         drm.registerEscrowContract(address(escrow));
-        drm.registerEscrowContract(address(disputeOps));
         vm.stopPrank();
 
         // Also register this test contract for direct DRM unit tests

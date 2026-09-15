@@ -9,8 +9,6 @@ import 'contracts/libraries/EscrowEncodingLibrary.sol';
 import 'contracts/interfaces/IReleaseStrategy.sol';
 import 'contracts/interfaces/IEscrowCore.sol';
 import 'contracts/ops/CreateOps.sol';
-import 'contracts/ops/DisputeOps.sol';
-import 'contracts/ops/SettlementOps.sol';
 import 'contracts/ops/YieldOps.sol';
 import 'contracts/core/BondCollector.sol';
 import 'contracts/mocks/MockERC20.sol';
@@ -37,8 +35,6 @@ contract ReleaseFlexibilityTest is Test {
     DefaultReleaseStrategy defaultReleaseStrategy;
     MockResolutionModule mockResolutionModule;
     CreateOps createOps;
-    DisputeOps disputeOps;
-    SettlementOps settlementOps;
     YieldOps yieldOps;
     BondCollector bondCollector;
     MockModuleSnapshotRegistry moduleSnapshotRegistry;
@@ -52,8 +48,6 @@ contract ReleaseFlexibilityTest is Test {
 
         // Deploy utility contracts
         createOps = new CreateOps(defaultAdmin);
-        disputeOps = new DisputeOps(defaultAdmin);
-        settlementOps = new SettlementOps(defaultAdmin);
         yieldOps = new YieldOps(defaultAdmin);
         bondCollector = new BondCollector(defaultAdmin);
         
@@ -71,12 +65,8 @@ contract ReleaseFlexibilityTest is Test {
         
         // Deploy EscrowVault (MOVED HERE) - deployer will be pranked so deployer gets ROLE_ADMIN
         vm.startPrank(deployer);
-        escrowVault = new EscrowVault(
-            0, // escrowFeeBps
-            feeAddress,
-            address(yieldOps),
-            address(disputeOps),
-            address(moduleSnapshotRegistry) // Pass the mock registry
+        escrowVault = new EscrowVault(0,// escrowFeeBps
+            feeAddress,address(yieldOps),address(moduleSnapshotRegistry) // Pass the mock registry
         );
         vm.stopPrank();
 
@@ -104,8 +94,6 @@ contract ReleaseFlexibilityTest is Test {
 
         vm.startPrank(defaultAdmin);
         createOps.grantRole(createOps.ROLE_ESCROW_CONTRACT(), address(escrowVault));
-        disputeOps.grantRole(disputeOps.ROLE_ESCROW_CONTRACT(), address(escrowVault));
-        settlementOps.grantRole(settlementOps.ROLE_ESCROW_CONTRACT(), address(escrowVault));
         yieldOps.grantRole(yieldOps.ROLE_ESCROW_CONTRACT(), address(escrowVault));
         bondCollector.grantRole(bondCollector.ROLE_ESCROW_CONTRACT(), address(escrowVault));
         vm.stopPrank();
@@ -113,8 +101,7 @@ contract ReleaseFlexibilityTest is Test {
 
         vm.startPrank(timelock);
         escrowVault.setCreateOps(address(createOps));
-        // Removed: escrowVault.setDisputeOps(address(disputeOps)); as DisputeOps is set in constructor
-        escrowVault.setSettlementOps(address(settlementOps));
+        // Dispute derivation is now internal (EscrowDisputeLogic); no DisputeOps wiring.
         escrowVault.setBondCollector(address(bondCollector));
         vm.stopPrank();
 

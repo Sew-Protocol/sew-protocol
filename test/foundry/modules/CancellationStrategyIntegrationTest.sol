@@ -7,8 +7,6 @@ import "../../../contracts/modules/DefaultReleaseStrategy.sol";
 import "../../../contracts/core/EscrowVault.sol";
 import "../../../contracts/ops/CreateOps.sol";
 import "../../../contracts/ops/YieldOps.sol";
-import "../../../contracts/ops/DisputeOps.sol";
-import "../../../contracts/ops/SettlementOps.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/types/EscrowTypes.sol";
@@ -24,8 +22,6 @@ contract CancellationStrategyIntegrationTest is Test {
     EscrowVault public vault;
     CreateOps public createOps;
     YieldOps public yieldOps;
-    DisputeOps public disputeOps;
-    SettlementOps public settlementOps;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
     DefaultCancellationStrategy public cancellationStrategy;
@@ -46,8 +42,6 @@ contract CancellationStrategyIntegrationTest is Test {
         
         // Deploy ops contracts
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps(address(this));
-        settlementOps = new SettlementOps(address(this));
         createOps = new CreateOps(address(this));
         
         // Deploy bond collector
@@ -63,20 +57,17 @@ contract CancellationStrategyIntegrationTest is Test {
         releaseStrategy = new DefaultReleaseStrategy();
         
         // Deploy EscrowVault
-        vault = new EscrowVault(ESCROW_FEE, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
+        vault = new EscrowVault(ESCROW_FEE,feeAddress,address(yieldOps),address(moduleManagement));
         
         // Register escrow contract with all ops contracts
         moduleManagement.registerEscrowContract(address(vault));
         yieldOps.registerEscrowContract(address(vault));
-        disputeOps.registerEscrowContract(address(vault));
-        settlementOps.registerEscrowContract(address(vault));
         createOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
         
         // Wire required ops contracts on the vault
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.setCreateOps(address(createOps));
-        vault.setSettlementOps(address(settlementOps));
         vault.setBondCollector(address(bondCollector));
         
         // Set default release strategy (needed for release tests)

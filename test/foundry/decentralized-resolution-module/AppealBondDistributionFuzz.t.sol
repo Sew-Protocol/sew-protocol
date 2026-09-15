@@ -7,7 +7,6 @@ import '../../../contracts/modules/decentralized-resolution-module/PaymentCalcul
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/DisputeOps.sol';
 
 /**
  * @title AppealBondDistributionFuzzTest
@@ -22,7 +21,6 @@ contract AppealBondDistributionFuzzTest is Test {
     PaymentCalculationLibraryV1 public paymentLib;
     ERC20Mock public token;
     YieldOps public yieldOps;
-    DisputeOps public disputeOps;
 
     address public deployer;
     address public escrowContract;
@@ -39,7 +37,6 @@ contract AppealBondDistributionFuzzTest is Test {
         incentiveModule = new ResolverIncentiveModuleV2(deployer, address(paymentLib));
         token = new ERC20Mock('Test Token', 'TEST', deployer, 0);
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps(address(this));
 
         // Register escrow contract (requires ROLE_TIMELOCK)
         bytes32 ROLE_TIMELOCK = incentiveModule.ROLE_TIMELOCK();

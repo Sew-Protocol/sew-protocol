@@ -7,8 +7,6 @@ import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/types/YieldPresets.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/DisputeOps.sol';
-import '../../../contracts/ops/SettlementOps.sol';
 import '../../../contracts/ops/CreateOps.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
@@ -31,8 +29,6 @@ contract PartialReleaseTest is Test {
     ModuleSnapshotRegistry moduleManagement;
     DefaultReleaseStrategy releaseStrategy;
     YieldOps yieldOps;
-    DisputeOps disputeOps;
-    SettlementOps settlementOps;
     CreateOps createOps;
     BondCollector bondCollector;
     DefaultResolutionModule resolutionModule;
@@ -41,15 +37,13 @@ contract PartialReleaseTest is Test {
         token = new ERC20Mock('Token', 'TKN', address(this), 1_000_000e18);
 
         yieldOps = new YieldOps(address(this));
-        disputeOps = new DisputeOps(address(this));
-        settlementOps = new SettlementOps(address(this));
         createOps = new CreateOps(address(this));
         bondCollector = new BondCollector(address(this));
         resolutionModule = new DefaultResolutionModule(address(this), address(0x1234));
         releaseStrategy = new DefaultReleaseStrategy();
         moduleManagement = new ModuleSnapshotRegistry(address(this));
 
-        vault = new EscrowVault(FEE_BPS, feeAddress, address(yieldOps), address(disputeOps), address(moduleManagement));
+        vault = new EscrowVault(FEE_BPS,feeAddress,address(yieldOps),address(moduleManagement));
 
         moduleManagement.registerEscrowContract(address(vault));
         moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
@@ -57,14 +51,11 @@ contract PartialReleaseTest is Test {
         moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
 
         yieldOps.registerEscrowContract(address(vault));
-        disputeOps.registerEscrowContract(address(vault));
-        settlementOps.registerEscrowContract(address(vault));
         createOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
 
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.setCreateOps(address(createOps));
-        vault.setSettlementOps(address(settlementOps));
         vault.setBondCollector(address(bondCollector));
         vault.setResolutionModule(address(resolutionModule));
         vault.grantRole(vault.ROLE_FEE_RECIPIENT(), feePicker);
@@ -303,7 +294,7 @@ contract PartialReleaseTest is Test {
 
         vm.prank(buyer);
         vm.expectEmit(true, true, true, true);
-        emit BaseEscrow.EscrowStateChanged(id, EscrowState.PENDING, EscrowState.RELEASED);
+        emit EscrowCreation.EscrowStateChanged(id, EscrowState.PENDING, EscrowState.RELEASED);
         vault.partialRelease(id, amountAfterFee);
     }
 
