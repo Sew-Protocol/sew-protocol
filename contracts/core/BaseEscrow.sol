@@ -1543,7 +1543,7 @@ abstract contract BaseEscrow is AccessControl, ReentrancyGuard {
     /// @dev Creates claimable entitlement only (no automatic payout delivery)
     /// @dev Part of IEscrowCore interface for wallet adoption
     /// @dev Callable even when paused (release strategy may further restrict)
-    function release(uint256 workflowId) external nonReentrant {
+    function release(uint256 workflowId) public nonReentrant {
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
 

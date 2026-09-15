@@ -7,8 +7,7 @@ import '../core/BaseEscrow.sol'; // For ModuleType enum
 
 /**
  * @title ModuleGetterLibrary
- * @notice Library for optimized module address retrieval
- * @dev Uses assembly for efficient storage lookups.
+ * @notice Shared module address retrieval for all escrow products.
  */
 library ModuleGetterLibrary {
     /**
@@ -19,7 +18,6 @@ library ModuleGetterLibrary {
      * @param moduleManagement ModuleSnapshotRegistry instance
      * @param escrowContract Address of the escrow contract (msg.sender for ModuleSnapshotRegistry)
      * @return moduleAddress The module address
-     * @dev Uses assembly for optimized storage reads and switch pattern
      */
     function getModuleAddress(
         uint256 workflowId,
@@ -28,37 +26,13 @@ library ModuleGetterLibrary {
         ModuleSnapshotRegistry moduleManagement,
         address escrowContract
     ) internal view returns (address moduleAddress) {
-        address snapshotModule;
-
-        // Use assembly for optimized switch-like pattern (saves ~600 bytes vs if/else chain)
         ModuleSnapshot storage snapshot = moduleSnapshots[workflowId];
-        
-        assembly {
-            // Switch on moduleType (0=RESOLUTION, 1=RELEASE, 2=CANCELLATION, 3=YIELD_GEN, 4=YIELD_DIST)
-            // Access struct fields via storage pointer offsets
-            let slot := snapshot.slot
-            switch moduleType
-            case 0 {
-                // RESOLUTION: snapshot.resolutionModule (offset 0)
-                snapshotModule := sload(slot)
-            }
-            case 1 {
-                // RELEASE: snapshot.releaseStrategy (offset 1)
-                snapshotModule := sload(add(slot, 1))
-            }
-            case 2 {
-                // CANCELLATION: snapshot.cancellationStrategy (offset 2)
-                snapshotModule := sload(add(slot, 2))
-            }
-            case 3 {
-                // YIELD_GEN: snapshot.yieldGenerationModule (offset 3)
-                snapshotModule := sload(add(slot, 3))
-            }
-            case 4 {
-                // YIELD_DIST: snapshot.yieldDistributionModule (offset 4)
-                snapshotModule := sload(add(slot, 4))
-            }
-        }
+        address snapshotModule;
+        if (moduleType == BaseEscrow.ModuleType.RESOLUTION) snapshotModule = snapshot.resolutionModule;
+        else if (moduleType == BaseEscrow.ModuleType.RELEASE) snapshotModule = snapshot.releaseStrategy;
+        else if (moduleType == BaseEscrow.ModuleType.CANCELLATION) snapshotModule = snapshot.cancellationStrategy;
+        else if (moduleType == BaseEscrow.ModuleType.YIELD_GEN) snapshotModule = snapshot.yieldGenerationModule;
+        else if (moduleType == BaseEscrow.ModuleType.YIELD_DIST) snapshotModule = snapshot.yieldDistributionModule;
 
         // If snapshot exists, return it
         if (snapshotModule != address(0)) {
