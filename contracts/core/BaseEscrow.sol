@@ -859,6 +859,12 @@ abstract contract BaseEscrow is EscrowLifecycle {
      * @param isRelease True to release to recipient, false to cancel/refund to sender
      * @param resolutionHash Hash of resolution details (for offchain verification)
      * @return success True if resolution executed successfully
+     *
+     * @dev PRF SEAM: this is where a future `finalOutcomeRoot`/`adjudicationClosureRoot`
+     *      would be captured and bound to the pending settlement. The outcome is
+     *      currently asserted by the authorized resolver (or the Kleros proxy at the
+     *      final round) and echoed into the module; it is not verified against an
+     *      independently rooted decision. `resolutionHash` is accepted but not bound.
      */
     function _executeResolution(
         uint256 workflowId,
@@ -1007,6 +1013,12 @@ abstract contract BaseEscrow is EscrowLifecycle {
         return _executeResolution(workflowId, true, resolutionHash);
     }
 
+    // SECURITY INVARIANT (future PRF boundary): `et.disputeResolver` is the sole
+    // settlement-authority gate for `releaseAsDisputeResolver`/`cancelAsDisputeResolver`.
+    // It must only ever be set to a locally recognized resolver (module-selected
+    // resolver, custom resolver, or the Kleros proxy at the final round) and MUST NOT
+    // be set to a bridge, message endpoint, or any remote caller. A remote adjudication
+    // message may inform a decision, but settlement authority stays local.
     function _isAuthorizedDisputeResolver(
         uint256 workflowId,
         address disputeResolver
@@ -1058,6 +1070,13 @@ abstract contract BaseEscrow is EscrowLifecycle {
     // Terminal-state finalization used by the orchestration paths above.
     // =====================================================================
 
+    // DUAL-FINALITY NOTE (must decide before a closure root is introduced):
+    // the module has its own finality predicate (`DisputeStatus.Final`, set by
+    // finalizeDispute when the appeal window expires or MAX_ROUND is reached), but
+    // this call is best-effort and its failure is swallowed. The effective
+    // settlement finality today is the escrow-local `PendingSettlement.appealDeadline`
+    // checked in EscrowSettlement.executePendingSettlement. A PRF closure model needs
+    // a single, enforced finality predicate rather than two loosely coupled clocks.
     function _finalizeDisputeInModule(uint256 workflowId) internal override {
         IResolutionModule resolutionModule = _getResolutionModule(workflowId);
         if (address(resolutionModule) == address(0)) return;

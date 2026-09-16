@@ -32,6 +32,16 @@ abstract contract EscrowStorage {
     mapping(address => uint256) public totalClaimableAssets;
     mapping(address => mapping(address => uint256)) public claimableBondProtocolFees;
     mapping(address => uint256) public claimableExcessEthRefunds;
+    // ── PRF adjudication seam (design marker; not implemented) ──────────────────
+    // The decision → finality → settlement pipeline attaches here. A future
+    // adjudication closure (`finalOutcomeRoot` / `adjudicationClosureRoot`) would
+    // be captured at the decision transition and verified before realization.
+    //
+    // SECURITY NOTE: `resolutionHash` is currently NON-BINDING. It is supplied by
+    // the authorized resolver / Kleros proxy and stored + emitted, but is never
+    // verified against a rooted outcome (see BaseEscrow._executeResolution). It is
+    // reserved as the likely closure slot; treat its presence as a placeholder, not
+    // as settlement authority.
     struct PendingSettlement { bool exists; bool isRelease; uint256 appealDeadline; bytes32 resolutionHash; }
     mapping(uint256 => PendingSettlement) public pendingSettlements;
     struct SplitProposal { address proposer; uint256 buyerAmount; uint256 sellerAmount; uint64 expiry; bool active; }

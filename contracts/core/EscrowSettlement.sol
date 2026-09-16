@@ -28,6 +28,10 @@ abstract contract EscrowSettlement is EscrowAccounting {
     event SplitAccepted(uint256 indexed workflowId, address indexed accepter, uint256 buyerAmount, uint256 sellerAmount);
     event SplitCancelled(uint256 indexed workflowId, address indexed cancelledBy);
 
+    // SETTLEMENT-REALIZATION SEAM. Local finality today is the stored
+    // `PendingSettlement.appealDeadline`; a future adjudication closure would be
+    // verified here before the terminal transition. Enforcement stays local: a
+    // remote decision message must never itself be settlement authority.
     function executePendingSettlement(uint256 workflowId) external nonReentrant {
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];

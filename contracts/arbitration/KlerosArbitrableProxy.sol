@@ -45,6 +45,13 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
     // Mapping: escrowContract => workflowId => dispute metadata
     mapping(address => mapping(uint256 => DisputeMetadata)) public disputes;
 
+    // Mapping: escrowContract => workflowId => refusal timestamp (0 = no refusal).
+    // Refusal (Kleros ruling 0) is a PROCESS/ADJUDICATION state, not an economic
+    // outcome. It is observational only: recording it must not authorize settlement,
+    // create a pending settlement, shorten any deadline, or move custody. The
+    // existing escalation/expiry/timeout machinery remains the sole economic path.
+    mapping(address => mapping(uint256 => uint256)) public refusalTimestamp;
+
     struct DisputeMetadata {
         address arbitrable;
         uint256 klerosDisputeId;
@@ -71,6 +78,9 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
     );
 
     event RulingExecuted(uint256 indexed workflowId, uint256 indexed klerosDisputeId, uint256 ruling);
+    /// @notice Emitted when the arbitrator declines to rule (ruling 0). Purely
+    ///         observational: no settlement authority is conferred by this event.
+    event RulingRefused(uint256 indexed workflowId, uint256 indexed klerosDisputeId, uint256 timestamp);
     event SettlementPropagated(uint256 indexed workflowId, address indexed escrowContract, bool isRelease, bool success);
 
     constructor(address _arbitrator, address _admin) {
@@ -205,6 +215,12 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
         dispute.resolved = true;
         dispute.ruling = _ruling;
 
+        // Record refusal explicitly (observational only; no settlement authority).
+        if (_ruling == 0) {
+            refusalTimestamp[escrowContract][workflowId] = block.timestamp;
+            emit RulingRefused(workflowId, _disputeID, block.timestamp);
+        }
+
         emit Ruling(arbitrator, _disputeID, _ruling);
         emit RulingExecuted(workflowId, _disputeID, _ruling);
 
@@ -228,6 +244,10 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
             if (status == IArbitrator.DisputeStatus.Solved) {
                 dispute.ruling = arbitrator.currentRuling(dispute.klerosDisputeId);
                 dispute.resolved = true;
+                if (dispute.ruling == 0) {
+                    refusalTimestamp[escrowContract][workflowId] = block.timestamp;
+                    emit RulingRefused(workflowId, dispute.klerosDisputeId, block.timestamp);
+                }
             } else {
                 revert('Not yet resolved by Kleros');
             }
@@ -239,6 +259,10 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
     /**
      * @dev Internal helper for propagating ruling to BaseEscrow
      */
+    // PRF NOTE: a refusal (`ruling == 0`) is currently UNREPRESENTED — it returns
+    // without recording any outcome on the escrow. The dispute remains DISPUTED and
+    // can only exit via the max-dispute-duration timeout, which refunds the sender.
+    // If PRF distinguishes REFUSED from REFUND, this is the point that must change.
     function _propagateRuling(uint256 workflowId, address escrowContract, uint256 ruling) internal {
         if (ruling == 0) return; // Refused to rule - requires manual intervention or timeout
 
@@ -275,6 +299,12 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
      * @param workflowId The escrow workflow ID
      * @param escrowContract Address of the escrow contract
      */
+    /// @notice Whether the arbitrator declined to rule for a workflow. Process state
+    ///         only; it does not imply any economic outcome or settlement authority.
+    function isRefused(uint256 workflowId, address escrowContract) external view returns (bool) {
+        return refusalTimestamp[escrowContract][workflowId] != 0;
+    }
+
     function getRuling(uint256 workflowId, address escrowContract) external view returns (bool resolved, uint256 ruling) {
         // Check if dispute exists
         if (workflowToKlerosDispute[escrowContract][workflowId] == 0) {

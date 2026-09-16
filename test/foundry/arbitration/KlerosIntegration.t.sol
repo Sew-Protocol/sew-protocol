@@ -440,6 +440,80 @@ contract KlerosIntegrationTest is Test {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
+    // REFUSAL TESTS (ruling 0): explicitly represented, observational only
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    event RulingRefused(uint256 indexed workflowId, uint256 indexed klerosDisputeId, uint256 timestamp);
+
+    function test_refusal_notSetBefore() public {
+        bytes memory escrowData = abi.encode(address(0), sender, recipient, AMOUNT, AMOUNT);
+        vm.prank(address(mockEscrow));
+        klerosProxy.createDispute{value: ARBITRATION_PRICE}(1, address(mockEscrow), 2, '0x', escrowData);
+
+        assertFalse(klerosProxy.isRefused(1, address(mockEscrow)));
+    }
+
+    function test_rule_refusal_recordsAndEmits() public {
+        bytes memory escrowData = abi.encode(address(0), sender, recipient, AMOUNT, AMOUNT);
+        vm.prank(address(mockEscrow));
+        klerosProxy.createDispute{value: ARBITRATION_PRICE}(1, address(mockEscrow), 2, '0x', escrowData);
+
+        vm.expectEmit(true, true, false, false);
+        emit RulingRefused(1, 0, block.timestamp);
+        mockArbitrator.giveRuling(0, 0);
+
+        assertTrue(klerosProxy.isRefused(1, address(mockEscrow)));
+        assertGt(klerosProxy.refusalTimestamp(address(mockEscrow), 1), 0);
+        (bool resolved, uint256 ruling) = klerosProxy.getRuling(1, address(mockEscrow));
+        assertTrue(resolved);
+        assertEq(ruling, 0);
+    }
+
+    /// @dev Refusal must not propagate any settlement instruction to the escrow.
+    function test_rule_refusal_doesNotSettle() public {
+        bytes memory escrowData = abi.encode(address(0), sender, recipient, AMOUNT, AMOUNT);
+        vm.prank(address(mockEscrow));
+        klerosProxy.createDispute{value: ARBITRATION_PRICE}(1, address(mockEscrow), 2, '0x', escrowData);
+
+        mockArbitrator.giveRuling(0, 0);
+
+        assertFalse(mockEscrow.released(1), 'refusal must not release');
+        assertFalse(mockEscrow.cancelled(1), 'refusal must not cancel/refund');
+    }
+
+    /// @dev Refusal must not emit SettlementPropagated (no settlement authority).
+    function test_rule_refusal_emitsNoSettlementPropagated() public {
+        bytes memory escrowData = abi.encode(address(0), sender, recipient, AMOUNT, AMOUNT);
+        vm.prank(address(mockEscrow));
+        klerosProxy.createDispute{value: ARBITRATION_PRICE}(1, address(mockEscrow), 2, '0x', escrowData);
+
+        vm.recordLogs();
+        mockArbitrator.giveRuling(0, 0);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 settlementTopic = keccak256('SettlementPropagated(uint256,address,bool,bool)');
+        for (uint256 i = 0; i < logs.length; i++) {
+            assertTrue(logs[i].topics[0] != settlementTopic, 'refusal emitted SettlementPropagated');
+        }
+    }
+
+    /// @dev Release/refund rulings are unaffected by the refusal representation.
+    function test_rulingReleaseAndCancel_unaffected() public {
+        bytes memory escrowData = abi.encode(address(0), sender, recipient, AMOUNT, AMOUNT);
+
+        vm.prank(address(mockEscrow));
+        klerosProxy.createDispute{value: ARBITRATION_PRICE}(1, address(mockEscrow), 2, '0x', escrowData);
+        mockArbitrator.giveRuling(0, 1);
+        assertTrue(mockEscrow.released(1));
+        assertFalse(klerosProxy.isRefused(1, address(mockEscrow)));
+
+        vm.prank(address(mockEscrow));
+        klerosProxy.createDispute{value: ARBITRATION_PRICE}(2, address(mockEscrow), 2, '0x', escrowData);
+        mockArbitrator.giveRuling(1, 2);
+        assertTrue(mockEscrow.cancelled(2));
+        assertFalse(klerosProxy.isRefused(2, address(mockEscrow)));
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
     // IRESOLUTION MODULE TESTS
     // ═══════════════════════════════════════════════════════════════════════════════
 
