@@ -43,6 +43,7 @@
     "@openzeppelin/hardhat-upgrades": "^3.9.1",
     "@safe-global/safe-contracts": "1.4.1-2",
     "@typechain/hardhat": "^9.1.0",
+    "@types/mocha": "^10.0.10",
     "@types/node": "^20.19.27",
     "@typescript-eslint/eslint-plugin": "^8.53.1",
     "@typescript-eslint/parser": "^8.53.1",
@@ -58,7 +59,5 @@
     "ts-node": "^10.9.2",
     "typechain": "^8.3.0",
     "typescript": "^5.9.3"
-  },
-  "dependencies": {
   }
 }

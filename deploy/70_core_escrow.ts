@@ -314,8 +314,6 @@ export default func;
 func.tags = ['core', 'escrow'];
 func.dependencies = [
   'yield-ops',
-  'dispute-ops',
-  'settlement-ops',
   'create-ops',
   'bond-collector',
   'module-management',

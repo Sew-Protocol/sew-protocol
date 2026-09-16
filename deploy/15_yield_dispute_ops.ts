@@ -198,5 +198,5 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 };
 
 export default func;
-func.tags = ['core', 'yield-ops', 'dispute-ops', 'settlement-ops', 'create-ops', 'bond-collector'];
+func.tags = ['core', 'yield-ops', 'create-ops', 'bond-collector'];
 func.dependencies = [];

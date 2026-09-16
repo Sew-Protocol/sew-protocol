@@ -94,6 +94,9 @@ describe('Module Metadata', function () {
 
     it('Should support IResolutionModule interface', async function () {
       // Calculate interface ID from function selectors (XOR of all function selectors)
+      const initializeDisputeSelector = ethers
+        .id('initializeDispute(uint256,address,address,bytes32)')
+        .slice(0, 10);
       const isAuthorizedSelector = ethers
         .id('isAuthorizedDisputeResolver(uint256,address,address,bytes)')
         .slice(0, 10);
@@ -114,6 +117,7 @@ describe('Module Metadata', function () {
       // Calculate XOR of all selectors (ERC-165 standard)
       let calculatedInterfaceId = BigInt(0);
       for (const selector of [
+        initializeDisputeSelector,
         isAuthorizedSelector,
         getResolverSelector,
         canEscalateSelector,
@@ -158,6 +162,9 @@ describe('Module Metadata', function () {
 
     it('Should support IResolutionModule interface', async function () {
       // Calculate interface ID from function selectors (XOR of all function selectors)
+      const initializeDisputeSelector = ethers
+        .id('initializeDispute(uint256,address,address,bytes32)')
+        .slice(0, 10);
       const isAuthorizedSelector = ethers
         .id('isAuthorizedDisputeResolver(uint256,address,address,bytes)')
         .slice(0, 10);
@@ -177,6 +184,7 @@ describe('Module Metadata', function () {
 
       let calculatedInterfaceId = BigInt(0);
       for (const selector of [
+        initializeDisputeSelector,
         isAuthorizedSelector,
         getResolverSelector,
         canEscalateSelector,
