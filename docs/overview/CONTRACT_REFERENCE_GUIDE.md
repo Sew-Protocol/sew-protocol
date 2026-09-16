@@ -156,10 +156,14 @@
 **Location**: `contracts/ops/`  
 **Pattern**: Stateless libraries deployed once, called by escrow contracts
 
-### CreateOps
-- **Type**: ✅ Singleton (Library)
-- **Description**: External contract for escrow creation validation and computation. Handles settings validation, encoding, and initialization.
-- **Extracted**: Reduces BaseEscrow contract size
+### EscrowCreationPolicy
+- **Location**: `contracts/core/EscrowCreationPolicy.sol`
+- **Type**: ✅ Singleton (shared policy authority)
+- **Description**: Holds only protocol-wide creation policy (`yieldDepositsPaused`, `resolverMustBeContract`) with its governance surface. No calculation, no resolver lookup, no creation orchestration. Requires no per-escrow registration.
+
+### EscrowCreationLogic (internal library)
+- **Location**: `contracts/libraries/EscrowCreationLogic.sol`
+- **Description**: Deterministic escrow creation derivation (validation, fee math, resolver lookup, yield configuration), internalized from the former CreateOps contract.
 
 ### YieldOps
 - **Type**: ✅ Singleton (Library)
@@ -244,7 +248,7 @@
 | Escrow Implementations | 🔄 Multi-Instance | 2 | EscrowVault, EscrowableERC20 |
 | Yield Modules | ✅ Singleton | 3 | AaveYieldGenerationModule, DefaultYieldGenerationModule, DefaultYieldDistributionModule |
 | Resolution Modules | ✅ Singleton | 2+ | DefaultResolutionModule, DefaultReleaseStrategy, DR modules |
-| Ops Libraries | ✅ Singleton | 4 | CreateOps, YieldOps, BondCollector, GuardianOps (dispute/settlement derivation is now internal) |
+| Ops / Policy | ✅ Singleton | 4 | YieldOps, BondCollector, GuardianOps, EscrowCreationPolicy (creation/dispute/settlement derivation is now internal) |
 | Pure Libraries | No deployment | 20+ | Various libraries in `contracts/libraries/` |
 
 ### Table 2: Contract Renames (for Reference)

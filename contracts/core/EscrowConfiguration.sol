@@ -84,9 +84,9 @@ abstract contract EscrowConfiguration is AccessControl, EscrowStorage {
         emit EscalationCooldownUpdated(cooldown);
     }
 
-    function setCreateOps(address ops) external onlyRole(ROLE_TIMELOCK) {
-        if (ops == address(0)) revert ZeroCreateOps();
-        createOps = CreateOps(ops);
+    function setCreationPolicy(address policy) external onlyRole(ROLE_TIMELOCK) {
+        if (policy == address(0)) revert ZeroCreationPolicy();
+        creationPolicy = EscrowCreationPolicy(policy);
     }
 
     function setBondCollector(address collector) external onlyRole(ROLE_TIMELOCK) {

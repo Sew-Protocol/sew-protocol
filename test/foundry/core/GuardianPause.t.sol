@@ -13,7 +13,7 @@ import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/types/YieldPresets.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/CreateOps.sol';
+import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/ops/GuardianOps.sol';
 import '../TestConfig.sol';
 
@@ -36,7 +36,7 @@ contract GuardianPause is Test {
     DefaultResolutionModule public resolutionModule;
     DefaultReleaseStrategy public releaseStrategy;
     YieldOps public yieldOps;
-    CreateOps public createOps;
+    EscrowCreationPolicy public creationPolicy;
     GuardianOps public guardianOps;
 
     address public owner;
@@ -73,7 +73,7 @@ contract GuardianPause is Test {
 
         // Deploy ops contracts
         yieldOps = new YieldOps(owner);
-        createOps = new CreateOps(owner);
+        creationPolicy = new EscrowCreationPolicy(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
 
         // Deploy vault
@@ -92,10 +92,9 @@ contract GuardianPause is Test {
 
         // Wire ops contracts
         yieldOps.registerEscrowContract(address(vault));
-        createOps.registerEscrowContract(address(vault));
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), owner);
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(adminContract));
-        vault.setCreateOps(address(createOps));
+        vault.setCreationPolicy(address(creationPolicy));
 
         moduleManagement.registerEscrowContract(address(vault));
         adminContract.registerEscrowContract(address(vault));

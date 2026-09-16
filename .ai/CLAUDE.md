@@ -68,7 +68,7 @@ pnpm coverage:summary
 
 ### Core Contracts
 
-**`BaseEscrow`** (`contracts/core/BaseEscrow.sol`) is the heart of the protocol. It implements the full escrow lifecycle and remains the visible authoritative orchestrator. Deterministic settlement and dispute derivation are compiled-in internal libraries (`EscrowSettlementLogic`, `EscrowDisputeLogic`) — the derive → result → apply boundary is preserved without a runtime/deployment trust boundary. Some computation is still delegated to externally deployed stateless **Ops contracts** (CreateOps, YieldOps, BondCollector, GuardianOps): the ops contract computes the result (pure/view) and BaseEscrow applies state changes. This split exists to keep BaseEscrow under the EIP-170 bytecode limit given `via_ir=true, optimizer_runs=1`.
+**`BaseEscrow`** (`contracts/core/BaseEscrow.sol`) is the heart of the protocol. It implements the full escrow lifecycle and remains the visible authoritative orchestrator. Deterministic settlement and dispute derivation are compiled-in internal libraries (`EscrowSettlementLogic`, `EscrowDisputeLogic`) — the derive → result → apply boundary is preserved without a runtime/deployment trust boundary. Creation derivation is compiled in via `EscrowCreationLogic`, while the protocol-wide policy flags (`yieldDepositsPaused`, `resolverMustBeContract`) remain in a narrow shared authority, `EscrowCreationPolicy`, so a single emergency action still affects all escrows. Some computation is still delegated to externally deployed stateless **Ops contracts** (YieldOps, BondCollector, GuardianOps): the ops contract computes the result (pure/view) and BaseEscrow applies state changes. This split exists to keep BaseEscrow under the EIP-170 bytecode limit given `via_ir=true, optimizer_runs=1`.
 
 **`EscrowVault`** (`contracts/core/EscrowVault.sol`) is the concrete implementation. It holds ERC20 tokens and tracks per-token balances (`totalHeldInEscrowPerToken`, `totalFeesPerToken`, `totalClaimableAssets`).
 
@@ -142,7 +142,7 @@ After editing any `.sol` or `.ts` file, run `codacy_cli_analyze` (Codacy MCP too
 test/foundry/
   core/          # BaseEscrow, EscrowVault, state transitions, reentrancy
   modules/       # Yield, resolution, strategy tests
-  ops/           # CreateOps, YieldOps (DisputeOps/SettlementOps removed; see EscrowDisputeLogic/EscrowSettlementLogic)
+  ops/           # YieldOps (CreateOps/DisputeOps/SettlementOps removed; see EscrowCreationLogic/EscrowDisputeLogic/EscrowSettlementLogic)
   registry/      # ModuleRegistry, ModuleSnapshotRegistry
   integration/   # Multi-escrow, cross-module workflows
   halmos/        # Symbolic execution (run with Halmos profile)

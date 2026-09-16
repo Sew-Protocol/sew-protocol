@@ -8,7 +8,7 @@ import "../../../contracts/modules/DefaultReleaseStrategy.sol";
 import "contracts/core/ModuleSnapshotRegistry.sol";
 import "contracts/admin/EscrowGovernanceTimelock.sol";
 import "contracts/core/modules/DefaultResolutionModule.sol";
-import "contracts/ops/CreateOps.sol";
+import "contracts/core/EscrowCreationPolicy.sol";
 import "contracts/core/BondCollector.sol";
 import "contracts/mocks/ERC20Mock.sol";
 import "contracts/libraries/SettingsValidationLibrary.sol";
@@ -45,7 +45,7 @@ contract YieldWithdrawalNonBlockingTest is Test {
     ModuleSnapshotRegistry moduleManagement;
     EscrowGovernanceTimelock adminContract;
     DefaultResolutionModule rm;
-    CreateOps createOps;
+    EscrowCreationPolicy creationPolicy;
     BondCollector bondCollector;
     DefaultReleaseStrategy releaseStrategy;
     BadYieldOps badYieldOps;
@@ -60,7 +60,7 @@ contract YieldWithdrawalNonBlockingTest is Test {
     uint256 constant AMOUNT = 10 ether;
 
     function setUp() public {
-        createOps = new CreateOps(address(this));
+        creationPolicy = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
         releaseStrategy = new DefaultReleaseStrategy();
         moduleManagement = new ModuleSnapshotRegistry(address(this));
@@ -74,14 +74,13 @@ contract YieldWithdrawalNonBlockingTest is Test {
         moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
 
         // Register escrow contract with ops contracts
-        createOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
         badYieldOps.registerEscrowContract(address(vault));
 
         // Wire ops
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(adminContract));
-        vault.setCreateOps(address(createOps));
+        vault.setCreationPolicy(address(creationPolicy));
         vault.setBondCollector(address(bondCollector));
 
         // Activate a resolution module so escrow creation succeeds.

@@ -8,7 +8,7 @@ import { BaseEscrow } from "../../contracts/core/BaseEscrow.sol";
 import { EscrowViewContract } from "../../contracts/core/EscrowViewContract.sol";
 import { DefaultResolutionModule } from "../../contracts/core/modules/DefaultResolutionModule.sol";
 import { DefaultReleaseStrategy } from "../../contracts/modules/DefaultReleaseStrategy.sol";
-import { CreateOps } from "../../contracts/ops/CreateOps.sol";
+import { EscrowCreationPolicy } from "../../contracts/core/EscrowCreationPolicy.sol";
 import { YieldOps } from "../../contracts/ops/YieldOps.sol";
 import { BondCollector } from "../../contracts/core/BondCollector.sol";
 import { ModuleSnapshotRegistry } from "../../contracts/core/ModuleSnapshotRegistry.sol";
@@ -68,7 +68,7 @@ contract TraceEquivalenceTest is Test {
     EscrowViewContract oracle;
     DefaultResolutionModule drModule;
     DefaultReleaseStrategy  releaseStrategy;
-    CreateOps        createOps;
+    EscrowCreationPolicy        creationPolicy;
     YieldOps         yieldOps;
     BondCollector    bondCollector;
     ModuleSnapshotRegistry moduleManagement;
@@ -177,7 +177,7 @@ contract TraceEquivalenceTest is Test {
 
         yieldOps       = new YieldOps(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
-        createOps      = new CreateOps(owner);
+        creationPolicy      = new EscrowCreationPolicy(owner);
         bondCollector  = new BondCollector(owner);
         drModule       = new DefaultResolutionModule(owner, RESOLVER);
         releaseStrategy = new DefaultReleaseStrategy();
@@ -188,11 +188,10 @@ contract TraceEquivalenceTest is Test {
         // Register vault with every ops contract (required before calls)
         yieldOps.registerEscrowContract(address(vault));
         moduleManagement.registerEscrowContract(address(vault));
-        createOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
 
         // Wire ops into vault (requires ROLE_TIMELOCK which address(this) already has)
-        vault.setCreateOps(address(createOps));
+        vault.setCreationPolicy(address(creationPolicy));
         vault.setBondCollector(address(bondCollector));
         // Keep trace executor authorized for timed actions in fixture replays
         vault.grantRole(vault.ROLE_TIMELOCK(), EXECUTOR);

@@ -68,7 +68,6 @@ import '../types/EscrowTypes.sol';
 import '../types/YieldPresets.sol';
 import '../libraries/YieldPresetLibrary.sol';
 import '../ops/YieldOps.sol';
-import '../ops/CreateOps.sol';
 import '../shared/interfaces/IIncentiveModule.sol';
 import './BondCollector.sol';
 import '../libraries/ModuleSnapshotLibrary.sol';

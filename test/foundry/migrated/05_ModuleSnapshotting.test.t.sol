@@ -10,7 +10,7 @@ import 'contracts/core/modules/DefaultResolutionModule.sol';
 import 'contracts/types/YieldPresets.sol';
 import 'contracts/admin/EscrowGovernanceTimelock.sol';
 import 'contracts/types/EscrowTypes.sol';
-import 'contracts/ops/CreateOps.sol';
+import 'contracts/core/EscrowCreationPolicy.sol';
 import 'contracts/core/BondCollector.sol';
 
 contract Test_05_ModuleSnapshotting_test is Test {
@@ -18,7 +18,7 @@ contract Test_05_ModuleSnapshotting_test is Test {
     EscrowGovernanceTimelock adminContract;
     YieldOps public yieldOps;
     ModuleSnapshotRegistry public moduleManagement;
-    CreateOps public createOps;
+    EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
     address deployer = address(this);
     address timelock = address(0x1);
@@ -33,10 +33,9 @@ contract Test_05_ModuleSnapshotting_test is Test {
         adminContract.grantRole(adminContract.ROLE_TIMELOCK(), timelock);
 
         // Wire required ops for createEscrow
-        createOps = new CreateOps(address(this));
-        // CreateOps requires ROLE_TIMELOCK for registerEscrowContract (granted by DEFAULT_ADMIN_ROLE)
-        createOps.grantRole(createOps.ROLE_TIMELOCK(), address(this));
-        createOps.registerEscrowContract(address(vault));
+        creationPolicy = new EscrowCreationPolicy(address(this));
+        // EscrowCreationPolicy requires ROLE_TIMELOCK for registerEscrowContract (granted by DEFAULT_ADMIN_ROLE)
+        creationPolicy.grantRole(creationPolicy.ROLE_TIMELOCK(), address(this));
 
 
         bondCollector = new BondCollector(address(this));
@@ -44,7 +43,7 @@ contract Test_05_ModuleSnapshotting_test is Test {
 
         // Grant this test admin-contract role to set ops addresses
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
-        vault.setCreateOps(address(createOps));
+        vault.setCreationPolicy(address(creationPolicy));
         vault.setBondCollector(address(bondCollector));
 
         // deploy and activate a default resolution module so createEscrow can succeed

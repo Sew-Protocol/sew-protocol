@@ -39,33 +39,33 @@ async function main() {
   console.log('════════════════════════════════════════════════════════════════\n');
   console.log(`Guardian: ${guardianAddr}\n`);
 
-  // Test 1: CreateOps - pauseYieldDeposits
-  console.log('─── Test 1: CreateOps.pauseYieldDeposits() ───');
+  // Test 1: EscrowCreationPolicy - pauseYieldDeposits
+  console.log('─── Test 1: EscrowCreationPolicy.pauseYieldDeposits() ───');
   try {
-    const createOpsAddr = registry.contracts.CreateOps.address;
-    const createOps = await hre.ethers.getContractAt('CreateOps', createOpsAddr);
+    const creationPolicyAddr = registry.contracts.EscrowCreationPolicy.address;
+    const creationPolicy = await hre.ethers.getContractAt('EscrowCreationPolicy', creationPolicyAddr);
 
     const ROLE_GUARDIAN = ethers.keccak256(ethers.toUtf8Bytes('ROLE_GUARDIAN'));
-    const hasRole = await createOps.hasRole(ROLE_GUARDIAN, guardianAddr);
+    const hasRole = await creationPolicy.hasRole(ROLE_GUARDIAN, guardianAddr);
 
     if (hasRole) {
-      const isPaused = await createOps.yieldDepositsPaused();
+      const isPaused = await creationPolicy.yieldDepositsPaused();
       results.push({
-        name: 'CreateOps.pauseYieldDeposits()',
+        name: 'EscrowCreationPolicy.pauseYieldDeposits()',
         passed: true,
         details: `Has ROLE_GUARDIAN, yieldDepositsPaused=${isPaused}`,
       });
       console.log(`   ✅ PASS: Has ROLE_GUARDIAN, yieldDepositsPaused=${isPaused}`);
     } else {
       results.push({
-        name: 'CreateOps.pauseYieldDeposits()',
+        name: 'EscrowCreationPolicy.pauseYieldDeposits()',
         passed: false,
         details: 'Missing ROLE_GUARDIAN',
       });
       console.log(`   ❌ FAIL: Missing ROLE_GUARDIAN`);
     }
   } catch (err: any) {
-    results.push({ name: 'CreateOps.pauseYieldDeposits()', passed: false, details: err.message });
+    results.push({ name: 'EscrowCreationPolicy.pauseYieldDeposits()', passed: false, details: err.message });
     console.log(`   ❌ FAIL: ${err.message}`);
   }
 

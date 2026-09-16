@@ -16,12 +16,12 @@ async function main() {
   const token = new hre.ethers.Contract(sewTokenAddr, erc20ABI, signer);
   
   // Try minimal createEscrow call
-  const createOpsAddr = '0xBC60481020457CAC819B6938396a1002B0518f34';
+  const creationPolicyAddr = '0xBC60481020457CAC819B6938396a1002B0518f34';
   
   console.log(`\nAttempting to check what happens with createEscrow...`);
   console.log(`EscrowVault: ${escrowVaultAddr}`);
   console.log(`Token: ${sewTokenAddr}`);
-  console.log(`CreateOps: ${createOpsAddr}`);
+  console.log(`EscrowCreationPolicy: ${creationPolicyAddr}`);
   
   // First, try to call at a low level to see the actual error
   try {

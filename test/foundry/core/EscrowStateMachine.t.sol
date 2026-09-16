@@ -10,7 +10,7 @@ import { DefaultResolutionModule } from "../../../contracts/core/modules/Default
 import { EscrowSettings, EscrowState, SenderStatus, RecipientStatus } from "../../../contracts/types/EscrowTypes.sol";
 import { YieldPreset } from "../../../contracts/types/YieldPresets.sol";
 import { YieldOps } from "../../../contracts/ops/YieldOps.sol";
-import { CreateOps } from "../../../contracts/ops/CreateOps.sol";
+import { EscrowCreationPolicy } from "../../../contracts/core/EscrowCreationPolicy.sol";
 import { BondCollector } from "../../../contracts/core/BondCollector.sol";
 import { ModuleSnapshotRegistry } from "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import { DefaultReleaseStrategy } from "../../../contracts/modules/DefaultReleaseStrategy.sol";
@@ -28,7 +28,7 @@ contract EscrowStateMachineTest is Test {
     DefaultResolutionModule internal rm;
     DefaultReleaseStrategy internal defaultReleaseStrategy;
     YieldOps internal yieldOps;
-    CreateOps internal createOps;
+    EscrowCreationPolicy internal creationPolicy;
     BondCollector internal bondCollector;
     ModuleSnapshotRegistry internal moduleManagement;
     EscrowGovernanceTimelock internal adminContract;
@@ -43,7 +43,7 @@ contract EscrowStateMachineTest is Test {
 
     function setUp() public {
         yieldOps = new YieldOps(address(this));
-        createOps = new CreateOps(address(this));
+        creationPolicy = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));
@@ -58,13 +58,12 @@ contract EscrowStateMachineTest is Test {
 
         // Register escrow contract with all ops contracts
         yieldOps.registerEscrowContract(address(vault));
-        createOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
 
         // Wire required ops contracts on the vault
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(adminContract));
-        vault.setCreateOps(address(createOps));
+        vault.setCreationPolicy(address(creationPolicy));
         vault.setBondCollector(address(bondCollector));
 
         // Resolution module (single resolver)

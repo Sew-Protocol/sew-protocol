@@ -2,7 +2,7 @@
 pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/ops/CreateOps.sol';
+import '../../mocks/legacy/CreateOpsReference.sol';
 import '../../../contracts/ops/YieldOps.sol';
 import '../../mocks/legacy/SettlementOpsReference.sol';
 import '../../mocks/legacy/DisputeOpsReference.sol';
@@ -12,7 +12,7 @@ import '../../../contracts/types/YieldPresets.sol';
 import '../../../contracts/shared/interfaces/IResolutionModule.sol';
 
 contract OpsCoverageTest is Test {
-    CreateOps public createOps;
+    CreateOpsReference public createOps;
     YieldOps public yieldOps;
     SettlementOpsReference public settlementOps;
     DisputeOpsReference public disputeOps;
@@ -34,14 +34,14 @@ contract OpsCoverageTest is Test {
         feeRecipient = address(0x5);
 
         // Deploy Ops contracts
-        createOps = new CreateOps(owner);
+        createOps = new CreateOpsReference(owner);
         yieldOps = new YieldOps(owner);
         settlementOps = new SettlementOpsReference(owner);
         disputeOps = new DisputeOpsReference(owner);
 
         token = new ERC20Mock('Test Token', 'TEST', owner, 10000e18);
 
-        // Setup roles for CreateOps
+        // Setup roles for CreateOpsReference
         createOps.grantRole(createOps.ROLE_TIMELOCK(), timelock);
         createOps.grantRole(createOps.ROLE_GUARDIAN(), guardian);
         
@@ -56,7 +56,7 @@ contract OpsCoverageTest is Test {
         disputeOps.grantRole(disputeOps.ROLE_TIMELOCK(), timelock);
     }
 
-    // ============ CreateOps Tests ============
+    // ============ CreateOpsReference Tests ============
 
     function test_CreateOps_pauseYieldDeposits_Guardian() public {
         vm.prank(guardian);
@@ -72,7 +72,7 @@ contract OpsCoverageTest is Test {
 
     function test_CreateOps_pauseYieldDeposits_Unauthorized() public {
         vm.prank(unauthorized);
-        vm.expectRevert(abi.encodeWithSelector(CreateOps.NotAuthorized.selector, unauthorized));
+        vm.expectRevert(abi.encodeWithSelector(CreateOpsReference.NotAuthorized.selector, unauthorized));
         createOps.pauseYieldDeposits("Hacking");
     }
 
@@ -81,7 +81,7 @@ contract OpsCoverageTest is Test {
         createOps.pauseYieldDeposits("Emergency");
         
         vm.prank(guardian);
-        vm.expectRevert(CreateOps.AlreadyPaused.selector);
+        vm.expectRevert(CreateOpsReference.AlreadyPaused.selector);
         createOps.pauseYieldDeposits("Emergency 2");
     }
 
@@ -107,7 +107,7 @@ contract OpsCoverageTest is Test {
 
     function test_CreateOps_resumeYieldDeposits_NotPaused() public {
         vm.prank(timelock);
-        vm.expectRevert(CreateOps.NotPaused.selector);
+        vm.expectRevert(CreateOpsReference.NotPaused.selector);
         createOps.resumeYieldDeposits();
     }
 
@@ -143,7 +143,7 @@ contract OpsCoverageTest is Test {
 
         // Call computeEscrowCreation
         vm.prank(escrowContract);
-        CreateOps.CreateResult memory result = createOps.computeEscrowCreation(
+        CreateOpsReference.CreateResult memory result = createOps.computeEscrowCreation(
             address(token),
             address(0x123), // to
             address(0x456), // from
@@ -174,7 +174,7 @@ contract OpsCoverageTest is Test {
         MockResolutionModule resMock = new MockResolutionModule();
         
         vm.prank(escrowContract);
-        CreateOps.CreateResult memory result = createOps.computeEscrowCreation(
+        CreateOpsReference.CreateResult memory result = createOps.computeEscrowCreation(
             address(token),
             address(0x1),
             address(0x2),
@@ -204,7 +204,7 @@ contract OpsCoverageTest is Test {
         resMock.setRevert(true);
         
         vm.prank(escrowContract);
-        CreateOps.CreateResult memory result = createOps.computeEscrowCreation(
+        CreateOpsReference.CreateResult memory result = createOps.computeEscrowCreation(
             address(token),
             address(0x1),
             address(0x2),
@@ -231,7 +231,7 @@ contract OpsCoverageTest is Test {
         });
 
         vm.prank(escrowContract);
-        CreateOps.CreateResult memory result = createOps.computeEscrowCreation(
+        CreateOpsReference.CreateResult memory result = createOps.computeEscrowCreation(
             address(token),
             address(0x1),
             address(0x2),
@@ -859,7 +859,7 @@ contract OpsCoverageTest is Test {
     }
 
 
-    // ============ CreateOps Extended Tests ============
+    // ============ CreateOpsReference Extended Tests ============
 
     function test_CreateOps_computeEscrowCreation_InvalidInputs() public {
         vm.prank(timelock);
@@ -918,7 +918,7 @@ contract OpsCoverageTest is Test {
         uint256 feeBps = 500; // 5%
 
         vm.prank(escrowContract);
-        CreateOps.CreateResult memory result = createOps.computeEscrowCreation(
+        CreateOpsReference.CreateResult memory result = createOps.computeEscrowCreation(
             address(token), 
             address(0x1), 
             address(0x2), 

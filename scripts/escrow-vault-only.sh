@@ -29,7 +29,7 @@ echo ""
 echo "Step 3: Running tests for EscrowVault..."
 echo "--------------------------------------"
 # Run specific test files that test EscrowVault
-# Note: Tests will need to register escrow contract with CreateOps (see CreateOps.registerEscrowContract)
+# Note: Tests will need to register escrow contract with EscrowCreationPolicy (see EscrowCreationPolicy.registerEscrowContract)
 # Use --match-path with a pattern that matches the test files
 forge test --match-path "test/foundry/core/{EscrowConstraints,BaseEscrowComprehensive,EscrowEdgeCases,ReentrancyProtection,AppealWindowEnforcement}.t.sol" -vv 2>&1 | tail -40
 

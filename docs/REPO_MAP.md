@@ -72,7 +72,7 @@ Stateless facet contracts. `BaseEscrow` delegates specific operations to these v
 
 | File | Role |
 |---|---|
-| `CreateOps.sol` | Escrow creation, yield deposit on creation, yield-deposit resume/pause. |
+| `EscrowCreationPolicy.sol` | Shared protocol-wide creation policy only (yield-deposit pause, resolver policy). No calculation. |
 | `YieldOps.sol` | Yield withdrawal and distribution. |
 | `GuardianOps.sol` | Guardian-only emergency operations (forced Aave unwind). |
 

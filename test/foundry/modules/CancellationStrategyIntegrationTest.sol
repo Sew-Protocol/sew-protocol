@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import "../../../contracts/modules/DefaultCancellationStrategy.sol";
 import "../../../contracts/modules/DefaultReleaseStrategy.sol";
 import "../../../contracts/core/EscrowVault.sol";
-import "../../../contracts/ops/CreateOps.sol";
+import "../../../contracts/core/EscrowCreationPolicy.sol";
 import "../../../contracts/ops/YieldOps.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
@@ -20,7 +20,7 @@ import "../../../contracts/mocks/ERC20Mock.sol";
  */
 contract CancellationStrategyIntegrationTest is Test {
     EscrowVault public vault;
-    CreateOps public createOps;
+    EscrowCreationPolicy public creationPolicy;
     YieldOps public yieldOps;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
@@ -42,7 +42,7 @@ contract CancellationStrategyIntegrationTest is Test {
         
         // Deploy ops contracts
         yieldOps = new YieldOps(address(this));
-        createOps = new CreateOps(address(this));
+        creationPolicy = new EscrowCreationPolicy(address(this));
         
         // Deploy bond collector
         bondCollector = new BondCollector(address(this));
@@ -62,12 +62,11 @@ contract CancellationStrategyIntegrationTest is Test {
         // Register escrow contract with all ops contracts
         moduleManagement.registerEscrowContract(address(vault));
         yieldOps.registerEscrowContract(address(vault));
-        createOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
         
         // Wire required ops contracts on the vault
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
-        vault.setCreateOps(address(createOps));
+        vault.setCreationPolicy(address(creationPolicy));
         vault.setBondCollector(address(bondCollector));
         
         // Set default release strategy (needed for release tests)

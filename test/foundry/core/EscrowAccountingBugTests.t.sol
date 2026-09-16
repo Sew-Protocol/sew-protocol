@@ -10,7 +10,7 @@ import '../../../contracts/core/modules/DefaultResolutionModule.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/modules/DefaultReleaseStrategy.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
-import '../../../contracts/ops/CreateOps.sol';
+import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/interfaces/IYieldModule.sol';
 import '../../../contracts/types/YieldPresets.sol';
@@ -113,7 +113,7 @@ contract EscrowAccountingBugTests is Test {
     EscrowVault public vault;
     YieldOps public yieldOps;
     ModuleSnapshotRegistry public mm;
-    CreateOps public createOps;
+    EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
     DefaultResolutionModule public resolutionModule;
     MockYieldModuleWithLoss public yieldGen;
@@ -132,7 +132,7 @@ contract EscrowAccountingBugTests is Test {
 
         yieldOps = new YieldOps(address(this));
         mm = new ModuleSnapshotRegistry(address(this));
-        createOps = new CreateOps(address(this));
+        creationPolicy = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
         resolutionModule = new DefaultResolutionModule(address(this), resolver);
         yieldGen = new MockYieldModuleWithLoss();
@@ -142,11 +142,10 @@ contract EscrowAccountingBugTests is Test {
 
         yieldOps.registerEscrowContract(address(vault));
         mm.registerEscrowContract(address(vault));
-        createOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
 
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
-        vault.setCreateOps(address(createOps));
+        vault.setCreationPolicy(address(creationPolicy));
         vault.setBondCollector(address(bondCollector));
         vault.setResolutionModule(address(resolutionModule));
 

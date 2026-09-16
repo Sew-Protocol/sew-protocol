@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Phase 1 CreateOps parameter matrix on Base Sepolia.
+# Phase 1 EscrowCreationPolicy parameter matrix on Base Sepolia.
 #
 # Required env vars:
 #   TEST_BUYER_PRIVATE_KEY=0x...

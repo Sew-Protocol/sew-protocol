@@ -5,7 +5,7 @@
  * - YieldOps: Handles yield withdrawal and distribution
  * - (Dispute derivation now lives in EscrowDisputeLogic; no deployed DisputeOps)
  * - (Settlement derivation now lives in EscrowSettlementLogic; no deployed SettlementOps)
- * - CreateOps: Handles escrow creation validation and computation
+ * - EscrowCreationPolicy: Handles escrow creation validation and computation
  * - BondCollector: Handles escalation bond collection
  */
 
@@ -86,34 +86,34 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     console.log(`   ✅ YieldOps already deployed at: ${yieldOpsDeployment.address}`);
   }
 
-  // Deploy CreateOps
-  console.log(`\n   Deploying CreateOps...`);
-  const createOpsDeployment = await deploy('CreateOps', {
-    contract: 'CreateOps',
+  // Deploy EscrowCreationPolicy
+  console.log(`\n   Deploying EscrowCreationPolicy...`);
+  const creationPolicyDeployment = await deploy('EscrowCreationPolicy', {
+    contract: 'EscrowCreationPolicy',
     from: deployer,
     args: [deployer], // initialOwner
     ...txOverrides,
     log: true,
   });
 
-  if (createOpsDeployment.newlyDeployed) {
-    const explorerUrl = getBlockExplorerUrl(hre, createOpsDeployment.address);
-    console.log(`   ✅ CreateOps deployed at: ${createOpsDeployment.address}`);
+  if (creationPolicyDeployment.newlyDeployed) {
+    const explorerUrl = getBlockExplorerUrl(hre, creationPolicyDeployment.address);
+    console.log(`   ✅ EscrowCreationPolicy deployed at: ${creationPolicyDeployment.address}`);
     if (explorerUrl) {
       console.log(`      📊 View on ${chainConfig.blockExplorer.name}: ${explorerUrl}`);
     }
 
-    if (createOpsDeployment.receipt) {
-      await registerDeployment(hre, 'CreateOps', {
-        address: createOpsDeployment.address,
-        txHash: createOpsDeployment.receipt.hash,
-        blockNumber: createOpsDeployment.receipt.blockNumber,
+    if (creationPolicyDeployment.receipt) {
+      await registerDeployment(hre, 'EscrowCreationPolicy', {
+        address: creationPolicyDeployment.address,
+        txHash: creationPolicyDeployment.receipt.hash,
+        blockNumber: creationPolicyDeployment.receipt.blockNumber,
         constructorArgs: [deployer],
         tags: ['core', 'create'],
       });
     }
   } else {
-    console.log(`   ✅ CreateOps already deployed at: ${createOpsDeployment.address}`);
+    console.log(`   ✅ EscrowCreationPolicy already deployed at: ${creationPolicyDeployment.address}`);
   }
 
   // Deploy BondCollector
@@ -155,7 +155,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
     const opsContracts = [
       { name: 'YieldOps', deployment: yieldOpsDeployment },
-      { name: 'CreateOps', deployment: createOpsDeployment },
+      { name: 'EscrowCreationPolicy', deployment: creationPolicyDeployment },
       { name: 'BondCollector', deployment: bondCollectorDeployment },
     ];
 
@@ -198,5 +198,5 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 };
 
 export default func;
-func.tags = ['core', 'yield-ops', 'create-ops', 'bond-collector'];
+func.tags = ['core', 'yield-ops', 'creation-policy', 'bond-collector'];
 func.dependencies = [];

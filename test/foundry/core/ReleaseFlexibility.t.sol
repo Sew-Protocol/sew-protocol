@@ -8,7 +8,7 @@ import 'contracts/types/EscrowTypes.sol';
 import 'contracts/libraries/EscrowEncodingLibrary.sol';
 import 'contracts/interfaces/IReleaseStrategy.sol';
 import 'contracts/interfaces/IEscrowCore.sol';
-import 'contracts/ops/CreateOps.sol';
+import 'contracts/core/EscrowCreationPolicy.sol';
 import 'contracts/ops/YieldOps.sol';
 import 'contracts/core/BondCollector.sol';
 import 'contracts/mocks/MockERC20.sol';
@@ -34,7 +34,7 @@ contract ReleaseFlexibilityTest is Test {
 
     DefaultReleaseStrategy defaultReleaseStrategy;
     MockResolutionModule mockResolutionModule;
-    CreateOps createOps;
+    EscrowCreationPolicy creationPolicy;
     YieldOps yieldOps;
     BondCollector bondCollector;
     MockModuleSnapshotRegistry moduleSnapshotRegistry;
@@ -47,7 +47,7 @@ contract ReleaseFlexibilityTest is Test {
         mockToken.mint(sender, 1000 ether);
 
         // Deploy utility contracts
-        createOps = new CreateOps(defaultAdmin);
+        creationPolicy = new EscrowCreationPolicy(defaultAdmin);
         yieldOps = new YieldOps(defaultAdmin);
         bondCollector = new BondCollector(defaultAdmin);
         
@@ -93,14 +93,13 @@ contract ReleaseFlexibilityTest is Test {
         vm.stopPrank();
 
         vm.startPrank(defaultAdmin);
-        createOps.grantRole(createOps.ROLE_ESCROW_CONTRACT(), address(escrowVault));
         yieldOps.grantRole(yieldOps.ROLE_ESCROW_CONTRACT(), address(escrowVault));
         bondCollector.grantRole(bondCollector.ROLE_ESCROW_CONTRACT(), address(escrowVault));
         vm.stopPrank();
 
 
         vm.startPrank(timelock);
-        escrowVault.setCreateOps(address(createOps));
+        escrowVault.setCreationPolicy(address(creationPolicy));
         // Dispute derivation is now internal (EscrowDisputeLogic); no DisputeOps wiring.
         escrowVault.setBondCollector(address(bondCollector));
         vm.stopPrank();

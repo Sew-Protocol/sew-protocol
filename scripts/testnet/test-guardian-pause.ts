@@ -34,8 +34,8 @@ async function main() {
   const registryPath = './deploy-registry/base-sepolia-v1-testnet.json';
   const registry = JSON.parse(fs.readFileSync(registryPath, 'utf-8'));
 
-  const createOpsAddr = registry.contracts.CreateOps.address;
-  const createOps = await hre.ethers.getContractAt('CreateOps', createOpsAddr);
+  const creationPolicyAddr = registry.contracts.EscrowCreationPolicy.address;
+  const creationPolicy = await hre.ethers.getContractAt('EscrowCreationPolicy', creationPolicyAddr);
 
   const guardianAddr = await guardian.getAddress();
 
@@ -45,10 +45,10 @@ async function main() {
 
   console.log('📋 Configuration:');
   console.log(`   Guardian: ${guardianAddr}`);
-  console.log(`   CreateOps: ${createOpsAddr}\n`);
+  console.log(`   EscrowCreationPolicy: ${creationPolicyAddr}\n`);
 
   // Check current pause state
-  const isPausedBefore = await createOps.yieldDepositsPaused();
+  const isPausedBefore = await creationPolicy.yieldDepositsPaused();
   console.log(`📊 State Before: yieldDepositsPaused = ${isPausedBefore}\n`);
 
   if (isPausedBefore) {
@@ -58,7 +58,7 @@ async function main() {
     console.log('🔐 TEST: Guardian calls pauseYieldDeposits()');
 
     try {
-      const tx = await createOps
+      const tx = await creationPolicy
         .connect(guardian)
         .pauseYieldDeposits('Test pause from guardian multisig');
       const rcpt = await tx.wait();
@@ -69,7 +69,7 @@ async function main() {
     }
 
     // Verify state changed
-    const isPausedAfter = await createOps.yieldDepositsPaused();
+    const isPausedAfter = await creationPolicy.yieldDepositsPaused();
     console.log(`📊 State After: yieldDepositsPaused = ${isPausedAfter}\n`);
 
     if (!isPausedAfter) {

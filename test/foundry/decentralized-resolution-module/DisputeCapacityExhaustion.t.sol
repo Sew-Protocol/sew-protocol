@@ -9,7 +9,7 @@ import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/core/BaseEscrow.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/CreateOps.sol';
+import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
 import '../../../contracts/core/BondCollector.sol';
@@ -36,7 +36,7 @@ contract DisputeCapacityExhaustionTest is Test {
     DRMAdminFacet public drmAdmin;
     ERC20Mock public token;
     YieldOps public yieldOps;
-    CreateOps public createOps;
+    EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
     EscrowGovernanceTimelock public adminContract;
@@ -73,7 +73,7 @@ contract DisputeCapacityExhaustionTest is Test {
 
         // Ops
         yieldOps = new YieldOps(deployer);
-        createOps = new CreateOps(deployer);
+        creationPolicy = new EscrowCreationPolicy(deployer);
         bondCollector = new BondCollector(deployer);
         moduleManagement = new ModuleSnapshotRegistry(deployer);
         adminContract = new EscrowGovernanceTimelock(deployer);
@@ -87,12 +87,11 @@ contract DisputeCapacityExhaustionTest is Test {
         escrow = new EscrowVault(FEE_BPS,feeRecipient,address(yieldOps),address(moduleManagement));
 
         // Wire ops
-        createOps.registerEscrowContract(address(escrow));
         bondCollector.registerEscrowContract(address(escrow));
 
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), deployer);
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(adminContract));
-        escrow.setCreateOps(address(createOps));
+        escrow.setCreationPolicy(address(creationPolicy));
         escrow.setBondCollector(address(bondCollector));
 
         // DRM roles & escrow registration

@@ -9,7 +9,7 @@ import '../../../contracts/core/BaseEscrow.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/core/modules/DefaultResolutionModule.sol';
 import '../../../contracts/modules/DefaultReleaseStrategy.sol';
-import '../../../contracts/ops/CreateOps.sol';
+import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/ops/YieldOps.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
@@ -34,7 +34,7 @@ contract SpendingLimitProxyTest is Test {
     ModuleSnapshotRegistry   public moduleRegistry;
     DefaultResolutionModule  public resolutionModule;
     DefaultReleaseStrategy   public releaseStrategy;
-    CreateOps                public createOps;
+    EscrowCreationPolicy                public creationPolicy;
     YieldOps                 public yieldOps;
     BondCollector            public bondCollector;
     DeferredFundingBridge    public bridge;
@@ -79,7 +79,7 @@ contract SpendingLimitProxyTest is Test {
 
         // 1. Deploy ops infrastructure
         yieldOps      = new YieldOps(admin);
-        createOps     = new CreateOps(admin);
+        creationPolicy     = new EscrowCreationPolicy(admin);
         bondCollector = new BondCollector(admin);
         moduleRegistry   = new ModuleSnapshotRegistry(admin);
         resolutionModule = new DefaultResolutionModule(admin, resolver);
@@ -90,12 +90,11 @@ contract SpendingLimitProxyTest is Test {
 
         // 3. Wire ops to vault
         yieldOps.registerEscrowContract(address(vault));
-        createOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
         moduleRegistry.registerEscrowContract(address(vault));
 
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), admin);
-        vault.setCreateOps(address(createOps));
+        vault.setCreationPolicy(address(creationPolicy));
         vault.setBondCollector(address(bondCollector));
         vault.setResolutionModule(address(resolutionModule));
 

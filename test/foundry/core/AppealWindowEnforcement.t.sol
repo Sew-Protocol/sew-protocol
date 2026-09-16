@@ -11,7 +11,7 @@ import '../../../contracts/modules/decentralized-resolution-module/PaymentCalcul
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/CreateOps.sol';
+import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
@@ -31,7 +31,7 @@ contract AppealWindowEnforcementTest is Test {
     PaymentCalculationLibraryV1 public paymentLib;
     ERC20Mock public token;
     YieldOps public yieldOps;
-    CreateOps public createOps;
+    EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
     EscrowGovernanceTimelock public adminContract;
@@ -80,25 +80,23 @@ contract AppealWindowEnforcementTest is Test {
 
         // Deploy escrow
         yieldOps = new YieldOps(address(this));
-        createOps = new CreateOps(address(this));
+        creationPolicy = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleSnapshotRegistry(deployer);
         adminContract = new EscrowGovernanceTimelock(deployer);
         escrow = new EscrowVault(ESCROW_FEE,feeAddress,address(yieldOps),address(moduleManagement));
         moduleManagement.registerEscrowContract(address(escrow));
 
-        // Wire ops contracts (CreateOps) and register escrow contract callers
-        createOps.registerEscrowContract(address(escrow));
+        // Wire ops contracts (EscrowCreationPolicy) and register escrow contract callers
         bondCollector.registerEscrowContract(address(escrow));
 
         // Also register this test contract as an escrow contract because it calls ops directly
-        createOps.registerEscrowContract(address(this));
         bondCollector.registerEscrowContract(address(this));
 
         // Allow this test contract to wire ops on the vault
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(this));
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(adminContract));
-        escrow.setCreateOps(address(createOps));
+        escrow.setCreationPolicy(address(creationPolicy));
         escrow.setBondCollector(address(bondCollector));
 
         // Setup roles

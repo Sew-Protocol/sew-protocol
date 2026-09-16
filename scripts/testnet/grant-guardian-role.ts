@@ -39,7 +39,7 @@ async function main() {
 
   const contracts = [
     { name: 'EscrowVault', address: registry.contracts.EscrowVault.address },
-    { name: 'CreateOps', address: registry.contracts.CreateOps.address },
+    { name: 'EscrowCreationPolicy', address: registry.contracts.EscrowCreationPolicy.address },
     { name: 'YieldOps', address: registry.contracts.YieldOps.address },
   ];
 

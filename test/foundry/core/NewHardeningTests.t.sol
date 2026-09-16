@@ -4,7 +4,7 @@ pragma solidity ^0.8.37;
 import "forge-std/Test.sol";
 import "../../../contracts/core/EscrowVault.sol";
 import "../../../contracts/core/BaseEscrow.sol";
-import "../../../contracts/ops/CreateOps.sol";
+import "../../../contracts/core/EscrowCreationPolicy.sol";
 import "../../../contracts/ops/YieldOps.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/core/BondCollector.sol";
@@ -15,7 +15,7 @@ import "../../../contracts/libraries/SettingsValidationLibrary.sol";
 
 contract NewHardeningTests is Test {
     EscrowVault public vault;
-    CreateOps public createOps;
+    EscrowCreationPolicy public creationPolicy;
     YieldOps public yieldOps;
     ModuleSnapshotRegistry public moduleManagement;
     ERC20Mock public token;
@@ -29,17 +29,16 @@ contract NewHardeningTests is Test {
 
     function setUp() public {
         vm.startPrank(owner);
-        createOps = new CreateOps(owner);
+        creationPolicy = new EscrowCreationPolicy(owner);
         yieldOps = new YieldOps(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
         
         vault = new EscrowVault(100,feeAddress,address(yieldOps),address(moduleManagement));
-        vault.setCreateOps(address(createOps));
+        vault.setCreationPolicy(address(creationPolicy));
         vault.grantRole(vault.ROLE_TIMELOCK(), timelock);
         
         resolutionModule = new DefaultResolutionModule(owner, address(0xDEAD));
         moduleManagement.registerEscrowContract(address(vault));
-        createOps.registerEscrowContract(address(vault));
         
         token = new ERC20Mock("Test", "TEST", buyer, 10000e18);
         
@@ -89,7 +88,7 @@ contract NewHardeningTests is Test {
 
         // Change policy to allow EOAs
         vm.prank(owner);
-        createOps.setResolverPolicy(false);
+        creationPolicy.setResolverPolicy(false);
 
         // Now it should succeed
         vm.prank(buyer);

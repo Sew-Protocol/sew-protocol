@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import "../../../contracts/modules/DefaultCancellationStrategy.sol";
 import "../../../contracts/modules/BuyerOnlyCancellationStrategy.sol";
 import "../../../contracts/core/EscrowVault.sol";
-import "../../../contracts/ops/CreateOps.sol";
+import "../../../contracts/core/EscrowCreationPolicy.sol";
 import "../../../contracts/ops/YieldOps.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
@@ -20,7 +20,7 @@ import "../../../contracts/mocks/ERC20Mock.sol";
  */
 contract CancellationStrategySwapTest is Test {
     EscrowVault public vault;
-    CreateOps public createOps;
+    EscrowCreationPolicy public creationPolicy;
     YieldOps public yieldOps;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
@@ -39,7 +39,7 @@ contract CancellationStrategySwapTest is Test {
         token = new ERC20Mock("Test", "TST", address(this), 10000e18);
         
         yieldOps = new YieldOps(address(this));
-        createOps = new CreateOps(address(this));
+        creationPolicy = new EscrowCreationPolicy(address(this));
         
         bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
@@ -51,12 +51,11 @@ contract CancellationStrategySwapTest is Test {
         
         moduleManagement.registerEscrowContract(address(vault));
         yieldOps.registerEscrowContract(address(vault));
-        createOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
         
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.grantRole(vault.ROLE_FEE_RECIPIENT(), address(this));
-        vault.setCreateOps(address(createOps));
+        vault.setCreationPolicy(address(creationPolicy));
         vault.setBondCollector(address(bondCollector));
         
         token.transfer(sender, 1000e18);

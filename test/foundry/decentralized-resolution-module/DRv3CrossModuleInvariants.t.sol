@@ -6,7 +6,7 @@ import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/core/modules/DefaultResolutionModule.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/CreateOps.sol';
+import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
@@ -24,7 +24,7 @@ contract DRv3CrossModuleInvariantsTest is Test {
     ERC20Mock        public token;
     DefaultResolutionModule public resolutionModule;
     YieldOps         public yieldOps;
-    CreateOps        public createOps;
+    EscrowCreationPolicy        public creationPolicy;
     BondCollector    public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
 
@@ -40,7 +40,7 @@ contract DRv3CrossModuleInvariantsTest is Test {
     function setUp() public {
         yieldOps      = new YieldOps(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
-        createOps     = new CreateOps(owner);
+        creationPolicy     = new EscrowCreationPolicy(owner);
         bondCollector = new BondCollector(owner);
         resolutionModule = new DefaultResolutionModule(owner, resolver);
 
@@ -48,17 +48,16 @@ contract DRv3CrossModuleInvariantsTest is Test {
 
         yieldOps.registerEscrowContract(address(vault));
         moduleManagement.registerEscrowContract(address(vault));
-        createOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
 
         vault.grantRole(vault.ROLE_TIMELOCK(), owner);
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), owner);
 
-        vault.setCreateOps(address(createOps));
+        vault.setCreationPolicy(address(creationPolicy));
         vault.setBondCollector(address(bondCollector));
         vault.setResolutionModule(address(resolutionModule));
 
-        createOps.setResolverPolicy(false);
+        creationPolicy.setResolverPolicy(false);
 
         token = new ERC20Mock('Test', 'TEST', owner, 0);
     }

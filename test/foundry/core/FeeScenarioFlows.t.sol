@@ -11,7 +11,7 @@ import "../../../contracts/types/EscrowTypes.sol";
 import "../../../contracts/libraries/SettingsValidationLibrary.sol";
 
 import "../../../contracts/ops/YieldOps.sol";
-import "../../../contracts/ops/CreateOps.sol";
+import "../../../contracts/core/EscrowCreationPolicy.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/admin/EscrowGovernanceTimelock.sol";
@@ -88,7 +88,7 @@ contract FeeScenarioFlowsTest is Test {
     ERC20Mock public token;
     DefaultResolutionModule public resolutionModule;
     YieldOps public yieldOps;
-    CreateOps public createOps;
+    EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
     EscrowGovernanceTimelock public adminContract;
@@ -120,7 +120,7 @@ contract FeeScenarioFlowsTest is Test {
         releaseStrategy = new DefaultReleaseStrategy();
         token = new ERC20Mock("Token", "TKN", owner, 10000000e18);
         yieldOps = new YieldOps(owner);
-        createOps = new CreateOps(owner);
+        creationPolicy = new EscrowCreationPolicy(owner);
         bondCollector = new BondCollector(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
         adminContract = new EscrowGovernanceTimelock(owner);
@@ -134,7 +134,6 @@ contract FeeScenarioFlowsTest is Test {
 
         // Register vault on ops contracts
         yieldOps.registerEscrowContract(address(vault));
-        createOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
 
         // Wire vault roles + ops
@@ -149,7 +148,7 @@ contract FeeScenarioFlowsTest is Test {
         adminContract.grantRole(adminContract.ROLE_TIMELOCK(), timelock);
 
         // Ops wiring (timelock-gated on the vault)
-        vault.setCreateOps(address(createOps));
+        vault.setCreationPolicy(address(creationPolicy));
         vault.setBondCollector(address(bondCollector));
 
         // Activate a resolution module so create flows have a valid default resolver path.

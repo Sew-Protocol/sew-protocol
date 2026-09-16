@@ -8,7 +8,7 @@ import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/CreateOps.sol';
+import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol';
@@ -38,7 +38,7 @@ contract DirectResolutionConfigSelectionIntegrationTest is Test, KlerosHandoffFi
 
     function setUp() public {
         YieldOps yieldOps = new YieldOps(address(this));
-        CreateOps createOps = new CreateOps(address(this));
+        EscrowCreationPolicy creationPolicy = new EscrowCreationPolicy(address(this));
         BondCollector bondCollector = new BondCollector(address(this));
         ModuleSnapshotRegistry registry = new ModuleSnapshotRegistry(address(this));
 
@@ -49,13 +49,13 @@ contract DirectResolutionConfigSelectionIntegrationTest is Test, KlerosHandoffFi
         (KlerosArbitrableProxy proxy, ) = _deployKlerosHandoffProxy(address(vault), address(this), 0);
         externalBackstop = address(proxy);
 
-        _wireEscrow(address(vault), registry, yieldOps, createOps, bondCollector);
-        _wireEscrow(address(escrowToken), registry, yieldOps, createOps, bondCollector);
+        _wireEscrow(address(vault), registry, yieldOps, creationPolicy, bondCollector);
+        _wireEscrow(address(escrowToken), registry, yieldOps, creationPolicy, bondCollector);
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
-        vault.setCreateOps(address(createOps));
+        vault.setCreationPolicy(address(creationPolicy));
         vault.setBondCollector(address(bondCollector));
         escrowToken.grantRole(escrowToken.ROLE_ADMIN_CONTRACT(), address(this));
-        escrowToken.setCreateOps(address(createOps));
+        escrowToken.setCreationPolicy(address(creationPolicy));
         escrowToken.setBondCollector(address(bondCollector));
 
         drm = new DecentralizedResolutionModule(address(this));
@@ -92,12 +92,11 @@ contract DirectResolutionConfigSelectionIntegrationTest is Test, KlerosHandoffFi
         address escrow,
         ModuleSnapshotRegistry registry,
         YieldOps yieldOps,
-        CreateOps createOps,
+        EscrowCreationPolicy creationPolicy,
         BondCollector bondCollector
     ) internal {
         registry.registerEscrowContract(escrow);
         yieldOps.registerEscrowContract(escrow);
-        createOps.registerEscrowContract(escrow);
         bondCollector.registerEscrowContract(escrow);
     }
 

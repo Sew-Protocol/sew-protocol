@@ -6,7 +6,7 @@ import "../../../contracts/core/EscrowVault.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/modules/DefaultReleaseStrategy.sol";
 import "../../../contracts/ops/YieldOps.sol";
-import "../../../contracts/ops/CreateOps.sol";
+import "../../../contracts/core/EscrowCreationPolicy.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/core/modules/DefaultResolutionModule.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
@@ -52,10 +52,9 @@ contract ModuleSnapshotRaceConditionTest is Test {
         mm.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
 
         // Configure ops
-        CreateOps co = new CreateOps(owner);
+        EscrowCreationPolicy co = new EscrowCreationPolicy(owner);
         co.grantRole(co.ROLE_TIMELOCK(), owner);
-        co.registerEscrowContract(address(vault));
-        vault.setCreateOps(address(co));
+        vault.setCreationPolicy(address(co));
         
         DefaultResolutionModule rm = new DefaultResolutionModule(owner, address(0xDEAD));
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), owner);

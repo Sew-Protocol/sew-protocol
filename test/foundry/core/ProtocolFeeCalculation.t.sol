@@ -9,7 +9,7 @@ import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/core/modules/DefaultResolutionModule.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/CreateOps.sol';
+import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
@@ -25,7 +25,7 @@ contract ProtocolFeeCalculationTest is Test {
     ERC20Mock public token;
     DefaultResolutionModule public resolutionModule;
     YieldOps public yieldOps;
-    CreateOps public createOps;
+    EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
     EscrowGovernanceTimelock public adminContract;
@@ -55,7 +55,7 @@ contract ProtocolFeeCalculationTest is Test {
         resolutionModule = new DefaultResolutionModule(owner, resolver);
         token = new ERC20Mock('Test Token', 'TEST', owner, 10000000e18);
         yieldOps = new YieldOps(address(this));
-        createOps = new CreateOps(address(this));
+        creationPolicy = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
 
         // Deploy vault
@@ -66,7 +66,6 @@ contract ProtocolFeeCalculationTest is Test {
 
         // Register escrow contract with all ops contracts
         yieldOps.registerEscrowContract(address(vault));
-        createOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
 
         // Setup vault roles
@@ -78,7 +77,7 @@ contract ProtocolFeeCalculationTest is Test {
         adminContract.grantRole(adminContract.ROLE_TIMELOCK(), owner);
 
         // Set ops contracts in vault
-        vault.setCreateOps(address(createOps));
+        vault.setCreationPolicy(address(creationPolicy));
         vault.setBondCollector(address(bondCollector));
 
         // Activate resolution module in vault

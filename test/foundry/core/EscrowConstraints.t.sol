@@ -10,7 +10,7 @@ import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/types/YieldPresets.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/CreateOps.sol';
+import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
@@ -27,7 +27,7 @@ contract EscrowConstraints is Test {
     DefaultResolutionModule public resolutionModule;
     DefaultReleaseStrategy public releaseStrategy;
     YieldOps public yieldOps;
-    CreateOps public createOps;
+    EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
     EscrowGovernanceTimelock public adminContract;
@@ -57,7 +57,7 @@ contract EscrowConstraints is Test {
 
         token = new ERC20Mock('Test Token', 'TEST', owner, 10000000e18);
         yieldOps = new YieldOps(address(this));
-        createOps = new CreateOps(address(this));
+        creationPolicy = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));
@@ -66,7 +66,6 @@ contract EscrowConstraints is Test {
 
         // Register escrow contract callers on ops contracts
         yieldOps.registerEscrowContract(address(vault));
-        createOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
 
         bytes32 ROLE_TIMELOCK = vault.ROLE_TIMELOCK();
@@ -76,7 +75,7 @@ contract EscrowConstraints is Test {
         // Allow this test contract to wire ops on the vault
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), owner);
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(adminContract));
-        vault.setCreateOps(address(createOps));
+        vault.setCreationPolicy(address(creationPolicy));
         vault.setBondCollector(address(bondCollector));
         adminContract.grantRole(adminContract.ROLE_TIMELOCK(), owner);
         adminContract.grantRole(adminContract.ROLE_TIMELOCK(), timelock);
@@ -324,9 +323,8 @@ contract EscrowConstraints is Test {
 
         // Wire ops contracts on maxFeeVault
         yieldOps.registerEscrowContract(address(maxFeeVault));
-        createOps.registerEscrowContract(address(maxFeeVault));
         bondCollector.registerEscrowContract(address(maxFeeVault));
-        maxFeeVault.setCreateOps(address(createOps));
+        maxFeeVault.setCreationPolicy(address(creationPolicy));
         maxFeeVault.setBondCollector(address(bondCollector));
 
         adminContract.queueResolutionModule(address(maxFeeVault), address(resolutionModule));

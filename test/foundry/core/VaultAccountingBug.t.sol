@@ -8,7 +8,7 @@ import '../../../contracts/core/EscrowVaultAnalytics.sol';
 import "../../../contracts/core/modules/DefaultResolutionModule.sol";
 import "../../../contracts/types/EscrowTypes.sol";
 import "../../../contracts/ops/YieldOps.sol";
-import "../../../contracts/ops/CreateOps.sol";
+import "../../../contracts/core/EscrowCreationPolicy.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
@@ -36,7 +36,7 @@ contract VaultAccountingBugTest is Test {
     RevertingERC20 public token;
     DefaultResolutionModule public resolutionModule;
     YieldOps public yieldOps;
-    CreateOps public createOps;
+    EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
 
@@ -51,7 +51,7 @@ contract VaultAccountingBugTest is Test {
         token = new RevertingERC20();
         yieldOps = new YieldOps(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
-        createOps = new CreateOps(owner);
+        creationPolicy = new EscrowCreationPolicy(owner);
         bondCollector = new BondCollector(owner);
         resolutionModule = new DefaultResolutionModule(owner, resolver);
         releaseStrategy = new DefaultReleaseStrategy();
@@ -63,11 +63,10 @@ contract VaultAccountingBugTest is Test {
         moduleManagement.queueModule(address(escrow), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
         vm.warp(block.timestamp + 8 days);
         moduleManagement.activateModule(address(escrow), BaseEscrow.ModuleType.RELEASE);
-        createOps.registerEscrowContract(address(escrow));
         bondCollector.registerEscrowContract(address(escrow));
 
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), owner);
-        escrow.setCreateOps(address(createOps));
+        escrow.setCreationPolicy(address(creationPolicy));
         escrow.setBondCollector(address(bondCollector));
         escrow.setResolutionModule(address(resolutionModule));
 

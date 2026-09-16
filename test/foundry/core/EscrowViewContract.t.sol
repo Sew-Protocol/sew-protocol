@@ -14,7 +14,7 @@ import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/types/YieldPresets.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/CreateOps.sol';
+import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/BondCollector.sol';
 
 /**
@@ -36,7 +36,7 @@ contract EscrowViewContractTest is Test {
     DefaultResolutionModule public resolutionModule;
     DefaultReleaseStrategy public releaseStrategy;
     YieldOps public yieldOps;
-    CreateOps public createOps;
+    EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
 
     address public owner;
@@ -64,7 +64,7 @@ contract EscrowViewContractTest is Test {
 
         token = new ERC20Mock('Test Token', 'TEST', owner, 10000000e18);
         yieldOps = new YieldOps(owner);
-        createOps = new CreateOps(owner);
+        creationPolicy = new EscrowCreationPolicy(owner);
         bondCollector = new BondCollector(owner);
         adminContract = new EscrowGovernanceTimelock(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
@@ -81,11 +81,10 @@ contract EscrowViewContractTest is Test {
 
         // Wire ops contracts on the vault
         yieldOps.registerEscrowContract(address(vault));
-        createOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), owner);
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(adminContract));
-        vault.setCreateOps(address(createOps));
+        vault.setCreationPolicy(address(creationPolicy));
         vault.setBondCollector(address(bondCollector));
 
         moduleManagement.registerEscrowContract(address(vault));

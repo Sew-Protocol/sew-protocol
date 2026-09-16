@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import "../../../contracts/core/EscrowVault.sol";
 import "../../../contracts/core/BaseEscrow.sol";
 import "../../../contracts/core/EscrowViewContract.sol";
-import "../../../contracts/ops/CreateOps.sol";
+import "../../../contracts/core/EscrowCreationPolicy.sol";
 import "../../../contracts/ops/YieldOps.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/core/BondCollector.sol";
@@ -17,7 +17,7 @@ import "../../../contracts/libraries/SettingsValidationLibrary.sol";
 contract UXIntegrationTests is Test {
     EscrowVault public vault;
     EscrowViewContract public escrowView;
-    CreateOps public createOps;
+    EscrowCreationPolicy public creationPolicy;
     YieldOps public yieldOps;
     ModuleSnapshotRegistry public moduleManagement;
     ERC20Mock public token;
@@ -39,18 +39,17 @@ contract UXIntegrationTests is Test {
 
     function setUp() public {
         vm.startPrank(owner);
-        createOps = new CreateOps(owner);
+        creationPolicy = new EscrowCreationPolicy(owner);
         yieldOps = new YieldOps(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
         
         vault = new EscrowVault(100,feeAddress,address(yieldOps),address(moduleManagement));
-        vault.setCreateOps(address(createOps));
+        vault.setCreationPolicy(address(creationPolicy));
         vault.grantRole(vault.ROLE_TIMELOCK(), timelock);
         vault.grantRole(vault.ROLE_TIMELOCK(), address(0x999));
         
         resolutionModule = new DefaultResolutionModule(owner, resolverAddr);
         moduleManagement.registerEscrowContract(address(vault));
-        createOps.registerEscrowContract(address(vault));
         
         token = new ERC20Mock("Test", "TEST", buyer, 10000e18);
         escrowView = new EscrowViewContract(address(vault));

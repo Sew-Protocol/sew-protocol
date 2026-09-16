@@ -42,7 +42,7 @@ async function main() {
 
   const resolverContractOverride = envFirst('TEST_CUSTOM_RESOLVER_CONTRACT', 'CUSTOM_RESOLVER_CONTRACT');
 
-  console.log(`\n🧪 Phase 1 CreateOps parameter matrix (Base Sepolia)`);
+  console.log(`\n🧪 Phase 1 EscrowCreationPolicy parameter matrix (Base Sepolia)`);
   console.log(`- EscrowVault: ${escrowVaultAddr}`);
   console.log(`  - ${basescanAddressLink(escrowVaultAddr)}`);
   console.log(`- Token: ${tokenAddr}`);
@@ -260,7 +260,7 @@ async function main() {
 
     // Dispute resolver rules:
     // - If customResolver is set, it must become the disputeResolver.
-    // - If customResolver is 0, CreateOps/module decides (assert non-zero when enabled).
+    // - If customResolver is 0, EscrowCreationPolicy/module decides (assert non-zero when enabled).
     if (settings.customResolver !== ethers.ZeroAddress) {
       assert(String(et.disputeResolver).toLowerCase() === settings.customResolver.toLowerCase(), 'disputeResolver != customResolver');
     } else if (INCLUDE_DEFAULT_RESOLVER) {
@@ -292,7 +292,7 @@ async function main() {
   const now = BigInt(Math.floor(Date.now() / 1000));
   const t1h = now + 3600n;
 
-  // Matrix entries (CreateOps + BaseEscrow settings application)
+  // Matrix entries (EscrowCreationPolicy + BaseEscrow settings application)
   await createAssertAndRelease('A) customResolver=forwarding, yieldPreset=OFF, no auto times', {
     customResolver: resolverContractAddr,
     yieldPreset: 0,
@@ -350,11 +350,11 @@ async function main() {
       });
   }
 
-  console.log(`\n✅ CreateOps parameter matrix completed.`);
+  console.log(`\n✅ EscrowCreationPolicy parameter matrix completed.`);
 }
 
 main().catch((err) => {
-  console.error(`\n❌ CreateOps parameter matrix failed:\n${err?.stack || err?.message || err}`);
+  console.error(`\n❌ EscrowCreationPolicy parameter matrix failed:\n${err?.stack || err?.message || err}`);
   process.exitCode = 1;
 });
 

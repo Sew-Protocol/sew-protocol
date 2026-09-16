@@ -8,7 +8,7 @@ import 'contracts/core/modules/DefaultResolutionModule.sol';
 import 'contracts/modules/DefaultReleaseStrategy.sol';
 import 'contracts/types/EscrowTypes.sol';
 import 'contracts/ops/YieldOps.sol';
-import 'contracts/ops/CreateOps.sol';
+import 'contracts/core/EscrowCreationPolicy.sol';
 import 'contracts/core/BondCollector.sol';
 import 'contracts/core/ModuleSnapshotRegistry.sol';
 import 'contracts/admin/EscrowGovernanceTimelock.sol';
@@ -24,7 +24,7 @@ contract AutoTransferTest is Test {
     DefaultResolutionModule rm;
     DefaultReleaseStrategy defaultReleaseStrategy;
     YieldOps yieldOps;
-    CreateOps createOps;
+    EscrowCreationPolicy creationPolicy;
     BondCollector bondCollector;
     ModuleSnapshotRegistry moduleManagement;
     EscrowGovernanceTimelock adminContract;
@@ -39,7 +39,7 @@ contract AutoTransferTest is Test {
 
     function setUp() public {
         yieldOps = new YieldOps(address(this));
-        createOps = new CreateOps(address(this));
+        creationPolicy = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));
@@ -53,7 +53,6 @@ contract AutoTransferTest is Test {
         moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
 
         yieldOps.registerEscrowContract(address(vault));
-        createOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
 
         token = new ERC20Mock('Test', 'TST', address(this), 1e24);
@@ -62,7 +61,7 @@ contract AutoTransferTest is Test {
         vault.grantRole(vault.ROLE_TIMELOCK(), address(this));
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(adminContract));
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
-        vault.setCreateOps(address(createOps));
+        vault.setCreationPolicy(address(creationPolicy));
         vault.setBondCollector(address(bondCollector));
         adminContract.queueResolutionModule(address(vault), address(rm));
         vm.warp(block.timestamp + 7 days + 1);

@@ -9,7 +9,7 @@ import '../../../contracts/modules/decentralized-resolution-module/DRMAdminFacet
 import '../../../contracts/modules/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/CreateOps.sol';
+import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/types/EscrowTypes.sol';
@@ -32,7 +32,7 @@ contract ReentrancyProtectionTest is Test {
     PaymentCalculationLibraryV1 public paymentLib;
     ERC20Mock public token;
     YieldOps public yieldOps;
-    CreateOps public createOps;
+    EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
     EscrowGovernanceTimelock public adminContract;
@@ -56,7 +56,7 @@ contract ReentrancyProtectionTest is Test {
 
         // Deploy infrastructure
         yieldOps = new YieldOps(address(this));
-        createOps = new CreateOps(address(this));
+        creationPolicy = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));
@@ -65,13 +65,12 @@ contract ReentrancyProtectionTest is Test {
 
         // Register escrow contract callers on ops contracts
         yieldOps.registerEscrowContract(address(escrow));
-        createOps.registerEscrowContract(address(escrow));
         bondCollector.registerEscrowContract(address(escrow));
 
         // Wire ops contracts on escrow
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(this));
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(adminContract));
-        escrow.setCreateOps(address(createOps));
+        escrow.setCreationPolicy(address(creationPolicy));
         escrow.setBondCollector(address(bondCollector));
 
         // Deploy modules

@@ -9,7 +9,7 @@ import '../../../contracts/modules/decentralized-resolution-module/PaymentCalcul
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/CreateOps.sol';
+import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/types/EscrowTypes.sol';
@@ -58,15 +58,14 @@ contract BondBehaviourCorrectionTest is Test {
         moduleMgmt = new ModuleSnapshotRegistry(address(this));
         escrow = new EscrowVault(100,feeAddr,address(yOps),address(moduleMgmt));
 
-        CreateOps cOps = new CreateOps(address(this));
+        EscrowCreationPolicy cOps = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
 
-        cOps.registerEscrowContract(address(escrow));
         bondCollector.registerEscrowContract(address(escrow));
         yOps.registerEscrowContract(address(escrow));
 
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(this));
-        escrow.setCreateOps(address(cOps));
+        escrow.setCreationPolicy(address(cOps));
         escrow.setBondCollector(address(bondCollector));
 
         // Wire modules

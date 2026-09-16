@@ -32,7 +32,7 @@ contract ResolverInvariants is Test {
     EscrowInvariantHandler  internal handler4;
 
     YieldOps     internal y4;
-    CreateOps    internal c4;
+    EscrowCreationPolicy    internal c4;
     BondCollector internal b4;
     ModuleSnapshotRegistry internal mm4;
 
@@ -47,19 +47,18 @@ contract ResolverInvariants is Test {
     function _setupVault4() internal {
         token4 = new ERC20Mock("Token4", "TKN4", address(this), 0);
         y4 = new YieldOps(address(this));
-        c4 = new CreateOps(address(this));
+        c4 = new EscrowCreationPolicy(address(this));
         b4 = new BondCollector(address(this));
         mm4 = new ModuleSnapshotRegistry(address(this));
         resModule4 = new DefaultResolutionModule(address(this), resolver4);
 
         vault4 = new EscrowVault(100,feeAddr4,address(y4),address(mm4));
         y4.registerEscrowContract(address(vault4));
-        c4.registerEscrowContract(address(vault4));
         b4.registerEscrowContract(address(vault4));
         mm4.registerEscrowContract(address(vault4));
 
         vault4.grantRole(vault4.ROLE_ADMIN_CONTRACT(), address(this));
-        vault4.setCreateOps(address(c4));
+        vault4.setCreationPolicy(address(c4));
         vault4.setBondCollector(address(b4));
         vault4.setResolutionModule(address(resModule4));
         vault4.grantRole(vault4.ROLE_FEE_RECIPIENT(), feeAddr4);
@@ -132,7 +131,7 @@ contract AppealWindowInvariants is Test {
     EscrowInvariantHandler  internal handler;
 
     YieldOps     internal yieldOps;
-    CreateOps    internal createOps;
+    EscrowCreationPolicy    internal creationPolicy;
     BondCollector internal bondCollector;
     ModuleSnapshotRegistry internal mm;
 
@@ -143,7 +142,7 @@ contract AppealWindowInvariants is Test {
         token = new ERC20Mock("AppealToken", "ATP", address(this), 0);
 
         yieldOps     = new YieldOps(address(this));
-        createOps    = new CreateOps(address(this));
+        creationPolicy    = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
         mm           = new ModuleSnapshotRegistry(address(this));
         resModule    = new DefaultResolutionModule(address(this), resolver);
@@ -151,12 +150,11 @@ contract AppealWindowInvariants is Test {
         vault = new EscrowVault(100,feeAddr,address(yieldOps),address(mm));
 
         yieldOps.registerEscrowContract(address(vault));
-        createOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
         mm.registerEscrowContract(address(vault));
 
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
-        vault.setCreateOps(address(createOps));
+        vault.setCreationPolicy(address(creationPolicy));
         vault.setBondCollector(address(bondCollector));
         vault.setResolutionModule(address(resModule));
         vault.grantRole(vault.ROLE_FEE_RECIPIENT(), feeAddr);

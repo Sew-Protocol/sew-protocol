@@ -8,7 +8,7 @@ import '../interfaces/IYieldModule.sol';
 import '../interfaces/IYieldDistributionModule.sol';
 import '../interfaces/IReleaseStrategy.sol';
 import '../shared/interfaces/IResolutionModule.sol';
-import '../ops/CreateOps.sol';
+import '../libraries/EscrowCreationLogic.sol';
 import '../libraries/ModuleSnapshotLibrary.sol';
 import '../types/EscrowTypes.sol';
 
@@ -35,14 +35,21 @@ abstract contract EscrowCreation is ReentrancyGuard, EscrowConfiguration {
         internal returns (uint256)
     {
         uint256 workflowId = escrowTransfers.length;
-        if (address(createOps) == address(0)) revert ZeroCreateOps();
+        if (address(creationPolicy) == address(0)) revert ZeroCreationPolicy();
         IResolutionModule resolutionModule = _getResolutionModule(workflowId);
         uint256 resolutionConfigVersion = _resolveResolutionConfigVersion(
             address(resolutionModule), requestedResolutionConfigVersion, settings.customResolver,
             explicitResolutionConfigSelection
         );
-        CreateOps.CreateResult memory result = createOps.computeEscrowCreation(
-            token, to, _msgSender(), amount, settings, escrowFee, workflowId, address(resolutionModule)
+
+        // Snapshot the shared policy once so a single creation transition has a
+        // coherent policy basis (no scattered, possibly-inconsistent reads).
+        bool resolverMustBeContract = creationPolicy.resolverMustBeContract();
+        bool yieldDepositsPaused = creationPolicy.yieldDepositsPaused();
+
+        EscrowCreationLogic.CreateResult memory result = EscrowCreationLogic.computeEscrowCreation(
+            token, to, _msgSender(), amount, settings, escrowFee, workflowId, address(resolutionModule),
+            address(this), resolverMustBeContract, yieldDepositsPaused
         );
 
         uint256 balBefore = IERC20(token).balanceOf(address(this));

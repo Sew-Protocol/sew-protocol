@@ -1,5 +1,5 @@
 /**
- * Fix: Grant EscrowVault ROLE_ESCROW_CONTRACT on CreateOps
+ * Fix: Grant EscrowVault ROLE_ESCROW_CONTRACT on EscrowCreationPolicy
  *
  * Usage:
  *   pnpm hardhat run --network baseSepolia scripts/testnet/fix-escrow-registration.ts
@@ -17,23 +17,23 @@ async function main() {
   );
 
   const escrowVaultAddr = registry.contracts.EscrowVault.address;
-  const createOpsAddr = registry.contracts.CreateOps.address;
+  const creationPolicyAddr = registry.contracts.EscrowCreationPolicy.address;
 
-  const createOps = await hre.ethers.getContractAt('CreateOps', createOpsAddr);
-  const ROLE_ESCROW_CONTRACT = await createOps.ROLE_ESCROW_CONTRACT();
+  const creationPolicy = await hre.ethers.getContractAt('EscrowCreationPolicy', creationPolicyAddr);
+  const ROLE_ESCROW_CONTRACT = await creationPolicy.ROLE_ESCROW_CONTRACT();
 
   console.log('\n=== Grant EscrowVault ROLE_ESCROW_CONTRACT ===');
   console.log('EscrowVault:', escrowVaultAddr);
-  console.log('CreateOps:', createOpsAddr);
+  console.log('EscrowCreationPolicy:', creationPolicyAddr);
 
   // Check current state
-  const hasRole = await createOps.hasRole(ROLE_ESCROW_CONTRACT, escrowVaultAddr);
+  const hasRole = await creationPolicy.hasRole(ROLE_ESCROW_CONTRACT, escrowVaultAddr);
   console.log('Has role?', hasRole);
 
   if (!hasRole) {
     console.log('\nGranting ROLE_ESCROW_CONTRACT...');
     try {
-      const tx = await createOps.grantRole(ROLE_ESCROW_CONTRACT, escrowVaultAddr);
+      const tx = await creationPolicy.grantRole(ROLE_ESCROW_CONTRACT, escrowVaultAddr);
       const rcpt = await tx.wait();
       console.log('✅ Granted (tx:', rcpt?.transactionHash, ')');
     } catch (err: any) {

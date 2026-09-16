@@ -13,7 +13,7 @@ import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/types/YieldPresets.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/CreateOps.sol';
+import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../TestConfig.sol';
 
@@ -34,7 +34,7 @@ contract PauseLocking is Test {
     
     // Ops contracts
     YieldOps public yieldOps;
-    CreateOps public createOps;
+    EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
     
     // Test accounts
@@ -69,7 +69,7 @@ contract PauseLocking is Test {
         
         // Deploy ops contracts with owner
         yieldOps = new YieldOps(owner);
-        createOps = new CreateOps(owner);
+        creationPolicy = new EscrowCreationPolicy(owner);
         
         // Deploy bond collector
         bondCollector = new BondCollector(owner);
@@ -91,12 +91,11 @@ contract PauseLocking is Test {
         
         // Grant ROLE_TIMELOCK to owner in all ops so we can register escrow contract
         yieldOps.grantRole(yieldOps.ROLE_TIMELOCK(), owner);
-        createOps.grantRole(createOps.ROLE_TIMELOCK(), owner);
+        creationPolicy.grantRole(creationPolicy.ROLE_TIMELOCK(), owner);
         snapshotRegistry.grantRole(snapshotRegistry.ROLE_TIMELOCK(), owner);
         
         // Register escrow contract with all ops
         yieldOps.registerEscrowContract(address(escrow));
-        createOps.registerEscrowContract(address(escrow));
         snapshotRegistry.registerEscrowContract(address(escrow));
         
         // Queue and activate release strategy (with 7-day slowlane)
@@ -105,7 +104,7 @@ contract PauseLocking is Test {
         // will need to warp time and activate it themselves or handle NotReady error.
         
         // Set ops addresses in vault
-        escrow.setCreateOps(address(createOps));
+        escrow.setCreationPolicy(address(creationPolicy));
         
         // Transfer tokens to sender
         token.transfer(sender, INITIAL_BALANCE);

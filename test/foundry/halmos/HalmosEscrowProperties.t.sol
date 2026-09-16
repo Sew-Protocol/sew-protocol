@@ -8,7 +8,7 @@ import "../../../contracts/core/EscrowVaultAnalytics.sol";
 import "../../../contracts/core/modules/DefaultResolutionModule.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/ops/YieldOps.sol";
-import "../../../contracts/ops/CreateOps.sol";
+import "../../../contracts/core/EscrowCreationPolicy.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
 import "../../../contracts/libraries/SettingsValidationLibrary.sol";
@@ -53,7 +53,7 @@ contract HalmosEscrowProperties is SymTest, Test {
     DefaultResolutionModule  internal resModule;
 
     YieldOps              internal yieldOps;
-    CreateOps             internal createOps;
+    EscrowCreationPolicy             internal creationPolicy;
     BondCollector         internal bondCollector;
     ModuleSnapshotRegistry internal mm;
 
@@ -67,7 +67,7 @@ contract HalmosEscrowProperties is SymTest, Test {
     address internal feeAddr       = address(0x1004);
 
     // exclusivityResolver: deployed contract used as settings.customResolver in
-    // check_custom_resolver_exclusivity.  CreateOps requires customResolver to be
+    // check_custom_resolver_exclusivity.  EscrowCreationPolicy requires customResolver to be
     // a contract (NotAContract guard), so we cannot use a bare EOA address here.
     MockCustomResolver internal exclusivityResolver;
 
@@ -80,7 +80,7 @@ contract HalmosEscrowProperties is SymTest, Test {
         token = new ERC20Mock("Token", "TKN", address(this), 0);
 
         yieldOps      = new YieldOps(address(this));
-        createOps     = new CreateOps(address(this));
+        creationPolicy     = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
         mm            = new ModuleSnapshotRegistry(address(this));
         resModule     = new DefaultResolutionModule(address(this), customResolver);
@@ -89,12 +89,11 @@ contract HalmosEscrowProperties is SymTest, Test {
         vault = new EscrowVault(FEE_BPS,feeAddr,address(yieldOps),address(mm));
 
         yieldOps.registerEscrowContract(address(vault));
-        createOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
         mm.registerEscrowContract(address(vault));
 
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
-        vault.setCreateOps(address(createOps));
+        vault.setCreationPolicy(address(creationPolicy));
         vault.setBondCollector(address(bondCollector));
         vault.setResolutionModule(address(resModule));
         vault.grantRole(vault.ROLE_FEE_RECIPIENT(), feeAddr);
@@ -181,7 +180,7 @@ contract HalmosEscrowProperties is SymTest, Test {
     // arbitrary addresses in test.check).  Here we verify the concrete gen-addr
     // boundary points exhaustively.
     //
-    // Note: settings.customResolver must be a deployed contract — CreateOps
+    // Note: settings.customResolver must be a deployed contract — EscrowCreationPolicy
     // rejects EOA addresses (NotAContract guard).  We therefore use
     // `exclusivityResolver` (a deployed MockCustomResolver) rather than a bare
     // address literal.

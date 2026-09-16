@@ -6,7 +6,7 @@ import "../../../contracts/core/EscrowVault.sol";
 import "../../../contracts/core/modules/DefaultResolutionModule.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/ops/YieldOps.sol";
-import "../../../contracts/ops/CreateOps.sol";
+import "../../../contracts/core/EscrowCreationPolicy.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
 import "../../../contracts/libraries/SettingsValidationLibrary.sol";
@@ -104,7 +104,7 @@ contract MultiTokenIsolationInvariants is Test {
     MultiTokenHandler internal handler;
 
     YieldOps      internal yieldOps;
-    CreateOps     internal createOps;
+    EscrowCreationPolicy     internal creationPolicy;
     BondCollector internal bondCollector;
     ModuleSnapshotRegistry internal mm;
     DefaultResolutionModule internal resModule;
@@ -117,7 +117,7 @@ contract MultiTokenIsolationInvariants is Test {
         tokenB = new ERC20Mock("TokenB", "TKNB", address(this), 0);
 
         yieldOps     = new YieldOps(address(this));
-        createOps    = new CreateOps(address(this));
+        creationPolicy    = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
         mm           = new ModuleSnapshotRegistry(address(this));
         resModule    = new DefaultResolutionModule(address(this), resolver);
@@ -125,12 +125,11 @@ contract MultiTokenIsolationInvariants is Test {
         vault = new EscrowVault(100,feeAddr,address(yieldOps),address(mm));
 
         yieldOps.registerEscrowContract(address(vault));
-        createOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
         mm.registerEscrowContract(address(vault));
 
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
-        vault.setCreateOps(address(createOps));
+        vault.setCreationPolicy(address(creationPolicy));
         vault.setBondCollector(address(bondCollector));
         vault.setResolutionModule(address(resModule));
         vault.grantRole(vault.ROLE_FEE_RECIPIENT(), feeAddr);

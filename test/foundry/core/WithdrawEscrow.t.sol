@@ -9,7 +9,7 @@ import 'contracts/mocks/ERC20Mock.sol';
 import 'contracts/core/modules/DefaultResolutionModule.sol';
 import 'contracts/types/EscrowTypes.sol';
 import 'contracts/ops/YieldOps.sol';
-import 'contracts/ops/CreateOps.sol';
+import 'contracts/core/EscrowCreationPolicy.sol';
 import 'contracts/core/BondCollector.sol';
 import 'contracts/core/ModuleSnapshotRegistry.sol';
 import 'contracts/modules/DefaultReleaseStrategy.sol';
@@ -22,7 +22,7 @@ contract WithdrawEscrowTest is Test {
     DefaultResolutionModule rm;
     DefaultReleaseStrategy releaseStrategy;
     YieldOps yieldOps;
-    CreateOps createOps;
+    EscrowCreationPolicy creationPolicy;
     BondCollector bondCollector;
     ModuleSnapshotRegistry moduleManagement;
     EscrowGovernanceTimelock adminContract;
@@ -37,7 +37,7 @@ contract WithdrawEscrowTest is Test {
 
     function setUp() public {
         yieldOps = new YieldOps(address(this));
-        createOps = new CreateOps(address(this));
+        creationPolicy = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));
@@ -51,14 +51,13 @@ contract WithdrawEscrowTest is Test {
 
         // Register escrow contract with all ops contracts
         yieldOps.registerEscrowContract(address(vault));
-        createOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
 
         // Wire ops contracts on the vault
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         // Allow EscrowGovernanceTimelock to apply queued changes on the vault
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(adminContract));
-        vault.setCreateOps(address(createOps));
+        vault.setCreationPolicy(address(creationPolicy));
         vault.setBondCollector(address(bondCollector));
 
         token = new ERC20Mock('Test', 'TST', address(this), 1e24);

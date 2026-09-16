@@ -12,7 +12,7 @@ import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/admin/EscrowGovernanceTimelock.sol";
 import "../../../contracts/libraries/SettingsValidationLibrary.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
-import "../../../contracts/ops/CreateOps.sol";
+import "../../../contracts/core/EscrowCreationPolicy.sol";
 import "../../../contracts/interfaces/IYieldGenerationModule.sol";
 
 contract SilentFailureModule is IYieldGenerationModule {
@@ -43,7 +43,7 @@ contract EscrowableERC20BugsTest is Test {
     ERC20Mock public otherToken;
     DefaultResolutionModule public resolutionModule;
     YieldOps public yieldOps;
-    CreateOps public createOps;
+    EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
     EscrowGovernanceTimelock public adminContract;
@@ -59,7 +59,7 @@ contract EscrowableERC20BugsTest is Test {
         owner = address(this);
         yieldOps = new YieldOps(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
-        createOps = new CreateOps(owner);
+        creationPolicy = new EscrowCreationPolicy(owner);
         bondCollector = new BondCollector(owner);
         resolutionModule = new DefaultResolutionModule(owner, resolver);
         adminContract = new EscrowGovernanceTimelock(owner);
@@ -72,12 +72,11 @@ contract EscrowableERC20BugsTest is Test {
 
         yieldOps.registerEscrowContract(address(escrowToken));
         moduleManagement.registerEscrowContract(address(escrowToken));
-        createOps.registerEscrowContract(address(escrowToken));
         bondCollector.registerEscrowContract(address(escrowToken));
         adminContract.registerEscrowContract(address(escrowToken));
 
         escrowToken.grantRole(escrowToken.ROLE_TIMELOCK(), owner);
-        escrowToken.setCreateOps(address(createOps));
+        escrowToken.setCreationPolicy(address(creationPolicy));
         escrowToken.setBondCollector(address(bondCollector));
 
         // Configure silent module via Registry

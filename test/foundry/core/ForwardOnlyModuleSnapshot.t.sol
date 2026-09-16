@@ -12,7 +12,7 @@ import "../../../contracts/types/EscrowTypes.sol";
 import "../../../contracts/types/YieldPresets.sol";
 import "../../../contracts/libraries/SettingsValidationLibrary.sol";
 import "../../../contracts/ops/YieldOps.sol";
-import "../../../contracts/ops/CreateOps.sol";
+import "../../../contracts/core/EscrowCreationPolicy.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/interfaces/IReleaseStrategy.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
@@ -86,13 +86,12 @@ contract ForwardOnlyModuleSnapshotTest is Test {
 
         mm.registerEscrowContract(address(vault));
 
-        CreateOps createOps = new CreateOps(address(this));
-        createOps.registerEscrowContract(address(vault));
+        EscrowCreationPolicy creationPolicy = new EscrowCreationPolicy(address(this));
         BondCollector bondCollector = new BondCollector(address(this));
         bondCollector.registerEscrowContract(address(vault));
 
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
-        vault.setCreateOps(address(createOps));
+        vault.setCreationPolicy(address(creationPolicy));
         vault.setBondCollector(address(bondCollector));
         vault.setResolutionModule(address(resolution));
 

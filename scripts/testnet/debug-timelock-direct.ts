@@ -14,11 +14,11 @@ async function main() {
   );
 
   const timelockAddr = registry.contracts.TimelockController.address;
-  const createOpsAddr = registry.contracts.CreateOps.address;
+  const creationPolicyAddr = registry.contracts.EscrowCreationPolicy.address;
   const escrowVaultAddr = registry.contracts.EscrowVault.address;
 
   const timelock = await hre.ethers.getContractAt('TimelockController', timelockAddr);
-  const createOps = await hre.ethers.getContractAt('CreateOps', createOpsAddr);
+  const creationPolicy = await hre.ethers.getContractAt('EscrowCreationPolicy', creationPolicyAddr);
 
   console.log('=== Timelock Config ===');
   const minDelay = await timelock.getMinDelay();
@@ -29,11 +29,11 @@ async function main() {
   console.log('Deployer is PROPOSER?', await timelock.hasRole(PROPOSER_ROLE, deployer.address));
 
   // Try direct grant from deployer (since deployer is admin on Timelock)
-  console.log('\n=== Try direct grant on CreateOps ===');
-  const ROLE_ESCROW_CONTRACT = await createOps.ROLE_ESCROW_CONTRACT();
+  console.log('\n=== Try direct grant on EscrowCreationPolicy ===');
+  const ROLE_ESCROW_CONTRACT = await creationPolicy.ROLE_ESCROW_CONTRACT();
   
   try {
-    const tx = await createOps.grantRole(ROLE_ESCROW_CONTRACT, escrowVaultAddr);
+    const tx = await creationPolicy.grantRole(ROLE_ESCROW_CONTRACT, escrowVaultAddr);
     const rcpt = await tx.wait();
     console.log('✅ Granted directly (tx:', rcpt?.transactionHash, ')');
   } catch (err: any) {
@@ -41,7 +41,7 @@ async function main() {
   }
 
   // Verify
-  const isRegistered = await createOps.hasRole(ROLE_ESCROW_CONTRACT, escrowVaultAddr);
+  const isRegistered = await creationPolicy.hasRole(ROLE_ESCROW_CONTRACT, escrowVaultAddr);
   console.log('\n📊 Result:', isRegistered ? 'SUCCESS' : 'FAILED');
 }
 

@@ -7,7 +7,7 @@ import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/types/YieldPresets.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/CreateOps.sol';
+import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/modules/DefaultReleaseStrategy.sol';
@@ -29,7 +29,7 @@ contract PartialReleaseTest is Test {
     ModuleSnapshotRegistry moduleManagement;
     DefaultReleaseStrategy releaseStrategy;
     YieldOps yieldOps;
-    CreateOps createOps;
+    EscrowCreationPolicy creationPolicy;
     BondCollector bondCollector;
     DefaultResolutionModule resolutionModule;
 
@@ -37,7 +37,7 @@ contract PartialReleaseTest is Test {
         token = new ERC20Mock('Token', 'TKN', address(this), 1_000_000e18);
 
         yieldOps = new YieldOps(address(this));
-        createOps = new CreateOps(address(this));
+        creationPolicy = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
         resolutionModule = new DefaultResolutionModule(address(this), address(0x1234));
         releaseStrategy = new DefaultReleaseStrategy();
@@ -51,11 +51,10 @@ contract PartialReleaseTest is Test {
         moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
 
         yieldOps.registerEscrowContract(address(vault));
-        createOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
 
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
-        vault.setCreateOps(address(createOps));
+        vault.setCreationPolicy(address(creationPolicy));
         vault.setBondCollector(address(bondCollector));
         vault.setResolutionModule(address(resolutionModule));
         vault.grantRole(vault.ROLE_FEE_RECIPIENT(), feePicker);

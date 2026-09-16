@@ -11,7 +11,7 @@ import '../../../contracts/core/BaseEscrow.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/CreateOps.sol';
+import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
@@ -28,7 +28,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
     PaymentCalculationLibraryV1 public paymentLib;
     ERC20Mock public token;
     YieldOps public yieldOps;
-    CreateOps public createOps;
+    EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
 
@@ -76,15 +76,14 @@ contract EscalationDepthHistogramIntegrationTest is Test {
         escrow = new EscrowVault(100,makeAddr('feeAddress'),address(yieldOps),address(moduleManagement));
 
         // Deploy and wire required ops (BaseEscrow now requires these)
-        createOps = new CreateOps(address(this));
+        creationPolicy = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
-        createOps.registerEscrowContract(address(escrow));
         bondCollector.registerEscrowContract(address(escrow));
         yieldOps.registerEscrowContract(address(escrow));
 
         // Grant admin-contract role so this test can configure ops
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(this));
-        escrow.setCreateOps(address(createOps));
+        escrow.setCreationPolicy(address(creationPolicy));
         escrow.setBondCollector(address(bondCollector));
 
         // Setup roles - deployer has DEFAULT_ADMIN_ROLE from constructors

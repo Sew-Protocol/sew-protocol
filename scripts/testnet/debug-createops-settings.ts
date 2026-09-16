@@ -1,5 +1,5 @@
 /**
- * Debug: Check CreateOps registration and role
+ * Debug: Check EscrowCreationPolicy registration and role
  */
 
 import hre from 'hardhat';
@@ -14,23 +14,23 @@ async function main() {
   );
 
   const escrowVaultAddr = registry.contracts.EscrowVault.address;
-  const createOpsAddr = registry.contracts.CreateOps.address;
+  const creationPolicyAddr = registry.contracts.EscrowCreationPolicy.address;
 
   const escrowVault = await hre.ethers.getContractAt('EscrowVault', escrowVaultAddr);
-  const createOps = await hre.ethers.getContractAt('CreateOps', createOpsAddr);
+  const creationPolicy = await hre.ethers.getContractAt('EscrowCreationPolicy', creationPolicyAddr);
 
-  // Check CreateOps has escrow registered
-  console.log('=== CreateOps State ===');
+  // Check EscrowCreationPolicy has escrow registered
+  console.log('=== EscrowCreationPolicy State ===');
 
-  const ROLE_ESCROW_CONTRACT = await createOps.ROLE_ESCROW_CONTRACT();
+  const ROLE_ESCROW_CONTRACT = await creationPolicy.ROLE_ESCROW_CONTRACT();
   console.log('ROLE_ESCROW_CONTRACT:', ROLE_ESCROW_CONTRACT);
   console.log(
     'EscrowVault has role?',
-    await createOps.hasRole(ROLE_ESCROW_CONTRACT, escrowVaultAddr),
+    await creationPolicy.hasRole(ROLE_ESCROW_CONTRACT, escrowVaultAddr),
   );
 
   // Check yieldDepositsPaused
-  console.log('yieldDepositsPaused?', await createOps.yieldDepositsPaused());
+  console.log('yieldDepositsPaused?', await creationPolicy.yieldDepositsPaused());
 
   // Try a dry-run call to computeEscrowCreation
   console.log('\n=== Test computeEscrowCreation ===');
@@ -44,7 +44,7 @@ async function main() {
   };
 
   try {
-    const result = await createOps.computeEscrowCreation.staticCall(
+    const result = await creationPolicy.computeEscrowCreation.staticCall(
       registry.contracts.SewToken.address, // token
       '0x936bC18f88f43c49d2291010Fc2E566Fd9afD8e5', // to
       '0x5F13B5089a0B23c74AD9A22a2db59F5F48ab09bC', // from

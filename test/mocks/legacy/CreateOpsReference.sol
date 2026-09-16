@@ -1,18 +1,26 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.37;
 
+// ============================================================================
+// TEST-ONLY REFERENCE IMPLEMENTATION.
+// Preserved solely for differential testing of EscrowCreationLogic.
+// Not part of the protocol architecture or deployment.
+// ============================================================================
+
 import '@openzeppelin/contracts/access/AccessControl.sol';
-import '../types/EscrowTypes.sol';
-import '../types/YieldPresets.sol';
-import '../libraries/SettingsValidationLibrary.sol';
-import '../libraries/YieldPresetLibrary.sol';
-import '../libraries/EscrowEncodingLibrary.sol';
-import '../shared/interfaces/IResolutionModule.sol';
-import '../interfaces/IYieldGenerationModule.sol';
+import '../../../contracts/types/EscrowTypes.sol';
+import '../../../contracts/types/YieldPresets.sol';
+import '../../../contracts/libraries/SettingsValidationLibrary.sol';
+import '../../../contracts/libraries/YieldPresetLibrary.sol';
+import '../../../contracts/libraries/EscrowEncodingLibrary.sol';
+import '../../../contracts/shared/interfaces/IResolutionModule.sol';
+import '../../../contracts/interfaces/IYieldGenerationModule.sol';
 
 /**
- * @title CreateOps
- * @notice External contract for escrow creation validation and computation
+ * @title CreateOpsReference
+ * @notice Formerly the externally deployed CreateOps contract, retained as a
+ *         test oracle only. Its compute semantics are the reference against
+ *         which EscrowCreationLogic is differentially fuzzed.
  *
  *      Key design principles:
  *      - Compute → Apply: Returns creation result, BaseEscrow applies to state
@@ -26,7 +34,7 @@ import '../interfaces/IYieldGenerationModule.sol';
  *      CreateOps returns: (fee, amountAfterFee, resolver, yieldEnabled, shouldDepositYield)
  *      BaseEscrow applies: Stores struct, updates balances, emits events
  */
-contract CreateOps is AccessControl {
+contract CreateOpsReference is AccessControl {
     uint256 private constant ESCROW_FEE_DENOMINATOR = 10000;
     
     // ============ Role Constants ============

@@ -6,7 +6,7 @@ import "forge-std/StdJson.sol";
 import { EscrowVault } from "../../contracts/core/EscrowVault.sol";
 import { EscrowViewContract } from "../../contracts/core/EscrowViewContract.sol";
 import { DefaultResolutionModule } from "../../contracts/core/modules/DefaultResolutionModule.sol";
-import { CreateOps } from "../../contracts/ops/CreateOps.sol";
+import { EscrowCreationPolicy } from "../../contracts/core/EscrowCreationPolicy.sol";
 import { YieldOps } from "../../contracts/ops/YieldOps.sol";
 import { BondCollector } from "../../contracts/core/BondCollector.sol";
 import { ModuleSnapshotRegistry } from "../../contracts/core/ModuleSnapshotRegistry.sol";
@@ -44,7 +44,7 @@ contract TraceRegressionTest is Test {
     EscrowVault             vault;
     EscrowViewContract      oracle;
     DefaultResolutionModule drModule;
-    CreateOps               createOps;
+    EscrowCreationPolicy               creationPolicy;
     YieldOps                yieldOps;
     BondCollector           bondCollector;
     ModuleSnapshotRegistry  moduleManagement;
@@ -74,7 +74,7 @@ contract TraceRegressionTest is Test {
 
         yieldOps         = new YieldOps(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
-        createOps        = new CreateOps(owner);
+        creationPolicy        = new EscrowCreationPolicy(owner);
         bondCollector    = new BondCollector(owner);
         drModule         = new DefaultResolutionModule(owner, RESOLVER);
 
@@ -82,10 +82,9 @@ contract TraceRegressionTest is Test {
 
         yieldOps.registerEscrowContract(address(vault));
         moduleManagement.registerEscrowContract(address(vault));
-        createOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
 
-        vault.setCreateOps(address(createOps));
+        vault.setCreationPolicy(address(creationPolicy));
         vault.setBondCollector(address(bondCollector));
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), owner);
         vault.setResolutionModule(address(drModule));

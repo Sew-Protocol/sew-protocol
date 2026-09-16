@@ -9,7 +9,7 @@ import "../../../contracts/ops/YieldOps.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
-import "../../../contracts/ops/CreateOps.sol";
+import "../../../contracts/core/EscrowCreationPolicy.sol";
 import "../../../contracts/interfaces/IYieldGenerationModule.sol";
 
 contract SilentFailureModule is IYieldGenerationModule {
@@ -39,7 +39,7 @@ contract YieldDepositFailureBugTest is Test {
     ERC20Mock public token;
     DefaultResolutionModule public resolutionModule;
     YieldOps public yieldOps;
-    CreateOps public createOps;
+    EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
     SilentFailureModule public silentModule;
@@ -55,7 +55,7 @@ contract YieldDepositFailureBugTest is Test {
         token = new ERC20Mock("Token", "TKN", owner, 0);
         yieldOps = new YieldOps(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
-        createOps = new CreateOps(owner);
+        creationPolicy = new EscrowCreationPolicy(owner);
         bondCollector = new BondCollector(owner);
         resolutionModule = new DefaultResolutionModule(owner, resolver);
         silentModule = new SilentFailureModule();
@@ -64,11 +64,10 @@ contract YieldDepositFailureBugTest is Test {
         
         yieldOps.registerEscrowContract(address(escrow));
         moduleManagement.registerEscrowContract(address(escrow));
-        createOps.registerEscrowContract(address(escrow));
         bondCollector.registerEscrowContract(address(escrow));
 
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), owner);
-        escrow.setCreateOps(address(createOps));
+        escrow.setCreationPolicy(address(creationPolicy));
         escrow.setBondCollector(address(bondCollector));
         escrow.setResolutionModule(address(resolutionModule));
 

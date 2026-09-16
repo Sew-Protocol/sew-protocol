@@ -7,7 +7,7 @@ import "forge-std/console.sol";
 import { EscrowVault } from "../../../contracts/core/EscrowVault.sol";
 import { ModuleSnapshotRegistry } from "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import { YieldOps } from "../../../contracts/ops/YieldOps.sol";
-import { CreateOps } from "../../../contracts/ops/CreateOps.sol";
+import { EscrowCreationPolicy } from "../../../contracts/core/EscrowCreationPolicy.sol";
 import { BondCollector } from "../../../contracts/core/BondCollector.sol";
 import { DefaultResolutionModule } from "../../../contracts/core/modules/DefaultResolutionModule.sol";
 import { ERC20Mock } from "../../../contracts/mocks/ERC20Mock.sol";
@@ -96,7 +96,7 @@ contract ReleaseStrategyWiringTest is Test {
     ModuleSnapshotRegistry internal mm;
     EscrowVaultReleaseStrategyHarness internal vault;
     YieldOps internal yieldOps;
-    CreateOps internal createOps;
+    EscrowCreationPolicy internal creationPolicy;
     BondCollector internal bondCollector;
     DefaultResolutionModule internal resolutionModule;
 
@@ -114,16 +114,15 @@ contract ReleaseStrategyWiringTest is Test {
         mm.registerEscrowContract(address(vault));
 
         // Wire required ops for createEscrow
-        createOps = new CreateOps(address(this));
-        createOps.grantRole(createOps.ROLE_TIMELOCK(), address(this));
-        createOps.registerEscrowContract(address(vault));
+        creationPolicy = new EscrowCreationPolicy(address(this));
+        creationPolicy.grantRole(creationPolicy.ROLE_TIMELOCK(), address(this));
 
 
         bondCollector = new BondCollector(address(this));
         bondCollector.registerEscrowContract(address(vault));
 
         // EscrowVault setters are timelock-gated; deployer has ROLE_TIMELOCK in constructor.
-        vault.setCreateOps(address(createOps));
+        vault.setCreationPolicy(address(creationPolicy));
         vault.setBondCollector(address(bondCollector));
 
         // Ensure createEscrow can choose a dispute resolver (resolution module must be configured).

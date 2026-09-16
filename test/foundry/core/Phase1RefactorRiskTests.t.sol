@@ -5,7 +5,7 @@ import 'forge-std/Test.sol';
 import 'contracts/core/EscrowVault.sol';
 import 'contracts/core/BaseEscrow.sol';
 import 'contracts/ops/YieldOps.sol';
-import 'contracts/ops/CreateOps.sol';
+import 'contracts/core/EscrowCreationPolicy.sol';
 import 'contracts/core/ModuleSnapshotRegistry.sol';
 import 'contracts/types/EscrowTypes.sol';
 import 'contracts/types/YieldPresets.sol';
@@ -18,12 +18,12 @@ import 'contracts/shared/interfaces/IIncentiveModule.sol';
 /**
  * @title Phase1RefactorRiskTests
  * @notice Tests for Phase 1 refactoring risks (createEscrow, raiseDispute, escalateDispute)
- * @dev These tests ensure that extracting logic to libraries/CreateOps doesn't break functionality
+ * @dev These tests ensure that extracting logic to libraries/EscrowCreationPolicy doesn't break functionality
  */
 contract Phase1RefactorRiskTests is Test {
     EscrowVault public vault;
     ERC20Mock public token;
-    CreateOps public createOps;
+    EscrowCreationPolicy public creationPolicy;
     YieldOps public yieldOps;
     ModuleSnapshotRegistry public moduleManagement;
     
@@ -49,7 +49,7 @@ contract Phase1RefactorRiskTests is Test {
         // yieldDistModule will be null for now (not needed for basic tests)
         
         // Deploy ops contracts
-        createOps = new CreateOps(address(this));
+        creationPolicy = new EscrowCreationPolicy(address(this));
         yieldOps = new YieldOps(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         
@@ -60,15 +60,14 @@ contract Phase1RefactorRiskTests is Test {
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.grantRole(vault.ROLE_TIMELOCK(), address(this));
         
-        // Register vault with CreateOps (needs ROLE_TIMELOCK)
-        createOps.grantRole(createOps.ROLE_TIMELOCK(), address(this));
-        createOps.registerEscrowContract(address(vault));
+        // Register vault with EscrowCreationPolicy (needs ROLE_TIMELOCK)
+        creationPolicy.grantRole(creationPolicy.ROLE_TIMELOCK(), address(this));
         
         // Register vault with other ops
         yieldOps.registerEscrowContract(address(vault));
         
-        // Set CreateOps
-        vault.setCreateOps(address(createOps));
+        // Set EscrowCreationPolicy
+        vault.setCreationPolicy(address(creationPolicy));
         
         // Register modules
         moduleManagement.registerEscrowContract(address(vault));
@@ -105,8 +104,8 @@ contract Phase1RefactorRiskTests is Test {
     // ============ createEscrow Refactor Risk Tests ============
     
     /**
-     * @notice Test that CreateOps results are correctly applied to escrow struct
-     * @dev Risk: If struct creation moves to CreateOps, need to ensure all fields are set correctly
+     * @notice Test that EscrowCreationPolicy results are correctly applied to escrow struct
+     * @dev Risk: If struct creation moves to EscrowCreationPolicy, need to ensure all fields are set correctly
      */
     function test_createEscrow_CreateOpsResultsAppliedCorrectly() public {
         EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
@@ -114,10 +113,10 @@ contract Phase1RefactorRiskTests is Test {
         vm.prank(buyer);
         uint256 workflowId = vault.createEscrow(address(token), seller, AMOUNT, settings);
         
-        // Verify escrow struct matches CreateOps results
+        // Verify escrow struct matches EscrowCreationPolicy results
         EscrowTransfer memory et = _loadTransfer(workflowId);
         
-        // These should match CreateOps.computeEscrowCreation results
+        // These should match EscrowCreationPolicy.computeEscrowCreation results
         assertEq(et.token, address(token), "token should match");
         assertEq(et.to, seller, "to should match");
         assertEq(et.from, buyer, "from should match");
@@ -125,18 +124,18 @@ contract Phase1RefactorRiskTests is Test {
         assertEq(uint256(et.senderStatus), uint256(SenderStatus.NONE), "senderStatus should be NONE");
         assertEq(uint256(et.recipientStatus), uint256(RecipientStatus.NONE), "recipientStatus should be NONE");
         
-        // amountAfterFee should match CreateOps calculation
+        // amountAfterFee should match EscrowCreationPolicy calculation
         uint256 expectedFee = (AMOUNT * ESCROW_FEE_BPS) / 10000;
         uint256 expectedAmountAfterFee = AMOUNT - expectedFee;
-        assertEq(et.amountAfterFee, expectedAmountAfterFee, "amountAfterFee should match CreateOps calculation");
+        assertEq(et.amountAfterFee, expectedAmountAfterFee, "amountAfterFee should match EscrowCreationPolicy calculation");
         
-        // disputeResolver should be set (from CreateOps/ResolutionModule)
+        // disputeResolver should be set (from EscrowCreationPolicy/ResolutionModule)
         assertTrue(et.disputeResolver != address(0), "disputeResolver should be set");
     }
     
     /**
-     * @notice Test that settings are correctly applied after CreateOps computation
-     * @dev Risk: If settings application moves to CreateOps, need to ensure they're still applied
+     * @notice Test that settings are correctly applied after EscrowCreationPolicy computation
+     * @dev Risk: If settings application moves to EscrowCreationPolicy, need to ensure they're still applied
      */
     function test_createEscrow_SettingsAppliedAfterCreateOps() public {
         uint256 futureTime = block.timestamp + 7 days;
@@ -159,8 +158,8 @@ contract Phase1RefactorRiskTests is Test {
     }
     
     /**
-     * @notice Test that module snapshots are created correctly after CreateOps
-     * @dev Risk: If module snapshotting moves to CreateOps, need to ensure snapshots are correct
+     * @notice Test that module snapshots are created correctly after EscrowCreationPolicy
+     * @dev Risk: If module snapshotting moves to EscrowCreationPolicy, need to ensure snapshots are correct
      */
     function test_createEscrow_ModuleSnapshotsCreatedCorrectly() public {
         EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
@@ -191,7 +190,7 @@ contract Phase1RefactorRiskTests is Test {
     }
     
     /**
-     * @notice Test that accounting is updated correctly after CreateOps
+     * @notice Test that accounting is updated correctly after EscrowCreationPolicy
      * @dev Risk: If accounting moves, need to ensure balances are correct
      */
     function test_createEscrow_AccountingUpdatedCorrectly() public {
@@ -221,8 +220,8 @@ contract Phase1RefactorRiskTests is Test {
     }
     
     /**
-     * @notice Test that token pull validation works correctly with CreateOps
-     * @dev Risk: If validation moves to CreateOps, need to ensure it still works
+     * @notice Test that token pull validation works correctly with EscrowCreationPolicy
+     * @dev Risk: If validation moves to EscrowCreationPolicy, need to ensure it still works
      */
     function test_createEscrow_TokenPullValidationWithCreateOps() public {
         EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();

@@ -7,7 +7,7 @@ import '../../../contracts/core/modules/DefaultResolutionModule.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/types/YieldPresets.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/CreateOps.sol';
+import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/modules/DefaultReleaseStrategy.sol';
@@ -24,7 +24,7 @@ contract EscrowableERC20CoverageTest is Test {
     EscrowableERC20Factory public factory;
     DefaultResolutionModule public resolutionModule;
     YieldOps public yieldOps;
-    CreateOps public createOps;
+    EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
     DefaultReleaseStrategy public releaseStrategy;
@@ -63,7 +63,7 @@ contract EscrowableERC20CoverageTest is Test {
 
     function setUp() public {
         yieldOps      = new YieldOps(address(this));
-        createOps     = new CreateOps(address(this));
+        creationPolicy     = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         resolutionModule = new DefaultResolutionModule(address(this), resolver);
@@ -79,11 +79,10 @@ contract EscrowableERC20CoverageTest is Test {
         moduleManagement.activateModule(address(token), BaseEscrow.ModuleType.RELEASE);
 
         yieldOps.registerEscrowContract(address(token));
-        createOps.registerEscrowContract(address(token));
         bondCollector.registerEscrowContract(address(token));
 
         token.grantRole(token.ROLE_ADMIN_CONTRACT(), address(this));
-        token.setCreateOps(address(createOps));
+        token.setCreationPolicy(address(creationPolicy));
         token.setBondCollector(address(bondCollector));
         token.setResolutionModule(address(resolutionModule));
     }
@@ -418,11 +417,10 @@ contract EscrowableERC20CoverageTest is Test {
         moduleManagement.activateModule(address(zeroFeeToken), BaseEscrow.ModuleType.RELEASE);
 
         yieldOps.registerEscrowContract(address(zeroFeeToken));
-        createOps.registerEscrowContract(address(zeroFeeToken));
         bondCollector.registerEscrowContract(address(zeroFeeToken));
 
         zeroFeeToken.grantRole(zeroFeeToken.ROLE_ADMIN_CONTRACT(), address(this));
-        zeroFeeToken.setCreateOps(address(createOps));
+        zeroFeeToken.setCreationPolicy(address(creationPolicy));
         zeroFeeToken.setBondCollector(address(bondCollector));
         zeroFeeToken.setResolutionModule(address(resolutionModule));
 

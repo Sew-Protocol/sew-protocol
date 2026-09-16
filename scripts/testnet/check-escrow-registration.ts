@@ -1,7 +1,7 @@
 /**
- * Register EscrowVault on CreateOps via Timelock
+ * Register EscrowVault on EscrowCreationPolicy via Timelock
  *
- * Since CreateOps admin is Timelock, we need to execute via governance
+ * Since EscrowCreationPolicy admin is Timelock, we need to execute via governance
  * For testnet, we can try calling directly if deployer has any access
  */
 
@@ -18,20 +18,20 @@ async function main() {
   );
 
   const escrowVaultAddr = registry.contracts.EscrowVault.address;
-  const createOpsAddr = registry.contracts.CreateOps.address;
+  const creationPolicyAddr = registry.contracts.EscrowCreationPolicy.address;
   const timelockAddr = registry.contracts.TimelockController.address;
 
-  const createOps = await hre.ethers.getContractAt('CreateOps', createOpsAddr);
+  const creationPolicy = await hre.ethers.getContractAt('EscrowCreationPolicy', creationPolicyAddr);
 
-  console.log('\n=== Register EscrowVault on CreateOps ===');
+  console.log('\n=== Register EscrowVault on EscrowCreationPolicy ===');
   console.log('EscrowVault:', escrowVaultAddr);
-  console.log('CreateOps:', createOpsAddr);
+  console.log('EscrowCreationPolicy:', creationPolicyAddr);
   console.log('Timelock:', timelockAddr);
   console.log('Deployer:', await deployer.getAddress());
 
   // Check if already registered
-  const ROLE_ESCROW_CONTRACT = await createOps.ROLE_ESCROW_CONTRACT();
-  const alreadyRegistered = await createOps.hasRole(ROLE_ESCROW_CONTRACT, escrowVaultAddr);
+  const ROLE_ESCROW_CONTRACT = await creationPolicy.ROLE_ESCROW_CONTRACT();
+  const alreadyRegistered = await creationPolicy.hasRole(ROLE_ESCROW_CONTRACT, escrowVaultAddr);
   console.log('Already registered?', alreadyRegistered);
 
   if (alreadyRegistered) {

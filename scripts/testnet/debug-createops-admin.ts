@@ -1,5 +1,5 @@
 /**
- * Debug: Who has admin on CreateOps?
+ * Debug: Who has admin on EscrowCreationPolicy?
  */
 
 import hre from 'hardhat';
@@ -13,16 +13,16 @@ async function main() {
     fs.readFileSync('./deploy-registry/base-sepolia-v1-testnet.json', 'utf-8'),
   );
 
-  const createOpsAddr = registry.contracts.CreateOps.address;
-  const createOps = await hre.ethers.getContractAt('CreateOps', createOpsAddr);
+  const creationPolicyAddr = registry.contracts.EscrowCreationPolicy.address;
+  const creationPolicy = await hre.ethers.getContractAt('EscrowCreationPolicy', creationPolicyAddr);
 
-  const adminRole = await createOps.DEFAULT_ADMIN_ROLE();
+  const adminRole = await creationPolicy.DEFAULT_ADMIN_ROLE();
   console.log('Admin role:', adminRole);
-  console.log('Deployer has admin?', await createOps.hasRole(adminRole, deployer.address));
+  console.log('Deployer has admin?', await creationPolicy.hasRole(adminRole, deployer.address));
 
   // Check timelock
   const timelock = registry.contracts.TimelockController.address;
-  console.log('Timelock has admin?', await createOps.hasRole(adminRole, timelock));
+  console.log('Timelock has admin?', await creationPolicy.hasRole(adminRole, timelock));
 }
 
 main().catch(console.error);

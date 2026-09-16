@@ -15,7 +15,7 @@ import "../../../contracts/types/EscrowTypes.sol";
 import "../../../contracts/types/YieldPresets.sol";
 import "../../../contracts/libraries/SettingsValidationLibrary.sol";
 import "../../../contracts/ops/YieldOps.sol";
-import "../../../contracts/ops/CreateOps.sol";
+import "../../../contracts/core/EscrowCreationPolicy.sol";
 import "../../../contracts/core/BondCollector.sol";
 
 contract PerEscrowSettingsHarness is EscrowVault {
@@ -83,9 +83,8 @@ contract PerEscrowSettingsTest is Test {
         moduleManagement.registerEscrowContract(address(vault));
 
         // Setup mandatory ops for createEscrow
-        CreateOps createOps = new CreateOps(owner);
-        createOps.registerEscrowContract(address(vault));
-        vault.setCreateOps(address(createOps));
+        EscrowCreationPolicy creationPolicy = new EscrowCreationPolicy(owner);
+        vault.setCreationPolicy(address(creationPolicy));
 
 
         BondCollector bondCollector = new BondCollector(owner);

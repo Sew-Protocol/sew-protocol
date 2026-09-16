@@ -25,20 +25,20 @@ async function main() {
   console.log('Guardian:', guardianAddr);
   console.log();
 
-  // Check CreateOps
-  console.log('=== CreateOps ===');
-  const createOps = await hre.ethers.getContractAt(
-    'CreateOps',
-    registry.contracts.CreateOps.address,
+  // Check EscrowCreationPolicy
+  console.log('=== EscrowCreationPolicy ===');
+  const creationPolicy = await hre.ethers.getContractAt(
+    'EscrowCreationPolicy',
+    registry.contracts.EscrowCreationPolicy.address,
   );
-  const createOpsAdmin = await createOps.DEFAULT_ADMIN_ROLE();
-  console.log('DEFAULT_ADMIN_ROLE:', createOpsAdmin);
-  console.log('Deployer has admin?', await createOps.hasRole(createOpsAdmin, deployerAddr));
-  console.log('Guardian has GUARDIAN?', await createOps.hasRole(ROLE_GUARDIAN, guardianAddr));
+  const creationPolicyAdmin = await creationPolicy.DEFAULT_ADMIN_ROLE();
+  console.log('DEFAULT_ADMIN_ROLE:', creationPolicyAdmin);
+  console.log('Deployer has admin?', await creationPolicy.hasRole(creationPolicyAdmin, deployerAddr));
+  console.log('Guardian has GUARDIAN?', await creationPolicy.hasRole(ROLE_GUARDIAN, guardianAddr));
 
   // Try grant with verbose error
   try {
-    const tx = await createOps.grantRole(ROLE_GUARDIAN, guardianAddr);
+    const tx = await creationPolicy.grantRole(ROLE_GUARDIAN, guardianAddr);
     console.log('Grant tx:', tx.hash);
     await tx.wait();
     console.log('SUCCESS');

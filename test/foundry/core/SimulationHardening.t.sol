@@ -8,7 +8,7 @@ import '../../../contracts/core/modules/DefaultResolutionModule.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/types/YieldPresets.sol';
 import '../../../contracts/ops/YieldOps.sol';
-import '../../../contracts/ops/CreateOps.sol';
+import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
@@ -34,7 +34,7 @@ contract SimulationHardeningTest is Test {
     ERC20Mock      public token;
     DefaultResolutionModule public resolutionModule;
     YieldOps       public yieldOps;
-    CreateOps      public createOps;
+    EscrowCreationPolicy      public creationPolicy;
     BondCollector  public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
 
@@ -53,7 +53,7 @@ contract SimulationHardeningTest is Test {
     function setUp() public {
         yieldOps      = new YieldOps(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
-        createOps     = new CreateOps(owner);
+        creationPolicy     = new EscrowCreationPolicy(owner);
         bondCollector = new BondCollector(owner);
         resolutionModule = new DefaultResolutionModule(owner, resolver);
 
@@ -61,14 +61,13 @@ contract SimulationHardeningTest is Test {
 
         yieldOps.registerEscrowContract(address(vault));
         moduleManagement.registerEscrowContract(address(vault));
-        createOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
 
         vault.grantRole(vault.ROLE_TIMELOCK(), owner);
         vault.grantRole(vault.ROLE_GUARDIAN(), owner);
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), owner);
 
-        vault.setCreateOps(address(createOps));
+        vault.setCreationPolicy(address(creationPolicy));
         vault.setBondCollector(address(bondCollector));
         vault.setResolutionModule(address(resolutionModule));
 
@@ -76,7 +75,7 @@ contract SimulationHardeningTest is Test {
         resolutionModule.grantRole(resolutionModule.ROLE_TIMELOCK(), owner);
 
         // Allow EOA custom resolvers in tests (default policy requires contract; relax for simplicity)
-        createOps.setResolverPolicy(false);
+        creationPolicy.setResolverPolicy(false);
 
         token = new ERC20Mock('Test', 'TEST', owner, 0);
     }
