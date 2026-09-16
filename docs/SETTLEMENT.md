@@ -1,5 +1,24 @@
 # Settlement
 
+> **Current implementation status (authoritative).** This document predates the
+> Ops-internalization refactor. Where anything below conflicts with this block,
+> this block governs.
+>
+> - **Settlement derivation** is compiled in (`EscrowSettlementLogic`); `SettlementOps`
+>   and `DisputeOps` no longer exist. Creation derivation is compiled in
+>   (`EscrowCreationLogic`) with the narrow shared `EscrowCreationPolicy`.
+> - **Custody and enforcement stay local** — pull-only entitlements, no remote
+>   settlement authority.
+> - **Adjudication** — `et.disputeResolver` is the sole local settlement-authority
+>   gate and must never be a bridge/message endpoint; `resolutionHash` is reserved,
+>   non-binding metadata; refusal (Kleros ruling 0) is observable process state only.
+> - **Finality** — settlement follows the escrow-local `PendingSettlement.appealDeadline`;
+>   module `finalizeDispute` is best-effort; capability-aware closure finality is deferred.
+> - **Refusal creates no `PendingSettlement`**; the max-dispute-duration timeout
+>   (`resolveDisputeByTimeout`) is the path that eventually produces the refund.
+> - **PRF seam** — decision → adjudication closure → `PendingSettlement` → local
+>   realization.
+
 > **Scope:** This document describes every settlement path available in the Sew Protocol
 > escrow system: voluntary release, cancellation, mutual split, dispute resolution,
 > appeal-window enforcement, timed automation, and dispute timeout. It also covers the
@@ -11,7 +30,7 @@
 > `executePendingSettlement`, `automateTimedActions`, `resolveDisputeByTimeout`,
 > `_releaseEscrowTransfer`, `_cancelAndRefund`, `_finalizeClaimableSettlement`,
 > `_creditClaimable`, `_handleYieldModuleUnwind`),
-> `contracts/ops/SettlementOps.sol`,
+> `contracts/libraries/EscrowSettlementLogic.sol`,
 > `contracts/ops/YieldOps.sol`,
 > `contracts/types/EscrowTypes.sol` (`EscrowState`, `PendingSettlement`, `SplitProposal`),
 > `contracts/types/YieldPresets.sol`.
@@ -175,7 +194,7 @@ Both functions call `_executeResolution(workflowId, isRelease, resolutionHash)`:
    calls `IResolutionModule.isAuthorizedDisputeResolver` / `getDisputeResolver`.
 2. Verifies escrow is `DISPUTED`.
 3. Records the resolution outcome in the resolution module.
-4. Calls `SettlementOps.computeResolutionExecution(resolutionModule, workflowId, isRelease, timeoutConfig)` to get:
+4. Calls `EscrowSettlementLogic.computeResolutionExecution(resolutionModule, workflowId, isRelease, timeoutConfig, address(this))` to get:
    - `shouldExecute` — true if this is the final round (no appeal window).
    - `appealDeadline` — the timestamp after which the decision becomes final.
    - `isFinalRound` — whether the module considers this the last possible appeal.
@@ -187,8 +206,11 @@ Execute immediately (`_releaseEscrowTransfer` or `_cancelAndRefund`). No appeal 
 Store a `PendingSettlement{ exists: true, isRelease, appealDeadline, resolutionHash }`.
 The decision is *pending*, not executed. Emit `PendingSettlementSet`.
 
-The `resolutionHash` provides an on-chain fingerprint of the resolution decision data,
-enabling off-chain verification of what was decided and when.
+`resolutionHash` is **reserved, non-binding metadata**: it is stored and emitted for
+off-chain reference, but it is never verified against a rooted outcome and does not
+authorize, time, or gate settlement. Its value cannot alter authorization, finality,
+pending-settlement creation, or custody disposition (enforced by
+`test/foundry/core/ResolutionHashNonBinding.t.sol`).
 
 ---
 
@@ -205,7 +227,7 @@ is still `DISPUTED` (i.e., not yet escalated).
 
 `executePendingSettlement`:
 
-1. Calls `SettlementOps.computePendingSettlementExecution(workflowId, pending, escrowState)`.
+1. Calls `EscrowSettlementLogic.computePendingSettlementExecution(workflowId, pending, escrowState)`.
 2. Reverts if: no pending settlement exists, appeal window has not expired, or escrow is
    no longer `DISPUTED`.
 3. On success: deletes `pendingSettlements[workflowId]`, calls `finalizeDispute` on the

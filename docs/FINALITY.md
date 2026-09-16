@@ -1,11 +1,33 @@
 # Finality in the Sew Protocol
 
+> **Current implementation status (authoritative).** This document predates the
+> Ops-internalization refactor. Where anything below conflicts with this block,
+> this block governs.
+>
+> - **Finality (now)** — settlement authority follows the escrow-local
+>   `PendingSettlement.appealDeadline`. The resolution module's `finalizeDispute`
+>   remains best-effort compatibility behavior: the call is fire-and-forget and its
+>   failure is swallowed; it is not the settlement predicate.
+> - **Finality (deferred)** — capability-aware adjudication finality is explicitly
+>   deferred to the PRF closure model. A future model must detect module finality
+>   capability explicitly (a swallowed revert must not be read as "unsupported").
+> - **Adjudication** — `et.disputeResolver` is the sole local settlement-authority
+>   gate and must never be a bridge/message endpoint; `resolutionHash` is reserved,
+>   non-binding metadata; refusal (Kleros ruling 0) is observable process state only,
+>   not an economic outcome.
+> - **Settlement** — custody/enforcement stays local; derivation is compiled in
+>   (`EscrowSettlementLogic`); `SettlementOps` no longer exists. Refusal creates no
+>   `PendingSettlement`; the max-dispute-duration timeout is the path that eventually
+>   produces the refund.
+> - **PRF seam** — decision → adjudication closure → `PendingSettlement` → local
+>   realization. No bridge/message endpoint is settlement authority.
+
 > **Scope:** This document defines what finality means in the Sew Protocol, how it is
 > reached, and — critically — what constitutes *partial finality*: states in which the
 > escrow outcome is determined but fund delivery is not yet complete.
 >
 > **Sources:** `contracts/core/BaseEscrow.sol`, `contracts/libraries/StateManagementLibrary.sol`,
-> `contracts/types/EscrowTypes.sol`, `contracts/ops/SettlementOps.sol`.
+> `contracts/types/EscrowTypes.sol`, `contracts/libraries/EscrowSettlementLogic.sol`.
 
 ---
 

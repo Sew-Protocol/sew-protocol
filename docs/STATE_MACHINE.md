@@ -1,11 +1,35 @@
 # Escrow State Machine
 
+> **Current implementation status (authoritative).** This document predates the
+> Ops-internalization refactor. Where anything below conflicts with this block,
+> this block governs.
+>
+> - **Creation** — deterministic derivation is compiled in (`EscrowCreationLogic`);
+>   the only remaining creation runtime dependency is the narrow shared policy
+>   authority `EscrowCreationPolicy` (`yieldDepositsPaused`, `resolverMustBeContract`).
+>   `CreateOps` no longer exists.
+> - **Adjudication** — `et.disputeResolver` is the sole local settlement-authority
+>   gate (`BaseEscrow._isAuthorizedDisputeResolver`) and must never be a bridge or
+>   message endpoint. `resolutionHash` is reserved, non-binding metadata (stored and
+>   emitted, never authorizing/timing/gating settlement). A recorded refusal (Kleros
+>   ruling 0) is observable process state only (`KlerosArbitrableProxy.refusalTimestamp`,
+>   `RulingRefused`, `isRefused`) and confers no economic or settlement authority.
+> - **Finality** — settlement authority follows the escrow-local
+>   `PendingSettlement.appealDeadline`; the module's `finalizeDispute` remains
+>   best-effort (failure swallowed), and capability-aware closure finality is deferred.
+> - **Settlement** — custody/enforcement is local; derivation is compiled in
+>   (`EscrowSettlementLogic`); `SettlementOps`/`DisputeOps` no longer exist. Refusal
+>   creates no `PendingSettlement`; the max-dispute-duration timeout
+>   (`resolveDisputeByTimeout`) is the path that eventually produces the refund.
+> - **PRF seam** — decision → adjudication closure → `PendingSettlement` → local
+>   realization. No bridge/message endpoint is settlement authority.
+
 > **Scope:** This document is a complete reference for the escrow state machine in the
 > Sew Protocol. It covers every state, every transition, every guard condition, and the
 > sub-state model that sits within `DISPUTED`.
 >
 > **Sources:** `contracts/core/BaseEscrow.sol`, `contracts/libraries/StateManagementLibrary.sol`,
-> `contracts/types/EscrowTypes.sol`, `contracts/ops/SettlementOps.sol`.
+> `contracts/types/EscrowTypes.sol`, `contracts/libraries/EscrowSettlementLogic.sol`.
 
 ---
 

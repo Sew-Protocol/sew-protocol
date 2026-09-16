@@ -11,7 +11,6 @@ import '../interfaces/IYieldModule.sol';
 import '../interfaces/IYieldDistributionModule.sol';
 import './ModuleSnapshotRegistry.sol';
 import '../libraries/ModuleGetterLibrary.sol';
-import '../libraries/ModuleGetterConsolidationLibrary.sol';
 
 /**
  * @title EscrowableERC20
@@ -188,10 +187,9 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
     // ============ Module Getters ============
 
     function _getReleaseStrategy(uint256 workflowId) internal view override returns (IReleaseStrategy) {
-        address moduleAddr = ModuleGetterLibrary.getModuleAddress(
+        return IReleaseStrategy(ModuleGetterLibrary.getModuleAddress(
             workflowId, ModuleType.RELEASE, moduleSnapshots, moduleManagement, address(this)
-        );
-        return ModuleGetterConsolidationLibrary.getReleaseStrategy(moduleAddr);
+        ));
     }
 
     function _getCancellationStrategy(uint256 workflowId) internal view override returns (address) {
@@ -204,21 +202,19 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         address moduleAddr = ModuleGetterLibrary.getModuleAddress(
             workflowId, ModuleType.RESOLUTION, moduleSnapshots, moduleManagement, address(this)
         );
-        return ModuleGetterConsolidationLibrary.getResolutionModule(moduleAddr, disputeResolutionModule);
+        return IResolutionModule(moduleAddr != address(0) ? moduleAddr : disputeResolutionModule);
     }
 
     function _getYieldGenerationModule(uint256 workflowId) internal view override returns (IYieldModule) {
-        address moduleAddr = ModuleGetterLibrary.getModuleAddress(
+        return IYieldModule(ModuleGetterLibrary.getModuleAddress(
             workflowId, ModuleType.YIELD_GEN, moduleSnapshots, moduleManagement, address(this)
-        );
-        return ModuleGetterConsolidationLibrary.getYieldModule(moduleAddr);
+        ));
     }
 
     function _getYieldDistributionModule(uint256 workflowId) internal view override returns (IYieldDistributionModule) {
-        address moduleAddr = ModuleGetterLibrary.getModuleAddress(
+        return IYieldDistributionModule(ModuleGetterLibrary.getModuleAddress(
             workflowId, ModuleType.YIELD_DIST, moduleSnapshots, moduleManagement, address(this)
-        );
-        return ModuleGetterConsolidationLibrary.getYieldDistributionModule(moduleAddr);
+        ));
     }
 
     // ============ Fee Management ============

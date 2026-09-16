@@ -29,3 +29,12 @@
 - Threats: yield protocol exploit, liquidity failures, accounting mismatch
 
 - Controls: yield is optional and bounded; escrow accounting remains authoritative; yield cannot change dispute outcomes or custody rules.
+
+---
+
+> **Current implementation status (authoritative).** `et.disputeResolver` is the sole
+> local settlement-authority gate and must never be a bridge/message endpoint;
+> `resolutionHash` is reserved, non-binding metadata; refusal (Kleros ruling 0) is
+> observable process state only and creates no `PendingSettlement`; current settlement
+> authority follows the escrow-local `PendingSettlement.appealDeadline` (module
+> `finalizeDispute` best-effort); custody/enforcement stays local.

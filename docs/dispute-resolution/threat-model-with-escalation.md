@@ -101,3 +101,10 @@ TB3 --- SR
 TB4 --- K
 TB5 --- DAO
 TB5 --- CFG
+
+> **Current implementation status (authoritative).** `et.disputeResolver` is the sole
+> local settlement-authority gate and must never be a bridge/message endpoint.
+> `resolutionHash` is reserved, non-binding metadata. Refusal (Kleros ruling 0) is
+> observable process state only, creates no `PendingSettlement`, and confers no
+> economic authority; settlement follows the escrow-local
+> `PendingSettlement.appealDeadline`; custody/enforcement stays local.

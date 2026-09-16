@@ -1,5 +1,29 @@
 # Sew Protocol — Security Model
 
+> **Current implementation status (authoritative).** This document predates the
+> Ops-internalization refactor. Where anything below conflicts with this block,
+> this block governs.
+>
+> - **Creation** — deterministic derivation is compiled in (`EscrowCreationLogic`);
+>   the only remaining creation runtime dependency is the narrow shared policy
+>   authority `EscrowCreationPolicy` (`yieldDepositsPaused`, `resolverMustBeContract`).
+>   `CreateOps` no longer exists; `EscrowCreationPolicy` requires no per-escrow
+>   registration and has no `ROLE_ESCROW_CONTRACT` gate.
+> - **Adjudication** — `et.disputeResolver` is the sole local settlement-authority
+>   gate (`BaseEscrow._isAuthorizedDisputeResolver`) and must never be a bridge or
+>   message endpoint. `resolutionHash` is reserved, non-binding metadata (never
+>   authorizes, times, or gates settlement). Refusal (Kleros ruling 0) is observable
+>   process state only (`KlerosArbitrableProxy.refusalTimestamp`/`RulingRefused`/`isRefused`),
+>   not economic or settlement authority.
+> - **Finality** — settlement authority follows the escrow-local
+>   `PendingSettlement.appealDeadline`; module `finalizeDispute` is best-effort
+>   (failure swallowed); capability-aware closure finality is deferred.
+> - **Settlement** — custody/enforcement stays local; derivation is compiled in
+>   (`EscrowSettlementLogic`); `SettlementOps`/`DisputeOps` no longer exist. Refusal
+>   creates no `PendingSettlement`; timeout is the refund path.
+> - **PRF seam** — decision → adjudication closure → `PendingSettlement` → local
+>   realization; no bridge/message endpoint is settlement authority.
+
 > **Audience:** Security researchers, auditors, protocol reviewers, integration partners.
 >
 > **Scope:** This document covers the complete security posture of the Sew Protocol:
@@ -145,7 +169,7 @@ compromise the stated security guarantees.
 | `ROLE_ADMIN_CONTRACT` | `EscrowAdminContract` | Configure operational parameters within bounds (timeouts, fees, attachments) | Act outside predefined bounds; change existing escrow state |
 | `ROLE_KEEPER` | Keeper EOA or contract | Trigger timed automations (`automateTimedActions`) | Rewire any protocol ops; change any configuration |
 | `ROLE_FEE_RECIPIENT` | Fee recipient address | Withdraw accrued protocol fees | Govern anything |
-| `ROLE_ESCROW_CONTRACT` | Registered escrow contracts | Interact with ops contracts (CreateOps, SettlementOps, DisputeOps, YieldOps) | Register new escrow contracts themselves |
+| `ROLE_ESCROW_CONTRACT` | Registered escrow contracts | Interact with remaining ops contracts (YieldOps, BondCollector, GuardianOps) | Register new escrow contracts themselves. `EscrowCreationPolicy` needs no registration and has no such gate |
 | `DEFAULT_ADMIN_ROLE` | `TimelockController` (transferred at deployment) | Grant / revoke roles | — (held by Timelock, so role changes require governance) |
 
 ### 4.2 TimelockController hardened posture

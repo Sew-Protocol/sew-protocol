@@ -2,6 +2,27 @@
 
 ## 4. Dispute Resolution Architecture
 
+> **Current implementation status (authoritative).** This section predates the
+> Ops-internalization refactor. Where it conflicts with this block, this block governs.
+>
+> - **Adjudication** — `et.disputeResolver` is the sole local settlement-authority gate
+>   (`BaseEscrow._isAuthorizedDisputeResolver`) and must never be a bridge/message
+>   endpoint. Dispute derivation is compiled in (`EscrowDisputeLogic`); `DisputeOps`
+>   no longer exists.
+> - **`resolutionHash`** is reserved, non-binding metadata — stored/emitted, never
+>   authorizing, timing, or gating settlement.
+> - **Refusal** (Kleros ruling 0) is observable process state only
+>   (`KlerosArbitrableProxy.refusalTimestamp`/`RulingRefused`/`isRefused`); it creates
+>   no `PendingSettlement` and confers no economic authority.
+> - **Finality** — settlement follows the escrow-local `PendingSettlement.appealDeadline`;
+>   module `finalizeDispute` is best-effort (failure swallowed); capability-aware
+>   adjudication-closure finality is deferred (PRF).
+> - **Settlement** — custody/enforcement stays local; derivation is compiled in
+>   (`EscrowSettlementLogic`); `SettlementOps` no longer exists; the max-dispute-duration
+>   timeout is the refund path.
+> - **PRF seam** — decision → adjudication closure → `PendingSettlement` → local
+>   realization; no bridge/message endpoint is settlement authority.
+
 > **Source**: Derived directly from the Sew Protocol smart contracts
 > (`contracts/core/BaseEscrow.sol`, `contracts/ops/DisputeOps.sol`,
 > `contracts/modules/decentralized-resolution-module/`,

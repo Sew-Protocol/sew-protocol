@@ -1,5 +1,11 @@
 # Third-Party Appeal Bonds
 
+> **Current implementation status note (authoritative).** Appeal orchestration remains in
+> `BaseEscrow` (`_appealDispute`): quote → bond economics → bond custody → Kleros fee →
+> `prepareKlerosHandoff` → `createDispute` → `commitKlerosHandoff` → resolver mutation,
+> atomically. `et.disputeResolver` is the sole local settlement-authority gate and must
+> never be a bridge/message endpoint. `resolutionHash` is reserved, non-binding metadata.
+
 **Status:** Simulation-modeled (Phase L); contract infrastructure partially in place; `challengeResolution()` entry point pending implementation.
 
 ---

@@ -15,7 +15,6 @@ import '../libraries/BalanceUpdateLibrary.sol';
 import '../libraries/FeeRecordingLibrary.sol';
 import '../libraries/EscrowVaultAccountingLibrary.sol';
 import '../libraries/ModuleGetterLibrary.sol';
-import '../libraries/ModuleGetterConsolidationLibrary.sol';
 import '../libraries/FeeWithdrawalLibrary.sol';
 import '../libraries/EscrowEncodingLibrary.sol';
 import '../libraries/StateManagementLibrary.sol';
@@ -120,15 +119,15 @@ contract EscrowVault is BaseEscrow {
     }
 
     function _getYieldGenerationModule(uint256 workflowId) internal view override returns (IYieldModule) {
-        return ModuleGetterConsolidationLibrary.getYieldModule(ModuleGetterLibrary.getModuleAddress(workflowId, ModuleType.YIELD_GEN, moduleSnapshots, moduleManagement, address(this)));
+        return IYieldModule(ModuleGetterLibrary.getModuleAddress(workflowId, ModuleType.YIELD_GEN, moduleSnapshots, moduleManagement, address(this)));
     }
 
     function _getYieldDistributionModule(uint256 workflowId) internal view override returns (IYieldDistributionModule) {
-        return ModuleGetterConsolidationLibrary.getYieldDistributionModule(ModuleGetterLibrary.getModuleAddress(workflowId, ModuleType.YIELD_DIST, moduleSnapshots, moduleManagement, address(this)));
+        return IYieldDistributionModule(ModuleGetterLibrary.getModuleAddress(workflowId, ModuleType.YIELD_DIST, moduleSnapshots, moduleManagement, address(this)));
     }
 
     function _getReleaseStrategy(uint256 workflowId) internal view override returns (IReleaseStrategy) {
-        return ModuleGetterConsolidationLibrary.getReleaseStrategy(ModuleGetterLibrary.getModuleAddress(workflowId, ModuleType.RELEASE, moduleSnapshots, moduleManagement, address(this)));
+        return IReleaseStrategy(ModuleGetterLibrary.getModuleAddress(workflowId, ModuleType.RELEASE, moduleSnapshots, moduleManagement, address(this)));
     }
 
     function _getCancellationStrategy(uint256 workflowId) internal view override returns (address) {
@@ -136,7 +135,8 @@ contract EscrowVault is BaseEscrow {
     }
 
     function _getResolutionModule(uint256 workflowId) internal view override returns (IResolutionModule) {
-        return ModuleGetterConsolidationLibrary.getResolutionModule(ModuleGetterLibrary.getModuleAddress(workflowId, ModuleType.RESOLUTION, moduleSnapshots, moduleManagement, address(this)), disputeResolutionModule);
+        address moduleAddr = ModuleGetterLibrary.getModuleAddress(workflowId, ModuleType.RESOLUTION, moduleSnapshots, moduleManagement, address(this));
+        return IResolutionModule(moduleAddr != address(0) ? moduleAddr : disputeResolutionModule);
     }
 
     function partialRelease(uint256 workflowId, uint256 amount) external nonReentrant {

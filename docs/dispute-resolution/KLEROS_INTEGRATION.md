@@ -1,5 +1,22 @@
 # Kleros Integration
 
+> **Current implementation status (authoritative).** Where anything below conflicts
+> with this block, this block governs.
+>
+> - **Refusal** — a Kleros ruling of 0 (declined to rule) is now explicitly represented
+>   as observable process state: `KlerosArbitrableProxy.refusalTimestamp`, the
+>   `RulingRefused` event, and `isRefused(workflowId, escrowContract)`. It is **not** an
+>   economic outcome and carries **no** settlement authority: it does not call the
+>   escrow, create a `PendingSettlement`, shorten deadlines, or move custody. The
+>   max-dispute-duration timeout remains the path that eventually produces the refund.
+> - **Adjudication** — the escrow acts only through its local authority gate:
+>   `et.disputeResolver` (`BaseEscrow._isAuthorizedDisputeResolver`). Neither a Kleros
+>   ruling nor any remote message is itself settlement authority; `resolutionHash` is
+>   reserved, non-binding metadata.
+> - **Finality** — settlement follows the escrow-local `PendingSettlement.appealDeadline`;
+>   module `finalizeDispute` is best-effort; capability-aware closure finality is deferred.
+> - **PRF seam** — decision → adjudication closure → `PendingSettlement` → local realization.
+
 > **Scope:** This document describes how Sew Protocol integrates Kleros as the final
 > escalation layer (round 2) of its Decentralized Resolution Module (DRM). It is grounded
 > entirely in the deployed contract source. Claims about behaviour are traceable to specific

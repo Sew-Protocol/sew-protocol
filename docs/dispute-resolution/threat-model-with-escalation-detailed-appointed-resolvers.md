@@ -53,3 +53,9 @@ SPOOL --> ST2
 DIS --> SL2 --> SPOOL
 
 DIS -->|loser appeals| K --> DIS
+
+> **Current implementation status (authoritative).** `et.disputeResolver` is the sole
+> local settlement-authority gate and must never be a bridge/message endpoint;
+> `resolutionHash` is reserved, non-binding metadata; refusal is observable process state
+> only; settlement follows the escrow-local `PendingSettlement.appealDeadline`; custody
+> stays local.

@@ -1,5 +1,22 @@
 # Finality Discipline + Pull Model Migration: Development Plan
 
+> **Current implementation status (authoritative).** This is a historical plan. Where
+> it conflicts with this block, this block governs.
+>
+> - **Finality (now)** — settlement authority follows the escrow-local
+>   `PendingSettlement.appealDeadline`. The resolution module's `finalizeDispute`
+>   remains best-effort compatibility behavior; its failure is swallowed and it is not
+>   the settlement predicate.
+> - **Finality (deferred)** — capability-aware adjudication-closure finality is
+>   explicitly deferred. A future model must detect module finality capability
+>   explicitly; a swallowed revert must not be read as "module doesn't support finality."
+> - **Adjudication** — `et.disputeResolver` is the sole local settlement-authority gate
+>   (never a bridge/message endpoint); `resolutionHash` is reserved, non-binding
+>   metadata; refusal is observable process state, not economic authority.
+> - **Settlement** — custody/enforcement stays local; refusal creates no
+>   `PendingSettlement`; timeout is the refund path.
+> - **PRF seam** — decision → adjudication closure → `PendingSettlement` → local realization.
+
 **Date:** Current  
 **Purpose:** Implement appeal-window-safe settlement (finality discipline) with pull-model withdrawals  
 **Priority:** Critical (2026 Ethereum-native "must have")  

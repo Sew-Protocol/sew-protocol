@@ -1,13 +1,32 @@
 # Sew Protocol — State Diagrams
 
+> **Current implementation status (authoritative).** These diagrams predate the
+> Ops-internalization refactor. Where a diagram conflicts with this block, this
+> block governs.
+>
+> - **Creation** — derivation is compiled in (`EscrowCreationLogic`); the only
+>   remaining creation runtime dependency is `EscrowCreationPolicy`. `CreateOps`
+>   no longer exists.
+> - **Adjudication** — `et.disputeResolver` is the sole local settlement-authority
+>   gate (never a bridge/message endpoint); `resolutionHash` is reserved, non-binding
+>   metadata; refusal is observable process state only.
+> - **Finality** — settlement authority follows the escrow-local
+>   `PendingSettlement.appealDeadline`; module `finalizeDispute` is best-effort;
+>   capability-aware closure finality is deferred.
+> - **Settlement** — custody/enforcement is local; derivation is compiled in
+>   (`EscrowSettlementLogic`); `SettlementOps`/`DisputeOps` no longer exist; refusal
+>   creates no `PendingSettlement`; timeout is the refund path.
+> - **PRF seam** — decision → adjudication closure → `PendingSettlement` → local
+>   realization; no bridge/message endpoint is settlement authority.
+
 > Two Mermaid diagrams derived directly from the contract source.
 >
 > **Sources:**
 > `contracts/types/EscrowTypes.sol` (state enum),
 > `contracts/core/BaseEscrow.sol` (transitions and guards),
 > `contracts/libraries/StateManagementLibrary.sol`,
-> `contracts/ops/DisputeOps.sol`,
-> `contracts/ops/SettlementOps.sol`,
+> `contracts/libraries/EscrowDisputeLogic.sol`,
+> `contracts/libraries/EscrowSettlementLogic.sol`,
 > `contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol`,
 > `contracts/arbitration/KlerosArbitrableProxy.sol`.
 >

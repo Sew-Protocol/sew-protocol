@@ -32,3 +32,9 @@ Kleros --> KlerosRuling: Ruling received / committed
 KlerosRuling --> Finalized: Finalize outcome (on-chain transfer)
 
 Finalized --> [*]
+
+> **Current implementation status (authoritative).** Settlement authority follows the
+> escrow-local `PendingSettlement.appealDeadline`; module `finalizeDispute` is
+> best-effort. `et.disputeResolver` is the sole local settlement-authority gate and must
+> never be a bridge/message endpoint; `resolutionHash` is reserved, non-binding metadata;
+> refusal is observable process state only; custody/enforcement stays local.
