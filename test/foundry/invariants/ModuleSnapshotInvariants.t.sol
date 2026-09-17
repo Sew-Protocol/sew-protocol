@@ -7,7 +7,7 @@ import "../../../contracts/core/BaseEscrow.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/core/modules/DefaultResolutionModule.sol";
 import "../../../contracts/modules/DefaultReleaseStrategy.sol";
-import "../../../contracts/modules/DefaultYieldDistributionModule.sol";
+import "../../../contracts/mocks/TestPlaceholderModule.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
 import "../../../contracts/types/EscrowTypes.sol";
 import "../../../contracts/types/YieldPresets.sol";
@@ -26,8 +26,8 @@ contract ModuleSnapshotInvariants is Test {
 
     DefaultReleaseStrategy internal releaseA;
     DefaultReleaseStrategy internal releaseB;
-    DefaultYieldDistributionModule internal yieldDistA;
-    DefaultYieldDistributionModule internal yieldDistB;
+    TestPlaceholderModule internal yieldDistA;
+    TestPlaceholderModule internal yieldDistB;
 
     function setUp() public {
         YieldOps yieldOps = new YieldOps(address(this));
@@ -35,8 +35,8 @@ contract ModuleSnapshotInvariants is Test {
 
         releaseA = new DefaultReleaseStrategy();
         releaseB = new DefaultReleaseStrategy();
-        yieldDistA = new DefaultYieldDistributionModule();
-        yieldDistB = new DefaultYieldDistributionModule();
+        yieldDistA = new TestPlaceholderModule();
+        yieldDistB = new TestPlaceholderModule();
 
         vault = new EscrowVaultModuleGetterHarness(
             100, address(0xFEE), address(yieldOps), address(mm)
@@ -138,8 +138,8 @@ contract ModuleSnapshotInvariantHandler is Test {
 
     DefaultReleaseStrategy public releaseA;
     DefaultReleaseStrategy public releaseB;
-    DefaultYieldDistributionModule public yieldDistA;
-    DefaultYieldDistributionModule public yieldDistB;
+    TestPlaceholderModule public yieldDistA;
+    TestPlaceholderModule public yieldDistB;
 
     address public buyer = address(0x1001);
     address public seller = address(0x1002);
@@ -150,8 +150,8 @@ contract ModuleSnapshotInvariantHandler is Test {
         ERC20Mock _token,
         DefaultReleaseStrategy _releaseA,
         DefaultReleaseStrategy _releaseB,
-        DefaultYieldDistributionModule _yieldDistA,
-        DefaultYieldDistributionModule _yieldDistB
+        TestPlaceholderModule _yieldDistA,
+        TestPlaceholderModule _yieldDistB
     ) {
         vault = _vault;
         mm = _mm;

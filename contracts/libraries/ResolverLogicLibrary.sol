@@ -2,7 +2,6 @@
 pragma solidity ^0.8.37;
 
 import '../interfaces/IResolver.sol';
-import '../interfaces/IYieldGenerationModule.sol';
 import '../types/EscrowTypes.sol';
 
 // Payout struct is defined in IResolver.sol at file level

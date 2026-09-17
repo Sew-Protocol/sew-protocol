@@ -6,7 +6,7 @@ import "../../../contracts/core/EscrowVault.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/core/modules/DefaultResolutionModule.sol";
 import "../../../contracts/modules/DefaultReleaseStrategy.sol";
-import "../../../contracts/modules/DefaultYieldDistributionModule.sol";
+import "../../../contracts/mocks/TestPlaceholderModule.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
 import "../../../contracts/types/EscrowTypes.sol";
 import "../../../contracts/types/YieldPresets.sol";
@@ -62,8 +62,8 @@ contract ForwardOnlyModuleSnapshotTest is Test {
 
     DefaultReleaseStrategy internal allowRelease;
     AlwaysRejectReleaseStrategy internal denyRelease;
-    DefaultYieldDistributionModule internal yieldDistA;
-    DefaultYieldDistributionModule internal yieldDistB;
+    TestPlaceholderModule internal yieldDistA;
+    TestPlaceholderModule internal yieldDistB;
     DefaultResolutionModule internal resolution;
 
     address internal buyer = address(0xB0B);
@@ -76,8 +76,8 @@ contract ForwardOnlyModuleSnapshotTest is Test {
 
         allowRelease = new DefaultReleaseStrategy();
         denyRelease = new AlwaysRejectReleaseStrategy();
-        yieldDistA = new DefaultYieldDistributionModule();
-        yieldDistB = new DefaultYieldDistributionModule();
+        yieldDistA = new TestPlaceholderModule();
+        yieldDistB = new TestPlaceholderModule();
         resolution = new DefaultResolutionModule(address(this), address(0x1234));
 
         vault = new EscrowVaultModuleGetterHarness(

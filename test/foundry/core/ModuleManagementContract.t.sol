@@ -5,11 +5,10 @@ import 'forge-std/Test.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/core/BaseEscrow.sol';
 import '../../../contracts/modules/DefaultReleaseStrategy.sol';
-import '../../../contracts/modules/DefaultYieldGenerationModule.sol';
 import '../../../contracts/interfaces/IYieldModule.sol';
-import '../../../contracts/modules/DefaultYieldDistributionModule.sol';
 import '../../../contracts/core/modules/DefaultResolutionModule.sol';
 import '../../../contracts/governance/SlowLaneQueueActivate.sol';
+import '../../../contracts/mocks/TestPlaceholderModule.sol';
 
 /**
  * @title ModuleSnapshotRegistryTest
@@ -29,10 +28,10 @@ contract ModuleSnapshotRegistryTest is Test {
     
     DefaultReleaseStrategy public releaseStrategy1;
     DefaultReleaseStrategy public releaseStrategy2;
-    DefaultYieldGenerationModule public yieldGenModule1;
-    DefaultYieldGenerationModule public yieldGenModule2;
-    DefaultYieldDistributionModule public yieldDistModule1;
-    DefaultYieldDistributionModule public yieldDistModule2;
+    TestPlaceholderModule public yieldGenModule1;
+    TestPlaceholderModule public yieldGenModule2;
+    TestPlaceholderModule public yieldDistModule1;
+    TestPlaceholderModule public yieldDistModule2;
     DefaultResolutionModule public resolutionModule1;
     DefaultResolutionModule public resolutionModule2;
     
@@ -50,10 +49,10 @@ contract ModuleSnapshotRegistryTest is Test {
         
         releaseStrategy1 = new DefaultReleaseStrategy();
         releaseStrategy2 = new DefaultReleaseStrategy();
-        yieldGenModule1 = new DefaultYieldGenerationModule();
-        yieldGenModule2 = new DefaultYieldGenerationModule();
-        yieldDistModule1 = new DefaultYieldDistributionModule();
-        yieldDistModule2 = new DefaultYieldDistributionModule();
+        yieldGenModule1 = new TestPlaceholderModule();
+        yieldGenModule2 = new TestPlaceholderModule();
+        yieldDistModule1 = new TestPlaceholderModule();
+        yieldDistModule2 = new TestPlaceholderModule();
         resolutionModule1 = new DefaultResolutionModule(owner, address(0x2222));
         resolutionModule2 = new DefaultResolutionModule(owner, address(0x3333));
         

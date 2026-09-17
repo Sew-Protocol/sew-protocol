@@ -10,7 +10,6 @@ import 'contracts/core/EscrowableERC20.sol';
 import 'contracts/core/EscrowVault.sol';
 import 'contracts/modules/DefaultReleaseStrategy.sol';
 import 'contracts/core/modules/DefaultResolutionModule.sol';
-import 'contracts/modules/DefaultYieldDistributionModule.sol';
 
 contract Test_MainnetReleaseSequence_test is Test {
     SewToken public governanceToken;
@@ -20,7 +19,6 @@ contract Test_MainnetReleaseSequence_test is Test {
     EscrowVault public vault;
     DefaultReleaseStrategy public relStrat;
     DefaultResolutionModule public resModule;
-    DefaultYieldDistributionModule public yieldDist;
 
     address deployer = address(this);
     address multisig = address(0xAB);
@@ -38,7 +36,6 @@ contract Test_MainnetReleaseSequence_test is Test {
         // Deploy modules
         relStrat = new DefaultReleaseStrategy();
         resModule = new DefaultResolutionModule(deployer, resolver);
-        yieldDist = new DefaultYieldDistributionModule();
 
         // Deploy main contracts
         escrowable = new EscrowableERC20('Escrowable Token','EUSD',100,feeAddress,address(yieldOps),address(moduleManagement));
@@ -69,7 +66,6 @@ contract Test_MainnetReleaseSequence_test is Test {
         // Verify modules are deployed and have expected metadata
         assertEq(relStrat.strategyName(), 'DefaultBuyerRelease');
         assertEq(resModule.moduleName(), 'DefaultSingleResolver');
-        assertEq(yieldDist.moduleName(), 'DefaultYieldDistribution');
 
         // Verify deployer has admin roles on escrow contracts
         bytes32 ADMIN = escrowable.DEFAULT_ADMIN_ROLE();

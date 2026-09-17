@@ -2,14 +2,12 @@
 pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/modules/DefaultYieldDistributionModule.sol';
 import '../../../contracts/modules/DefaultReleaseStrategy.sol';
 import '../../../contracts/core/modules/DefaultResolutionModule.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/libraries/EscrowEncodingLibrary.sol';
 
 contract ModulesCoverageTest is Test {
-    DefaultYieldDistributionModule public distModule;
     DefaultReleaseStrategy public relStrategy;
     DefaultResolutionModule public resModule;
     ERC20Mock public token;
@@ -23,133 +21,12 @@ contract ModulesCoverageTest is Test {
         resolver = address(0x123);
         timelock = address(0x456);
 
-        distModule = new DefaultYieldDistributionModule();
         relStrategy = new DefaultReleaseStrategy();
         resModule = new DefaultResolutionModule(owner, resolver);
         token = new ERC20Mock("Test", "TEST", address(this), 10000e18);
 
         // Grant TIMELOCK role
         resModule.grantRole(resModule.ROLE_TIMELOCK(), timelock);
-    }
-
-    // ============ DefaultYieldDistributionModule Tests ============
-
-    function test_DefaultDist_distributeYield_ZeroAmount() public {
-        (bool success, uint256 distributed) = distModule.distributeYield(1, address(this), address(token), 0, "");
-        assertTrue(success);
-        assertEq(distributed, 0);
-    }
-
-    function test_DefaultDist_distributeYield_EmptyData() public {
-        (bool success, uint256 distributed) = distModule.distributeYield(1, address(this), address(token), 100, "");
-        assertTrue(success);
-        assertEq(distributed, 0);
-    }
-
-    function test_DefaultDist_distributeYield_Success() public {
-        address[] memory recipients = new address[](2);
-        recipients[0] = address(0x1);
-        recipients[1] = address(0x2);
-        uint256[] memory percentages = new uint256[](2);
-        percentages[0] = 5000;
-        percentages[1] = 5000;
-        bytes memory data = abi.encode(recipients, percentages);
-
-        token.mint(address(distModule), 100);
-
-        (bool success, uint256 distributed) = distModule.distributeYield(1, address(this), address(token), 100, data);
-        assertTrue(success);
-        assertEq(distributed, 0);
-        assertEq(token.balanceOf(address(0x1)), 0);
-        assertEq(token.balanceOf(address(0x2)), 0);
-    }
-
-    function test_DefaultDist_distributeYield_Mismatch() public {
-        address[] memory recipients = new address[](1);
-        uint256[] memory percentages = new uint256[](0);
-        bytes memory data = abi.encode(recipients, percentages);
-
-        (bool success, uint256 distributed) = distModule.distributeYield(1, address(this), address(token), 100, data);
-        assertFalse(success);
-        assertEq(distributed, 0);
-    }
-
-    function test_DefaultDist_distributeYield_BadSum() public {
-        address[] memory recipients = new address[](1);
-        recipients[0] = address(0x1);
-        uint256[] memory percentages = new uint256[](1);
-        percentages[0] = 9999;
-        bytes memory data = abi.encode(recipients, percentages);
-
-        (bool success, uint256 distributed) = distModule.distributeYield(1, address(this), address(token), 100, data);
-        assertFalse(success);
-        assertEq(distributed, 0);
-    }
-
-    function test_DefaultDist_distributeYield_MismatchedLength() public {
-        address[] memory recipients = new address[](2);
-        uint256[] memory percentages = new uint256[](1);
-        bytes memory data = abi.encode(recipients, percentages);
-
-        (bool success, uint256 distributed) = distModule.distributeYield(1, address(this), address(token), 100, data);
-        assertFalse(success);
-        assertEq(distributed, 0);
-    }
-
-    function test_DefaultDist_Metadata() public {
-        assertEq(distModule.moduleName(), "DefaultYieldDistribution");
-        assertEq(distModule.moduleVersion(), "1.0.0");
-        assertTrue(distModule.supportsInterface(type(IYieldDistributionModule).interfaceId));
-        assertFalse(distModule.supportsInterface(0x12345678));
-    }
-
-    function test_DefaultDist_distributeYield_SkipZero() public {
-        address[] memory recipients = new address[](2);
-        recipients[0] = address(0);
-        recipients[1] = address(0x2);
-        uint256[] memory percentages = new uint256[](2);
-        percentages[0] = 5000;
-        percentages[1] = 5000;
-        bytes memory data = abi.encode(recipients, percentages);
-
-        token.mint(address(distModule), 100);
-
-        (bool success, uint256 distributed) = distModule.distributeYield(1, address(this), address(token), 100, data);
-        assertTrue(success);
-        assertEq(distributed, 0);
-        assertEq(token.balanceOf(address(0x2)), 0);
-    }
-
-    function test_DefaultDist_distributeYield_ZeroShare() public {
-        address[] memory recipients = new address[](1);
-        recipients[0] = address(0x1);
-        uint256[] memory percentages = new uint256[](1);
-        percentages[0] = 10000;
-        bytes memory data = abi.encode(recipients, percentages);
-
-        token.mint(address(distModule), 100);
-
-        // yieldAmount = 0 handled already. Try very small yield that results in 0 share if denominator was larger, 
-        // but here percentages[0] is 10000, so it will be 100.
-        // To get 0 share with 10000 denominator: yieldAmount * 1 / 10000 where yieldAmount < 10000.
-        
-        uint256 smallYield = 1;
-        uint256 tinyPercentage = 1; // 0.01%
-        
-        address[] memory r2 = new address[](2);
-        r2[0] = address(0x1);
-        r2[1] = address(0x2);
-        uint256[] memory p2 = new uint256[](2);
-        p2[0] = tinyPercentage; 
-        p2[1] = 10000 - tinyPercentage;
-        bytes memory data2 = abi.encode(r2, p2);
-        
-        token.mint(address(distModule), smallYield);
-        (bool success, uint256 distributed) = distModule.distributeYield(1, address(this), address(token), smallYield, data2);
-        assertTrue(success);
-        // share0 = 1 * 1 / 10000 = 0
-        // share1 = 1 * 9999 / 10000 = 0
-        assertEq(distributed, 0);
     }
 
     // ============ DefaultReleaseStrategy Tests ============
