@@ -30,7 +30,33 @@ contract EscrowCreationPolicy is AccessControl {
     /// @notice Pause flag for yield deposits (emergency control, protocol-wide)
     bool public yieldDepositsPaused;
 
-    /// @notice Policy flag: whether customResolver must be a contract (default true)
+    /// @notice Policy flag: whether a non-zero `customResolver` must be a contract.
+    /// @dev Default `true`. This flag gates exactly one check: at creation,
+    ///      `SettingsValidationLibrary.validateEscrowSettings` rejects a
+    ///      `customResolver` with no code when the flag is true.
+    ///
+    ///      IMPORTANT — admission-only. This flag affects the admission of NEW
+    ///      escrows only. Changing the policy does NOT alter the resolver or the
+    ///      authority of any existing escrow: an escrow's resolver is captured in
+    ///      `escrowSettings[workflowId].customResolver` / `escrowTransfers[workflowId].disputeResolver`
+    ///      at creation and is thereafter immutable for that workflow.
+    ///
+    ///      Consequences of `false` (specified, not merely tolerated). `false`
+    ///      permits a non-zero EOA `customResolver`, which means:
+    ///        - that address is the workflow's resolver authority
+    ///          (`BaseEscrow._isAuthorizedDisputeResolver` treats it as the sole resolver);
+    ///        - resolver callbacks are unavailable (`DisputeInitializationLibrary.callResolverCallback`
+    ///          returns early for code-less resolvers);
+    ///        - appeals are unsupported for that custom-resolver workflow
+    ///          (`BaseEscrow._appealDispute` reverts `AppealsUnsupportedForCustomResolver`);
+    ///        - settlement/custody execution is unchanged (same terminal transitions
+    ///          and pull-only entitlements as any other resolution).
+    ///
+    ///      The production default is `true`, and deployments use contract resolvers
+    ///      (e.g. a forwarding resolver) even when an EOA owns resolution. `false` is
+    ///      a deliberately tested, end-to-end supported compatibility mode — retained
+    ///      as an explicit policy choice, not dead code — but is not used by any
+    ///      deployment. (See `docs/architecture/ARCHITECTURAL_PRINCIPLES.md`.)
     bool public resolverMustBeContract = true;
 
     // ============ Custom Errors ============
