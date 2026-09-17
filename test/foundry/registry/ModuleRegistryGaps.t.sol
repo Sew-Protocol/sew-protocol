@@ -4,7 +4,7 @@ pragma solidity ^0.8.37;
 import 'forge-std/Test.sol';
 import '../../../contracts/registry/ModuleRegistry.sol';
 import '../../../contracts/interfaces/IModuleRegistry.sol';
-import '../../../contracts/interfaces/IYieldGenerationModule.sol';
+import '../../../contracts/interfaces/IYieldModule.sol';
 import '../../../contracts/interfaces/IYieldDistributionModule.sol';
 import '../../../contracts/shared/interfaces/IResolutionModule.sol';
 
@@ -66,6 +66,6 @@ contract ModuleRegistryGapsTest is Test {
 
 contract MockGenRegModule {
     function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
-        return interfaceId == type(IYieldGenerationModule).interfaceId || interfaceId == type(IERC165).interfaceId;
+        return interfaceId == type(IYieldModule).interfaceId || interfaceId == type(IERC165).interfaceId;
     }
 }

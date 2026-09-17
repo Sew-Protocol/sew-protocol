@@ -103,6 +103,10 @@ contract MockYieldModuleWithLoss is IYieldModule {
         return (true, 0x0);
     }
 
+    function previewPosition(uint256, address) external pure returns (uint256, uint256, bool) {
+        return (0, 0, false);
+    }
+
     function getModuleInfo()
         external pure returns (string memory name, string memory version, bytes32 protocolId) {
         return ("MockYieldModuleWithLoss", "1.0.0", keccak256("mock-v1"));

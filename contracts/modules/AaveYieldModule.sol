@@ -6,6 +6,7 @@ import '../interfaces/aave/AaveV3Interfaces.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/access/Ownable2Step.sol';
+import '@openzeppelin/contracts/utils/introspection/ERC165.sol';
 import '@openzeppelin/contracts/utils/math/Math.sol';
 
 /**
@@ -25,7 +26,7 @@ import '@openzeppelin/contracts/utils/math/Math.sol';
  *
  * This separation keeps modules simple and distribution policy in core.
  */
-contract AaveYieldModule is IYieldModule, Ownable2Step {
+contract AaveYieldModule is IYieldModule, ERC165, Ownable2Step {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
@@ -34,7 +35,7 @@ contract AaveYieldModule is IYieldModule, Ownable2Step {
     struct YieldPosition {
         address token;
         uint256 principalDeposited;  // INVARIANT 4: actual accepted amount, not requested
-        uint256 aTokenShares;        // aToken balance delta at deposit time (per-position share)
+        uint256 aTokenShares;        // scaled (index-independent) aToken share delta at deposit time
     }
 
     // ============ Storage ============
@@ -61,12 +62,18 @@ contract AaveYieldModule is IYieldModule, Ownable2Step {
     // If unset (0), defaults to 1 unit to avoid accidental zero-value/noise positions.
     mapping(address token => uint256 minDepositByToken) public minDepositByToken;
 
+    // Recovery operators (e.g. GuardianOps) authorized to unwind positions on behalf
+    // of approved escrows during an incident. The escrow itself is always authorized
+    // to operate on its own positions.
+    mapping(address operator => bool) public recoveryOperators;
+
     // ============ Events ============
 
     event EscrowApproved(address indexed escrow);
     event EscrowRevoked(address indexed escrow);
     event TokenConfigured(address indexed token, address indexed aToken);
     event MinDepositConfigured(address indexed token, uint256 minDeposit);
+    event RecoveryOperatorSet(address indexed operator, bool allowed);
 
     // ============ Errors ============
 
@@ -127,6 +134,19 @@ contract AaveYieldModule is IYieldModule, Ownable2Step {
         emit MinDepositConfigured(token, minDeposit);
     }
 
+    /**
+     * @notice Grant/revoke recovery-operator status for an address (e.g. GuardianOps)
+     * @param operator Address to authorize or deauthorize
+     * @param allowed True to grant recovery-operator status
+     * @dev Recovery operators may unwind an approved escrow's position during an incident.
+     *      Proceeds always go to the escrow owner, never to the operator.
+     */
+    function setRecoveryOperator(address operator, bool allowed) external onlyOwner {
+        require(operator != address(0), "InvalidAddress");
+        recoveryOperators[operator] = allowed;
+        emit RecoveryOperatorSet(operator, allowed);
+    }
+
     // ============ Core Yield Operations ============
 
     /**
@@ -138,7 +158,7 @@ contract AaveYieldModule is IYieldModule, Ownable2Step {
      * @return accepted Amount actually deposited
      *
      * INVARIANT 4: We track principalDeposited (actual accepted), not requested amount.
-     * aTokenShares records the exact aToken balance delta so that multiple concurrent
+     * aTokenShares records the exact scaled aToken share delta so that multiple concurrent
      * positions for the same token do not interfere with each other on withdrawal.
      */
     function initializeYield(
@@ -151,36 +171,38 @@ contract AaveYieldModule is IYieldModule, Ownable2Step {
 
         address aToken = _getAToken(token);
 
-        // Pull model: the escrow approves this module (via `_depositForYield`) and
-        // this call pulls `amount` from the calling escrow. For fee-on-transfer
-        // tokens the received amount may be less than requested.
-        uint256 balBefore = IERC20(token).balanceOf(address(this));
-        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
-        uint256 available = IERC20(token).balanceOf(address(this)) - balBefore;
-        require(available > 0, "InsufficientBalance");
         uint256 minDeposit = minDepositByToken[token];
         if (minDeposit == 0) minDeposit = 1;
-        require(available >= minDeposit, "BelowMinDeposit");
+        require(amount >= minDeposit, "BelowMinDeposit");
 
-        // Snapshot aToken balance before deposit to calculate our exact share
-        uint256 aTokenBefore = IERC20(aToken).balanceOf(address(this));
+        // PULL model: the escrow approves this module (EscrowVault/_depositForYield
+        // already grants an allowance) and we pull the requested principal from it.
+        // For fee-on-transfer tokens, fewer tokens than `amount` are credited.
+        uint256 balBefore = IERC20(token).balanceOf(address(this));
+        SafeERC20.safeTransferFrom(IERC20(token), msg.sender, address(this), amount);
+        uint256 received = balBefore < IERC20(token).balanceOf(address(this))
+            ? IERC20(token).balanceOf(address(this)) - balBefore
+            : 0;
+        require(received > 0, "InsufficientBalance");
 
-        // Approve pool to pull tokens (use available, not amount)
-        SafeERC20.forceApprove(IERC20(token), address(aavePool), available);
+        // Snapshot scaled aToken balance before deposit to record exact scaled shares.
+        // scaledBalanceOf is index-independent, so the recorded share is not affected by
+        // yield accrued before this deposit and is converted to underlying exactly once at unwind.
+        uint256 aTokenBefore = IAaveAToken(aToken).scaledBalanceOf(address(this));
 
-        // Deposit to Aave
-        aavePool.supply(token, available, address(this), 0);
+        // Approve pool to pull the underlying we received and deposit to Aave
+        SafeERC20.forceApprove(IERC20(token), address(aavePool), received);
+        aavePool.supply(token, received, address(this), 0);
 
-        // Calculate actual deposited (handles fee-on-transfer). Base is the
-        // pre-supply balance, i.e. any pre-existing balance plus the pulled amount.
+        // Calculate actual deposited (handles fee-on-transfer dust left on the module)
         uint256 balAfter = IERC20(token).balanceOf(address(this));
-        uint256 preSupply = balBefore + available;
-        uint256 actualDeposited = preSupply > balAfter ? preSupply - balAfter : 0;
-
+        uint256 actualDeposited = received > balAfter ? received - balAfter : 0;
         require(actualDeposited > 0, "InsufficientBalance");
 
-        // Calculate exact aToken shares received for this position
-        uint256 aTokenAfter = IERC20(aToken).balanceOf(address(this));
+        // Record the exact scaled shares received for this position (INVARIANT 4).
+        // Using scaledBalanceOf (rather than the rebased balanceOf delta) avoids
+        // double-counting the liquidity index when the position is later valued at unwind.
+        uint256 aTokenAfter = IAaveAToken(aToken).scaledBalanceOf(address(this));
         uint256 aTokenShares = aTokenAfter > aTokenBefore ? aTokenAfter - aTokenBefore : 0;
         require(aTokenShares > 0, "NoATokenSharesReceived");
 
@@ -200,7 +222,6 @@ contract AaveYieldModule is IYieldModule, Ownable2Step {
      * @notice Withdraw yield position from Aave
      * @param escrowId Escrow identifier
      * @param token Token to withdraw
-     * @param principalExpected Expected principal (for validation)
      * @return principalOut Principal amount
      * @return yieldOut Yield amount
      *
@@ -211,20 +232,19 @@ contract AaveYieldModule is IYieldModule, Ownable2Step {
     function unwindToEscrow(
         uint256 escrowId,
         address token,
-        uint256 principalExpected
+        uint256 /* principalExpected */
     ) external onlyEscrow returns (uint256 principalOut, uint256 yieldOut) {
         YieldPosition memory pos = positions[msg.sender][escrowId];
         require(pos.token == token, "TokenMismatch");
         require(pos.aTokenShares > 0, "NoPosition");
 
-        // Withdraw only our position's aToken shares — not the global balance
+        // Withdraw only our position's scaled shares (converted to underlying once).
         address aToken = _getAToken(token);
+        // currentATokenBalance (rebased) caps the withdrawal at what the module actually holds.
         uint256 currentATokenBalance = IERC20(aToken).balanceOf(address(this));
-        // pos.aTokenShares was recorded as the rebased-balance delta at deposit time.
-        // Since the liquidity index equals INITIAL_INDEX at deposit, aTokenShares == scaled shares.
-        // Current underlying value = scaledShares * currentLiquidityIndex / INITIAL_INDEX.
-        // We retrieve currentIndex from the pool to compute the correct withdrawal amount,
-        // which correctly includes any yield that has accrued since deposit.
+        // pos.aTokenShares is the scaled (index-independent) share count recorded at deposit.
+        // Convert to current underlying value exactly once: scaled * currentIndex / 1e27.
+        // This includes yield accrued since deposit without double-counting the index.
         uint256 currentIndex = aavePool.getReserveNormalizedIncome(token);
         require(currentIndex > 0, "InvalidIncomeIndex");
         uint256 positionCurrentValue = Math.mulDiv(pos.aTokenShares, currentIndex, 1e27);
@@ -242,7 +262,13 @@ contract AaveYieldModule is IYieldModule, Ownable2Step {
 
         // Calculate yield
         // INVARIANT 4: Use principalDeposited (actual accepted), not principalExpected
+        // INVARIANT 1: Never overstate principal. If Aave returned less than the deposited
+        // principal (e.g. share-price drawdown), report only what was actually recovered so
+        // the escrow never claims more than was physically returned. yield stays at 0.
         uint256 principal = pos.principalDeposited;
+        if (totalReceived < principal) {
+            principal = totalReceived;
+        }
         uint256 yield = totalReceived > principal ? totalReceived - principal : 0;
 
         // Clean up position
@@ -268,8 +294,44 @@ contract AaveYieldModule is IYieldModule, Ownable2Step {
         address token,
         uint256 principalExpected
     ) external onlyEscrow returns (uint256 recovered) {
-        YieldPosition memory pos = positions[msg.sender][escrowId];
+        return _emergencyUnwind(msg.sender, escrowId, token, principalExpected);
+    }
+
+    /**
+     * @notice Emergency recovery of a specific escrow's position (operator/escrow only)
+     * @param escrow The escrow contract that owns the position
+     * @param escrowId Escrow identifier
+     * @param token Token to recover
+     * @param principalExpected Expected principal
+     * @return recovered Amount recovered
+     * @dev A callable by the position owner, or by an approved recovery operator
+     *      (e.g. GuardianOps) during an incident. Proceeds ALWAYS go to `escrow`,
+     *      never to the caller. INVARIANT 6: returns > 0 or reverts, never 0.
+     */
+    function emergencyUnwindForEscrow(
+        address escrow,
+        uint256 escrowId,
+        address token,
+        uint256 principalExpected
+    ) external returns (uint256 recovered) {
+        require(approvedEscrows[escrow], "UnauthorizedEscrow");
+        require(msg.sender == escrow || recoveryOperators[msg.sender], "UnauthorizedEscrow");
+        return _emergencyUnwind(escrow, escrowId, token, principalExpected);
+    }
+
+    /**
+     * @notice Shared emergency unwind logic operating on a named escrow owner
+     * @dev INVARIANT 2: Funds are only ever sent back to the escrow owner.
+     */
+    function _emergencyUnwind(
+        address escrowOwner,
+        uint256 escrowId,
+        address token,
+        uint256 /* principalExpected */
+    ) internal returns (uint256 recovered) {
+        YieldPosition memory pos = positions[escrowOwner][escrowId];
         require(pos.token == token, "TokenMismatch");
+        require(pos.aTokenShares > 0, "NoPosition");
 
         address aToken = _getAToken(token);
         uint256 currentATokenBalance = IERC20(aToken).balanceOf(address(this));
@@ -281,7 +343,6 @@ contract AaveYieldModule is IYieldModule, Ownable2Step {
             ? positionCurrentValue
             : currentATokenBalance;
 
-
         if (sharesToWithdraw == 0) {
             revert("NoATokenBalance");
         }
@@ -289,11 +350,11 @@ contract AaveYieldModule is IYieldModule, Ownable2Step {
         // Try to withdraw
         uint256 out = aavePool.withdraw(token, sharesToWithdraw, address(this));
 
-        // Transfer to escrow
-        IERC20(token).safeTransfer(msg.sender, out);
+        // Transfer to the escrow owner (never the caller/operator)
+        IERC20(token).safeTransfer(escrowOwner, out);
 
         // Clean up
-        delete positions[msg.sender][escrowId];
+        delete positions[escrowOwner][escrowId];
 
         // INVARIANT 6: Strict semantics - never return 0
         if (out == 0) {
@@ -330,6 +391,33 @@ contract AaveYieldModule is IYieldModule, Ownable2Step {
     function getModuleInfo()
         external pure returns (string memory name, string memory version, bytes32 protocolId) {
         return (MODULE_NAME, MODULE_VERSION, PROTOCOL_ID);
+    }
+
+    /**
+     * @notice Preview the tracked position for an escrow (IYieldModule view).
+     * @dev Best-effort; returns inactive/zero for unknown positions.
+     */
+    function previewPosition(
+        uint256 escrowId,
+        address escrowContract
+    ) external view returns (uint256 principal, uint256 currentValue, bool isActive) {
+        YieldPosition memory pos = positions[escrowContract][escrowId];
+        principal = pos.principalDeposited;
+        isActive = principal > 0;
+        currentValue = principal;
+        if (isActive && pos.aTokenShares > 0) {
+            if (tokenToAToken[pos.token] != address(0)) {
+                uint256 currentIndex = aavePool.getReserveNormalizedIncome(pos.token);
+                if (currentIndex > 0) {
+                    currentValue = Math.mulDiv(pos.aTokenShares, currentIndex, 1e27);
+                }
+            }
+        }
+    }
+
+    /// @notice ERC-165: advertises IYieldModule (v2.5) support for registry validation.
+    function supportsInterface(bytes4 interfaceId) public view virtual override returns (bool) {
+        return interfaceId == type(IYieldModule).interfaceId || super.supportsInterface(interfaceId);
     }
 
     // ============ Helpers ============

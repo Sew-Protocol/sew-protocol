@@ -5,7 +5,7 @@ import '@openzeppelin/contracts/access/AccessControl.sol';
 import '../governance/SlowLaneQueueActivate.sol';
 import '../interfaces/IReleaseStrategy.sol';
 import '../interfaces/ICancellationStrategy.sol';
-import '../interfaces/IYieldGenerationModule.sol';
+import '../interfaces/IYieldModule.sol';
 import '../interfaces/IYieldDistributionModule.sol';
 import '../shared/interfaces/IResolutionModule.sol';
 import './BaseEscrow.sol';
@@ -23,7 +23,7 @@ contract ModuleSnapshotRegistry is AccessControl, SlowLaneQueueActivate {
     struct ModuleState {
         IReleaseStrategy defaultReleaseStrategy;
         ICancellationStrategy defaultCancellationStrategy;
-        IYieldGenerationModule defaultYieldGenerationModule;
+        IYieldModule defaultYieldGenerationModule;
         IYieldDistributionModule defaultYieldDistributionModule;
         IResolutionModule defaultResolutionModule;
         mapping(BaseEscrow.ModuleType => PendingAddress) pendingModules;
@@ -194,7 +194,7 @@ contract ModuleSnapshotRegistry is AccessControl, SlowLaneQueueActivate {
             emit DefaultReleaseStrategyActivated(escrowContract, oldModule, newModule);
         } else if (moduleType == BaseEscrow.ModuleType.YIELD_GEN) {
             oldModule = address(state.defaultYieldGenerationModule);
-            state.defaultYieldGenerationModule = IYieldGenerationModule(newModule);
+            state.defaultYieldGenerationModule = IYieldModule(newModule);
             emit DefaultYieldGenerationModuleActivated(escrowContract, oldModule, newModule);
         } else if (moduleType == BaseEscrow.ModuleType.YIELD_DIST) {
             oldModule = address(state.defaultYieldDistributionModule);
@@ -239,7 +239,7 @@ contract ModuleSnapshotRegistry is AccessControl, SlowLaneQueueActivate {
     /**
      * @notice Get current default yield generation module for an escrow contract
      */
-    function getDefaultYieldGenerationModule(address escrowContract) external view returns (IYieldGenerationModule) {
+    function getDefaultYieldGenerationModule(address escrowContract) external view returns (IYieldModule) {
         return escrowModuleStates[escrowContract].defaultYieldGenerationModule;
     }
 

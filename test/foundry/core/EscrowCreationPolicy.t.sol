@@ -41,6 +41,10 @@ contract AcceptingYieldModule is IYieldModule {
         return (true, bytes32(0));
     }
 
+    function previewPosition(uint256, address) external pure override returns (uint256, uint256, bool) {
+        return (0, 0, false);
+    }
+
     function getModuleInfo() external pure override returns (string memory, string memory, bytes32) {
         return ('Accepting', '1.0.0', keccak256('accepting'));
     }

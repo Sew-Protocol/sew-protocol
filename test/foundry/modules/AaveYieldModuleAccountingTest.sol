@@ -202,4 +202,79 @@ contract AaveYieldModuleAccountingTest is Test {
         assertEq(p1After, 0, "First withdrawn");
         assertEq(p2After, 75e18, "Second intact");
     }
+
+    // ============ P0 Regression: scaled-share accounting ============
+
+    /**
+     * @notice Regression: a deposit made AFTER yield has accrued (liquidity index > initial)
+     * must NOT be overstated by double-applying the index. The module stores scaled
+     * (index-independent) shares and converts to underlying exactly once at unwind.
+     * Pre-fix, the module stored the rebased balance delta and re-applied the index,
+     * overstating the position by the index-at-deposit factor.
+     */
+    function test_deposit_after_yield_not_overstated() public {
+        // Accrue yield BEFORE the deposit so the liquidity index is already above initial.
+        pool.simulateYield(address(token), 50);
+
+        uint256 amount = 100e18;
+        vm.prank(escrow);
+        token.transfer(escrow, amount);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
+
+        vm.prank(escrow);
+        uint256 accepted = module.initializeYield(1, address(token), amount, YieldPreset.TO_SENDER);
+        assertEq(accepted, amount, "Should accept full amount");
+
+        // previewPosition must not overstate beyond the deposited principal.
+        (uint256 principal, uint256 currentValue, bool isActive) = module.previewPosition(1, escrow);
+        assertEq(principal, amount, "Tracked principal correct");
+        assertLe(currentValue, amount, "Current value must not exceed deposited principal");
+        assertTrue(isActive, "Position active");
+
+        // Withdraw with no further yield: recover exactly the principal.
+        vm.prank(escrow);
+        (uint256 p, uint256 y) = module.unwindToEscrow(1, address(token), amount);
+        assertApproxEqAbs(p, amount, 1, "Must recover exactly the principal, not more");
+        assertEq(y, 0, "No yield without further accrual");
+    }
+
+    /**
+     * @notice Regression: multiple same-token positions deposited at different liquidity
+     * indices unwind independently and never steal from each other. This is only correct
+     * because each position tracks its own scaled shares.
+     */
+    function test_multiple_positions_after_yield_accrual() public {
+        uint256 a = 100e18;
+        uint256 b = 50e18;
+
+        // Position 1 at initial index.
+        vm.prank(escrow);
+        token.transfer(escrow, a);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
+        vm.prank(escrow);
+        module.initializeYield(1, address(token), a, YieldPreset.TO_SENDER);
+
+        // Yield accrues, then position 2 is deposited at the elevated index.
+        pool.simulateYield(address(token), 100);
+        vm.prank(escrow);
+        token.transfer(escrow, b);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
+        vm.prank(escrow);
+        module.initializeYield(2, address(token), b, YieldPreset.TO_SENDER);
+
+        // More yield accrues for both positions.
+        pool.simulateYield(address(token), 100);
+
+        // Unwind position 2 first: it must return its own principal + its own yield only.
+        vm.prank(escrow);
+        (uint256 p2, uint256 y2) = module.unwindToEscrow(2, address(token), b);
+        assertApproxEqAbs(p2, b, 1, "Position 2 principal correct");
+        assertGe(p2 + y2, b, "Position 2 recovers at least its principal");
+
+        // Unwind position 1: still returns its full principal despite pos 2 already unwound.
+        vm.prank(escrow);
+        (uint256 p1, uint256 y1) = module.unwindToEscrow(1, address(token), a);
+        assertApproxEqAbs(p1, a, 1, "Position 1 principal correct");
+        assertGe(p1 + y1, a, "Position 1 recovers at least its principal");
+    }
 }

@@ -4,7 +4,7 @@ pragma solidity ^0.8.37;
 import '@openzeppelin/contracts/access/AccessControl.sol';
 import '@openzeppelin/contracts/utils/introspection/IERC165.sol';
 import '../interfaces/IModuleRegistry.sol';
-import '../interfaces/IYieldGenerationModule.sol';
+import '../interfaces/IYieldModule.sol';
 import '../interfaces/IYieldDistributionModule.sol';
 import '../interfaces/IReleaseStrategy.sol';
 import '../interfaces/ICancellationStrategy.sol';
@@ -100,7 +100,7 @@ contract ModuleRegistry is AccessControl, IModuleRegistry {
 
         // Validate interface
         if (moduleType == ModuleType.YIELD_GENERATION) {
-            if (!IERC165(module).supportsInterface(type(IYieldGenerationModule).interfaceId)) {
+            if (!IERC165(module).supportsInterface(type(IYieldModule).interfaceId)) {
                 revert InvalidInterface(moduleType, module);
             }
         } else if (moduleType == ModuleType.YIELD_DISTRIBUTION) {

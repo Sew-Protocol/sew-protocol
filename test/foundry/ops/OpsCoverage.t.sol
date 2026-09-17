@@ -4,6 +4,7 @@ pragma solidity ^0.8.37;
 import 'forge-std/Test.sol';
 import '../../mocks/legacy/CreateOpsReference.sol';
 import '../../../contracts/ops/YieldOps.sol';
+import '../../../contracts/interfaces/IYieldModule.sol';
 import '../../mocks/legacy/SettlementOpsReference.sol';
 import '../../mocks/legacy/DisputeOpsReference.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
@@ -257,7 +258,7 @@ contract OpsCoverageTest is Test {
 
         vm.prank(escrowContract);
         YieldOps.YieldResult memory result = yieldOps.handleYield(
-            IYieldGenerationModule(address(mockGen)),
+            IYieldModule(address(mockGen)),
             IYieldDistributionModule(address(0)),
             1,
             address(token),
@@ -349,7 +350,7 @@ contract OpsCoverageTest is Test {
 
         vm.prank(escrowContract);
         YieldOps.YieldResult memory result = yieldOps.handleYield(
-            IYieldGenerationModule(address(mockGen)),
+            IYieldModule(address(mockGen)),
             IYieldDistributionModule(address(0)),
             1,
             address(token),
@@ -953,7 +954,7 @@ contract OpsCoverageTest is Test {
 
         vm.prank(escrowContract);
         YieldOps.YieldResult memory result = yieldOps.handleYield(
-            IYieldGenerationModule(address(mockGen)),
+            IYieldModule(address(mockGen)),
             IYieldDistributionModule(address(0)), // Not used in handleYield anymore
             1,
             address(token),
@@ -981,7 +982,7 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         // Should not revert, but return failure with reason
         YieldOps.YieldResult memory result = yieldOps.handleYield(
-            IYieldGenerationModule(address(mockGen)),
+            IYieldModule(address(mockGen)),
             IYieldDistributionModule(address(0)),
             1,
             address(token),
@@ -1037,7 +1038,7 @@ contract OpsCoverageTest is Test {
 
         vm.prank(escrowContract);
         YieldOps.YieldResult memory result = yieldOps.handleYield(
-            IYieldGenerationModule(address(mockGen)),
+            IYieldModule(address(mockGen)),
             IYieldDistributionModule(address(0)),
             1,
             address(token),
@@ -1048,7 +1049,8 @@ contract OpsCoverageTest is Test {
         );
 
         assertFalse(result.success);
-        assertEq(result.failureReason, "Yield generation module returned false");
+        // v2.5: a declined/failed unwind surfaces as a revert caught by YieldOps.
+        assertEq(result.failureReason, "Withdraw failed");
     }
 
     function test_YieldOps_distributeWithdrawnYield_NoDist_NoFeeRecip() public {
@@ -1245,7 +1247,7 @@ contract OpsCoverageTest is Test {
 
         vm.prank(escrowContract);
         YieldOps.YieldResult memory result = yieldOps.handleYield(
-            IYieldGenerationModule(address(mockGen2)),
+            IYieldModule(address(mockGen2)),
             IYieldDistributionModule(address(0)),
             1,
             address(token),
@@ -1270,7 +1272,7 @@ contract OpsCoverageTest is Test {
 
         vm.prank(escrowContract);
         YieldOps.YieldResult memory result = yieldOps.handleYield(
-            IYieldGenerationModule(address(mockGen3)),
+            IYieldModule(address(mockGen3)),
             IYieldDistributionModule(address(0)),
             1,
             address(token),
@@ -1465,6 +1467,14 @@ contract MockYieldGenerationModule is IYieldGenerationModule {
         if (shouldRevert) revert("Gen Fail");
         return (success, actual, yield);
     }
+
+    // IYieldModule (v2.5) surface used by YieldOps.handleYield
+    function unwindToEscrow(uint256, address, uint256) external view returns (uint256, uint256) {
+        if (shouldRevert) revert("Gen Fail");
+        if (!success) revert("Withdraw failed");
+        return (actual, yield);
+    }
+    function previewPosition(uint256, address) external pure returns (uint256, uint256, bool) { return (0, 0, false); }
 
     function depositForYield(uint256, address, uint256, address) external pure returns (bool, uint256) { return (true, 0); }
     function getPosition(uint256, address, address) external pure returns (IYieldGenerationModule.YieldPosition memory) {

@@ -7,6 +7,7 @@ import '@openzeppelin/contracts/utils/Address.sol';
 import '@openzeppelin/contracts/utils/Context.sol';
 import '../interfaces/IYieldModule.sol';
 import '../interfaces/aave/AaveV3Interfaces.sol';
+import '../modules/AaveYieldModule.sol';
 import '../core/BaseEscrow.sol';
 import '../core/ModuleSnapshotRegistry.sol';
 
@@ -57,6 +58,7 @@ contract GuardianOps is Context {
     error AmountExceedsLimit(uint256 amount, uint256 maxAmount);
     error ModuleNotConfigured();
     error PoolNotConfigured();
+    error InvalidEscrowTarget(address target);
     error NothingToUnwind(address token);
     error WithdrawalFailed(address token, uint256 amount);
 
@@ -101,34 +103,70 @@ contract GuardianOps is Context {
         }
 
         // Note: pause functionality was removed from BaseEscrow for bytecode-size reasons.
-        // Guardian authentication (Safety check 1 above) is sufficient protection here —
-        // ROLE_GUARDIAN is time-locked and the rate-limiting in this contract prevents abuse.
+        // Guardian authentication above is sufficient protection here — ROLE_GUARDIAN is
+        // time-locked and the rate-limiting in this contract prevents abuse.
 
-        // Get yield generation module
-        IYieldModule genModule;
-        
-        // Try to get moduleManagement from EscrowVault (public getter)
-        (bool success, bytes memory data) = address(escrowContract).staticcall(
-            abi.encodeWithSelector(bytes4(keccak256("moduleManagement()")))
-        );
-        if (success && data.length >= 32) {
-            address moduleMgmtAddr = abi.decode(data, (address));
-            if (moduleMgmtAddr != address(0) && moduleMgmtAddr.code.length > 0) {
-                ModuleSnapshotRegistry mm = ModuleSnapshotRegistry(moduleMgmtAddr);
-                genModule = IYieldModule(mm.getModule(targetEscrow, BaseEscrow.ModuleType.YIELD_GEN));
+        // GuardianOps is bound to exactly one escrow vault (immutable). The Aave position and
+        // its recorded principal live on that same vault, so the unwind target must BE that
+        // vault. Rejecting any other target prevents relaying proceeds to an unrelated contract
+        // while the recorded principal is read from escrowContract.
+        if (targetEscrow != address(escrowContract)) {
+            revert InvalidEscrowTarget(targetEscrow);
+        }
+
+        // Rate limiting: at most one unwind per token per UNWIND_COOLDOWN window.
+        if (block.timestamp < lastUnwindTimestamp[token] + UNWIND_COOLDOWN) {
+            revert CooldownNotExpired(token, lastUnwindTimestamp[token], block.timestamp);
+        }
+
+        // Prefer the module that actually holds this position (the workflow-recorded module
+        // from EscrowVault), falling back to the registry default. Using the recorded module
+        // keeps unwinds correct after a module upgrade: the position lives in the module it
+        // was deposited into, not necessarily the current default.
+        address genModuleAddr = escrowContract.v25YieldModules(workflowId);
+        if (genModuleAddr == address(0)) {
+            // Try to get moduleManagement from EscrowVault (public getter)
+            (bool success, bytes memory data) = address(escrowContract).staticcall(
+                abi.encodeWithSelector(bytes4(keccak256("moduleManagement()")))
+            );
+            if (success && data.length >= 32) {
+                address moduleMgmtAddr = abi.decode(data, (address));
+                if (moduleMgmtAddr != address(0) && moduleMgmtAddr.code.length > 0) {
+                    ModuleSnapshotRegistry mm = ModuleSnapshotRegistry(moduleMgmtAddr);
+                    genModuleAddr = mm.getModule(targetEscrow, BaseEscrow.ModuleType.YIELD_GEN);
+                }
             }
         }
-        
-        if (address(genModule) == address(0)) {
+
+        if (genModuleAddr == address(0)) {
             revert ModuleNotConfigured();
         }
+        IYieldModule genModule = IYieldModule(genModuleAddr);
 
         // Pass the recorded principal so the module can enforce minimum recovery.
         uint256 principalExpected = escrowContract.v25YieldPrincipals(workflowId);
-        unwoundAmount = genModule.emergencyUnwind(workflowId, token, principalExpected);
+        // Route the unwind through the module explicitly naming the escrow that owns the
+        // position. The module is namespaced by (escrow, escrowId) using the escrow as the
+        // owning key, so we must pass `targetEscrow` as the owner rather than relying on
+        // msg.sender (which here is this GuardianOps contract). Funds are sent by the
+        // module directly to `targetEscrow`, keeping the "proceeds always go to escrow"
+        // invariant intact. GuardianOps must be registered as a recovery operator on the
+        // AaveYieldModule for this call to authenticate.
+        unwoundAmount = AaveYieldModule(address(genModule)).emergencyUnwindForEscrow(
+            targetEscrow,
+            workflowId,
+            token,
+            principalExpected
+        );
 
         if (unwoundAmount > 0) {
+            // Enforce per-call unwind cap. A revert here rolls back the whole transaction,
+            // including the module's transfer to the escrow, so nothing is left dangling.
+            if (unwoundAmount > MAX_UNWIND_AMOUNT_PER_CALL) {
+                revert AmountExceedsLimit(unwoundAmount, MAX_UNWIND_AMOUNT_PER_CALL);
+            }
             totalUnwoundAmount += unwoundAmount;
+            lastUnwindTimestamp[token] = block.timestamp;
             
             emit EmergencyUnwindExecuted(
                 token,

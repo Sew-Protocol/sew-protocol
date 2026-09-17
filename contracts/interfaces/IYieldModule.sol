@@ -112,6 +112,22 @@ interface IYieldModule {
         uint256 principalExpected
     ) external returns (uint256 recovered);
     
+    // ============ Views ============
+
+    /**
+     * @notice Preview the current tracked position for an escrow.
+     * @param escrowId Escrow identifier
+     * @param escrowContract The escrow that owns the position (state is namespaced by escrow)
+     * @return principal Recorded principal (accepted at initializeYield)
+     * @return currentValue Current underlying value of the position (principal + accrued)
+     * @return isActive Whether a position is recorded
+     * @dev View-only, best-effort: implementations should not revert for unknown positions.
+     */
+    function previewPosition(
+        uint256 escrowId,
+        address escrowContract
+    ) external view returns (uint256 principal, uint256 currentValue, bool isActive);
+
     // ============ Metadata & Validation ============
     
     /**

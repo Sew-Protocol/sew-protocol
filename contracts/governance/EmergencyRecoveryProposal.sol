@@ -53,6 +53,10 @@ contract EmergencyRecoveryProposal is AccessControl {
         string reason;                // Human-readable reason
         address proposedBy;           // Who proposed this
         bool[] executionResults;      // Results of recovery actions
+        // EMERGENCY_UNWIND_AAVE target (set via proposeRecoveryWithUnwindTarget)
+        address unwindToken;          // Token to unwind from Aave
+        uint256 unwindWorkflowId;     // Escrow transfer ID to unwind
+        address unwindTargetEscrow;   // Escrow contract owning the position
     }
 
     enum RecoveryAction {
@@ -65,6 +69,12 @@ contract EmergencyRecoveryProposal is AccessControl {
     // Recovery proposals indexed by ID
     mapping(uint256 => RecoveryProposal) public recoveryProposals;
     uint256 public recoveryProposalCount;
+
+    /// @notice When true, recovery proposals may be created. Admin-controlled so the
+    ///         contract is inert outside of an incident. BaseEscrow no longer supports
+    ///         pausing (pause() was removed for bytecode-size reasons), so this replaces
+    ///         the previous `escrowVault.paused()` guard, which could never be true.
+    bool public recoveryEnabled;
 
     // Events
     event RecoveryProposalCreated(
@@ -93,14 +103,17 @@ contract EmergencyRecoveryProposal is AccessControl {
         uint256 timestamp
     );
 
+    event RecoveryEnabledSet(bool enabled);
+
     // Custom errors
-    error SystemNotPaused(address vault);
     error ProposalNotApproved(uint256 proposalId, RecoveryStatus currentStatus);
     error NoActionsProvided();
     error TimelockDelayNotMet(uint256 approvedAt, uint256 currentTime);
     error OnlyGovernor(address caller);
     error InvalidRecoveryAction(RecoveryAction action);
     error RecoveryAlreadyExecuted(uint256 proposalId);
+    error RecoveryDisabled();
+    error NoUnwindTarget();
 
     /**
      * @notice Initialize recovery proposal contract
@@ -126,8 +139,19 @@ contract EmergencyRecoveryProposal is AccessControl {
     }
 
     /**
+     * @notice Enable/disable recovery proposal creation (admin)
+     * @param enabled True to allow proposing recovery actions
+     * @dev Should be enabled by the admin/timelock at the start of an incident and
+     *      disabled once the system is back to a safe state.
+     */
+    function setRecoveryEnabled(bool enabled) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        recoveryEnabled = enabled;
+        emit RecoveryEnabledSet(enabled);
+    }
+
+    /**
      * @notice Create emergency recovery proposal
-     * @dev Can only propose when system is paused (safety check)
+     * @dev Can only propose when recovery is enabled (incident mode, admin-controlled)
      * @param action Type of recovery action to propose
      * @param reason Human-readable reason for recovery
      * @return proposalId ID of created proposal
@@ -136,9 +160,49 @@ contract EmergencyRecoveryProposal is AccessControl {
         RecoveryAction action,
         string calldata reason
     ) external onlyRole(ROLE_PROPOSER) returns (uint256) {
-        // Safety check: only allow recovery proposals when paused
-        if (!escrowVault.paused()) {
-            revert SystemNotPaused(address(escrowVault));
+        return _proposeRecovery(action, reason);
+    }
+
+    /**
+     * @notice Create an EMERGENCY_UNWIND_AAVE proposal with an explicit unwind target
+     * @param action Must be EMERGENCY_UNWIND_AAVE
+     * @param reason Human-readable reason
+     * @param token Underlying token to unwind
+     * @param workflowId Escrow transfer ID to unwind
+     * @param targetEscrow Escrow contract owning the position
+     * @return proposalId ID of created proposal
+     */
+    function proposeRecoveryWithUnwindTarget(
+        RecoveryAction action,
+        string calldata reason,
+        address token,
+        uint256 workflowId,
+        address targetEscrow
+    ) external onlyRole(ROLE_PROPOSER) returns (uint256) {
+        require(action == RecoveryAction.EMERGENCY_UNWIND_AAVE, "InvalidRecoveryAction");
+        if (token == address(0) || targetEscrow == address(0) || workflowId == 0) {
+            revert NoUnwindTarget();
+        }
+        uint256 proposalId = _proposeRecovery(action, reason);
+        RecoveryProposal storage p = recoveryProposals[proposalId];
+        p.unwindToken = token;
+        p.unwindWorkflowId = workflowId;
+        p.unwindTargetEscrow = targetEscrow;
+        return proposalId;
+    }
+
+    /**
+     * @notice Shared proposal-creation logic (safety gate + action validation + storage)
+     * @dev Can only propose when recovery is enabled (incident mode, admin-controlled).
+     *      Previously gated on escrowVault.paused(), which BaseEscrow removed and always
+     *      returns false, so the guard could never pass. Replaced with an explicit toggle.
+     */
+    function _proposeRecovery(
+        RecoveryAction action,
+        string memory reason
+    ) internal returns (uint256) {
+        if (!recoveryEnabled) {
+            revert RecoveryDisabled();
         }
 
         // Validate action
@@ -157,7 +221,10 @@ contract EmergencyRecoveryProposal is AccessControl {
             executedAt: 0,
             reason: reason,
             proposedBy: _msgSender(),
-            executionResults: new bool[](0)
+            executionResults: new bool[](0),
+            unwindToken: address(0),
+            unwindWorkflowId: 0,
+            unwindTargetEscrow: address(0)
         });
 
         emit RecoveryProposalCreated(proposalId, action, _msgSender(), reason, block.timestamp);
@@ -254,12 +321,30 @@ contract EmergencyRecoveryProposal is AccessControl {
     /**
      * @notice Execute emergency Aave position unwind
      * @param proposalId Proposal ID (for event logging)
+     * @dev Unwinds the specific position recorded at proposal time via GuardianOps.
+     *      NOTE: For the governance path to authenticate against GuardianOps, the
+     *      EmergencyRecoveryProposal contract must hold ROLE_GUARDIAN on the escrow
+     *      vault (granted by the admin/timelock). If not, GuardianOps reverts NotGuardian
+     *      and the proposal is marked FAILED.
      */
     function _executeEmergencyUnwindAave(uint256 proposalId) internal {
-        // Call guardian ops to unwind all Aave positions
-        // This is a simplified version - production would iterate over positions
+        RecoveryProposal storage proposal = recoveryProposals[proposalId];
 
-        recoveryProposals[proposalId].executionResults.push(true);
+        if (
+            proposal.unwindToken == address(0) ||
+            proposal.unwindTargetEscrow == address(0) ||
+            proposal.unwindWorkflowId == 0
+        ) {
+            revert NoUnwindTarget();
+        }
+
+        guardianOps.emergencyUnwindAavePosition(
+            proposal.unwindToken,
+            proposal.unwindWorkflowId,
+            proposal.unwindTargetEscrow
+        );
+
+        proposal.executionResults.push(true);
     }
 
     /**

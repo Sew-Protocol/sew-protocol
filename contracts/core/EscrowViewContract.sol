@@ -7,6 +7,7 @@ import '../types/YieldPresets.sol';
 import '../libraries/SettingsValidationLibrary.sol';
 import '../libraries/DisputeManagementLibrary.sol';
 import '../libraries/EscrowSettlementLogic.sol';
+import '../interfaces/IYieldModule.sol';
 import '@openzeppelin/contracts/utils/math/SafeCast.sol';
 
 /**
@@ -533,16 +534,16 @@ contract EscrowViewContract {
         // ModuleSnapshot: (address resolutionModule, address releaseStrategy, address cancellationStrategy, address yieldGenerationModule, address yieldDistributionModule, address incentiveModule, uint256 yieldProtocolFeeBps, uint256 appealBondProtocolFeeBps, uint256 escrowFeeBps, uint256 defaultAutoReleaseDelay, uint256 defaultAutoCancelDelay, uint256 maxDisputeDuration, uint256 appealWindowDuration)
         (, , , address genMod, , , , , , , , , ) = escrowContract.moduleSnapshots(workflowId);
         if (genMod != address(0) && genMod.code.length > 0) {
-            try IYieldGenerationModule(genMod).getPosition(workflowId, token, address(escrowContract)) returns (IYieldGenerationModule.YieldPosition memory pos) {
-                if (pos.isActive) {
-                    metrics.accruedInterest = pos.currentYield;
+            // Yield generation is unified on IYieldModule (v2.5).
+            try IYieldModule(genMod).previewPosition(workflowId, address(escrowContract)) returns (
+                uint256 principalHeld,
+                uint256 currentValue,
+                bool active
+            ) {
+                if (active && currentValue > principalHeld) {
+                    metrics.accruedInterest = currentValue - principalHeld;
                 }
-            } catch {
-                // Fallback for older modules that don't have getPosition
-                try IYieldGenerationModule(genMod).calculateYield(workflowId, token, address(escrowContract)) returns (uint256 yield) {
-                    metrics.accruedInterest = yield;
-                } catch {}
-            }
+            } catch {}
         }
     }
 

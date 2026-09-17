@@ -5,7 +5,7 @@ import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/access/AccessControl.sol';
 import '@openzeppelin/contracts/utils/math/Math.sol';
-import '../interfaces/IYieldGenerationModule.sol';
+import '../interfaces/IYieldModule.sol';
 import '../interfaces/IYieldDistributionModule.sol';
 import '../libraries/ResolverLogicLibrary.sol';
 
@@ -173,7 +173,7 @@ contract YieldOps is AccessControl {
      * @notice Handle yield withdrawal
      */
     function handleYield(
-        IYieldGenerationModule genModule,
+        IYieldModule genModule,
         IYieldDistributionModule /* distModule */,
         uint256 workflowId,
         address token,
@@ -193,30 +193,25 @@ contract YieldOps is AccessControl {
 
         uint256 balBefore = IERC20(token).balanceOf(address(this));
 
-        try genModule.withdrawWithYield(workflowId, token, amount, escrowContract) returns (
-            bool withdrawSuccess,
-            uint256 actualAmountWithdrawn,
-            uint256 /* yieldGenerated */
+        // Yield generation is unified on IYieldModule (v2.5).
+        try genModule.unwindToEscrow(workflowId, token, amount) returns (
+            uint256 principalOut,
+            uint256 yieldOut
         ) {
             uint256 balAfter = IERC20(token).balanceOf(address(this));
             uint256 received = balAfter > balBefore ? balAfter - balBefore : 0;
 
-            if (withdrawSuccess) {
-                result.actualAmount = actualAmountWithdrawn;
-                if (actualAmountWithdrawn > amount) {
-                    result.yield = actualAmountWithdrawn - amount;
-                    emit YieldWithdrawn(workflowId, token, result.yield);
-                }
-                
-                // Pull-only hardening: do not auto-forward to escrow contract.
-                // Credit escrow claimable balance for explicit pull.
-                if (received > 0) {
-                    claimableEscrowYield[token][escrowContract] += received;
-                    emit EscrowYieldClaimableCredited(workflowId, token, escrowContract, received);
-                }
-            } else {
-                result.success = false;
-                result.failureReason = 'Yield generation module returned false';
+            result.actualAmount = principalOut;
+            result.yield = yieldOut;
+            if (yieldOut > 0) {
+                emit YieldWithdrawn(workflowId, token, yieldOut);
+            }
+
+            // Pull-only hardening: do not auto-forward to escrow contract.
+            // Credit escrow claimable balance for explicit pull.
+            if (received > 0) {
+                claimableEscrowYield[token][escrowContract] += received;
+                emit EscrowYieldClaimableCredited(workflowId, token, escrowContract, received);
             }
         } catch Error(string memory reason) {
             result.success = false;

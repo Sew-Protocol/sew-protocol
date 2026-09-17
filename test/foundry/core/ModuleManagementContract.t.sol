@@ -6,6 +6,7 @@ import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/core/BaseEscrow.sol';
 import '../../../contracts/modules/DefaultReleaseStrategy.sol';
 import '../../../contracts/modules/DefaultYieldGenerationModule.sol';
+import '../../../contracts/interfaces/IYieldModule.sol';
 import '../../../contracts/modules/DefaultYieldDistributionModule.sol';
 import '../../../contracts/core/modules/DefaultResolutionModule.sol';
 import '../../../contracts/governance/SlowLaneQueueActivate.sol';
@@ -251,7 +252,7 @@ contract ModuleSnapshotRegistryTest is Test {
             BaseEscrow.ModuleType.YIELD_GEN
         );
         
-        IYieldGenerationModule module = moduleManagement.getDefaultYieldGenerationModule(address(escrowContract));
+        IYieldModule module = moduleManagement.getDefaultYieldGenerationModule(address(escrowContract));
         assertEq(address(module), address(yieldGenModule1));
     }
     
@@ -446,7 +447,7 @@ contract ModuleSnapshotRegistryTest is Test {
             BaseEscrow.ModuleType.YIELD_GEN
         );
         
-        IYieldGenerationModule module = moduleManagement.getDefaultYieldGenerationModule(address(escrowContract));
+        IYieldModule module = moduleManagement.getDefaultYieldGenerationModule(address(escrowContract));
         assertEq(address(module), address(yieldGenModule1));
     }
     
