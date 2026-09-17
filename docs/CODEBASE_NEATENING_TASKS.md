@@ -119,6 +119,12 @@ suite is green. The following are outstanding, non-refactor items.
 - [ ] Reconcile `differential-setup.json` schema with the external `AnvilRunner`
       consumer (the removed `disputeOps` field).
 - [ ] Optional: add a real-`EscrowVault` end-to-end Kleros-refusal test.
+- [x] Aave coverage for the current (simpler) `AaveYieldModule`: added an admin/events/
+      ownership/revoke suite; the active suite totals 91 passing tests (4 RPC fork skips).
+- [x] Deleted 27 obsolete old-module Aave `.bak` tests (inert, targeted the prior module).
+- [ ] Optional Aave follow-ups: an active escrow-level end-to-end test
+      (`EscrowVault` + `AaveYieldModule`); and porting any still-relevant old scenarios
+      (decimal robustness, dust deficit, stateful fuzz, inter-temporal bug).
 
 Deployment note: the current changes are designed to be deployed **after EIP-170 is
 removed**; the contract-size warnings are therefore expected and are not a release
