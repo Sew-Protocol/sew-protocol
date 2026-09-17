@@ -29,8 +29,7 @@ pnpm test
 ## Tests
 
 ```bash
-pnpm test                 # hardhat + foundry
-pnpm test:hardhat
+pnpm test                 # foundry
 pnpm test:foundry
 pnpm lint
 pnpm typecheck

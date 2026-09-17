@@ -4,8 +4,7 @@
   "private": true,
   "license": "Apache2",
   "scripts": {
-    "test": "pnpm test:hardhat && pnpm test:foundry",
-    "test:hardhat": "hardhat test",
+    "test": "pnpm test:foundry",
     "test:foundry": "bash scripts/check-foundry-deps.sh && forge test -vvv",
     "test:foundry:invariants": "forge test --match-path 'test/foundry/invariants/*.t.sol' -vvv",
     "test:foundry:core": "forge test --match-path 'test/foundry/core/*.t.sol' --no-match-path '*disabled*' -vvv",

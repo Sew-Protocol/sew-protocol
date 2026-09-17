@@ -47,9 +47,6 @@ forge test test/foundry/core/ReleaseStrategyWiring.t.sol -vvv
 forge test --match-test "testFunctionName" -vvv
 forge test --match-contract "ContractTest" --match-test "testName" -vvv
 
-# Hardhat tests
-pnpm test:hardhat
-
 # Lint / format / typecheck
 pnpm lint
 pnpm format
@@ -148,9 +145,6 @@ test/foundry/
   halmos/        # Symbolic execution (run with Halmos profile)
   adapters/      # External integrations (Aave, Safe)
 
-test/hardhat/
-  governance/    # Proposal, voting flows
-  integration/   # Multi-L2 scenarios, fork tests
 ```
 
 Tests use `ERC20Mock` from `contracts/mocks/` and shared setup via `TestConfig.sol`.

@@ -7,9 +7,10 @@
       "networkName": "hardhat",
       "contractName": "ModuleSnapshotRegistry",
       "address": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+      "deploymentTxHash": "0x1b653c0c7e5a4ed1ca4c17f605ff5b01f0367bdfb71720ff132e7512b78d6fc3",
       "blockNumber": 2,
       "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-      "timestamp": "2026-04-24T17:34:41.263Z",
+      "timestamp": "2026-09-17T14:31:53.931Z",
       "verified": false,
       "blockExplorerUrl": "",
       "constructorArgs": [
@@ -21,6 +22,8 @@
       ],
       "compilerVersion": "0.8.37",
       "optimizationRuns": 1000,
+      "gasUsed": "931512",
+      "deploymentCost": "0.001648624684860624",
       "proxyType": "none"
     },
     {
@@ -28,9 +31,10 @@
       "networkName": "hardhat",
       "contractName": "YieldOps",
       "address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+      "deploymentTxHash": "0xb8002d05a7af305d231009b4bffeace575350ed46fc52bcd475717fe05fc7e0c",
       "blockNumber": 3,
       "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-      "timestamp": "2026-04-24T17:34:41.316Z",
+      "timestamp": "2026-09-17T14:31:54.022Z",
       "verified": false,
       "blockExplorerUrl": "",
       "constructorArgs": [
@@ -42,6 +46,8 @@
       ],
       "compilerVersion": "0.8.37",
       "optimizationRuns": 1000,
+      "gasUsed": "1524152",
+      "deploymentCost": "0.002559940671100008",
       "proxyType": "none"
     },
     {
@@ -111,10 +117,11 @@
       "chainId": 31337,
       "networkName": "hardhat",
       "contractName": "BondCollector",
-      "address": "0x0165878A594ca255338adfa4d48449f69242Eb8F",
-      "blockNumber": 7,
+      "address": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+      "deploymentTxHash": "0xee5a62193f98ffc8140c653b46569399fa4c11f2a5a05ea2211829c39e864026",
+      "blockNumber": 5,
       "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-      "timestamp": "2026-04-24T17:34:41.502Z",
+      "timestamp": "2026-09-17T14:31:54.160Z",
       "verified": false,
       "blockExplorerUrl": "",
       "constructorArgs": [
@@ -126,16 +133,19 @@
       ],
       "compilerVersion": "0.8.37",
       "optimizationRuns": 1000,
+      "gasUsed": "1000725",
+      "deploymentCost": "0.001531653631390575",
       "proxyType": "none"
     },
     {
       "chainId": 31337,
       "networkName": "hardhat",
       "contractName": "EscrowGovernanceTimelock",
-      "address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
-      "blockNumber": 8,
+      "address": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
+      "deploymentTxHash": "0xba07029c13c4201e66ce0997afcfbe36cdd1bebec02673a1da3f3280640c1df5",
+      "blockNumber": 6,
       "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-      "timestamp": "2026-04-24T17:34:41.551Z",
+      "timestamp": "2026-09-17T14:31:54.232Z",
       "verified": false,
       "blockExplorerUrl": "",
       "constructorArgs": [
@@ -147,16 +157,19 @@
       ],
       "compilerVersion": "0.8.37",
       "optimizationRuns": 1000,
+      "gasUsed": "1439425",
+      "deploymentCost": "0.00211401209338345",
       "proxyType": "none"
     },
     {
       "chainId": 31337,
       "networkName": "hardhat",
       "contractName": "SewToken",
-      "address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
-      "blockNumber": 9,
+      "address": "0x0165878A594ca255338adfa4d48449f69242Eb8F",
+      "deploymentTxHash": "0xf5318e56e84cf968b534ae76d417f4120884a8428495385d4f3a1528adbf1511",
+      "blockNumber": 7,
       "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-      "timestamp": "2026-04-24T17:34:41.603Z",
+      "timestamp": "2026-09-17T14:31:54.300Z",
       "verified": false,
       "blockExplorerUrl": "",
       "constructorArgs": [
@@ -171,16 +184,19 @@
       ],
       "compilerVersion": "0.8.37",
       "optimizationRuns": 1000,
+      "gasUsed": "1828600",
+      "deploymentCost": "0.0025887319299044",
       "proxyType": "none"
     },
     {
       "chainId": 31337,
       "networkName": "hardhat",
       "contractName": "TimelockController",
-      "address": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318",
-      "blockNumber": 10,
+      "address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
+      "deploymentTxHash": "0x8d9a1509f02a628f1f771c15a1adfe341a2c671445cb06f99d77cd65972601a8",
+      "blockNumber": 8,
       "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-      "timestamp": "2026-04-24T17:34:41.694Z",
+      "timestamp": "2026-09-17T14:31:54.446Z",
       "verified": false,
       "blockExplorerUrl": "",
       "constructorArgs": [
@@ -197,6 +213,8 @@
       ],
       "compilerVersion": "0.8.37",
       "optimizationRuns": 1000,
+      "gasUsed": "1335911",
+      "deploymentCost": "0.001830283241005805",
       "proxyType": "none"
     },
     {
@@ -267,6 +285,30 @@
       ],
       "compilerVersion": "0.8.37",
       "optimizationRuns": 1000,
+      "proxyType": "none"
+    },
+    {
+      "chainId": 31337,
+      "networkName": "hardhat",
+      "contractName": "EscrowCreationPolicy",
+      "address": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+      "deploymentTxHash": "0x4c8f0e777a093c0a053b429845e98e10c3f1797f36a36e6a6c7bf751e4de6db6",
+      "blockNumber": 4,
+      "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "timestamp": "2026-09-17T14:31:54.091Z",
+      "verified": false,
+      "blockExplorerUrl": "",
+      "constructorArgs": [
+        "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+      ],
+      "tags": [
+        "core",
+        "create"
+      ],
+      "compilerVersion": "0.8.37",
+      "optimizationRuns": 1000,
+      "gasUsed": "534128",
+      "deploymentCost": "0.000856349905138112",
       "proxyType": "none"
     }
   ],

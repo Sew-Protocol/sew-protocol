@@ -104,8 +104,12 @@ suite is green. The following are outstanding, non-refactor items.
       `CONTRACT_DEPENDENCY_MAP`, `CONTRACT_QUICK_REFERENCE`, `CONTRACT_NAMES_DESCRIPTIONS`,
       `CONTRACT_NAMING_REVIEW`, `PROTOCOL_MODULARITY`, `PER_ESCROW_MODULE_SELECTION`,
       `CANCEL_SEMANTICS_DESIGN`, `DIRECTORY_BEFORE_AFTER`, `DIRECTORY_REORG_PROPOSAL`.
-- [ ] Delete the migrated/skipped Hardhat tests now that they are migrated to Forge
-      (`test/hardhat/**`, including `ARCHIVED_*`) and remove the Hardhat test path from CI.
+- [x] Delete the migrated/skipped Hardhat tests (`test/hardhat/**`) and remove the
+      Hardhat test path from CI (`pnpm test:hardhat`, `package.json`, `tsconfig.json`,
+      `hardhat.config.ts` paths, docs). Note: `AaveIntegration` was already skipped
+      (its Forge target is a disabled `.bak`) and `BaseSepoliaLiveFeeFlows` was
+      `LIVE_TESTS`-gated; recreate the latter as a script if a live fee-flow check
+      is still wanted.
 - [x] `receipt.hash` → `transactionHash` across `deploy/` + `scripts/` (hardhat-deploy
       `Deployment.transactionHash`; its `Receipt` uses `transactionHash`, not `hash`).
 - [ ] Resolve or explicitly waive the remaining pre-existing TypeScript toolchain debt:

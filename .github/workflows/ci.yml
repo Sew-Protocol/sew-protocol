@@ -47,9 +47,6 @@ jobs:
       - name: Compile (Hardhat + Forge)
         run: pnpm compile
 
-      - name: Tests (Hardhat)
-        run: pnpm test:hardhat
-
       - name: Tests (Foundry)
         run: pnpm test:foundry
 

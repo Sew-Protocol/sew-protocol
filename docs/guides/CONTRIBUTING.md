@@ -64,10 +64,7 @@ pnpm test
    # Run all tests
    pnpm test
 
-   # Run only Hardhat tests
-   pnpm test:hardhat
-
-   # Run only Foundry tests
+   # Run Foundry tests (Hardhat tests have been migrated to Foundry)
    pnpm test:foundry
    ```
 
