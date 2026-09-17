@@ -79,7 +79,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (insuranceDeploy.receipt) {
       await registerDeployment(hre, 'InsurancePoolVault', {
         address: insuranceDeploy.address,
-        txHash: insuranceDeploy.receipt.hash,
+        txHash: insuranceDeploy.transactionHash,
         blockNumber: insuranceDeploy.receipt.blockNumber,
         constructorArgs: [deployer, stableToken],
         tags: ['dr3', 'insurance'],
@@ -106,7 +106,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (stakingDeploy.receipt) {
       await registerDeployment(hre, 'ResolverStakingModuleV1', {
         address: stakingDeploy.address,
-        txHash: stakingDeploy.receipt.hash,
+        txHash: stakingDeploy.transactionHash,
         blockNumber: stakingDeploy.receipt.blockNumber,
         constructorArgs: [deployer, stableToken, sewTokenAddr],
         tags: ['dr3', 'staking'],
@@ -133,7 +133,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (slashingDeploy.receipt) {
       await registerDeployment(hre, 'ResolverSlashingModuleV1', {
         address: slashingDeploy.address,
-        txHash: slashingDeploy.receipt.hash,
+        txHash: slashingDeploy.transactionHash,
         blockNumber: slashingDeploy.receipt.blockNumber,
         constructorArgs: [deployer, stakingDeploy.address, insuranceDeploy.address, stableToken],
         tags: ['dr3', 'slashing'],
@@ -160,7 +160,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (bondRegistryDeploy.receipt) {
       await registerDeployment(hre, 'BondTokenRegistry', {
         address: bondRegistryDeploy.address,
-        txHash: bondRegistryDeploy.receipt.hash,
+        txHash: bondRegistryDeploy.transactionHash,
         blockNumber: bondRegistryDeploy.receipt.blockNumber,
         constructorArgs: [timelockAddr, stableToken],
         tags: ['dr3', 'bond-registry'],
@@ -187,7 +187,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (adminFacetDeploy.receipt) {
       await registerDeployment(hre, 'DRMAdminFacet', {
         address: adminFacetDeploy.address,
-        txHash: adminFacetDeploy.receipt.hash,
+        txHash: adminFacetDeploy.transactionHash,
         blockNumber: adminFacetDeploy.receipt.blockNumber,
         constructorArgs: [timelockAddr, stableToken],
         tags: ['dr3', 'drm-admin'],
@@ -214,7 +214,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (paymentLibDeploy.receipt) {
       await registerDeployment(hre, 'PaymentCalculationLibraryV1', {
         address: paymentLibDeploy.address,
-        txHash: paymentLibDeploy.receipt.hash,
+        txHash: paymentLibDeploy.transactionHash,
         blockNumber: paymentLibDeploy.receipt.blockNumber,
         constructorArgs: [],
         tags: ['dr3', 'payment-lib'],
@@ -241,7 +241,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (incentiveDeploy.receipt) {
       await registerDeployment(hre, 'ResolverIncentiveModuleV2', {
         address: incentiveDeploy.address,
-        txHash: incentiveDeploy.receipt.hash,
+        txHash: incentiveDeploy.transactionHash,
         blockNumber: incentiveDeploy.receipt.blockNumber,
         constructorArgs: [deployer, paymentLibDeploy.address],
         tags: ['dr3', 'incentive'],

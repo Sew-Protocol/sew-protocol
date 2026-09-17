@@ -38,7 +38,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (moduleManagementDeployment.receipt) {
       await registerDeployment(hre, 'ModuleSnapshotRegistry', {
         address: moduleManagementDeployment.address,
-        txHash: moduleManagementDeployment.receipt.hash,
+        txHash: moduleManagementDeployment.transactionHash,
         blockNumber: moduleManagementDeployment.receipt.blockNumber,
         constructorArgs: [deployer],
         tags: ['core', 'module-management'],

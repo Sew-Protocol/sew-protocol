@@ -76,7 +76,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (escrowVaultDeployment.receipt) {
       await registerDeployment(hre, 'EscrowVault', {
         address: escrowVaultDeployment.address,
-        txHash: escrowVaultDeployment.receipt.hash,
+        txHash: escrowVaultDeployment.transactionHash,
         blockNumber: escrowVaultDeployment.receipt.blockNumber,
         constructorArgs: [
           escrowFee,
@@ -207,7 +207,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       if (escrowableERC20Deployment.receipt) {
         await registerDeployment(hre, 'EscrowableERC20', {
           address: escrowableERC20Deployment.address,
-          txHash: escrowableERC20Deployment.receipt.hash,
+          txHash: escrowableERC20Deployment.transactionHash,
           blockNumber: escrowableERC20Deployment.receipt.blockNumber,
           constructorArgs: [
             tokenName,

@@ -106,11 +106,14 @@ suite is green. The following are outstanding, non-refactor items.
       `CANCEL_SEMANTICS_DESIGN`, `DIRECTORY_BEFORE_AFTER`, `DIRECTORY_REORG_PROPOSAL`.
 - [ ] Delete the migrated/skipped Hardhat tests now that they are migrated to Forge
       (`test/hardhat/**`, including `ARCHIVED_*`) and remove the Hardhat test path from CI.
-- [ ] Resolve or explicitly waive pre-existing TypeScript toolchain debt:
-      `receipt.hash` → `transactionHash` in `deploy/` + `scripts/`; relative import-path
-      errors; the Typechain generator quirk; testnet/gov cast errors.
-- [ ] Compile-verify or relocate `scripts/DifferentialSetup.s.sol` (`foundry.toml` has no
-      `script=` entry, so it is not built); reconcile its JSON schema with `AnvilRunner`.
+- [x] `receipt.hash` → `transactionHash` across `deploy/` + `scripts/` (hardhat-deploy
+      `Deployment.transactionHash`; its `Receipt` uses `transactionHash`, not `hash`).
+- [ ] Resolve or explicitly waive the remaining pre-existing TypeScript toolchain debt:
+      relative import-path errors; the Typechain generator quirk; testnet/gov cast errors.
+- [x] Relocate `DifferentialSetup.s.sol` from `scripts/` to `script/` so `forge build`
+      compiles it (it was silently unbuilt because `foundry.toml` defines no `script=`).
+- [ ] Reconcile `differential-setup.json` schema with the external `AnvilRunner`
+      consumer (the removed `disputeOps` field).
 - [ ] Optional: add a real-`EscrowVault` end-to-end Kleros-refusal test.
 
 Deployment note: the current changes are designed to be deployed **after EIP-170 is

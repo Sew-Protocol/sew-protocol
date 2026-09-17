@@ -73,7 +73,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (timelockDeployment.receipt) {
       await registerDeployment(hre, 'TimelockController', {
         address: timelockDeployment.address,
-        txHash: timelockDeployment.receipt.hash,
+        txHash: timelockDeployment.transactionHash,
         blockNumber: timelockDeployment.receipt.blockNumber,
         constructorArgs: [
           config.timelock.minDelaySec,

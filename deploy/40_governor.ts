@@ -87,7 +87,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
           if (governorDeployment.receipt) {
             await registerDeployment(hre, 'GovGovernor', {
               address: governorDeployment.address,
-              txHash: governorDeployment.receipt.hash,
+              txHash: governorDeployment.transactionHash,
               blockNumber: governorDeployment.receipt.blockNumber,
               constructorArgs: [
                 tokenDeployment.address,
@@ -126,7 +126,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (governorDeployment.receipt) {
       await registerDeployment(hre, 'GovGovernor', {
         address: governorDeployment.address,
-        txHash: governorDeployment.receipt.hash,
+        txHash: governorDeployment.transactionHash,
         blockNumber: governorDeployment.receipt.blockNumber,
               constructorArgs: [
                 tokenDeployment.address,

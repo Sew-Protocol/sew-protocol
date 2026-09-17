@@ -53,7 +53,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (tokenDeployment.receipt) {
       await registerDeployment(hre, 'SewToken', {
         address: tokenDeployment.address,
-        txHash: tokenDeployment.receipt.hash,
+        txHash: tokenDeployment.transactionHash,
         blockNumber: tokenDeployment.receipt.blockNumber,
         constructorArgs: [
           config.token.name,

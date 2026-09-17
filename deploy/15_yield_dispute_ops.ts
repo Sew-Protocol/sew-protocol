@@ -76,7 +76,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (yieldOpsDeployment.receipt) {
       await registerDeployment(hre, 'YieldOps', {
         address: yieldOpsDeployment.address,
-        txHash: yieldOpsDeployment.receipt.hash,
+        txHash: yieldOpsDeployment.transactionHash,
         blockNumber: yieldOpsDeployment.receipt.blockNumber,
         constructorArgs: [deployer],
         tags: ['core', 'yield'],
@@ -106,7 +106,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (creationPolicyDeployment.receipt) {
       await registerDeployment(hre, 'EscrowCreationPolicy', {
         address: creationPolicyDeployment.address,
-        txHash: creationPolicyDeployment.receipt.hash,
+        txHash: creationPolicyDeployment.transactionHash,
         blockNumber: creationPolicyDeployment.receipt.blockNumber,
         constructorArgs: [deployer],
         tags: ['core', 'create'],
@@ -136,7 +136,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (bondCollectorDeployment.receipt) {
       await registerDeployment(hre, 'BondCollector', {
         address: bondCollectorDeployment.address,
-        txHash: bondCollectorDeployment.receipt.hash,
+        txHash: bondCollectorDeployment.transactionHash,
         blockNumber: bondCollectorDeployment.receipt.blockNumber,
         constructorArgs: [deployer],
         tags: ['core', 'bond'],

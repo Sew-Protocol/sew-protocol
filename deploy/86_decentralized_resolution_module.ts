@@ -72,7 +72,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (drmDeploy.receipt) {
       await registerDeployment(hre, 'DecentralizedResolutionModule', {
         address: drmDeploy.address,
-        txHash: drmDeploy.receipt.hash,
+        txHash: drmDeploy.transactionHash,
         blockNumber: drmDeploy.receipt.blockNumber,
         constructorArgs: [deployer],
         tags: ['dr3', 'resolution-module'],

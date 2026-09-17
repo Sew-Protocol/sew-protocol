@@ -44,7 +44,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (defaultCancellationStrategyDeployment.receipt) {
       await registerDeployment(hre, 'DefaultCancellationStrategy', {
         address: defaultCancellationStrategyDeployment.address,
-        txHash: defaultCancellationStrategyDeployment.receipt.hash,
+        txHash: defaultCancellationStrategyDeployment.transactionHash,
         blockNumber: defaultCancellationStrategyDeployment.receipt.blockNumber,
         constructorArgs: [],
         tags: ['module', 'cancellation-strategy'],

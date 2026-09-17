@@ -68,7 +68,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (aaveYieldModuleDeployment.receipt) {
       await registerDeployment(hre, 'AaveYieldModule', {
         address: aaveYieldModuleDeployment.address,
-        txHash: aaveYieldModuleDeployment.receipt.hash,
+        txHash: aaveYieldModuleDeployment.transactionHash,
         blockNumber: aaveYieldModuleDeployment.receipt.blockNumber,
         constructorArgs: [poolAddress],
         tags: ['yield', 'aave'],

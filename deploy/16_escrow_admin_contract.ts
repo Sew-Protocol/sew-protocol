@@ -28,7 +28,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (deployment.receipt) {
       await registerDeployment(hre, 'EscrowGovernanceTimelock', {
         address: deployment.address,
-        txHash: deployment.receipt.hash,
+        txHash: deployment.transactionHash,
         blockNumber: deployment.receipt.blockNumber,
         constructorArgs: [deployer],
         tags: ['escrow-admin', 'governance'],

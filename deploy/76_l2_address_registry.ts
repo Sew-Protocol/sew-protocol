@@ -47,7 +47,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (registryDeployment.receipt) {
       await registerDeployment(hre, 'L2AddressRegistry', {
         address: registryDeployment.address,
-        txHash: registryDeployment.receipt.hash,
+        txHash: registryDeployment.transactionHash,
         blockNumber: registryDeployment.receipt.blockNumber,
         constructorArgs: [initialGovernors, requiredSignatures],
         tags: ['registry', 'multi-l2'],
