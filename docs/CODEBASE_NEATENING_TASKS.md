@@ -122,8 +122,12 @@ suite is green. The following are outstanding, non-refactor items.
 - [x] Aave coverage for the current (simpler) `AaveYieldModule`: added an admin/events/
       ownership/revoke suite; the active suite totals 91 passing tests (4 RPC fork skips).
 - [x] Deleted 27 obsolete old-module Aave `.bak` tests (inert, targeted the prior module).
-- [ ] Optional Aave follow-ups: an active escrow-level end-to-end test
-      (`EscrowVault` + `AaveYieldModule`); and porting any still-relevant old scenarios
+- [x] Aave escrow-level E2E: `test/foundry/modules/AaveEscrowE2E.t.sol`. This surfaced
+      and fixed a real bug — `AaveYieldModule.initializeYield` used a push model
+      (read its own balance) while the escrow hook uses pull (approve only), so
+      escrow creation with Aave yield reverted `InsufficientBalance`. The module now
+      pulls `amount` from the escrow; module-level tests were migrated to the pull flow.
+- [ ] Optional Aave follow-ups: porting any still-relevant old scenarios
       (decimal robustness, dust deficit, stateful fuzz, inter-temporal bug).
 
 Deployment note: the current changes are designed to be deployed **after EIP-170 is

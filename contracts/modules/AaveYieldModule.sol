@@ -151,12 +151,12 @@ contract AaveYieldModule is IYieldModule, Ownable2Step {
 
         address aToken = _getAToken(token);
 
-        // Escrow has already transferred 'amount' to us (push model)
-        // Note: For fee-on-transfer tokens, balance may be less than amount
+        // Pull model: the escrow approves this module (via `_depositForYield`) and
+        // this call pulls `amount` from the calling escrow. For fee-on-transfer
+        // tokens the received amount may be less than requested.
         uint256 balBefore = IERC20(token).balanceOf(address(this));
-
-        // We can only deposit what we have
-        uint256 available = balBefore;
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+        uint256 available = IERC20(token).balanceOf(address(this)) - balBefore;
         require(available > 0, "InsufficientBalance");
         uint256 minDeposit = minDepositByToken[token];
         if (minDeposit == 0) minDeposit = 1;
@@ -171,9 +171,11 @@ contract AaveYieldModule is IYieldModule, Ownable2Step {
         // Deposit to Aave
         aavePool.supply(token, available, address(this), 0);
 
-        // Calculate actual deposited (handles fee-on-transfer)
+        // Calculate actual deposited (handles fee-on-transfer). Base is the
+        // pre-supply balance, i.e. any pre-existing balance plus the pulled amount.
         uint256 balAfter = IERC20(token).balanceOf(address(this));
-        uint256 actualDeposited = balBefore > balAfter ? balBefore - balAfter : 0;
+        uint256 preSupply = balBefore + available;
+        uint256 actualDeposited = preSupply > balAfter ? preSupply - balAfter : 0;
 
         require(actualDeposited > 0, "InsufficientBalance");
 

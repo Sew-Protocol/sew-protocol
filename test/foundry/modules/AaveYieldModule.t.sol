@@ -110,7 +110,8 @@ contract AaveYieldModuleTest is Test {
         module.approveEscrow(escrow);
         module.configureToken(address(token), address(aToken));
         
-        token.transfer(address(module), DEPOSIT_AMOUNT);
+        token.transfer(escrow, DEPOSIT_AMOUNT);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
         token.approve(address(module), DEPOSIT_AMOUNT);
         
         vm.prank(escrow);
@@ -129,20 +130,22 @@ contract AaveYieldModuleTest is Test {
     }
 
     function test_InitializeYield_UnauthorizedEscrow() public {
-        token.transfer(address(module), DEPOSIT_AMOUNT);
+        token.transfer(escrow, DEPOSIT_AMOUNT);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow);
         vm.expectRevert("UnauthorizedEscrow");
         module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.OFF);
     }
 
-    function test_InitializeYield_InsufficientBalance() public {
+    function test_InitializeYield_NoFundsOrApproval_Reverts() public {
         module.approveEscrow(escrow);
         module.configureToken(address(token), address(aToken));
-        
-        // No tokens transferred
+
+        // Pull model: with no funds and no approval the module's transferFrom
+        // cannot source the deposit and the call reverts.
         vm.prank(escrow);
-        vm.expectRevert("InsufficientBalance");
+        vm.expectRevert();
         module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.OFF);
     }
 
@@ -151,7 +154,8 @@ contract AaveYieldModuleTest is Test {
         module.configureToken(address(token), address(aToken));
         module.configureMinDeposit(address(token), DEPOSIT_AMOUNT + 1);
 
-        token.transfer(address(module), DEPOSIT_AMOUNT);
+        token.transfer(escrow, DEPOSIT_AMOUNT);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
 
         vm.prank(escrow);
         vm.expectRevert("BelowMinDeposit");
@@ -225,7 +229,8 @@ contract AaveYieldModuleTest is Test {
         module.configureToken(address(token), address(aToken));
         
         uint256 escrowBalBefore = token.balanceOf(escrow);
-        token.transfer(address(module), DEPOSIT_AMOUNT);
+        token.transfer(escrow, DEPOSIT_AMOUNT);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
         token.approve(address(module), DEPOSIT_AMOUNT);
         
         vm.prank(escrow);
@@ -245,7 +250,8 @@ contract AaveYieldModuleTest is Test {
         module.approveEscrow(escrow);
         module.configureToken(address(token), address(aToken));
         
-        token.transfer(address(module), DEPOSIT_AMOUNT);
+        token.transfer(escrow, DEPOSIT_AMOUNT);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow);
         module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.OFF);
@@ -267,13 +273,15 @@ contract AaveYieldModuleTest is Test {
         module.approveEscrow(escrow);
         module.configureToken(address(token), address(aToken));
         
-        token.transfer(address(module), DEPOSIT_AMOUNT);
+        token.transfer(escrow, DEPOSIT_AMOUNT);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
         token.approve(address(module), DEPOSIT_AMOUNT);
         
         vm.prank(escrow);
         module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.OFF);
         
-        token.transfer(address(module), DEPOSIT_AMOUNT * 2);
+        token.transfer(escrow, DEPOSIT_AMOUNT * 2);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
         token.approve(address(module), DEPOSIT_AMOUNT * 2);
         
         vm.prank(escrow);
@@ -285,7 +293,8 @@ contract AaveYieldModuleTest is Test {
         module.approveEscrow(escrow);
         module.configureToken(address(token), address(aToken));
         
-        token.transfer(address(module), DEPOSIT_AMOUNT);
+        token.transfer(escrow, DEPOSIT_AMOUNT);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
         token.approve(address(module), DEPOSIT_AMOUNT);
         
         vm.prank(escrow);
@@ -300,7 +309,8 @@ contract AaveYieldModuleTest is Test {
         module.approveEscrow(escrow);
         module.configureToken(address(token), address(aToken));
         
-        token.transfer(address(module), DEPOSIT_AMOUNT);
+        token.transfer(escrow, DEPOSIT_AMOUNT);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow);
         module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.OFF);
@@ -334,7 +344,8 @@ contract AaveYieldModuleTest is Test {
         module.approveEscrow(escrow);
         module.configureToken(address(token), address(aToken));
 
-        token.transfer(address(module), DEPOSIT_AMOUNT);
+        token.transfer(escrow, DEPOSIT_AMOUNT);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
 
         vm.prank(escrow);
         module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.OFF);
@@ -351,7 +362,8 @@ contract AaveYieldModuleTest is Test {
         module.approveEscrow(escrow);
         module.configureToken(address(token), address(aToken));
 
-        token.transfer(address(module), DEPOSIT_AMOUNT);
+        token.transfer(escrow, DEPOSIT_AMOUNT);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
 
         vm.prank(escrow);
         module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.OFF);
@@ -368,7 +380,8 @@ contract AaveYieldModuleTest is Test {
         
         ERC20Mock otherToken = new ERC20Mock("Other", "OTH", owner, INITIAL_BALANCE);
         otherToken.approve(address(pool), type(uint256).max);
-        otherToken.transfer(address(module), DEPOSIT_AMOUNT);
+        otherToken.transfer(escrow, DEPOSIT_AMOUNT);
+        vm.prank(escrow); otherToken.approve(address(module), type(uint256).max);
         
         // Module reverts with TokenNotConfigured custom error before reaching the pool
         vm.prank(escrow);
@@ -401,7 +414,10 @@ contract AaveYieldModuleTest is Test {
         uint256 expectedFee = requestedAmount / 100; // 1% fee
         uint256 expectedDeposited = requestedAmount - expectedFee;
         
-        feeToken.transfer(address(module), requestedAmount);
+        // Mint directly to the escrow so it holds the full requested amount; the
+        // 1% fee is then charged on the escrow -> module pull.
+        feeToken.mint(escrow, requestedAmount);
+        vm.prank(escrow); feeToken.approve(address(module), type(uint256).max);
         
         // Pass requestedAmount but only what's available will be deposited
         vm.prank(escrow);
@@ -480,7 +496,8 @@ contract AaveYieldModule6DecimalTest is Test {
         module.approveEscrow(escrow);
         module.configureToken(address(usdc), address(usdcAToken));
         
-        usdc.transfer(address(module), DEPOSIT_AMOUNT_6DEC);
+        usdc.transfer(escrow, DEPOSIT_AMOUNT_6DEC);
+        vm.prank(escrow); usdc.approve(address(module), type(uint256).max);
         usdc.approve(address(module), DEPOSIT_AMOUNT_6DEC);
         
         vm.prank(escrow);
@@ -494,7 +511,8 @@ contract AaveYieldModule6DecimalTest is Test {
         module.configureToken(address(usdc), address(usdcAToken));
         
         // Small deposit (100 USDC = 100e6)
-        usdc.transfer(address(module), SMALL_DEPOSIT_6DEC);
+        usdc.transfer(escrow, SMALL_DEPOSIT_6DEC);
+        vm.prank(escrow); usdc.approve(address(module), type(uint256).max);
         usdc.approve(address(module), SMALL_DEPOSIT_6DEC);
         
         vm.prank(escrow);
@@ -508,7 +526,8 @@ contract AaveYieldModule6DecimalTest is Test {
         module.approveEscrow(escrow);
         module.configureToken(address(usdc), address(usdcAToken));
         
-        usdc.transfer(address(module), DEPOSIT_AMOUNT_6DEC);
+        usdc.transfer(escrow, DEPOSIT_AMOUNT_6DEC);
+        vm.prank(escrow); usdc.approve(address(module), type(uint256).max);
         usdc.approve(address(module), DEPOSIT_AMOUNT_6DEC);
         
         vm.prank(escrow);
@@ -527,7 +546,8 @@ contract AaveYieldModule6DecimalTest is Test {
         module.approveEscrow(escrow);
         module.configureToken(address(usdc), address(usdcAToken));
         
-        usdc.transfer(address(module), DEPOSIT_AMOUNT_6DEC);
+        usdc.transfer(escrow, DEPOSIT_AMOUNT_6DEC);
+        vm.prank(escrow); usdc.approve(address(module), type(uint256).max);
         
         vm.prank(escrow);
         module.initializeYield(1, address(usdc), DEPOSIT_AMOUNT_6DEC, YieldPreset.OFF);
@@ -551,7 +571,8 @@ contract AaveYieldModule6DecimalTest is Test {
         module.approveEscrow(escrow);
         module.configureToken(address(usdt), address(usdtAToken));
         
-        usdt.transfer(address(module), DEPOSIT_AMOUNT_6DEC);
+        usdt.transfer(escrow, DEPOSIT_AMOUNT_6DEC);
+        vm.prank(escrow); usdt.approve(address(module), type(uint256).max);
         usdt.approve(address(module), DEPOSIT_AMOUNT_6DEC);
         
         vm.prank(escrow);
@@ -564,7 +585,8 @@ contract AaveYieldModule6DecimalTest is Test {
         module.approveEscrow(escrow);
         module.configureToken(address(usdt), address(usdtAToken));
         
-        usdt.transfer(address(module), DEPOSIT_AMOUNT_6DEC);
+        usdt.transfer(escrow, DEPOSIT_AMOUNT_6DEC);
+        vm.prank(escrow); usdt.approve(address(module), type(uint256).max);
         usdt.approve(address(module), DEPOSIT_AMOUNT_6DEC);
         
         vm.prank(escrow);
@@ -586,12 +608,14 @@ contract AaveYieldModule6DecimalTest is Test {
         module.configureToken(address(usdc), address(usdcAToken));
         
         // Escrow 1 deposits
-        usdc.transfer(address(module), DEPOSIT_AMOUNT_6DEC);
+        usdc.transfer(escrow, DEPOSIT_AMOUNT_6DEC);
+        vm.prank(escrow); usdc.approve(address(module), type(uint256).max);
         vm.prank(escrow);
         module.initializeYield(1, address(usdc), DEPOSIT_AMOUNT_6DEC, YieldPreset.OFF);
         
         // Escrow 2 deposits
-        usdc.transfer(address(module), DEPOSIT_AMOUNT_6DEC * 2);
+        usdc.transfer(escrow2, DEPOSIT_AMOUNT_6DEC * 2);
+        vm.prank(escrow2); usdc.approve(address(module), type(uint256).max);
         vm.prank(escrow2);
         module.initializeYield(1, address(usdc), DEPOSIT_AMOUNT_6DEC * 2, YieldPreset.OFF);
         
@@ -607,7 +631,8 @@ contract AaveYieldModule6DecimalTest is Test {
         module.approveEscrow(escrow);
         module.configureToken(address(usdc), address(usdcAToken));
         
-        usdc.transfer(address(module), DEPOSIT_AMOUNT_6DEC);
+        usdc.transfer(escrow, DEPOSIT_AMOUNT_6DEC);
+        vm.prank(escrow); usdc.approve(address(module), type(uint256).max);
         
         vm.prank(escrow);
         module.initializeYield(1, address(usdc), DEPOSIT_AMOUNT_6DEC, YieldPreset.OFF);
@@ -630,7 +655,8 @@ contract AaveYieldModule6DecimalTest is Test {
         
         // Minimum dust amount (1 USDC = 1e6)
         uint256 dustAmount = 1e6;
-        usdc.transfer(address(module), dustAmount);
+        usdc.transfer(escrow, dustAmount);
+        vm.prank(escrow); usdc.approve(address(module), type(uint256).max);
         
         vm.prank(escrow);
         uint256 accepted = module.initializeYield(1, address(usdc), dustAmount, YieldPreset.OFF);
@@ -651,7 +677,8 @@ contract AaveYieldModule6DecimalTest is Test {
         module.configureToken(address(usdc), address(usdcAToken));
         
         // Initialize
-        usdc.transfer(address(module), DEPOSIT_AMOUNT_6DEC);
+        usdc.transfer(escrow, DEPOSIT_AMOUNT_6DEC);
+        vm.prank(escrow); usdc.approve(address(module), type(uint256).max);
         usdc.approve(address(module), DEPOSIT_AMOUNT_6DEC);
         
         vm.prank(escrow);
@@ -718,12 +745,14 @@ contract AaveYieldModuleMixedDecimalsTest is Test {
         module.configureToken(address(dai), address(daiAToken));
         
         // USDC deposit (6 decimals)
-        usdc.transfer(address(module), 1000e6);
+        usdc.transfer(escrow, 1000e6);
+        vm.prank(escrow); usdc.approve(address(module), type(uint256).max);
         vm.prank(escrow);
         module.initializeYield(1, address(usdc), 1000e6, YieldPreset.OFF);
         
         // DAI deposit (18 decimals)
-        dai.transfer(address(module), 1000e18);
+        dai.transfer(escrow, 1000e18);
+        vm.prank(escrow); dai.approve(address(module), type(uint256).max);
         vm.prank(escrow);
         module.initializeYield(2, address(dai), 1000e18, YieldPreset.OFF);
         
@@ -741,8 +770,10 @@ contract AaveYieldModuleMixedDecimalsTest is Test {
         module.configureToken(address(dai), address(daiAToken));
         
         // Deposit both
-        usdc.transfer(address(module), 1000e6);
-        dai.transfer(address(module), 1000e18);
+        usdc.transfer(escrow, 1000e6);
+        vm.prank(escrow); usdc.approve(address(module), type(uint256).max);
+        dai.transfer(escrow, 1000e18);
+        vm.prank(escrow); dai.approve(address(module), type(uint256).max);
         
         vm.prank(escrow);
         module.initializeYield(1, address(usdc), 1000e6, YieldPreset.OFF);

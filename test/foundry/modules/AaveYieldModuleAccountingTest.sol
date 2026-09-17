@@ -51,7 +51,8 @@ contract AaveYieldModuleAccountingTest is Test {
         uint256 smallAmount = 1e18;
         
         vm.prank(escrow);
-        token.transfer(address(module), smallAmount);
+        token.transfer(escrow, smallAmount);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow);
         uint256 accepted = module.initializeYield(1, address(token), smallAmount, YieldPreset.TO_SENDER);
@@ -71,7 +72,8 @@ contract AaveYieldModuleAccountingTest is Test {
         uint256 amount = 50e18;
         
         vm.prank(escrow);
-        token.transfer(address(module), amount);
+        token.transfer(escrow, amount);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow);
         uint256 accepted = module.initializeYield(1, address(token), amount, YieldPreset.TO_SENDER);
@@ -93,7 +95,8 @@ contract AaveYieldModuleAccountingTest is Test {
         uint256 largeAmount = 1000e18;
         
         vm.prank(escrow);
-        token.transfer(address(module), largeAmount);
+        token.transfer(escrow, largeAmount);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow);
         uint256 accepted = module.initializeYield(1, address(token), largeAmount, YieldPreset.TO_SENDER);
@@ -119,7 +122,8 @@ contract AaveYieldModuleAccountingTest is Test {
         
         for (uint256 i = 1; i <= cycles; i++) {
             vm.prank(escrow);
-            token.transfer(address(module), cycleAmount);
+            token.transfer(escrow, cycleAmount);
+            vm.prank(escrow); token.approve(address(module), type(uint256).max);
             
             vm.prank(escrow);
             uint256 accepted = module.initializeYield(i, address(token), cycleAmount, YieldPreset.TO_SENDER);
@@ -145,7 +149,8 @@ contract AaveYieldModuleAccountingTest is Test {
         uint256 depositAmount = 100e18;
         
         vm.prank(escrow);
-        token.transfer(address(module), depositAmount);
+        token.transfer(escrow, depositAmount);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow);
         module.initializeYield(1, address(token), depositAmount, YieldPreset.TO_SENDER);
@@ -167,13 +172,15 @@ contract AaveYieldModuleAccountingTest is Test {
     function test_multiple_independent_positions() public {
         // First position
         vm.prank(escrow);
-        token.transfer(address(module), 50e18);
+        token.transfer(escrow, 50e18);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
         vm.prank(escrow);
         module.initializeYield(1, address(token), 50e18, YieldPreset.TO_SENDER);
         
         // Second position (different ID)
         vm.prank(escrow);
-        token.transfer(address(module), 75e18);
+        token.transfer(escrow, 75e18);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
         vm.prank(escrow);
         module.initializeYield(2, address(token), 75e18, YieldPreset.TO_SENDER);
         

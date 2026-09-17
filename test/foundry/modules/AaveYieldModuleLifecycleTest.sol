@@ -57,7 +57,8 @@ contract AaveYieldModuleLifecycleTest is Test {
         
         // Setup and deposit
         vm.prank(escrow1);
-        token.transfer(address(module), amount);
+        token.transfer(escrow1, amount);
+        vm.prank(escrow1); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow1);
         module.initializeYield(1, address(token), amount, YieldPreset.TO_SENDER);
@@ -83,7 +84,8 @@ contract AaveYieldModuleLifecycleTest is Test {
         uint256 amount = 100e18;
         
         vm.prank(escrow1);
-        token.transfer(address(module), amount);
+        token.transfer(escrow1, amount);
+        vm.prank(escrow1); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow1);
         module.initializeYield(1, address(token), amount, YieldPreset.TO_SENDER);
@@ -105,7 +107,8 @@ contract AaveYieldModuleLifecycleTest is Test {
         uint256 amount = 100e18;
         
         vm.prank(escrow1);
-        token.transfer(address(module), amount);
+        token.transfer(escrow1, amount);
+        vm.prank(escrow1); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow1);
         module.initializeYield(1, address(token), amount, YieldPreset.TO_SENDER);
@@ -131,17 +134,20 @@ contract AaveYieldModuleLifecycleTest is Test {
         
         // Create 3 positions
         vm.prank(escrow1);
-        token.transfer(address(module), amount1);
+        token.transfer(escrow1, amount1);
+        vm.prank(escrow1); token.approve(address(module), type(uint256).max);
         vm.prank(escrow1);
         module.initializeYield(1, address(token), amount1, YieldPreset.TO_SENDER);
         
         vm.prank(escrow1);
-        token.transfer(address(module), amount2);
+        token.transfer(escrow1, amount2);
+        vm.prank(escrow1); token.approve(address(module), type(uint256).max);
         vm.prank(escrow1);
         module.initializeYield(2, address(token), amount2, YieldPreset.TO_SENDER);
         
         vm.prank(escrow2);
-        token.transfer(address(module), amount3);
+        token.transfer(escrow2, amount3);
+        vm.prank(escrow2); token.approve(address(module), type(uint256).max);
         vm.prank(escrow2);
         module.initializeYield(1, address(token), amount3, YieldPreset.TO_SENDER);
         
@@ -176,13 +182,15 @@ contract AaveYieldModuleLifecycleTest is Test {
         
         // Escrow1 deposits
         vm.prank(escrow1);
-        token.transfer(address(module), amount1);
+        token.transfer(escrow1, amount1);
+        vm.prank(escrow1); token.approve(address(module), type(uint256).max);
         vm.prank(escrow1);
         module.initializeYield(1, address(token), amount1, YieldPreset.TO_SENDER);
         
         // Escrow2 deposits
         vm.prank(escrow2);
-        token.transfer(address(module), amount2);
+        token.transfer(escrow2, amount2);
+        vm.prank(escrow2); token.approve(address(module), type(uint256).max);
         vm.prank(escrow2);
         module.initializeYield(1, address(token), amount2, YieldPreset.TO_SENDER);
         
@@ -207,7 +215,8 @@ contract AaveYieldModuleLifecycleTest is Test {
         uint256 amount = 100e18;
         
         vm.prank(escrow1);
-        token.transfer(address(module), amount);
+        token.transfer(escrow1, amount);
+        vm.prank(escrow1); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow1);
         module.initializeYield(1, address(token), amount, YieldPreset.TO_SENDER);
@@ -232,7 +241,8 @@ contract AaveYieldModuleLifecycleTest is Test {
         uint256 amount = 100e18;
         
         vm.prank(escrow1);
-        token.transfer(address(module), amount);
+        token.transfer(escrow1, amount);
+        vm.prank(escrow1); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow1);
         module.initializeYield(1, address(token), amount, YieldPreset.TO_SENDER);

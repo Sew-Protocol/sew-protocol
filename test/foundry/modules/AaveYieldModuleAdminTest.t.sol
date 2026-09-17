@@ -135,14 +135,16 @@ contract AaveYieldModuleAdminTest is Test {
         module.approveEscrow(escrow);
         module.configureToken(address(token), address(aToken));
 
-        token.transfer(address(module), DEPOSIT_AMOUNT);
+        token.transfer(escrow, DEPOSIT_AMOUNT);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
         vm.prank(escrow);
         uint256 accepted = module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.OFF);
         assertEq(accepted, DEPOSIT_AMOUNT, 'first deposit');
 
         module.revokeEscrow(escrow);
 
-        token.transfer(address(module), DEPOSIT_AMOUNT);
+        token.transfer(escrow, DEPOSIT_AMOUNT);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
         vm.prank(escrow);
         vm.expectRevert('UnauthorizedEscrow');
         module.initializeYield(2, address(token), DEPOSIT_AMOUNT, YieldPreset.OFF);

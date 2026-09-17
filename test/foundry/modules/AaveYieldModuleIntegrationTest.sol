@@ -54,7 +54,8 @@ contract AaveYieldModuleIntegrationTest is Test {
      */
     function test_withdraw_reserve_unavailable() public {
         vm.prank(escrow);
-        token.transfer(address(module), 100e18);
+        token.transfer(escrow, 100e18);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow);
         module.initializeYield(1, address(token), 100e18, YieldPreset.TO_SENDER);
@@ -73,7 +74,8 @@ contract AaveYieldModuleIntegrationTest is Test {
      */
     function test_emergency_unwind_reserve_unavailable() public {
         vm.prank(escrow);
-        token.transfer(address(module), 100e18);
+        token.transfer(escrow, 100e18);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow);
         module.initializeYield(1, address(token), 100e18, YieldPreset.TO_SENDER);
@@ -97,12 +99,14 @@ contract AaveYieldModuleIntegrationTest is Test {
         uint256 amount2 = 75e18;
         
         vm.prank(escrow);
-        token.transfer(address(module), amount1);
+        token.transfer(escrow, amount1);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
         vm.prank(escrow);
         module.initializeYield(1, address(token), amount1, YieldPreset.TO_SENDER);
         
         vm.prank(otherEscrow);
-        token.transfer(address(module), amount2);
+        token.transfer(otherEscrow, amount2);
+        vm.prank(otherEscrow); token.approve(address(module), type(uint256).max);
         vm.prank(otherEscrow);
         module.initializeYield(1, address(token), amount2, YieldPreset.TO_SENDER);
         
@@ -131,7 +135,8 @@ contract AaveYieldModuleIntegrationTest is Test {
         uint256 depositAmount = 100e18;
         
         vm.prank(escrow);
-        token.transfer(address(module), depositAmount);
+        token.transfer(escrow, depositAmount);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow);
         module.initializeYield(1, address(token), depositAmount, YieldPreset.TO_SENDER);
@@ -154,7 +159,8 @@ contract AaveYieldModuleIntegrationTest is Test {
         address attacker = address(0xDEAD);
         
         vm.prank(escrow);
-        token.transfer(address(module), 100e18);
+        token.transfer(escrow, 100e18);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow);
         module.initializeYield(1, address(token), 100e18, YieldPreset.TO_SENDER);
@@ -174,7 +180,8 @@ contract AaveYieldModuleIntegrationTest is Test {
         
         // Deposit
         vm.prank(escrow);
-        token.transfer(address(module), depositAmount);
+        token.transfer(escrow, depositAmount);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow);
         uint256 accepted = module.initializeYield(1, address(token), depositAmount, YieldPreset.TO_SENDER);

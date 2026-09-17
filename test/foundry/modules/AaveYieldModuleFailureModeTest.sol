@@ -52,7 +52,8 @@ contract AaveYieldModuleFailureModeTest is Test {
      */
     function test_aave_withdraw_reverts_fail_closed() public {
         vm.prank(escrow);
-        token.transfer(address(module), DEPOSIT_AMOUNT);
+        token.transfer(escrow, DEPOSIT_AMOUNT);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow);
         module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.TO_SENDER);
@@ -75,7 +76,8 @@ contract AaveYieldModuleFailureModeTest is Test {
      */
     function test_emergency_unwind_fail_closed() public {
         vm.prank(escrow);
-        token.transfer(address(module), DEPOSIT_AMOUNT);
+        token.transfer(escrow, DEPOSIT_AMOUNT);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow);
         module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.TO_SENDER);
@@ -98,7 +100,8 @@ contract AaveYieldModuleFailureModeTest is Test {
         pool.setSupplyFail(true);
         
         vm.prank(escrow);
-        token.transfer(address(module), DEPOSIT_AMOUNT);
+        token.transfer(escrow, DEPOSIT_AMOUNT);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow);
         vm.expectRevert();
@@ -118,7 +121,8 @@ contract AaveYieldModuleFailureModeTest is Test {
         pool.setSupplyFailAmount(DEPOSIT_AMOUNT / 2);
         
         vm.prank(escrow);
-        token.transfer(address(module), DEPOSIT_AMOUNT);
+        token.transfer(escrow, DEPOSIT_AMOUNT);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow);
         uint256 accepted = module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.TO_SENDER);
@@ -135,7 +139,8 @@ contract AaveYieldModuleFailureModeTest is Test {
      */
     function test_withdraw_exceeds_available() public {
         vm.prank(escrow);
-        token.transfer(address(module), DEPOSIT_AMOUNT / 2);
+        token.transfer(escrow, DEPOSIT_AMOUNT / 2);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow);
         module.initializeYield(1, address(token), DEPOSIT_AMOUNT / 2, YieldPreset.TO_SENDER);
@@ -153,7 +158,8 @@ contract AaveYieldModuleFailureModeTest is Test {
      */
     function test_withdraw_exactly_available() public {
         vm.prank(escrow);
-        token.transfer(address(module), DEPOSIT_AMOUNT);
+        token.transfer(escrow, DEPOSIT_AMOUNT);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow);
         module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.TO_SENDER);
@@ -209,7 +215,8 @@ contract AaveYieldModuleFailureModeTest is Test {
      */
     function test_accounting_integrity() public {
         vm.prank(escrow);
-        token.transfer(address(module), DEPOSIT_AMOUNT);
+        token.transfer(escrow, DEPOSIT_AMOUNT);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow);
         module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.TO_SENDER);
