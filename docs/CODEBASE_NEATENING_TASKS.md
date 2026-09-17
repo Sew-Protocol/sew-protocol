@@ -91,6 +91,32 @@ not as isolated cleanup.
 - [ ] Keep the size report as informational telemetry after the limit migration; retain a conservative alert threshold rather than a historical hard-coded gate.
 - [ ] Update README, docs index, setup guides, governance runbooks, and CI instructions to describe one current path from build through deployment and verification.
 
+## Post-internalization follow-ups (SEW refactor)
+
+Context: deterministic creation/dispute/settlement derivation was internalized
+(`EscrowCreationLogic` / `EscrowDisputeLogic` / `EscrowSettlementLogic`); global
+creation policy was extracted to `EscrowCreationPolicy`; the runtime
+`CreateOps` / `SettlementOps` / `DisputeOps` boundaries were removed. The Foundry
+suite is green. The following are outstanding, non-refactor items.
+
+- [ ] Update the remaining current-state architecture docs to match the internalized
+      architecture (using the authoritative-block approach applied elsewhere):
+      `CONTRACT_DEPENDENCY_MAP`, `CONTRACT_QUICK_REFERENCE`, `CONTRACT_NAMES_DESCRIPTIONS`,
+      `CONTRACT_NAMING_REVIEW`, `PROTOCOL_MODULARITY`, `PER_ESCROW_MODULE_SELECTION`,
+      `CANCEL_SEMANTICS_DESIGN`, `DIRECTORY_BEFORE_AFTER`, `DIRECTORY_REORG_PROPOSAL`.
+- [ ] Delete the migrated/skipped Hardhat tests now that they are migrated to Forge
+      (`test/hardhat/**`, including `ARCHIVED_*`) and remove the Hardhat test path from CI.
+- [ ] Resolve or explicitly waive pre-existing TypeScript toolchain debt:
+      `receipt.hash` → `transactionHash` in `deploy/` + `scripts/`; relative import-path
+      errors; the Typechain generator quirk; testnet/gov cast errors.
+- [ ] Compile-verify or relocate `scripts/DifferentialSetup.s.sol` (`foundry.toml` has no
+      `script=` entry, so it is not built); reconcile its JSON schema with `AnvilRunner`.
+- [ ] Optional: add a real-`EscrowVault` end-to-end Kleros-refusal test.
+
+Deployment note: the current changes are designed to be deployed **after EIP-170 is
+removed**; the contract-size warnings are therefore expected and are not a release
+blocker.
+
 ## Completion criteria
 
 - [ ] A clean release build uses the approved `0.8.37` compiler configuration with no unintended mixed pragmas.
