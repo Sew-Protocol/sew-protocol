@@ -20,6 +20,10 @@ contract MockAavePool {
 
     uint256 public constant INITIAL_LIQUIDITY_INDEX = 1e27; // 1.0 with 27 decimals
     uint256 public constant YIELD_RATE = 1e25; // 1% per block (for testing)
+    // OPT-IN time-based accrual (default OFF so block-based tests are unaffected).
+    bool public autoAccrueByTime;
+    uint256 public timeYieldRate; // per-second rate, scaled by 1e27
+    mapping(address => uint256) public lastTimeAccrual; // asset => last accrual ts
 
     // Failure simulation
     bool public supplyFail;
@@ -55,18 +59,58 @@ contract MockAavePool {
         supplyFailAmount = _amount;
     }
 
-    function getLiquidityIndex(address asset) public view returns (uint256) {
+    function _baseIndex(address asset) internal view returns (uint256) {
         return liquidityIndex[asset] > 0 ? liquidityIndex[asset] : INITIAL_LIQUIDITY_INDEX;
+    }
+
+    function getLiquidityIndex(address asset) public view returns (uint256) {
+        uint256 base = _baseIndex(asset);
+        if (!autoAccrueByTime) return base;
+        uint256 last = lastTimeAccrual[asset];
+        if (last == 0 || block.timestamp <= last) return base;
+        uint256 elapsed = block.timestamp - last;
+        return base + (base * timeYieldRate * elapsed) / INITIAL_LIQUIDITY_INDEX;
     }
 
     function getReserveNormalizedIncome(address asset) external view returns (uint256) {
         return getLiquidityIndex(asset);
     }
 
+    function enableTimeAccrual(uint256 perSecondRate) external {
+        autoAccrueByTime = true;
+        timeYieldRate = perSecondRate;
+    }
+
+    function disableTimeAccrual() external {
+        autoAccrueByTime = false;
+    }
+
+    function _accrueToNow(address asset) internal {
+        if (!autoAccrueByTime) return;
+        uint256 base = _baseIndex(asset);
+        uint256 last = lastTimeAccrual[asset];
+        if (last == 0) {
+            liquidityIndex[asset] = base;
+            lastTimeAccrual[asset] = block.timestamp;
+            return;
+        }
+        if (block.timestamp <= last) return;
+        uint256 elapsed = block.timestamp - last;
+        uint256 newIndex = base + (base * timeYieldRate * elapsed) / INITIAL_LIQUIDITY_INDEX;
+        uint256 poolBalance = IERC20(asset).balanceOf(address(this));
+        uint256 yieldGenerated = (poolBalance * (newIndex - base)) / base;
+        if (yieldGenerated > 0) {
+            ERC20Mock(asset).mint(address(this), yieldGenerated);
+        }
+        liquidityIndex[asset] = newIndex;
+        lastTimeAccrual[asset] = block.timestamp;
+    }
+
     function supply(address asset, uint256 amount, address onBehalfOf, uint16) external virtual {
         require(tokenToAToken[asset] != address(0), 'Token not supported');
         require(!supplyFail, 'Supply failed');
 
+        _accrueToNow(asset);
         uint256 currentIndex = getLiquidityIndex(asset);
 
         // Handle partial failure
@@ -94,6 +138,7 @@ contract MockAavePool {
         require(tokenToAToken[asset] != address(0), 'Token not supported');
         require(!withdrawFail, 'Withdraw failed');
 
+        _accrueToNow(asset);
         MockAToken aTokenContract = MockAToken(tokenToAToken[asset]);
         uint256 currentIndex = getLiquidityIndex(asset);
 

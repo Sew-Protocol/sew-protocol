@@ -233,6 +233,39 @@ contract EmergencyRecoveryFlowTest is Test {
         assertGt(unwound2, 0, 'second unwind succeeds after cooldown');
     }
 
+    function test_guardianOps_unwindUsesRecordedModuleAfterUpgrade() public {
+        // Fund a position into the currently-default module (aaveModule).
+        uint256 wf = _openEscrowWithYield();
+        assertEq(vault.v25YieldModules(wf), address(aaveModule), 'recorded module is aaveModule');
+
+        // Simulate a module upgrade: deploy a new module and make it the registry default.
+        AaveYieldModule newModule = new AaveYieldModule(address(pool));
+        newModule.configureToken(address(token), address(aToken));
+        newModule.approveEscrow(address(vault));
+        newModule.setRecoveryOperator(address(guardianOps), true);
+        registry.queueModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN, address(newModule));
+        vm.warp(block.timestamp + 8 days);
+        registry.activateModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN);
+
+        // The workflow still records the ORIGINAL module, even though the default changed.
+        assertEq(vault.v25YieldModules(wf), address(aaveModule), 'workflow records original module');
+        assertEq(registry.getModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN), address(newModule), 'default is now newModule');
+
+        // An emergency unwind must route through the RECORDED module (which holds the
+        // position), not the new default. If it used the default, it would find no position
+        // and revert (TokenMismatch), so this test fails pre-fix.
+        uint256 principalExpected = vault.v25YieldPrincipals(wf);
+        vm.prank(GUARDIAN);
+        uint256 unwound = guardianOps.emergencyUnwindAavePosition(address(token), wf, address(vault));
+        assertGe(unwound, principalExpected, 'funds recovered via recorded module');
+
+        // Position cleared on the recorded module; new module holds nothing.
+        (, uint256 principal, ) = aaveModule.positions(address(vault), wf);
+        assertEq(principal, 0, 'position cleared on recorded module');
+        (, uint256 newPrincipal, ) = newModule.positions(address(vault), wf);
+        assertEq(newPrincipal, 0, 'new module has no position');
+    }
+
     function test_guardianOps_maxUnwindPerCallReverts() public {
         // Deposit a position larger than the per-call unwind cap.
         uint256 maxAllowed = guardianOps.MAX_UNWIND_AMOUNT_PER_CALL();
