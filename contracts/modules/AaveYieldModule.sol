@@ -185,6 +185,10 @@ contract AaveYieldModule is IYieldModule, ERC165, Ownable2Step {
             : 0;
         require(received > 0, "InsufficientBalance");
 
+        // Module balance immediately after pulling the principal. Used below to measure
+        // how much the supply call actually moved into the pool.
+        uint256 balanceAfterPull = IERC20(token).balanceOf(address(this));
+
         // Snapshot scaled aToken balance before deposit to record exact scaled shares.
         // scaledBalanceOf is index-independent, so the recorded share is not affected by
         // yield accrued before this deposit and is converted to underlying exactly once at unwind.
@@ -194,9 +198,14 @@ contract AaveYieldModule is IYieldModule, ERC165, Ownable2Step {
         SafeERC20.forceApprove(IERC20(token), address(aavePool), received);
         aavePool.supply(token, received, address(this), 0);
 
-        // Calculate actual deposited (handles fee-on-transfer dust left on the module)
-        uint256 balAfter = IERC20(token).balanceOf(address(this));
-        uint256 actualDeposited = received > balAfter ? received - balAfter : 0;
+        // actualDeposited = the module-balance delta across the supply call
+        // (balanceAfterPull - balanceAfterSupply). Unlike `received - balanceOf(this)`,
+        // this is robust to a stray/donated pre-existing module balance: the pre-existing
+        // amount is the same on both sides of supply, so it cancels out. Without this,
+        // any existing balance is wrongly attributed to the new deposit and can even
+        // drive actualDeposited to zero (reverting the deposit) or understate principal.
+        uint256 balAfterSupply = IERC20(token).balanceOf(address(this));
+        uint256 actualDeposited = balanceAfterPull > balAfterSupply ? balanceAfterPull - balAfterSupply : 0;
         require(actualDeposited > 0, "InsufficientBalance");
 
         // Record the exact scaled shares received for this position (INVARIANT 4).

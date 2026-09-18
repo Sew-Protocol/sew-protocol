@@ -277,4 +277,55 @@ contract AaveYieldModuleAccountingTest is Test {
         assertApproxEqAbs(p1, a, 1, "Position 1 principal correct");
         assertGe(p1 + y1, a, "Position 1 recovers at least its principal");
     }
+    // ============ P0 Regression: #1 stray module balance must not poison principal ============
+
+    /**
+     * @notice Regression (#1): a pre-existing balance in the module (donation/stray),
+     * whether smaller or larger than the new deposit, must not be attributed to the
+     * deposit. Pre-fix, actualDeposited was derived from the absolute remaining balance
+     * (received - balanceOf(this)), which understated principal when a smaller stray
+     * balance existed and reverted when the stray balance was >= the deposit.
+     */
+    function test_stray_module_balance_does_not_poison_deposit_principal() public {
+        uint256 stray = 10e18;
+        uint256 deposit = 100e18;
+        // Donate a pre-existing balance directly to the module (anyone can do this).
+        token.transfer(address(module), stray);
+
+        // Escrow already holds INITIAL_BALANCE from setUp; just approve the pull.
+        vm.prank(escrow);
+        token.approve(address(module), type(uint256).max);
+
+        vm.prank(escrow);
+        uint256 accepted = module.initializeYield(7, address(token), deposit, YieldPreset.TO_SENDER);
+        assertEq(accepted, deposit, "principal must equal the deposit, not deposit minus stray");
+
+        // Tiny yield then full unwind: principal fully recovered.
+        pool.simulateYield(address(token), 10);
+        vm.prank(escrow);
+        (uint256 principal, ) = module.unwindToEscrow(7, address(token), deposit);
+        assertApproxEqAbs(principal, deposit, 1, "unwind recovers full deposit despite stray balance");
+    }
+
+    /**
+     * @notice Regression (#1): when the pre-existing module balance EXCEEDS the new
+     * deposit, the deposit previously reverted (actualDeposited collapsed to zero).
+     * Now it must be accepted in full.
+     */
+    function test_stray_balance_greater_than_deposit_still_works() public {
+        uint256 stray = 200e18;
+        uint256 deposit = 100e18;
+        token.transfer(address(module), stray);
+
+        vm.prank(escrow);
+        token.approve(address(module), type(uint256).max);
+
+        vm.prank(escrow);
+        uint256 accepted = module.initializeYield(8, address(token), deposit, YieldPreset.TO_SENDER);
+        assertEq(accepted, deposit, "deposit accepted in full even when module already holds more");
+
+        vm.prank(escrow);
+        (uint256 principal, ) = module.unwindToEscrow(8, address(token), deposit);
+        assertApproxEqAbs(principal, deposit, 1, "full principal recovered");
+    }
 }
