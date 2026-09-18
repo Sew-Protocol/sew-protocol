@@ -6,7 +6,6 @@ import '../governance/SlowLaneQueueActivate.sol';
 import '../interfaces/IReleaseStrategy.sol';
 import '../interfaces/ICancellationStrategy.sol';
 import '../interfaces/IYieldModule.sol';
-import '../interfaces/IYieldDistributionModule.sol';
 import '../shared/interfaces/IResolutionModule.sol';
 import './BaseEscrow.sol';
 
@@ -24,7 +23,6 @@ contract ModuleSnapshotRegistry is AccessControl, SlowLaneQueueActivate {
         IReleaseStrategy defaultReleaseStrategy;
         ICancellationStrategy defaultCancellationStrategy;
         IYieldModule defaultYieldGenerationModule;
-        IYieldDistributionModule defaultYieldDistributionModule;
         IResolutionModule defaultResolutionModule;
         mapping(BaseEscrow.ModuleType => PendingAddress) pendingModules;
     }
@@ -49,17 +47,6 @@ contract ModuleSnapshotRegistry is AccessControl, SlowLaneQueueActivate {
         uint64 eta
     );
     event DefaultYieldGenerationModuleActivated(
-        address indexed escrowContract,
-        address indexed oldModule,
-        address indexed newModule
-    );
-    event DefaultYieldDistributionModuleQueued(
-        address indexed escrowContract,
-        address indexed oldModule,
-        address indexed newModule,
-        uint64 eta
-    );
-    event DefaultYieldDistributionModuleActivated(
         address indexed escrowContract,
         address indexed oldModule,
         address indexed newModule
@@ -150,13 +137,6 @@ contract ModuleSnapshotRegistry is AccessControl, SlowLaneQueueActivate {
                 module,
                 state.pendingModules[moduleType].eta
             );
-        } else if (moduleType == BaseEscrow.ModuleType.YIELD_DIST) {
-            emit DefaultYieldDistributionModuleQueued(
-                escrowContract,
-                address(state.defaultYieldDistributionModule),
-                module,
-                state.pendingModules[moduleType].eta
-            );
         } else if (moduleType == BaseEscrow.ModuleType.RESOLUTION) {
             emit DefaultResolutionModuleQueued(
                 escrowContract,
@@ -196,10 +176,6 @@ contract ModuleSnapshotRegistry is AccessControl, SlowLaneQueueActivate {
             oldModule = address(state.defaultYieldGenerationModule);
             state.defaultYieldGenerationModule = IYieldModule(newModule);
             emit DefaultYieldGenerationModuleActivated(escrowContract, oldModule, newModule);
-        } else if (moduleType == BaseEscrow.ModuleType.YIELD_DIST) {
-            oldModule = address(state.defaultYieldDistributionModule);
-            state.defaultYieldDistributionModule = IYieldDistributionModule(newModule);
-            emit DefaultYieldDistributionModuleActivated(escrowContract, oldModule, newModule);
         } else if (moduleType == BaseEscrow.ModuleType.RESOLUTION) {
             oldModule = address(state.defaultResolutionModule);
             state.defaultResolutionModule = IResolutionModule(newModule);
@@ -244,13 +220,6 @@ contract ModuleSnapshotRegistry is AccessControl, SlowLaneQueueActivate {
     }
 
     /**
-     * @notice Get current default yield distribution module for an escrow contract
-     */
-    function getDefaultYieldDistributionModule(address escrowContract) external view returns (IYieldDistributionModule) {
-        return escrowModuleStates[escrowContract].defaultYieldDistributionModule;
-    }
-
-    /**
      * @notice Get current default resolution module for an escrow contract
      */
     function getDefaultResolutionModule(address escrowContract) external view returns (IResolutionModule) {
@@ -269,8 +238,6 @@ contract ModuleSnapshotRegistry is AccessControl, SlowLaneQueueActivate {
             return address(state.defaultReleaseStrategy);
         } else if (moduleType == BaseEscrow.ModuleType.YIELD_GEN) {
             return address(state.defaultYieldGenerationModule);
-        } else if (moduleType == BaseEscrow.ModuleType.YIELD_DIST) {
-            return address(state.defaultYieldDistributionModule);
         } else if (moduleType == BaseEscrow.ModuleType.RESOLUTION) {
             return address(state.defaultResolutionModule);
         } else if (moduleType == BaseEscrow.ModuleType.CANCELLATION) {

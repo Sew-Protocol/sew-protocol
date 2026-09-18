@@ -6,7 +6,6 @@ import "../../../contracts/core/EscrowVault.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/core/modules/DefaultResolutionModule.sol";
 import "../../../contracts/modules/DefaultReleaseStrategy.sol";
-import "../../../contracts/mocks/TestPlaceholderModule.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
 import "../../../contracts/types/EscrowTypes.sol";
 import "../../../contracts/types/YieldPresets.sol";
@@ -29,10 +28,6 @@ contract EscrowVaultModuleGetterHarness is EscrowVault {
 
     function effectiveReleaseStrategy(uint256 workflowId) external view returns (address) {
         return address(_getReleaseStrategy(workflowId));
-    }
-
-    function effectiveYieldDistributionModule(uint256 workflowId) external view returns (address) {
-        return address(_getYieldDistributionModule(workflowId));
     }
 
     function effectiveCancellationStrategy(uint256 workflowId) external view returns (address) {
@@ -62,8 +57,6 @@ contract ForwardOnlyModuleSnapshotTest is Test {
 
     DefaultReleaseStrategy internal allowRelease;
     AlwaysRejectReleaseStrategy internal denyRelease;
-    TestPlaceholderModule internal yieldDistA;
-    TestPlaceholderModule internal yieldDistB;
     DefaultResolutionModule internal resolution;
 
     address internal buyer = address(0xB0B);
@@ -76,8 +69,6 @@ contract ForwardOnlyModuleSnapshotTest is Test {
 
         allowRelease = new DefaultReleaseStrategy();
         denyRelease = new AlwaysRejectReleaseStrategy();
-        yieldDistA = new TestPlaceholderModule();
-        yieldDistB = new TestPlaceholderModule();
         resolution = new DefaultResolutionModule(address(this), address(0x1234));
 
         vault = new EscrowVaultModuleGetterHarness(
@@ -154,36 +145,17 @@ contract ForwardOnlyModuleSnapshotTest is Test {
     }
 
     // -------------------------------------------------------------------------
-    // Yield distribution: getter must match non-zero snapshot
-    // -------------------------------------------------------------------------
-
-    function test_yield_distribution_getter_matches_snapshot_after_default_swap() public {
-        _activateModule(BaseEscrow.ModuleType.YIELD_DIST, address(yieldDistA));
-        uint256 wid = _createEscrow();
-
-        assertEq(vault.getModuleSnapshot(wid).yieldDistributionModule, address(yieldDistA));
-        assertEq(vault.effectiveYieldDistributionModule(wid), address(yieldDistA));
-
-        _activateModule(BaseEscrow.ModuleType.YIELD_DIST, address(yieldDistB));
-
-        assertEq(vault.getModuleSnapshot(wid).yieldDistributionModule, address(yieldDistA));
-        assertEq(vault.effectiveYieldDistributionModule(wid), address(yieldDistA));
-    }
-
-    // -------------------------------------------------------------------------
     // All snapshotted module axes: runtime getter == storage when snapshot non-zero
     // -------------------------------------------------------------------------
 
     function test_all_module_getters_match_snapshot_when_set() public {
         _activateModule(BaseEscrow.ModuleType.RELEASE, address(allowRelease));
-        _activateModule(BaseEscrow.ModuleType.YIELD_DIST, address(yieldDistA));
 
         uint256 wid = _createEscrow();
         ModuleSnapshot memory snap = vault.getModuleSnapshot(wid);
 
         assertTrue(snap.releaseStrategy != address(0));
         assertEq(vault.effectiveReleaseStrategy(wid), snap.releaseStrategy);
-        assertEq(vault.effectiveYieldDistributionModule(wid), snap.yieldDistributionModule);
         assertEq(vault.effectiveCancellationStrategy(wid), snap.cancellationStrategy);
         assertEq(vault.effectiveResolutionModule(wid), snap.resolutionModule);
         assertEq(vault.effectiveYieldGenerationModule(wid), snap.yieldGenerationModule);

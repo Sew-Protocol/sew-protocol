@@ -5,7 +5,6 @@ import '@openzeppelin/contracts/access/AccessControl.sol';
 import '@openzeppelin/contracts/utils/introspection/IERC165.sol';
 import '../interfaces/IModuleRegistry.sol';
 import '../interfaces/IYieldModule.sol';
-import '../interfaces/IYieldDistributionModule.sol';
 import '../interfaces/IReleaseStrategy.sol';
 import '../interfaces/ICancellationStrategy.sol';
 import '../shared/interfaces/IResolutionModule.sol';
@@ -101,10 +100,6 @@ contract ModuleRegistry is AccessControl, IModuleRegistry {
         // Validate interface
         if (moduleType == ModuleType.YIELD_GENERATION) {
             if (!IERC165(module).supportsInterface(type(IYieldModule).interfaceId)) {
-                revert InvalidInterface(moduleType, module);
-            }
-        } else if (moduleType == ModuleType.YIELD_DISTRIBUTION) {
-            if (!IERC165(module).supportsInterface(type(IYieldDistributionModule).interfaceId)) {
                 revert InvalidInterface(moduleType, module);
             }
         } else if (moduleType == ModuleType.RESOLUTION) {

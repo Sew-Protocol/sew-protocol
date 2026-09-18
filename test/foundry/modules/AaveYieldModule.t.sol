@@ -43,6 +43,20 @@ contract AaveYieldModuleTest is Test {
         token.approve(address(pool), type(uint256).max);
     }
 
+    // ===== Slow-lane governance helpers =====
+
+    function _configureToken(address token_, address aToken_) internal {
+        module.queueConfigureToken(token_, aToken_);
+        vm.warp(block.timestamp + 7 days);
+        module.activateConfigureToken(token_);
+    }
+
+    function _approveEscrow(address escrow_) internal {
+        module.queueApproveEscrow(escrow_);
+        vm.warp(block.timestamp + 7 days);
+        module.activateApproveEscrow();
+    }
+
     // ============ Constructor Tests ============
 
     function test_Constructor_ValidPool() public {
@@ -62,17 +76,17 @@ contract AaveYieldModuleTest is Test {
     // ============ Escrow Approval Tests ============
 
     function test_ApproveEscrow() public {
-        module.approveEscrow(escrow);
+        _approveEscrow(escrow);
         assertTrue(module.approvedEscrows(escrow));
     }
 
     function test_ApproveEscrow_ZeroAddress() public {
         vm.expectRevert("InvalidAddress");
-        module.approveEscrow(address(0));
+        module.queueApproveEscrow(address(0));
     }
 
     function test_RevokeEscrow() public {
-        module.approveEscrow(escrow);
+        _approveEscrow(escrow);
         module.revokeEscrow(escrow);
         assertFalse(module.approvedEscrows(escrow));
     }
@@ -80,18 +94,18 @@ contract AaveYieldModuleTest is Test {
     // ============ Token Configuration Tests ============
 
     function test_ConfigureToken() public {
-        module.configureToken(address(token), address(aToken));
+        _configureToken(address(token), address(aToken));
         assertEq(module.tokenToAToken(address(token)), address(aToken));
     }
 
     function test_ConfigureToken_ZeroToken() public {
         vm.expectRevert("InvalidAddress");
-        module.configureToken(address(0), address(aToken));
+        module.queueConfigureToken(address(0), address(aToken));
     }
 
     function test_ConfigureToken_ZeroAToken() public {
         vm.expectRevert("InvalidAToken");
-        module.configureToken(address(token), address(0));
+        module.queueConfigureToken(address(token), address(0));
     }
 
     function test_ConfigureMinDeposit_Success() public {
@@ -107,8 +121,8 @@ contract AaveYieldModuleTest is Test {
     // ============ Initialize Yield Tests ============
 
     function test_InitializeYield_Success() public {
-        module.approveEscrow(escrow);
-        module.configureToken(address(token), address(aToken));
+        _approveEscrow(escrow);
+        _configureToken(address(token), address(aToken));
         
         token.transfer(escrow, DEPOSIT_AMOUNT);
         vm.prank(escrow); token.approve(address(module), type(uint256).max);
@@ -121,8 +135,8 @@ contract AaveYieldModuleTest is Test {
     }
 
     function test_InitializeYield_ZeroAmount() public {
-        module.approveEscrow(escrow);
-        module.configureToken(address(token), address(aToken));
+        _approveEscrow(escrow);
+        _configureToken(address(token), address(aToken));
         
         vm.prank(escrow);
         vm.expectRevert("ZeroAmount");
@@ -139,8 +153,8 @@ contract AaveYieldModuleTest is Test {
     }
 
     function test_InitializeYield_NoFundsOrApproval_Reverts() public {
-        module.approveEscrow(escrow);
-        module.configureToken(address(token), address(aToken));
+        _approveEscrow(escrow);
+        _configureToken(address(token), address(aToken));
 
         // Pull model: with no funds and no approval the module's transferFrom
         // cannot source the deposit and the call reverts.
@@ -150,8 +164,8 @@ contract AaveYieldModuleTest is Test {
     }
 
     function test_InitializeYield_BelowConfiguredMinDeposit_Reverts() public {
-        module.approveEscrow(escrow);
-        module.configureToken(address(token), address(aToken));
+        _approveEscrow(escrow);
+        _configureToken(address(token), address(aToken));
         module.configureMinDeposit(address(token), DEPOSIT_AMOUNT + 1);
 
         token.transfer(escrow, DEPOSIT_AMOUNT);
@@ -166,8 +180,8 @@ contract AaveYieldModuleTest is Test {
 
     function test_UnwindToEscrow_Unauthorized() public {
         // First set up a position
-        module.approveEscrow(escrow);
-        module.configureToken(address(token), address(aToken));
+        _approveEscrow(escrow);
+        _configureToken(address(token), address(aToken));
         
         // Try to unwind from non-approved escrow - gets TokenMismatch since escrow isn't the one with position
         vm.prank(otherEscrow);
@@ -176,8 +190,8 @@ contract AaveYieldModuleTest is Test {
     }
 
     function test_UnwindToEscrow_TokenMismatch() public {
-        module.approveEscrow(escrow);
-        module.configureToken(address(token), address(aToken));
+        _approveEscrow(escrow);
+        _configureToken(address(token), address(aToken));
         
         // Try to unwind with wrong token - gets TokenMismatch because escrow has no position
         vm.prank(escrow);
@@ -189,7 +203,7 @@ contract AaveYieldModuleTest is Test {
 
     function test_EmergencyUnwind_Unauthorized() public {
         // First set up a position
-        module.approveEscrow(escrow);
+        _approveEscrow(escrow);
         
         // Try to emergency unwind from non-approved escrow
         vm.prank(otherEscrow);
@@ -198,7 +212,7 @@ contract AaveYieldModuleTest is Test {
     }
 
     function test_EmergencyUnwind_TokenMismatch() public {
-        module.approveEscrow(escrow);
+        _approveEscrow(escrow);
         
         // Try to emergency unwind with wrong token - gets TokenMismatch because no position
         vm.prank(escrow);
@@ -211,12 +225,12 @@ contract AaveYieldModuleTest is Test {
     function test_GetModuleInfo() public {
         (string memory name, string memory version, bytes32 protocolId) = module.getModuleInfo();
         assertEq(name, "AaveYieldModule");
-        assertEq(version, "2.5.2");
+        assertEq(version, "2.5.3");
         assertEq(protocolId, keccak256("aave-v3"));
     }
 
     function test_CanHandle() public {
-        module.configureToken(address(token), address(aToken));
+        _configureToken(address(token), address(aToken));
         (bool supported, bytes32 reason) = module.canHandle(address(token), YieldPreset.OFF, 1000e18);
         assertTrue(supported);
         assertEq(reason, bytes32(0));
@@ -225,8 +239,8 @@ contract AaveYieldModuleTest is Test {
     // ============ Full Flow Tests ============
 
     function test_FullFlow_InitializeAndUnwind() public {
-        module.approveEscrow(escrow);
-        module.configureToken(address(token), address(aToken));
+        _approveEscrow(escrow);
+        _configureToken(address(token), address(aToken));
         
         uint256 escrowBalBefore = token.balanceOf(escrow);
         token.transfer(escrow, DEPOSIT_AMOUNT);
@@ -247,8 +261,8 @@ contract AaveYieldModuleTest is Test {
     }
 
     function test_FullFlow_WithYield() public {
-        module.approveEscrow(escrow);
-        module.configureToken(address(token), address(aToken));
+        _approveEscrow(escrow);
+        _configureToken(address(token), address(aToken));
         
         token.transfer(escrow, DEPOSIT_AMOUNT);
         vm.prank(escrow); token.approve(address(module), type(uint256).max);
@@ -270,8 +284,8 @@ contract AaveYieldModuleTest is Test {
     }
 
     function test_FullFlow_MultiplePositions() public {
-        module.approveEscrow(escrow);
-        module.configureToken(address(token), address(aToken));
+        _approveEscrow(escrow);
+        _configureToken(address(token), address(aToken));
         
         token.transfer(escrow, DEPOSIT_AMOUNT);
         vm.prank(escrow); token.approve(address(module), type(uint256).max);
@@ -290,8 +304,8 @@ contract AaveYieldModuleTest is Test {
     }
 
     function test_PositionStorage() public {
-        module.approveEscrow(escrow);
-        module.configureToken(address(token), address(aToken));
+        _approveEscrow(escrow);
+        _configureToken(address(token), address(aToken));
         
         token.transfer(escrow, DEPOSIT_AMOUNT);
         vm.prank(escrow); token.approve(address(module), type(uint256).max);
@@ -306,8 +320,8 @@ contract AaveYieldModuleTest is Test {
     }
 
     function test_EmergencyUnwind_Success() public {
-        module.approveEscrow(escrow);
-        module.configureToken(address(token), address(aToken));
+        _approveEscrow(escrow);
+        _configureToken(address(token), address(aToken));
         
         token.transfer(escrow, DEPOSIT_AMOUNT);
         vm.prank(escrow); token.approve(address(module), type(uint256).max);
@@ -324,7 +338,7 @@ contract AaveYieldModuleTest is Test {
     }
 
     function test_EmergencyUnwind_NoPosition() public {
-        module.approveEscrow(escrow);
+        _approveEscrow(escrow);
         
         // Since there's no position, it will revert with TokenMismatch (checks position first)
         vm.prank(escrow);
@@ -333,7 +347,7 @@ contract AaveYieldModuleTest is Test {
     }
 
     function test_UnwindToEscrow_NoPosition() public {
-        module.approveEscrow(escrow);
+        _approveEscrow(escrow);
         
         vm.prank(escrow);
         vm.expectRevert("TokenMismatch");
@@ -341,8 +355,8 @@ contract AaveYieldModuleTest is Test {
     }
 
     function test_UnwindToEscrow_InvalidIncomeIndex_PathNotReachableInMock() public {
-        module.approveEscrow(escrow);
-        module.configureToken(address(token), address(aToken));
+        _approveEscrow(escrow);
+        _configureToken(address(token), address(aToken));
 
         token.transfer(escrow, DEPOSIT_AMOUNT);
         vm.prank(escrow); token.approve(address(module), type(uint256).max);
@@ -359,8 +373,8 @@ contract AaveYieldModuleTest is Test {
     }
 
     function test_EmergencyUnwind_InvalidIncomeIndex_PathNotReachableInMock() public {
-        module.approveEscrow(escrow);
-        module.configureToken(address(token), address(aToken));
+        _approveEscrow(escrow);
+        _configureToken(address(token), address(aToken));
 
         token.transfer(escrow, DEPOSIT_AMOUNT);
         vm.prank(escrow); token.approve(address(module), type(uint256).max);
@@ -376,7 +390,7 @@ contract AaveYieldModuleTest is Test {
     }
 
     function test_TokenNotConfigured() public {
-        module.approveEscrow(escrow);
+        _approveEscrow(escrow);
         
         ERC20Mock otherToken = new ERC20Mock("Other", "OTH", owner, INITIAL_BALANCE);
         otherToken.approve(address(pool), type(uint256).max);
@@ -392,7 +406,7 @@ contract AaveYieldModuleTest is Test {
     // ============ Fee-on-Transfer Token Test ============
 
     function test_FeeOnTransferToken() public {
-        module.approveEscrow(escrow);
+        _approveEscrow(escrow);
         
         // Create a fee-on-transfer token (100 bps = 1% fee)
         FeeOnTransferERC20Mock feeToken = new FeeOnTransferERC20Mock("FeeToken", "FEE", 100);
@@ -407,7 +421,7 @@ contract AaveYieldModuleTest is Test {
         // Approve pool after setting up
         feeToken.approve(address(pool), type(uint256).max);
         
-        module.configureToken(address(feeToken), address(feeAToken));
+        _configureToken(address(feeToken), address(feeAToken));
         
         // Transfer amount accounting for fee (escrow sends 1000, but only 990 arrives due to 1% fee)
         uint256 requestedAmount = DEPOSIT_AMOUNT;
@@ -442,8 +456,8 @@ contract AaveYieldModuleTest is Test {
      * initiation and forced-to-escrow routing, not an alternate way out of Aave.
      */
     function test_emergencyUnwind_sharesAaveWithdrawalPath() public {
-        module.approveEscrow(escrow);
-        module.configureToken(address(token), address(aToken));
+        _approveEscrow(escrow);
+        _configureToken(address(token), address(aToken));
 
         token.transfer(escrow, DEPOSIT_AMOUNT);
         vm.prank(escrow); token.approve(address(module), type(uint256).max);
@@ -480,8 +494,8 @@ contract AaveYieldModuleTest is Test {
      * remains recoverable.
      */
     function test_configChange_doesNotInvalidateExistingPosition() public {
-        module.approveEscrow(escrow);
-        module.configureToken(address(token), address(aToken));
+        _approveEscrow(escrow);
+        _configureToken(address(token), address(aToken));
         pool.setAToken(address(token), address(aToken));
 
         token.transfer(escrow, DEPOSIT_AMOUNT);
@@ -492,7 +506,7 @@ contract AaveYieldModuleTest is Test {
         // Owner reconfigures the token to a DIFFERENT aToken. The pool's canonical
         // reserve still points at the original aToken.
         MockAToken other = new MockAToken(address(token), "aOther", "aOTHER");
-        module.configureToken(address(token), address(other));
+        _configureToken(address(token), address(other));
 
         // The existing position must still unwind against the original aToken.
         pool.simulateYield(address(token), 50);
@@ -511,8 +525,8 @@ contract AaveYieldModuleTest is Test {
      * Passing the correct principal succeeds.
      */
     function test_principalExpectedMismatch_reverts() public {
-        module.approveEscrow(escrow);
-        module.configureToken(address(token), address(aToken));
+        _approveEscrow(escrow);
+        _configureToken(address(token), address(aToken));
         token.transfer(escrow, DEPOSIT_AMOUNT);
         vm.prank(escrow); token.approve(address(module), type(uint256).max);
         vm.prank(escrow);
@@ -552,7 +566,7 @@ contract AaveYieldModuleTest is Test {
 
     function test_canHandle_belowMinDeposit_returnsFalse() public {
         // Configure a large min-deposit for the token; amount below it is not handled.
-        module.configureToken(address(token), address(aToken));
+        _configureToken(address(token), address(aToken));
         module.configureMinDeposit(address(token), 1000e18);
         (bool supported, bytes32 reason) = module.canHandle(address(token), YieldPreset.OFF, 999e18);
         assertFalse(supported);
@@ -615,16 +629,30 @@ contract AaveYieldModule6DecimalTest is Test {
         usdt.approve(address(pool), type(uint256).max);
     }
 
+    // ===== Slow-lane governance helpers =====
+
+    function _configureToken(address token_, address aToken_) internal {
+        module.queueConfigureToken(token_, aToken_);
+        vm.warp(block.timestamp + 7 days);
+        module.activateConfigureToken(token_);
+    }
+
+    function _approveEscrow(address escrow_) internal {
+        module.queueApproveEscrow(escrow_);
+        vm.warp(block.timestamp + 7 days);
+        module.activateApproveEscrow();
+    }
+
     // ============ USDC (6 decimals) Tests ============
 
     function test_ConfigureUSDC() public {
-        module.configureToken(address(usdc), address(usdcAToken));
+        _configureToken(address(usdc), address(usdcAToken));
         assertEq(module.tokenToAToken(address(usdc)), address(usdcAToken));
     }
 
     function test_InitializeYield_USDC() public {
-        module.approveEscrow(escrow);
-        module.configureToken(address(usdc), address(usdcAToken));
+        _approveEscrow(escrow);
+        _configureToken(address(usdc), address(usdcAToken));
         
         usdc.transfer(escrow, DEPOSIT_AMOUNT_6DEC);
         vm.prank(escrow); usdc.approve(address(module), type(uint256).max);
@@ -637,8 +665,8 @@ contract AaveYieldModule6DecimalTest is Test {
     }
 
     function test_InitializeYield_USDC_SmallAmount() public {
-        module.approveEscrow(escrow);
-        module.configureToken(address(usdc), address(usdcAToken));
+        _approveEscrow(escrow);
+        _configureToken(address(usdc), address(usdcAToken));
         
         // Small deposit (100 USDC = 100e6)
         usdc.transfer(escrow, SMALL_DEPOSIT_6DEC);
@@ -653,8 +681,8 @@ contract AaveYieldModule6DecimalTest is Test {
     }
 
     function test_UnwindToEscrow_USDC() public {
-        module.approveEscrow(escrow);
-        module.configureToken(address(usdc), address(usdcAToken));
+        _approveEscrow(escrow);
+        _configureToken(address(usdc), address(usdcAToken));
         
         usdc.transfer(escrow, DEPOSIT_AMOUNT_6DEC);
         vm.prank(escrow); usdc.approve(address(module), type(uint256).max);
@@ -673,8 +701,8 @@ contract AaveYieldModule6DecimalTest is Test {
     }
 
     function test_EmergencyUnwind_USDC() public {
-        module.approveEscrow(escrow);
-        module.configureToken(address(usdc), address(usdcAToken));
+        _approveEscrow(escrow);
+        _configureToken(address(usdc), address(usdcAToken));
         
         usdc.transfer(escrow, DEPOSIT_AMOUNT_6DEC);
         vm.prank(escrow); usdc.approve(address(module), type(uint256).max);
@@ -693,13 +721,13 @@ contract AaveYieldModule6DecimalTest is Test {
     // ============ USDT (6 decimals) Tests ============
 
     function test_ConfigureUSDT() public {
-        module.configureToken(address(usdt), address(usdtAToken));
+        _configureToken(address(usdt), address(usdtAToken));
         assertEq(module.tokenToAToken(address(usdt)), address(usdtAToken));
     }
 
     function test_InitializeYield_USDT() public {
-        module.approveEscrow(escrow);
-        module.configureToken(address(usdt), address(usdtAToken));
+        _approveEscrow(escrow);
+        _configureToken(address(usdt), address(usdtAToken));
         
         usdt.transfer(escrow, DEPOSIT_AMOUNT_6DEC);
         vm.prank(escrow); usdt.approve(address(module), type(uint256).max);
@@ -712,8 +740,8 @@ contract AaveYieldModule6DecimalTest is Test {
     }
 
     function test_UnwindToEscrow_USDT() public {
-        module.approveEscrow(escrow);
-        module.configureToken(address(usdt), address(usdtAToken));
+        _approveEscrow(escrow);
+        _configureToken(address(usdt), address(usdtAToken));
         
         usdt.transfer(escrow, DEPOSIT_AMOUNT_6DEC);
         vm.prank(escrow); usdt.approve(address(module), type(uint256).max);
@@ -733,9 +761,9 @@ contract AaveYieldModule6DecimalTest is Test {
     function test_MultipleEscrows_USDC() public {
         address escrow2 = address(0x1003);
         
-        module.approveEscrow(escrow);
-        module.approveEscrow(escrow2);
-        module.configureToken(address(usdc), address(usdcAToken));
+        _approveEscrow(escrow);
+        _approveEscrow(escrow2);
+        _configureToken(address(usdc), address(usdcAToken));
         
         // Escrow 1 deposits
         usdc.transfer(escrow, DEPOSIT_AMOUNT_6DEC);
@@ -758,8 +786,8 @@ contract AaveYieldModule6DecimalTest is Test {
     }
 
     function test_YieldAccrual_USDC() public {
-        module.approveEscrow(escrow);
-        module.configureToken(address(usdc), address(usdcAToken));
+        _approveEscrow(escrow);
+        _configureToken(address(usdc), address(usdcAToken));
         
         usdc.transfer(escrow, DEPOSIT_AMOUNT_6DEC);
         vm.prank(escrow); usdc.approve(address(module), type(uint256).max);
@@ -780,8 +808,8 @@ contract AaveYieldModule6DecimalTest is Test {
     // ============ Edge Cases ============
 
     function test_DustAmount_USDC() public {
-        module.approveEscrow(escrow);
-        module.configureToken(address(usdc), address(usdcAToken));
+        _approveEscrow(escrow);
+        _configureToken(address(usdc), address(usdcAToken));
         
         // Minimum dust amount (1 USDC = 1e6)
         uint256 dustAmount = 1e6;
@@ -796,15 +824,15 @@ contract AaveYieldModule6DecimalTest is Test {
     }
 
     function test_CanHandle_USDC() public {
-        module.configureToken(address(usdc), address(usdcAToken));
+        _configureToken(address(usdc), address(usdcAToken));
         
         (bool supported, bytes32 reason) = module.canHandle(address(usdc), YieldPreset.OFF, 1000e6);
         assertTrue(supported);
     }
 
     function test_FullFlow_USDC() public {
-        module.approveEscrow(escrow);
-        module.configureToken(address(usdc), address(usdcAToken));
+        _approveEscrow(escrow);
+        _configureToken(address(usdc), address(usdcAToken));
         
         // Initialize
         usdc.transfer(escrow, DEPOSIT_AMOUNT_6DEC);
@@ -869,10 +897,24 @@ contract AaveYieldModuleMixedDecimalsTest is Test {
         dai.approve(address(pool), type(uint256).max);
     }
 
+    // ===== Slow-lane governance helpers =====
+
+    function _configureToken(address token_, address aToken_) internal {
+        module.queueConfigureToken(token_, aToken_);
+        vm.warp(block.timestamp + 7 days);
+        module.activateConfigureToken(token_);
+    }
+
+    function _approveEscrow(address escrow_) internal {
+        module.queueApproveEscrow(escrow_);
+        vm.warp(block.timestamp + 7 days);
+        module.activateApproveEscrow();
+    }
+
     function test_MixedDecimals_SimultaneousEscrows() public {
-        module.approveEscrow(escrow);
-        module.configureToken(address(usdc), address(usdcAToken));
-        module.configureToken(address(dai), address(daiAToken));
+        _approveEscrow(escrow);
+        _configureToken(address(usdc), address(usdcAToken));
+        _configureToken(address(dai), address(daiAToken));
         
         // USDC deposit (6 decimals)
         usdc.transfer(escrow, 1000e6);
@@ -895,9 +937,9 @@ contract AaveYieldModuleMixedDecimalsTest is Test {
     }
 
     function test_YieldAcrossDecimals() public {
-        module.approveEscrow(escrow);
-        module.configureToken(address(usdc), address(usdcAToken));
-        module.configureToken(address(dai), address(daiAToken));
+        _approveEscrow(escrow);
+        _configureToken(address(usdc), address(usdcAToken));
+        _configureToken(address(dai), address(daiAToken));
         
         // Deposit both
         usdc.transfer(escrow, 1000e6);

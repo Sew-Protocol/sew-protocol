@@ -36,8 +36,8 @@ contract AaveYieldModuleAccountingTest is Test {
         token.approve(address(pool), type(uint256).max);
         
         escrow = address(0x1001);
-        module.approveEscrow(escrow);
-        module.configureToken(address(token), address(aToken));
+        _approve(escrow);
+        _cfgToken(address(token), address(aToken));
         
         token.transfer(escrow, INITIAL_BALANCE);
     }
@@ -47,6 +47,20 @@ contract AaveYieldModuleAccountingTest is Test {
     /**
      * @notice M1: Very small positions should work correctly
      */
+    function _cfgToken(address token_, address aToken_) internal {
+        module.queueConfigureToken(token_, aToken_);
+        (, uint64 eta, ) = module.getPendingConfigureToken(token_);
+        vm.warp(eta);
+        module.activateConfigureToken(token_);
+    }
+
+    function _approve(address escrow_) internal {
+        module.queueApproveEscrow(escrow_);
+        (, uint64 eta, ) = module.getPendingApproveEscrow();
+        vm.warp(eta);
+        module.activateApproveEscrow();
+    }
+
     function test_small_position_deposit_and_withdraw() public {
         uint256 smallAmount = 1e18;
         

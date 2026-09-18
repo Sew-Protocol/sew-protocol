@@ -174,11 +174,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
             console.log(`      ✅ DEFAULT_ADMIN_ROLE granted to TimelockController`);
           }
 
-          // Revoke deployer's DEFAULT_ADMIN_ROLE
-          console.log(`      Revoking DEFAULT_ADMIN_ROLE from deployer for ${name}...`);
-          const tx2 = await contract.revokeRole(DEFAULT_ADMIN_ROLE, deployer);
-          await tx2.wait();
-          console.log(`      ✅ Deployer's DEFAULT_ADMIN_ROLE revoked for ${name}`);
+          // NOTE: Deployer's DEFAULT_ADMIN_ROLE is intentionally retained here
+          // through the remaining wiring scripts and is stripped ONLY at the very
+          // end of the deploy sequence in deploy/95_finalize_governance.ts.
+          // Do NOT revoke it early here.
         } else {
           console.log(`      ✅ ${name}: Deployer does not have DEFAULT_ADMIN_ROLE`);
         }

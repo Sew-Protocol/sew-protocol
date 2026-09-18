@@ -59,10 +59,17 @@ contract AaveYieldModuleForkTest is Test {
         module = new AaveYieldModule(AAVE_POOL);
         
         // Approve escrow
-        module.approveEscrow(testEscrow);
+        _approve(testEscrow);
     }
 
     // ============ Fork Connectivity Tests ============
+
+    function _approve(address escrow_) internal {
+        module.queueApproveEscrow(escrow_);
+        (, uint64 eta, ) = module.getPendingApproveEscrow();
+        vm.warp(eta);
+        module.activateApproveEscrow();
+    }
 
     function test_fork_poolIsValid() public {
         // Verify pool contract exists and has code
@@ -94,7 +101,7 @@ contract AaveYieldModuleForkTest is Test {
         // 3. Escrow approval works
         
         // Approve this contract as escrow
-        module.approveEscrow(address(this));
+        _approve(address(this));
         
         assertTrue(module.approvedEscrows(address(this)));
     }

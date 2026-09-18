@@ -41,17 +41,31 @@ contract AaveYieldModuleInvariantTest is Test {
         escrow2 = address(0x1002);
         escrow3 = address(0x1003);
         
-        module.approveEscrow(escrow1);
-        module.approveEscrow(escrow2);
-        module.approveEscrow(escrow3);
+        _approve(escrow1);
+        _approve(escrow2);
+        _approve(escrow3);
         
-        module.configureToken(address(token), address(aToken));
+        _cfgToken(address(token), address(aToken));
         
         token.transfer(escrow1, 10000e18);
         token.transfer(escrow2, 10000e18);
         token.transfer(escrow3, 10000e18);
 
         targetContract(address(module));
+    }
+
+    function _cfgToken(address token_, address aToken_) internal {
+        module.queueConfigureToken(token_, aToken_);
+        (, uint64 eta, ) = module.getPendingConfigureToken(token_);
+        vm.warp(eta);
+        module.activateConfigureToken(token_);
+    }
+
+    function _approve(address escrow_) internal {
+        module.queueApproveEscrow(escrow_);
+        (, uint64 eta, ) = module.getPendingApproveEscrow();
+        vm.warp(eta);
+        module.activateApproveEscrow();
     }
 
     function invariant_principal_never_exceeds_balance() public {

@@ -1237,9 +1237,6 @@ abstract contract BaseEscrow is EscrowLifecycle {
     function _getYieldGenerationModule(
         uint256 workflowId
     ) internal view virtual override returns (IYieldModule);
-    function _getYieldDistributionModule(
-        uint256 workflowId
-    ) internal view virtual override returns (IYieldDistributionModule);
     function _getReleaseStrategy(
         uint256 workflowId
     ) internal view virtual override returns (IReleaseStrategy);

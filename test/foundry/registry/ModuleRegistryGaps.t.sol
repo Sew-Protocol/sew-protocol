@@ -5,7 +5,6 @@ import 'forge-std/Test.sol';
 import '../../../contracts/registry/ModuleRegistry.sol';
 import '../../../contracts/interfaces/IModuleRegistry.sol';
 import '../../../contracts/interfaces/IYieldModule.sol';
-import '../../../contracts/interfaces/IYieldDistributionModule.sol';
 import '../../../contracts/shared/interfaces/IResolutionModule.sol';
 
 contract ModuleRegistryGapsTest is Test {

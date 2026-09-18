@@ -110,7 +110,7 @@ contract SlowLaneCancellationStrategyTest is Test {
         vm.stopPrank();
         
         // Check snapshot for Escrow 1
-        (,, address strategy1,,,,,,,,,,) = vault.moduleSnapshots(wid1);
+        (,, address strategy1,,,,,,,,,) = vault.moduleSnapshots(wid1);
         assertEq(strategy1, address(defaultStrategy), "Escrow 1 should use default strategy");
         
         // Queue new strategy: BuyerOnly
@@ -123,7 +123,7 @@ contract SlowLaneCancellationStrategyTest is Test {
         vm.stopPrank();
         
         // Escrow 2 should still use Default because BuyerOnly is not active
-        (,, address strategy2,,,,,,,,,,) = vault.moduleSnapshots(wid2);
+        (,, address strategy2,,,,,,,,,) = vault.moduleSnapshots(wid2);
         assertEq(strategy2, address(defaultStrategy), "Escrow 2 should still use active default strategy");
         
         // Activate BuyerOnly
@@ -138,7 +138,7 @@ contract SlowLaneCancellationStrategyTest is Test {
         vm.stopPrank();
         
         // Escrow 3 should use BuyerOnly
-        (,, address strategy3,,,,,,,,,,) = vault.moduleSnapshots(wid3);
+        (,, address strategy3,,,,,,,,,) = vault.moduleSnapshots(wid3);
         assertEq(strategy3, address(buyerOnlyStrategy), "Escrow 3 should use new buyer-only strategy");
         
         // Verify behavioral consistency:

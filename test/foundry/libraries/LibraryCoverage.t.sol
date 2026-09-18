@@ -8,7 +8,6 @@ import "../../../contracts/libraries/FeeWithdrawalLibrary.sol";
 import "../../../contracts/libraries/RecoveryLibrary.sol";
 import "../../../contracts/libraries/SettingsValidationLibrary.sol";
 import "../../../contracts/libraries/YieldPresetLibrary.sol";
-import "../../../contracts/libraries/YieldDistributionLibrary.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
 import "../../../contracts/types/EscrowTypes.sol";
 import "../../../contracts/types/YieldPresets.sol";
@@ -111,11 +110,6 @@ contract LibraryHarness {
 
     }
 
-    function validateYieldDistribution(address[] memory recipients, uint256[] memory bps) external pure {
-
-        SettingsValidationLibrary.validateYieldDistribution(recipients, bps);
-
-    }
 
 
 
@@ -128,20 +122,6 @@ contract LibraryHarness {
     }
 
 
-
-    // YieldDistribution wrapper
-
-    function validateYieldDist(address[] memory recipients, uint256[] memory percentages) external pure {
-
-        YieldDistributionLibrary.validateYieldDistribution(recipients, percentages);
-
-    }
-
-    function distributeYieldFallback(address token, uint256 yieldAmount, address[] memory recipients, uint256[] memory percentages, address feeAddress) external returns (uint256) {
-
-        return YieldDistributionLibrary.distributeYieldFallback(token, yieldAmount, recipients, percentages, feeAddress);
-
-    }
 
 }
 
@@ -541,39 +521,6 @@ contract LibraryCoverageTest is Test {
 
 
 
-    function test_SettingsValidation_validateYieldDistribution() public {
-
-        address[] memory r = new address[](1); r[0] = address(0x1);
-
-        uint256[] memory p = new uint256[](1); p[0] = 10000;
-
-        harness.validateYieldDistribution(r, p);
-
-        
-
-        address[] memory r2 = new address[](0);
-
-        vm.expectRevert();
-
-        harness.validateYieldDistribution(r2, p);
-
-        
-
-        address[] memory r3 = new address[](11);
-
-        vm.expectRevert();
-
-        harness.validateYieldDistribution(r3, p);
-
-        
-
-        p[0] = 9999;
-
-        vm.expectRevert();
-
-        harness.validateYieldDistribution(r, p);
-
-    }
 
 
 
@@ -630,130 +577,5 @@ contract LibraryCoverageTest is Test {
     }
 
 
-
-    // ============ YieldDistributionLibrary Tests ============
-
-
-
-    function test_YieldDistribution_validate_Success() public {
-
-        address[] memory r = new address[](1); r[0] = address(0x1);
-
-        uint256[] memory p = new uint256[](1); p[0] = 10000;
-
-        harness.validateYieldDist(r, p);
-
-    }
-
-
-
-    function test_YieldDistribution_validate_Empty_Revert() public {
-
-        address[] memory r;
-
-        uint256[] memory p;
-
-        vm.expectRevert();
-
-        harness.validateYieldDist(r, p);
-
-    }
-
-
-
-    function test_YieldDistribution_validate_Mismatch_Revert() public {
-
-        address[] memory r = new address[](1);
-
-        uint256[] memory p = new uint256[](2);
-
-        vm.expectRevert();
-
-        harness.validateYieldDist(r, p);
-
-    }
-
-
-
-    function test_YieldDistribution_validate_ZeroAddress_Revert() public {
-
-        address[] memory r = new address[](1); r[0] = address(0);
-
-        uint256[] memory p = new uint256[](1); p[0] = 10000;
-
-        vm.expectRevert();
-
-        harness.validateYieldDist(r, p);
-
-    }
-
-
-
-    function test_YieldDistribution_validate_ZeroPercent_Revert() public {
-
-        address[] memory r = new address[](1); r[0] = address(0x1);
-
-        uint256[] memory p = new uint256[](1); p[0] = 0;
-
-        vm.expectRevert();
-
-        harness.validateYieldDist(r, p);
-
-    }
-
-
-
-    function test_YieldDistribution_validate_BadSum_Revert() public {
-
-        address[] memory r = new address[](1); r[0] = address(0x1);
-
-        uint256[] memory p = new uint256[](1); p[0] = 9999;
-
-        vm.expectRevert();
-
-        harness.validateYieldDist(r, p);
-
-    }
-
-
-
-    function test_YieldDistribution_decode() public {
-
-        address[] memory r = new address[](1); r[0] = address(0x1);
-
-        uint256[] memory p = new uint256[](1); p[0] = 10000;
-
-        bytes memory data = abi.encode(r, p);
-
-        (address[] memory r2, uint256[] memory p2) = YieldDistributionLibrary.decodeYieldDistribution(data);
-
-        assertEq(r2[0], address(0x1));
-
-        assertEq(p2[0], 10000);
-
-    }
-
-
-
-    function test_YieldDistribution_fallback() public {
-
-        token.mint(address(harness), 100);
-
-        address[] memory r = new address[](1); r[0] = address(0x1);
-
-        uint256[] memory p = new uint256[](1); p[0] = 5000;
-
-        
-
-        uint256 dist = harness.distributeYieldFallback(address(token), 100, r, p, feeAddress);
-
-        // Pull-only mode: no recipient-level transfers are performed
-        assertEq(dist, 0);
-
-        assertEq(token.balanceOf(address(0x1)), 0);
-
-        assertEq(token.balanceOf(feeAddress), 0);
-
-    }
 
 }

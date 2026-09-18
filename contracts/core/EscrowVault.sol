@@ -9,7 +9,6 @@ import '../types/YieldPresets.sol';
 import '../interfaces/IReleaseStrategy.sol';
 import '../shared/interfaces/IResolutionModule.sol';
 import '../interfaces/IYieldModule.sol';
-import '../interfaces/IYieldDistributionModule.sol';
 import './ModuleSnapshotRegistry.sol';
 import '../libraries/BalanceUpdateLibrary.sol';
 import '../libraries/FeeRecordingLibrary.sol';
@@ -120,10 +119,6 @@ contract EscrowVault is BaseEscrow {
 
     function _getYieldGenerationModule(uint256 workflowId) internal view override returns (IYieldModule) {
         return IYieldModule(ModuleGetterLibrary.getModuleAddress(workflowId, ModuleType.YIELD_GEN, moduleSnapshots, moduleManagement, address(this)));
-    }
-
-    function _getYieldDistributionModule(uint256 workflowId) internal view override returns (IYieldDistributionModule) {
-        return IYieldDistributionModule(ModuleGetterLibrary.getModuleAddress(workflowId, ModuleType.YIELD_DIST, moduleSnapshots, moduleManagement, address(this)));
     }
 
     function _getReleaseStrategy(uint256 workflowId) internal view override returns (IReleaseStrategy) {

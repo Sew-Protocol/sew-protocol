@@ -47,7 +47,7 @@ contract AaveYieldModuleForkTestExpanded is Test {
         
         testEscrow = makeAddr('TestEscrow');
         module = new AaveYieldModule(AAVE_POOL);
-        module.approveEscrow(testEscrow);
+        _approve(testEscrow);
     }
 
     // ============ M4: Pinned Block Tests ============
@@ -55,8 +55,15 @@ contract AaveYieldModuleForkTestExpanded is Test {
     /**
      * @notice M4: Test with pinned block number for deterministic CI
      */
+    function _approve(address escrow_) internal {
+        module.queueApproveEscrow(escrow_);
+        (, uint64 eta, ) = module.getPendingApproveEscrow();
+        vm.warp(eta);
+        module.activateApproveEscrow();
+    }
+
     function test_fork_pinnedBlock_deposit() public {
-        module.approveEscrow(address(this));
+        _approve(address(this));
         
         (bool supported,) = module.canHandle(USDC, YieldPreset.TO_SENDER, 1e6);
         emit log_string("Pinned block test executed");

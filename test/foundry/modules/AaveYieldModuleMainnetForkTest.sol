@@ -27,6 +27,13 @@ contract AaveYieldModuleMainnetForkTest is Test {
         module = new AaveYieldModule(AAVE_POOL);
     }
     
+    function _cfgToken(address token_, address aToken_) internal {
+        module.queueConfigureToken(token_, aToken_);
+        (, uint64 eta, ) = module.getPendingConfigureToken(token_);
+        vm.warp(eta);
+        module.activateConfigureToken(token_);
+    }
+
     function test_fork_poolExists() public view {
         assertGt(AAVE_POOL.code.length, 0);
     }
@@ -47,7 +54,7 @@ contract AaveYieldModuleMainnetForkTest is Test {
     function test_fork_canHandle() public {
         // canHandle only reports supported once the token's aToken is configured in the
         // module, so configure USDC with its real aToken first, then assert support.
-        module.configureToken(USDC, AUSDC);
+        _cfgToken(USDC, AUSDC);
         (bool supported, bytes32 reason) = module.canHandle(USDC, YieldPreset.TO_SENDER, 100e6);
         assertTrue(supported, "USDC should be supported on Base mainnet");
         assertEq(reason, bytes32(0), "no reason code when supported");

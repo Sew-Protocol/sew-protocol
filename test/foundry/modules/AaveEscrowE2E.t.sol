@@ -41,14 +41,14 @@ contract AaveEscrowE2ETest is Test {
         aToken.setPool(address(pool));
 
         aaveModule = new AaveYieldModule(address(pool));
-        aaveModule.configureToken(address(token), address(aToken));
+        _cfgToken(address(token), address(aToken));
 
         yieldOps = new YieldOps(address(this));
         registry = new ModuleSnapshotRegistry(address(this));
         policy = new EscrowCreationPolicy(address(this));
 
         vault = new EscrowVault(0, FEE, address(yieldOps), address(registry));
-        aaveModule.approveEscrow(address(vault));
+        _approve(address(vault));
         yieldOps.registerEscrowContract(address(vault));
         registry.registerEscrowContract(address(vault));
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
@@ -75,6 +75,20 @@ contract AaveEscrowE2ETest is Test {
             autoReleaseTime: 0,
             autoCancelTime: 0
         });
+    }
+
+    function _approve(address escrow_) internal {
+        aaveModule.queueApproveEscrow(escrow_);
+        (, uint64 eta, ) = aaveModule.getPendingApproveEscrow();
+        vm.warp(eta);
+        aaveModule.activateApproveEscrow();
+    }
+
+    function _cfgToken(address token_, address aToken_) internal {
+        aaveModule.queueConfigureToken(token_, aToken_);
+        (, uint64 eta, ) = aaveModule.getPendingConfigureToken(token_);
+        vm.warp(eta);
+        aaveModule.activateConfigureToken(token_);
     }
 
     function test_escrowLevel_aave_deposit_then_cancel_unwinds() public {

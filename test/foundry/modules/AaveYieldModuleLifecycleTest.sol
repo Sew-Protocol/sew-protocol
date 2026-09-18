@@ -39,9 +39,9 @@ contract AaveYieldModuleLifecycleTest is Test {
         escrow1 = address(0x1001);
         escrow2 = address(0x1002);
         
-        module.approveEscrow(escrow1);
-        module.approveEscrow(escrow2);
-        module.configureToken(address(token), address(aToken));
+        _approve(escrow1);
+        _approve(escrow2);
+        _cfgToken(address(token), address(aToken));
         
         token.transfer(escrow1, INITIAL_BALANCE);
         token.transfer(escrow2, INITIAL_BALANCE);
@@ -52,6 +52,20 @@ contract AaveYieldModuleLifecycleTest is Test {
     /**
      * @notice G3: After position is fully unwound, cannot withdraw again
      */
+    function _cfgToken(address token_, address aToken_) internal {
+        module.queueConfigureToken(token_, aToken_);
+        (, uint64 eta, ) = module.getPendingConfigureToken(token_);
+        vm.warp(eta);
+        module.activateConfigureToken(token_);
+    }
+
+    function _approve(address escrow_) internal {
+        module.queueApproveEscrow(escrow_);
+        (, uint64 eta, ) = module.getPendingApproveEscrow();
+        vm.warp(eta);
+        module.activateApproveEscrow();
+    }
+
     function test_yield_unwind_blocked_after_full_unwind() public {
         uint256 amount = 100e18;
         

@@ -47,9 +47,9 @@ contract AaveYieldModuleRecoveryTest is Test {
         otherEscrow = address(0x1002);
         operator = address(0x3001);
 
-        module.approveEscrow(escrow);
-        module.approveEscrow(otherEscrow);
-        module.configureToken(address(token), address(aToken));
+        _approve(escrow);
+        _approve(otherEscrow);
+        _cfgToken(address(token), address(aToken));
 
         token.transfer(escrow, DEPOSIT_AMOUNT * 4);
         token.transfer(otherEscrow, DEPOSIT_AMOUNT * 4);
@@ -65,6 +65,20 @@ contract AaveYieldModuleRecoveryTest is Test {
 
     // ================= Recovery operator administration =================
 
+    function _cfgToken(address token_, address aToken_) internal {
+        module.queueConfigureToken(token_, aToken_);
+        (, uint64 eta, ) = module.getPendingConfigureToken(token_);
+        vm.warp(eta);
+        module.activateConfigureToken(token_);
+    }
+
+    function _approve(address escrow_) internal {
+        module.queueApproveEscrow(escrow_);
+        (, uint64 eta, ) = module.getPendingApproveEscrow();
+        vm.warp(eta);
+        module.activateApproveEscrow();
+    }
+
     function test_setRecoveryOperator_onlyOwner() public {
         module.setRecoveryOperator(operator, true);
         assertTrue(module.recoveryOperators(operator));
@@ -79,12 +93,17 @@ contract AaveYieldModuleRecoveryTest is Test {
         module.setRecoveryOperator(operator, true);
     }
 
-    function test_setRecoveryOperator_onlyOwner_revertsForNonOwner() public {
-        vm.prank(operator);
+    function test_setRecoveryOperator_onlyRoleTimelock_revertsForNonAuthorized() public {
+        // startPrank so the ROLE_TIMELOCK() view call inside the revert expectation
+        // does not consume the one-shot prank of the single (non-reverting) call.
+        vm.startPrank(operator);
         vm.expectRevert(
-            abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", operator)
+            abi.encodeWithSignature(
+                "AccessControlUnauthorizedAccount(address,bytes32)", operator, module.ROLE_TIMELOCK()
+            )
         );
         module.setRecoveryOperator(operator, true);
+        vm.stopPrank();
     }
 
     function test_setRecoveryOperator_zeroReverts() public {

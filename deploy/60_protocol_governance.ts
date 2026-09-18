@@ -117,31 +117,26 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
           }
         }
 
-        // Revoke DEFAULT_ADMIN_ROLE from deployer (if deployer has it)
-        const deployerHasAdmin = await contract.hasRole(DEFAULT_ADMIN_ROLE, deployer);
-        if (deployerHasAdmin) {
-          // Grant DEFAULT_ADMIN_ROLE to TimelockController first
-          const timelockHasAdmin = await contract.hasRole(
-            DEFAULT_ADMIN_ROLE,
-            timelockDeployment.address,
-          );
-          if (!timelockHasAdmin) {
-            console.log(`      Granting DEFAULT_ADMIN_ROLE to TimelockController...`);
-            const tx3 = await contract.grantRole(DEFAULT_ADMIN_ROLE, timelockDeployment.address);
-            await tx3.wait();
-            console.log(`      ✅ DEFAULT_ADMIN_ROLE granted to TimelockController`);
-            rolesGranted++;
-          }
-
-          // Revoke deployer's DEFAULT_ADMIN_ROLE
-          console.log(`      Revoking DEFAULT_ADMIN_ROLE from deployer...`);
-          const tx4 = await contract.revokeRole(DEFAULT_ADMIN_ROLE, deployer);
-          await tx4.wait();
-          console.log(`      ✅ Deployer's DEFAULT_ADMIN_ROLE revoked`);
+        // DEFAULT_ADMIN_ROLE administration: grant the TimelockController DEFAULT_ADMIN_ROLE so it
+        // can govern, but intentionally DO NOT revoke the deployer's roles here. The deployer must
+        // retain DEFAULT_ADMIN_ROLE (and ROLE_TIMELOCK) throughout the wiring scripts (75/85/86/90)
+        // so operations like queueApproveEscrow, setSlashingModule, and setRecoveryOperator succeed.
+        // The deployer's authority is stripped at the very end by deploy/95_finalize_governance.ts.
+        const timelockHasAdmin = await contract.hasRole(
+          DEFAULT_ADMIN_ROLE,
+          timelockDeployment.address,
+        );
+        if (!timelockHasAdmin) {
+          console.log(`      Granting DEFAULT_ADMIN_ROLE to TimelockController...`);
+          const tx3 = await contract.grantRole(DEFAULT_ADMIN_ROLE, timelockDeployment.address);
+          await tx3.wait();
+          console.log(`      ✅ DEFAULT_ADMIN_ROLE granted to TimelockController`);
           rolesGranted++;
         } else {
-          console.log(`      ✅ Deployer does not have DEFAULT_ADMIN_ROLE`);
+          console.log(`      ✅ TimelockController already has DEFAULT_ADMIN_ROLE`);
         }
+        // NOTE: Deployer's DEFAULT_ADMIN_ROLE / ROLE_TIMELOCK intentionally retained here;
+        // stripped from every governed contract in deploy/95_finalize_governance.ts.
       } catch (error: any) {
         // Contract might not have AccessControl
         console.log(`      ⚠️  Contract does not support AccessControl: ${error.message}`);

@@ -120,7 +120,7 @@ contract ProtocolFeeCalculationTest is Test {
         // Verify fee would be transferred to fee address
         uint256 feeAddressBalanceBefore = token.balanceOf(escrowFeeAddress);
 
-        // Simulate fee transfer (this happens in YieldOps._distributeYieldInternal)
+        // Simulate fee transfer from the yield ops flow
         token.transfer(escrowFeeAddress, expectedProtocolFee);
 
         uint256 feeAddressBalanceAfter = token.balanceOf(escrowFeeAddress);

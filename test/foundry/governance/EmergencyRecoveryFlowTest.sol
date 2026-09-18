@@ -57,14 +57,14 @@ contract EmergencyRecoveryFlowTest is Test {
 
         // Aave module (pull model)
         aaveModule = new AaveYieldModule(address(pool));
-        aaveModule.configureToken(address(token), address(aToken));
+        _configureToken(aaveModule, address(token), address(aToken));
 
         yieldOps = new YieldOps(address(this));
         registry = new ModuleSnapshotRegistry(address(this));
         policy = new EscrowCreationPolicy(address(this));
 
         vault = new EscrowVault(0, FEE, address(yieldOps), address(registry));
-        aaveModule.approveEscrow(address(vault));
+        _approveEscrow(aaveModule, address(vault));
         yieldOps.registerEscrowContract(address(vault));
         registry.registerEscrowContract(address(vault));
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
@@ -90,6 +90,22 @@ contract EmergencyRecoveryFlowTest is Test {
         token.mint(BUYER, 1_000_000e18);
         vm.prank(BUYER);
         token.approve(address(vault), type(uint256).max);
+    }
+
+    // ---- Slow-lane two-step helpers (queue -> warp to eta -> activate) ----
+    // These warp to the exact pending eta so they do not shift later relative timing.
+    function _configureToken(AaveYieldModule m, address token_, address aToken_) internal {
+        m.queueConfigureToken(token_, aToken_);
+        (, uint64 eta, ) = m.getPendingConfigureToken(token_);
+        vm.warp(eta);
+        m.activateConfigureToken(token_);
+    }
+
+    function _approveEscrow(AaveYieldModule m, address escrow_) internal {
+        m.queueApproveEscrow(escrow_);
+        (, uint64 eta, ) = m.getPendingApproveEscrow();
+        vm.warp(eta);
+        m.activateApproveEscrow();
     }
 
     function _settings() internal pure returns (EscrowSettings memory) {
@@ -240,8 +256,8 @@ contract EmergencyRecoveryFlowTest is Test {
 
         // Simulate a module upgrade: deploy a new module and make it the registry default.
         AaveYieldModule newModule = new AaveYieldModule(address(pool));
-        newModule.configureToken(address(token), address(aToken));
-        newModule.approveEscrow(address(vault));
+        _configureToken(newModule, address(token), address(aToken));
+        _approveEscrow(newModule, address(vault));
         newModule.setRecoveryOperator(address(guardianOps), true);
         registry.queueModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN, address(newModule));
         vm.warp(block.timestamp + 8 days);

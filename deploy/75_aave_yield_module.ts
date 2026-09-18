@@ -91,10 +91,18 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     // Check if already approved
     const isApproved = await aaveModule.approvedEscrows(escrowVaultDeployment.address);
     if (!isApproved) {
-      console.log(`      Approving EscrowVault: ${escrowVaultDeployment.address}`);
-      const tx = await aaveModule.approveEscrow(escrowVaultDeployment.address);
-      await tx.wait();
-      console.log(`      ✅ EscrowVault approved`);
+      console.log(`      Queuing approval for EscrowVault: ${escrowVaultDeployment.address}`);
+      // Risk-increasing: approving an escrow goes through the 7-day slow lane.
+      const qTx = await aaveModule.queueApproveEscrow(escrowVaultDeployment.address);
+      await qTx.wait();
+      const [, pendingEta] = await aaveModule.getPendingApproveEscrow();
+      if (BigInt(pendingEta) <= BigInt((await ethers.provider.getBlock('latest')).timestamp)) {
+        const aTx = await aaveModule.activateApproveEscrow();
+        await aTx.wait();
+        console.log(`      ✅ EscrowVault approved`);
+      } else {
+        console.log(`      ℹ️  EscrowVault approval queued; activation requires the 7-day slow-lane delay (governance will activate)`);
+      }
     } else {
       console.log(`      ✅ EscrowVault already approved`);
     }
@@ -149,10 +157,18 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
     const isApproved = await aaveModule.approvedEscrows(escrowableERC20Deployment.address);
     if (!isApproved) {
-      console.log(`      Approving EscrowableERC20: ${escrowableERC20Deployment.address}`);
-      const tx = await aaveModule.approveEscrow(escrowableERC20Deployment.address);
-      await tx.wait();
-      console.log(`      ✅ EscrowableERC20 approved`);
+      console.log(`      Queuing approval for EscrowableERC20: ${escrowableERC20Deployment.address}`);
+      // Risk-increasing: approving an escrow goes through the 7-day slow lane.
+      const qTx = await aaveModule.queueApproveEscrow(escrowableERC20Deployment.address);
+      await qTx.wait();
+      const [, pendingEta] = await aaveModule.getPendingApproveEscrow();
+      if (BigInt(pendingEta) <= BigInt((await ethers.provider.getBlock('latest')).timestamp)) {
+        const aTx = await aaveModule.activateApproveEscrow();
+        await aTx.wait();
+        console.log(`      ✅ EscrowableERC20 approved`);
+      } else {
+        console.log(`      ℹ️  EscrowableERC20 approval queued; activation requires the 7-day slow-lane delay (governance will activate)`);
+      }
     } else {
       console.log(`      ✅ EscrowableERC20 already approved`);
     }
@@ -199,8 +215,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       // The module will get aToken from Aave Pool's getReserveData
 
       // Actually, let's just configure the token - the module handles aToken lookup
-      // We need to call configureToken but that requires aToken address
-      // Let's skip for now and let the module handle it lazily
+      // Configuring a token is risk-increasing and goes through the slow-lane two-step:
+      // queueConfigureToken(token, aToken) then activateConfigureToken(token) after the
+      // 7-day delay. We skip it here and let the module handle configuration lazily, but
+      // the pending aToken would need to be queued/activated by the AaveYieldModule owner.
 
       console.log(`      ℹ️  ${name} will be configured on first use (lazy initialization)`);
     } catch (error: any) {

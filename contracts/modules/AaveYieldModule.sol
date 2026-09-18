@@ -5,9 +5,10 @@ import '../interfaces/IYieldModule.sol';
 import '../interfaces/aave/AaveV3Interfaces.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
-import '@openzeppelin/contracts/access/Ownable2Step.sol';
+import '@openzeppelin/contracts/access/AccessControl.sol';
 import '@openzeppelin/contracts/utils/introspection/ERC165.sol';
 import '@openzeppelin/contracts/utils/math/Math.sol';
+import './../governance/SlowLaneQueueActivate.sol';
 
 /**
  * @title AaveYieldModule
@@ -26,7 +27,7 @@ import '@openzeppelin/contracts/utils/math/Math.sol';
  *
  * This separation keeps modules simple and distribution policy in core.
  */
-contract AaveYieldModule is IYieldModule, ERC165, Ownable2Step {
+contract AaveYieldModule is IYieldModule, ERC165, AccessControl, SlowLaneQueueActivate {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
@@ -46,7 +47,9 @@ contract AaveYieldModule is IYieldModule, ERC165, Ownable2Step {
 
     // Module metadata
     string public constant MODULE_NAME = "AaveYieldModule";
-    string public constant MODULE_VERSION = "2.5.2";
+    bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');
+    bytes32 public constant ROLE_GUARDIAN = keccak256('ROLE_GUARDIAN');
+    string public constant MODULE_VERSION = "2.5.3";
     bytes32 public constant PROTOCOL_ID = keccak256("aave-v3");
 
     // Authorization: approved escrow contracts
@@ -67,6 +70,12 @@ contract AaveYieldModule is IYieldModule, ERC165, Ownable2Step {
     // of approved escrows during an incident. The escrow itself is always authorized
     // to operate on its own positions.
     mapping(address operator => bool) public recoveryOperators;
+    // Slow-lane (governance) pending state: a single escrow approval, and a
+    // per-token aToken configuration. Both are risk-INCREASING changes that require
+    // a 7-day slow-lane queue->activate cycle before taking effect.
+    SlowLaneQueueActivate.PendingAddress private _pendingApproveEscrow;
+    mapping(address token => SlowLaneQueueActivate.PendingAddress) private _pendingTokenConfig;
+
 
     // ============ Events ============
 
@@ -75,6 +84,7 @@ contract AaveYieldModule is IYieldModule, ERC165, Ownable2Step {
     event TokenConfigured(address indexed token, address indexed aToken);
     event MinDepositConfigured(address indexed token, uint256 minDeposit);
     event RecoveryOperatorSet(address indexed operator, bool allowed);
+    event TokenDisabled(address token);
 
     // ============ Errors ============
 
@@ -82,7 +92,9 @@ contract AaveYieldModule is IYieldModule, ERC165, Ownable2Step {
 
     // ============ Constructor ============
 
-    constructor(address _aavePool) Ownable(msg.sender) {
+    constructor(address _aavePool) {
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(ROLE_TIMELOCK, msg.sender);
         require(_aavePool != address(0), "InvalidPoolAddress");
         require(_aavePool.code.length > 0, "PoolAddressIsNotContract");
         aavePool = IAavePool(_aavePool);
@@ -96,13 +108,30 @@ contract AaveYieldModule is IYieldModule, ERC165, Ownable2Step {
     }
 
     /**
-     * @notice Approve an escrow contract to use this module
-     * @param escrow Address to approve
+     * @notice [SLOW LANE] Queue approval of an escrow contract to use this module.
+     * @dev Risk-increasing: expands who can deposit capital into the Aave path, so it is
+     *      applied only after the 7-day slow-lane delay elapses (see activateApproveEscrow).
+     * @param escrow Escrow to approve
      */
-    function approveEscrow(address escrow) external onlyOwner {
+    function queueApproveEscrow(address escrow) external onlyRole(ROLE_TIMELOCK) {
         require(escrow != address(0), "InvalidAddress");
+        _queueAddress(_pendingApproveEscrow, escrow);
+    }
+
+    /**
+     * @notice Activate the queued escrow approval after the slow-lane delay.
+     */
+    function activateApproveEscrow() external onlyRole(ROLE_TIMELOCK) {
+        address escrow = _activateAddress(_pendingApproveEscrow);
         approvedEscrows[escrow] = true;
         emit EscrowApproved(escrow);
+    }
+
+    /**
+     * @notice Get the pending escrow approval (value, eta, exists).
+     */
+    function getPendingApproveEscrow() external view returns (address value, uint64 eta, bool exists) {
+        return getPendingAddress(_pendingApproveEscrow);
     }
 
     /**
@@ -112,27 +141,62 @@ contract AaveYieldModule is IYieldModule, ERC165, Ownable2Step {
      *      and a recovery operator may still emergencyUnwindForEscrow. (finding #3)
      * @param escrow Address to revoke
      */
-    function revokeEscrow(address escrow) external onlyOwner {
+    function revokeEscrow(address escrow) external onlyRole(ROLE_TIMELOCK) {
         approvedEscrows[escrow] = false;
         emit EscrowRevoked(escrow);
     }
 
     /**
-     * @notice Configure aToken address for a token (must be called before deposits)
-     * @param token Underlying token address
-     * @param aToken Aave aToken address for this underlying
+     * @notice [SLOW LANE] Queue a token -> aToken configuration.
+     * @dev Risk-increasing: adds a new capital entry into the Aave path, so it only takes
+     *      effect after the 7-day slow-lane delay (see activateConfigureToken). Existing
+     *      positions are unaffected (each position stores its own aToken).
+     * @param token Underlying token
+     * @param aToken Aave aToken for this underlying
      */
-    function configureToken(address token, address aToken) external onlyOwner {
+    function queueConfigureToken(address token, address aToken) external onlyRole(ROLE_TIMELOCK) {
         require(token != address(0), "InvalidAddress");
+        require(aToken != address(0), "InvalidAToken");
+        _queueAddress(_pendingTokenConfig[token], aToken);
+    }
+
+    /**
+     * @notice Activate a queued token->aToken config after the slow-lane delay.
+     * @param token Underlying token whose pending aToken is applied
+     */
+    function activateConfigureToken(address token) external onlyRole(ROLE_TIMELOCK) {
+        require(token != address(0), "InvalidAddress");
+        address aToken = _activateAddress(_pendingTokenConfig[token]);
         require(aToken != address(0), "InvalidAToken");
         tokenToAToken[token] = aToken;
         emit TokenConfigured(token, aToken);
     }
 
     /**
+     * @notice [FAST] Disable a token from the Aave path.
+     * @dev Risk-reducing: instantly blocks NEW deposits of this token (canHandle returns
+     *      TOKEN_NOT_CONFIGURED; initializeYield reverts TokenNotConfigured). Existing positions
+     *      still unwind normally because each position records its own aToken. Mirrors the
+     *      "fast to remove risk" governance asymmetry.
+     * @param token Underlying token to disable
+     */
+    function disableToken(address token) external onlyRole(ROLE_TIMELOCK) {
+        require(token != address(0), "InvalidAddress");
+        tokenToAToken[token] = address(0);
+        emit TokenDisabled(token);
+    }
+
+    /**
+     * @notice Get the pending token config for a token (aToken value, eta, exists).
+     */
+    function getPendingConfigureToken(address token) external view returns (address value, uint64 eta, bool exists) {
+        return getPendingAddress(_pendingTokenConfig[token]);
+    }
+
+    /**
      * @notice Configure per-token minimum accepted deposit amount.
      */
-    function configureMinDeposit(address token, uint256 minDeposit) external onlyOwner {
+    function configureMinDeposit(address token, uint256 minDeposit) external onlyRole(ROLE_TIMELOCK) {
         require(token != address(0), "InvalidAddress");
         minDepositByToken[token] = minDeposit;
         emit MinDepositConfigured(token, minDeposit);
@@ -145,7 +209,7 @@ contract AaveYieldModule is IYieldModule, ERC165, Ownable2Step {
      * @dev Recovery operators may unwind an approved escrow's position during an incident.
      *      Proceeds always go to the escrow owner, never to the operator.
      */
-    function setRecoveryOperator(address operator, bool allowed) external onlyOwner {
+    function setRecoveryOperator(address operator, bool allowed) external onlyRole(ROLE_TIMELOCK) {
         require(operator != address(0), "InvalidAddress");
         recoveryOperators[operator] = allowed;
         emit RecoveryOperatorSet(operator, allowed);
@@ -489,7 +553,7 @@ contract AaveYieldModule is IYieldModule, ERC165, Ownable2Step {
     }
 
     /// @notice ERC-165: advertises IYieldModule (v2.5) support for registry validation.
-    function supportsInterface(bytes4 interfaceId) public view virtual override returns (bool) {
+    function supportsInterface(bytes4 interfaceId) public view virtual override(AccessControl, ERC165) returns (bool) {
         return interfaceId == type(IYieldModule).interfaceId || super.supportsInterface(interfaceId);
     }
 

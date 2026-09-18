@@ -95,14 +95,6 @@ contract ModuleSnapshotInvariants is Test {
                 );
             }
 
-            if (snap.yieldDistributionModule != address(0)) {
-                assertEq(
-                    vault.effectiveYieldDistributionModule(i),
-                    snap.yieldDistributionModule,
-                    "yield distribution getter must use snapshot"
-                );
-            }
-
             if (snap.cancellationStrategy != address(0)) {
                 assertEq(
                     vault.effectiveCancellationStrategy(i),

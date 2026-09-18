@@ -39,8 +39,8 @@ contract AaveYieldModuleFailureModeTest is Test {
         escrow = address(0x1001);
         attacker = makeAddr('Attacker');
         
-        module.approveEscrow(escrow);
-        module.configureToken(address(token), address(aToken));
+        _approve(escrow);
+        _cfgToken(address(token), address(aToken));
         
         token.transfer(escrow, DEPOSIT_AMOUNT * 10);
     }
@@ -50,6 +50,20 @@ contract AaveYieldModuleFailureModeTest is Test {
     /**
      * @notice G5: Module fails closed when Aave withdraw reverts
      */
+    function _cfgToken(address token_, address aToken_) internal {
+        module.queueConfigureToken(token_, aToken_);
+        (, uint64 eta, ) = module.getPendingConfigureToken(token_);
+        vm.warp(eta);
+        module.activateConfigureToken(token_);
+    }
+
+    function _approve(address escrow_) internal {
+        module.queueApproveEscrow(escrow_);
+        (, uint64 eta, ) = module.getPendingApproveEscrow();
+        vm.warp(eta);
+        module.activateApproveEscrow();
+    }
+
     function test_aave_withdraw_reverts_fail_closed() public {
         vm.prank(escrow);
         token.transfer(escrow, DEPOSIT_AMOUNT);

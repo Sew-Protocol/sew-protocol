@@ -51,12 +51,6 @@ struct EscrowSettings {
     uint256 autoCancelTime; // Custom cancel time (0 = use default)
 }
 
-// DEPRECATED: YieldDistribution struct removed - distribution now derived from preset
-// struct YieldDistribution {
-//     address[] recipients; // Addresses to receive yield
-//     uint256[] percentages; // Percentage per recipient (basis points, sum to 10000)
-//     bool isSet; // Whether distribution is configured
-// }
 
 // Escrow state and status enums (shared across contracts)
 enum EscrowState {
@@ -106,7 +100,6 @@ struct ModuleSnapshot {
     address releaseStrategy;
     address cancellationStrategy;
     address yieldGenerationModule;
-    address yieldDistributionModule;
     address incentiveModule;
     uint256 yieldProtocolFeeBps;      // Snapshotted at creation - fee on yield generated
     uint256 appealBondProtocolFeeBps; // Snapshotted at creation - fee on appeal bonds

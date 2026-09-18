@@ -5,7 +5,6 @@ import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 import './EscrowConfiguration.sol';
 import '../interfaces/IYieldModule.sol';
-import '../interfaces/IYieldDistributionModule.sol';
 import '../interfaces/IReleaseStrategy.sol';
 import '../shared/interfaces/IResolutionModule.sol';
 import '../libraries/EscrowCreationLogic.sol';
@@ -103,7 +102,6 @@ abstract contract EscrowCreation is ReentrancyGuard, EscrowConfiguration {
             resolutionModule: resModule, releaseStrategy: address(_getReleaseStrategy(workflowId)),
             cancellationStrategy: _getCancellationStrategy(workflowId),
             yieldGenerationModule: address(_getYieldGenerationModule(workflowId)),
-            yieldDistributionModule: address(_getYieldDistributionModule(workflowId)),
             incentiveModule: ModuleSnapshotLibrary.getIncentiveModule(resModule),
             yieldProtocolFeeBps: yieldProtocolFeeBps, appealBondProtocolFeeBps: appealBondProtocolFeeBps,
             escrowFeeBps: escrowFee, defaultAutoReleaseDelay: timeoutConfig.defaultAutoReleaseDelay,
@@ -166,5 +164,4 @@ abstract contract EscrowCreation is ReentrancyGuard, EscrowConfiguration {
     function _getReleaseStrategy(uint256 workflowId) internal view virtual returns (IReleaseStrategy);
     function _getCancellationStrategy(uint256 workflowId) internal view virtual returns (address);
     function _getYieldGenerationModule(uint256 workflowId) internal view virtual returns (IYieldModule);
-    function _getYieldDistributionModule(uint256 workflowId) internal view virtual returns (IYieldDistributionModule);
 }

@@ -39,9 +39,9 @@ contract AaveYieldModuleIntegrationTest is Test {
         escrow = address(0x1001);
         otherEscrow = address(0x1002);
         
-        module.approveEscrow(escrow);
-        module.approveEscrow(otherEscrow);
-        module.configureToken(address(token), address(aToken));
+        _approve(escrow);
+        _approve(otherEscrow);
+        _cfgToken(address(token), address(aToken));
         
         token.transfer(escrow, INITIAL_BALANCE);
         token.transfer(otherEscrow, INITIAL_BALANCE);
@@ -52,6 +52,20 @@ contract AaveYieldModuleIntegrationTest is Test {
     /**
      * @notice Withdraw when reserve is unavailable should fail
      */
+    function _cfgToken(address token_, address aToken_) internal {
+        module.queueConfigureToken(token_, aToken_);
+        (, uint64 eta, ) = module.getPendingConfigureToken(token_);
+        vm.warp(eta);
+        module.activateConfigureToken(token_);
+    }
+
+    function _approve(address escrow_) internal {
+        module.queueApproveEscrow(escrow_);
+        (, uint64 eta, ) = module.getPendingApproveEscrow();
+        vm.warp(eta);
+        module.activateApproveEscrow();
+    }
+
     function test_withdraw_reserve_unavailable() public {
         vm.prank(escrow);
         token.transfer(escrow, 100e18);

@@ -259,7 +259,6 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         YieldOps.YieldResult memory result = yieldOps.handleYield(
             IYieldModule(address(mockGen)),
-            IYieldDistributionModule(address(0)),
             1,
             address(token),
             1000,
@@ -274,31 +273,6 @@ contract OpsCoverageTest is Test {
         assertEq(result.yield, 0, "Should have no yield");
     }
 
-    function test_YieldOps_distributeWithdrawnYield_ProtocolFee() public {
-        vm.prank(timelock);
-        yieldOps.registerEscrowContract(escrowContract);
-
-        uint256 earned = 100;
-        token.mint(address(yieldOps), earned);
-
-        vm.prank(escrowContract);
-        YieldOps.DistributionResult memory result = yieldOps.distributeWithdrawnYield(
-            IYieldDistributionModule(address(0)),
-            1,
-            address(token),
-            earned,
-            1000, // 10% protocol fee
-            feeRecipient,
-            ""
-        );
-
-        assertTrue(result.success);
-        assertEq(result.distributedAmount, 0); // non-fee yield retained for claimable flow
-        assertEq(result.failureReason, 'Yield retained in escrow claimable pool');
-        // feeRecipient should not receive direct transfer; fee is claimable
-        assertEq(token.balanceOf(feeRecipient), 0);
-        assertEq(yieldOps.claimableProtocolFees(address(token), feeRecipient), 10);
-    }
 
     function test_YieldOps_recoverTokens_Guardian() public {
         // Send tokens to YieldOps
@@ -351,7 +325,6 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         YieldOps.YieldResult memory result = yieldOps.handleYield(
             IYieldModule(address(mockGen)),
-            IYieldDistributionModule(address(0)),
             1,
             address(token),
             1000,
@@ -937,7 +910,6 @@ contract OpsCoverageTest is Test {
     // ============ YieldOps Extended Tests ============
 
     MockYieldGenerationModule public mockGen;
-    MockYieldDistributionModule public mockDist;
 
     function test_YieldOps_handleYield_Success() public {
         mockGen = new MockYieldGenerationModule();
@@ -955,7 +927,6 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         YieldOps.YieldResult memory result = yieldOps.handleYield(
             IYieldModule(address(mockGen)),
-            IYieldDistributionModule(address(0)), // Not used in handleYield anymore
             1,
             address(token),
             original,
@@ -965,7 +936,6 @@ contract OpsCoverageTest is Test {
         );
 
         // handleYield ONLY withdraws, does NOT distribute
-        // Distribution must be done separately via distributeWithdrawnYield
         assertTrue(result.success);
         assertEq(result.yield, earned);
         assertEq(result.actualAmount, total);
@@ -983,7 +953,6 @@ contract OpsCoverageTest is Test {
         // Should not revert, but return failure with reason
         YieldOps.YieldResult memory result = yieldOps.handleYield(
             IYieldModule(address(mockGen)),
-            IYieldDistributionModule(address(0)),
             1,
             address(token),
             1000,
@@ -998,36 +967,6 @@ contract OpsCoverageTest is Test {
         assertEq(result.actualAmount, 1000, "Should return original amount");
     }
 
-    function test_YieldOps_distributeWithdrawnYield_DistFailure() public {
-        mockDist = new MockYieldDistributionModule();
-        
-        vm.prank(timelock);
-        yieldOps.registerEscrowContract(escrowContract);
-
-        uint256 earned = 100;
-        token.mint(address(yieldOps), earned);
-
-        mockDist.setRevert(true);
-
-        vm.prank(escrowContract);
-        YieldOps.DistributionResult memory result = yieldOps.distributeWithdrawnYield(
-            IYieldDistributionModule(address(mockDist)),
-            1,
-            address(token),
-            earned,
-            0,
-            feeRecipient,
-            ""
-        );
-
-        // On failure, no fallback transfer of yield remainder should occur
-        assertFalse(result.success, "Should fail"); 
-        assertEq(result.distributedAmount, 0, "Should not distribute on failure fallback path");
-        assertTrue(bytes(result.failureReason).length > 0, "Should have failure reason");
-
-        // Verify feeRecipient did not get fallback yield transfer
-        assertEq(token.balanceOf(feeRecipient), 0);
-    }
 
     function test_YieldOps_handleYield_WithdrawSuccessFalse() public {
         mockGen = new MockYieldGenerationModule();
@@ -1039,7 +978,6 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         YieldOps.YieldResult memory result = yieldOps.handleYield(
             IYieldModule(address(mockGen)),
-            IYieldDistributionModule(address(0)),
             1,
             address(token),
             1000,
@@ -1053,109 +991,9 @@ contract OpsCoverageTest is Test {
         assertEq(result.failureReason, "Withdraw failed");
     }
 
-    function test_YieldOps_distributeWithdrawnYield_NoDist_NoFeeRecip() public {
-        vm.prank(timelock);
-        yieldOps.registerEscrowContract(escrowContract);
 
-        uint256 earned = 100;
-        token.mint(address(yieldOps), earned);
 
-        vm.prank(escrowContract);
-        YieldOps.DistributionResult memory result = yieldOps.distributeWithdrawnYield(
-            IYieldDistributionModule(address(0)),
-            1,
-            address(token),
-            earned,
-            0,
-            address(0), // No fee recipient
-            ""
-        );
 
-        assertTrue(result.success);
-        assertEq(result.distributedAmount, 0);
-        assertEq(result.failureReason, "Yield retained in escrow claimable pool");
-    }
-
-    function test_YieldOps_distributeYieldInternal_Partial() public {
-        mockDist = new MockYieldDistributionModule();
-        vm.prank(timelock);
-        yieldOps.registerEscrowContract(escrowContract);
-
-        uint256 earned = 100;
-        token.mint(address(yieldOps), earned);
-        
-        // Mock partial distribution: distributedAmount = 50
-        mockDist.setDistributedAmount(50);
-
-        vm.prank(escrowContract);
-        YieldOps.DistributionResult memory result = yieldOps.distributeWithdrawnYield(
-            IYieldDistributionModule(address(mockDist)),
-            1,
-            address(token),
-            earned,
-            0,
-            feeRecipient,
-            ""
-        );
-
-        assertTrue(result.success);
-        // Partial distribution module reports the partial amount
-        assertEq(result.distributedAmount, 50);
-    }
-
-    function test_YieldOps_distributeWithdrawnYield_NoDistModule() public {
-        vm.prank(timelock);
-        yieldOps.registerEscrowContract(escrowContract);
-
-        uint256 earned = 100;
-        token.mint(address(yieldOps), earned);
-
-        vm.prank(escrowContract);
-        YieldOps.DistributionResult memory result = yieldOps.distributeWithdrawnYield(
-            IYieldDistributionModule(address(0)),
-            1,
-            address(token),
-            earned,
-            0,
-            feeRecipient,
-            ""
-        );
-
-        // No distribution module: non-fee yield is retained (claimable path)
-        assertTrue(result.success, "Should succeed with retained-yield path");
-        assertEq(result.distributedAmount, 0, "Should not transfer non-fee yield directly");
-        assertEq(result.failureReason, 'Yield retained in escrow claimable pool');
-        assertEq(token.balanceOf(feeRecipient), 0);
-    }
-
-    function test_YieldOps_withdrawClaimableProtocolFee_Success() public {
-        vm.prank(timelock);
-        yieldOps.registerEscrowContract(escrowContract);
-
-        uint256 earned = 100;
-        token.mint(address(yieldOps), earned);
-
-        vm.prank(escrowContract);
-        yieldOps.distributeWithdrawnYield(
-            IYieldDistributionModule(address(0)),
-            1,
-            address(token),
-            earned,
-            1000,
-            feeRecipient,
-            ""
-        );
-
-        assertEq(yieldOps.claimableProtocolFees(address(token), feeRecipient), 10);
-        assertEq(token.balanceOf(feeRecipient), 0);
-
-        vm.prank(feeRecipient);
-        uint256 withdrawn = yieldOps.withdrawClaimableProtocolFee(address(token), 10);
-
-        assertEq(withdrawn, 10);
-        assertEq(yieldOps.claimableProtocolFees(address(token), feeRecipient), 0);
-        assertEq(token.balanceOf(feeRecipient), 10);
-    }
 
     function test_YieldOps_withdrawClaimableProtocolFee_InvalidAmount() public {
         vm.prank(feeRecipient);
@@ -1163,80 +1001,12 @@ contract OpsCoverageTest is Test {
         yieldOps.withdrawClaimableProtocolFee(address(token), 1);
     }
 
-    function test_YieldOps_distributeWithdrawnYield_FeeRecipientCannotBeZero() public {
-        vm.prank(timelock);
-        yieldOps.registerEscrowContract(escrowContract);
-
-        uint256 earned = 100;
-        token.mint(address(yieldOps), earned);
-
-        vm.prank(escrowContract);
-        vm.expectRevert(YieldOps.FeeRecipientCannotBeZero.selector);
-        yieldOps.distributeWithdrawnYield(
-            IYieldDistributionModule(address(0)),
-            1,
-            address(token),
-            earned,
-            1000, // 10% protocol fee - requires feeRecipient
-            address(0), // Zero address for feeRecipient
-            ""
-        );
-    }
 
     function test_Example() public {
         // Placeholder to keep context correct
     }
 
-    function test_YieldOps_distributeWithdrawnYield_ProtocolFeeExceedsMaximum() public {
-        vm.prank(timelock);
-        yieldOps.registerEscrowContract(escrowContract);
 
-        uint256 earned = 100;
-        token.mint(address(yieldOps), earned);
-
-        vm.prank(escrowContract);
-        vm.expectRevert(abi.encodeWithSelector(
-            YieldOps.ProtocolFeeExceedsMaximum.selector,
-            3001,
-            3000
-        ));
-        yieldOps.distributeWithdrawnYield(
-            IYieldDistributionModule(address(0)),
-            1,
-            address(token),
-            earned,
-            3001, // 30.01% protocol fee - exceeds 30% maximum
-            feeRecipient,
-            ""
-        );
-    }
-
-    function test_YieldOps_distributeWithdrawnYield_NoFeeRecipientNoDistModule() public {
-        vm.prank(timelock);
-        yieldOps.registerEscrowContract(escrowContract);
-
-        uint256 earned = 100;
-        token.mint(address(yieldOps), earned);
-
-        vm.prank(escrowContract);
-        YieldOps.DistributionResult memory result = yieldOps.distributeWithdrawnYield(
-            IYieldDistributionModule(address(0)), // No distribution module
-            1,
-            address(token),
-            earned,
-            0,
-            address(0), // No fee recipient
-            ""
-        );
-
-        // Yield should stay in YieldOps - returns success but 0 distributed
-        // This is a warning scenario tracked by failureReason
-        assertTrue(result.success, "Should succeed (yield stays in contract)");
-        assertEq(result.distributedAmount, 0, "Should not distribute");
-        assertTrue(bytes(result.failureReason).length > 0, "Should have failure reason explaining yield stayed in contract");
-        // Yield stays in contract
-        assertEq(token.balanceOf(address(yieldOps)), earned);
-    }
 
     function test_YieldOps_handleYield_WithdrawalReturnsFalse() public {
         MockYieldGenerationModule mockGen2 = new MockYieldGenerationModule();
@@ -1248,7 +1018,6 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         YieldOps.YieldResult memory result = yieldOps.handleYield(
             IYieldModule(address(mockGen2)),
-            IYieldDistributionModule(address(0)),
             1,
             address(token),
             1000,
@@ -1273,7 +1042,6 @@ contract OpsCoverageTest is Test {
         vm.prank(escrowContract);
         YieldOps.YieldResult memory result = yieldOps.handleYield(
             IYieldModule(address(mockGen3)),
-            IYieldDistributionModule(address(0)),
             1,
             address(token),
             1000,
@@ -1288,21 +1056,6 @@ contract OpsCoverageTest is Test {
         assertEq(result.yield, 0, "Should have no yield");
     }
 
-    function test_YieldOps_distributeYieldInternal_AccessControl() public {
-        // distributeYieldInternal is public but has check: msg.sender == address(this)
-        vm.prank(owner);
-        vm.expectRevert(abi.encodeWithSelector(YieldOps.InternalOnly.selector, owner));
-        yieldOps._distributeYieldInternal(
-            IYieldDistributionModule(address(0)),
-            1,
-            address(this),
-            address(token),
-            100,
-            ""
-        );
-    }
-
-    // ============ SettlementOpsReference Extended Tests ============
 
     function test_SettlementOps_computePendingSettlementExecution() public {
         vm.prank(timelock);
@@ -1488,31 +1241,6 @@ contract MockYieldGenerationModule is IYieldGenerationModule {
     function supportsInterface(bytes4) external pure returns (bool) { return true; }
     function getAavePoolAddress() external pure returns (address) { return address(0); }
     function getATokenAddress(address) external pure returns (address) { return address(0); }
-}
-
-contract MockYieldDistributionModule is IYieldDistributionModule {
-    bool public shouldRevert;
-    bool public success;
-    uint256 public distributed;
-
-    function setRevert(bool _r) external { shouldRevert = _r; }
-    function setDistributeResult(bool _s, uint256 _d) external {
-        success = _s;
-        distributed = _d;
-    }
-    function setDistributedAmount(uint256 _d) external {
-        success = true;
-        distributed = _d;
-    }
-
-    function distributeYield(uint256, address, address, uint256, bytes calldata) external view returns (bool, uint256) {
-        if (shouldRevert) revert("Dist Fail");
-        return (success, distributed);
-    }
-
-    function moduleName() external pure returns (string memory) { return "MockDist"; }
-    function moduleVersion() external pure returns (string memory) { return "1.0"; }
-    function supportsInterface(bytes4) external pure returns (bool) { return true; }
 }
 
 contract MockResolutionModule {

@@ -16,7 +16,6 @@ import 'contracts/modules/DefaultReleaseStrategy.sol';
 import 'contracts/admin/EscrowGovernanceTimelock.sol';
 import 'contracts/libraries/SettingsValidationLibrary.sol';
 import 'contracts/interfaces/IYieldModule.sol';
-import 'contracts/interfaces/IYieldDistributionModule.sol';
 
 /**
  * @title ReleaseEscrowEdgeCasesTest

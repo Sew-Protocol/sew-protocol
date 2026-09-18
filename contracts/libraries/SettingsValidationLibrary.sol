@@ -218,56 +218,6 @@ library SettingsValidationLibrary {
         }
     }
 
-    /**
-     * @notice Validate yield distribution configuration
-     * @param recipients Array of recipient addresses
-     * @param bps Array of basis points for each recipient
-     * @dev Validates:
-     *      - 1 <= recipients.length <= 10
-     *      - recipients.length == bps.length
-     *      - Sum of bps == 10_000
-     *      - All recipients non-zero
-     *      - No duplicate recipients
-     */
-    function validateYieldDistribution(
-        address[] memory recipients,
-        uint256[] memory bps
-    ) internal pure {
-        uint256 length = recipients.length;
-
-        // Check recipient count bounds
-        if (length < MIN_YIELD_RECIPIENTS || length > MAX_YIELD_RECIPIENTS) {
-            revert TooManyRecipients(length, MAX_YIELD_RECIPIENTS);
-        }
-
-        // Check array lengths match
-        if (length != bps.length) {
-            revert InvalidArrayLength(length, bps.length);
-        }
-
-        // Validate recipients and calculate sum
-        uint256 sum = 0;
-        for (uint256 i = 0; i < length; i++) {
-            // Check recipient is non-zero
-            if (recipients[i] == address(0)) {
-                revert InvalidAddress(ADDR_YIELD_OPS, address(0));
-            }
-
-            // Check for duplicates
-            for (uint256 j = i + 1; j < length; j++) {
-                if (recipients[i] == recipients[j]) {
-                    revert DuplicateRecipient(recipients[i]);
-                }
-            }
-
-            sum += bps[i];
-        }
-
-        // Check sum equals 100%
-        if (sum != BPS_DENOMINATOR) {
-            revert InvalidBpsSum(sum);
-        }
-    }
 
     /**
      * @notice Validate address is non-zero

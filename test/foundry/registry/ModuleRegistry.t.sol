@@ -5,7 +5,6 @@ import 'forge-std/Test.sol';
 import '../../../contracts/registry/ModuleRegistry.sol';
 import '../../../contracts/interfaces/IModuleRegistry.sol';
 import '../../../contracts/interfaces/IYieldModule.sol';
-import '../../../contracts/interfaces/IYieldDistributionModule.sol';
 import '../../../contracts/shared/interfaces/IResolutionModule.sol';
 
 contract ModuleRegistryTest is Test {
@@ -224,7 +223,7 @@ contract MockGenRegModule {
 
 contract MockDistRegModule {
     function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
-        return interfaceId == type(IYieldDistributionModule).interfaceId || interfaceId == type(IERC165).interfaceId;
+        return interfaceId == type(IERC165).interfaceId;
     }
 }
 

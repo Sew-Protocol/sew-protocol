@@ -13,7 +13,6 @@ import "contracts/core/BondCollector.sol";
 import "contracts/mocks/ERC20Mock.sol";
 import "contracts/libraries/SettingsValidationLibrary.sol";
 import "contracts/interfaces/IYieldGenerationModule.sol";
-import "contracts/interfaces/IYieldDistributionModule.sol";
 
 contract BadYieldOps {
     // Provide a stub so tests can "register" the escrow contract.
@@ -23,7 +22,6 @@ contract BadYieldOps {
     // Returning a single uint256 makes the return data 32 bytes, which is malformed for YieldOps.YieldResult.
     function handleYield(
         IYieldGenerationModule,
-        IYieldDistributionModule,
         uint256,
         address,
         uint256,

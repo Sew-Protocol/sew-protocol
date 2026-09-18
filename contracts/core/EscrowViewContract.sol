@@ -531,8 +531,8 @@ contract EscrowViewContract {
         metrics.yieldToken = token;
 
         // Try to query current yield from the generation module
-        // ModuleSnapshot: (address resolutionModule, address releaseStrategy, address cancellationStrategy, address yieldGenerationModule, address yieldDistributionModule, address incentiveModule, uint256 yieldProtocolFeeBps, uint256 appealBondProtocolFeeBps, uint256 escrowFeeBps, uint256 defaultAutoReleaseDelay, uint256 defaultAutoCancelDelay, uint256 maxDisputeDuration, uint256 appealWindowDuration)
-        (, , , address genMod, , , , , , , , , ) = escrowContract.moduleSnapshots(workflowId);
+        // ModuleSnapshot: (address resolutionModule, address releaseStrategy, address cancellationStrategy, address yieldGenerationModule, address incentiveModule, uint256 yieldProtocolFeeBps, uint256 appealBondProtocolFeeBps, uint256 escrowFeeBps, uint256 defaultAutoReleaseDelay, uint256 defaultAutoCancelDelay, uint256 maxDisputeDuration, uint256 appealWindowDuration)
+        (, , , address genMod, , , , , , , , ) = escrowContract.moduleSnapshots(workflowId);
         if (genMod != address(0) && genMod.code.length > 0) {
             // Yield generation is unified on IYieldModule (v2.5).
             try IYieldModule(genMod).previewPosition(workflowId, address(escrowContract)) returns (

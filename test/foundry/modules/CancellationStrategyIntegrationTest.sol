@@ -107,7 +107,7 @@ contract CancellationStrategyIntegrationTest is Test {
         
         // Check that the cancellation strategy was snapshotted
         // ModuleSnapshot: resolution, release, cancellation, yieldGen, yieldDist, incentive, yieldFee, appealFee, escrowFee, autoRelease, autoCancel, maxDispute, appealWindow
-        (,, address cancelStrategy,,,,,,,,,,) = vault.moduleSnapshots(wid);
+        (,, address cancelStrategy,,,,,,,,,) = vault.moduleSnapshots(wid);
         assertEq(cancelStrategy, address(cancellationStrategy), "Should use default cancellation strategy");
     }
 

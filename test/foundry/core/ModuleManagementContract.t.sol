@@ -30,8 +30,6 @@ contract ModuleSnapshotRegistryTest is Test {
     DefaultReleaseStrategy public releaseStrategy2;
     TestPlaceholderModule public yieldGenModule1;
     TestPlaceholderModule public yieldGenModule2;
-    TestPlaceholderModule public yieldDistModule1;
-    TestPlaceholderModule public yieldDistModule2;
     DefaultResolutionModule public resolutionModule1;
     DefaultResolutionModule public resolutionModule2;
     
@@ -51,8 +49,6 @@ contract ModuleSnapshotRegistryTest is Test {
         releaseStrategy2 = new DefaultReleaseStrategy();
         yieldGenModule1 = new TestPlaceholderModule();
         yieldGenModule2 = new TestPlaceholderModule();
-        yieldDistModule1 = new TestPlaceholderModule();
-        yieldDistModule2 = new TestPlaceholderModule();
         resolutionModule1 = new DefaultResolutionModule(owner, address(0x2222));
         resolutionModule2 = new DefaultResolutionModule(owner, address(0x3333));
         
@@ -135,23 +131,6 @@ contract ModuleSnapshotRegistryTest is Test {
         );
         
         assertEq(value, address(yieldGenModule1));
-        assertTrue(exists);
-    }
-    
-    function test_queueModule_YIELD_DIST_success() public {
-        vm.prank(timelock);
-        moduleManagement.queueModule(
-            address(escrowContract),
-            BaseEscrow.ModuleType.YIELD_DIST,
-            address(yieldDistModule1)
-        );
-        
-        (address value, , bool exists) = moduleManagement.getPendingModule(
-            address(escrowContract),
-            BaseEscrow.ModuleType.YIELD_DIST
-        );
-        
-        assertEq(value, address(yieldDistModule1));
         assertTrue(exists);
     }
     
@@ -253,26 +232,6 @@ contract ModuleSnapshotRegistryTest is Test {
         
         IYieldModule module = moduleManagement.getDefaultYieldGenerationModule(address(escrowContract));
         assertEq(address(module), address(yieldGenModule1));
-    }
-    
-    function test_activateModule_YIELD_DIST_success() public {
-        vm.prank(timelock);
-        moduleManagement.queueModule(
-            address(escrowContract),
-            BaseEscrow.ModuleType.YIELD_DIST,
-            address(yieldDistModule1)
-        );
-        
-        vm.warp(block.timestamp + 7 days + 1);
-        
-        vm.prank(timelock);
-        moduleManagement.activateModule(
-            address(escrowContract),
-            BaseEscrow.ModuleType.YIELD_DIST
-        );
-        
-        IYieldDistributionModule module = moduleManagement.getDefaultYieldDistributionModule(address(escrowContract));
-        assertEq(address(module), address(yieldDistModule1));
     }
     
     function test_activateModule_RESOLUTION_success() public {
@@ -450,24 +409,6 @@ contract ModuleSnapshotRegistryTest is Test {
         assertEq(address(module), address(yieldGenModule1));
     }
     
-    function test_getDefaultYieldDistributionModule() public {
-        vm.prank(timelock);
-        moduleManagement.queueModule(
-            address(escrowContract),
-            BaseEscrow.ModuleType.YIELD_DIST,
-            address(yieldDistModule1)
-        );
-        vm.warp(block.timestamp + 7 days + 1);
-        vm.prank(timelock);
-        moduleManagement.activateModule(
-            address(escrowContract),
-            BaseEscrow.ModuleType.YIELD_DIST
-        );
-        
-        IYieldDistributionModule module = moduleManagement.getDefaultYieldDistributionModule(address(escrowContract));
-        assertEq(address(module), address(yieldDistModule1));
-    }
-    
     function test_getDefaultResolutionModule() public {
         vm.prank(timelock);
         moduleManagement.queueModule(
@@ -526,27 +467,6 @@ contract ModuleSnapshotRegistryTest is Test {
             BaseEscrow.ModuleType.YIELD_GEN
         );
         assertEq(module, address(yieldGenModule1));
-    }
-    
-    function test_getModule_YIELD_DIST() public {
-        vm.prank(timelock);
-        moduleManagement.queueModule(
-            address(escrowContract),
-            BaseEscrow.ModuleType.YIELD_DIST,
-            address(yieldDistModule1)
-        );
-        vm.warp(block.timestamp + 7 days + 1);
-        vm.prank(timelock);
-        moduleManagement.activateModule(
-            address(escrowContract),
-            BaseEscrow.ModuleType.YIELD_DIST
-        );
-        
-        address module = moduleManagement.getModule(
-            address(escrowContract),
-            BaseEscrow.ModuleType.YIELD_DIST
-        );
-        assertEq(module, address(yieldDistModule1));
     }
     
     function test_getModule_RESOLUTION() public {

@@ -71,7 +71,7 @@ contract ModuleSnapshotRaceConditionTest is Test {
 
         // 2. Verify the escrow snapshots strategy A.
         // struct ModuleSnapshot: resolution, release, cancellation, yieldGen, yieldDist, incentive, yieldFee, appealFee, escrowFee, autoRelease, autoCancel, maxDispute, appealWindow
-        (, address snapRelease, , , , , , , , , , , ) = vault.moduleSnapshots(wid);
+        (, address snapRelease, , , , , , , , , , ) = vault.moduleSnapshots(wid);
         assertEq(snapRelease, address(strategyA));
 
         // 3. Swap the default to strategy B.
@@ -83,7 +83,7 @@ contract ModuleSnapshotRaceConditionTest is Test {
         assertEq(mm.getModule(address(vault), BaseEscrow.ModuleType.RELEASE), address(strategyB));
 
         // 5. Verify the original escrow remains bound to strategy A.
-        (, snapRelease, , , , , , , , , , , ) = vault.moduleSnapshots(wid);
+        (, snapRelease, , , , , , , , , , ) = vault.moduleSnapshots(wid);
         assertEq(snapRelease, address(strategyA));
     }
 }

@@ -32,7 +32,6 @@ library ModuleGetterLibrary {
         else if (moduleType == BaseEscrow.ModuleType.RELEASE) snapshotModule = snapshot.releaseStrategy;
         else if (moduleType == BaseEscrow.ModuleType.CANCELLATION) snapshotModule = snapshot.cancellationStrategy;
         else if (moduleType == BaseEscrow.ModuleType.YIELD_GEN) snapshotModule = snapshot.yieldGenerationModule;
-        else if (moduleType == BaseEscrow.ModuleType.YIELD_DIST) snapshotModule = snapshot.yieldDistributionModule;
 
         // If snapshot exists, return it
         if (snapshotModule != address(0)) {

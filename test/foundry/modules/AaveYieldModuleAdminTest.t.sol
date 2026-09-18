@@ -8,7 +8,7 @@ import 'contracts/mocks/ERC20Mock.sol';
 import 'contracts/interfaces/IYieldModule.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 
-/// @notice Admin surface, event emissions, Ownable2Step ownership, and the
+/// @notice Admin surface, event emissions, AccessControl (Role-Based Access Control), and the
 ///         revocation effect for the current AaveYieldModule.
 contract AaveYieldModuleAdminTest is Test {
     AaveYieldModule public module;
@@ -28,6 +28,24 @@ contract AaveYieldModuleAdminTest is Test {
     event TokenConfigured(address indexed token, address indexed aToken);
     event MinDepositConfigured(address indexed token, uint256 minDeposit);
 
+    /// @dev Slow-lane two-step for escrow approval. Helper is file-local to this
+    ///      test suite; the module's approveEscrow/configureToken setters were
+    ///      replaced by an asymmetric queue->activate (7-day) governance flow.
+    function _approve(address escrow_) internal {
+        module.queueApproveEscrow(escrow_);
+        (, uint64 eta, ) = module.getPendingApproveEscrow();
+        vm.warp(eta);
+        module.activateApproveEscrow();
+    }
+
+    /// @dev Slow-lane two-step for token->aToken configuration.
+    function _cfgToken(address token_, address aToken_) internal {
+        module.queueConfigureToken(token_, aToken_);
+        (, uint64 eta, ) = module.getPendingConfigureToken(token_);
+        vm.warp(eta);
+        module.activateConfigureToken(token_);
+    }
+
     function setUp() public {
         owner = address(this);
         escrow = address(0x1001);
@@ -46,14 +64,16 @@ contract AaveYieldModuleAdminTest is Test {
     // ============ Events ============
 
     function test_approveEscrow_emits() public {
+        module.queueApproveEscrow(escrow);
+        vm.warp(block.timestamp + 7 days);
         vm.expectEmit(true, true, false, false);
         emit EscrowApproved(escrow);
-        module.approveEscrow(escrow);
+        module.activateApproveEscrow();
         assertTrue(module.approvedEscrows(escrow));
     }
 
     function test_revokeEscrow_emits() public {
-        module.approveEscrow(escrow);
+        _approve(escrow);
         vm.expectEmit(true, true, false, false);
         emit EscrowRevoked(escrow);
         module.revokeEscrow(escrow);
@@ -61,9 +81,11 @@ contract AaveYieldModuleAdminTest is Test {
     }
 
     function test_configureToken_emits() public {
+        module.queueConfigureToken(address(token), address(aToken));
+        vm.warp(block.timestamp + 7 days);
         vm.expectEmit(true, true, false, false);
         emit TokenConfigured(address(token), address(aToken));
-        module.configureToken(address(token), address(aToken));
+        module.activateConfigureToken(address(token));
         assertEq(module.tokenToAToken(address(token)), address(aToken));
     }
 
@@ -76,16 +98,24 @@ contract AaveYieldModuleAdminTest is Test {
 
     // ============ Admin is owner-only ============
 
-    function test_admin_onlyOwner() public {
+    function test_admin_onlyRoleTimelock() public {
         address stranger = address(0xBAD);
 
         vm.startPrank(stranger);
-        vm.expectRevert();
-        module.approveEscrow(escrow);
+        vm.expectRevert(
+            abi.encodeWithSignature(
+                'AccessControlUnauthorizedAccount(address,bytes32)', stranger, module.ROLE_TIMELOCK()
+            )
+        );
+        module.queueApproveEscrow(escrow);
         vm.expectRevert();
         module.revokeEscrow(escrow);
-        vm.expectRevert();
-        module.configureToken(address(token), address(aToken));
+        vm.expectRevert(
+            abi.encodeWithSignature(
+                'AccessControlUnauthorizedAccount(address,bytes32)', stranger, module.ROLE_TIMELOCK()
+            )
+        );
+        module.queueConfigureToken(address(token), address(aToken));
         vm.expectRevert();
         module.configureMinDeposit(address(token), 1);
         vm.stopPrank();
@@ -95,45 +125,93 @@ contract AaveYieldModuleAdminTest is Test {
 
     function test_configureToken_reconfigure_updates() public {
         MockAToken aToken2 = new MockAToken(address(token), 'aTest2', 'aTEST2');
-        module.configureToken(address(token), address(aToken));
-        module.configureToken(address(token), address(aToken2));
+        _cfgToken(address(token), address(aToken));
+        _cfgToken(address(token), address(aToken2));
         assertEq(module.tokenToAToken(address(token)), address(aToken2));
     }
 
-    // ============ Ownable2Step ============
+    // ============ Slow-lane asymmetry (risk-increase is slow, risk-reduce is fast) ============
 
-    function test_ownership_twoStepTransfer() public {
-        address newOwner = address(0xA11CE);
+    function test_activateApproveEscrow_beforeDelay_reverts() public {
+        module.queueApproveEscrow(escrow);
+        (address pendingValue, uint64 eta, bool exists) = module.getPendingApproveEscrow();
+        assertEq(pendingValue, escrow);
+        assertTrue(exists, 'pending approval recorded');
+        // 1 day short of the 7-day slow-lane delay.
+        vm.warp(block.timestamp + 6 days);
+        vm.expectRevert(abi.encodeWithSignature('NotReady(uint64)', eta));
+        module.activateApproveEscrow();
+    }
 
-        module.transferOwnership(newOwner);
-        assertEq(module.pendingOwner(), newOwner);
-        assertEq(module.owner(), owner, 'owner unchanged until accepted');
+    function test_activateConfigureToken_beforeDelay_reverts() public {
+        module.queueConfigureToken(address(token), address(aToken));
+        (address pendingValue, uint64 eta, bool exists) = module.getPendingConfigureToken(address(token));
+        assertEq(pendingValue, address(aToken));
+        assertTrue(exists, 'pending config recorded');
+        vm.warp(block.timestamp + 6 days);
+        vm.expectRevert(abi.encodeWithSignature('NotReady(uint64)', eta));
+        module.activateConfigureToken(address(token));
+    }
 
-        // Only the pending owner may accept.
-        vm.prank(address(0xBAD));
-        vm.expectRevert();
-        module.acceptOwnership();
+    function test_disableToken_isFast() public {
+        _approve(escrow);
+        _cfgToken(address(token), address(aToken));
 
-        vm.prank(newOwner);
-        module.acceptOwnership();
-        assertEq(module.owner(), newOwner);
-        assertEq(module.pendingOwner(), address(0));
+        (bool supportedBefore, ) = module.canHandle(address(token), YieldPreset.OFF, 1000e18);
+        assertTrue(supportedBefore, 'token configured before disable');
 
-        // Old owner is no longer authorized.
-        vm.expectRevert();
-        module.approveEscrow(escrow);
+        module.disableToken(address(token));
 
-        // New owner is authorized.
-        vm.prank(newOwner);
-        module.approveEscrow(escrow);
+        (bool supportedAfter, bytes32 reason) = module.canHandle(address(token), YieldPreset.OFF, 1000e18);
+        assertFalse(supportedAfter, 'token disabled');
+        assertEq(reason, keccak256('TOKEN_NOT_CONFIGURED'));
+
+        vm.prank(escrow);
+        vm.expectRevert(abi.encodeWithSignature('TokenNotConfigured(address)', address(token)));
+        module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.OFF);
+    }
+
+    // ============ AccessControl ============
+
+    function test_admin_rolesGrantedToDeployer() public {
+        // The module is deployed from the test contract, so address(this) holds both roles.
+        assertTrue(module.hasRole(module.DEFAULT_ADMIN_ROLE(), address(this)));
+        assertTrue(module.hasRole(module.ROLE_TIMELOCK(), address(this)));
+    }
+
+    function test_strangerCannotAdminister() public {
+        address stranger = address(0xBAD);
+        // startPrank so the ROLE_TIMELOCK() view call inside the revert expectation
+        // does not consume the one-shot prank of the single (non-reverting) call.
+        vm.startPrank(stranger);
+        vm.expectRevert(
+            abi.encodeWithSignature(
+                'AccessControlUnauthorizedAccount(address,bytes32)', stranger, module.ROLE_TIMELOCK()
+            )
+        );
+        module.queueApproveEscrow(escrow);
+        vm.stopPrank();
+    }
+
+    function test_grantedTimelockCanAdminister() public {
+        // A freshly granted ROLE_TIMELOCK holder may perform admin actions.
+        address newAdmin = address(0xA11CE);
+        module.grantRole(module.ROLE_TIMELOCK(), newAdmin);
+        assertTrue(module.hasRole(module.ROLE_TIMELOCK(), newAdmin));
+
+        vm.prank(newAdmin);
+        module.queueApproveEscrow(escrow);
+        vm.warp(block.timestamp + 7 days);
+        vm.prank(newAdmin);
+        module.activateApproveEscrow();
         assertTrue(module.approvedEscrows(escrow));
     }
 
     // ============ Revocation effect ============
 
     function test_revoke_blocks_initializeYield() public {
-        module.approveEscrow(escrow);
-        module.configureToken(address(token), address(aToken));
+        _approve(escrow);
+        _cfgToken(address(token), address(aToken));
 
         token.transfer(escrow, DEPOSIT_AMOUNT);
         vm.prank(escrow); token.approve(address(module), type(uint256).max);
