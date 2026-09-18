@@ -14,8 +14,8 @@ import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DRMAdminFacet.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
-import '../../../contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV2.sol';
-import '../../../contracts/modules/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModuleV2.sol';
+import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibraryV1.sol';
 import '../helpers/KlerosHandoffFixture.sol';
 
 /// @notice Product-level coverage for direct DRM config selection entry points.

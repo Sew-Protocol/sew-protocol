@@ -6,8 +6,8 @@ import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 import '../../governance/SlowLaneQueueActivate.sol';
 import '../../shared/interfaces/IIncentiveModule.sol';
 import './DRMStorageBase.sol';
-import './ResolutionAnalytics.sol';
-import './EscalationCostLibrary.sol';
+import './analytics/ResolutionAnalytics.sol';
+import './libraries/EscalationCostLibrary.sol';
 import '../../libraries/ResolutionTableLibrary.sol';
 
 /**

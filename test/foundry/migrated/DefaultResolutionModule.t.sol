@@ -3,7 +3,7 @@ import "../../../contracts/types/YieldPresets.sol";
 pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
-import 'contracts/core/modules/DefaultResolutionModule.sol';
+import '../../../contracts/modules/DefaultResolutionModule.sol';
 import 'contracts/shared/interfaces/IResolutionModule.sol';
 
 contract Test_DefaultResolutionModule is Test {

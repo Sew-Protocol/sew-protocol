@@ -30,7 +30,7 @@ BONDLEDGER_FROZEN=5194
 FACADE_FROZEN=24300
 
 BONDLEDGER_SPEC="contracts/shared/BondLedger.sol:BondLedger"
-FACADE_SPEC="contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV2BondLedger.sol:ResolverIncentiveModuleV2BondLedger"
+FACADE_SPEC="contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModuleV2BondLedger.sol:ResolverIncentiveModuleV2BondLedger"
 
 runtime_bytes() {
   local spec="$1"

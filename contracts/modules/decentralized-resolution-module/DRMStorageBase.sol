@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.37;
 
-import './IBondTokenRegistry.sol';
+import './interfaces/IBondTokenRegistry.sol';
 import '../../shared/interfaces/IIncentiveModule.sol';
 import './DecentralizedResolverStructs.sol';
 

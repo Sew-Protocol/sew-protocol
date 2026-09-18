@@ -8,7 +8,7 @@ import "../../../contracts/modules/DefaultReleaseStrategy.sol";
 import "../../../contracts/ops/YieldOps.sol";
 import "../../../contracts/core/EscrowCreationPolicy.sol";
 import "../../../contracts/core/BondCollector.sol";
-import "../../../contracts/core/modules/DefaultResolutionModule.sol";
+import "../../../contracts/modules/DefaultResolutionModule.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
 import "../../../contracts/libraries/SettingsValidationLibrary.sol";
 

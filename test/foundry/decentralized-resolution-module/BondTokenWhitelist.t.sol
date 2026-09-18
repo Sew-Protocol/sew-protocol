@@ -4,7 +4,7 @@ pragma solidity ^0.8.37;
 import 'forge-std/Test.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DRMAdminFacet.sol';
-import '../../../contracts/modules/decentralized-resolution-module/BondTokenRegistry.sol';
+import '../../../contracts/modules/decentralized-resolution-module/bond/BondTokenRegistry.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/types/EscrowTypes.sol';

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.37;
 
-import '../../shared/interfaces/IResolutionModule.sol';
+import '../shared/interfaces/IResolutionModule.sol';
 import '@openzeppelin/contracts/access/AccessControl.sol';
-import '../../types/EscrowTypes.sol';
+import '../types/EscrowTypes.sol';
 
 /**
  * @title DefaultResolutionModule

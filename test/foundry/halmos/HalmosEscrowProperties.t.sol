@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import {SymTest} from "halmos-cheatcodes/src/SymTest.sol";
 import "../../../contracts/core/EscrowVault.sol";
 import "../../../contracts/core/EscrowVaultAnalytics.sol";
-import "../../../contracts/core/modules/DefaultResolutionModule.sol";
+import "../../../contracts/modules/DefaultResolutionModule.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/ops/YieldOps.sol";
 import "../../../contracts/core/EscrowCreationPolicy.sol";

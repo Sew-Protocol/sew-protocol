@@ -2,8 +2,8 @@
 pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/modules/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
-import { IPaymentCalculationLibrary, PaymentInput, PaymentOutput, ResolverRecord, Weights } from '../../../contracts/modules/decentralized-resolution-module/IPaymentCalculationLibrary.sol';
+import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibraryV1.sol';
+import { IPaymentCalculationLibrary, PaymentInput, PaymentOutput, ResolverRecord, Weights } from '../../../contracts/modules/decentralized-resolution-module/interfaces/IPaymentCalculationLibrary.sol';
 
 /**
  * @title PaymentCalculationFuzzTest

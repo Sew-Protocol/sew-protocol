@@ -3,7 +3,7 @@ import "../../../contracts/types/YieldPresets.sol";
 pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
-import {DefaultResolutionModule} from '../../../contracts/core/modules/DefaultResolutionModule.sol';
+import {DefaultResolutionModule} from '../../../contracts/modules/DefaultResolutionModule.sol';
 import {DefaultReleaseStrategy} from '../../../contracts/modules/DefaultReleaseStrategy.sol';
 import {IResolutionModule} from '../../../contracts/shared/interfaces/IResolutionModule.sol';
 import {IReleaseStrategy} from '../../../contracts/interfaces/IReleaseStrategy.sol';

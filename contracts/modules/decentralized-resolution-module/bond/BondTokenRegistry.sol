@@ -2,8 +2,8 @@
 pragma solidity ^0.8.37;
 
 import '@openzeppelin/contracts/access/AccessControl.sol';
-import '../../governance/SlowLaneQueueActivate.sol';
-import './IBondTokenRegistry.sol';
+import '../../../governance/SlowLaneQueueActivate.sol';
+import '../interfaces/IBondTokenRegistry.sol';
 
 /**
  * @title BondTokenRegistry

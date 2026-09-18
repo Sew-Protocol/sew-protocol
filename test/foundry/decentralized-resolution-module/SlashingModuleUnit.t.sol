@@ -2,10 +2,10 @@
 pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/modules/decentralized-resolution-module/ResolverSlashingModuleV1.sol';
-import '../../../contracts/modules/decentralized-resolution-module/ResolverStakingModuleV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/slashing/ResolverSlashingModuleV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/staking/ResolverStakingModuleV1.sol';
 import '../../../contracts/modules/decentralized-resolution-module/InsurancePoolVault.sol';
-import '../../../contracts/modules/decentralized-resolution-module/ISlashingModule.sol';
+import '../../../contracts/modules/decentralized-resolution-module/interfaces/ISlashingModule.sol';
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol';
 

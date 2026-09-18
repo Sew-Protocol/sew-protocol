@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import "../../../contracts/core/EscrowVault.sol";
 import "../../../contracts/core/EscrowViewContract.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
-import "../../../contracts/core/modules/DefaultResolutionModule.sol";
+import "../../../contracts/modules/DefaultResolutionModule.sol";
 import "../../../contracts/types/EscrowTypes.sol";
 import "../../../contracts/types/YieldPresets.sol";
 import "../../../contracts/ops/YieldOps.sol";

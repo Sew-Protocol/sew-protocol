@@ -6,7 +6,7 @@ import "forge-std/console.sol";
 import { MockERC20 } from "../contracts/mocks/MockERC20.sol";
 import { EscrowVault } from "../contracts/core/EscrowVault.sol";
 import { EscrowViewContract } from "../contracts/core/EscrowViewContract.sol";
-import { DefaultResolutionModule } from "../contracts/core/modules/DefaultResolutionModule.sol";
+import { DefaultResolutionModule } from "../contracts/modules/DefaultResolutionModule.sol";
 import { YieldOps } from "../contracts/ops/YieldOps.sol";
 import { ModuleSnapshotRegistry } from "../contracts/core/ModuleSnapshotRegistry.sol";
 

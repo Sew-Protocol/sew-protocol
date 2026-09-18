@@ -5,7 +5,7 @@ import 'forge-std/Test.sol';
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
 import '../../../contracts/core/EscrowVault.sol';
-import '../../../contracts/core/modules/DefaultResolutionModule.sol';
+import '../../../contracts/modules/DefaultResolutionModule.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/governance/SlowLaneQueueActivate.sol';
 import '../../../contracts/ops/YieldOps.sol';

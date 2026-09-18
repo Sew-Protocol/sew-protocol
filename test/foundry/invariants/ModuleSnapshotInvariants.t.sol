@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import "../core/ForwardOnlyModuleSnapshot.t.sol";
 import "../../../contracts/core/BaseEscrow.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
-import "../../../contracts/core/modules/DefaultResolutionModule.sol";
+import "../../../contracts/modules/DefaultResolutionModule.sol";
 import "../../../contracts/modules/DefaultReleaseStrategy.sol";
 import "../../../contracts/mocks/TestPlaceholderModule.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";

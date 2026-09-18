@@ -4,7 +4,7 @@ pragma solidity ^0.8.37;
 import "forge-std/Test.sol";
 import "../../../contracts/core/EscrowableERC20.sol";
 import "../../../contracts/modules/DefaultReleaseStrategy.sol";
-import "../../../contracts/core/modules/DefaultResolutionModule.sol";
+import "../../../contracts/modules/DefaultResolutionModule.sol";
 import "../../../contracts/types/EscrowTypes.sol";
 import "../../../contracts/ops/YieldOps.sol";
 import "../../../contracts/core/BondCollector.sol";

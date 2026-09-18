@@ -2,8 +2,8 @@
 pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/modules/decentralized-resolution-module/ResolverStakingModuleV1.sol';
-import '../../../contracts/modules/decentralized-resolution-module/BondValuationLibrary.sol';
+import '../../../contracts/modules/decentralized-resolution-module/staking/ResolverStakingModuleV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/libraries/BondValuationLibrary.sol';
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol';
 

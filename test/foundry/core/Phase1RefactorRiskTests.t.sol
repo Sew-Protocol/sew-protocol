@@ -11,7 +11,7 @@ import 'contracts/types/EscrowTypes.sol';
 import 'contracts/types/YieldPresets.sol';
 import 'contracts/libraries/SettingsValidationLibrary.sol';
 import 'contracts/mocks/ERC20Mock.sol';
-import 'contracts/core/modules/DefaultResolutionModule.sol';
+import '../../../contracts/modules/DefaultResolutionModule.sol';
 import 'contracts/modules/DefaultReleaseStrategy.sol';
 import 'contracts/shared/interfaces/IIncentiveModule.sol';
 

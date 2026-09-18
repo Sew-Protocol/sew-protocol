@@ -2,7 +2,7 @@
 pragma solidity ^0.8.37;
 
 import './ResolverIncentiveModuleV2.sol';
-import '../../shared/interfaces/IBondLedger.sol';
+import '../../../shared/interfaces/IBondLedger.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 
 /**

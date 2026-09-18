@@ -11,7 +11,7 @@ import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/modules/DefaultReleaseStrategy.sol';
-import '../../../contracts/core/modules/DefaultResolutionModule.sol';
+import '../../../contracts/modules/DefaultResolutionModule.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
 
 contract PartialReleaseTest is Test {

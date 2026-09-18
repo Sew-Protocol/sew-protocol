@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.37;
 
-import './ISlashingModule.sol';
-import './ResolverStakingModuleV1.sol';
-import './InsurancePoolVault.sol';
+import '../interfaces/ISlashingModule.sol';
+import '../staking/ResolverStakingModuleV1.sol';
+import '../InsurancePoolVault.sol';
 import '@openzeppelin/contracts/access/AccessControl.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';

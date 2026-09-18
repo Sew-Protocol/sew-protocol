@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.37;
 
-import './ISlashingModule.sol';
+import '../interfaces/ISlashingModule.sol';
 import '@openzeppelin/contracts/access/AccessControl.sol';
 
 /**

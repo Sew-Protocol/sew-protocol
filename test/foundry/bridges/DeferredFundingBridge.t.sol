@@ -6,7 +6,7 @@ import '../../../contracts/bridges/DeferredFundingBridge.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/core/BaseEscrow.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
-import '../../../contracts/core/modules/DefaultResolutionModule.sol';
+import '../../../contracts/modules/DefaultResolutionModule.sol';
 import '../../../contracts/modules/DefaultReleaseStrategy.sol';
 import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/ops/YieldOps.sol';

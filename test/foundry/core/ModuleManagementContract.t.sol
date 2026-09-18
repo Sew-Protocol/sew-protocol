@@ -6,7 +6,7 @@ import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/core/BaseEscrow.sol';
 import '../../../contracts/modules/DefaultReleaseStrategy.sol';
 import '../../../contracts/interfaces/IYieldModule.sol';
-import '../../../contracts/core/modules/DefaultResolutionModule.sol';
+import '../../../contracts/modules/DefaultResolutionModule.sol';
 import '../../../contracts/governance/SlowLaneQueueActivate.sol';
 import '../../../contracts/mocks/TestPlaceholderModule.sol';
 

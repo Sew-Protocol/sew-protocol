@@ -5,10 +5,10 @@ import 'forge-std/Test.sol';
 import 'forge-std/StdInvariant.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DRMAdminFacet.sol';
-import '../../../contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModuleV1.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
-import '../../../contracts/modules/decentralized-resolution-module/ResolutionAnalytics.sol';
-import '../../../contracts/modules/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/analytics/ResolutionAnalytics.sol';
+import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibraryV1.sol';
 
 /**
  * @title DRv1InvariantsTest

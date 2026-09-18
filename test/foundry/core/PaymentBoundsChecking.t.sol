@@ -2,9 +2,9 @@
 pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV1.sol';
-import '../../../contracts/modules/decentralized-resolution-module/PaymentCalculationLibraryV1.sol';
-import '../../../contracts/modules/decentralized-resolution-module/IPaymentCalculationLibrary.sol';
+import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModuleV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibraryV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/interfaces/IPaymentCalculationLibrary.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 

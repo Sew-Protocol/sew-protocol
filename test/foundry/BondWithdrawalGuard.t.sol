@@ -2,8 +2,8 @@
 pragma solidity ^0.8.37;
 
 import "forge-std/Test.sol";
-import "../../contracts/modules/decentralized-resolution-module/ResolverStakingModuleV1.sol";
-import "../../contracts/modules/decentralized-resolution-module/ResolverSlashingModuleV1.sol";
+import "../../contracts/modules/decentralized-resolution-module/staking/ResolverStakingModuleV1.sol";
+import "../../contracts/modules/decentralized-resolution-module/slashing/ResolverSlashingModuleV1.sol";
 import "../../contracts/modules/decentralized-resolution-module/InsurancePoolVault.sol";
 import "../../contracts/mocks/ERC20Mock.sol";
 

@@ -3,7 +3,7 @@ pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
 import '../../../contracts/modules/DefaultReleaseStrategy.sol';
-import '../../../contracts/core/modules/DefaultResolutionModule.sol';
+import '../../../contracts/modules/DefaultResolutionModule.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/libraries/EscrowEncodingLibrary.sol';
 

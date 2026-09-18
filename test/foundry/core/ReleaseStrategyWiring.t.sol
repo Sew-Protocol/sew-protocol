@@ -9,7 +9,7 @@ import { ModuleSnapshotRegistry } from "../../../contracts/core/ModuleSnapshotRe
 import { YieldOps } from "../../../contracts/ops/YieldOps.sol";
 import { EscrowCreationPolicy } from "../../../contracts/core/EscrowCreationPolicy.sol";
 import { BondCollector } from "../../../contracts/core/BondCollector.sol";
-import { DefaultResolutionModule } from "../../../contracts/core/modules/DefaultResolutionModule.sol";
+import { DefaultResolutionModule } from "../../../contracts/modules/DefaultResolutionModule.sol";
 import { ERC20Mock } from "../../../contracts/mocks/ERC20Mock.sol";
 
 import { IReleaseStrategy } from "../../../contracts/interfaces/IReleaseStrategy.sol";

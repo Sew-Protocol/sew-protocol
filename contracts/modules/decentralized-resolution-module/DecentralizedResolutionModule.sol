@@ -7,11 +7,11 @@ import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 import '../../governance/SlowLaneQueueActivate.sol';
 import '../../shared/interfaces/IIncentiveModule.sol';
 import './DRMStorageBase.sol';
-import './IStakingModule.sol';
-import './ISlashingModule.sol';
-import './ResolutionAnalytics.sol';
-import './EscalationCostLibrary.sol';
-import './IKlerosHandoffResolutionModule.sol';
+import './interfaces/IStakingModule.sol';
+import './interfaces/ISlashingModule.sol';
+import './analytics/ResolutionAnalytics.sol';
+import './libraries/EscalationCostLibrary.sol';
+import './interfaces/IKlerosHandoffResolutionModule.sol';
 import '../../libraries/ResolutionTableLibrary.sol';
 
 /**

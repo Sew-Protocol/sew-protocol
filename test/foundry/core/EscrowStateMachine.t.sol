@@ -6,7 +6,7 @@ import "forge-std/Test.sol";
 import { EscrowVault } from "../../../contracts/core/EscrowVault.sol";
 import { BaseEscrow } from "../../../contracts/core/BaseEscrow.sol";
 import { ERC20Mock } from "../../../contracts/mocks/ERC20Mock.sol";
-import { DefaultResolutionModule } from "../../../contracts/core/modules/DefaultResolutionModule.sol";
+import { DefaultResolutionModule } from "../../../contracts/modules/DefaultResolutionModule.sol";
 import { EscrowSettings, EscrowState, SenderStatus, RecipientStatus } from "../../../contracts/types/EscrowTypes.sol";
 import { YieldPreset } from "../../../contracts/types/YieldPresets.sol";
 import { YieldOps } from "../../../contracts/ops/YieldOps.sol";

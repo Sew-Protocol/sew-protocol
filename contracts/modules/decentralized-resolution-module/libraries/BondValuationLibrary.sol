@@ -2,7 +2,7 @@
 pragma solidity ^0.8.37;
 
 import '@openzeppelin/contracts/utils/math/Math.sol';
-import '../../libraries/ProtocolMathLibrary.sol';
+import '../../../libraries/ProtocolMathLibrary.sol';
 
 /**
  * @title BondValuationLibrary
