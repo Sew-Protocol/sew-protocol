@@ -140,7 +140,7 @@ contract EmergencyRecoveryFlowTest is Test {
         assertGe(unwound, principalExpected, 'recovered at least principal');
 
         // Position cleared in the module.
-        (, uint256 principal, ) = aaveModule.positions(address(vault), wf);
+        (, uint256 principal, , ) = aaveModule.positions(address(vault), wf);
         assertEq(principal, 0);
 
         // Note: the vault's v25YieldModules/v25YieldPrincipals bookkeeping is intentionally
@@ -260,9 +260,9 @@ contract EmergencyRecoveryFlowTest is Test {
         assertGe(unwound, principalExpected, 'funds recovered via recorded module');
 
         // Position cleared on the recorded module; new module holds nothing.
-        (, uint256 principal, ) = aaveModule.positions(address(vault), wf);
+        (, uint256 principal, , ) = aaveModule.positions(address(vault), wf);
         assertEq(principal, 0, 'position cleared on recorded module');
-        (, uint256 newPrincipal, ) = newModule.positions(address(vault), wf);
+        (, uint256 newPrincipal, , ) = newModule.positions(address(vault), wf);
         assertEq(newPrincipal, 0, 'new module has no position');
     }
 
@@ -287,7 +287,7 @@ contract EmergencyRecoveryFlowTest is Test {
         guardianOps.emergencyUnwindAavePosition(address(token), wf, address(vault));
 
         // The revert rolls back the whole transaction, so the position is untouched.
-        (, uint256 principal, ) = aaveModule.positions(address(vault), wf);
+        (, uint256 principal, , ) = aaveModule.positions(address(vault), wf);
         assertEq(principal, bigAmount, 'position preserved when unwind cap exceeded');
     }
 
@@ -362,7 +362,7 @@ contract EmergencyRecoveryFlowTest is Test {
         EmergencyRecoveryProposal.RecoveryProposal memory p = noRole.getRecoveryProposal(proposalId);
         assertEq(uint8(p.status), uint8(EmergencyRecoveryProposal.RecoveryStatus.FAILED));
         // Position is untouched.
-        (, uint256 principal, ) = aaveModule.positions(address(vault), wf);
+        (, uint256 principal, , ) = aaveModule.positions(address(vault), wf);
         assertEq(principal, AMOUNT);
     }
 

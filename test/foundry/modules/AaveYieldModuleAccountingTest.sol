@@ -104,7 +104,7 @@ contract AaveYieldModuleAccountingTest is Test {
         assertEq(accepted, largeAmount, "Large amount should be accepted");
         
         // Verify position recorded correctly
-        (, uint256 principal, ) = module.positions(escrow, 1);
+        (, uint256 principal, , ) = module.positions(escrow, 1);
         assertEq(principal, largeAmount, "Large principal should be stored");
     }
 
@@ -185,8 +185,8 @@ contract AaveYieldModuleAccountingTest is Test {
         module.initializeYield(2, address(token), 75e18, YieldPreset.TO_SENDER);
         
         // Verify both positions
-        (, uint256 p1, ) = module.positions(escrow, 1);
-        (, uint256 p2, ) = module.positions(escrow, 2);
+        (, uint256 p1, , ) = module.positions(escrow, 1);
+        (, uint256 p2, , ) = module.positions(escrow, 2);
         
         assertEq(p1, 50e18, "First position correct");
         assertEq(p2, 75e18, "Second position correct");
@@ -196,8 +196,8 @@ contract AaveYieldModuleAccountingTest is Test {
         module.unwindToEscrow(1, address(token), 50e18);
         
         // Verify first withdrawn, second intact
-        (, uint256 p1After, ) = module.positions(escrow, 1);
-        (, uint256 p2After, ) = module.positions(escrow, 2);
+        (, uint256 p1After, , ) = module.positions(escrow, 1);
+        (, uint256 p2After, , ) = module.positions(escrow, 2);
         
         assertEq(p1After, 0, "First withdrawn");
         assertEq(p2After, 75e18, "Second intact");
@@ -327,5 +327,31 @@ contract AaveYieldModuleAccountingTest is Test {
         vm.prank(escrow);
         (uint256 principal, ) = module.unwindToEscrow(8, address(token), deposit);
         assertApproxEqAbs(principal, deposit, 1, "full principal recovered");
+    }
+
+    // ============ P0 Regression: #2 second initialization must not overwrite position ============
+
+    /**
+     * @notice Regression (#2): a second initializeYield on the same (escrow, escrowId)
+     * must revert rather than silently overwrite the first position (which would orphan
+     * the first position's aTokens). A DIFFERENT escrowId on the same escrow remains valid.
+     */
+    function test_second_initialize_same_position_reverts() public {
+        uint256 amt = 100e18;
+        vm.prank(escrow);
+        token.approve(address(module), type(uint256).max);
+
+        vm.prank(escrow);
+        module.initializeYield(1, address(token), amt, YieldPreset.TO_SENDER);
+
+        // Same (escrow, escrowId): must revert.
+        vm.prank(escrow);
+        vm.expectRevert("PositionAlreadyExists");
+        module.initializeYield(1, address(token), amt, YieldPreset.TO_SENDER);
+
+        // Different escrowId on the same escrow is still allowed (positions are distinct).
+        vm.prank(escrow);
+        uint256 accepted2 = module.initializeYield(2, address(token), amt, YieldPreset.TO_SENDER);
+        assertEq(accepted2, amt, "a different escrowId is still allowed");
     }
 }

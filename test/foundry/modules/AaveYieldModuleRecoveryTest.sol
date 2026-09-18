@@ -109,7 +109,7 @@ contract AaveYieldModuleRecoveryTest is Test {
         assertEq(token.balanceOf(address(module)), 0);
 
         // Position cleared.
-        (, uint256 principal, ) = module.positions(escrow, 1);
+        (, uint256 principal, , ) = module.positions(escrow, 1);
         assertEq(principal, 0);
     }
 
@@ -228,8 +228,59 @@ contract AaveYieldModuleRecoveryTest is Test {
         vm.prank(operator);
         module.emergencyUnwindForEscrow(escrow, 1, address(token), DEPOSIT_AMOUNT);
 
-        (, uint256 remaining, ) = module.positions(escrow, 2);
+        (, uint256 remaining, , ) = module.positions(escrow, 2);
         assertEq(remaining, DEPOSIT_AMOUNT);
     }
+    // ============ #3 Revocation gates new deposits, not exits ============
 
+    function test_revokedEscrow_canStillUnwindExistingPosition() public {
+        _deposit(escrow, 1, DEPOSIT_AMOUNT);
+        module.revokeEscrow(escrow);
+
+        uint256 balBefore = token.balanceOf(escrow);
+        vm.prank(escrow);
+        (uint256 principal, ) = module.unwindToEscrow(1, address(token), DEPOSIT_AMOUNT);
+        assertEq(principal, DEPOSIT_AMOUNT);
+        assertEq(token.balanceOf(escrow), balBefore + DEPOSIT_AMOUNT);
+    }
+
+    function test_revokedEscrow_canStillEmergencyUnwindItself() public {
+        _deposit(escrow, 1, DEPOSIT_AMOUNT);
+        module.revokeEscrow(escrow);
+
+        vm.prank(escrow);
+        uint256 recovered = module.emergencyUnwind(1, address(token), DEPOSIT_AMOUNT);
+        assertEq(recovered, DEPOSIT_AMOUNT);
+    }
+
+    function test_revokedEscrow_operatorCanStillEmergencyUnwind() public {
+        module.setRecoveryOperator(operator, true);
+        _deposit(escrow, 1, DEPOSIT_AMOUNT);
+        module.revokeEscrow(escrow);
+
+        uint256 escrowBalBefore = token.balanceOf(escrow);
+        vm.prank(operator);
+        uint256 recovered = module.emergencyUnwindForEscrow(escrow, 1, address(token), DEPOSIT_AMOUNT);
+        assertEq(recovered, DEPOSIT_AMOUNT);
+        assertEq(token.balanceOf(escrow), escrowBalBefore + DEPOSIT_AMOUNT);
+    }
+
+    function test_revokedEscrow_cannotInitializeNewPosition() public {
+        _deposit(escrow, 1, DEPOSIT_AMOUNT);
+        module.revokeEscrow(escrow);
+
+        vm.prank(escrow);
+        vm.expectRevert("UnauthorizedEscrow");
+        module.initializeYield(2, address(token), DEPOSIT_AMOUNT, YieldPreset.TO_SENDER);
+    }
+
+    function test_strangerCannotUnwindRevokedEscrow() public {
+        _deposit(escrow, 1, DEPOSIT_AMOUNT);
+        module.revokeEscrow(escrow);
+
+        address stranger = address(0x9002);
+        vm.prank(stranger);
+        vm.expectRevert("UnauthorizedEscrow");
+        module.unwindToEscrow(1, address(token), DEPOSIT_AMOUNT);
+    }
 }

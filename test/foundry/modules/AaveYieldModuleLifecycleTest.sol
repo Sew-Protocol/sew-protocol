@@ -68,7 +68,7 @@ contract AaveYieldModuleLifecycleTest is Test {
         module.unwindToEscrow(1, address(token), amount);
         
         // Verify position is cleared
-        (, uint256 principal, ) = module.positions(escrow1, 1);
+        (, uint256 principal, , ) = module.positions(escrow1, 1);
         assertEq(principal, 0, "Position should be cleared");
         
         // Try to unwind again - should fail (no position)
@@ -96,7 +96,7 @@ contract AaveYieldModuleLifecycleTest is Test {
         module.unwindToEscrow(1, address(token), amount);
         
         // Position cleared
-        (, uint256 principal, ) = module.positions(escrow1, 1);
+        (, uint256 principal, , ) = module.positions(escrow1, 1);
         assertEq(principal, 0, "Position should be cleared after unwind");
     }
 
@@ -118,7 +118,7 @@ contract AaveYieldModuleLifecycleTest is Test {
         module.emergencyUnwind(1, address(token), amount);
         
         // Position cleared
-        (, uint256 principal, ) = module.positions(escrow1, 1);
+        (, uint256 principal, , ) = module.positions(escrow1, 1);
         assertEq(principal, 0);
     }
 
@@ -152,9 +152,9 @@ contract AaveYieldModuleLifecycleTest is Test {
         module.initializeYield(1, address(token), amount3, YieldPreset.TO_SENDER);
         
         // Verify all positions
-        (, uint256 p1, ) = module.positions(escrow1, 1);
-        (, uint256 p2, ) = module.positions(escrow1, 2);
-        (, uint256 p3, ) = module.positions(escrow2, 1);
+        (, uint256 p1, , ) = module.positions(escrow1, 1);
+        (, uint256 p2, , ) = module.positions(escrow1, 2);
+        (, uint256 p3, , ) = module.positions(escrow2, 1);
         
         assertEq(p1, amount1);
         assertEq(p2, amount2);
@@ -164,9 +164,9 @@ contract AaveYieldModuleLifecycleTest is Test {
         vm.prank(escrow1);
         module.unwindToEscrow(1, address(token), amount1);
         
-        (, uint256 p1After, ) = module.positions(escrow1, 1);
-        (, uint256 p2After, ) = module.positions(escrow1, 2);
-        (, uint256 p3After, ) = module.positions(escrow2, 1);
+        (, uint256 p1After, , ) = module.positions(escrow1, 1);
+        (, uint256 p2After, , ) = module.positions(escrow1, 2);
+        (, uint256 p3After, , ) = module.positions(escrow2, 1);
         
         assertEq(p1After, 0, "Position 1 cleared");
         assertEq(p2After, amount2, "Position 2 unchanged");
@@ -199,8 +199,8 @@ contract AaveYieldModuleLifecycleTest is Test {
         module.unwindToEscrow(1, address(token), amount1);
         
         // Verify escrow1 cleared, escrow2 intact
-        (, uint256 bal1, ) = module.positions(escrow1, 1);
-        (, uint256 bal2, ) = module.positions(escrow2, 1);
+        (, uint256 bal1, , ) = module.positions(escrow1, 1);
+        (, uint256 bal2, , ) = module.positions(escrow2, 1);
         
         assertEq(bal1, 0);
         assertEq(bal2, amount2);

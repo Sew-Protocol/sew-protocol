@@ -17,7 +17,7 @@ import '@openzeppelin/contracts/utils/math/Math.sol';
  * - Depositing tokens into Aave V3
  * - Tracking positions by (escrow, escrowId)
  * - Withdrawing from Aave and returning to escrow
- * - Emergency recovery on normal withdrawal failure
+ * - Operator/escrow-triggered unwind (recovery initiation) on normal withdrawal failure
  *
  * The escrow is responsible for:
  * - Initializing yield (calling initializeYield)
@@ -36,6 +36,7 @@ contract AaveYieldModule is IYieldModule, ERC165, Ownable2Step {
         address token;
         uint256 principalDeposited;  // INVARIANT 4: actual accepted amount, not requested
         uint256 aTokenShares;        // scaled (index-independent) aToken share delta at deposit time
+        address aToken;              // aToken this position was created with (finding #5)
     }
 
     // ============ Storage ============
@@ -45,7 +46,7 @@ contract AaveYieldModule is IYieldModule, ERC165, Ownable2Step {
 
     // Module metadata
     string public constant MODULE_NAME = "AaveYieldModule";
-    string public constant MODULE_VERSION = "2.5.1";
+    string public constant MODULE_VERSION = "2.5.2";
     bytes32 public constant PROTOCOL_ID = keccak256("aave-v3");
 
     // Authorization: approved escrow contracts
@@ -105,7 +106,10 @@ contract AaveYieldModule is IYieldModule, ERC165, Ownable2Step {
     }
 
     /**
-     * @notice Revoke approval for an escrow contract
+     * @notice Revoke approval for an escrow contract.
+     * @dev Revocation blocks NEW deposits (initializeYield) but does NOT freeze exiting an
+     *      existing position: the owning escrow may still unwindToEscrow / emergencyUnwind,
+     *      and a recovery operator may still emergencyUnwindForEscrow. (finding #3)
      * @param escrow Address to revoke
      */
     function revokeEscrow(address escrow) external onlyOwner {
@@ -169,6 +173,12 @@ contract AaveYieldModule is IYieldModule, ERC165, Ownable2Step {
     ) external onlyEscrow returns (uint256 accepted) {
         require(amount > 0, "ZeroAmount");
 
+        // Guard against a second initialization silently overwriting an existing
+        // (escrow, escrowId) position. Otherwise the aTokens already supplied for the
+        // first position would remain owned by the module but no longer attributable
+        // to any position, orphaning them.
+        require(positions[msg.sender][escrowId].aTokenShares == 0, "PositionAlreadyExists");
+
         address aToken = _getAToken(token);
 
         uint256 minDeposit = minDepositByToken[token];
@@ -219,7 +229,8 @@ contract AaveYieldModule is IYieldModule, ERC165, Ownable2Step {
         positions[msg.sender][escrowId] = YieldPosition({
             token: token,
             principalDeposited: actualDeposited,
-            aTokenShares: aTokenShares
+            aTokenShares: aTokenShares,
+            aToken: aToken
         });
 
         emit YieldInitialized(escrowId, token, actualDeposited, yieldMode);
@@ -242,13 +253,21 @@ contract AaveYieldModule is IYieldModule, ERC165, Ownable2Step {
         uint256 escrowId,
         address token,
         uint256 /* principalExpected */
-    ) external onlyEscrow returns (uint256 principalOut, uint256 yieldOut) {
+    ) external returns (uint256 principalOut, uint256 yieldOut) {
+        // Approval gates NEW deposits only; a revoked escrow may still close a position
+        // it owns (ownership proven by the recorded position). (finding #3)
+        require(
+            approvedEscrows[msg.sender] || positions[msg.sender][escrowId].aTokenShares > 0,
+            "UnauthorizedEscrow"
+        );
         YieldPosition memory pos = positions[msg.sender][escrowId];
         require(pos.token == token, "TokenMismatch");
         require(pos.aTokenShares > 0, "NoPosition");
 
         // Withdraw only our position's scaled shares (converted to underlying once).
-        address aToken = _getAToken(token);
+        // Use the aToken recorded at deposit (finding #5): later changes to tokenToAToken
+        // must NOT redirect an existing position to a different aToken.
+        address aToken = pos.aToken;
         // currentATokenBalance (rebased) caps the withdrawal at what the module actually holds.
         uint256 currentATokenBalance = IERC20(aToken).balanceOf(address(this));
         // pos.aTokenShares is the scaled (index-independent) share count recorded at deposit.
@@ -289,11 +308,18 @@ contract AaveYieldModule is IYieldModule, ERC165, Ownable2Step {
     }
 
     /**
-     * @notice Emergency recovery if normal unwind fails
+     * @notice Escrow-triggered unwind of the caller's own position (fallback to unwindToEscrow)
      * @param escrowId Escrow identifier
      * @param token Token to recover
      * @param principalExpected Expected principal
      * @return recovered Amount recovered
+     *
+     * @dev finding #4: this is an OPERATOR/ESCROW-TRIGGERED unwind, NOT an independent
+     *      Aave recovery mechanism. It calls the SAME aavePool.withdraw() as unwindToEscrow,
+     *      so it fails for the same reasons a normal withdrawal would (Aave pause, no
+     *      liquidity, pool malfunction). Its value is that it can be initiated by the escrow
+     *      itself or (via emergencyUnwindForEscrow) by an authorized recovery operator, with
+     *      proceeds ALWAYS forced to the escrow owner. It does NOT bypass Aave's own path.
      *
      * INVARIANT 1: MUST return funds or REVERT
      * INVARIANT 6: Strict semantics - return > 0 or revert, never return 0
@@ -302,20 +328,28 @@ contract AaveYieldModule is IYieldModule, ERC165, Ownable2Step {
         uint256 escrowId,
         address token,
         uint256 principalExpected
-    ) external onlyEscrow returns (uint256 recovered) {
+    ) external returns (uint256 recovered) {
+        // Same decoupling: a revoked escrow may still recover a position it owns. (finding #3)
+        require(
+            approvedEscrows[msg.sender] || positions[msg.sender][escrowId].aTokenShares > 0,
+            "UnauthorizedEscrow"
+        );
         return _emergencyUnwind(msg.sender, escrowId, token, principalExpected);
     }
 
     /**
-     * @notice Emergency recovery of a specific escrow's position (operator/escrow only)
+     * @notice Recovery-operator/escrow-triggered unwind of a named escrow's position
      * @param escrow The escrow contract that owns the position
      * @param escrowId Escrow identifier
      * @param token Token to recover
      * @param principalExpected Expected principal
      * @return recovered Amount recovered
-     * @dev A callable by the position owner, or by an approved recovery operator
-     *      (e.g. GuardianOps) during an incident. Proceeds ALWAYS go to `escrow`,
-     *      never to the caller. INVARIANT 6: returns > 0 or reverts, never 0.
+     * @dev finding #4: like emergencyUnwind, this is authorized third-party initiation of
+     *      the SAME Aave withdrawal path, not an alternate recovery mechanism — it reverts
+     *      if aavePool.withdraw() reverts. Proceeds ALWAYS go to `escrow`, never to the
+     *      caller. GuardianOps layers cooldown + per-call cap guardrails on top when it
+     *      invokes this. Callable by the position owner or an approved recovery operator.
+     *      INVARIANT 6: returns > 0 or reverts, never 0.
      */
     function emergencyUnwindForEscrow(
         address escrow,
@@ -323,14 +357,18 @@ contract AaveYieldModule is IYieldModule, ERC165, Ownable2Step {
         address token,
         uint256 principalExpected
     ) external returns (uint256 recovered) {
-        require(approvedEscrows[escrow], "UnauthorizedEscrow");
+        // Escrow approval gates NEW exposure only; recovery may proceed on existing
+        // positions even after revokeEscrow. (finding #3)
         require(msg.sender == escrow || recoveryOperators[msg.sender], "UnauthorizedEscrow");
         return _emergencyUnwind(escrow, escrowId, token, principalExpected);
     }
 
     /**
-     * @notice Shared emergency unwind logic operating on a named escrow owner
-     * @dev INVARIANT 2: Funds are only ever sent back to the escrow owner.
+     * @notice Shared unwind logic operating on a named escrow owner.
+     * @dev finding #4: uses the same aavePool.withdraw() as normal unwind; provides
+     *      third-party initiation + forced-to-escrow routing, not an independent Aave exit.
+     *      INVARIANT 2: Funds are only ever sent back to the escrow owner.
+     *      INVARIANT 6: returns > 0 or reverts, never 0.
      */
     function _emergencyUnwind(
         address escrowOwner,
@@ -342,7 +380,8 @@ contract AaveYieldModule is IYieldModule, ERC165, Ownable2Step {
         require(pos.token == token, "TokenMismatch");
         require(pos.aTokenShares > 0, "NoPosition");
 
-        address aToken = _getAToken(token);
+        // aToken recorded at deposit (finding #5) — immune to later config changes.
+        address aToken = pos.aToken;
         uint256 currentATokenBalance = IERC20(aToken).balanceOf(address(this));
 
         uint256 currentIndex = aavePool.getReserveNormalizedIncome(token);
@@ -415,7 +454,7 @@ contract AaveYieldModule is IYieldModule, ERC165, Ownable2Step {
         isActive = principal > 0;
         currentValue = principal;
         if (isActive && pos.aTokenShares > 0) {
-            if (tokenToAToken[pos.token] != address(0)) {
+            if (pos.aToken != address(0)) {
                 uint256 currentIndex = aavePool.getReserveNormalizedIncome(pos.token);
                 if (currentIndex > 0) {
                     currentValue = Math.mulDiv(pos.aTokenShares, currentIndex, 1e27);

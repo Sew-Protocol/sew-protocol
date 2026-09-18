@@ -211,7 +211,7 @@ contract AaveYieldModuleTest is Test {
     function test_GetModuleInfo() public {
         (string memory name, string memory version, bytes32 protocolId) = module.getModuleInfo();
         assertEq(name, "AaveYieldModule");
-        assertEq(version, "2.5.1");
+        assertEq(version, "2.5.2");
         assertEq(protocolId, keccak256("aave-v3"));
     }
 
@@ -300,7 +300,7 @@ contract AaveYieldModuleTest is Test {
         vm.prank(escrow);
         module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.OFF);
         
-        (address posToken, uint256 principal, ) = module.positions(escrow, 1);
+        (address posToken, uint256 principal, , ) = module.positions(escrow, 1);
         assertEq(posToken, address(token));
         assertEq(principal, DEPOSIT_AMOUNT);
     }
@@ -427,9 +427,80 @@ contract AaveYieldModuleTest is Test {
         assertEq(accepted, expectedDeposited);
         
         // Verify position stores the actual deposited amount
-        (address posToken, uint256 principal, ) = module.positions(escrow, 1);
+        (address posToken, uint256 principal, , ) = module.positions(escrow, 1);
         assertEq(posToken, address(feeToken));
         assertEq(principal, expectedDeposited);
+    }
+
+    // ============ #4 Emergency unwind shares the Aave withdrawal path ============
+
+    /**
+     * @notice Regression (#4): the "emergency" unwind is NOT an independent Aave exit —
+     * it calls the same aavePool.withdraw() as the normal unwind. When Aave's withdrawal
+     * path fails (pause / no liquidity / pool malfunction), BOTH normal and emergency
+     * unwind fail with the same reason. Emergency unwind provides operator/escrow-triggered
+     * initiation and forced-to-escrow routing, not an alternate way out of Aave.
+     */
+    function test_emergencyUnwind_sharesAaveWithdrawalPath() public {
+        module.approveEscrow(escrow);
+        module.configureToken(address(token), address(aToken));
+
+        token.transfer(escrow, DEPOSIT_AMOUNT);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
+        vm.prank(escrow);
+        module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.OFF);
+
+        // Aave's withdrawal path fails.
+        pool.setWithdrawFail(true);
+
+        // Normal unwind fails with the same reason.
+        vm.prank(escrow);
+        vm.expectRevert("Withdraw failed");
+        module.unwindToEscrow(1, address(token), DEPOSIT_AMOUNT);
+
+        // Emergency unwind also fails with the same reason — not an independent exit.
+        vm.prank(escrow);
+        vm.expectRevert("Withdraw failed");
+        module.emergencyUnwind(1, address(token), DEPOSIT_AMOUNT);
+
+        // Operator-triggered emergency unwind is likewise blocked by the shared path.
+        address op = address(0xBEEF);
+        module.setRecoveryOperator(op, true);
+        vm.prank(op);
+        vm.expectRevert("Withdraw failed");
+        module.emergencyUnwindForEscrow(escrow, 1, address(token), DEPOSIT_AMOUNT);
+    }
+
+    // ============ #5 config change must not invalidate existing positions ============
+
+    /**
+     * @notice Regression (#5): an existing position is bound to the aToken it was created
+     * with. The owner may later change tokenToAToken, but withdrawal of an existing position
+     * must still operate against the ORIGINAL aToken (not the new config), so the position
+     * remains recoverable.
+     */
+    function test_configChange_doesNotInvalidateExistingPosition() public {
+        module.approveEscrow(escrow);
+        module.configureToken(address(token), address(aToken));
+        pool.setAToken(address(token), address(aToken));
+
+        token.transfer(escrow, DEPOSIT_AMOUNT);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
+        vm.prank(escrow);
+        module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.OFF);
+
+        // Owner reconfigures the token to a DIFFERENT aToken. The pool's canonical
+        // reserve still points at the original aToken.
+        MockAToken other = new MockAToken(address(token), "aOther", "aOTHER");
+        module.configureToken(address(token), address(other));
+
+        // The existing position must still unwind against the original aToken.
+        pool.simulateYield(address(token), 50);
+        vm.prank(escrow);
+        (uint256 principal, uint256 y) = module.unwindToEscrow(1, address(token), DEPOSIT_AMOUNT);
+
+        assertEq(principal, DEPOSIT_AMOUNT, "principal recovered despite config change");
+        assertGt(principal + y, DEPOSIT_AMOUNT, "full value recovered");
     }
 }
 
@@ -620,10 +691,10 @@ contract AaveYieldModule6DecimalTest is Test {
         module.initializeYield(1, address(usdc), DEPOSIT_AMOUNT_6DEC * 2, YieldPreset.OFF);
         
         // Verify positions
-        (address token1, uint256 principal1, ) = module.positions(escrow, 1);
+        (address token1, uint256 principal1, , ) = module.positions(escrow, 1);
         assertEq(principal1, DEPOSIT_AMOUNT_6DEC);
         
-        (address token2, uint256 principal2, ) = module.positions(escrow2, 1);
+        (address token2, uint256 principal2, , ) = module.positions(escrow2, 1);
         assertEq(principal2, DEPOSIT_AMOUNT_6DEC * 2);
     }
 
@@ -757,8 +828,8 @@ contract AaveYieldModuleMixedDecimalsTest is Test {
         module.initializeYield(2, address(dai), 1000e18, YieldPreset.OFF);
         
         // Verify both positions
-        (, uint256 usdcPrincipal, ) = module.positions(escrow, 1);
-        (, uint256 daiPrincipal, ) = module.positions(escrow, 2);
+        (, uint256 usdcPrincipal, , ) = module.positions(escrow, 1);
+        (, uint256 daiPrincipal, , ) = module.positions(escrow, 2);
         
         assertEq(usdcPrincipal, 1000e6);
         assertEq(daiPrincipal, 1000e18);

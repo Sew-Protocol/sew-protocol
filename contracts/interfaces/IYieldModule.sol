@@ -98,6 +98,11 @@ interface IYieldModule {
      * @return recovered Amount recovered (always > 0, or reverts)
      * 
      * @dev Called after unwindToEscrow fails
+     * @dev NOTE (finding #4): this is an escrow-triggered unwind, NOT an independent recovery
+     *      mechanism. It uses the same protocol withdraw() path as normal unwinds, so an
+     *      Aave-level failure (pause / no liquidity) reverts both. It guarantees strict
+     *      semantics (return > 0 or revert), proceeds-only-to-msg.sender, and — where the
+     *      module supports it — operator-triggered initiation.
      * @dev INVARIANT 6: MUST return funds or REVERT (never return 0)
      *      Strict semantics: return > 0 or fail
      *      No ambiguous "I tried and got nothing" states
