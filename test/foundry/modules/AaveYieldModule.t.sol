@@ -502,7 +502,66 @@ contract AaveYieldModuleTest is Test {
         assertEq(principal, DEPOSIT_AMOUNT, "principal recovered despite config change");
         assertGt(principal + y, DEPOSIT_AMOUNT, "full value recovered");
     }
+
+    // ============ #7 principalExpected must equal recorded principal ============
+
+    /**
+     * @notice Regression (#7): unwind paths reject a caller-supplied expected principal
+     * that does not equal the recorded principalDeposited (cross-component integrity check).
+     * Passing the correct principal succeeds.
+     */
+    function test_principalExpectedMismatch_reverts() public {
+        module.approveEscrow(escrow);
+        module.configureToken(address(token), address(aToken));
+        token.transfer(escrow, DEPOSIT_AMOUNT);
+        vm.prank(escrow); token.approve(address(module), type(uint256).max);
+        vm.prank(escrow);
+        module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.OFF);
+
+        // A wrong expected principal must revert on every unwind path.
+        vm.prank(escrow);
+        vm.expectRevert("PrincipalMismatch");
+        module.unwindToEscrow(1, address(token), DEPOSIT_AMOUNT + 1);
+
+        vm.prank(escrow);
+        vm.expectRevert("PrincipalMismatch");
+        module.emergencyUnwind(1, address(token), DEPOSIT_AMOUNT + 1);
+
+        address op = address(0xBEEF);
+        module.setRecoveryOperator(op, true);
+        vm.prank(op);
+        vm.expectRevert("PrincipalMismatch");
+        module.emergencyUnwindForEscrow(escrow, 1, address(token), DEPOSIT_AMOUNT + 1);
+
+        // The correct principal still succeeds and returns the full principal.
+        vm.prank(escrow);
+        (uint256 principal, ) = module.unwindToEscrow(1, address(token), DEPOSIT_AMOUNT);
+        assertEq(principal, DEPOSIT_AMOUNT);
+    }
+    function test_canHandle_zeroAmount_returnsFalse() public {
+        (bool supported, bytes32 reason) = module.canHandle(address(token), YieldPreset.OFF, 0);
+        assertFalse(supported);
+        assertEq(reason, keccak256("ZERO_AMOUNT"));
+    }
+
+    function test_canHandle_unconfiguredToken_returnsFalse() public {
+        (bool supported, bytes32 reason) = module.canHandle(address(0xBEEF), YieldPreset.OFF, 1e18);
+        assertFalse(supported);
+        assertEq(reason, keccak256("TOKEN_NOT_CONFIGURED"));
+    }
+
+    function test_canHandle_belowMinDeposit_returnsFalse() public {
+        // Configure a large min-deposit for the token; amount below it is not handled.
+        module.configureToken(address(token), address(aToken));
+        module.configureMinDeposit(address(token), 1000e18);
+        (bool supported, bytes32 reason) = module.canHandle(address(token), YieldPreset.OFF, 999e18);
+        assertFalse(supported);
+        assertEq(reason, keccak256("BELOW_MIN_DEPOSIT"));
+        // Restore default so other tests in the file are unaffected.
+        module.configureMinDeposit(address(token), 0);
+    }
 }
+
 
 // ============ 6-Decimal Token Tests ============
 

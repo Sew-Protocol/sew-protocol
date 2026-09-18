@@ -64,7 +64,7 @@ contract AaveYieldModuleIntegrationTest is Test {
         
         vm.prank(escrow);
         vm.expectRevert();
-        module.unwindToEscrow(1, address(token), 50e18);
+        module.unwindToEscrow(1, address(token), 100e18);
         
         pool.setWithdrawFail(false);
     }
@@ -167,7 +167,7 @@ contract AaveYieldModuleIntegrationTest is Test {
         
         vm.prank(attacker);
         vm.expectRevert();
-        module.unwindToEscrow(1, address(token), 50e18);
+        module.unwindToEscrow(1, address(token), 100e18);
     }
 
     // ============ Full Flow ============

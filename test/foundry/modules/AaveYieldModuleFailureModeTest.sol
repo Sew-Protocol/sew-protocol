@@ -146,8 +146,9 @@ contract AaveYieldModuleFailureModeTest is Test {
         module.initializeYield(1, address(token), DEPOSIT_AMOUNT / 2, YieldPreset.TO_SENDER);
         
         // Module will withdraw what's available, not revert
+        // Pass the recorded principal (DEPOSIT_AMOUNT / 2) per finding #7.
         vm.prank(escrow);
-        (uint256 principal, uint256 yieldOut) = module.unwindToEscrow(1, address(token), DEPOSIT_AMOUNT);
+        (uint256 principal, uint256 yieldOut) = module.unwindToEscrow(1, address(token), DEPOSIT_AMOUNT / 2);
         
         // Only available amount is withdrawn
         assertEq(principal, DEPOSIT_AMOUNT / 2);

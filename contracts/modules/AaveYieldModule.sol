@@ -252,7 +252,7 @@ contract AaveYieldModule is IYieldModule, ERC165, Ownable2Step {
     function unwindToEscrow(
         uint256 escrowId,
         address token,
-        uint256 /* principalExpected */
+        uint256 principalExpected
     ) external returns (uint256 principalOut, uint256 yieldOut) {
         // Approval gates NEW deposits only; a revoked escrow may still close a position
         // it owns (ownership proven by the recorded position). (finding #3)
@@ -263,6 +263,12 @@ contract AaveYieldModule is IYieldModule, ERC165, Ownable2Step {
         YieldPosition memory pos = positions[msg.sender][escrowId];
         require(pos.token == token, "TokenMismatch");
         require(pos.aTokenShares > 0, "NoPosition");
+
+        // finding #7: the caller-supplied expected principal must equal the recorded
+        // principal. Core stores the module's accepted amount (v25YieldPrincipals) and
+        // passes it here, so equality is a cross-component integrity check against a
+        // re-deposit overwrite or mis-recording.
+        require(principalExpected == pos.principalDeposited, "PrincipalMismatch");
 
         // Withdraw only our position's scaled shares (converted to underlying once).
         // Use the aToken recorded at deposit (finding #5): later changes to tokenToAToken
@@ -276,20 +282,25 @@ contract AaveYieldModule is IYieldModule, ERC165, Ownable2Step {
         uint256 currentIndex = aavePool.getReserveNormalizedIncome(token);
         require(currentIndex > 0, "InvalidIncomeIndex");
         uint256 positionCurrentValue = Math.mulDiv(pos.aTokenShares, currentIndex, 1e27);
-        uint256 sharesToWithdraw = positionCurrentValue <= currentATokenBalance
+        uint256 underlyingToWithdraw = positionCurrentValue <= currentATokenBalance
             ? positionCurrentValue
             : currentATokenBalance;
-        require(sharesToWithdraw > 0, "NoATokenBalance");
+        require(underlyingToWithdraw > 0, "NoATokenBalance");
+
+        // CEI (finding #9): clear the position BEFORE any external call so a reentrancy
+        // attempt cannot observe a live position mid-unwind. A reverting external call
+        // restores the deleted state anyway, so this is safe.
+        delete positions[msg.sender][escrowId];
 
         // Withdraw from Aave back to us
-        uint256 totalReceived = aavePool.withdraw(token, sharesToWithdraw, address(this));
+        uint256 totalReceived = aavePool.withdraw(token, underlyingToWithdraw, address(this));
 
         // Transfer everything back to escrow (msg.sender)
         // INVARIANT 2: Only send to msg.sender (the escrow)
         IERC20(token).safeTransfer(msg.sender, totalReceived);
 
         // Calculate yield
-        // INVARIANT 4: Use principalDeposited (actual accepted), not principalExpected
+        // INVARIANT 4: principalDeposited (actual accepted) is authoritative; principalExpected is validated == principalDeposited (finding #7)
         // INVARIANT 1: Never overstate principal. If Aave returned less than the deposited
         // principal (e.g. share-price drawdown), report only what was actually recovered so
         // the escrow never claims more than was physically returned. yield stays at 0.
@@ -298,9 +309,6 @@ contract AaveYieldModule is IYieldModule, ERC165, Ownable2Step {
             principal = totalReceived;
         }
         uint256 yield = totalReceived > principal ? totalReceived - principal : 0;
-
-        // Clean up position
-        delete positions[msg.sender][escrowId];
 
         emit YieldWithdrawn(escrowId, token, principal, yield);
 
@@ -374,11 +382,14 @@ contract AaveYieldModule is IYieldModule, ERC165, Ownable2Step {
         address escrowOwner,
         uint256 escrowId,
         address token,
-        uint256 /* principalExpected */
+        uint256 principalExpected
     ) internal returns (uint256 recovered) {
         YieldPosition memory pos = positions[escrowOwner][escrowId];
         require(pos.token == token, "TokenMismatch");
         require(pos.aTokenShares > 0, "NoPosition");
+
+        // finding #7: ensure the caller-expected principal matches the recorded principal.
+        require(principalExpected == pos.principalDeposited, "PrincipalMismatch");
 
         // aToken recorded at deposit (finding #5) — immune to later config changes.
         address aToken = pos.aToken;
@@ -387,22 +398,23 @@ contract AaveYieldModule is IYieldModule, ERC165, Ownable2Step {
         uint256 currentIndex = aavePool.getReserveNormalizedIncome(token);
         require(currentIndex > 0, "InvalidIncomeIndex");
         uint256 positionCurrentValue = Math.mulDiv(pos.aTokenShares, currentIndex, 1e27);
-        uint256 sharesToWithdraw = positionCurrentValue <= currentATokenBalance
+        uint256 underlyingToWithdraw = positionCurrentValue <= currentATokenBalance
             ? positionCurrentValue
             : currentATokenBalance;
 
-        if (sharesToWithdraw == 0) {
+        if (underlyingToWithdraw == 0) {
             revert("NoATokenBalance");
         }
 
+        // CEI (finding #9): clear the position BEFORE the external withdraw+transfer so a
+        // reentrancy attempt cannot observe a live position. Revert restores deleted state.
+        delete positions[escrowOwner][escrowId];
+
         // Try to withdraw
-        uint256 out = aavePool.withdraw(token, sharesToWithdraw, address(this));
+        uint256 out = aavePool.withdraw(token, underlyingToWithdraw, address(this));
 
         // Transfer to the escrow owner (never the caller/operator)
         IERC20(token).safeTransfer(escrowOwner, out);
-
-        // Clean up
-        delete positions[escrowOwner][escrowId];
 
         // INVARIANT 6: Strict semantics - never return 0
         if (out == 0) {
@@ -425,10 +437,23 @@ contract AaveYieldModule is IYieldModule, ERC165, Ownable2Step {
     function canHandle(
         address token,
         YieldPreset, /* mode */
-        uint256      /* amount */
+        uint256 amount
     ) external view returns (bool supported, bytes32 reasonCode) {
+        // Mirror the cheap, deterministic admissibility checks that initializeYield
+        // enforces, so canHandle never reports "supported" for a call that
+        // initializeYield would reject immediately. Reduced to view-only, caller-visible
+        // conditions (token/amount); the (msg.sender, escrowId)-dependent
+        // PositionAlreadyExists check is intentionally not applied here.
+        if (amount == 0) {
+            return (false, keccak256("ZERO_AMOUNT"));
+        }
         if (tokenToAToken[token] == address(0)) {
             return (false, keccak256("TOKEN_NOT_CONFIGURED"));
+        }
+        uint256 minDeposit = minDepositByToken[token];
+        if (minDeposit == 0) minDeposit = 1;
+        if (amount < minDeposit) {
+            return (false, keccak256("BELOW_MIN_DEPOSIT"));
         }
         return (true, 0x0);
     }

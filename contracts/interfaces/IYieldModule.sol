@@ -73,7 +73,8 @@ interface IYieldModule {
      * @notice Withdraw yield position back to escrow
      * @param escrowId Escrow identifier
      * @param token Token address
-     * @param principalExpected Expected principal (for validation)
+     * @param principalExpected Accepted principal the caller expects (must equal the module's
+     *                          recorded principalDeposited; the module enforces this — finding #7)
      * @return principalOut Actual principal withdrawn
      * @return yieldOut Gross yield accrued (may be 0)
      * 
@@ -94,7 +95,8 @@ interface IYieldModule {
      * @notice Emergency recovery path
      * @param escrowId Escrow identifier
      * @param token Token address
-     * @param principalExpected Expected principal
+     * @param principalExpected Accepted principal the caller expects (must equal the module's
+     *                          recorded principalDeposited — finding #7)
      * @return recovered Amount recovered (always > 0, or reverts)
      * 
      * @dev Called after unwindToEscrow fails
@@ -144,7 +146,7 @@ interface IYieldModule {
      * @return reasonCode Error code if not (0x0 = OK, else specific reason)
      * 
      * @dev Used for preflight checks; initializeYield may still revert
-     * @dev Reason codes: 0x0 (OK), 0x1 (token not supported), etc.
+     * @dev Reason codes are keccak256 hashes of stable strings (e.g. keccak256("TOKEN_NOT_CONFIGURED"), keccak256("ZERO_AMOUNT"), keccak256("BELOW_MIN_DEPOSIT")); 0x0 means OK.
      * @dev Not safety-critical; initializeYield is the authoritative check
      */
     function canHandle(

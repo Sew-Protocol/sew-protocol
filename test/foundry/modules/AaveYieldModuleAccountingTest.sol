@@ -354,4 +354,69 @@ contract AaveYieldModuleAccountingTest is Test {
         uint256 accepted2 = module.initializeYield(2, address(token), amt, YieldPreset.TO_SENDER);
         assertEq(accepted2, amt, "a different escrowId is still allowed");
     }
+
+    // ============ P0 Regression: #6 scaled-share isolation ============
+
+    uint256 constant SCALE_TOLERANCE = 1e4;
+
+    /// @dev Unwind escrowId and assert the module's scaled aToken balance drops by (near)
+    ///      exactly the position's own recorded scaled shares — i.e. it must NOT burn shares
+    ///      belonging to a different interleaved position. Tolerates integer-rounding dust.
+    function _assertScaledBurnWithin(uint256 escrowId, uint256 recordedShares, string memory label) internal {
+        (, uint256 recordedPrincipal, , ) = module.positions(escrow, escrowId);
+        uint256 scaledBefore = aToken.scaledBalanceOf(address(module));
+        vm.prank(escrow);
+        module.unwindToEscrow(escrowId, address(token), recordedPrincipal);
+        uint256 scaledAfter = aToken.scaledBalanceOf(address(module));
+        require(scaledBefore >= scaledAfter, "scaled balance must not increase");
+        uint256 burned = scaledBefore - scaledAfter;
+        assertGe(burned + SCALE_TOLERANCE, recordedShares, string.concat(label, ": burns (near) the full recorded shares"));
+        assertLe(burned, recordedShares + SCALE_TOLERANCE, string.concat(label, ": must NOT burn another position's shares"));
+    }
+
+    /**
+     * @notice Regression (#6): with N interleaved same-token positions of different sizes,
+     * unwinding each position burns only its own recorded scaled shares (plus rounding),
+     * never another position's. After all positions unwind, only rounding dust remains in
+     * the module. This backs the claim that a position withdraws only the shares recorded
+     * for that specific position.
+     */
+    function test_scaled_share_isolation_interleaved_positions() public {
+        uint256 a = 100e18;
+        uint256 b = 40e18;
+        uint256 c = 250e18;
+
+        vm.prank(escrow);
+        token.approve(address(module), type(uint256).max);
+
+        // Position 1 at the initial liquidity index.
+        vm.prank(escrow);
+        module.initializeYield(1, address(token), a, YieldPreset.TO_SENDER);
+
+        // Yield accrues, then position 2 at the elevated index.
+        pool.simulateYield(address(token), 50);
+        vm.prank(escrow);
+        module.initializeYield(2, address(token), b, YieldPreset.TO_SENDER);
+
+        // More yield, then position 3.
+        pool.simulateYield(address(token), 50);
+        vm.prank(escrow);
+        module.initializeYield(3, address(token), c, YieldPreset.TO_SENDER);
+
+        // Further yield accrues for all positions.
+        pool.simulateYield(address(token), 50);
+
+        (, , uint256 shares1, ) = module.positions(escrow, 1);
+        (, , uint256 shares2, ) = module.positions(escrow, 2);
+        (, , uint256 shares3, ) = module.positions(escrow, 3);
+
+        // Unwind in a NON-creation order (2, then 1, then 3).
+        _assertScaledBurnWithin(2, shares2, "pos2");
+        _assertScaledBurnWithin(1, shares1, "pos1");
+        _assertScaledBurnWithin(3, shares3, "pos3");
+
+        // After all positions unwind, only rounding dust remains in the module.
+        uint256 remaining = aToken.scaledBalanceOf(address(module));
+        assertLe(remaining, SCALE_TOLERANCE, "no meaningful scaled balance remains after all unwinds");
+    }
 }
