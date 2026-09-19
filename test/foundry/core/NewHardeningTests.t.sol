@@ -5,7 +5,6 @@ import "forge-std/Test.sol";
 import "../../../contracts/core/EscrowVault.sol";
 import "../../../contracts/core/BaseEscrow.sol";
 import "../../../contracts/core/EscrowCreationPolicy.sol";
-import "../../../contracts/ops/YieldOps.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
@@ -16,7 +15,6 @@ import "../../../contracts/libraries/SettingsValidationLibrary.sol";
 contract NewHardeningTests is Test {
     EscrowVault public vault;
     EscrowCreationPolicy public creationPolicy;
-    YieldOps public yieldOps;
     ModuleSnapshotRegistry public moduleManagement;
     ERC20Mock public token;
     DefaultResolutionModule public resolutionModule;
@@ -30,15 +28,13 @@ contract NewHardeningTests is Test {
     function setUp() public {
         vm.startPrank(owner);
         creationPolicy = new EscrowCreationPolicy(owner);
-        yieldOps = new YieldOps(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
         
-        vault = new EscrowVault(100,feeAddress,address(yieldOps),address(moduleManagement));
+        vault = new EscrowVault(100,feeAddress,address(moduleManagement));
         vault.setCreationPolicy(address(creationPolicy));
         vault.grantRole(vault.ROLE_TIMELOCK(), timelock);
         
         resolutionModule = new DefaultResolutionModule(owner, address(0xDEAD));
-        moduleManagement.registerEscrowContract(address(vault));
         
         token = new ERC20Mock("Test", "TEST", buyer, 10000e18);
         

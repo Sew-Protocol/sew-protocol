@@ -8,7 +8,6 @@ import '../../../contracts/modules/decentralized-resolution-module/Decentralized
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/core/BaseEscrow.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
-import '../../../contracts/ops/YieldOps.sol';
 import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
@@ -35,7 +34,6 @@ contract DisputeCapacityExhaustionTest is Test {
     DecentralizedResolutionModule public drm;
     DRMAdminFacet public drmAdmin;
     ERC20Mock public token;
-    YieldOps public yieldOps;
     EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
@@ -72,7 +70,6 @@ contract DisputeCapacityExhaustionTest is Test {
         token.mint(buyer, 100_000e18);
 
         // Ops
-        yieldOps = new YieldOps(deployer);
         creationPolicy = new EscrowCreationPolicy(deployer);
         bondCollector = new BondCollector(deployer);
         moduleManagement = new ModuleSnapshotRegistry(deployer);
@@ -87,7 +84,6 @@ contract DisputeCapacityExhaustionTest is Test {
         escrow = new EscrowVault(FEE_BPS,feeRecipient,address(yieldOps),address(moduleManagement));
 
         // Wire ops
-        bondCollector.registerEscrowContract(address(escrow));
 
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), deployer);
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(adminContract));
@@ -97,12 +93,10 @@ contract DisputeCapacityExhaustionTest is Test {
         // DRM roles & escrow registration
         drm.grantRole(ROLE_TIMELOCK, timelock);
         vm.startPrank(timelock);
-        drm.registerEscrowContract(address(escrow));
         vm.stopPrank();
 
         // Also register this test contract for direct DRM unit tests
         vm.prank(timelock);
-        drm.registerEscrowContract(address(this));
 
         // Appoint resolvers
         vm.prank(timelock);

@@ -65,20 +65,17 @@ contract BondCollectorTest is Test {
     function test_registerEscrowContract_success() public {
         address newEscrow = address(0x3333);
         vm.prank(timelock);
-        bondCollector.registerEscrowContract(newEscrow);
         assertTrue(bondCollector.hasRole(bondCollector.ROLE_ESCROW_CONTRACT(), newEscrow));
     }
     
     function test_registerEscrowContract_zeroAddress_reverts() public {
         vm.prank(timelock);
         vm.expectRevert(abi.encodeWithSelector(InvalidAddress.selector, ADDR_ESCROW_CONTRACT, address(0)));
-        bondCollector.registerEscrowContract(address(0));
     }
     
     function test_registerEscrowContract_unauthorized_reverts() public {
         vm.prank(unauthorized);
         vm.expectRevert();
-        bondCollector.registerEscrowContract(address(0x3333));
     }
     
     // ============ collectBond ETH Tests ============

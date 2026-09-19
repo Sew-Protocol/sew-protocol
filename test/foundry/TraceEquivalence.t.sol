@@ -9,7 +9,6 @@ import { EscrowViewContract } from "../../contracts/core/EscrowViewContract.sol"
 import { DefaultResolutionModule } from "../../contracts/modules/DefaultResolutionModule.sol";
 import { DefaultReleaseStrategy } from "../../contracts/modules/DefaultReleaseStrategy.sol";
 import { EscrowCreationPolicy } from "../../contracts/core/EscrowCreationPolicy.sol";
-import { YieldOps } from "../../contracts/ops/YieldOps.sol";
 import { BondCollector } from "../../contracts/core/BondCollector.sol";
 import { ModuleSnapshotRegistry } from "../../contracts/core/ModuleSnapshotRegistry.sol";
 import { ERC20Mock } from "../../contracts/mocks/ERC20Mock.sol";
@@ -175,7 +174,6 @@ contract TraceEquivalenceTest is Test {
     function _initializeVaultStack() internal {
         token = new ERC20Mock("Trace USDC", "TUSDC", owner, 0);
 
-        yieldOps       = new YieldOps(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
         creationPolicy      = new EscrowCreationPolicy(owner);
         bondCollector  = new BondCollector(owner);
@@ -186,9 +184,6 @@ contract TraceEquivalenceTest is Test {
         vault = new EscrowVault(_vaultFeeBps,FEE_ADDR,address(yieldOps),address(moduleManagement));
 
         // Register vault with every ops contract (required before calls)
-        yieldOps.registerEscrowContract(address(vault));
-        moduleManagement.registerEscrowContract(address(vault));
-        bondCollector.registerEscrowContract(address(vault));
 
         // Wire ops into vault (requires ROLE_TIMELOCK which address(this) already has)
         vault.setCreationPolicy(address(creationPolicy));

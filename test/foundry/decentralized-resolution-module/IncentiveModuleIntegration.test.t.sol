@@ -11,7 +11,6 @@ import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DRMAdminFacet.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
 import '../../../contracts/types/EscrowTypes.sol';
-import '../../../contracts/ops/YieldOps.sol';
 import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
@@ -30,7 +29,6 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
     ResolverIncentiveModuleV2 public incentiveModuleV2;
     PaymentCalculationLibraryV1 public paymentLib;
     ERC20Mock public token;
-    YieldOps public yieldOps;
     EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
@@ -78,25 +76,19 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
 
         incentiveModuleV1.grantRole(incentiveModuleV1.ROLE_TIMELOCK(), address(this));
         incentiveModuleV2.grantRole(incentiveModuleV2.ROLE_TIMELOCK(), address(this));
-        incentiveModuleV1.registerEscrowContract(address(this));
-        incentiveModuleV2.registerEscrowContract(address(this));
 
         // Deploy resolution module
         resolutionModule = new DecentralizedResolutionModule(deployer);
         { DRMAdminFacet drmAdminFacet_ = new DRMAdminFacet(); resolutionModule.setAdminFacet(address(drmAdminFacet_)); }
 
         // Deploy escrow
-        yieldOps = new YieldOps(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));
         escrow = new EscrowVault(100,feeRecipient,address(yieldOps),address(moduleManagement));
-        incentiveModuleV1.registerEscrowContract(address(escrow));
-        incentiveModuleV2.registerEscrowContract(address(escrow));
 
         // Deploy and wire required ops (BaseEscrow now requires these)
         creationPolicy = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
-        bondCollector.registerEscrowContract(address(escrow));
 
         // Grant admin-contract role so this test can configure ops,
         // and so EscrowGovernanceTimelock can activate modules without attempting to grant itself.
@@ -115,33 +107,24 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
 
         // Register escrow contract in resolution module
         vm.prank(timelock);
-        resolutionModule.registerEscrowContract(address(escrow));
         // Escrow calls into the resolution module during escalation; registration is handled above.
         vm.prank(timelock);
-        resolutionModule.registerEscrowContract(address(this));
 
         // Register escrow contract in incentive modules
         vm.prank(timelock);
-        incentiveModuleV1.registerEscrowContract(address(escrow));
         vm.prank(timelock);
-        incentiveModuleV2.registerEscrowContract(address(escrow));
 
         // Register this test contract as an escrow contract for direct calls
         vm.prank(timelock);
-        incentiveModuleV2.registerEscrowContract(address(this));
 
         // BondCollector calls incentive module directly for bond recording (ERC20 path),
         // so it must also be authorized as an escrow contract.
         vm.prank(timelock);
-        incentiveModuleV1.registerEscrowContract(address(bondCollector));
         vm.prank(timelock);
-        incentiveModuleV2.registerEscrowContract(address(bondCollector));
 
         // Also register resolution module in incentive modules (it calls hooks)
         vm.prank(timelock);
-        incentiveModuleV1.registerEscrowContract(address(resolutionModule));
         vm.prank(timelock);
-        incentiveModuleV2.registerEscrowContract(address(resolutionModule));
 
         // Set incentive module in resolution module
         vm.prank(timelock);

@@ -53,7 +53,6 @@ contract ResolverIncentiveModuleComprehensiveTest is Test {
         // Setup Roles
         incentiveModule.grantRole(ROLE_TIMELOCK, timelock);
         incentiveModule.grantRole(ROLE_TIMELOCK, address(this));
-        incentiveModule.registerEscrowContract(escrow);
 
         // Deploy Mock Token
         token = new ERC20Mock('Test Token', 'TEST', owner, 1000000 ether);

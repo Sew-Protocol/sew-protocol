@@ -49,23 +49,6 @@ async function main() {
       console.log('Attempting to get revert reason...');
     }
   }
-
-  // Check YieldOps
-  console.log('\n=== YieldOps ===');
-  const yieldOps = await hre.ethers.getContractAt('YieldOps', registry.contracts.YieldOps.address);
-  const yieldOpsAdmin = await yieldOps.DEFAULT_ADMIN_ROLE();
-  console.log('DEFAULT_ADMIN_ROLE:', yieldOpsAdmin);
-  console.log('Deployer has admin?', await yieldOps.hasRole(yieldOpsAdmin, deployerAddr));
-  console.log('Guardian has GUARDIAN?', await yieldOps.hasRole(ROLE_GUARDIAN, guardianAddr));
-
-  try {
-    const tx = await yieldOps.grantRole(ROLE_GUARDIAN, guardianAddr);
-    console.log('Grant tx:', tx.hash);
-    await tx.wait();
-    console.log('SUCCESS');
-  } catch (err: any) {
-    console.log('Error:', err.message);
-  }
 }
 
 main().catch(console.error);

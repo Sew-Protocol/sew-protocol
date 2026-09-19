@@ -8,7 +8,6 @@ import '../../../contracts/modules/decentralized-resolution-module/DRMAdminFacet
 import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibraryV1.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
-import '../../../contracts/ops/YieldOps.sol';
 import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/core/BondCollector.sol';
@@ -46,36 +45,28 @@ contract BondBehaviourCorrectionTest is Test {
         v2 = new ResolverIncentiveModuleV2(deployer, address(lib));
         v2.grantRole(v2.ROLE_TIMELOCK(), address(this));
         v2.grantRole(v2.ROLE_TIMELOCK(), timelock);
-        v2.registerEscrowContract(address(this));
 
         drm = new DecentralizedResolutionModule(deployer);
         { DRMAdminFacet f = new DRMAdminFacet(); drm.setAdminFacet(address(f)); }
         drm.grantRole(drm.ROLE_TIMELOCK(), address(this));
         drm.grantRole(drm.ROLE_TIMELOCK(), timelock);
-        drm.registerEscrowContract(address(this));
 
-        YieldOps yOps = new YieldOps(address(this));
         moduleMgmt = new ModuleSnapshotRegistry(address(this));
         escrow = new EscrowVault(100,feeAddr,address(yOps),address(moduleMgmt));
 
         EscrowCreationPolicy cOps = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
 
-        bondCollector.registerEscrowContract(address(escrow));
-        yOps.registerEscrowContract(address(escrow));
 
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(this));
         escrow.setCreationPolicy(address(cOps));
         escrow.setBondCollector(address(bondCollector));
 
         // Wire modules
-        drm.registerEscrowContract(address(escrow));
-        v2.registerEscrowContract(address(escrow));
         drm.setIncentiveModule(address(v2));
         v2.setResolutionModule(address(drm));
 
         // Module management
-        moduleMgmt.registerEscrowContract(address(escrow));
         moduleMgmt.grantRole(moduleMgmt.ROLE_ESCROW_CONTRACT(), address(escrow));
         moduleMgmt.queueModule(address(escrow), BaseEscrow.ModuleType.RESOLUTION, address(drm));
         vm.warp(block.timestamp + 8 days);

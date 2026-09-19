@@ -57,7 +57,6 @@ contract DRv1WorkloadRoutingTest is Test {
         vm.stopPrank();
 
         vm.prank(timelock);
-        module.registerEscrowContract(escrowContract);
 
         // Appoint senior resolver
         vm.prank(timelock);

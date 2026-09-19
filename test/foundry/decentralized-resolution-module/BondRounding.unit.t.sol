@@ -7,7 +7,6 @@ import '../../../contracts/modules/decentralized-resolution-module/libraries/Pay
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
-import '../../../contracts/ops/YieldOps.sol';
 
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 /**
@@ -20,7 +19,6 @@ contract BondRoundingTest is Test {
     PaymentCalculationLibraryV1 public paymentLib;
     EscrowVault public escrow;
     ERC20Mock public token;
-    YieldOps public yieldOps;
     ModuleSnapshotRegistry public moduleManagement;
 
     address public deployer;
@@ -40,8 +38,6 @@ contract BondRoundingTest is Test {
         incentiveModule = new ResolverIncentiveModuleV2(deployer, address(paymentLib));
         token = new ERC20Mock('Test Token', 'TEST', address(this), 0);
         incentiveModule.grantRole(incentiveModule.ROLE_TIMELOCK(), address(this));
-        incentiveModule.registerEscrowContract(address(this));
-        yieldOps = new YieldOps(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         escrow = new EscrowVault(100,feeAddress,address(yieldOps),address(moduleManagement));
 
@@ -50,7 +46,7 @@ contract BondRoundingTest is Test {
 
         // Register escrow contract
         vm.prank(timelock);
-        incentiveModule.registerEscrowContract(address(escrow));
+        incentiveModule.registerEscrowContract(address(this));
     }
 
     /**

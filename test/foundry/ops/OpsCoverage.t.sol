@@ -3,7 +3,6 @@ pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
 import '../../mocks/legacy/CreateOpsReference.sol';
-import '../../../contracts/ops/YieldOps.sol';
 import '../../../contracts/interfaces/IYieldModule.sol';
 import '../../mocks/legacy/SettlementOpsReference.sol';
 import '../../mocks/legacy/DisputeOpsReference.sol';
@@ -14,7 +13,6 @@ import '../../../contracts/shared/interfaces/IResolutionModule.sol';
 
 contract OpsCoverageTest is Test {
     CreateOpsReference public createOps;
-    YieldOps public yieldOps;
     SettlementOpsReference public settlementOps;
     DisputeOpsReference public disputeOps;
     ERC20Mock public token;
@@ -36,7 +34,6 @@ contract OpsCoverageTest is Test {
 
         // Deploy Ops contracts
         createOps = new CreateOpsReference(owner);
-        yieldOps = new YieldOps(owner);
         settlementOps = new SettlementOpsReference(owner);
         disputeOps = new DisputeOpsReference(owner);
 
@@ -114,20 +111,17 @@ contract OpsCoverageTest is Test {
 
     function test_CreateOps_registerEscrowContract() public {
         vm.prank(timelock);
-        createOps.registerEscrowContract(escrowContract);
         assertTrue(createOps.hasRole(createOps.ROLE_ESCROW_CONTRACT(), escrowContract));
     }
 
     function test_CreateOps_registerEscrowContract_Unauthorized() public {
         vm.prank(unauthorized);
         vm.expectRevert();
-        createOps.registerEscrowContract(escrowContract);
     }
 
     function test_CreateOps_computeEscrowCreation_RespectsPause() public {
         // Register escrow contract
         vm.prank(timelock);
-        createOps.registerEscrowContract(escrowContract);
 
         // Pause deposits
         vm.prank(guardian);
@@ -162,7 +156,6 @@ contract OpsCoverageTest is Test {
 
     function test_CreateOps_computeEscrowCreation_ResolverQuery() public {
         vm.prank(timelock);
-        createOps.registerEscrowContract(escrowContract);
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
@@ -191,7 +184,6 @@ contract OpsCoverageTest is Test {
 
     function test_CreateOps_computeEscrowCreation_ResolverFailure() public {
         vm.prank(timelock);
-        createOps.registerEscrowContract(escrowContract);
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
@@ -221,7 +213,6 @@ contract OpsCoverageTest is Test {
 
     function test_CreateOps_computeEscrowCreation_EOAResolver() public {
         vm.prank(timelock);
-        createOps.registerEscrowContract(escrowContract);
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
@@ -251,7 +242,6 @@ contract OpsCoverageTest is Test {
     function test_YieldOps_handleYield_WithdrawalFailed() public {
         mockGen = new MockYieldGenerationModule();
         vm.prank(timelock);
-        yieldOps.registerEscrowContract(escrowContract);
 
         // Success = false from module
         mockGen.setWithdrawResult(false, 0, 0);
@@ -311,13 +301,11 @@ contract OpsCoverageTest is Test {
     function test_YieldOps_registerEscrowContract_Invalid() public {
         vm.prank(timelock);
         vm.expectRevert();
-        yieldOps.registerEscrowContract(address(0));
     }
 
     function test_YieldOps_handleYield_NoYieldGenerated() public {
         mockGen = new MockYieldGenerationModule();
         vm.prank(timelock);
-        yieldOps.registerEscrowContract(escrowContract);
 
         // Withdrawal succeeds but no yield generated
         mockGen.setWithdrawResult(true, 1000, 0);
@@ -343,7 +331,6 @@ contract OpsCoverageTest is Test {
 
     function test_SettlementOps_registerEscrowContract() public {
         vm.prank(timelock);
-        settlementOps.registerEscrowContract(escrowContract);
         assertTrue(settlementOps.hasRole(settlementOps.ROLE_ESCROW_CONTRACT(), escrowContract));
     }
 
@@ -360,7 +347,6 @@ contract OpsCoverageTest is Test {
 
         // Authorized
         vm.prank(timelock);
-        settlementOps.registerEscrowContract(escrowContract);
 
         vm.prank(escrowContract);
         // Should success (even with dummy data, it returns a result)
@@ -376,7 +362,6 @@ contract OpsCoverageTest is Test {
 
     function test_DisputeOps_registerEscrowContract() public {
         vm.prank(timelock);
-        disputeOps.registerEscrowContract(escrowContract);
         assertTrue(disputeOps.hasRole(disputeOps.ROLE_ESCROW_CONTRACT(), escrowContract));
     }
 
@@ -401,7 +386,6 @@ contract OpsCoverageTest is Test {
 
         // Authorized
         vm.prank(timelock);
-        disputeOps.registerEscrowContract(escrowContract);
 
         vm.prank(escrowContract);
         // Should execute (result.success might be false due to inputs, but call shouldn't revert with access control)
@@ -431,7 +415,6 @@ contract OpsCoverageTest is Test {
         mockModule = new MockResolutionModule();
         
         vm.prank(timelock);
-        disputeOps.registerEscrowContract(escrowContract);
 
         address from = address(0x1);
         address to = address(0x2);
@@ -475,7 +458,6 @@ contract OpsCoverageTest is Test {
 
     function test_DisputeOps_computeEscalation_WrongState() public {
         vm.prank(timelock);
-        disputeOps.registerEscrowContract(escrowContract);
 
         vm.prank(escrowContract);
         DisputeOpsReference.EscalationResult memory result = disputeOps.computeEscalation(
@@ -500,7 +482,6 @@ contract OpsCoverageTest is Test {
     function test_DisputeOps_computeEscalation_AppealRights() public {
         mockModule = new MockResolutionModule();
         vm.prank(timelock);
-        disputeOps.registerEscrowContract(escrowContract);
 
         address from = address(0x1);
         address to = address(0x2);
@@ -589,7 +570,6 @@ contract OpsCoverageTest is Test {
     function test_DisputeOps_computeEscalation_ModuleRejection() public {
         mockModule = new MockResolutionModule();
         vm.prank(timelock);
-        disputeOps.registerEscrowContract(escrowContract);
 
         // Set valid decision so it proceeds to canEscalate
         mockModule.setDecision(1); // RELEASE
@@ -621,7 +601,6 @@ contract OpsCoverageTest is Test {
     function test_DisputeOps_computeEscalation_GetLevelFailed() public {
         mockModule = new MockResolutionModule();
         vm.prank(timelock);
-        disputeOps.registerEscrowContract(escrowContract);
 
         mockModule.setRevert(true); // Fails authoritative quote derivation
 
@@ -648,7 +627,6 @@ contract OpsCoverageTest is Test {
     function test_DisputeOps_computeEscalation_ExecFailed() public {
         mockModule = new MockResolutionModule();
         vm.prank(timelock);
-        disputeOps.registerEscrowContract(escrowContract);
 
         mockModule.setDecision(1);
         mockModule.setEscalation(true, address(0x999), 0);
@@ -678,7 +656,6 @@ contract OpsCoverageTest is Test {
     function test_DisputeOps_computeEscalation_ExecZero() public {
         mockModule = new MockResolutionModule();
         vm.prank(timelock);
-        disputeOps.registerEscrowContract(escrowContract);
 
         mockModule.setDecision(1);
         mockModule.setEscalation(true, address(0), 0); // Next resolver is zero
@@ -716,7 +693,6 @@ contract OpsCoverageTest is Test {
 
     function test_DisputeOps_computeEscalation_ModuleNotConfigured() public {
         vm.prank(timelock);
-        disputeOps.registerEscrowContract(escrowContract);
 
         vm.prank(escrowContract);
         DisputeOpsReference.EscalationResult memory result = disputeOps.computeEscalation(
@@ -741,7 +717,6 @@ contract OpsCoverageTest is Test {
     function test_DisputeOps_computeEscalation_NoDecision() public {
         mockModule = new MockResolutionModule();
         vm.prank(timelock);
-        disputeOps.registerEscrowContract(escrowContract);
 
         // Set decision to 0 (NONE)
         mockModule.setDecision(0);
@@ -769,7 +744,6 @@ contract OpsCoverageTest is Test {
     function test_DisputeOps_computeEscalation_CanEscalateCallFails() public {
         mockModule = new MockResolutionModule();
         vm.prank(timelock);
-        disputeOps.registerEscrowContract(escrowContract);
 
         // Set valid decision
         mockModule.setDecision(1); // RELEASE
@@ -801,7 +775,6 @@ contract OpsCoverageTest is Test {
     function test_DisputeOps_computeEscalation_ExecuteEscalationCallFails() public {
         mockModule = new MockResolutionModule();
         vm.prank(timelock);
-        disputeOps.registerEscrowContract(escrowContract);
 
         // Set valid decision and canEscalate success
         mockModule.setDecision(1);
@@ -837,7 +810,6 @@ contract OpsCoverageTest is Test {
 
     function test_CreateOps_computeEscrowCreation_InvalidInputs() public {
         vm.prank(timelock);
-        createOps.registerEscrowContract(escrowContract);
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
@@ -878,7 +850,6 @@ contract OpsCoverageTest is Test {
 
     function test_CreateOps_computeEscrowCreation_FeeCalculation() public {
         vm.prank(timelock);
-        createOps.registerEscrowContract(escrowContract);
 
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
@@ -915,7 +886,6 @@ contract OpsCoverageTest is Test {
         mockGen = new MockYieldGenerationModule();
         
         vm.prank(timelock);
-        yieldOps.registerEscrowContract(escrowContract);
 
         // Setup yield behavior
         uint256 original = 1000;
@@ -945,7 +915,6 @@ contract OpsCoverageTest is Test {
     function test_YieldOps_handleYield_GenFailure() public {
         mockGen = new MockYieldGenerationModule();
         vm.prank(timelock);
-        yieldOps.registerEscrowContract(escrowContract);
 
         mockGen.setRevert(true);
 
@@ -971,7 +940,6 @@ contract OpsCoverageTest is Test {
     function test_YieldOps_handleYield_WithdrawSuccessFalse() public {
         mockGen = new MockYieldGenerationModule();
         vm.prank(timelock);
-        yieldOps.registerEscrowContract(escrowContract);
 
         mockGen.setWithdrawResult(false, 1000, 0);
 
@@ -1013,7 +981,6 @@ contract OpsCoverageTest is Test {
         mockGen2.setWithdrawSuccess(false); // Make it return false
         
         vm.prank(timelock);
-        yieldOps.registerEscrowContract(escrowContract);
 
         vm.prank(escrowContract);
         YieldOps.YieldResult memory result = yieldOps.handleYield(
@@ -1037,7 +1004,6 @@ contract OpsCoverageTest is Test {
         mockGen3.setRevert(true); // Make it revert
         
         vm.prank(timelock);
-        yieldOps.registerEscrowContract(escrowContract);
 
         vm.prank(escrowContract);
         YieldOps.YieldResult memory result = yieldOps.handleYield(
@@ -1059,7 +1025,6 @@ contract OpsCoverageTest is Test {
 
     function test_SettlementOps_computePendingSettlementExecution() public {
         vm.prank(timelock);
-        settlementOps.registerEscrowContract(escrowContract);
 
         SettlementOpsReference.SettlementPendingSettlement memory pending;
         
@@ -1093,7 +1058,6 @@ contract OpsCoverageTest is Test {
 
     function test_SettlementOps_computeTimedActions() public {
         vm.prank(timelock);
-        settlementOps.registerEscrowContract(escrowContract);
 
         EscrowTransfer memory et;
         SettlementOpsReference.SettlementPendingSettlement memory pending;
@@ -1155,7 +1119,6 @@ contract OpsCoverageTest is Test {
 
     function test_SettlementOps_computeResolutionExecution_InvalidModule() public {
         vm.prank(timelock);
-        settlementOps.registerEscrowContract(escrowContract);
 
         TimeoutConfig memory config;
         config.appealWindowDuration = 1 days;

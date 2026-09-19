@@ -5,7 +5,6 @@ import 'forge-std/Test.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/core/EscrowVaultAnalytics.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
-import '../../../contracts/ops/YieldOps.sol';
 import '../../../contracts/modules/DefaultResolutionModule.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
@@ -14,7 +13,6 @@ import '../../../contracts/core/BondCollector.sol';
 
 contract EscrowVaultAccountingAdvancedTest is Test {
     EscrowVault public vault;
-    YieldOps public yieldOps;
     ModuleSnapshotRegistry public mm;
     EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
@@ -33,17 +31,13 @@ contract EscrowVaultAccountingAdvancedTest is Test {
     function setUp() public {
         token = new ERC20Mock("Token", "TKN", address(this), 1000000e18);
 
-        yieldOps = new YieldOps(address(this));
         mm = new ModuleSnapshotRegistry(address(this));
         creationPolicy = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
         resolutionModule = new DefaultResolutionModule(address(this), resolver);
 
-        vault = new EscrowVault(INITIAL_FEE_BPS,feeAddress1,address(yieldOps),address(mm));
+        vault = new EscrowVault(INITIAL_FEE_BPS,feeAddress1,address(mm));
 
-        yieldOps.registerEscrowContract(address(vault));
-        mm.registerEscrowContract(address(vault));
-        bondCollector.registerEscrowContract(address(vault));
 
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.setCreationPolicy(address(creationPolicy));

@@ -19,7 +19,6 @@ async function main() {
 
   const contracts = [
     { name: 'EscrowCreationPolicy', address: registry.contracts.EscrowCreationPolicy.address },
-    { name: 'YieldOps', address: registry.contracts.YieldOps.address },
   ];
 
   for (const c of contracts) {

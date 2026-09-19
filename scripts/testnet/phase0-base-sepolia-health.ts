@@ -113,7 +113,6 @@ async function run() {
     'GovGovernor',
     'Safe_Multisig',
     'GuardianSafe',
-    'YieldOps',
     'EscrowCreationPolicy',
     'BondCollector',
     'ModuleSnapshotRegistry',
@@ -140,7 +139,6 @@ async function run() {
   const escrowVault = await hre.ethers.getContractAt('EscrowVault', d.EscrowVault.address);
 
   const wiringPairs: Array<[string, () => Promise<string>, string]> = [
-    ['EscrowVault.yieldOps', () => escrowVault.yieldOps(), d.YieldOps.address],
     ['EscrowVault.creationPolicy', () => escrowVault.creationPolicy(), d.EscrowCreationPolicy.address],
     ['EscrowVault.bondCollector', () => escrowVault.bondCollector(), d.BondCollector.address],
     ['EscrowVault.moduleManagement', () => escrowVault.moduleManagement(), d.ModuleSnapshotRegistry.address],
@@ -171,7 +169,7 @@ async function run() {
     'function DEFAULT_ADMIN_ROLE() view returns (bytes32)',
   ];
 
-  for (const name of ['EscrowCreationPolicy', 'YieldOps', 'BondCollector'] as const) {
+  for (const name of ['EscrowCreationPolicy', 'BondCollector'] as const) {
     const c = await hre.ethers.getContractAt(accessControlAbi, d[name].address);
     const ok = await c.hasRole(ROLE_ESCROW_CONTRACT, d.EscrowVault.address);
     results.push({

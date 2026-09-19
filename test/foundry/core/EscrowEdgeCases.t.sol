@@ -8,7 +8,6 @@ import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/mocks/MockFeeOnTransfer.sol';
 import '../../../contracts/modules/DefaultResolutionModule.sol';
 import '../../../contracts/types/EscrowTypes.sol';
-import '../../../contracts/ops/YieldOps.sol';
 import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
@@ -24,7 +23,6 @@ contract EscrowEdgeCasesTest is Test {
     ERC20Mock public token;
     MockFeeOnTransfer public feeToken;
     DefaultResolutionModule public resolutionModule;
-    YieldOps public yieldOps;
     EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
@@ -52,17 +50,13 @@ contract EscrowEdgeCasesTest is Test {
         // Fee token with 1% fee (100 bps)
         feeToken = new MockFeeOnTransfer('FeeToken', 'FEE', owner, 10000000e18, 100, address(0xdead));
         
-        yieldOps = new YieldOps(address(this));
         creationPolicy = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));
-        vault = new EscrowVault(ESCROW_FEE,feeAddress,address(yieldOps),address(moduleManagement));
-        moduleManagement.registerEscrowContract(address(vault));
+        vault = new EscrowVault(ESCROW_FEE,feeAddress,address(moduleManagement));
 
         // Register escrow contract callers on ops contracts
-        yieldOps.registerEscrowContract(address(vault));
-        bondCollector.registerEscrowContract(address(vault));
 
         // Setup vault
         vault.grantRole(vault.ROLE_TIMELOCK(), owner);

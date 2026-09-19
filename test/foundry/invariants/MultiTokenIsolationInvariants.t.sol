@@ -5,7 +5,6 @@ import "forge-std/Test.sol";
 import "../../../contracts/core/EscrowVault.sol";
 import "../../../contracts/modules/DefaultResolutionModule.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
-import "../../../contracts/ops/YieldOps.sol";
 import "../../../contracts/core/EscrowCreationPolicy.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
@@ -103,7 +102,6 @@ contract MultiTokenIsolationInvariants is Test {
     ERC20Mock     internal tokenB;
     MultiTokenHandler internal handler;
 
-    YieldOps      internal yieldOps;
     EscrowCreationPolicy     internal creationPolicy;
     BondCollector internal bondCollector;
     ModuleSnapshotRegistry internal mm;
@@ -116,17 +114,13 @@ contract MultiTokenIsolationInvariants is Test {
         tokenA = new ERC20Mock("TokenA", "TKNA", address(this), 0);
         tokenB = new ERC20Mock("TokenB", "TKNB", address(this), 0);
 
-        yieldOps     = new YieldOps(address(this));
         creationPolicy    = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
         mm           = new ModuleSnapshotRegistry(address(this));
         resModule    = new DefaultResolutionModule(address(this), resolver);
 
-        vault = new EscrowVault(100,feeAddr,address(yieldOps),address(mm));
+        vault = new EscrowVault(100,feeAddr,address(mm));
 
-        yieldOps.registerEscrowContract(address(vault));
-        bondCollector.registerEscrowContract(address(vault));
-        mm.registerEscrowContract(address(vault));
 
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.setCreationPolicy(address(creationPolicy));

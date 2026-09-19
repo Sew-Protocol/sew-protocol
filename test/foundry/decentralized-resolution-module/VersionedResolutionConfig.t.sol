@@ -25,7 +25,6 @@ contract VersionedResolutionConfigTest is Test {
         facet = new DRMAdminFacet();
         drm.setAdminFacet(address(facet));
         drm.grantRole(drm.ROLE_TIMELOCK(), address(this));
-        drm.registerEscrowContract(ESCROW);
         drm.appointSeniorResolver(SENIOR, 'senior', '');
         vm.prank(SENIOR);
         drm.appointResolver(RESOLVER, 'resolver', '');

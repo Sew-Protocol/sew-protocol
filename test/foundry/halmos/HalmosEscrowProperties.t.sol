@@ -7,7 +7,6 @@ import "../../../contracts/core/EscrowVault.sol";
 import "../../../contracts/core/EscrowVaultAnalytics.sol";
 import "../../../contracts/modules/DefaultResolutionModule.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
-import "../../../contracts/ops/YieldOps.sol";
 import "../../../contracts/core/EscrowCreationPolicy.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
@@ -52,7 +51,6 @@ contract HalmosEscrowProperties is SymTest, Test {
     ERC20Mock                internal token;
     DefaultResolutionModule  internal resModule;
 
-    YieldOps              internal yieldOps;
     EscrowCreationPolicy             internal creationPolicy;
     BondCollector         internal bondCollector;
     ModuleSnapshotRegistry internal mm;
@@ -79,18 +77,14 @@ contract HalmosEscrowProperties is SymTest, Test {
     function setUp() public {
         token = new ERC20Mock("Token", "TKN", address(this), 0);
 
-        yieldOps      = new YieldOps(address(this));
         creationPolicy     = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
         mm            = new ModuleSnapshotRegistry(address(this));
         resModule     = new DefaultResolutionModule(address(this), customResolver);
         exclusivityResolver = new MockCustomResolver();
 
-        vault = new EscrowVault(FEE_BPS,feeAddr,address(yieldOps),address(mm));
+        vault = new EscrowVault(FEE_BPS,feeAddr,address(mm));
 
-        yieldOps.registerEscrowContract(address(vault));
-        bondCollector.registerEscrowContract(address(vault));
-        mm.registerEscrowContract(address(vault));
 
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.setCreationPolicy(address(creationPolicy));

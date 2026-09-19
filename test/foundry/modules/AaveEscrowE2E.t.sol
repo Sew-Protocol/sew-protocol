@@ -7,7 +7,6 @@ import 'contracts/core/BaseEscrow.sol';
 import 'contracts/modules/AaveYieldModule.sol';
 import 'contracts/mocks/MockAavePool.sol';
 import 'contracts/mocks/ERC20Mock.sol';
-import 'contracts/ops/YieldOps.sol';
 import 'contracts/core/ModuleSnapshotRegistry.sol';
 import 'contracts/core/EscrowCreationPolicy.sol';
 import 'contracts/modules/DefaultReleaseStrategy.sol';
@@ -24,7 +23,6 @@ contract AaveEscrowE2ETest is Test {
     MockAavePool internal pool;
     MockAToken internal aToken;
     ERC20Mock internal token;
-    YieldOps internal yieldOps;
     ModuleSnapshotRegistry internal registry;
     EscrowCreationPolicy internal policy;
 
@@ -43,16 +41,15 @@ contract AaveEscrowE2ETest is Test {
         aaveModule = new AaveYieldModule(address(pool));
         _cfgToken(address(token), address(aToken));
 
-        yieldOps = new YieldOps(address(this));
         registry = new ModuleSnapshotRegistry(address(this));
         policy = new EscrowCreationPolicy(address(this));
 
-        vault = new EscrowVault(0, FEE, address(yieldOps), address(registry));
+        vault = new EscrowVault(0, FEE, address(registry));
         _approve(address(vault));
-        yieldOps.registerEscrowContract(address(vault));
-        registry.registerEscrowContract(address(vault));
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.setCreationPolicy(address(policy));
+
+        registry.registerEscrowContract(address(vault));
 
         // Make the Aave module the default YIELD_GEN module for the vault, and register a
         // default RELEASE strategy so the release path can be exercised.

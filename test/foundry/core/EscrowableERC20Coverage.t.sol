@@ -6,7 +6,6 @@ import '../../../contracts/core/EscrowableERC20.sol';
 import '../../../contracts/modules/DefaultResolutionModule.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/types/YieldPresets.sol';
-import '../../../contracts/ops/YieldOps.sol';
 import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
@@ -23,7 +22,6 @@ contract EscrowableERC20CoverageTest is Test {
     EscrowableERC20 public token;
     EscrowableERC20Factory public factory;
     DefaultResolutionModule public resolutionModule;
-    YieldOps public yieldOps;
     EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
@@ -62,14 +60,13 @@ contract EscrowableERC20CoverageTest is Test {
     // ─── setUp ────────────────────────────────────────────────────────────────
 
     function setUp() public {
-        yieldOps      = new YieldOps(address(this));
         creationPolicy     = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         resolutionModule = new DefaultResolutionModule(address(this), resolver);
         releaseStrategy = new DefaultReleaseStrategy();
 
-        token = new EscrowableERC20('SEW Token','SEW',FEE_BPS,feeAddress,address(yieldOps),address(moduleManagement));
+        token = new EscrowableERC20('SEW Token','SEW',FEE_BPS,feeAddress,address(moduleManagement));
 
         factory = new EscrowableERC20Factory();
 
@@ -78,8 +75,6 @@ contract EscrowableERC20CoverageTest is Test {
         vm.warp(block.timestamp + 8 days);
         moduleManagement.activateModule(address(token), BaseEscrow.ModuleType.RELEASE);
 
-        yieldOps.registerEscrowContract(address(token));
-        bondCollector.registerEscrowContract(address(token));
 
         token.grantRole(token.ROLE_ADMIN_CONTRACT(), address(this));
         token.setCreationPolicy(address(creationPolicy));
@@ -109,32 +104,22 @@ contract EscrowableERC20CoverageTest is Test {
     function test_constructor_revert_fee_too_high() public {
         uint256 badFee = token.MAX_ESCROW_FEE_BPS() + 1;
         vm.expectRevert();
-        new EscrowableERC20('T','T',badFee,feeAddress,address(yieldOps),address(moduleManagement));
+        new EscrowableERC20('T','T',badFee,feeAddress,address(moduleManagement));
     }
 
     function test_constructor_revert_zero_fee_address() public {
         vm.expectRevert();
-        new EscrowableERC20('T','T',FEE_BPS,address(0),address(yieldOps),address(moduleManagement));
-    }
-
-    function test_constructor_revert_zero_yield_ops() public {
-        vm.expectRevert();
-        new EscrowableERC20('T','T',FEE_BPS,feeAddress,address(0),address(moduleManagement));
+        new EscrowableERC20('T','T',FEE_BPS,address(0),address(moduleManagement));
     }
 
     function test_constructor_revert_zero_module_management() public {
         vm.expectRevert();
-        new EscrowableERC20('T','T',FEE_BPS,feeAddress,address(yieldOps),address(0));
-    }
-
-    function test_constructor_revert_no_code_yield_ops() public {
-        vm.expectRevert();
-        new EscrowableERC20('T','T',FEE_BPS,feeAddress,address(0xAAAA),address(moduleManagement));
+        new EscrowableERC20('T','T',FEE_BPS,feeAddress,address(0));
     }
 
     function test_constructor_revert_no_code_module_management() public {
         vm.expectRevert();
-        new EscrowableERC20('T','T',FEE_BPS,feeAddress,address(yieldOps),address(0xCCCC));
+        new EscrowableERC20('T','T',FEE_BPS,feeAddress,address(0xCCCC));
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -363,7 +348,7 @@ contract EscrowableERC20CoverageTest is Test {
     function test_factory_creates_valid_token() public {
         address newToken = factory.createEscrowableERC20(
             'Factory Token', 'FTK', FEE_BPS, feeAddress,
-            address(yieldOps), address(moduleManagement)
+             address(moduleManagement)
         );
         assertNotEq(newToken, address(0));
         assertGt(newToken.code.length, 0);
@@ -372,7 +357,7 @@ contract EscrowableERC20CoverageTest is Test {
     function test_factory_token_has_initial_supply() public {
         address newToken = factory.createEscrowableERC20(
             'Factory Token', 'FTK', FEE_BPS, feeAddress,
-            address(yieldOps), address(moduleManagement)
+             address(moduleManagement)
         );
         EscrowableERC20 t = EscrowableERC20(newToken);
         assertEq(t.totalSupply(), t.INITIAL_SUPPLY());
@@ -382,7 +367,7 @@ contract EscrowableERC20CoverageTest is Test {
         vm.prank(buyer);
         address newToken = factory.createEscrowableERC20(
             'Factory Token', 'FTK', FEE_BPS, feeAddress,
-            address(yieldOps), address(moduleManagement)
+             address(moduleManagement)
         );
         EscrowableERC20 t = EscrowableERC20(newToken);
         // _mint targets _msgSender() inside constructor, which is the factory contract itself
@@ -393,7 +378,7 @@ contract EscrowableERC20CoverageTest is Test {
         vm.expectRevert();
         factory.createEscrowableERC20(
             'T', 'T', FEE_BPS, address(0),  // zero fee address
-            address(yieldOps), address(moduleManagement)
+             address(moduleManagement)
         );
     }
 
@@ -410,14 +395,11 @@ contract EscrowableERC20CoverageTest is Test {
     // ═══════════════════════════════════════════════════════════════════════════
 
     function test_zero_fee_escrow() public {
-        EscrowableERC20 zeroFeeToken = new EscrowableERC20('Zero Fee','ZF',0,feeAddress,address(yieldOps),address(moduleManagement));
-        moduleManagement.registerEscrowContract(address(zeroFeeToken));
+        EscrowableERC20 zeroFeeToken = new EscrowableERC20('Zero Fee','ZF',0,feeAddress,address(moduleManagement));
         moduleManagement.queueModule(address(zeroFeeToken), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
         vm.warp(block.timestamp + 8 days);
         moduleManagement.activateModule(address(zeroFeeToken), BaseEscrow.ModuleType.RELEASE);
 
-        yieldOps.registerEscrowContract(address(zeroFeeToken));
-        bondCollector.registerEscrowContract(address(zeroFeeToken));
 
         zeroFeeToken.grantRole(zeroFeeToken.ROLE_ADMIN_CONTRACT(), address(this));
         zeroFeeToken.setCreationPolicy(address(creationPolicy));

@@ -12,7 +12,6 @@ import "../../../contracts/mocks/ERC20Mock.sol";
 import "../../../contracts/types/EscrowTypes.sol";
 import "../../../contracts/types/YieldPresets.sol";
 import "../../../contracts/libraries/SettingsValidationLibrary.sol";
-import "../../../contracts/ops/YieldOps.sol";
 import "../../../contracts/core/EscrowCreationPolicy.sol";
 import "../../../contracts/core/BondCollector.sol";
 
@@ -20,9 +19,8 @@ contract PerEscrowSettingsHarness is EscrowVault {
     constructor(
         uint256 escrowFeeBps,
         address feeAddress,
-        address yieldOpsAddress,
         address moduleManagementAddress
-    ) EscrowVault(escrowFeeBps, feeAddress, yieldOpsAddress, moduleManagementAddress) {}
+    ) EscrowVault(escrowFeeBps, feeAddress, moduleManagementAddress) {}
 
     function getReleaseStrategyAddr(uint256 workflowId) external view returns (address) {
         return moduleSnapshots[workflowId].releaseStrategy;
@@ -72,7 +70,6 @@ contract PerEscrowSettingsTest is Test {
         vault = new PerEscrowSettingsHarness(
             100, // 1%
             feeAddress,
-            address(new YieldOps(owner)),
             address(moduleManagement)
         );
         vault.grantRole(vault.ROLE_TIMELOCK(), owner);
@@ -86,7 +83,6 @@ contract PerEscrowSettingsTest is Test {
 
 
         BondCollector bondCollector = new BondCollector(owner);
-        bondCollector.registerEscrowContract(address(vault));
         vault.setBondCollector(address(bondCollector));
 
         // Initial global modules

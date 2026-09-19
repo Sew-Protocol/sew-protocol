@@ -8,7 +8,6 @@ import 'contracts/core/BaseEscrow.sol';
 import 'contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/modules/DefaultResolutionModule.sol';
 import 'contracts/types/EscrowTypes.sol';
-import 'contracts/ops/YieldOps.sol';
 import 'contracts/core/EscrowCreationPolicy.sol';
 import 'contracts/core/BondCollector.sol';
 import 'contracts/core/ModuleSnapshotRegistry.sol';
@@ -21,7 +20,6 @@ contract WithdrawEscrowTest is Test {
     ERC20Mock token;
     DefaultResolutionModule rm;
     DefaultReleaseStrategy releaseStrategy;
-    YieldOps yieldOps;
     EscrowCreationPolicy creationPolicy;
     BondCollector bondCollector;
     ModuleSnapshotRegistry moduleManagement;
@@ -36,13 +34,12 @@ contract WithdrawEscrowTest is Test {
     uint256 constant AMOUNT = 10 ether;
 
     function setUp() public {
-        yieldOps = new YieldOps(address(this));
         creationPolicy = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));
         releaseStrategy = new DefaultReleaseStrategy();
-        vault = new EscrowVault(ESCROW_FEE,feeAddress,address(yieldOps),address(moduleManagement));
+        vault = new EscrowVault(ESCROW_FEE,feeAddress,address(moduleManagement));
         moduleManagement.registerEscrowContract(address(vault));
         moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
         vm.warp(block.timestamp + 8 days);
@@ -50,8 +47,6 @@ contract WithdrawEscrowTest is Test {
 
 
         // Register escrow contract with all ops contracts
-        yieldOps.registerEscrowContract(address(vault));
-        bondCollector.registerEscrowContract(address(vault));
 
         // Wire ops contracts on the vault
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));

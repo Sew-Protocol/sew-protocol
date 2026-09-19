@@ -6,7 +6,6 @@ import "../../../contracts/modules/DefaultCancellationStrategy.sol";
 import "../../../contracts/modules/DefaultReleaseStrategy.sol";
 import "../../../contracts/core/EscrowVault.sol";
 import "../../../contracts/core/EscrowCreationPolicy.sol";
-import "../../../contracts/ops/YieldOps.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/types/EscrowTypes.sol";
@@ -21,7 +20,6 @@ import "../../../contracts/mocks/ERC20Mock.sol";
 contract CancellationStrategyIntegrationTest is Test {
     EscrowVault public vault;
     EscrowCreationPolicy public creationPolicy;
-    YieldOps public yieldOps;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
     DefaultCancellationStrategy public cancellationStrategy;
@@ -41,7 +39,6 @@ contract CancellationStrategyIntegrationTest is Test {
         token = new ERC20Mock("Test", "TST", address(this), 10000e18);
         
         // Deploy ops contracts
-        yieldOps = new YieldOps(address(this));
         creationPolicy = new EscrowCreationPolicy(address(this));
         
         // Deploy bond collector
@@ -57,11 +54,10 @@ contract CancellationStrategyIntegrationTest is Test {
         releaseStrategy = new DefaultReleaseStrategy();
         
         // Deploy EscrowVault
-        vault = new EscrowVault(ESCROW_FEE,feeAddress,address(yieldOps),address(moduleManagement));
+        vault = new EscrowVault(ESCROW_FEE,feeAddress,address(moduleManagement));
         
         // Register escrow contract with all ops contracts
         moduleManagement.registerEscrowContract(address(vault));
-        yieldOps.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
         
         // Wire required ops contracts on the vault

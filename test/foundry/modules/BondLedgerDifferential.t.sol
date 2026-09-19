@@ -10,7 +10,6 @@ import '../../../contracts/modules/decentralized-resolution-module/libraries/Pay
 import '../../../contracts/modules/decentralized-resolution-module/interfaces/IPaymentCalculationLibrary.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
-import '../../../contracts/ops/YieldOps.sol';
 import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/core/BondCollector.sol';
@@ -441,34 +440,26 @@ contract BondLedgerDifferential is Test {
 
         s.incentive.grantRole(s.incentive.ROLE_TIMELOCK(), address(this));
         s.incentive.grantRole(s.incentive.ROLE_TIMELOCK(), timelock);
-        s.incentive.registerEscrowContract(address(this));
 
         s.drm = new DecentralizedResolutionModule(deployer);
         { DRMAdminFacet f = new DRMAdminFacet(); s.drm.setAdminFacet(address(f)); }
         s.drm.grantRole(s.drm.ROLE_TIMELOCK(), address(this));
         s.drm.grantRole(s.drm.ROLE_TIMELOCK(), timelock);
-        s.drm.registerEscrowContract(address(this));
 
-        YieldOps yOps = new YieldOps(address(this));
         ModuleSnapshotRegistry mm = new ModuleSnapshotRegistry(address(this));
         s.escrow = new EscrowVault(100,feeAddr,address(yOps),address(mm));
 
         EscrowCreationPolicy cOps = new EscrowCreationPolicy(address(this));
         BondCollector bc = new BondCollector(address(this));
 
-        bc.registerEscrowContract(address(s.escrow));
-        yOps.registerEscrowContract(address(s.escrow));
 
         s.escrow.grantRole(s.escrow.ROLE_ADMIN_CONTRACT(), address(this));
         s.escrow.setCreationPolicy(address(cOps));
         s.escrow.setBondCollector(address(bc));
 
-        s.drm.registerEscrowContract(address(s.escrow));
-        s.incentive.registerEscrowContract(address(s.escrow));
         s.drm.setIncentiveModule(address(s.incentive));
         s.incentive.setResolutionModule(address(s.drm));
 
-        mm.registerEscrowContract(address(s.escrow));
         mm.grantRole(mm.ROLE_ESCROW_CONTRACT(), address(s.escrow));
         mm.queueModule(address(s.escrow), BaseEscrow.ModuleType.RESOLUTION, address(s.drm));
         vm.warp(block.timestamp + 8 days);

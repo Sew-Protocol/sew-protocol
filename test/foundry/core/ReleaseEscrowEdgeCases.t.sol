@@ -8,7 +8,6 @@ import 'contracts/core/BaseEscrow.sol';
 import 'contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/modules/DefaultResolutionModule.sol';
 import 'contracts/types/EscrowTypes.sol';
-import 'contracts/ops/YieldOps.sol';
 import 'contracts/core/EscrowCreationPolicy.sol';
 import 'contracts/core/BondCollector.sol';
 import 'contracts/core/ModuleSnapshotRegistry.sol';
@@ -26,7 +25,6 @@ contract ReleaseEscrowEdgeCasesTest is Test {
     EscrowVault vault;
     ERC20Mock token;
     DefaultResolutionModule rm;
-    YieldOps yieldOps;
     EscrowCreationPolicy creationPolicy;
     BondCollector bondCollector;
     ModuleSnapshotRegistry moduleManagement;
@@ -46,13 +44,12 @@ contract ReleaseEscrowEdgeCasesTest is Test {
     MockYieldGenForEdgeCases mockYieldGen;
     
     function setUp() public {
-        yieldOps = new YieldOps(address(this));
         creationPolicy = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));
         releaseStrategy = new DefaultReleaseStrategy();
-        vault = new EscrowVault(ESCROW_FEE,feeAddress,address(yieldOps),address(moduleManagement));
+        vault = new EscrowVault(ESCROW_FEE,feeAddress,address(moduleManagement));
         
         // Register escrow contract (requires ROLE_TIMELOCK, which address(this) has from constructor)
         vm.prank(address(this));
@@ -63,8 +60,6 @@ contract ReleaseEscrowEdgeCasesTest is Test {
         moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
 
         // Register escrow contract with all ops contracts
-        yieldOps.registerEscrowContract(address(vault));
-        bondCollector.registerEscrowContract(address(vault));
 
         // Wire ops contracts on the vault
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
@@ -129,10 +124,6 @@ contract ReleaseEscrowEdgeCasesTest is Test {
         // Note: In real flow, module withdraws from Aave to escrow, then YieldOps pulls yield portion
         // For this test, we simulate by funding the mock
         token.transfer(address(mockYieldGen), principal + yieldAmount);
-        
-        // Also need to fund YieldOps with yield portion for distribution
-        // In real flow, YieldOps would pull from escrow, but for test we pre-fund
-        token.transfer(address(yieldOps), yieldAmount);
 
         // Release escrow
         vm.prank(sender);
@@ -182,9 +173,6 @@ contract ReleaseEscrowEdgeCasesTest is Test {
         
         // Fund mock module with tokens for all escrows
         token.transfer(address(mockYieldGen), (principalPerEscrow + yieldAmount) * 3);
-        
-        // Fund YieldOps with yield portion for distribution (for all 3 escrows)
-        token.transfer(address(yieldOps), yieldAmount * 3);
 
         // Release first escrow
         vm.prank(sender);

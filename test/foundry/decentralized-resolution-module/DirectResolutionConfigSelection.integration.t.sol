@@ -7,7 +7,6 @@ import '../../../contracts/core/EscrowableERC20.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
-import '../../../contracts/ops/YieldOps.sol';
 import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
 import '../../../contracts/types/EscrowTypes.sol';
@@ -37,7 +36,6 @@ contract DirectResolutionConfigSelectionIntegrationTest is Test, KlerosHandoffFi
     event ResolutionConfigBound(uint256 indexed workflowId, address indexed resolutionModule, uint256 indexed version, bytes32 configRoot);
 
     function setUp() public {
-        YieldOps yieldOps = new YieldOps(address(this));
         EscrowCreationPolicy creationPolicy = new EscrowCreationPolicy(address(this));
         BondCollector bondCollector = new BondCollector(address(this));
         ModuleSnapshotRegistry registry = new ModuleSnapshotRegistry(address(this));
@@ -61,8 +59,6 @@ contract DirectResolutionConfigSelectionIntegrationTest is Test, KlerosHandoffFi
         drm = new DecentralizedResolutionModule(address(this));
         drm.setAdminFacet(address(new DRMAdminFacet()));
         drm.grantRole(drm.ROLE_TIMELOCK(), address(this));
-        drm.registerEscrowContract(address(vault));
-        drm.registerEscrowContract(address(escrowToken));
         drm.appointSeniorResolver(SENIOR, 'senior', '');
         vm.prank(SENIOR);
         drm.appointResolver(RESOLVER, 'resolver', '');
@@ -74,10 +70,6 @@ contract DirectResolutionConfigSelectionIntegrationTest is Test, KlerosHandoffFi
         PaymentCalculationLibraryV1 paymentLibrary = new PaymentCalculationLibraryV1();
         ResolverIncentiveModuleV2 incentive = new ResolverIncentiveModuleV2(address(this), address(paymentLibrary));
         incentive.grantRole(incentive.ROLE_TIMELOCK(), address(this));
-        incentive.registerEscrowContract(address(vault));
-        incentive.registerEscrowContract(address(escrowToken));
-        incentive.registerEscrowContract(address(bondCollector));
-        incentive.registerEscrowContract(address(drm));
         drm.setIncentiveModule(address(incentive));
 
         vault.setResolutionModule(address(drm));
@@ -95,9 +87,6 @@ contract DirectResolutionConfigSelectionIntegrationTest is Test, KlerosHandoffFi
         EscrowCreationPolicy creationPolicy,
         BondCollector bondCollector
     ) internal {
-        registry.registerEscrowContract(escrow);
-        yieldOps.registerEscrowContract(escrow);
-        bondCollector.registerEscrowContract(escrow);
     }
 
     function _publishPolicyB() internal returns (uint256 version) {

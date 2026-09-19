@@ -6,7 +6,6 @@ import "forge-std/console.sol";
 
 import { EscrowVault } from "../../../contracts/core/EscrowVault.sol";
 import { ModuleSnapshotRegistry } from "../../../contracts/core/ModuleSnapshotRegistry.sol";
-import { YieldOps } from "../../../contracts/ops/YieldOps.sol";
 import { EscrowCreationPolicy } from "../../../contracts/core/EscrowCreationPolicy.sol";
 import { BondCollector } from "../../../contracts/core/BondCollector.sol";
 import { DefaultResolutionModule } from "../../../contracts/modules/DefaultResolutionModule.sol";
@@ -78,9 +77,8 @@ contract EscrowVaultReleaseStrategyHarness is EscrowVault {
     constructor(
         uint256 escrowFeeBps,
         address feeAddress,
-        address yieldOpsAddress,
         address moduleManagementAddress
-    ) EscrowVault(escrowFeeBps, feeAddress, yieldOpsAddress, moduleManagementAddress) {}
+    ) EscrowVault(escrowFeeBps, feeAddress, moduleManagementAddress) {}
 
     function snapReleaseStrategy(uint256 workflowId) external view returns (address) {
         return moduleSnapshots[workflowId].releaseStrategy;
@@ -95,7 +93,6 @@ contract EscrowVaultReleaseStrategyHarness is EscrowVault {
 contract ReleaseStrategyWiringTest is Test {
     ModuleSnapshotRegistry internal mm;
     EscrowVaultReleaseStrategyHarness internal vault;
-    YieldOps internal yieldOps;
     EscrowCreationPolicy internal creationPolicy;
     BondCollector internal bondCollector;
     DefaultResolutionModule internal resolutionModule;
@@ -105,13 +102,11 @@ contract ReleaseStrategyWiringTest is Test {
     address internal seller = address(0xA11CE);
 
     function setUp() public {
-        yieldOps = new YieldOps(address(this));
         mm = new ModuleSnapshotRegistry(address(this));
 
-        vault = new EscrowVaultReleaseStrategyHarness(0, FEE, address(yieldOps), address(mm));
+        vault = new EscrowVaultReleaseStrategyHarness(0, FEE,  address(mm));
 
         // Register escrow contract so it can queue/activate modules (msg.sender must be the escrow itself).
-        mm.registerEscrowContract(address(vault));
 
         // Wire required ops for createEscrow
         creationPolicy = new EscrowCreationPolicy(address(this));
@@ -119,7 +114,6 @@ contract ReleaseStrategyWiringTest is Test {
 
 
         bondCollector = new BondCollector(address(this));
-        bondCollector.registerEscrowContract(address(vault));
 
         // EscrowVault setters are timelock-gated; deployer has ROLE_TIMELOCK in constructor.
         vault.setCreationPolicy(address(creationPolicy));
@@ -149,6 +143,7 @@ contract ReleaseStrategyWiringTest is Test {
 
     function _setDefaultReleaseStrategy(address newStrategy) internal {
         vm.prank(address(this));
+        mm.registerEscrowContract(address(vault));
         mm.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, newStrategy);
         vm.warp(block.timestamp + 7 days + 1);
         vm.prank(address(this));

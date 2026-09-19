@@ -12,7 +12,6 @@ import '../../../contracts/modules/DefaultReleaseStrategy.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/types/YieldPresets.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
-import '../../../contracts/ops/YieldOps.sol';
 import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../TestConfig.sol';
@@ -33,7 +32,6 @@ contract PauseLocking is Test {
     ModuleSnapshotRegistry public snapshotRegistry;
     
     // Ops contracts
-    YieldOps public yieldOps;
     EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
     
@@ -68,7 +66,6 @@ contract PauseLocking is Test {
         token = new ERC20Mock("Test Token", "TEST", owner, 10000 ether);
         
         // Deploy ops contracts with owner
-        yieldOps = new YieldOps(owner);
         creationPolicy = new EscrowCreationPolicy(owner);
         
         // Deploy bond collector
@@ -81,7 +78,7 @@ contract PauseLocking is Test {
         releaseStrategy = new DefaultReleaseStrategy();
         
         // Deploy escrow vault (fee, feeAddress, yieldOps, moduleManagement)
-        escrow = new EscrowVault(ESCROW_FEE,owner,address(yieldOps),address(snapshotRegistry));
+        escrow = new EscrowVault(ESCROW_FEE,owner,address(snapshotRegistry));
         
         // Grant necessary roles
         vm.startPrank(owner);
@@ -90,13 +87,10 @@ contract PauseLocking is Test {
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), owner);
         
         // Grant ROLE_TIMELOCK to owner in all ops so we can register escrow contract
-        yieldOps.grantRole(yieldOps.ROLE_TIMELOCK(), owner);
         creationPolicy.grantRole(creationPolicy.ROLE_TIMELOCK(), owner);
         snapshotRegistry.grantRole(snapshotRegistry.ROLE_TIMELOCK(), owner);
         
         // Register escrow contract with all ops
-        yieldOps.registerEscrowContract(address(escrow));
-        snapshotRegistry.registerEscrowContract(address(escrow));
         
         // Queue and activate release strategy (with 7-day slowlane)
         snapshotRegistry.queueModule(address(escrow), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));

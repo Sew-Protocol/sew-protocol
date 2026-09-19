@@ -7,15 +7,13 @@ describe('CREATE2EscrowFactory', function () {
   let factory: CREATE2EscrowFactory;
   let deployer: HardhatEthersSigner;
   let feeAddress: HardhatEthersSigner;
-  let yieldOpsAddress: HardhatEthersSigner;
-  let disputeOpsAddress: HardhatEthersSigner;
   let moduleManagement: ModuleManagementContract;
 
   const ESCROW_FEE_BPS = 500; // 5%
   const TEST_SALT = ethers.id('multi-L2-test-v1');
 
   before(async function () {
-    [deployer, feeAddress, yieldOpsAddress, disputeOpsAddress] = await ethers.getSigners();
+    [deployer, feeAddress] = await ethers.getSigners();
 
     // Deploy factory
     const factoryFactory = await ethers.getContractFactory('CREATE2EscrowFactory');
@@ -31,8 +29,6 @@ describe('CREATE2EscrowFactory', function () {
       const params = {
         escrowFeeBps: ESCROW_FEE_BPS,
         feeAddress: feeAddress.address,
-        yieldOpsAddress: yieldOpsAddress.address,
-        disputeOpsAddress: disputeOpsAddress.address,
         moduleManagementAddress: moduleManagement.address,
         salt: TEST_SALT,
       };
@@ -40,8 +36,6 @@ describe('CREATE2EscrowFactory', function () {
       const addr1 = await factory.getDeploymentAddress(
         params.escrowFeeBps,
         params.feeAddress,
-        params.yieldOpsAddress,
-        params.disputeOpsAddress,
         params.moduleManagementAddress,
         params.salt,
       );
@@ -49,8 +43,6 @@ describe('CREATE2EscrowFactory', function () {
       const addr2 = await factory.getDeploymentAddress(
         params.escrowFeeBps,
         params.feeAddress,
-        params.yieldOpsAddress,
-        params.disputeOpsAddress,
         params.moduleManagementAddress,
         params.salt,
       );
@@ -64,8 +56,6 @@ describe('CREATE2EscrowFactory', function () {
       const addr1 = await factory.getDeploymentAddress(
         ESCROW_FEE_BPS,
         feeAddress.address,
-        yieldOpsAddress.address,
-        disputeOpsAddress.address,
         moduleManagement.address,
         salt,
       );
@@ -74,8 +64,6 @@ describe('CREATE2EscrowFactory', function () {
       const addr2 = await factory.getDeploymentAddress(
         1000, // different fee
         feeAddress.address,
-        yieldOpsAddress.address,
-        disputeOpsAddress.address,
         moduleManagement.address,
         salt,
       );
@@ -87,8 +75,6 @@ describe('CREATE2EscrowFactory', function () {
       const addr1 = await factory.getDeploymentAddress(
         ESCROW_FEE_BPS,
         feeAddress.address,
-        yieldOpsAddress.address,
-        disputeOpsAddress.address,
         moduleManagement.address,
         ethers.id('salt-v1'),
       );
@@ -96,8 +82,6 @@ describe('CREATE2EscrowFactory', function () {
       const addr2 = await factory.getDeploymentAddress(
         ESCROW_FEE_BPS,
         feeAddress.address,
-        yieldOpsAddress.address,
-        disputeOpsAddress.address,
         moduleManagement.address,
         ethers.id('salt-v2'),
       );
@@ -112,8 +96,6 @@ describe('CREATE2EscrowFactory', function () {
       const params = {
         escrowFeeBps: ESCROW_FEE_BPS,
         feeAddress: feeAddress.address,
-        yieldOpsAddress: yieldOpsAddress.address,
-        disputeOpsAddress: disputeOpsAddress.address,
         moduleManagementAddress: moduleManagement.address,
       };
 
@@ -121,8 +103,6 @@ describe('CREATE2EscrowFactory', function () {
       const predictedAddr = await factory.getDeploymentAddress(
         params.escrowFeeBps,
         params.feeAddress,
-        params.yieldOpsAddress,
-        params.disputeOpsAddress,
         params.moduleManagementAddress,
         salt,
       );
@@ -133,8 +113,6 @@ describe('CREATE2EscrowFactory', function () {
       const tx = await factory.deployEscrow(
         params.escrowFeeBps,
         params.feeAddress,
-        params.yieldOpsAddress,
-        params.disputeOpsAddress,
         params.moduleManagementAddress,
         salt,
       );
@@ -163,8 +141,6 @@ describe('CREATE2EscrowFactory', function () {
       const params = {
         escrowFeeBps: ESCROW_FEE_BPS,
         feeAddress: feeAddress.address,
-        yieldOpsAddress: yieldOpsAddress.address,
-        disputeOpsAddress: disputeOpsAddress.address,
         moduleManagementAddress: moduleManagement.address,
       };
 
@@ -172,8 +148,6 @@ describe('CREATE2EscrowFactory', function () {
       await factory.deployEscrow(
         params.escrowFeeBps,
         params.feeAddress,
-        params.yieldOpsAddress,
-        params.disputeOpsAddress,
         params.moduleManagementAddress,
         salt,
       );
@@ -183,8 +157,6 @@ describe('CREATE2EscrowFactory', function () {
         factory.deployEscrow(
           params.escrowFeeBps,
           params.feeAddress,
-          params.yieldOpsAddress,
-          params.disputeOpsAddress,
           params.moduleManagementAddress,
           salt,
         ),
@@ -196,8 +168,6 @@ describe('CREATE2EscrowFactory', function () {
       const params = {
         escrowFeeBps: ESCROW_FEE_BPS,
         feeAddress: feeAddress.address,
-        yieldOpsAddress: yieldOpsAddress.address,
-        disputeOpsAddress: disputeOpsAddress.address,
         moduleManagementAddress: moduleManagement.address,
       };
 
@@ -205,8 +175,6 @@ describe('CREATE2EscrowFactory', function () {
       let isDeployed = await factory.isDeployed(
         params.escrowFeeBps,
         params.feeAddress,
-        params.yieldOpsAddress,
-        params.disputeOpsAddress,
         params.moduleManagementAddress,
         salt,
       );
@@ -216,8 +184,6 @@ describe('CREATE2EscrowFactory', function () {
       await factory.deployEscrow(
         params.escrowFeeBps,
         params.feeAddress,
-        params.yieldOpsAddress,
-        params.disputeOpsAddress,
         params.moduleManagementAddress,
         salt,
       );
@@ -226,8 +192,6 @@ describe('CREATE2EscrowFactory', function () {
       isDeployed = await factory.isDeployed(
         params.escrowFeeBps,
         params.feeAddress,
-        params.yieldOpsAddress,
-        params.disputeOpsAddress,
         params.moduleManagementAddress,
         salt,
       );
@@ -240,8 +204,6 @@ describe('CREATE2EscrowFactory', function () {
       const baseParams = {
         escrowFeeBps: ESCROW_FEE_BPS,
         feeAddress: feeAddress.address,
-        yieldOpsAddress: yieldOpsAddress.address,
-        disputeOpsAddress: disputeOpsAddress.address,
         moduleManagementAddress: moduleManagement.address,
       };
 
@@ -249,8 +211,6 @@ describe('CREATE2EscrowFactory', function () {
       const addrV1 = await factory.getDeploymentAddress(
         baseParams.escrowFeeBps,
         baseParams.feeAddress,
-        baseParams.yieldOpsAddress,
-        baseParams.disputeOpsAddress,
         baseParams.moduleManagementAddress,
         ethers.id('v1'),
       );
@@ -259,8 +219,6 @@ describe('CREATE2EscrowFactory', function () {
       const addrV2 = await factory.getDeploymentAddress(
         baseParams.escrowFeeBps,
         baseParams.feeAddress,
-        baseParams.yieldOpsAddress,
-        baseParams.disputeOpsAddress,
         baseParams.moduleManagementAddress,
         ethers.id('v2'),
       );
@@ -276,8 +234,6 @@ describe('CREATE2EscrowFactory', function () {
       const params = {
         escrowFeeBps: ESCROW_FEE_BPS,
         feeAddress: feeAddress.address,
-        yieldOpsAddress: yieldOpsAddress.address,
-        disputeOpsAddress: disputeOpsAddress.address,
         moduleManagementAddress: moduleManagement.address,
         salt: ethers.id('multi-l2-escrow'),
       };
@@ -285,8 +241,6 @@ describe('CREATE2EscrowFactory', function () {
       const mainnetAddr = await factory.getDeploymentAddress(
         params.escrowFeeBps,
         params.feeAddress,
-        params.yieldOpsAddress,
-        params.disputeOpsAddress,
         params.moduleManagementAddress,
         params.salt,
       );

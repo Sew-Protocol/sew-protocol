@@ -37,7 +37,7 @@ error ArrayLengthMismatch(uint256 expectedLength, uint256 actualLength);
 error ZeroCreationPolicy();
 error InvalidResolutionModule(address module);
 error ModuleNotContract(address module);
-error NotAContract(uint8 which, address addr); // which: 1=resolutionModule, 2=yieldOps, etc.
+error NotAContract(uint8 which, address addr); // which: 1=resolutionModule, 2=moduleManagement, etc.
 error AmountZero();
 error FeeOverflow();
 error NoTokensToRecover();

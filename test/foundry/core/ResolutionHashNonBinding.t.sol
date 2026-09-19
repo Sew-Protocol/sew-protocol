@@ -5,7 +5,6 @@ import 'forge-std/Test.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
-import '../../../contracts/ops/YieldOps.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/types/YieldPresets.sol';
@@ -18,7 +17,6 @@ contract DummyResolver {}
 contract ResolutionHashNonBindingTest is Test {
     EscrowVault internal vault;
     EscrowCreationPolicy internal policy;
-    YieldOps internal yieldOps;
     ModuleSnapshotRegistry internal mm;
     ERC20Mock internal token;
     DummyResolver internal resolver;
@@ -29,7 +27,6 @@ contract ResolutionHashNonBindingTest is Test {
     uint256 internal constant AMOUNT = 100 ether;
 
     function setUp() public {
-        yieldOps = new YieldOps(address(this));
         mm = new ModuleSnapshotRegistry(address(this));
         policy = new EscrowCreationPolicy(address(this));
         resolver = new DummyResolver();
@@ -42,9 +39,7 @@ contract ResolutionHashNonBindingTest is Test {
     }
 
     function _newVault(uint256 appealWindow) internal returns (EscrowVault v) {
-        v = new EscrowVault(0, FEE, address(yieldOps), address(mm));
-        yieldOps.registerEscrowContract(address(v));
-        mm.registerEscrowContract(address(v));
+        v = new EscrowVault(0, FEE,  address(mm));
         v.grantRole(v.ROLE_ADMIN_CONTRACT(), address(this));
         v.setCreationPolicy(address(policy));
         v.setTimeoutConfig(TimeoutConfig(0, 0, 90 days, appealWindow));

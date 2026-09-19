@@ -5,7 +5,6 @@ import "forge-std/Test.sol";
 import "../../../contracts/core/EscrowVault.sol";
 import "../../../contracts/modules/DefaultResolutionModule.sol";
 import "../../../contracts/types/EscrowTypes.sol";
-import "../../../contracts/ops/YieldOps.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
@@ -38,7 +37,6 @@ contract YieldDepositFailureBugTest is Test {
     EscrowVault public escrow;
     ERC20Mock public token;
     DefaultResolutionModule public resolutionModule;
-    YieldOps public yieldOps;
     EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
@@ -53,18 +51,14 @@ contract YieldDepositFailureBugTest is Test {
     function setUp() public {
         owner = address(this);
         token = new ERC20Mock("Token", "TKN", owner, 0);
-        yieldOps = new YieldOps(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
         creationPolicy = new EscrowCreationPolicy(owner);
         bondCollector = new BondCollector(owner);
         resolutionModule = new DefaultResolutionModule(owner, resolver);
         silentModule = new SilentFailureModule();
 
-        escrow = new EscrowVault(0,feeAddress,address(yieldOps),address(moduleManagement));
+        escrow = new EscrowVault(0,feeAddress,address(moduleManagement));
         
-        yieldOps.registerEscrowContract(address(escrow));
-        moduleManagement.registerEscrowContract(address(escrow));
-        bondCollector.registerEscrowContract(address(escrow));
 
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), owner);
         escrow.setCreationPolicy(address(creationPolicy));
@@ -72,6 +66,7 @@ contract YieldDepositFailureBugTest is Test {
         escrow.setResolutionModule(address(resolutionModule));
 
         // Configure silent module as default yield gen module
+        moduleManagement.registerEscrowContract(address(escrow));
         moduleManagement.queueModule(address(escrow), BaseEscrow.ModuleType.YIELD_GEN, address(silentModule));
         vm.warp(block.timestamp + 8 days);
         moduleManagement.activateModule(address(escrow), BaseEscrow.ModuleType.YIELD_GEN);

@@ -8,7 +8,6 @@ import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/modules/DefaultResolutionModule.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/governance/SlowLaneQueueActivate.sol';
-import '../../../contracts/ops/YieldOps.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 
 /**
@@ -30,7 +29,6 @@ contract EscrowGovernanceTimelockTest is Test {
     DefaultResolutionModule public resolutionModule1;
     DefaultResolutionModule public resolutionModule2;
     
-    YieldOps public yieldOps;
     ModuleSnapshotRegistry public moduleManagement;
     
     address public owner;
@@ -48,10 +46,9 @@ contract EscrowGovernanceTimelockTest is Test {
         feeAddress2 = address(0xFEE2);
         unauthorized = address(0x9999);
         
-        yieldOps = new YieldOps(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
         
-        vault = new EscrowVault(ESCROW_FEE,feeAddress1,address(yieldOps),address(moduleManagement));
+        vault = new EscrowVault(ESCROW_FEE,feeAddress1,address(moduleManagement));
         
         resolutionModule1 = new DefaultResolutionModule(owner, address(0x2222));
         resolutionModule2 = new DefaultResolutionModule(owner, address(0x3333));
@@ -80,7 +77,7 @@ contract EscrowGovernanceTimelockTest is Test {
     function test_registerEscrowContract_success() public {
         address newEscrow = address(0x3333);
         vm.prank(timelock);
-        adminContract.registerEscrowContract(newEscrow);
+        adminContract.registerEscrowContract(address(newEscrow));
         assertTrue(adminContract.hasRole(adminContract.ROLE_ESCROW_CONTRACT(), newEscrow));
     }
     
@@ -93,7 +90,7 @@ contract EscrowGovernanceTimelockTest is Test {
     function test_registerEscrowContract_unauthorized_reverts() public {
         vm.prank(unauthorized);
         vm.expectRevert();
-        adminContract.registerEscrowContract(address(0x3333));
+        adminContract.registerEscrowContract(address(vault));
     }
     
     // ============ Fee Recipient Management Tests ============
@@ -517,11 +514,10 @@ contract EscrowGovernanceTimelockTest is Test {
     // ============ Multiple Escrow Contracts Tests ============
     
     function test_multipleEscrowContracts() public {
-        EscrowVault vault2 = new EscrowVault(ESCROW_FEE,feeAddress1,address(yieldOps),address(moduleManagement));
+        EscrowVault vault2 = new EscrowVault(ESCROW_FEE,feeAddress1,address(moduleManagement));
         vault2.grantRole(vault2.ROLE_ADMIN_CONTRACT(), address(adminContract));
         
         vm.prank(timelock);
-        adminContract.registerEscrowContract(address(vault2));
         
         // Queue different values for each vault
         vm.prank(timelock);

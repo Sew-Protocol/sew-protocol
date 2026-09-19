@@ -5,7 +5,6 @@ import 'forge-std/Test.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
-import '../../../contracts/ops/YieldOps.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/types/YieldPresets.sol';
@@ -21,7 +20,6 @@ contract NoopResolver {}
 contract DisputeTimeoutRefundTest is Test {
     EscrowVault internal vault;
     EscrowCreationPolicy internal policy;
-    YieldOps internal yieldOps;
     ModuleSnapshotRegistry internal mm;
     ERC20Mock internal token;
     NoopResolver internal resolver;
@@ -33,15 +31,12 @@ contract DisputeTimeoutRefundTest is Test {
     uint256 internal constant MAX_DISPUTE_DURATION = 90 days;
 
     function setUp() public {
-        yieldOps = new YieldOps(address(this));
         mm = new ModuleSnapshotRegistry(address(this));
         policy = new EscrowCreationPolicy(address(this));
         resolver = new NoopResolver();
         token = new ERC20Mock('Token', 'TKN', BUYER, 1_000_000 ether);
 
-        vault = new EscrowVault(0, FEE, address(yieldOps), address(mm));
-        yieldOps.registerEscrowContract(address(vault));
-        mm.registerEscrowContract(address(vault));
+        vault = new EscrowVault(0, FEE,  address(mm));
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.setCreationPolicy(address(policy));
         vault.setTimeoutConfig(TimeoutConfig(0, 0, MAX_DISPUTE_DURATION, 2 days));

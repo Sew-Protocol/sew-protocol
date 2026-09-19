@@ -7,7 +7,6 @@ import 'contracts/core/BaseEscrow.sol';
 import 'contracts/modules/AaveYieldModule.sol';
 import 'contracts/mocks/MockAavePool.sol';
 import 'contracts/mocks/ERC20Mock.sol';
-import 'contracts/ops/YieldOps.sol';
 import 'contracts/ops/GuardianOps.sol';
 import 'contracts/governance/EmergencyRecoveryProposal.sol';
 import 'contracts/core/ModuleSnapshotRegistry.sol';
@@ -35,7 +34,6 @@ contract EmergencyRecoveryFlowTest is Test {
     MockAavePool internal pool;
     MockAToken internal aToken;
     ERC20Mock internal token;
-    YieldOps internal yieldOps;
     ModuleSnapshotRegistry internal registry;
     EscrowCreationPolicy internal policy;
     GuardianOps internal guardianOps;
@@ -59,16 +57,15 @@ contract EmergencyRecoveryFlowTest is Test {
         aaveModule = new AaveYieldModule(address(pool));
         _configureToken(aaveModule, address(token), address(aToken));
 
-        yieldOps = new YieldOps(address(this));
         registry = new ModuleSnapshotRegistry(address(this));
         policy = new EscrowCreationPolicy(address(this));
 
-        vault = new EscrowVault(0, FEE, address(yieldOps), address(registry));
+        vault = new EscrowVault(0, FEE, address(registry));
         _approveEscrow(aaveModule, address(vault));
-        yieldOps.registerEscrowContract(address(vault));
-        registry.registerEscrowContract(address(vault));
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.setCreationPolicy(address(policy));
+
+        registry.registerEscrowContract(address(vault));
 
         bytes32 roleGuardian = vault.ROLE_GUARDIAN();
         vault.grantRole(roleGuardian, GUARDIAN);
@@ -193,8 +190,7 @@ contract EmergencyRecoveryFlowTest is Test {
         GuardianOps bare = new GuardianOps(address(vault));
         // New unregistered registry has no module for the vault.
         ModuleSnapshotRegistry bareRegistry = new ModuleSnapshotRegistry(address(this));
-        EscrowVault bareVault = new EscrowVault(0, FEE, address(yieldOps), address(bareRegistry));
-        bareRegistry.registerEscrowContract(address(bareVault));
+        EscrowVault bareVault = new EscrowVault(0, FEE, address(bareRegistry));
         GuardianOps ops = new GuardianOps(address(bareVault));
         bareVault.grantRole(bareVault.ROLE_GUARDIAN(), GUARDIAN);
 

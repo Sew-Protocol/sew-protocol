@@ -4,7 +4,6 @@ pragma solidity ^0.8.37;
 import 'forge-std/Test.sol';
 import 'contracts/core/EscrowVault.sol';
 import 'contracts/core/BaseEscrow.sol';
-import 'contracts/ops/YieldOps.sol';
 import 'contracts/core/EscrowCreationPolicy.sol';
 import 'contracts/core/ModuleSnapshotRegistry.sol';
 import 'contracts/types/EscrowTypes.sol';
@@ -24,7 +23,6 @@ contract Phase1RefactorRiskTests is Test {
     EscrowVault public vault;
     ERC20Mock public token;
     EscrowCreationPolicy public creationPolicy;
-    YieldOps public yieldOps;
     ModuleSnapshotRegistry public moduleManagement;
     
     DefaultResolutionModule public resolutionModule;
@@ -50,11 +48,10 @@ contract Phase1RefactorRiskTests is Test {
         
         // Deploy ops contracts
         creationPolicy = new EscrowCreationPolicy(address(this));
-        yieldOps = new YieldOps(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         
         // Deploy vault
-        vault = new EscrowVault(ESCROW_FEE_BPS,feeRecipient,address(yieldOps),address(moduleManagement));
+        vault = new EscrowVault(ESCROW_FEE_BPS,feeRecipient,address(moduleManagement));
         
         // Grant roles for vault setup
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
@@ -64,13 +61,11 @@ contract Phase1RefactorRiskTests is Test {
         creationPolicy.grantRole(creationPolicy.ROLE_TIMELOCK(), address(this));
         
         // Register vault with other ops
-        yieldOps.registerEscrowContract(address(vault));
         
         // Set EscrowCreationPolicy
         vault.setCreationPolicy(address(creationPolicy));
         
         // Register modules
-        moduleManagement.registerEscrowContract(address(vault));
         // Grant ROLE_ESCROW_CONTRACT to vault so it can call moduleManagement
         moduleManagement.grantRole(moduleManagement.ROLE_ESCROW_CONTRACT(), address(vault));
         

@@ -7,7 +7,6 @@ import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/modules/DefaultResolutionModule.sol';
 import '../../../contracts/core/BondCollector.sol';
-import '../../../contracts/ops/YieldOps.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/interfaces/IYieldModule.sol';
 import '../../../contracts/types/EscrowTypes.sol';
@@ -56,7 +55,6 @@ contract AcceptingYieldModule is IYieldModule {
 contract EscrowCreationPolicyTest is Test {
     EscrowCreationPolicy internal policy;
     AcceptingYieldModule internal yieldModule;
-    YieldOps internal yieldOps;
     ModuleSnapshotRegistry internal mm;
     BondCollector internal bondCollector;
     DefaultResolutionModule internal resolutionModule;
@@ -72,7 +70,6 @@ contract EscrowCreationPolicyTest is Test {
     function setUp() public {
         policy = new EscrowCreationPolicy(address(this));
         yieldModule = new AcceptingYieldModule();
-        yieldOps = new YieldOps(address(this));
         mm = new ModuleSnapshotRegistry(address(this));
         bondCollector = new BondCollector(address(this));
         resolutionModule = new DefaultResolutionModule(address(this), address(0x1234));
@@ -89,16 +86,14 @@ contract EscrowCreationPolicyTest is Test {
     }
 
     function _deployEscrow() internal returns (EscrowVault escrow) {
-        escrow = new EscrowVault(0, FEE, address(yieldOps), address(mm));
-        yieldOps.registerEscrowContract(address(escrow));
-        mm.registerEscrowContract(address(escrow));
-        bondCollector.registerEscrowContract(address(escrow));
+        escrow = new EscrowVault(0, FEE,  address(mm));
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(this));
         escrow.setCreationPolicy(address(policy));
         escrow.setBondCollector(address(bondCollector));
         escrow.setResolutionModule(address(resolutionModule));
 
         // Per-escrow YIELD_GEN override
+        mm.registerEscrowContract(address(escrow));
         mm.queueModule(address(escrow), BaseEscrow.ModuleType.YIELD_GEN, address(yieldModule));
         vm.warp(block.timestamp + 8 days);
         mm.activateModule(address(escrow), BaseEscrow.ModuleType.YIELD_GEN);

@@ -6,7 +6,6 @@ import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/types/YieldPresets.sol';
-import '../../../contracts/ops/YieldOps.sol';
 import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
@@ -28,7 +27,6 @@ contract PartialReleaseTest is Test {
     EscrowVault vault;
     ModuleSnapshotRegistry moduleManagement;
     DefaultReleaseStrategy releaseStrategy;
-    YieldOps yieldOps;
     EscrowCreationPolicy creationPolicy;
     BondCollector bondCollector;
     DefaultResolutionModule resolutionModule;
@@ -36,22 +34,19 @@ contract PartialReleaseTest is Test {
     function setUp() public {
         token = new ERC20Mock('Token', 'TKN', address(this), 1_000_000e18);
 
-        yieldOps = new YieldOps(address(this));
         creationPolicy = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
         resolutionModule = new DefaultResolutionModule(address(this), address(0x1234));
         releaseStrategy = new DefaultReleaseStrategy();
         moduleManagement = new ModuleSnapshotRegistry(address(this));
 
-        vault = new EscrowVault(FEE_BPS,feeAddress,address(yieldOps),address(moduleManagement));
+        vault = new EscrowVault(FEE_BPS,feeAddress,address(moduleManagement));
 
         moduleManagement.registerEscrowContract(address(vault));
         moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
         vm.warp(block.timestamp + 8 days);
         moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
 
-        yieldOps.registerEscrowContract(address(vault));
-        bondCollector.registerEscrowContract(address(vault));
 
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.setCreationPolicy(address(creationPolicy));

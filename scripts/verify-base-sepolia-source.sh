@@ -42,7 +42,6 @@ declare -A CONTRACTS=(
   [TimelockController]="0xD62A6C62233357B6681F9410218FE53BA931fDD1"
   [DefaultReleaseStrategy]="0x7F8A089339bD1b58e7ccB53f8F4eD2f0AD0DF47b"
   [ModuleSnapshotRegistry]="0x353f5F9e0997585779a48CcBD1e6F7d525f14376"
-  [YieldOps]="0x6f39a05f88D8d7416AC5ebdE03e0579B6B2EE76B"
   [EscrowCreationPolicy]="0x4dba1d914D45f80dda5Ddab123EA766196034738"
   [BondCollector]="0xad4FB744919dd147478d3D8d1C547f7b8F112e35"
   [L2AddressRegistry]="0xAf1af27D2d0467fd3bAd71416bB0e20B9291F796"
@@ -82,8 +81,6 @@ if [ -n "$1" ]; then
       "$ADDRESS" \
       "0" \
       "0x5F13B5089a0B23c74AD9A22a2db59F5F48ab09bC" \
-      "0x6f39a05f88D8d7416AC5ebdE03e0579B6B2EE76B" \
-      "0x5915E46643452f0f009AF64D44Dc376350977aDf" \
       "0x353f5F9e0997585779a48CcBD1e6F7d525f14376"
   else
     echo "Running verification (checking for constructor args in deployment artifact)..."

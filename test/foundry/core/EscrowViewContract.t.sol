@@ -13,7 +13,6 @@ import '../../../contracts/modules/DefaultReleaseStrategy.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/types/YieldPresets.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
-import '../../../contracts/ops/YieldOps.sol';
 import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/BondCollector.sol';
 
@@ -35,7 +34,6 @@ contract EscrowViewContractTest is Test {
     ERC20Mock public token;
     DefaultResolutionModule public resolutionModule;
     DefaultReleaseStrategy public releaseStrategy;
-    YieldOps public yieldOps;
     EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
 
@@ -63,12 +61,11 @@ contract EscrowViewContractTest is Test {
         releaseStrategy = new DefaultReleaseStrategy();
 
         token = new ERC20Mock('Test Token', 'TEST', owner, 10000000e18);
-        yieldOps = new YieldOps(owner);
         creationPolicy = new EscrowCreationPolicy(owner);
         bondCollector = new BondCollector(owner);
         adminContract = new EscrowGovernanceTimelock(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
-        vault = new EscrowVault(ESCROW_FEE,feeAddress,address(yieldOps),address(moduleManagement));
+        vault = new EscrowVault(ESCROW_FEE,feeAddress,address(moduleManagement));
 
         // Allow the dedicated timelock address to operate the admin contract in tests
         adminContract.grantRole(adminContract.ROLE_TIMELOCK(), timelock);
@@ -80,17 +77,15 @@ contract EscrowViewContractTest is Test {
         vault.grantRole(ROLE_GUARDIAN, guardian);
 
         // Wire ops contracts on the vault
-        yieldOps.registerEscrowContract(address(vault));
-        bondCollector.registerEscrowContract(address(vault));
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), owner);
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(adminContract));
         vault.setCreationPolicy(address(creationPolicy));
         vault.setBondCollector(address(bondCollector));
 
-        moduleManagement.registerEscrowContract(address(vault));
 
         adminContract.queueResolutionModule(address(vault), address(resolutionModule));
         vm.prank(address(this));
+        moduleManagement.registerEscrowContract(address(vault));
         moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
         vm.warp(block.timestamp + 14 days + 1);
         adminContract.activateResolutionModule(address(vault));

@@ -6,7 +6,6 @@ import "../../../contracts/core/EscrowableERC20.sol";
 import "../../../contracts/modules/DefaultReleaseStrategy.sol";
 import "../../../contracts/modules/DefaultResolutionModule.sol";
 import "../../../contracts/types/EscrowTypes.sol";
-import "../../../contracts/ops/YieldOps.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/admin/EscrowGovernanceTimelock.sol";
@@ -42,7 +41,6 @@ contract EscrowableERC20BugsTest is Test {
     DefaultReleaseStrategy public releaseStrategy;
     ERC20Mock public otherToken;
     DefaultResolutionModule public resolutionModule;
-    YieldOps public yieldOps;
     EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
@@ -57,7 +55,6 @@ contract EscrowableERC20BugsTest is Test {
 
     function setUp() public {
         owner = address(this);
-        yieldOps = new YieldOps(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
         creationPolicy = new EscrowCreationPolicy(owner);
         bondCollector = new BondCollector(owner);
@@ -66,14 +63,10 @@ contract EscrowableERC20BugsTest is Test {
         releaseStrategy = new DefaultReleaseStrategy();
         silentModule = new SilentFailureModule();
 
-        escrowToken = new EscrowableERC20("EscrowToken","ESC",0,feeAddress,address(yieldOps),address(moduleManagement));
+        escrowToken = new EscrowableERC20("EscrowToken","ESC",0,feeAddress,address(moduleManagement));
         
         otherToken = new ERC20Mock("Other", "OTH", owner, 1000 ether);
 
-        yieldOps.registerEscrowContract(address(escrowToken));
-        moduleManagement.registerEscrowContract(address(escrowToken));
-        bondCollector.registerEscrowContract(address(escrowToken));
-        adminContract.registerEscrowContract(address(escrowToken));
 
         escrowToken.grantRole(escrowToken.ROLE_TIMELOCK(), owner);
         escrowToken.setCreationPolicy(address(creationPolicy));
@@ -81,6 +74,7 @@ contract EscrowableERC20BugsTest is Test {
 
         // Configure silent module via Registry
         vm.startPrank(owner);
+        moduleManagement.registerEscrowContract(address(escrowToken));
         moduleManagement.queueModule(address(escrowToken), BaseEscrow.ModuleType.YIELD_GEN, address(silentModule));
         moduleManagement.queueModule(address(escrowToken), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
         vm.warp(block.timestamp + 8 days);

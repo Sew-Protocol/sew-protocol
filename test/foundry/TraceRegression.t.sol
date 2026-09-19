@@ -7,7 +7,6 @@ import { EscrowVault } from "../../contracts/core/EscrowVault.sol";
 import { EscrowViewContract } from "../../contracts/core/EscrowViewContract.sol";
 import { DefaultResolutionModule } from "../../contracts/modules/DefaultResolutionModule.sol";
 import { EscrowCreationPolicy } from "../../contracts/core/EscrowCreationPolicy.sol";
-import { YieldOps } from "../../contracts/ops/YieldOps.sol";
 import { BondCollector } from "../../contracts/core/BondCollector.sol";
 import { ModuleSnapshotRegistry } from "../../contracts/core/ModuleSnapshotRegistry.sol";
 import { ERC20Mock } from "../../contracts/mocks/ERC20Mock.sol";
@@ -72,7 +71,6 @@ contract TraceRegressionTest is Test {
 
         token = new ERC20Mock("Regression USDC", "RUSDC", owner, 0);
 
-        yieldOps         = new YieldOps(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
         creationPolicy        = new EscrowCreationPolicy(owner);
         bondCollector    = new BondCollector(owner);
@@ -80,9 +78,6 @@ contract TraceRegressionTest is Test {
 
         vault = new EscrowVault(100,FEE_ADDR,address(yieldOps),address(moduleManagement));
 
-        yieldOps.registerEscrowContract(address(vault));
-        moduleManagement.registerEscrowContract(address(vault));
-        bondCollector.registerEscrowContract(address(vault));
 
         vault.setCreationPolicy(address(creationPolicy));
         vault.setBondCollector(address(bondCollector));

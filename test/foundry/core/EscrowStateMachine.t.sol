@@ -9,7 +9,6 @@ import { ERC20Mock } from "../../../contracts/mocks/ERC20Mock.sol";
 import { DefaultResolutionModule } from "../../../contracts/modules/DefaultResolutionModule.sol";
 import { EscrowSettings, EscrowState, SenderStatus, RecipientStatus } from "../../../contracts/types/EscrowTypes.sol";
 import { YieldPreset } from "../../../contracts/types/YieldPresets.sol";
-import { YieldOps } from "../../../contracts/ops/YieldOps.sol";
 import { EscrowCreationPolicy } from "../../../contracts/core/EscrowCreationPolicy.sol";
 import { BondCollector } from "../../../contracts/core/BondCollector.sol";
 import { ModuleSnapshotRegistry } from "../../../contracts/core/ModuleSnapshotRegistry.sol";
@@ -27,7 +26,6 @@ contract EscrowStateMachineTest is Test {
     ERC20Mock internal token;
     DefaultResolutionModule internal rm;
     DefaultReleaseStrategy internal defaultReleaseStrategy;
-    YieldOps internal yieldOps;
     EscrowCreationPolicy internal creationPolicy;
     BondCollector internal bondCollector;
     ModuleSnapshotRegistry internal moduleManagement;
@@ -42,23 +40,20 @@ contract EscrowStateMachineTest is Test {
     uint256 internal constant AMOUNT = 100 ether;
 
     function setUp() public {
-        yieldOps = new YieldOps(address(this));
         creationPolicy = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));
         defaultReleaseStrategy = new DefaultReleaseStrategy();
 
-        vault = new EscrowVault(ESCROW_FEE_BPS,feeAddress,address(yieldOps),address(moduleManagement));
-        moduleManagement.registerEscrowContract(address(vault));
+        vault = new EscrowVault(ESCROW_FEE_BPS,feeAddress,address(moduleManagement));
 
+        moduleManagement.registerEscrowContract(address(vault));
         moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(defaultReleaseStrategy));
         vm.warp(block.timestamp + 8 days);
         moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
 
         // Register escrow contract with all ops contracts
-        yieldOps.registerEscrowContract(address(vault));
-        bondCollector.registerEscrowContract(address(vault));
 
         // Wire required ops contracts on the vault
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));

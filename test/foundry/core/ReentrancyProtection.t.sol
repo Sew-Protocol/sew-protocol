@@ -8,7 +8,6 @@ import '../../../contracts/modules/decentralized-resolution-module/Decentralized
 import '../../../contracts/modules/decentralized-resolution-module/DRMAdminFacet.sol';
 import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibraryV1.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
-import '../../../contracts/ops/YieldOps.sol';
 import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
@@ -31,7 +30,6 @@ contract ReentrancyProtectionTest is Test {
     DecentralizedResolutionModule public resolutionModule;
     PaymentCalculationLibraryV1 public paymentLib;
     ERC20Mock public token;
-    YieldOps public yieldOps;
     EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
@@ -55,17 +53,13 @@ contract ReentrancyProtectionTest is Test {
         user2 = makeAddr('user2');
 
         // Deploy infrastructure
-        yieldOps = new YieldOps(address(this));
         creationPolicy = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));
-        escrow = new EscrowVault(100,makeAddr('feeAddress'),address(yieldOps),address(moduleManagement));
-        moduleManagement.registerEscrowContract(address(escrow));
+        escrow = new EscrowVault(100,makeAddr('feeAddress'),address(moduleManagement));
 
         // Register escrow contract callers on ops contracts
-        yieldOps.registerEscrowContract(address(escrow));
-        bondCollector.registerEscrowContract(address(escrow));
 
         // Wire ops contracts on escrow
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(this));
@@ -86,8 +80,6 @@ contract ReentrancyProtectionTest is Test {
 
         // Register escrow
         vm.startPrank(timelock);
-        incentiveModule.registerEscrowContract(address(escrow));
-        resolutionModule.registerEscrowContract(address(escrow));
         resolutionModule.setIncentiveModule(address(incentiveModule));
         vm.stopPrank();
 

@@ -9,7 +9,6 @@ import "../../../contracts/mocks/ERC20Mock.sol";
 import "../../../contracts/modules/DefaultResolutionModule.sol";
 import "../../../contracts/types/EscrowTypes.sol";
 import "../../../contracts/types/YieldPresets.sol";
-import "../../../contracts/ops/YieldOps.sol";
 import "../../../contracts/core/EscrowCreationPolicy.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
@@ -19,7 +18,6 @@ contract EscrowDisputeTest is Test {
     EscrowVault public vault;
     ERC20Mock public token;
     DefaultResolutionModule public resolutionModule;
-    YieldOps public yieldOps;
     EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
@@ -39,17 +37,13 @@ contract EscrowDisputeTest is Test {
         guardian = address(0x2);
         
         token = new ERC20Mock("Test", "TEST", owner, 10000e18);
-        yieldOps = new YieldOps(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
         creationPolicy = new EscrowCreationPolicy(owner);
         bondCollector = new BondCollector(owner);
         resolutionModule = new DefaultResolutionModule(owner, resolver);
 
-        vault = new EscrowVault(100,feeAddress,address(yieldOps),address(moduleManagement));
+        vault = new EscrowVault(100,feeAddress,address(moduleManagement));
         
-        yieldOps.registerEscrowContract(address(vault));
-        moduleManagement.registerEscrowContract(address(vault));
-        bondCollector.registerEscrowContract(address(vault));
 
         vault.grantRole(vault.ROLE_TIMELOCK(), timelock);
         vault.grantRole(vault.ROLE_GUARDIAN(), guardian);

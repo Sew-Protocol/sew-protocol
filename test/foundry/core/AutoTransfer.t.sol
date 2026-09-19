@@ -7,7 +7,6 @@ import 'contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/modules/DefaultResolutionModule.sol';
 import 'contracts/modules/DefaultReleaseStrategy.sol';
 import 'contracts/types/EscrowTypes.sol';
-import 'contracts/ops/YieldOps.sol';
 import 'contracts/core/EscrowCreationPolicy.sol';
 import 'contracts/core/BondCollector.sol';
 import 'contracts/core/ModuleSnapshotRegistry.sol';
@@ -23,7 +22,6 @@ contract AutoTransferTest is Test {
     ERC20Mock token;
     DefaultResolutionModule rm;
     DefaultReleaseStrategy defaultReleaseStrategy;
-    YieldOps yieldOps;
     EscrowCreationPolicy creationPolicy;
     BondCollector bondCollector;
     ModuleSnapshotRegistry moduleManagement;
@@ -38,22 +36,19 @@ contract AutoTransferTest is Test {
     uint256 constant AMOUNT = 10 ether;
 
     function setUp() public {
-        yieldOps = new YieldOps(address(this));
         creationPolicy = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));
         defaultReleaseStrategy = new DefaultReleaseStrategy();
-        vault = new EscrowVault(ESCROW_FEE,feeAddress,address(yieldOps),address(moduleManagement));
-        moduleManagement.registerEscrowContract(address(vault));
+        vault = new EscrowVault(ESCROW_FEE,feeAddress,address(moduleManagement));
 
+        moduleManagement.registerEscrowContract(address(vault));
         moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(defaultReleaseStrategy));
 
         vm.warp(block.timestamp + 8 days);
         moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
 
-        yieldOps.registerEscrowContract(address(vault));
-        bondCollector.registerEscrowContract(address(vault));
 
         token = new ERC20Mock('Test', 'TST', address(this), 1e24);
         rm = new DefaultResolutionModule(address(this), resolver);

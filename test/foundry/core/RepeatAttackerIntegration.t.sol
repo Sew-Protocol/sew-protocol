@@ -11,7 +11,6 @@ import "../../../contracts/modules/decentralized-resolution-module/incentive/Res
 import "../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibraryV1.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
 import "../../../contracts/types/EscrowTypes.sol";
-import "../../../contracts/ops/YieldOps.sol";
 import "../../../contracts/core/EscrowCreationPolicy.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
@@ -35,7 +34,6 @@ contract RepeatAttackerIntegrationTest is Test {
     ResolverIncentiveModuleV2 public incentiveModule;
     PaymentCalculationLibraryV1 public paymentLib;
     ERC20Mock public token;
-    YieldOps public yieldOps;
     EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
@@ -68,20 +66,15 @@ contract RepeatAttackerIntegrationTest is Test {
         resolutionModule = new DecentralizedResolutionModule(deployer);
         { DRMAdminFacet f = new DRMAdminFacet(); resolutionModule.setAdminFacet(address(f)); }
 
-        yieldOps = new YieldOps(deployer);
         creationPolicy = new EscrowCreationPolicy(deployer);
         bondCollector = new BondCollector(deployer);
         moduleManagement = new ModuleSnapshotRegistry(deployer);
         adminContract = new EscrowGovernanceTimelock(deployer);
 
-        escrow = new EscrowVault(0,feeAddress,address(yieldOps),address(moduleManagement));
+        escrow = new EscrowVault(0,feeAddress,address(moduleManagement));
 
-        moduleManagement.registerEscrowContract(address(escrow));
-        yieldOps.registerEscrowContract(address(escrow));
-        bondCollector.registerEscrowContract(address(escrow));
 
         // Allow test contract to call ops directly (for forceProgress via escrow)
-        bondCollector.registerEscrowContract(address(this));
 
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(this));
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(adminContract));
@@ -91,13 +84,8 @@ contract RepeatAttackerIntegrationTest is Test {
 
         resolutionModule.grantRole(resolutionModule.ROLE_TIMELOCK(), address(this));
         resolutionModule.grantRole(resolutionModule.ROLE_TIMELOCK(), timelockAddr);
-        resolutionModule.registerEscrowContract(address(escrow));
-        resolutionModule.registerEscrowContract(address(this));
 
         incentiveModule.grantRole(incentiveModule.ROLE_TIMELOCK(), address(this));
-        incentiveModule.registerEscrowContract(address(escrow));
-        incentiveModule.registerEscrowContract(address(this));
-        incentiveModule.registerEscrowContract(address(resolutionModule));
 
         resolutionModule.setIncentiveModule(address(incentiveModule));
 
