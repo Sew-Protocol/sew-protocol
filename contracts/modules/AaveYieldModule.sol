@@ -26,6 +26,12 @@ import './../governance/SlowLaneQueueActivate.sol';
  * - Handling all authorization and fund flow
  *
  * This separation keeps modules simple and distribution policy in core.
+ *
+ * The Aave pool reference is IMMUTABLE (set once at construction, no setter).
+ * If a pool migration ever becomes necessary, the model is:
+ *   deploy replacement module -> approve/configure it -> switch new escrows to it
+ *   -> unwind old positions from the old module. Existing positions are safe
+ *   because each records its own aToken; tokenToAToken only gates NEW deposits.
  */
 contract AaveYieldModule is IYieldModule, ERC165, AccessControl, SlowLaneQueueActivate {
     using SafeERC20 for IERC20;
@@ -49,7 +55,7 @@ contract AaveYieldModule is IYieldModule, ERC165, AccessControl, SlowLaneQueueAc
     string public constant MODULE_NAME = "AaveYieldModule";
     bytes32 public constant ROLE_TIMELOCK = keccak256('ROLE_TIMELOCK');
     bytes32 public constant ROLE_GUARDIAN = keccak256('ROLE_GUARDIAN');
-    string public constant MODULE_VERSION = "2.5.3";
+    string public constant MODULE_VERSION = "2.5.4";
     bytes32 public constant PROTOCOL_ID = keccak256("aave-v3");
 
     // Authorization: approved escrow contracts
@@ -76,6 +82,17 @@ contract AaveYieldModule is IYieldModule, ERC165, AccessControl, SlowLaneQueueAc
     SlowLaneQueueActivate.PendingAddress private _pendingApproveEscrow;
     mapping(address token => SlowLaneQueueActivate.PendingAddress) private _pendingTokenConfig;
 
+    // ---- Per-token exposure cap ----
+    // depositCapByToken[token] is the maximum total Aave exposure allowed for a
+    // token (0 = unlimited). totalDepositedByToken[token] tracks the live sum of
+    // position principalDeposited. New deposits are rejected once totalDeposited
+    // would exceed the cap; unwinds always reduce exposure, so lowering a cap never
+    // strands existing funds.
+    mapping(address token => uint256) public depositCapByToken;
+    mapping(address token => uint256) public totalDepositedByToken;
+    // Slow-lane pending per-token cap RAISE (PendingUint). Lowering is fast (lowerTokenCap).
+    mapping(address token => SlowLaneQueueActivate.PendingUint) private _pendingTokenCap;
+
 
     // ============ Events ============
 
@@ -85,6 +102,8 @@ contract AaveYieldModule is IYieldModule, ERC165, AccessControl, SlowLaneQueueAc
     event MinDepositConfigured(address indexed token, uint256 minDeposit);
     event RecoveryOperatorSet(address indexed operator, bool allowed);
     event TokenDisabled(address token);
+    event TokenCapConfigured(address indexed token, uint256 cap);
+    event TokenCapLowered(address indexed token, uint256 newCap);
 
     // ============ Errors ============
 
@@ -203,6 +222,51 @@ contract AaveYieldModule is IYieldModule, ERC165, AccessControl, SlowLaneQueueAc
     }
 
     /**
+     * @notice [SLOW LANE] Queue a per-token deposit cap (raising a cap is risk-increasing).
+     * @dev Applies only after the 7-day slow-lane delay (see activateConfigureTokenCap).
+     * @param token Underlying token
+     * @param cap New cap in underlying token units; 0 = unlimited
+     */
+    function queueConfigureTokenCap(address token, uint256 cap) external onlyRole(ROLE_TIMELOCK) {
+        require(token != address(0), "InvalidAddress");
+        _queueUint(_pendingTokenCap[token], cap);
+    }
+
+    /**
+     * @notice Activate a queued per-token cap after the slow-lane delay.
+     * @param token Underlying token whose queued cap is applied
+     */
+    function activateConfigureTokenCap(address token) external onlyRole(ROLE_TIMELOCK) {
+        require(token != address(0), "InvalidAddress");
+        uint256 cap = _activateUint(_pendingTokenCap[token]);
+        depositCapByToken[token] = cap;
+        emit TokenCapConfigured(token, cap);
+    }
+
+    /**
+     * @notice Get the pending per-token cap (value, eta, exists).
+     */
+    function getPendingConfigureTokenCap(address token) external view returns (uint256 value, uint64 eta, bool exists) {
+        return getPendingUint(_pendingTokenCap[token]);
+    }
+
+    /**
+     * @notice [FAST] Lower (only) a per-token deposit cap. Risk-reducing, so no slow lane.
+     * @dev Strictly decreases the cap. It never strands funds: existing exposure
+     *      (totalDepositedByToken) is untouched; only NEW deposits are blocked until
+     *      exposure falls back under the cap.
+     * @param token Underlying token
+     * @param cap New (strictly lower) cap
+     */
+    function lowerTokenCap(address token, uint256 cap) external onlyRole(ROLE_TIMELOCK) {
+        require(token != address(0), "InvalidAddress");
+        uint256 current = depositCapByToken[token];
+        require(cap < current, "CapNotLowered");
+        depositCapByToken[token] = cap;
+        emit TokenCapLowered(token, cap);
+    }
+
+    /**
      * @notice Grant/revoke recovery-operator status for an address (e.g. GuardianOps)
      * @param operator Address to authorize or deauthorize
      * @param allowed True to grant recovery-operator status
@@ -289,6 +353,15 @@ contract AaveYieldModule is IYieldModule, ERC165, AccessControl, SlowLaneQueueAc
         uint256 aTokenShares = aTokenAfter > aTokenBefore ? aTokenAfter - aTokenBefore : 0;
         require(aTokenShares > 0, "NoATokenSharesReceived");
 
+        // Enforce the per-token exposure cap and record this position's exposure.
+        // Uses actualDeposited (the precise amount moved into Aave), not the requested
+        // amount, so fee-on-transfer tokens cannot bypass or overflow the cap.
+        uint256 cap = depositCapByToken[token];
+        if (cap > 0) {
+            require(totalDepositedByToken[token] + actualDeposited <= cap, "CapExceeded");
+        }
+        totalDepositedByToken[token] += actualDeposited;
+
         // Store position with actual deposited amount and aToken shares (INVARIANT 4)
         positions[msg.sender][escrowId] = YieldPosition({
             token: token,
@@ -355,6 +428,8 @@ contract AaveYieldModule is IYieldModule, ERC165, AccessControl, SlowLaneQueueAc
         // attempt cannot observe a live position mid-unwind. A reverting external call
         // restores the deleted state anyway, so this is safe.
         delete positions[msg.sender][escrowId];
+        // Reduce live exposure by this position's principal (CEI: state before external calls).
+        totalDepositedByToken[token] -= pos.principalDeposited;
 
         // Withdraw from Aave back to us
         uint256 totalReceived = aavePool.withdraw(token, underlyingToWithdraw, address(this));
@@ -473,6 +548,8 @@ contract AaveYieldModule is IYieldModule, ERC165, AccessControl, SlowLaneQueueAc
         // CEI (finding #9): clear the position BEFORE the external withdraw+transfer so a
         // reentrancy attempt cannot observe a live position. Revert restores deleted state.
         delete positions[escrowOwner][escrowId];
+        // Reduce live exposure by this position's principal (CEI: state before external calls).
+        totalDepositedByToken[pos.token] -= pos.principalDeposited;
 
         // Try to withdraw
         uint256 out = aavePool.withdraw(token, underlyingToWithdraw, address(this));
@@ -518,6 +595,10 @@ contract AaveYieldModule is IYieldModule, ERC165, AccessControl, SlowLaneQueueAc
         if (minDeposit == 0) minDeposit = 1;
         if (amount < minDeposit) {
             return (false, keccak256("BELOW_MIN_DEPOSIT"));
+        }
+        uint256 cap = depositCapByToken[token];
+        if (cap > 0 && totalDepositedByToken[token] + amount > cap) {
+            return (false, keccak256("CAP_EXCEEDED"));
         }
         return (true, 0x0);
     }

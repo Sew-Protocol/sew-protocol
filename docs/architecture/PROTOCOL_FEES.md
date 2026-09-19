@@ -38,14 +38,40 @@ When enabled, the protocol may collect a **Protocol Fee on yield generated from 
 
 **Implementation**
 
-The protocol fee is calculated and collected in `YieldOps.handleYield()`:
+The protocol fee is realized in core at settlement time (`EscrowSettlement.sol`), not in the
+Aave module — the module only produces gross yield. When an escrow unwinds its yield position
+on release/cancel or a split, the core computes the fee on **realized positive yield only**:
 
 ```solidity
-uint256 protocolFeeAmount = (yieldAmount * yieldProtocolFeeBps) / 10000;
-uint256 yieldToDistribute = yieldAmount - protocolFeeAmount;
+// grossYield = max(R - P, 0) where R = assets recovered, P = principal deposited
+uint256 feeAmount = (grossYield * feeBps) / 10000;  // feeBps = snapshotted yieldProtocolFeeBps
+uint256 beneficiaryYield = grossYield - feeAmount;
 ```
 
-The protocol fee is transferred to `escrowFeeAddress` before the remaining yield is distributed to recipients via the yield distribution module.
+Economic model (conservation is exact, only the fee is floored):
+
+* `P` = principal deposited
+* `R` = assets recovered from Aave
+* `Y = max(R - P, 0)` — realized positive yield
+* `F = floor(Y * feeBps / 10000)` — protocol yield fee
+* `B = Y - F` — beneficiary yield
+* `R = P + B + F`
+
+The fee is **never charged against principal**: if `R <= P` then `Y = 0` and `F = 0`, so a loss
+never becomes a fee obligation. The rate is the **snapshotted** per-escrow value
+(`moduleSnapshots[workflowId].yieldProtocolFeeBps`), so later governance changes never
+alter in-flight escrows.
+
+Proceeds are credited to the **pull-based** `totalFeesPerToken` balance (via `_recordFee`) rather
+than pushed to a treasury during settlement. This reclassifies the fee portion of the escrow's
+`yieldInBalance` into `feesCollected`, and the fee is later withdrawn by the fee recipient via
+`withdrawFees(address)`. No external treasury call is made in the settlement/unwind path.
+
+Because the yield module deletes its position on unwind, the same yield can never be realized
+(or fee-charged) twice. When a split unlock occurs (`acceptSplit`), the fee is charged once on the
+gross yield and the **remaining** net yield is split pro-rata to the parties. Each realization
+emits `YieldProtocolFeeCollected(workflowId, token, grossYield, feeBps, feeAmount)` for
+independent reconstruction.
 
 ---
 
