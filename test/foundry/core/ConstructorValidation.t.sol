@@ -86,6 +86,24 @@ contract ConstructorValidation is Test {
         assertLe(vault.appealBondProtocolFeeBps(), MAX_PROTOCOL_FEE_BPS);
     }
 
+    /// @dev Pins the nonzero-fee/no-recipient configuration invariant: whenever a yield
+    ///      protocol fee is enabled there must be a fee recipient set. This couples the
+    ///      default fee to the presence of escrowFeeAddress rather than relying on it
+    ///      incidentally (Finding: nonzero-fee/no-recipient config invariant).
+    function test_EscrowVault_yieldProtocolFee_invariant_feeImpliesRecipient() public {
+        EscrowVault vault = new EscrowVault(100,feeAddress,address(yieldOps),address(moduleManagement));
+        assertEq(vault.escrowFeeAddress(), feeAddress, 'recipient set in test setup');
+        assertTrue(vault.yieldProtocolFeeBps() == 0 || vault.escrowFeeAddress() != address(0),
+            'nonzero yield protocol fee requires a fee recipient');
+    }
+
+    function test_EscrowableERC20_yieldProtocolFee_invariant_feeImpliesRecipient() public {
+        EscrowableERC20 token = new EscrowableERC20('Test Token','TEST',100,feeAddress,address(yieldOps),address(moduleManagement));
+        assertEq(token.escrowFeeAddress(), feeAddress, 'recipient set in test setup');
+        assertTrue(token.yieldProtocolFeeBps() == 0 || token.escrowFeeAddress() != address(0),
+            'nonzero yield protocol fee requires a fee recipient');
+    }
+
     // ============ EscrowableERC20 Constructor Tests ============
 
     function test_EscrowableERC20_constructor_reverts_escrowFeeTooHigh() public {

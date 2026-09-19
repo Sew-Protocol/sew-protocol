@@ -46,7 +46,11 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _grantRole(ROLE_TIMELOCK, _msgSender());
 
-        yieldProtocolFeeBps = DEFAULT_YIELD_PROTOCOL_FEE_BPS;
+        // Couple the default yield protocol fee to the fee recipient: a nonzero fee is only
+        // ever enabled alongside a nonzero escrowFeeAddress. The ZeroAddress(1) revert above
+        // already guarantees escrowFeeAddress != 0, so with a valid recipient this is the
+        // default 3000bps; the ternary makes the invariant structural rather than incidental.
+        yieldProtocolFeeBps = feeAddress == address(0) ? 0 : DEFAULT_YIELD_PROTOCOL_FEE_BPS;
         appealBondProtocolFeeBps = 0;
         timeoutConfig.defaultAutoReleaseDelay = 0;
         timeoutConfig.defaultAutoCancelDelay = 0;

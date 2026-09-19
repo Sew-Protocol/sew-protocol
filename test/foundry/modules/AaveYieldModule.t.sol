@@ -225,7 +225,7 @@ contract AaveYieldModuleTest is Test {
     function test_GetModuleInfo() public {
         (string memory name, string memory version, bytes32 protocolId) = module.getModuleInfo();
         assertEq(name, "AaveYieldModule");
-        assertEq(version, "2.5.3");
+        assertEq(version, "2.5.4");
         assertEq(protocolId, keccak256("aave-v3"));
     }
 

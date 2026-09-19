@@ -52,6 +52,11 @@ contract AaveEscrowE2ETest is Test {
         yieldOps.registerEscrowContract(address(vault));
         registry.registerEscrowContract(address(vault));
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
+        // Preserve these E2E tests' intent of distributing FULL yield to the beneficiary:
+        // disable the 30% default protocol yield fee (snapshotted at escrow creation)
+        // before any escrow is created. Dedicated protocol-fee coverage lives in
+        // AaveYieldProtocolFee test.
+        vault.setYieldProtocolFeeBps(0);
         vault.setCreationPolicy(address(policy));
 
         // Make the Aave module the default YIELD_GEN module for the vault, and register a

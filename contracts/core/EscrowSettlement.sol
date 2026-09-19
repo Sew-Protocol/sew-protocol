@@ -27,6 +27,16 @@ abstract contract EscrowSettlement is EscrowAccounting {
     event SplitProposed(uint256 indexed workflowId, address indexed proposer, uint256 buyerAmount, uint256 sellerAmount, uint64 expiry);
     event SplitAccepted(uint256 indexed workflowId, address indexed accepter, uint256 buyerAmount, uint256 sellerAmount);
     event SplitCancelled(uint256 indexed workflowId, address indexed cancelledBy);
+    // Emitted whenever protocol yield fee is realized on settlement. Provides an
+    // independent reconstruction source for the 30% protocol share of yield
+    // (R = P + B + F conservation; see _computeYieldProtocolFee).
+    event YieldProtocolFeeCollected(
+        uint256 indexed workflowId,
+        address indexed token,
+        uint256 grossYield,
+        uint256 feeBps,
+        uint256 feeAmount
+    );
 
     // SETTLEMENT-REALIZATION SEAM. Local finality today is the stored
     // `PendingSettlement.appealDeadline`; a future adjudication closure would be
@@ -181,27 +191,28 @@ abstract contract EscrowSettlement is EscrowAccounting {
 
         delete disputeRaisedTimestamp[workflowId];
 
-        // Unwind yield module if active; yield is split proportionally to the principal split
-        (uint256 principalOut, uint256 yieldOut) = _handleYieldModuleUnwind(workflowId, token, principal);
-        uint256 totalOut = principalOut + yieldOut;
+        // Unwind yield module if active; yield is split proportionally to the principal split.
+        // The protocol yield fee (snapshotted at escrow creation) is charged first on gross
+        // yield and credited to totalFeesPerToken; the remaining yield is split pro-rata so
+        // conservation holds exactly: principalOut + yieldOut == principal + beneficiary + fee.
+        (, uint256 yieldOut) = _handleYieldModuleUnwind(workflowId, token, principal);
+        uint256 feeAmount = _computeYieldProtocolFee(workflowId, token, yieldOut);
+        uint256 yieldAfterFee = yieldOut - feeAmount;
 
         _updateEscrowBalance(token, principal, false);
 
-        if (yieldOut == 0) {
+        if (yieldAfterFee == 0) {
             if (buyerAmount > 0) _creditClaimable(workflowId, buyer, token, buyerAmount, buyerAmount);
             if (sellerAmount > 0) _creditClaimable(workflowId, seller, token, sellerAmount, sellerAmount);
         } else {
-            // Proportional yield split: buyer share = yieldOut * buyerAmount / principal
-            uint256 yieldToBuyer = principal > 0 ? (yieldOut * buyerAmount) / principal : 0;
-            uint256 yieldToSeller = yieldOut - yieldToBuyer;
+            // Proportional yield split: buyer share = yieldAfterFee * buyerAmount / principal
+            uint256 yieldToBuyer = principal > 0 ? (yieldAfterFee * buyerAmount) / principal : 0;
+            uint256 yieldToSeller = yieldAfterFee - yieldToBuyer;
             uint256 totalBuyer = buyerAmount + yieldToBuyer;
             uint256 totalSeller = sellerAmount + yieldToSeller;
             if (totalBuyer > 0) _creditClaimable(workflowId, buyer, token, totalBuyer, buyerAmount);
             if (totalSeller > 0) _creditClaimable(workflowId, seller, token, totalSeller, sellerAmount);
         }
-
-        // Suppress unused warning for totalOut (used only when yield is active)
-        totalOut;
 
         emit SplitAccepted(workflowId, _msgSender(), buyerAmount, sellerAmount);
     }
@@ -222,11 +233,55 @@ abstract contract EscrowSettlement is EscrowAccounting {
         address beneficiary
     ) internal {
         (uint256 principal, uint256 yield) = _handleYieldModuleUnwind(workflowId, token, amount);
-        uint256 actualAmount = principal + yield;
+        // Charge the snapshotted protocol yield fee on realized positive yield only.
+        // Fee is credited to the pull-based totalFeesPerToken bucket (withdrawn via
+        // withdrawFees by the fee recipient), never taken from principal, and never
+        // negative: principal + (yield - fee) + fee == principal + yield (conservation).
+        uint256 feeAmount = _computeYieldProtocolFee(workflowId, token, yield);
+        uint256 beneficiaryYield = yield - feeAmount;
+        uint256 actualAmount = principal + beneficiaryYield;
 
         // Pull-only settlement: entitlement creation only
         _updateEscrowBalance(token, amount, false);
         _creditClaimable(workflowId, beneficiary, token, actualAmount, amount);
+    }
+
+    /**
+     * @notice Compute and record the protocol yield fee on realized positive yield.
+     * @param workflowId Escrow ID whose snapshotted fee rate applies
+     * @param token Underlying token of the yield
+     * @param grossYield Realized gross yield (R - P), already 0 or positive
+     * @return feeAmount Protocol fee in underlying token units
+     *
+     * Economic model:
+     *   P = principal deposited, R = assets recovered from Aave
+     *   Y = max(R - P, 0)               realized positive yield
+     *   F = floor(Y * feeBps / 10_000)  protocol yield fee
+     *   B = Y - F                       beneficiary yield
+     *   conservation: R = P + B + F (exact, only F is floored)
+     *
+     * The fee is NEVER charged against principal: if R <= P then Y = 0 and F = 0, so a
+     * loss never becomes a fee obligation. The rate is snapshotted at escrow creation
+     * (moduleSnapshots[workflowId].yieldProtocolFeeBps), so a later governance change to
+     * yieldProtocolFeeBps does not retroactively alter in-flight escrows. Proceeds are
+     * credited to the pull-based totalFeesPerToken bucket (reclassifying part of the
+     * escrow's yieldInBalance into feesCollected) with no external treasury call.
+     * The position is deleted by the module on unwind, so the same yield cannot be
+     * realized/charged twice.
+     */
+    function _computeYieldProtocolFee(
+        uint256 workflowId,
+        address token,
+        uint256 grossYield
+    ) internal returns (uint256 feeAmount) {
+        if (grossYield == 0) return 0;
+        uint256 feeBps = moduleSnapshots[workflowId].yieldProtocolFeeBps;
+        if (feeBps == 0) return 0;
+        feeAmount = (grossYield * feeBps) / ESCROW_FEE_DENOMINATOR;
+        if (feeAmount > 0) {
+            _recordFee(token, feeAmount);
+            emit YieldProtocolFeeCollected(workflowId, token, grossYield, feeBps, feeAmount);
+        }
     }
 
     function _clearPendingSettlementIfExists(uint256 workflowId) internal {

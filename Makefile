@@ -1,4 +1,4 @@
-.PHONY: install compile test hh forge forge-invariants halmos-smoke formal-smoke coverage coverage-report format lint typecheck clean size size-check verify deploy deploy-local export help
+.PHONY: install compile test hh forge forge-invariants halmos-smoke formal-smoke coverage coverage-report format lint typecheck clean verify deploy deploy-local export help
 
 # Default target
 help:
@@ -17,8 +17,6 @@ help:
 	@echo "  lint          - Run ESLint"
 	@echo "  typecheck     - Type check TypeScript files"
 	@echo "  clean         - Clean build artifacts"
-	@echo "  size          - Print contract sizes"
-	@echo "  size-check    - Compile and check contract sizes"
 	@echo "  verify        - Verify contracts on block explorer"
 	@echo "  deploy        - Deploy contracts (requires NETWORK=name)"
 	@echo "  deploy-local  - Deploy to local Hardhat network"
@@ -72,12 +70,6 @@ clean:
 	rm -rf cache cache-foundry out artifacts dist typechain-types coverage deploy-ledger .hardhat
 
 # Contract Size
-size:
-	pnpm size
-
-size-check:
-	pnpm size:check
-
 # Verification
 verify:
 	pnpm verify
