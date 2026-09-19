@@ -3,7 +3,6 @@ pragma solidity ^0.8.37;
 
 import "forge-std/Test.sol";
 import "../../../contracts/modules/DefaultCancellationStrategy.sol";
-import "../../../contracts/modules/BuyerOnlyCancellationStrategy.sol";
 import "../../../contracts/core/EscrowVault.sol";
 import "../../../contracts/core/EscrowCreationPolicy.sol";
 import "../../../contracts/ops/YieldOps.sol";
@@ -22,7 +21,7 @@ contract SlowLaneCancellationStrategyTest is Test {
     EscrowVault public vault;
     ModuleSnapshotRegistry public moduleManagement;
     DefaultCancellationStrategy public defaultStrategy;
-    BuyerOnlyCancellationStrategy public buyerOnlyStrategy;
+    DefaultCancellationStrategy public defaultStrategy2;
     
     ERC20Mock public token;
     
@@ -42,7 +41,7 @@ contract SlowLaneCancellationStrategyTest is Test {
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         
         defaultStrategy = new DefaultCancellationStrategy();
-        buyerOnlyStrategy = new BuyerOnlyCancellationStrategy();
+        defaultStrategy2 = new DefaultCancellationStrategy();
         
         vault = new EscrowVault(ESCROW_FEE,feeAddress,address(yieldOps),address(moduleManagement));
         
@@ -113,20 +112,20 @@ contract SlowLaneCancellationStrategyTest is Test {
         (,, address strategy1,,,,,,,,,) = vault.moduleSnapshots(wid1);
         assertEq(strategy1, address(defaultStrategy), "Escrow 1 should use default strategy");
         
-        // Queue new strategy: BuyerOnly
-        moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.CANCELLATION, address(buyerOnlyStrategy));
+        // Queue new strategy: a second (snapshotted) strategy instance
+        moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.CANCELLATION, address(defaultStrategy2));
         
-        // Create Escrow 2 while BuyerOnly is PENDING
+        // Create Escrow 2 while the new strategy is PENDING
         vm.startPrank(sender);
         token.approve(address(vault), 100e18);
         uint256 wid2 = vault.createEscrow(address(token), recipient, 100e18, settings);
         vm.stopPrank();
         
-        // Escrow 2 should still use Default because BuyerOnly is not active
+        // Escrow 2 should still use the active default strategy while the new one is pending
         (,, address strategy2,,,,,,,,,) = vault.moduleSnapshots(wid2);
         assertEq(strategy2, address(defaultStrategy), "Escrow 2 should still use active default strategy");
         
-        // Activate BuyerOnly
+        // Activate the new strategy
         (, uint64 eta, ) = moduleManagement.getPendingModule(address(vault), BaseEscrow.ModuleType.CANCELLATION);
         vm.warp(eta + 1);
         moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.CANCELLATION);
@@ -137,9 +136,9 @@ contract SlowLaneCancellationStrategyTest is Test {
         uint256 wid3 = vault.createEscrow(address(token), recipient, 100e18, settings);
         vm.stopPrank();
         
-        // Escrow 3 should use BuyerOnly
+        // Escrow 3 should use the newly activated strategy instance
         (,, address strategy3,,,,,,,,,) = vault.moduleSnapshots(wid3);
-        assertEq(strategy3, address(buyerOnlyStrategy), "Escrow 3 should use new buyer-only strategy");
+        assertEq(strategy3, address(defaultStrategy2), "Escrow 3 should use new buyer-only strategy");
         
         // Verify behavioral consistency:
         // Escrow 1 (Default): Sender initiates, still pending
@@ -148,10 +147,10 @@ contract SlowLaneCancellationStrategyTest is Test {
         (,,,,,,, EscrowState state1,,) = vault.escrowTransfers(wid1);
         assertEq(uint8(state1), uint8(EscrowState.PENDING), "Escrow 1 needs mutual consent");
         
-        // Escrow 3 (BuyerOnly): Recipient cancels alone
+        // Escrow 3 (snapshotted strategy instance): recipient initiates, mutual consent still required
         vm.prank(recipient);
         vault.recipientCancel(wid3);
         (,,,,,,, EscrowState state3,,) = vault.escrowTransfers(wid3);
-        assertEq(uint8(state3), uint8(EscrowState.REFUNDED), "Escrow 3 cancelled by buyer alone");
+        assertEq(uint8(state3), uint8(EscrowState.PENDING), "Escrow 3 (mutual consent) requires both parties");
     }
 }

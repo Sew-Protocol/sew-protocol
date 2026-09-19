@@ -29,8 +29,6 @@ DR_DEPENDENT_TESTS=(
   "test/foundry/core/AppealWindowEnforcement.t.sol"
   "test/foundry/core/ResolverIncentiveModuleComprehensive.t.sol"
   "test/foundry/core/PaymentBoundsChecking.t.sol"
-  "test/foundry/migrated/ResolverIncentiveModule.test.t.sol"
-  "test/foundry/migrated/DecentralizedResolutionModule.test.t.sol"
   "test/foundry/governance/AccessControlEdgeCases.t.sol"
   "test/foundry/governance/ModuleSwapPath.test.t.sol"
   "test/foundry/testnet/Phase3DRStagedBaseSepoliaFork.t.sol"
