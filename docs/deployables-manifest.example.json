@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "packageName": "@sew/deployables",
+  "bundleVersion": "0.1.0",
+  "source": {
+    "repository": "sew/sew-protocol",
+    "commit": "abc1234...",
+    "commitSource": "git",
+    "commitOverride": false,
+    "dirty": false
+  },
+  "build": {
+    "artifactSource": "forge",
+    "profile": "default",
+    "compiler": { "name": "solc", "version": "0.8.37+commit.f401782d" },
+    "settings": { "evmVersion": "osaka", "optimizerRuns": 200, "viaIR": true }
+  },
+  "artifacts": {
+    "EscrowVault": {
+      "contractName": "EscrowVault",
+      "sourcePath": "contracts/core/EscrowVault.sol",
+      "scopeHint": "sew",
+      "category": "core",
+      "artifactFile": "artifacts/EscrowVault.json",
+      "abiSha256": "d8267c69d805978c37038d2d5c7befaaca98b6bf0ac85d4cd488745f8a9c4f5f",
+      "creationBytecodeSha256": "f087d1443ae726e3899bc974d3daf586f83c72748c87bacff76b011a1d34c919",
+      "runtimeBytecodeSha256": "bdf9a6f1db3459ca6d600f17c713460ff64be8d4f68f02f4887d150f1da8705a",
+      "fileSha256": "5f75f3f837a8c875751e26c172a3537f72b180a184b2e0a52ebf9b981444c4d7",
+      "hasLinkReferences": true,
+      "hasDeployedLinkReferences": true
+    },
+    "SewToken": {
+      "contractName": "SewToken",
+      "sourcePath": "contracts/token/SewToken.sol",
+      "scopeHint": "shared",
+      "category": "governance",
+      "artifactFile": "artifacts/SewToken.json",
+      "abiSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "creationBytecodeSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "runtimeBytecodeSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "fileSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "hasLinkReferences": false,
+      "hasDeployedLinkReferences": false
+    }
+  },
+  "bundleRoot": "0000000000000000000000000000000000000000000000000000000000000000"
+}

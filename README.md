@@ -70,6 +70,25 @@ pnpm lint
 pnpm typecheck
 ```
 
+### Deployable artifact export
+
+`sew-protocol` stays authoritative for SEW source/compile/tests/bytecode. A
+deterministic deployable-artifact bundle (for consumption by a separate
+deployment-composition repository, without recompiling SEW) is produced by:
+
+```bash
+pnpm compile              # native build (forge)
+pnpm deployables:export   # write deployables/ bundle
+pnpm deployables:validate # verify hashes + allow-list coverage
+pnpm deployables:test     # round-trip / determinism / adversarial tests
+pnpm deployables:pack     # tar.gz the bundle
+```
+
+See [docs/deployables-export.md](docs/deployables-export.md) (design, manifest
+schema, local consumption) and [docs/migration-inventory.md](docs/migration-inventory.md)
+(tooling that may move later vs remain SEW-local).
+
+
 ## Deployment
 
 The protocol has been deployed to:

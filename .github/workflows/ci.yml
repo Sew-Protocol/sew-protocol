@@ -52,3 +52,16 @@ jobs:
 
       - name: Contract size check
         run: pnpm size:check
+
+      - name: Export deployable artifacts
+        run: pnpm deployables:export
+        env:
+          GIT_SHA: ${{ github.sha }}
+
+      - name: Validate deployables
+        run: pnpm deployables:validate
+
+      - name: Deployables tests (integrity + determinism)
+        run: pnpm deployables:test
+        env:
+          GIT_SHA: ${{ github.sha }}

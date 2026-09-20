@@ -1,0 +1,210 @@
+{
+  "schemaVersion": 1,
+  "packageName": "@sew/deployables",
+  "bundleVersion": "0.1.0",
+  "buildArtifactSource": "forge",
+  "buildProfile": "default",
+  "entries": [
+    {
+      "artifactName": "SewToken",
+      "contractName": "SewToken",
+      "sourcePath": "contracts/token/SewToken.sol",
+      "scopeHint": "shared",
+      "category": "governance",
+      "notes": "Governance voting token. Logically shared governance infrastructure even though source lives in sew-protocol."
+    },
+    {
+      "artifactName": "GovGovernor",
+      "contractName": "GovGovernor",
+      "sourcePath": "contracts/governance/GovGovernor.sol",
+      "scopeHint": "shared",
+      "category": "governance",
+      "notes": "Governor (timelock control). Shared governance machinery."
+    },
+    {
+      "artifactName": "TimelockController",
+      "contractName": "TimelockController",
+      "sourcePath": "node_modules/@openzeppelin/contracts/governance/TimelockController.sol",
+      "origin": "openzeppelin",
+      "scopeHint": "shared",
+      "category": "governance",
+      "notes": "OpenZeppelin timelock execution lane. External dependency, not SEW-authored source."
+    },
+    {
+      "artifactName": "DefaultReleaseStrategy",
+      "contractName": "DefaultReleaseStrategy",
+      "sourcePath": "contracts/modules/DefaultReleaseStrategy.sol",
+      "scopeHint": "shared",
+      "category": "governance",
+      "notes": "Release/governance strategy infrastructure; may serve both PRF and SEW."
+    },
+    {
+      "artifactName": "DefaultCancellationStrategy",
+      "contractName": "DefaultCancellationStrategy",
+      "sourcePath": "contracts/modules/DefaultCancellationStrategy.sol",
+      "scopeHint": "shared",
+      "category": "governance",
+      "notes": "Cancellation/governance strategy infrastructure."
+    },
+    {
+      "artifactName": "EmergencyRecoveryProposal",
+      "contractName": "EmergencyRecoveryProposal",
+      "sourcePath": "contracts/governance/EmergencyRecoveryProposal.sol",
+      "scopeHint": "shared",
+      "category": "governance",
+      "notes": "Emergency recovery proposal mechanism."
+    },
+    {
+      "artifactName": "GuardianOps",
+      "contractName": "GuardianOps",
+      "sourcePath": "contracts/ops/GuardianOps.sol",
+      "scopeHint": "shared",
+      "category": "ops",
+      "notes": "Guardian operations / emergency ops."
+    },
+    {
+      "artifactName": "EscrowGovernanceTimelock",
+      "contractName": "EscrowGovernanceTimelock",
+      "sourcePath": "contracts/admin/EscrowGovernanceTimelock.sol",
+      "scopeHint": "shared",
+      "category": "governance",
+      "notes": "Escrow admin timelock governing protocol params."
+    },
+    {
+      "artifactName": "L2AddressRegistry",
+      "contractName": "L2AddressRegistry",
+      "sourcePath": "contracts/core/L2AddressRegistry.sol",
+      "scopeHint": "shared",
+      "category": "infra",
+      "notes": "Cross-chain address registry for shared coordination."
+    },
+    {
+      "artifactName": "EscrowVault",
+      "contractName": "EscrowVault",
+      "sourcePath": "contracts/core/EscrowVault.sol",
+      "scopeHint": "sew",
+      "category": "core",
+      "notes": "Core escrow vault."
+    },
+    {
+      "artifactName": "EscrowableERC20",
+      "contractName": "EscrowableERC20",
+      "sourcePath": "contracts/core/EscrowableERC20.sol",
+      "scopeHint": "sew",
+      "category": "core",
+      "notes": "Escrowable ERC20 token wrapper."
+    },
+    {
+      "artifactName": "EscrowCreationPolicy",
+      "contractName": "EscrowCreationPolicy",
+      "sourcePath": "contracts/core/EscrowCreationPolicy.sol",
+      "scopeHint": "sew",
+      "category": "core",
+      "notes": "Escrow creation policy."
+    },
+    {
+      "artifactName": "BondCollector",
+      "contractName": "BondCollector",
+      "sourcePath": "contracts/core/BondCollector.sol",
+      "scopeHint": "sew",
+      "category": "core",
+      "notes": "Bond collection and management."
+    },
+    {
+      "artifactName": "CREATE2EscrowFactory",
+      "contractName": "CREATE2EscrowFactory",
+      "sourcePath": "contracts/core/CREATE2EscrowFactory.sol",
+      "scopeHint": "sew",
+      "category": "core",
+      "notes": "CREATE2 factory for escrow instances."
+    },
+    {
+      "artifactName": "MultiL2ViewAggregator",
+      "contractName": "MultiL2ViewAggregator",
+      "sourcePath": "contracts/core/MultiL2ViewAggregator.sol",
+      "scopeHint": "sew",
+      "category": "core",
+      "notes": "Multi-L2 view aggregator."
+    },
+    {
+      "artifactName": "ModuleSnapshotRegistry",
+      "contractName": "ModuleSnapshotRegistry",
+      "sourcePath": "contracts/core/ModuleSnapshotRegistry.sol",
+      "scopeHint": "sew",
+      "category": "infra",
+      "notes": "Module snapshot/metadata registry."
+    },
+    {
+      "artifactName": "AaveYieldModule",
+      "contractName": "AaveYieldModule",
+      "sourcePath": "contracts/modules/AaveYieldModule.sol",
+      "scopeHint": "sew",
+      "category": "yield",
+      "notes": "Yield module integrating Aave; SEW-specific integration adapter."
+    },
+    {
+      "artifactName": "DecentralizedResolutionModule",
+      "contractName": "DecentralizedResolutionModule",
+      "sourcePath": "contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol",
+      "scopeHint": "sew",
+      "category": "resolution",
+      "notes": "Decentralized resolution module."
+    },
+    {
+      "artifactName": "InsurancePoolVault",
+      "contractName": "InsurancePoolVault",
+      "sourcePath": "contracts/modules/decentralized-resolution-module/InsurancePoolVault.sol",
+      "scopeHint": "sew",
+      "category": "resolution",
+      "notes": "Insurance pool vault."
+    },
+    {
+      "artifactName": "ResolverStakingModuleV1",
+      "contractName": "ResolverStakingModuleV1",
+      "sourcePath": "contracts/modules/decentralized-resolution-module/staking/ResolverStakingModuleV1.sol",
+      "scopeHint": "sew",
+      "category": "resolution",
+      "notes": "Resolver staking module."
+    },
+    {
+      "artifactName": "ResolverSlashingModuleV1",
+      "contractName": "ResolverSlashingModuleV1",
+      "sourcePath": "contracts/modules/decentralized-resolution-module/slashing/ResolverSlashingModuleV1.sol",
+      "scopeHint": "sew",
+      "category": "resolution",
+      "notes": "Resolver slashing module."
+    },
+    {
+      "artifactName": "BondTokenRegistry",
+      "contractName": "BondTokenRegistry",
+      "sourcePath": "contracts/modules/decentralized-resolution-module/bond/BondTokenRegistry.sol",
+      "scopeHint": "sew",
+      "category": "resolution",
+      "notes": "Bond token registry."
+    },
+    {
+      "artifactName": "DRMAdminFacet",
+      "contractName": "DRMAdminFacet",
+      "sourcePath": "contracts/modules/decentralized-resolution-module/DRMAdminFacet.sol",
+      "scopeHint": "sew",
+      "category": "resolution",
+      "notes": "DRM admin facet."
+    },
+    {
+      "artifactName": "ResolverIncentiveModuleV2",
+      "contractName": "ResolverIncentiveModuleV2",
+      "sourcePath": "contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModuleV2.sol",
+      "scopeHint": "sew",
+      "category": "resolution",
+      "notes": "Resolver incentive module v2."
+    },
+    {
+      "artifactName": "PaymentCalculationLibraryV1",
+      "contractName": "PaymentCalculationLibraryV1",
+      "sourcePath": "contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibraryV1.sol",
+      "scopeHint": "sew",
+      "category": "library",
+      "notes": "Deployed (public) library requiring separate linking/deployment."
+    }
+  ]
+}
