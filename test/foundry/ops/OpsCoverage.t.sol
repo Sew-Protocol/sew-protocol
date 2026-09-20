@@ -3,7 +3,6 @@ pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
 import '../../mocks/legacy/CreateOpsReference.sol';
-import '../../../contracts/ops/YieldOps.sol';
 import '../../../contracts/interfaces/IYieldModule.sol';
 import '../../mocks/legacy/SettlementOpsReference.sol';
 import '../../mocks/legacy/DisputeOpsReference.sol';
@@ -14,7 +13,6 @@ import '../../../contracts/shared/interfaces/IResolutionModule.sol';
 
 contract OpsCoverageTest is Test {
     CreateOpsReference public createOps;
-    YieldOps public yieldOps;
     SettlementOpsReference public settlementOps;
     DisputeOpsReference public disputeOps;
     ERC20Mock public token;
@@ -36,7 +34,6 @@ contract OpsCoverageTest is Test {
 
         // Deploy Ops contracts
         createOps = new CreateOpsReference(owner);
-        yieldOps = new YieldOps(owner);
         settlementOps = new SettlementOpsReference(owner);
         disputeOps = new DisputeOpsReference(owner);
 
@@ -46,9 +43,6 @@ contract OpsCoverageTest is Test {
         createOps.grantRole(createOps.ROLE_TIMELOCK(), timelock);
         createOps.grantRole(createOps.ROLE_GUARDIAN(), guardian);
         
-        // Setup roles for YieldOps
-        yieldOps.grantRole(yieldOps.ROLE_TIMELOCK(), timelock);
-        yieldOps.grantRole(yieldOps.ROLE_GUARDIAN(), guardian);
 
         // Setup roles for SettlementOpsReference
         settlementOps.grantRole(settlementOps.ROLE_TIMELOCK(), timelock);
@@ -163,7 +157,7 @@ contract OpsCoverageTest is Test {
     function test_CreateOps_computeEscrowCreation_ResolverQuery() public {
         vm.prank(timelock);
         createOps.registerEscrowContract(escrowContract);
-
+        
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
             releaseAddress: address(0),
@@ -192,7 +186,7 @@ contract OpsCoverageTest is Test {
     function test_CreateOps_computeEscrowCreation_ResolverFailure() public {
         vm.prank(timelock);
         createOps.registerEscrowContract(escrowContract);
-
+        
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
             releaseAddress: address(0),
@@ -222,7 +216,7 @@ contract OpsCoverageTest is Test {
     function test_CreateOps_computeEscrowCreation_EOAResolver() public {
         vm.prank(timelock);
         createOps.registerEscrowContract(escrowContract);
-
+        
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
             releaseAddress: address(0),
@@ -244,99 +238,6 @@ contract OpsCoverageTest is Test {
         );
 
         assertEq(result.resolver, address(0));
-    }
-
-    // ============ YieldOps Tests ============
-
-    function test_YieldOps_handleYield_WithdrawalFailed() public {
-        mockGen = new MockYieldGenerationModule();
-        vm.prank(timelock);
-        yieldOps.registerEscrowContract(escrowContract);
-
-        // Success = false from module
-        mockGen.setWithdrawResult(false, 0, 0);
-
-        vm.prank(escrowContract);
-        YieldOps.YieldResult memory result = yieldOps.handleYield(
-            IYieldModule(address(mockGen)),
-            1,
-            address(token),
-            1000,
-            0,
-            feeRecipient,
-            ""
-        );
-
-        assertFalse(result.success, "Should fail when module returns false");
-        assertTrue(bytes(result.failureReason).length > 0, "Should have failure reason");
-        assertEq(result.actualAmount, 1000, "Should return original amount"); // Falls back to original amount
-        assertEq(result.yield, 0, "Should have no yield");
-    }
-
-
-    function test_YieldOps_recoverTokens_Guardian() public {
-        // Send tokens to YieldOps
-        token.mint(address(yieldOps), 1000e18);
-        
-        uint256 balanceBefore = token.balanceOf(guardian);
-        
-        vm.prank(guardian);
-        yieldOps.recoverTokens(address(token), guardian, 1000e18);
-        
-        assertEq(token.balanceOf(guardian), balanceBefore + 1000e18);
-        assertEq(token.balanceOf(address(yieldOps)), 0);
-    }
-
-    function test_YieldOps_recoverTokens_Unauthorized() public {
-        token.mint(address(yieldOps), 1000e18);
-        
-        vm.prank(unauthorized);
-        vm.expectRevert(); // AccessControl error
-        yieldOps.recoverTokens(address(token), unauthorized, 1000e18);
-    }
-
-    function test_YieldOps_recoverETH_Guardian() public {
-        // Send ETH to YieldOps (needs to handle receive/fallback or we force send)
-        vm.deal(address(yieldOps), 1 ether);
-        
-        uint256 balanceBefore = guardian.balance;
-        
-        vm.prank(guardian);
-        yieldOps.recoverTokens(address(0), guardian, 1 ether);
-        
-        assertEq(guardian.balance, balanceBefore + 1 ether);
-        assertEq(address(yieldOps).balance, 0);
-    }
-
-    function test_YieldOps_registerEscrowContract_Invalid() public {
-        vm.prank(timelock);
-        vm.expectRevert();
-        yieldOps.registerEscrowContract(address(0));
-    }
-
-    function test_YieldOps_handleYield_NoYieldGenerated() public {
-        mockGen = new MockYieldGenerationModule();
-        vm.prank(timelock);
-        yieldOps.registerEscrowContract(escrowContract);
-
-        // Withdrawal succeeds but no yield generated
-        mockGen.setWithdrawResult(true, 1000, 0);
-
-        vm.prank(escrowContract);
-        YieldOps.YieldResult memory result = yieldOps.handleYield(
-            IYieldModule(address(mockGen)),
-            1,
-            address(token),
-            1000,
-            0,
-            feeRecipient,
-            ""
-        );
-
-        assertTrue(result.success);
-        assertEq(result.yield, 0);
-        assertEq(result.actualAmount, 1000);
-        assertEq(result.yieldDistributed, 0);
     }
 
     // ============ SettlementOpsReference Tests ============
@@ -838,7 +739,7 @@ contract OpsCoverageTest is Test {
     function test_CreateOps_computeEscrowCreation_InvalidInputs() public {
         vm.prank(timelock);
         createOps.registerEscrowContract(escrowContract);
-
+        
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
             releaseAddress: address(0),
@@ -879,7 +780,7 @@ contract OpsCoverageTest is Test {
     function test_CreateOps_computeEscrowCreation_FeeCalculation() public {
         vm.prank(timelock);
         createOps.registerEscrowContract(escrowContract);
-
+        
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
             releaseAddress: address(0),
@@ -906,156 +807,6 @@ contract OpsCoverageTest is Test {
         assertEq(result.fee, 500); // 5% of 10000
         assertEq(result.amountAfterFee, 9500);
     }
-
-    // ============ YieldOps Extended Tests ============
-
-    MockYieldGenerationModule public mockGen;
-
-    function test_YieldOps_handleYield_Success() public {
-        mockGen = new MockYieldGenerationModule();
-        
-        vm.prank(timelock);
-        yieldOps.registerEscrowContract(escrowContract);
-
-        // Setup yield behavior
-        uint256 original = 1000;
-        uint256 earned = 100;
-        uint256 total = 1100;
-        
-        mockGen.setWithdrawResult(true, total, earned);
-
-        vm.prank(escrowContract);
-        YieldOps.YieldResult memory result = yieldOps.handleYield(
-            IYieldModule(address(mockGen)),
-            1,
-            address(token),
-            original,
-            0,
-            feeRecipient,
-            ""
-        );
-
-        // handleYield ONLY withdraws, does NOT distribute
-        assertTrue(result.success);
-        assertEq(result.yield, earned);
-        assertEq(result.actualAmount, total);
-        assertEq(result.yieldDistributed, 0); // No distribution in handleYield
-    }
-
-    function test_YieldOps_handleYield_GenFailure() public {
-        mockGen = new MockYieldGenerationModule();
-        vm.prank(timelock);
-        yieldOps.registerEscrowContract(escrowContract);
-
-        mockGen.setRevert(true);
-
-        vm.prank(escrowContract);
-        // Should not revert, but return failure with reason
-        YieldOps.YieldResult memory result = yieldOps.handleYield(
-            IYieldModule(address(mockGen)),
-            1,
-            address(token),
-            1000,
-            0,
-            feeRecipient,
-            ""
-        );
-
-        assertFalse(result.success, "Should fail");
-        assertTrue(bytes(result.failureReason).length > 0, "Should have failure reason");
-        assertEq(result.yield, 0, "Should have no yield");
-        assertEq(result.actualAmount, 1000, "Should return original amount");
-    }
-
-
-    function test_YieldOps_handleYield_WithdrawSuccessFalse() public {
-        mockGen = new MockYieldGenerationModule();
-        vm.prank(timelock);
-        yieldOps.registerEscrowContract(escrowContract);
-
-        mockGen.setWithdrawResult(false, 1000, 0);
-
-        vm.prank(escrowContract);
-        YieldOps.YieldResult memory result = yieldOps.handleYield(
-            IYieldModule(address(mockGen)),
-            1,
-            address(token),
-            1000,
-            0,
-            feeRecipient,
-            ""
-        );
-
-        assertFalse(result.success);
-        // v2.5: a declined/failed unwind surfaces as a revert caught by YieldOps.
-        assertEq(result.failureReason, "Withdraw failed");
-    }
-
-
-
-
-
-    function test_YieldOps_withdrawClaimableProtocolFee_InvalidAmount() public {
-        vm.prank(feeRecipient);
-        vm.expectRevert();
-        yieldOps.withdrawClaimableProtocolFee(address(token), 1);
-    }
-
-
-    function test_Example() public {
-        // Placeholder to keep context correct
-    }
-
-
-
-    function test_YieldOps_handleYield_WithdrawalReturnsFalse() public {
-        MockYieldGenerationModule mockGen2 = new MockYieldGenerationModule();
-        mockGen2.setWithdrawSuccess(false); // Make it return false
-        
-        vm.prank(timelock);
-        yieldOps.registerEscrowContract(escrowContract);
-
-        vm.prank(escrowContract);
-        YieldOps.YieldResult memory result = yieldOps.handleYield(
-            IYieldModule(address(mockGen2)),
-            1,
-            address(token),
-            1000,
-            0,
-            feeRecipient,
-            ""
-        );
-
-        // Should fail with appropriate reason
-        assertFalse(result.success, "Should fail");
-        assertTrue(bytes(result.failureReason).length > 0, "Should have failure reason");
-        assertEq(result.yield, 0, "Should have no yield");
-    }
-
-    function test_YieldOps_handleYield_WithdrawalRevert() public {
-        MockYieldGenerationModule mockGen3 = new MockYieldGenerationModule();
-        mockGen3.setRevert(true); // Make it revert
-        
-        vm.prank(timelock);
-        yieldOps.registerEscrowContract(escrowContract);
-
-        vm.prank(escrowContract);
-        YieldOps.YieldResult memory result = yieldOps.handleYield(
-            IYieldModule(address(mockGen3)),
-            1,
-            address(token),
-            1000,
-            0,
-            feeRecipient,
-            ""
-        );
-
-        // Should fail with appropriate reason
-        assertFalse(result.success, "Should fail");
-        assertTrue(bytes(result.failureReason).length > 0, "Should have failure reason");
-        assertEq(result.yield, 0, "Should have no yield");
-    }
-
 
     function test_SettlementOps_computePendingSettlementExecution() public {
         vm.prank(timelock);

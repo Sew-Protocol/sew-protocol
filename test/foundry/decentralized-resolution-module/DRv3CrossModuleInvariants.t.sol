@@ -5,7 +5,6 @@ import 'forge-std/Test.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/modules/DefaultResolutionModule.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
-import '../../../contracts/ops/YieldOps.sol';
 import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
@@ -23,7 +22,6 @@ contract DRv3CrossModuleInvariantsTest is Test {
     EscrowVault      public vault;
     ERC20Mock        public token;
     DefaultResolutionModule public resolutionModule;
-    YieldOps         public yieldOps;
     EscrowCreationPolicy        public creationPolicy;
     BondCollector    public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
@@ -38,15 +36,13 @@ contract DRv3CrossModuleInvariantsTest is Test {
     uint256 constant AMOUNT  = 1000e18;
 
     function setUp() public {
-        yieldOps      = new YieldOps(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
         creationPolicy     = new EscrowCreationPolicy(owner);
         bondCollector = new BondCollector(owner);
         resolutionModule = new DefaultResolutionModule(owner, resolver);
 
-        vault = new EscrowVault(FEE_BPS,feeAddr,address(yieldOps),address(moduleManagement));
+        vault = new EscrowVault(FEE_BPS,feeAddr,address(moduleManagement));
 
-        yieldOps.registerEscrowContract(address(vault));
         moduleManagement.registerEscrowContract(address(vault));
         bondCollector.registerEscrowContract(address(vault));
 

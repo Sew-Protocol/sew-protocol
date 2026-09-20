@@ -8,7 +8,6 @@ import '../../../contracts/core/EscrowableERC20.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/modules/DefaultResolutionModule.sol';
 import '../../../contracts/types/EscrowTypes.sol';
-import '../../../contracts/ops/YieldOps.sol';
 import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
@@ -24,7 +23,6 @@ contract ProtocolFeeCalculationTest is Test {
     EscrowVault public vault;
     ERC20Mock public token;
     DefaultResolutionModule public resolutionModule;
-    YieldOps public yieldOps;
     EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
@@ -54,19 +52,15 @@ contract ProtocolFeeCalculationTest is Test {
         // Deploy core contracts
         resolutionModule = new DefaultResolutionModule(owner, resolver);
         token = new ERC20Mock('Test Token', 'TEST', owner, 10000000e18);
-        yieldOps = new YieldOps(address(this));
         creationPolicy = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
 
         // Deploy vault
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));
-        vault = new EscrowVault(ESCROW_FEE_BPS,escrowFeeAddress,address(yieldOps),address(moduleManagement));
-        moduleManagement.registerEscrowContract(address(vault));
+        vault = new EscrowVault(ESCROW_FEE_BPS,escrowFeeAddress,address(moduleManagement));
 
         // Register escrow contract with all ops contracts
-        yieldOps.registerEscrowContract(address(vault));
-        bondCollector.registerEscrowContract(address(vault));
 
         // Setup vault roles
         vault.grantRole(ROLE_TIMELOCK, owner);

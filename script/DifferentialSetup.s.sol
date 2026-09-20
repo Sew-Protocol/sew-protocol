@@ -7,7 +7,6 @@ import { MockERC20 } from "../contracts/mocks/MockERC20.sol";
 import { EscrowVault } from "../contracts/core/EscrowVault.sol";
 import { EscrowViewContract } from "../contracts/core/EscrowViewContract.sol";
 import { DefaultResolutionModule } from "../contracts/modules/DefaultResolutionModule.sol";
-import { YieldOps } from "../contracts/ops/YieldOps.sol";
 import { ModuleSnapshotRegistry } from "../contracts/core/ModuleSnapshotRegistry.sol";
 
 /**
@@ -16,11 +15,10 @@ import { ModuleSnapshotRegistry } from "../contracts/core/ModuleSnapshotRegistry
  *
  * Deploys:
  *   1. MockERC20 token
- *   2. YieldOps (ops infrastructure)
- *   3. ModuleSnapshotRegistry
- *   4. EscrowVault
- *   5. EscrowViewContract (oracle)
- *   6. DefaultResolutionModule
+ *   2. ModuleSnapshotRegistry
+ *   3. EscrowVault
+ *   4. EscrowViewContract (oracle)
+ *   5. DefaultResolutionModule
  *
  * Exports addresses to differential-setup.json for AnvilRunner.
  */
@@ -34,7 +32,6 @@ contract DifferentialSetup is Script {
     uint256 constant ESCROW_FEE_BPS = 100; // 1%
 
     MockERC20 token;
-    YieldOps yieldOps;
     ModuleSnapshotRegistry moduleRegistry;
     EscrowVault vault;
     EscrowViewContract oracle;
@@ -51,10 +48,6 @@ contract DifferentialSetup is Script {
         token.mint(BUYER, 10_000_000 * 1e18);
         console.log("Minted tokens to BUYER");
 
-        // Deploy YieldOps (this handles yield delegation)
-        yieldOps = new YieldOps(DEPLOYER);
-        console.log("Deployed YieldOps:", address(yieldOps));
-
         // Deploy ModuleSnapshotRegistry
         moduleRegistry = new ModuleSnapshotRegistry(DEPLOYER);
         console.log("Deployed ModuleSnapshotRegistry:", address(moduleRegistry));
@@ -63,7 +56,6 @@ contract DifferentialSetup is Script {
         vault = new EscrowVault(
             ESCROW_FEE_BPS,           // escrowFeeBps
             DEPLOYER,                 // feeAddress
-            address(yieldOps),        // yieldOpsAddress
             address(moduleRegistry)   // moduleManagementAddress
         );
         console.log("Deployed EscrowVault:", address(vault));
@@ -89,7 +81,6 @@ contract DifferentialSetup is Script {
             '"vault":"', addressToString(address(vault)), '",',
             '"oracle":"', addressToString(address(oracle)), '",',
             '"drModule":"', addressToString(address(drModule)), '",',
-            '"yieldOps":"', addressToString(address(yieldOps)), '",',
             '"moduleRegistry":"', addressToString(address(moduleRegistry)), '",',
             '"deployer":"', addressToString(DEPLOYER), '",',
             '"buyer":"', addressToString(BUYER), '",',

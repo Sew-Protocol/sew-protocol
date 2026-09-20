@@ -5,7 +5,6 @@ import "forge-std/Test.sol";
 import "../../../contracts/core/EscrowVault.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/modules/DefaultReleaseStrategy.sol";
-import "../../../contracts/ops/YieldOps.sol";
 import "../../../contracts/core/EscrowCreationPolicy.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/modules/DefaultResolutionModule.sol";
@@ -42,9 +41,7 @@ contract ModuleSnapshotRaceConditionTest is Test {
         strategyB = new SimpleReleaseStrategy();
         token = new ERC20Mock("Token", "TKN", owner, 1000e18);
 
-        vault = new EscrowVault(0,address(0xFEE),address(new YieldOps(owner)),address(mm));
         
-        mm.registerEscrowContract(address(vault));
         
         // Setup initial default strategy.
         mm.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(strategyA));

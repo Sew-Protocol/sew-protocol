@@ -52,7 +52,6 @@ contract DisputeLogicEquivalenceTest is Test {
 
     function setUp() public {
         ops = new DisputeOpsReference(address(this));
-        ops.registerEscrowContract(address(this));
     }
 
     function _assertOpeningEq(

@@ -34,7 +34,6 @@ async function main() {
   const contracts = [
     { name: 'EscrowVault', address: registry.contracts.EscrowVault.address, needsTimelock: false },
     { name: 'EscrowCreationPolicy', address: registry.contracts.EscrowCreationPolicy.address, needsTimelock: true },
-    { name: 'YieldOps', address: registry.contracts.YieldOps.address, needsTimelock: true },
   ];
 
   let hasGuardian = 0;
@@ -80,7 +79,7 @@ async function main() {
     console.log('2. For testnet only: deployer renounces admin, grants role, reclaims admin');
     console.log('\nExample Timelock call:');
     console.log(`   grantRole(${ROLE_GUARDIAN}, ${guardianAddr})`);
-    console.log(`   on: EscrowCreationPolicy, YieldOps\n`);
+    console.log(`   on: EscrowCreationPolicy\n`);
   } else {
     console.log('✅ Guardian role fully configured!\n');
   }

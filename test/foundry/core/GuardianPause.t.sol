@@ -12,7 +12,6 @@ import '../../../contracts/modules/DefaultReleaseStrategy.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/types/YieldPresets.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
-import '../../../contracts/ops/YieldOps.sol';
 import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/ops/GuardianOps.sol';
 import '../TestConfig.sol';
@@ -35,7 +34,6 @@ contract GuardianPause is Test {
     ERC20Mock public token;
     DefaultResolutionModule public resolutionModule;
     DefaultReleaseStrategy public releaseStrategy;
-    YieldOps public yieldOps;
     EscrowCreationPolicy public creationPolicy;
     GuardianOps public guardianOps;
 
@@ -72,12 +70,11 @@ contract GuardianPause is Test {
         token = new ERC20Mock('Test Token', 'TEST', owner, 10000000e18);
 
         // Deploy ops contracts
-        yieldOps = new YieldOps(owner);
         creationPolicy = new EscrowCreationPolicy(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
 
         // Deploy vault
-        vault = new EscrowVault(ESCROW_FEE,feeAddress,address(yieldOps),address(moduleManagement));
+        vault = new EscrowVault(ESCROW_FEE,feeAddress,address(moduleManagement));
 
         // Deploy admin contract
         adminContract = new EscrowGovernanceTimelock(owner);
@@ -91,17 +88,15 @@ contract GuardianPause is Test {
         vault.grantRole(ROLE_GUARDIAN, guardian);
 
         // Wire ops contracts
-        yieldOps.registerEscrowContract(address(vault));
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), owner);
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(adminContract));
         vault.setCreationPolicy(address(creationPolicy));
 
-        moduleManagement.registerEscrowContract(address(vault));
-        adminContract.registerEscrowContract(address(vault));
 
         // Queue and activate modules
         adminContract.queueResolutionModule(address(vault), address(resolutionModule));
         vm.prank(address(this));
+        moduleManagement.registerEscrowContract(address(vault));
         moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
         vm.warp(block.timestamp + 14 days + 1);
         adminContract.activateResolutionModule(address(vault));

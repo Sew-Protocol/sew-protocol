@@ -27,7 +27,6 @@ interface ContractInfo {
 
 const DEPLOYED_ADDRESSES: Record<string, string> = {
   ModuleSnapshotRegistry: '0x1B152685Fb8268d7eb4F292524d86661dCFEEdE6',
-  YieldOps: '0xEc421d01E88754dAe5AAdE24C7616F8161f9f0F3',
   EscrowCreationPolicy: '0xBC60481020457CAC819B6938396a1002B0518f34',
   BondCollector: '0x24240912ed0143A47Cda4b7d32C8AB8CdFA825B4',
   EscrowGovernanceTimelock: '0x13e2DBa43A28D5278803764F8308f1D230478391',

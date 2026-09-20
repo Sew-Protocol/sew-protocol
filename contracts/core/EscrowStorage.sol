@@ -3,7 +3,6 @@ pragma solidity ^0.8.37;
 
 // Sole owner of BaseEscrow state. Declaration order is intentionally preserved.
 import '../types/EscrowTypes.sol';
-import '../ops/YieldOps.sol';
 import './EscrowCreationPolicy.sol';
 import './BondCollector.sol';
 import '../libraries/ModuleSnapshotLibrary.sol';
@@ -60,7 +59,6 @@ abstract contract EscrowStorage {
     mapping(uint256 => ModuleSnapshot) public moduleSnapshots;
     mapping(uint256 => address) public appealBondFeeRecipients;
     mapping(uint256 => uint256) public workflowResolutionConfigVersion;
-    YieldOps public yieldOps;
     BondCollector public bondCollector;
     EscrowCreationPolicy public creationPolicy;
 }

@@ -7,7 +7,6 @@ import "../../../contracts/modules/DefaultReleaseStrategy.sol";
 import '../../../contracts/core/EscrowVaultAnalytics.sol';
 import "../../../contracts/modules/DefaultResolutionModule.sol";
 import "../../../contracts/types/EscrowTypes.sol";
-import "../../../contracts/ops/YieldOps.sol";
 import "../../../contracts/core/EscrowCreationPolicy.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
@@ -35,7 +34,6 @@ contract VaultAccountingBugTest is Test {
     DefaultReleaseStrategy public releaseStrategy;
     RevertingERC20 public token;
     DefaultResolutionModule public resolutionModule;
-    YieldOps public yieldOps;
     EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
@@ -49,21 +47,18 @@ contract VaultAccountingBugTest is Test {
     function setUp() public {
         owner = address(this);
         token = new RevertingERC20();
-        yieldOps = new YieldOps(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
         creationPolicy = new EscrowCreationPolicy(owner);
         bondCollector = new BondCollector(owner);
         resolutionModule = new DefaultResolutionModule(owner, resolver);
         releaseStrategy = new DefaultReleaseStrategy();
 
-        escrow = new EscrowVault(0,feeAddress,address(yieldOps),address(moduleManagement));
+        escrow = new EscrowVault(0,feeAddress,address(moduleManagement));
         
-        yieldOps.registerEscrowContract(address(escrow));
         moduleManagement.registerEscrowContract(address(escrow));
         moduleManagement.queueModule(address(escrow), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
         vm.warp(block.timestamp + 8 days);
         moduleManagement.activateModule(address(escrow), BaseEscrow.ModuleType.RELEASE);
-        bondCollector.registerEscrowContract(address(escrow));
 
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), owner);
         escrow.setCreationPolicy(address(creationPolicy));

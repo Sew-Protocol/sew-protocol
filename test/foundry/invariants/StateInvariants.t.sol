@@ -29,7 +29,6 @@ contract StateInvariants is Test {
     DefaultResolutionModule internal resModule;
     EscrowInvariantHandler  internal handler;
 
-    YieldOps     internal yieldOps;
     EscrowCreationPolicy    internal creationPolicy;
     BondCollector internal bondCollector;
     ModuleSnapshotRegistry internal mm;
@@ -42,17 +41,13 @@ contract StateInvariants is Test {
     function setUp() public {
         token = new ERC20Mock("Token", "TKN", address(this), 0);
 
-        yieldOps     = new YieldOps(address(this));
         creationPolicy    = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
         mm           = new ModuleSnapshotRegistry(address(this));
         resModule    = new DefaultResolutionModule(address(this), resolver);
 
-        vault = new EscrowVault(FEE_BPS,feeAddr,address(yieldOps),address(mm));
+        vault = new EscrowVault(FEE_BPS,feeAddr,address(mm));
 
-        yieldOps.registerEscrowContract(address(vault));
-        bondCollector.registerEscrowContract(address(vault));
-        mm.registerEscrowContract(address(vault));
 
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.setCreationPolicy(address(creationPolicy));

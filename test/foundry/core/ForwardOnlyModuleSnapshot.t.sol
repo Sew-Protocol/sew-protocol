@@ -10,7 +10,6 @@ import "../../../contracts/mocks/ERC20Mock.sol";
 import "../../../contracts/types/EscrowTypes.sol";
 import "../../../contracts/types/YieldPresets.sol";
 import "../../../contracts/libraries/SettingsValidationLibrary.sol";
-import "../../../contracts/ops/YieldOps.sol";
 import "../../../contracts/core/EscrowCreationPolicy.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/interfaces/IReleaseStrategy.sol";
@@ -22,9 +21,8 @@ contract EscrowVaultModuleGetterHarness is EscrowVault {
     constructor(
         uint256 escrowFeeBps,
         address feeAddress,
-        address yieldOpsAddress,
         address moduleManagementAddress
-    ) EscrowVault(escrowFeeBps, feeAddress, yieldOpsAddress, moduleManagementAddress) {}
+    ) EscrowVault(escrowFeeBps, feeAddress, moduleManagementAddress) {}
 
     function effectiveReleaseStrategy(uint256 workflowId) external view returns (address) {
         return address(_getReleaseStrategy(workflowId));
@@ -64,7 +62,6 @@ contract ForwardOnlyModuleSnapshotTest is Test {
     address internal constant FEE = address(0xFEE);
 
     function setUp() public {
-        YieldOps yieldOps = new YieldOps(address(this));
         mm = new ModuleSnapshotRegistry(address(this));
 
         allowRelease = new DefaultReleaseStrategy();
@@ -72,14 +69,12 @@ contract ForwardOnlyModuleSnapshotTest is Test {
         resolution = new DefaultResolutionModule(address(this), address(0x1234));
 
         vault = new EscrowVaultModuleGetterHarness(
-            0, FEE, address(yieldOps), address(mm)
+            0, FEE,  address(mm)
         );
-
         mm.registerEscrowContract(address(vault));
 
         EscrowCreationPolicy creationPolicy = new EscrowCreationPolicy(address(this));
         BondCollector bondCollector = new BondCollector(address(this));
-        bondCollector.registerEscrowContract(address(vault));
 
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.setCreationPolicy(address(creationPolicy));

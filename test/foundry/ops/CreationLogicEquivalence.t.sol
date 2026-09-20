@@ -53,7 +53,6 @@ contract CreationLogicEquivalenceTest is Test {
 
     function setUp() public {
         createOps = new CreateOpsReference(address(this));
-        createOps.registerEscrowContract(address(this));
         module = new CreateResolverModule();
         contractResolver = address(module); // any deployed contract
         vm.warp(1_000_000);

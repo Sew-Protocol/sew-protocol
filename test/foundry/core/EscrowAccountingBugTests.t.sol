@@ -5,7 +5,6 @@ import 'forge-std/Test.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/core/EscrowVaultAnalytics.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
-import '../../../contracts/ops/YieldOps.sol';
 import '../../../contracts/modules/DefaultResolutionModule.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/modules/DefaultReleaseStrategy.sol';
@@ -115,7 +114,6 @@ contract MockYieldModuleWithLoss is IYieldModule {
 
 contract EscrowAccountingBugTests is Test {
     EscrowVault public vault;
-    YieldOps public yieldOps;
     ModuleSnapshotRegistry public mm;
     EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
@@ -134,7 +132,6 @@ contract EscrowAccountingBugTests is Test {
     function setUp() public {
         token = new ERC20Mock("Token", "TKN", address(this), 1000000e18);
 
-        yieldOps = new YieldOps(address(this));
         mm = new ModuleSnapshotRegistry(address(this));
         creationPolicy = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
@@ -142,11 +139,8 @@ contract EscrowAccountingBugTests is Test {
         yieldGen = new MockYieldModuleWithLoss();
         releaseStrategy = new DefaultReleaseStrategy();
 
-        vault = new EscrowVault(FEE_BPS,feeAddress,address(yieldOps),address(mm));
+        vault = new EscrowVault(FEE_BPS,feeAddress,address(mm));
 
-        yieldOps.registerEscrowContract(address(vault));
-        mm.registerEscrowContract(address(vault));
-        bondCollector.registerEscrowContract(address(vault));
 
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.setCreationPolicy(address(creationPolicy));
@@ -154,6 +148,7 @@ contract EscrowAccountingBugTests is Test {
         vault.setResolutionModule(address(resolutionModule));
 
         // Set default modules via governance
+        mm.registerEscrowContract(address(vault));
         mm.queueModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN, address(yieldGen));
         mm.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
         vm.warp(block.timestamp + 8 days);

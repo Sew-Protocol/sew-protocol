@@ -10,8 +10,6 @@ describe('MultiL2ViewAggregator - Multicall Integration', function () {
   let from: HardhatEthersSigner;
   let to: HardhatEthersSigner;
   let feeAddress: HardhatEthersSigner;
-  let yieldOpsAddress: HardhatEthersSigner;
-  let disputeOpsAddress: HardhatEthersSigner;
   let moduleManagement: ModuleManagementContract;
   let testToken: any;
 
@@ -19,7 +17,7 @@ describe('MultiL2ViewAggregator - Multicall Integration', function () {
   const TEST_AMOUNT = ethers.parseEther('100');
 
   before(async function () {
-    [deployer, from, to, feeAddress, yieldOpsAddress, disputeOpsAddress] = await ethers.getSigners();
+    [deployer, from, to, feeAddress] = await ethers.getSigners();
 
     // Deploy ModuleManagementContract
     const mmcFactory = await ethers.getContractFactory('ModuleManagementContract');
@@ -30,8 +28,6 @@ describe('MultiL2ViewAggregator - Multicall Integration', function () {
     vault = await vaultFactory.deploy(
       ESCROW_FEE_BPS,
       feeAddress.address,
-      yieldOpsAddress.address,
-      disputeOpsAddress.address,
       moduleManagement.address,
     );
 

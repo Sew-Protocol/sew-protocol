@@ -31,7 +31,6 @@ contract ResolverInvariants is Test {
     DefaultResolutionModule internal resModule4;
     EscrowInvariantHandler  internal handler4;
 
-    YieldOps     internal y4;
     EscrowCreationPolicy    internal c4;
     BondCollector internal b4;
     ModuleSnapshotRegistry internal mm4;
@@ -46,16 +45,12 @@ contract ResolverInvariants is Test {
 
     function _setupVault4() internal {
         token4 = new ERC20Mock("Token4", "TKN4", address(this), 0);
-        y4 = new YieldOps(address(this));
         c4 = new EscrowCreationPolicy(address(this));
         b4 = new BondCollector(address(this));
         mm4 = new ModuleSnapshotRegistry(address(this));
         resModule4 = new DefaultResolutionModule(address(this), resolver4);
 
-        vault4 = new EscrowVault(100,feeAddr4,address(y4),address(mm4));
-        y4.registerEscrowContract(address(vault4));
-        b4.registerEscrowContract(address(vault4));
-        mm4.registerEscrowContract(address(vault4));
+        vault4 = new EscrowVault(100,feeAddr4,address(mm4));
 
         vault4.grantRole(vault4.ROLE_ADMIN_CONTRACT(), address(this));
         vault4.setCreationPolicy(address(c4));
@@ -130,7 +125,6 @@ contract AppealWindowInvariants is Test {
     DefaultResolutionModule internal resModule;
     EscrowInvariantHandler  internal handler;
 
-    YieldOps     internal yieldOps;
     EscrowCreationPolicy    internal creationPolicy;
     BondCollector internal bondCollector;
     ModuleSnapshotRegistry internal mm;
@@ -141,17 +135,13 @@ contract AppealWindowInvariants is Test {
     function setUp() public {
         token = new ERC20Mock("AppealToken", "ATP", address(this), 0);
 
-        yieldOps     = new YieldOps(address(this));
         creationPolicy    = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
         mm           = new ModuleSnapshotRegistry(address(this));
         resModule    = new DefaultResolutionModule(address(this), resolver);
 
-        vault = new EscrowVault(100,feeAddr,address(yieldOps),address(mm));
+        vault = new EscrowVault(100,feeAddr,address(mm));
 
-        yieldOps.registerEscrowContract(address(vault));
-        bondCollector.registerEscrowContract(address(vault));
-        mm.registerEscrowContract(address(vault));
 
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.setCreationPolicy(address(creationPolicy));

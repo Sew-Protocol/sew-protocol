@@ -63,7 +63,6 @@ async function main() {
     Safe_Multisig: 'Safe multisig (testnet; may be same as guardian)',
     GuardianSafe: 'Guardian multisig (testnet; may be same as governance safe)',
 
-    YieldOps: 'Yield ops router (yield deposit/withdraw orchestration)',
     EscrowCreationPolicy: 'Create ops router (escrow creation orchestration)',
     BondCollector: 'Bond/fee collector helper (as configured)',
 
@@ -90,7 +89,7 @@ async function main() {
     },
     {
       title: 'Ops contracts',
-      names: ['EscrowCreationPolicy', 'YieldOps', 'BondCollector'],
+      names: ['EscrowCreationPolicy', 'BondCollector'],
     },
     {
       title: 'Core escrow',

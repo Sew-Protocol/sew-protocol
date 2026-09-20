@@ -10,7 +10,6 @@ import '../../../contracts/modules/decentralized-resolution-module/incentive/Res
 import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibraryV1.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/types/EscrowTypes.sol';
-import '../../../contracts/ops/YieldOps.sol';
 import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
@@ -30,7 +29,6 @@ contract AppealWindowEnforcementTest is Test {
     ResolverIncentiveModuleV2 public incentiveModule;
     PaymentCalculationLibraryV1 public paymentLib;
     ERC20Mock public token;
-    YieldOps public yieldOps;
     EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
@@ -79,19 +77,15 @@ contract AppealWindowEnforcementTest is Test {
         klerosProxy = new KlerosArbitrableProxy(address(klerosArbitrator), address(this));
 
         // Deploy escrow
-        yieldOps = new YieldOps(address(this));
         creationPolicy = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleSnapshotRegistry(deployer);
         adminContract = new EscrowGovernanceTimelock(deployer);
-        escrow = new EscrowVault(ESCROW_FEE,feeAddress,address(yieldOps),address(moduleManagement));
-        moduleManagement.registerEscrowContract(address(escrow));
+        escrow = new EscrowVault(ESCROW_FEE,feeAddress,address(moduleManagement));
 
         // Wire ops contracts (EscrowCreationPolicy) and register escrow contract callers
-        bondCollector.registerEscrowContract(address(escrow));
 
         // Also register this test contract as an escrow contract because it calls ops directly
-        bondCollector.registerEscrowContract(address(this));
 
         // Allow this test contract to wire ops on the vault
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(this));
@@ -112,15 +106,10 @@ contract AppealWindowEnforcementTest is Test {
         escrow.grantRole(escrowRoleTimelock, address(this));
 
         // Register escrow contract in resolution module
-        resolutionModule.registerEscrowContract(address(escrow));
-        resolutionModule.registerEscrowContract(address(this)); // Register self because we call setEscrowCategory
         klerosProxy.grantRole(klerosProxy.ROLE_TIMELOCK(), address(this));
         klerosProxy.registerKlerosHandoffEscrow(address(escrow));
 
         // Register escrow contract in incentive module
-        incentiveModule.registerEscrowContract(address(escrow));
-        incentiveModule.registerEscrowContract(address(this));
-        incentiveModule.registerEscrowContract(address(resolutionModule));
 
         // Set incentive module in resolution module
         vm.prank(timelock);

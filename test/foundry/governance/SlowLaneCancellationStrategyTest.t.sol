@@ -5,7 +5,6 @@ import "forge-std/Test.sol";
 import "../../../contracts/modules/DefaultCancellationStrategy.sol";
 import "../../../contracts/core/EscrowVault.sol";
 import "../../../contracts/core/EscrowCreationPolicy.sol";
-import "../../../contracts/ops/YieldOps.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/types/EscrowTypes.sol";
@@ -34,7 +33,6 @@ contract SlowLaneCancellationStrategyTest is Test {
     function setUp() public {
         token = new ERC20Mock("Test", "TST", address(this), 10000e18);
         
-        YieldOps yieldOps = new YieldOps(address(this));
         EscrowCreationPolicy creationPolicy = new EscrowCreationPolicy(address(this));
         BondCollector bondCollector = new BondCollector(address(this));
         
@@ -43,15 +41,13 @@ contract SlowLaneCancellationStrategyTest is Test {
         defaultStrategy = new DefaultCancellationStrategy();
         defaultStrategy2 = new DefaultCancellationStrategy();
         
-        vault = new EscrowVault(ESCROW_FEE,feeAddress,address(yieldOps),address(moduleManagement));
-        
-        moduleManagement.registerEscrowContract(address(vault));
-        yieldOps.registerEscrowContract(address(vault));
-        bondCollector.registerEscrowContract(address(vault));
-        
+        vault = new EscrowVault(ESCROW_FEE,feeAddress,address(moduleManagement));
+
+
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.setCreationPolicy(address(creationPolicy));
         vault.setBondCollector(address(bondCollector));
+        moduleManagement.registerEscrowContract(address(vault));
         
         token.transfer(sender, 1000e18);
     }

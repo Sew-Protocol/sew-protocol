@@ -10,7 +10,6 @@ import { EscrowSettings, EscrowState } from "../../../contracts/types/EscrowType
 
 interface IEscrowVaultPhase1 {
     // Wiring / config
-    function yieldOps() external view returns (address);
     function creationPolicy() external view returns (address);
     function bondCollector() external view returns (address);
     function moduleManagement() external view returns (address);
@@ -79,7 +78,6 @@ contract Phase1CoreJourneysBaseSepoliaForkTest is Test {
         escrow = IEscrowVaultPhase1(escrowVaultAddr);
 
         // --- UPGRADE CORE ON FORK ---
-        address yieldOps = _dep("YieldOps");
         address moduleManagement = _dep("ModuleSnapshotRegistry");
         address safeMultisig = _dep("Safe_Multisig");
         address creationPolicy = _dep("EscrowCreationPolicy");

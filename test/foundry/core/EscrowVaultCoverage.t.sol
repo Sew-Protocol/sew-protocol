@@ -7,7 +7,6 @@ import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/modules/DefaultResolutionModule.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/types/YieldPresets.sol';
-import '../../../contracts/ops/YieldOps.sol';
 import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
@@ -24,7 +23,6 @@ contract EscrowVaultCoverageTest is Test {
     ERC20Mock public tokenA;
     ERC20Mock public tokenB;
     DefaultResolutionModule public resolutionModule;
-    YieldOps public yieldOps;
     EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
@@ -65,22 +63,19 @@ contract EscrowVaultCoverageTest is Test {
         tokenA = new ERC20Mock('Token A', 'TKNA', address(this), 1_000_000e18);
         tokenB = new ERC20Mock('Token B', 'TKNB', address(this), 1_000_000e18);
 
-        yieldOps      = new YieldOps(address(this));
         creationPolicy     = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         resolutionModule = new DefaultResolutionModule(address(this), resolver);
         releaseStrategy = new DefaultReleaseStrategy();
 
-        vault = new EscrowVault(FEE_BPS,feeAddress,address(yieldOps),address(moduleManagement));
+        vault = new EscrowVault(FEE_BPS,feeAddress,address(moduleManagement));
 
         moduleManagement.registerEscrowContract(address(vault));
         moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
         vm.warp(block.timestamp + 8 days);
         moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
 
-        yieldOps.registerEscrowContract(address(vault));
-        bondCollector.registerEscrowContract(address(vault));
 
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.setCreationPolicy(address(creationPolicy));
@@ -102,34 +97,23 @@ contract EscrowVaultCoverageTest is Test {
     function test_constructor_revert_fee_too_high() public {
         uint256 badFee = vault.MAX_ESCROW_FEE_BPS() + 1;
         vm.expectRevert();
-        new EscrowVault(badFee,feeAddress,address(yieldOps),address(moduleManagement));
+        new EscrowVault(badFee,feeAddress,address(moduleManagement));
     }
 
     function test_constructor_revert_zero_fee_address() public {
         vm.expectRevert();
-        new EscrowVault(FEE_BPS,address(0),address(yieldOps),address(moduleManagement));
-    }
-
-    function test_constructor_revert_zero_yield_ops() public {
-        vm.expectRevert();
-        new EscrowVault(FEE_BPS,feeAddress,address(0),address(moduleManagement));
+        new EscrowVault(FEE_BPS,address(0),address(moduleManagement));
     }
 
     function test_constructor_revert_zero_module_management() public {
         vm.expectRevert();
-        new EscrowVault(FEE_BPS,feeAddress,address(yieldOps),address(0));
-    }
-
-    function test_constructor_revert_no_code_yield_ops() public {
-        address eoa = address(0xAAAA);
-        vm.expectRevert();
-        new EscrowVault(FEE_BPS,feeAddress,eoa,address(moduleManagement));
+        new EscrowVault(FEE_BPS,feeAddress,address(0));
     }
 
     function test_constructor_revert_no_code_module_management() public {
         address eoa = address(0xCCCC);
         vm.expectRevert();
-        new EscrowVault(FEE_BPS,feeAddress,address(yieldOps),eoa);
+        new EscrowVault(FEE_BPS,feeAddress,eoa);
     }
 
     function test_constructor_grants_admin_role_to_deployer() public view {

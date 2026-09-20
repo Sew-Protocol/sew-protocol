@@ -9,7 +9,6 @@ import 'contracts/libraries/EscrowEncodingLibrary.sol';
 import 'contracts/interfaces/IReleaseStrategy.sol';
 import 'contracts/interfaces/IEscrowCore.sol';
 import 'contracts/core/EscrowCreationPolicy.sol';
-import 'contracts/ops/YieldOps.sol';
 import 'contracts/core/BondCollector.sol';
 import 'contracts/mocks/MockERC20.sol';
 import 'contracts/mocks/MockResolutionModule.sol';
@@ -35,7 +34,6 @@ contract ReleaseFlexibilityTest is Test {
     DefaultReleaseStrategy defaultReleaseStrategy;
     MockResolutionModule mockResolutionModule;
     EscrowCreationPolicy creationPolicy;
-    YieldOps yieldOps;
     BondCollector bondCollector;
     MockModuleSnapshotRegistry moduleSnapshotRegistry;
 
@@ -48,7 +46,6 @@ contract ReleaseFlexibilityTest is Test {
 
         // Deploy utility contracts
         creationPolicy = new EscrowCreationPolicy(defaultAdmin);
-        yieldOps = new YieldOps(defaultAdmin);
         bondCollector = new BondCollector(defaultAdmin);
         
         // Deploy DefaultReleaseStrategy
@@ -66,13 +63,12 @@ contract ReleaseFlexibilityTest is Test {
         // Deploy EscrowVault (MOVED HERE) - deployer will be pranked so deployer gets ROLE_ADMIN
         vm.startPrank(deployer);
         escrowVault = new EscrowVault(0,// escrowFeeBps
-            feeAddress,address(yieldOps),address(moduleSnapshotRegistry) // Pass the mock registry
+            feeAddress,address(moduleSnapshotRegistry) // Pass the mock registry
         );
         vm.stopPrank();
 
         // Setup initial default modules in the mock registry (MOVED HERE)
         vm.startPrank(timelock);
-        moduleSnapshotRegistry.registerEscrowContract(address(escrowVault));
         
         // Queue and activate release strategy
         moduleSnapshotRegistry.queueModule(address(escrowVault), BaseEscrow.ModuleType.RELEASE, address(defaultReleaseStrategy));
@@ -93,7 +89,6 @@ contract ReleaseFlexibilityTest is Test {
         vm.stopPrank();
 
         vm.startPrank(defaultAdmin);
-        yieldOps.grantRole(yieldOps.ROLE_ESCROW_CONTRACT(), address(escrowVault));
         bondCollector.grantRole(bondCollector.ROLE_ESCROW_CONTRACT(), address(escrowVault));
         vm.stopPrank();
 

@@ -19,7 +19,6 @@ interface ITimelockControllerMinimal {
 }
 
 interface IEscrowVaultPhase0 is IAccessControlMinimal {
-    function yieldOps() external view returns (address);
     function creationPolicy() external view returns (address);
     function bondCollector() external view returns (address);
     function moduleManagement() external view returns (address);
@@ -57,7 +56,6 @@ contract Phase0BaseSepoliaForkTest is Test {
     address internal governor;
     address internal safeMultisig;
     address internal guardianSafe;
-    address internal yieldOps;
     address internal creationPolicy;
     address internal bondCollector;
     address internal moduleManagement;
@@ -84,7 +82,6 @@ contract Phase0BaseSepoliaForkTest is Test {
         governor = _dep("GovGovernor");
         safeMultisig = _dep("Safe_Multisig");
         guardianSafe = _dep("GuardianSafe");
-        yieldOps = _dep("YieldOps");
         creationPolicy = _dep("EscrowCreationPolicy");
         bondCollector = _dep("BondCollector");
         moduleManagement = _dep("ModuleSnapshotRegistry");
@@ -105,7 +102,6 @@ contract Phase0BaseSepoliaForkTest is Test {
         _requireCode("GovGovernor", governor);
         // NOTE: On Base Sepolia testnet, these may be EOAs (no bytecode).
         // We still require them to be non-zero addresses (enforced by _dep()).
-        _requireCode("YieldOps", yieldOps);
         _requireCode("EscrowCreationPolicy", creationPolicy);
         _requireCode("BondCollector", bondCollector);
         _requireCode("ModuleSnapshotRegistry", moduleManagement);
@@ -114,7 +110,6 @@ contract Phase0BaseSepoliaForkTest is Test {
 
         // 2) Core wiring
         IEscrowVaultPhase0 ev = IEscrowVaultPhase0(escrowVault);
-        assertEq(ev.yieldOps(), yieldOps, "EscrowVault.yieldOps mismatch");
         assertEq(ev.creationPolicy(), creationPolicy, "EscrowVault.creationPolicy mismatch");
         assertEq(ev.bondCollector(), bondCollector, "EscrowVault.bondCollector mismatch");
         assertEq(ev.moduleManagement(), moduleManagement, "EscrowVault.moduleManagement mismatch");
@@ -122,7 +117,6 @@ contract Phase0BaseSepoliaForkTest is Test {
 
         // 3) Ops registration: ROLE_ESCROW_CONTRACT for EscrowVault
         bytes32 ROLE_ESCROW_CONTRACT = keccak256("ROLE_ESCROW_CONTRACT");
-        assertTrue(IAccessControlMinimal(yieldOps).hasRole(ROLE_ESCROW_CONTRACT, escrowVault), "YieldOps missing ROLE_ESCROW_CONTRACT");
         assertTrue(IAccessControlMinimal(bondCollector).hasRole(ROLE_ESCROW_CONTRACT, escrowVault), "BondCollector missing ROLE_ESCROW_CONTRACT");
 
         // 4) Slow lane admin wiring: EscrowGovernanceTimelock authorized on EscrowVault

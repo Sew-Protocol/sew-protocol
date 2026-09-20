@@ -4,7 +4,6 @@ pragma solidity ^0.8.37;
 import 'forge-std/Test.sol';
 import 'contracts/core/EscrowVault.sol';
 import 'contracts/core/BaseEscrow.sol';
-import 'contracts/ops/YieldOps.sol';
 import 'contracts/core/ModuleSnapshotRegistry.sol';
 import 'contracts/core/EscrowCreationPolicy.sol';
 import 'contracts/modules/DefaultReleaseStrategy.sol';
@@ -90,7 +89,6 @@ contract MockYieldModuleFee is IYieldModule {
 contract AaveYieldProtocolFeeTest is Test {
     EscrowVault internal vault;
     MockYieldModuleFee internal module;
-    YieldOps internal yieldOps;
     ModuleSnapshotRegistry internal registry;
     EscrowCreationPolicy internal policy;
     ERC20Mock internal token;
@@ -104,15 +102,14 @@ contract AaveYieldProtocolFeeTest is Test {
     function setUp() public {
         token = new ERC20Mock('Token', 'TKN', address(this), 0);
         module = new MockYieldModuleFee();
-        yieldOps = new YieldOps(address(this));
         registry = new ModuleSnapshotRegistry(address(this));
         policy = new EscrowCreationPolicy(address(this));
 
-        vault = new EscrowVault(0, FEE, address(yieldOps), address(registry));
-        yieldOps.registerEscrowContract(address(vault));
-        registry.registerEscrowContract(address(vault));
+        vault = new EscrowVault(0, FEE, address(registry));
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.setCreationPolicy(address(policy));
+
+        registry.registerEscrowContract(address(vault));
 
         registry.queueModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN, address(module));
         registry.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(new DefaultReleaseStrategy()));

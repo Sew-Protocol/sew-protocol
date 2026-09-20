@@ -12,7 +12,6 @@ import "../../../contracts/mocks/ERC20Mock.sol";
 import "../../../contracts/types/EscrowTypes.sol";
 import "../../../contracts/types/YieldPresets.sol";
 import "../../../contracts/libraries/SettingsValidationLibrary.sol";
-import "../../../contracts/ops/YieldOps.sol";
 import "../../../contracts/core/EscrowCreationPolicy.sol";
 import "../../../contracts/core/BondCollector.sol";
 
@@ -30,7 +29,6 @@ contract ModuleSnapshotInvariants is Test {
     TestPlaceholderModule internal yieldDistB;
 
     function setUp() public {
-        YieldOps yieldOps = new YieldOps(address(this));
         mm = new ModuleSnapshotRegistry(address(this));
 
         releaseA = new DefaultReleaseStrategy();
@@ -39,13 +37,11 @@ contract ModuleSnapshotInvariants is Test {
         yieldDistB = new TestPlaceholderModule();
 
         vault = new EscrowVaultModuleGetterHarness(
-            100, address(0xFEE), address(yieldOps), address(mm)
+            100, address(0xFEE), address(mm)
         );
-        mm.registerEscrowContract(address(vault));
 
         EscrowCreationPolicy creationPolicy = new EscrowCreationPolicy(address(this));
         BondCollector bondCollector = new BondCollector(address(this));
-        bondCollector.registerEscrowContract(address(vault));
 
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.setCreationPolicy(address(creationPolicy));
@@ -75,6 +71,7 @@ contract ModuleSnapshotInvariants is Test {
     }
 
     function _activate(BaseEscrow.ModuleType moduleType, address module) internal {
+        mm.registerEscrowContract(address(vault));
         mm.queueModule(address(vault), moduleType, module);
         (, uint64 eta,) = mm.getPendingModule(address(vault), moduleType);
         vm.warp(uint256(eta) + 1);

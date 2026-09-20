@@ -10,7 +10,6 @@ import "../../../contracts/modules/DefaultResolutionModule.sol";
 import "../../../contracts/types/EscrowTypes.sol";
 import "../../../contracts/libraries/SettingsValidationLibrary.sol";
 
-import "../../../contracts/ops/YieldOps.sol";
 import "../../../contracts/core/EscrowCreationPolicy.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
@@ -87,7 +86,6 @@ contract FeeScenarioFlowsTest is Test {
     DefaultReleaseStrategy public releaseStrategy;
     ERC20Mock public token;
     DefaultResolutionModule public resolutionModule;
-    YieldOps public yieldOps;
     EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
@@ -119,22 +117,19 @@ contract FeeScenarioFlowsTest is Test {
         resolutionModule = new DefaultResolutionModule(owner, resolver);
         releaseStrategy = new DefaultReleaseStrategy();
         token = new ERC20Mock("Token", "TKN", owner, 10000000e18);
-        yieldOps = new YieldOps(owner);
         creationPolicy = new EscrowCreationPolicy(owner);
         bondCollector = new BondCollector(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
         adminContract = new EscrowGovernanceTimelock(owner);
 
         // Vault starts with 0% fee; we'll slow-lane set to 1% in tests.
-        vault = new EscrowVault(INITIAL_ESCROW_FEE_BPS,treasury,address(yieldOps),address(moduleManagement));
+        vault = new EscrowVault(INITIAL_ESCROW_FEE_BPS,treasury,address(moduleManagement));
         moduleManagement.registerEscrowContract(address(vault));
         moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
         vm.warp(block.timestamp + 8 days);
         moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
 
         // Register vault on ops contracts
-        yieldOps.registerEscrowContract(address(vault));
-        bondCollector.registerEscrowContract(address(vault));
 
         // Wire vault roles + ops
         vault.grantRole(vault.ROLE_TIMELOCK(), timelock);
@@ -266,7 +261,6 @@ contract FeeScenarioFlowsTest is Test {
         MockIncentiveModule incentive = new MockIncentiveModule();
 
         // Allow this test contract to call BondCollector.collectBond (ROLE_ESCROW_CONTRACT)
-        bondCollector.registerEscrowContract(address(this));
 
         uint256 workflowId = 77;
         uint256 bondAmount = 10 ether;

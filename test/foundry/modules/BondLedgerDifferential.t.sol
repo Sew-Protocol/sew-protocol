@@ -10,7 +10,6 @@ import '../../../contracts/modules/decentralized-resolution-module/libraries/Pay
 import '../../../contracts/modules/decentralized-resolution-module/interfaces/IPaymentCalculationLibrary.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
-import '../../../contracts/ops/YieldOps.sol';
 import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/core/BondCollector.sol';
@@ -449,15 +448,13 @@ contract BondLedgerDifferential is Test {
         s.drm.grantRole(s.drm.ROLE_TIMELOCK(), timelock);
         s.drm.registerEscrowContract(address(this));
 
-        YieldOps yOps = new YieldOps(address(this));
         ModuleSnapshotRegistry mm = new ModuleSnapshotRegistry(address(this));
-        s.escrow = new EscrowVault(100,feeAddr,address(yOps),address(mm));
+        s.escrow = new EscrowVault(100,feeAddr,address(mm));
 
         EscrowCreationPolicy cOps = new EscrowCreationPolicy(address(this));
         BondCollector bc = new BondCollector(address(this));
 
         bc.registerEscrowContract(address(s.escrow));
-        yOps.registerEscrowContract(address(s.escrow));
 
         s.escrow.grantRole(s.escrow.ROLE_ADMIN_CONTRACT(), address(this));
         s.escrow.setCreationPolicy(address(cOps));

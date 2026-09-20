@@ -8,7 +8,6 @@ import '../../../contracts/modules/decentralized-resolution-module/DRMAdminFacet
 import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibraryV1.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
-import '../../../contracts/ops/YieldOps.sol';
 import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/core/BondCollector.sol';
@@ -54,16 +53,13 @@ contract BondBehaviourCorrectionTest is Test {
         drm.grantRole(drm.ROLE_TIMELOCK(), timelock);
         drm.registerEscrowContract(address(this));
 
-        YieldOps yOps = new YieldOps(address(this));
         moduleMgmt = new ModuleSnapshotRegistry(address(this));
-        escrow = new EscrowVault(100,feeAddr,address(yOps),address(moduleMgmt));
+        escrow = new EscrowVault(100,feeAddr,address(moduleMgmt));
 
         EscrowCreationPolicy cOps = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
 
         bondCollector.registerEscrowContract(address(escrow));
-        yOps.registerEscrowContract(address(escrow));
-
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(this));
         escrow.setCreationPolicy(address(cOps));
         escrow.setBondCollector(address(bondCollector));

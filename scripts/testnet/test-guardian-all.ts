@@ -69,35 +69,6 @@ async function main() {
     console.log(`   ❌ FAIL: ${err.message}`);
   }
 
-  // Test 2: YieldOps - recoverTokens role
-  console.log('\n─── Test 2: YieldOps.recoverTokens() ───');
-  try {
-    const yieldOpsAddr = registry.contracts.YieldOps.address;
-    const yieldOps = await hre.ethers.getContractAt('YieldOps', yieldOpsAddr);
-
-    const ROLE_GUARDIAN = ethers.keccak256(ethers.toUtf8Bytes('ROLE_GUARDIAN'));
-    const hasRole = await yieldOps.hasRole(ROLE_GUARDIAN, guardianAddr);
-
-    if (hasRole) {
-      results.push({
-        name: 'YieldOps.recoverTokens()',
-        passed: true,
-        details: 'Has ROLE_GUARDIAN',
-      });
-      console.log(`   ✅ PASS: Has ROLE_GUARDIAN`);
-    } else {
-      results.push({
-        name: 'YieldOps.recoverTokens()',
-        passed: false,
-        details: 'Missing ROLE_GUARDIAN',
-      });
-      console.log(`   ❌ FAIL: Missing ROLE_GUARDIAN`);
-    }
-  } catch (err: any) {
-    results.push({ name: 'YieldOps.recoverTokens()', passed: false, details: err.message });
-    console.log(`   ❌ FAIL: ${err.message}`);
-  }
-
   // Test 3: EscrowVault - guardian role
   console.log('\n─── Test 3: EscrowVault Guardian Role ───');
   try {

@@ -4,7 +4,6 @@ pragma solidity ^0.8.37;
 import 'forge-std/Test.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
-import '../../../contracts/ops/YieldOps.sol';
 import '../../../contracts/modules/DefaultResolutionModule.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
@@ -20,7 +19,6 @@ import '../../../contracts/modules/DefaultReleaseStrategy.sol';
  */
 contract EscrowVaultAccountingTest is Test {
     EscrowVault public vault;
-    YieldOps public yieldOps;
     ModuleSnapshotRegistry public mm;
     EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
@@ -43,24 +41,21 @@ contract EscrowVaultAccountingTest is Test {
         tokenB = new ERC20Mock("Token B", "TKNB", address(this), 1000000e18);
         revertingToken = new MockRevertingERC20("Reverting", "REVERT", address(this), 1000000e18);
 
-        yieldOps = new YieldOps(address(this));
         mm = new ModuleSnapshotRegistry(address(this));
         creationPolicy = new EscrowCreationPolicy(address(this));
         bondCollector = new BondCollector(address(this));
         resolutionModule = new DefaultResolutionModule(address(this), resolver);
         defaultReleaseStrategy = new DefaultReleaseStrategy();
 
-        vault = new EscrowVault(FEE_BPS,feeAddress,address(yieldOps),address(mm));
+        vault = new EscrowVault(FEE_BPS,feeAddress,address(mm));
 
-        yieldOps.registerEscrowContract(address(vault));
-        mm.registerEscrowContract(address(vault));
-        bondCollector.registerEscrowContract(address(vault));
 
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.setCreationPolicy(address(creationPolicy));
         vault.setBondCollector(address(bondCollector));
         vault.setResolutionModule(address(resolutionModule));
         
+        mm.registerEscrowContract(address(vault));
         mm.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(defaultReleaseStrategy));
         vm.warp(block.timestamp + 8 days);
         mm.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);

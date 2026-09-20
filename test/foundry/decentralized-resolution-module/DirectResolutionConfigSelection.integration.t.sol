@@ -7,7 +7,6 @@ import '../../../contracts/core/EscrowableERC20.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/core/BondCollector.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
-import '../../../contracts/ops/YieldOps.sol';
 import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
 import '../../../contracts/types/EscrowTypes.sol';
@@ -37,20 +36,19 @@ contract DirectResolutionConfigSelectionIntegrationTest is Test, KlerosHandoffFi
     event ResolutionConfigBound(uint256 indexed workflowId, address indexed resolutionModule, uint256 indexed version, bytes32 configRoot);
 
     function setUp() public {
-        YieldOps yieldOps = new YieldOps(address(this));
         EscrowCreationPolicy creationPolicy = new EscrowCreationPolicy(address(this));
         BondCollector bondCollector = new BondCollector(address(this));
         ModuleSnapshotRegistry registry = new ModuleSnapshotRegistry(address(this));
 
-        vault = new EscrowVault(0,FEE_RECIPIENT,address(yieldOps),address(registry));
-        escrowToken = new EscrowableERC20('Escrow','ESC',0,FEE_RECIPIENT,address(yieldOps),address(registry));
+        vault = new EscrowVault(0,FEE_RECIPIENT,address(registry));
+        escrowToken = new EscrowableERC20('Escrow','ESC',0,FEE_RECIPIENT,address(registry));
         paymentToken = new ERC20Mock('Payment', 'PAY', BUYER, 1_000 ether);
         bondToken = new ERC20Mock('Bond', 'BOND', BUYER, 1_000 ether);
         (KlerosArbitrableProxy proxy, ) = _deployKlerosHandoffProxy(address(vault), address(this), 0);
         externalBackstop = address(proxy);
 
-        _wireEscrow(address(vault), registry, yieldOps, creationPolicy, bondCollector);
-        _wireEscrow(address(escrowToken), registry, yieldOps, creationPolicy, bondCollector);
+        _wireEscrow(address(vault), registry, creationPolicy, bondCollector);
+        _wireEscrow(address(escrowToken), registry, creationPolicy, bondCollector);
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.setCreationPolicy(address(creationPolicy));
         vault.setBondCollector(address(bondCollector));
@@ -91,12 +89,10 @@ contract DirectResolutionConfigSelectionIntegrationTest is Test, KlerosHandoffFi
     function _wireEscrow(
         address escrow,
         ModuleSnapshotRegistry registry,
-        YieldOps yieldOps,
         EscrowCreationPolicy creationPolicy,
         BondCollector bondCollector
     ) internal {
         registry.registerEscrowContract(escrow);
-        yieldOps.registerEscrowContract(escrow);
         bondCollector.registerEscrowContract(escrow);
     }
 

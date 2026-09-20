@@ -34,7 +34,6 @@ contract EscrowVault is BaseEscrow {
     constructor(
         uint256 escrowFeeBps,
         address feeAddress,
-        address yieldOpsAddress,
         address moduleManagementAddress
     ) {
         address deployer = _msgSender();
@@ -42,14 +41,11 @@ contract EscrowVault is BaseEscrow {
         _grantRole(ROLE_TIMELOCK, deployer);
         if (escrowFeeBps > MAX_ESCROW_FEE_BPS) revert InvalidEscrowFee(escrowFeeBps, MAX_ESCROW_FEE_BPS);
         if (feeAddress == address(0)) revert ZeroAddress(1);
-        if (yieldOpsAddress == address(0)) revert ZeroAddress(2);
         if (moduleManagementAddress == address(0)) revert ZeroAddress(4);
-        if (yieldOpsAddress.code.length == 0) revert ZeroAddress(2);
         if (moduleManagementAddress.code.length == 0) revert ZeroAddress(4);
         escrowFee = escrowFeeBps;
         escrowFeeAddress = feeAddress;
         moduleManagement = ModuleSnapshotRegistry(moduleManagementAddress);
-        yieldOps = YieldOps(yieldOpsAddress);
         // Couple the default yield protocol fee to the fee recipient: a nonzero fee is only
         // ever enabled alongside a nonzero escrowFeeAddress. The ZeroAddress(1) revert above
         // already guarantees escrowFeeAddress != 0, so with a valid recipient this is the

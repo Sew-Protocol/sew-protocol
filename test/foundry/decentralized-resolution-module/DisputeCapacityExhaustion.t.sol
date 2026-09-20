@@ -8,7 +8,6 @@ import '../../../contracts/modules/decentralized-resolution-module/Decentralized
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/core/BaseEscrow.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
-import '../../../contracts/ops/YieldOps.sol';
 import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
@@ -35,7 +34,6 @@ contract DisputeCapacityExhaustionTest is Test {
     DecentralizedResolutionModule public drm;
     DRMAdminFacet public drmAdmin;
     ERC20Mock public token;
-    YieldOps public yieldOps;
     EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
@@ -72,7 +70,6 @@ contract DisputeCapacityExhaustionTest is Test {
         token.mint(buyer, 100_000e18);
 
         // Ops
-        yieldOps = new YieldOps(deployer);
         creationPolicy = new EscrowCreationPolicy(deployer);
         bondCollector = new BondCollector(deployer);
         moduleManagement = new ModuleSnapshotRegistry(deployer);
@@ -84,7 +81,7 @@ contract DisputeCapacityExhaustionTest is Test {
         drm.setAdminFacet(address(drmAdmin));
 
         // Escrow vault
-        escrow = new EscrowVault(FEE_BPS,feeRecipient,address(yieldOps),address(moduleManagement));
+        escrow = new EscrowVault(FEE_BPS,feeRecipient,address(moduleManagement));
 
         // Wire ops
         bondCollector.registerEscrowContract(address(escrow));

@@ -24,7 +24,6 @@ contract CREATE2EscrowFactory {
     function getDeploymentAddress(
         uint256 escrowFeeBps,
         address feeAddress,
-        address yieldOpsAddress,
         address moduleManagementAddress,
         bytes32 salt
     ) external view returns (address predictedAddress) {
@@ -33,7 +32,6 @@ contract CREATE2EscrowFactory {
             abi.encode(
                 escrowFeeBps,
                 feeAddress,
-                yieldOpsAddress,
                 moduleManagementAddress
             )
         );
@@ -44,14 +42,12 @@ contract CREATE2EscrowFactory {
     function deployEscrow(
         uint256 escrowFeeBps,
         address feeAddress,
-        address yieldOpsAddress,
         address moduleManagementAddress,
         bytes32 salt
     ) external returns (EscrowVault escrowVault) {
         bytes memory constructorArgs = abi.encode(
             escrowFeeBps,
             feeAddress,
-            yieldOpsAddress,
             moduleManagementAddress
         );
 
@@ -85,14 +81,12 @@ contract CREATE2EscrowFactory {
     function isDeployed(
         uint256 escrowFeeBps,
         address feeAddress,
-        address yieldOpsAddress,
         address moduleManagementAddress,
         bytes32 salt
     ) external view returns (bool deployed) {
         address predictedAddress = this.getDeploymentAddress(
             escrowFeeBps,
             feeAddress,
-            yieldOpsAddress,
             moduleManagementAddress,
             salt
         );

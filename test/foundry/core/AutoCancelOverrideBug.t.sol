@@ -5,7 +5,6 @@ import "forge-std/Test.sol";
 import "../../../contracts/core/EscrowVault.sol";
 import "../../../contracts/modules/DefaultResolutionModule.sol";
 import "../../../contracts/types/EscrowTypes.sol";
-import "../../../contracts/ops/YieldOps.sol";
 import "../../../contracts/core/BondCollector.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
@@ -34,7 +33,6 @@ contract AutoCancelOverrideBugTest is Test {
     EscrowVault public escrow;
     ERC20Mock public token;
     MockAppealModule public resolutionModule;
-    YieldOps public yieldOps;
     EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleManagement;
@@ -48,17 +46,13 @@ contract AutoCancelOverrideBugTest is Test {
     function setUp() public {
         owner = address(this);
         token = new ERC20Mock("Token", "TKN", owner, 0);
-        yieldOps = new YieldOps(owner);
         moduleManagement = new ModuleSnapshotRegistry(owner);
         creationPolicy = new EscrowCreationPolicy(owner);
         bondCollector = new BondCollector(owner);
         resolutionModule = new MockAppealModule(owner, resolver);
 
-        escrow = new EscrowVault(0,feeAddress,address(yieldOps),address(moduleManagement));
+        escrow = new EscrowVault(0,feeAddress,address(moduleManagement));
         
-        yieldOps.registerEscrowContract(address(escrow));
-        moduleManagement.registerEscrowContract(address(escrow));
-        bondCollector.registerEscrowContract(address(escrow));
 
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), owner);
         escrow.setCreationPolicy(address(creationPolicy));
