@@ -286,7 +286,7 @@ default, individual escrow creators can override two aspects at creation time vi
 struct EscrowSettings {
     address customResolver;   // Override the module's resolver selection (address(0) = use module default)
     address releaseAddress;   // Delegated release address (address(0) = sender only)
-    YieldPreset yieldPreset;  // Yield distribution preset (OFF, TO_SENDER, TO_RECIPIENT, SPLIT, ...)
+    YieldPreset yieldPreset;  // Yield preset (OFF, ENABLED)
     uint256 autoReleaseTime;  // Custom auto-release timeout (0 = use contract default)
     uint256 autoCancelTime;   // Custom auto-cancel timeout (0 = use contract default)
 }

@@ -55,7 +55,7 @@ contract AaveYieldModuleMainnetForkTest is Test {
         // canHandle only reports supported once the token's aToken is configured in the
         // module, so configure USDC with its real aToken first, then assert support.
         _cfgToken(USDC, AUSDC);
-        (bool supported, bytes32 reason) = module.canHandle(USDC, YieldPreset.TO_SENDER, 100e6);
+        (bool supported, bytes32 reason) = module.canHandle(USDC, YieldPreset.ENABLED, 100e6);
         assertTrue(supported, "USDC should be supported on Base mainnet");
         assertEq(reason, bytes32(0), "no reason code when supported");
     }

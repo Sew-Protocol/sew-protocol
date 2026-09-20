@@ -130,7 +130,7 @@ contract AaveYieldProtocolFeeTest is Test {
         return EscrowSettings({
             customResolver: address(0),
             releaseAddress: address(0),
-            yieldPreset: YieldPreset.TO_SENDER,
+            yieldPreset: YieldPreset.ENABLED,
             autoReleaseTime: 0,
             autoCancelTime: 0
         });
@@ -348,5 +348,70 @@ contract AaveYieldProtocolFeeTest is Test {
         // until withdrawFees() is called by a ROLE_FEE_RECIPIENT.
         assertEq(token.balanceOf(FEE), feeWalletBefore, 'fee wallet unchanged at settlement');
         assertGt(vault.totalFeesPerToken(address(token)), 0, 'fee recorded internally');
+    }
+
+    // ================= Nonzero yield fee requires a real fee recipient =================
+
+    /**
+     * @notice Adversarial invariant: the "nonzero yield fee with no fee recipient"
+     *         configuration cannot exist, so a realized yield fee can never be silently
+     *         orphaned — recorded into totalFeesPerToken yet unwithdrawable because there
+     *         is no recipient (or consumed from principal). escrowFeeAddress is a
+     *         vault-global field and the code forbids pairing a nonzero rate with a zero
+     *         recipient at every config layer:
+     *
+     *           1. The vault constructor reverts (ZeroAddress) if feeAddress == 0, so a
+     *              recipient-less vault is never deployed; the ctor would otherwise force
+     *              yieldProtocolFeeBps = 0 as a backstop.
+     *           2. setFeeRecipient(address(0)) reverts (InvalidAddress), so the recipient
+     *              cannot be nulled/removed after deployment.
+     *           3. setYieldProtocolFeeBps(feeBps > 0) reverts (InvalidAddress) while
+     *              escrowFeeAddress == 0, so a nonzero rate can never be enabled on a
+     *              recipient-less vault (structurally unreachable given guards 1 & 2).
+     *
+     *         Consequently every escrow that charges a yield fee always retains a
+     *         withdrawable recipient; the fee is pull-based and never gets stuck. The
+     *         tests below assert these guards rather than a hypothetical post-hoc stuck
+     *         state that the current code makes unreachable.
+     */
+    function test_nonZeroYieldFee_cannotPairWithZeroRecipient_constructorReverts() public {
+        // A vault cannot even be deployed without a fee recipient, so the
+        // "nonzero fee + no recipient" state is uncreatable.
+        vm.expectRevert(abi.encodeWithSignature('ZeroAddress(uint8)', 1));
+        new EscrowVault(0, address(0), address(registry));
+    }
+
+    function test_nonZeroYieldFee_cannotPairWithZeroRecipient_feeRecipientReverts() public {
+        // The recipient cannot be zeroed after deployment, so a nonzero yield fee
+        // always retains the payer it is withdrawn to.
+        vm.expectRevert(abi.encodeWithSignature('InvalidAddress(uint8,address)', 5, address(0)));
+        vault.setFeeRecipient(address(0));
+    }
+
+    function test_yieldFee_withValidRecipient_isRoleGatedAndRouted_notLost() public {
+        // Complement of the no-recipient guard: with the recipient guaranteed nonzero,
+        // the charged fee is neither lost nor consumed from principal — it is pull-based
+        // and only reachable by a ROLE_FEE_RECIPIENT, then routed to the recipient.
+        _setFee(DEFAULT_FEE_BPS);
+        uint256 wf = _openEscrow();
+        module.setYield(100e18);
+
+        _release(wf);
+
+        uint256 expectedFee = 100e18 * DEFAULT_FEE_BPS / 10_000;
+        assertEq(vault.totalFeesPerToken(address(token)), expectedFee, 'fee recorded to bucket');
+        assertEq(vault.claimableBalances(wf, SELLER), AMOUNT + (100e18 - expectedFee), 'principal never consumed as fee');
+
+        // Fee is pull-based and role-gated: a non-recipient cannot pull it.
+        vm.expectRevert();
+        vault.withdrawFees(address(token));
+
+        // With a valid recipient holding the role, the fee is withdrawn and routed to it.
+        vault.grantRole(vault.ROLE_FEE_RECIPIENT(), FEE);
+        uint256 feeWalletBefore = token.balanceOf(FEE);
+        vm.prank(FEE);
+        vault.withdrawFees(address(token));
+        assertEq(vault.totalFeesPerToken(address(token)), 0, 'fee bucket cleared on withdrawal');
+        assertEq(token.balanceOf(FEE), feeWalletBefore + expectedFee, 'fee routed to recipient, not lost');
     }
 }

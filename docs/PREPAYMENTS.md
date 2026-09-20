@@ -177,18 +177,21 @@ cannot override it.
 
 ```solidity
 EscrowSettings {
-    yieldPreset: YieldPreset.TO_SENDER,
+    yieldPreset: YieldPreset.ENABLED,
     ...
 }
 ```
 
 While funds are locked, they can optionally earn yield via the Aave integration.
-Setting `YieldPreset.TO_SENDER` credits any accrued yield to the buyer when the escrow
-is settled, regardless of whether it settles as a release or refund. This means:
+Setting `YieldPreset.ENABLED` turns on yield accrual for the escrow. On settlement, the
+realized yield is credited to the settlement beneficiary together with the principal —
+on a release the recipient receives `principal + yield`; on a refund the sender receives
+`principal + yield`. The snapshotted protocol yield fee (`_computeYieldProtocolFee`, max
+30%) is carved out of realized positive yield before crediting. This means:
 
-- The buyer is compensated for the opportunity cost of locking capital.
-- The seller receives only the agreed principal — no yield is diverted to them under
-  `TO_SENDER`.
+- The party receiving the principal is also credited the earned yield.
+- Yield distribution happens in core at settlement — there is no separate `YieldOps` or
+  yield-distribution module.
 
 Yield accrues passively; the buyer does not need to take any action during the lock
 period to benefit.
@@ -276,7 +279,7 @@ is taken, payment releases automatically.
 EscrowSettings({
     customResolver: address(0),          // Use protocol default resolver
     releaseAddress: address(0),          // Only buyer can release
-    yieldPreset: YieldPreset.TO_SENDER,  // Buyer earns yield during hold
+    yieldPreset: YieldPreset.ENABLED,   // Yield accrues; credited to settlement beneficiary
     autoReleaseTime: block.timestamp + 30 days,
     autoCancelTime: 0                    // No auto-cancel (buyer has 30 days)
 })
@@ -306,7 +309,7 @@ buyer has a 7-day review window after the month ends.
 EscrowSettings({
     customResolver: address(0xKnownFreelancePlatform),
     releaseAddress: address(0),
-    yieldPreset: YieldPreset.TO_SENDER,
+    yieldPreset: YieldPreset.ENABLED,
     autoReleaseTime: block.timestamp + 37 days,  // 30-day work + 7-day review
     autoCancelTime: 0
 })
@@ -323,7 +326,7 @@ off-chain contract.
 EscrowSettings({
     customResolver: address(0xArbitrationService),
     releaseAddress: address(0xBuyersAccountingBot),
-    yieldPreset: YieldPreset.TO_SENDER,
+    yieldPreset: YieldPreset.ENABLED,
     autoReleaseTime: block.timestamp + 90 days,
     autoCancelTime: 0
 })

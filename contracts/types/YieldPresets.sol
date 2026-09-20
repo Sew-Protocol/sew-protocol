@@ -8,5 +8,5 @@ pragma solidity ^0.8.37;
  */
 enum YieldPreset {
     OFF,           // No yield (default)
-    TO_SENDER      // Yield goes to sender (buyer) - 100%
+    ENABLED        // Yield goes to sender (buyer) - 100%
 }

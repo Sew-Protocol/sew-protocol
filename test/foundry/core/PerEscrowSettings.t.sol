@@ -187,7 +187,7 @@ contract PerEscrowSettingsTest is Test {
         EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
         settings.customResolver = address(resolutionV2); // non-zero contract address
         settings.releaseAddress = address(0); // Added default releaseAddress
-        settings.yieldPreset = YieldPreset.TO_SENDER;
+        settings.yieldPreset = YieldPreset.ENABLED;
         settings.autoReleaseTime = block.timestamp + 10 days;
         // autoCancelTime must remain 0 when autoReleaseTime is set
 

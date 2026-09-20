@@ -67,7 +67,7 @@ function escrowInYield(uint256 workflowId, address token) returns (bool)
 struct EscrowSettings {
     address customResolver;      // Optional dispute resolver
     address releaseAddress;      // Optional authorized releaser
-    uint8 yieldPreset;           // 0=OFF, 1=TO_SENDER
+    uint8 yieldPreset;           // 0=OFF, 1=ENABLED
     uint256 autoReleaseTime;     // Auto-release timestamp (0=disabled)
     uint256 autoCancelTime;      // Auto-cancel timestamp (0=disabled)
 }

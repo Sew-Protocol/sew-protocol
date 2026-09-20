@@ -60,7 +60,7 @@ contract AaveYieldModuleRecoveryTest is Test {
         vm.prank(who);
         token.approve(address(module), type(uint256).max);
         vm.prank(who);
-        module.initializeYield(escrowId, address(token), amount, YieldPreset.TO_SENDER);
+        module.initializeYield(escrowId, address(token), amount, YieldPreset.ENABLED);
     }
 
     // ================= Recovery operator administration =================
@@ -406,7 +406,7 @@ contract AaveYieldModuleRecoveryTest is Test {
 
         vm.prank(escrow);
         vm.expectRevert("UnauthorizedEscrow");
-        module.initializeYield(2, address(token), DEPOSIT_AMOUNT, YieldPreset.TO_SENDER);
+        module.initializeYield(2, address(token), DEPOSIT_AMOUNT, YieldPreset.ENABLED);
     }
 
     function test_strangerCannotUnwindRevokedEscrow() public {

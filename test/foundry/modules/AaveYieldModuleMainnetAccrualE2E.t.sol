@@ -17,7 +17,7 @@ import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
  * @notice Escrow-level END-TO-END against REAL Aave V3 on Base mainnet: deposit real USDC
  *         into an EscrowVault that is wired to the real AaveYieldModule, let real interest
  *         accrue in the Aave pool's liquidity index, then unwind and assert the sender
- *         (YieldPreset.TO_SENDER) can claim AND withdraw principal + realized yield.
+ *         (YieldPreset.ENABLED) can claim AND withdraw principal + realized yield.
  *
  *         This is a network-dependent test. It creates a fork of Base mainnet via
  *         vm.createSelectFork and pins to PINNED_BLOCK for deterministic CI. If the RPC is
@@ -104,7 +104,7 @@ contract AaveYieldModuleMainnetAccrualE2ETest is Test {
         return EscrowSettings({
             customResolver: address(0),
             releaseAddress: address(0),
-            yieldPreset: YieldPreset.TO_SENDER,
+            yieldPreset: YieldPreset.ENABLED,
             autoReleaseTime: 0,
             autoCancelTime: 0
         });
@@ -136,7 +136,7 @@ contract AaveYieldModuleMainnetAccrualE2ETest is Test {
         IAavePool(AAVE_POOL).supply(USDC, refreshAmt, address(this), 0);
     }
 
-    /// @dev Real end-to-end: deposit -> real yield accrues -> mutual cancel (TO_SENDER) ->
+    /// @dev Real end-to-end: deposit -> real yield accrues -> mutual cancel (ENABLED) ->
     ///      unwind against real Aave -> sender claims + withdraws principal + yield.
     function test_realAave_accrual_cancel_senderClaimsAndWithdraws() public {
         uint256 buyerBalBefore = IERC20(USDC).balanceOf(BUYER);
@@ -160,7 +160,7 @@ contract AaveYieldModuleMainnetAccrualE2ETest is Test {
         assertEq(pvPrincipal, AMOUNT, 'preview principal == deposited');
         assertGt(pvValue, AMOUNT, 'preview value exceeds principal (real yield accrued)');
 
-        // Mutually cancel: sender (TO_SENDER) receives principal + yield.
+        // Mutually cancel: sender (ENABLED) receives principal + yield.
         vm.prank(BUYER);
         vault.senderCancel(wf);
         vm.prank(SELLER);
@@ -168,7 +168,7 @@ contract AaveYieldModuleMainnetAccrualE2ETest is Test {
 
         assertEq(vault.v25YieldModules(wf), address(0), 'position unwound');
         uint256 claimable = vault.claimableBalances(wf, BUYER);
-        assertGt(claimable, AMOUNT, 'sender claimable exceeds principal (real yield TO_SENDER)');
+        assertGt(claimable, AMOUNT, 'sender claimable exceeds principal (real yield ENABLED)');
         // Realistic sanity bound: yield cannot be absurd (guard against index corruptions).
         assertLt(claimable, AMOUNT * 2, 'yield bounded');
 

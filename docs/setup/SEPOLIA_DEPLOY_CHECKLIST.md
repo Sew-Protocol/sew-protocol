@@ -82,7 +82,7 @@ function test_EscrowVault_constructor_protocolFeeValidation() public
   - ✅ Implemented: Checks `settings.customResolver.code.length > 0`
   - 📝 **Action**: Add test for EOA as custom resolver (should revert)
 
-- [x] **Yield preset**: Uses `YieldPreset` enum (OFF, TO_SENDER)
+- [x] **Yield preset**: Uses `YieldPreset` enum (OFF, ENABLED)
   - ✅ Implemented: `YieldPresetLibrary.validatePresetParams`
   - 📝 **Action**: Add test for invalid enum value (if possible)
 

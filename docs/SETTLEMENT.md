@@ -31,7 +31,11 @@
 > `_releaseEscrowTransfer`, `_cancelAndRefund`, `_finalizeClaimableSettlement`,
 > `_creditClaimable`, `_handleYieldModuleUnwind`),
 > `contracts/libraries/EscrowSettlementLogic.sol`,
-> `contracts/ops/YieldOps.sol`,
+> `contracts/core/EscrowYield.sol` (`_handleYieldModuleUnwind`),
+> `contracts/core/EscrowSettlement.sol` (`_computeYieldProtocolFee`),
+> `contracts/core/EscrowVault.sol` (`withdrawFees`),
+> `contracts/modules/AaveYieldModule.sol` (`unwindToEscrow`, `emergencyUnwind`,
+> `recoverTokens`, `recoverETH`),
 > `contracts/types/EscrowTypes.sol` (`EscrowState`, `PendingSettlement`, `SplitProposal`),
 > `contracts/types/YieldPresets.sol`.
 
@@ -326,49 +330,62 @@ IERC20(token).safeTransfer(_msgSender(), amount);
 
 ## 5. Yield unwind on settlement
 
-Whenever any settlement path reaches `_finalizeClaimableSettlement` or
-`_releaseEscrowTransfer`, it calls `_handleYieldModuleUnwind(workflowId, token, amount)`.
+Whenever a settlement path reaches `_finalizeClaimableSettlement` (release, refund, or
+split), it calls `_handleYieldModuleUnwind(workflowId, token, amount)` (in `EscrowYield`)
+before crediting any entitlement.
 
 **Yield unwind flow:**
 
-1. If `snap.yieldGenerationModule` is set, call
-   `YieldOps.handleYield(genModule, ..., workflowId, token, amount, ...)`.
-2. `YieldOps.handleYield` calls `IYieldGenerationModule.withdrawWithYield(workflowId, token, amount, escrow)`.
-3. The module returns `(success, actualAmountWithdrawn, yieldGenerated)`.
-4. If withdrawal succeeds and `actualAmountWithdrawn > amount`, the difference is yield.
-5. Withdrawn funds are credited to `claimableEscrowYield[token][escrowContract]` in `YieldOps`
-   (pull-first hardening — no automatic forwarding back to the escrow).
-6. The escrow calls `YieldOps.claimEscrowYield(token, amount)` to pull back the funds.
+1. If a yield module is snapshotted for the escrow, `_handleYieldModuleUnwind` calls the
+   module's `unwindToEscrow(escrowId, token, ...)` to pull principal + realized yield back
+   into the escrow.
+2. If `unwindToEscrow` reverts, `emergencyUnwind` is attempted as a fallback.
+3. If both unwind paths fail, the escrow **fails open**: it emits `YieldUnwindFailed` and
+   clears the module linkage so settlement can complete from the remaining escrow balance.
+   The escrow is never permanently frozen — the admin must recover the stranded module
+   funds separately (via the module's `recoverTokens` / `recoverETH`).
+4. The unwind returns `(amount, yield)` — the yield is the amount above the deposited
+   principal. The module deletes the position on unwind, so the same yield cannot be
+   unwound twice.
 
-**Yield distribution:**
+**Yield protocol fee (in `EscrowSettlement`):**
 
-After the principal and yield are received, `YieldOps.distributeWithdrawnYield` handles
-the yield split:
-
-1. If a protocol fee is configured (`yieldProtocolFeeBps > 0`), compute
-   `protocolFeeAmount = yieldAmount × feeBps / 10,000` and credit it to
-   `claimableProtocolFees[token][feeRecipient]` (pull-only).
-2. The remaining yield is passed to `IYieldDistributionModule.distributeYield(...)` for
-   allocation per the `YieldPreset` configured at escrow creation.
+1. `_computeYieldProtocolFee(workflowId, token, yield)` applies the snapshotted
+   `yieldProtocolFeeBps` (max **3000 bps / 30%**) to realized **positive** yield only. If
+   realized yield is zero, no fee is charged — the fee is never negative and never taken
+   from principal.
+2. The fee is credited to the pull-based `totalFeesPerToken[token]` bucket and later
+   withdrawn by the fee recipient via `EscrowVault.withdrawFees(token)`.
+3. The remaining `beneficiaryYield = yield − fee` is credited, together with the principal,
+   to the single settlement beneficiary's `claimableBalances[workflowId][address]`, who
+   pulls it via `withdrawEscrow(workflowId)`.
 
 **Current yield presets:**
 
 | Preset | Distribution |
 |--------|-------------|
-| `OFF` | No yield; default when `yieldGenerationModule` is a no-op |
-| `TO_SENDER` | 100% of yield credited to sender (`et.from`) |
+| `OFF` | No yield; default when no yield module or a no-op module is active |
+| `ENABLED` | Yield accrues and is credited to the single settlement beneficiary along with principal (formerly `TO_SENDER`; same numeric value `1`) |
 
-Yield distribution is wrapped in `try/catch`. If the distribution module reverts, the yield
-is deferred to `claimableEscrowYield` rather than blocking the settlement.
+> The preset formerly named `TO_SENDER` is now `ENABLED`. It no longer implies a separate
+> distribution step — yield flows to the settlement beneficiary and the protocol fee is
+> carved out during `_computeYieldProtocolFee` before credit.
 
-**Emergency fallback:** If `withdrawWithYield` itself fails, `BaseEscrow` attempts
-`IYieldModule.emergencyUnwind(workflowId, token, yieldPrincipal)` as a last resort. If
-both fail, settlement proceeds with the original principal only (yield is written off for
-that escrow).
+**Emergency fallback:** On settlement, `_handleYieldModuleUnwind` first calls
+`unwindToEscrow`; if that reverts it attempts `IYieldModule.emergencyUnwind` as a last
+resort. If both fail, settlement proceeds from the remaining escrow balance (fail-open,
+`YieldUnwindFailed`), and the admin recovers the stranded module funds via
+`AaveYieldModule.recoverTokens` / `recoverETH` (timelock-gated, scoped to
+`recoverableAssets`).
 
 ---
 
 ## 6. The `SettlementOps` compute/apply pattern
+
+> **Historical.** `SettlementOps` no longer exists in the current codebase; settlement
+> derivation is compiled into `EscrowSettlementLogic.sol`. Section 5 above describes the
+> current yield-unwind flow. This section is retained to document the design that preceded
+> the Ops-internalization refactor.
 
 `SettlementOps` is an externally deployed compute-only contract. Its functions return
 results; they do not write to `BaseEscrow` state.

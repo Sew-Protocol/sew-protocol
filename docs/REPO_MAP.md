@@ -48,6 +48,7 @@ The kernel of the protocol. All escrow lifecycle logic is rooted here.
 | File | Role |
 |---|---|
 | `BaseEscrow.sol` | Abstract base for all escrow vaults. State machine, dispute lifecycle, module dispatch, CEI-safe settlement and release flows. All public functions are `nonReentrant`. |
+| `EscrowCreationPolicy.sol` | Shared protocol-wide creation policy (yield-deposit pause, resolver policy). No calculation. |
 | `EscrowVault.sol` | Concrete vault for native ERC-20 tokens. Extends `BaseEscrow`; adds per-token balance tracking, fee withdrawal, and accounting reconciliation. |
 | `EscrowableERC20.sol` | Placeholder ERC-20 vault variant; constructor reverts — not deployable in current release. |
 | `BondCollector.sol` | Collects and holds appeal bonds posted during dispute escalation. |
@@ -72,9 +73,12 @@ Stateless facet contracts. `BaseEscrow` delegates specific operations to these v
 
 | File | Role |
 |---|---|
-| `EscrowCreationPolicy.sol` | Shared protocol-wide creation policy only (yield-deposit pause, resolver policy). No calculation. |
-| `YieldOps.sol` | Yield withdrawal and distribution. |
 | `GuardianOps.sol` | Guardian-only emergency operations (forced Aave unwind). |
+
+> The former ops boundaries (`CreateOps`, `SettlementOps`, `DisputeOps`, `YieldOps`) have
+> been internalized into core (derivation compiled into `EscrowCreationLogic` /
+> `EscrowSettlementLogic` / `EscrowDisputeLogic`); `EscrowCreationPolicy.sol` now lives in
+> `contracts/core/`. Only `GuardianOps.sol` remains in `contracts/ops/`.
 
 ### Modules (`contracts/modules/`)
 
@@ -83,12 +87,9 @@ for a given escrow. Changes require Slow lane governance (~9 days).
 
 | File | Role |
 |---|---|
-| `AaveYieldModule.sol` | Yield generation via Aave v3. Deposits principal, accrues aTokens, enforces per-token and global exposure caps, slippage-checked withdrawals. |
-| `DefaultYieldGenerationModule.sol` | No-op yield generation (hold only). |
-| `DefaultYieldDistributionModule.sol` | Default yield distribution to configured recipients. |
+| `AaveYieldModule.sol` | Yield generation via Aave v3. Deposits principal, accrues aTokens, tracks positions by `(escrow, escrowId)`, enforces per-token caps and min-deposit; unwinds via `unwindToEscrow`/`emergencyUnwind`/`emergencyUnwindForEscrow`; timelock-gated `recoverTokens`/`recoverETH` (scoped to `recoverableAssets`, guardian-protective) as last-resort recovery. Distribution policy lives in core (`EscrowYield`/`EscrowSettlement`), not in a distribution module. |
 | `DefaultReleaseStrategy.sol` | Default release authorization (recipient acceptance required). |
 | `DefaultCancellationStrategy.sol` | Default cancellation rules. |
-| `BuyerOnlyCancellationStrategy.sol` | Restricts cancellation to the buyer (sender) only. |
 
 #### Decentralized Resolution Module (`contracts/modules/decentralized-resolution-module/`)
 
@@ -170,37 +171,28 @@ Extracted logic libraries (`using L for ...` or direct call pattern). Key librar
 
 | File | Role |
 |---|---|
-| `EscrowCreationLibrary.sol` | Escrow creation validation and setup. |
-| `EscrowAccountingLibrary.sol` | Balance tracking and accounting deltas. |
+| `EscrowCreationLogic.sol` | Internalized escrow creation derivation (formerly `CreateOps`). |
+| `EscrowDisputeLogic.sol` | Internalized dispute derivation (formerly `DisputeOps`). |
+| `EscrowSettlementLogic.sol` | Internalized settlement derivation (formerly `SettlementOps`). |
+| `EscrowEncodingLibrary.sol` | ABI encoding helpers for escrow data. |
 | `DisputeRaiseLibrary.sol` | Dispute initiation validation. |
 | `DisputeManagementLibrary.sol` | Dispute state transitions. |
 | `DisputeEscalationLibrary.sol` | Escalation round management. |
 | `DisputeInitializationLibrary.sol` | Dispute metadata initialization. |
 | `StateManagementLibrary.sol` | Escrow state machine transitions. |
 | `ModuleSnapshotLibrary.sol` | Snapshot capture and lookup. |
-| `ModuleManagementLibrary.sol` | Default module getters/setters. |
-| `ModuleProposalLibrary.sol` | Slow-lane queue/activate for module changes. |
 | `SettingsValidationLibrary.sol` | Parameter bounds enforcement (bounds on all config). |
-| `AaveYieldHandlingLibrary.sol` | Aave deposit/withdraw CEI patterns. |
-| `AaveYieldLibrary.sol` | Aave-specific math and balance queries. |
-| `YieldHandlingLibrary.sol` | Generic yield delegation. |
-| `YieldDistributionLibrary.sol` | Yield distribution to recipients. |
 | `BondHandlingLibrary.sol` | Appeal bond posting and release. |
 | `FeeRecordingLibrary.sol` | Protocol fee accrual. |
 | `FeeWithdrawalLibrary.sol` | Fee withdrawal CEI pattern. |
 | `RecoveryLibrary.sol` | Token recovery (excess balance extraction). |
 | `ResolverLogicLibrary.sol` | Resolver assignment and round management. |
-| `ResolverActionLibrary.sol` | Resolver accept/decide/timeout actions. |
-| `ResolutionModuleLibrary.sol` | Resolution module dispatch. |
 | `ResolutionTableLibrary.sol` | Resolution outcome lookup. |
 | `ProtocolMathLibrary.sol` | Shared fixed-point math. |
-| `EscrowManagementLibrary.sol` | Escrow lifecycle helpers. |
-| `EscrowEncodingLibrary.sol` | ABI encoding helpers for escrow data. |
 | `BalanceUpdateLibrary.sol` | Balance update coordination. |
-| `TokenRecoveryLibrary.sol` | Token recovery with safety checks. |
 | `YieldPresetLibrary.sol` | Yield preset selection and configuration. |
-| `ModuleGetterLibrary.sol` / `ModuleGetterConsolidationLibrary.sol` | Module address resolution. |
-| `EscrowVaultAccountingLibrary.sol` / `EscrowVaultModuleLibrary.sol` | Vault-specific helpers. |
+| `ModuleGetterLibrary.sol` | Module address resolution. |
+| `EscrowVaultAccountingLibrary.sol` | Vault-specific accounting helpers. |
 
 ### Token (`contracts/token/`)
 

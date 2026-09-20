@@ -100,7 +100,7 @@ contract NewHardeningTests is Test {
     function test_TinyYieldDeposit_Success() public {
         uint256 tinyAmount = SettingsValidationLibrary.MIN_ESCROW_AMOUNT; // 1000 wei
         EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
-        settings.yieldPreset = YieldPreset.TO_SENDER;
+        settings.yieldPreset = YieldPreset.ENABLED;
 
         // Should succeed even with tiny amount because we removed the threshold
         vm.prank(buyer);

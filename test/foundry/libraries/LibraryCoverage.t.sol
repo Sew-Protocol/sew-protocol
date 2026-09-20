@@ -538,9 +538,9 @@ contract LibraryCoverageTest is Test {
 
 
 
-    function test_YieldPreset_deriveDistributionData_TO_SENDER() public {
+    function test_YieldPreset_deriveDistributionData_ENABLED() public {
 
-        bytes memory data = YieldPresetLibrary.deriveDistributionData(YieldPreset.TO_SENDER, user1, address(0));
+        bytes memory data = YieldPresetLibrary.deriveDistributionData(YieldPreset.ENABLED, user1, address(0));
 
         (address[] memory r, uint256[] memory p) = abi.decode(data, (address[], uint256[]));
 
@@ -558,7 +558,7 @@ contract LibraryCoverageTest is Test {
 
         assertFalse(YieldPresetLibrary.isYieldEnabled(YieldPreset.OFF));
 
-        assertTrue(YieldPresetLibrary.isYieldEnabled(YieldPreset.TO_SENDER));
+        assertTrue(YieldPresetLibrary.isYieldEnabled(YieldPreset.ENABLED));
 
     }
 
@@ -568,11 +568,11 @@ contract LibraryCoverageTest is Test {
 
         YieldPresetLibrary.validatePresetParams(YieldPreset.OFF, address(0), address(0));
 
-        YieldPresetLibrary.validatePresetParams(YieldPreset.TO_SENDER, user1, address(0));
+        YieldPresetLibrary.validatePresetParams(YieldPreset.ENABLED, user1, address(0));
 
         vm.expectRevert();
 
-        harness.validatePresetParams(YieldPreset.TO_SENDER, address(0), address(0));
+        harness.validatePresetParams(YieldPreset.ENABLED, address(0), address(0));
 
     }
 

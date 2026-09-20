@@ -113,7 +113,7 @@ contract YieldDosBugTest is Test {
         uint256 wid = escrow.createEscrow(address(token), user2, 100 ether, EscrowSettings({
             customResolver: address(0),
             releaseAddress: address(0),
-            yieldPreset: YieldPreset.TO_SENDER,
+            yieldPreset: YieldPreset.ENABLED,
             autoReleaseTime: 0,
             autoCancelTime: 0
         }));

@@ -130,6 +130,7 @@ contract FeeScenarioFlowsTest is Test {
         moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.RELEASE);
 
         // Register vault on ops contracts
+        bondCollector.registerEscrowContract(address(vault));
 
         // Wire vault roles + ops
         vault.grantRole(vault.ROLE_TIMELOCK(), timelock);
@@ -261,6 +262,7 @@ contract FeeScenarioFlowsTest is Test {
         MockIncentiveModule incentive = new MockIncentiveModule();
 
         // Allow this test contract to call BondCollector.collectBond (ROLE_ESCROW_CONTRACT)
+        bondCollector.registerEscrowContract(address(this));
 
         uint256 workflowId = 77;
         uint256 bondAmount = 10 ether;

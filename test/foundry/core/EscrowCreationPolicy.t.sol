@@ -144,22 +144,22 @@ contract EscrowCreationPolicyTest is Test {
 
     function test_sharedYieldPause_affectsBothEscrows() public {
         // Baseline: policy not paused, yield preset ON → both record a deposit.
-        uint256 a1 = _create(escrowA, YieldPreset.TO_SENDER);
-        uint256 b1 = _create(escrowB, YieldPreset.TO_SENDER);
+        uint256 a1 = _create(escrowA, YieldPreset.ENABLED);
+        uint256 b1 = _create(escrowB, YieldPreset.ENABLED);
         assertTrue(escrowA.v25YieldModules(a1) != address(0), 'A should deposit when unpaused');
         assertTrue(escrowB.v25YieldModules(b1) != address(0), 'B should deposit when unpaused');
 
         // Pause once → both escrows stop depositing.
         policy.pauseYieldDeposits('emergency');
-        uint256 a2 = _create(escrowA, YieldPreset.TO_SENDER);
-        uint256 b2 = _create(escrowB, YieldPreset.TO_SENDER);
+        uint256 a2 = _create(escrowA, YieldPreset.ENABLED);
+        uint256 b2 = _create(escrowB, YieldPreset.ENABLED);
         assertEq(escrowA.v25YieldModules(a2), address(0), 'A should not deposit when paused');
         assertEq(escrowB.v25YieldModules(b2), address(0), 'B should not deposit when paused');
 
         // Resume once → both escrows deposit again.
         policy.resumeYieldDeposits();
-        uint256 a3 = _create(escrowA, YieldPreset.TO_SENDER);
-        uint256 b3 = _create(escrowB, YieldPreset.TO_SENDER);
+        uint256 a3 = _create(escrowA, YieldPreset.ENABLED);
+        uint256 b3 = _create(escrowB, YieldPreset.ENABLED);
         assertTrue(escrowA.v25YieldModules(a3) != address(0), 'A should deposit after resume');
         assertTrue(escrowB.v25YieldModules(b3) != address(0), 'B should deposit after resume');
 

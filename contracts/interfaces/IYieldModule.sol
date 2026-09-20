@@ -47,7 +47,7 @@ interface IYieldModule {
      * @param escrowId Unique escrow identifier
      * @param token Token to yield on
      * @param amount Amount to deposit
-     * @param yieldMode Preset (OFF, TO_SENDER, TO_RECIPIENT, etc.)
+     * @param yieldMode Preset (OFF, ENABLED, TO_RECIPIENT, etc.)
      * @return accepted Amount actually accepted for yielding
      * 
      * @dev Called once per escrow during initialization

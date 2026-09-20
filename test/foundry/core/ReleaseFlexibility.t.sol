@@ -69,6 +69,7 @@ contract ReleaseFlexibilityTest is Test {
 
         // Setup initial default modules in the mock registry (MOVED HERE)
         vm.startPrank(timelock);
+        moduleSnapshotRegistry.registerEscrowContract(address(escrowVault));
         
         // Queue and activate release strategy
         moduleSnapshotRegistry.queueModule(address(escrowVault), BaseEscrow.ModuleType.RELEASE, address(defaultReleaseStrategy));

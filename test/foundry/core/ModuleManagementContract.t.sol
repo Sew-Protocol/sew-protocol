@@ -57,6 +57,7 @@ contract ModuleSnapshotRegistryTest is Test {
         
         // Register escrow contract
         vm.prank(timelock);
+        moduleManagement.registerEscrowContract(address(escrowContract));
         
         // Grant escrow contract the role
         moduleManagement.grantRole(moduleManagement.ROLE_ESCROW_CONTRACT(), address(escrowContract));
@@ -80,17 +81,20 @@ contract ModuleSnapshotRegistryTest is Test {
     function test_registerEscrowContract_success() public {
         address newEscrow = address(0x3333);
         vm.prank(timelock);
+        moduleManagement.registerEscrowContract(newEscrow);
         assertTrue(moduleManagement.hasRole(moduleManagement.ROLE_ESCROW_CONTRACT(), newEscrow));
     }
     
     function test_registerEscrowContract_zeroAddress_reverts() public {
         vm.prank(timelock);
         vm.expectRevert(SlowLaneQueueActivate.InvalidValue.selector);
+        moduleManagement.registerEscrowContract(address(0));
     }
     
     function test_registerEscrowContract_unauthorized_reverts() public {
         vm.prank(unauthorized);
         vm.expectRevert();
+        moduleManagement.registerEscrowContract(address(0x3333));
     }
     
     // ============ queueModule Tests ============

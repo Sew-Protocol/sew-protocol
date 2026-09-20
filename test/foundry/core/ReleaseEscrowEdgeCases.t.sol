@@ -104,7 +104,7 @@ contract ReleaseEscrowEdgeCasesTest is Test {
         token.approve(address(vault), AMOUNT);
 
         EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
-        settings.yieldPreset = YieldPreset.TO_SENDER;
+        settings.yieldPreset = YieldPreset.ENABLED;
         vm.prank(sender);
         uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT, settings);
 
@@ -148,7 +148,7 @@ contract ReleaseEscrowEdgeCasesTest is Test {
         token.approve(address(vault), AMOUNT * 3);
 
         EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
-        settings.yieldPreset = YieldPreset.TO_SENDER;
+        settings.yieldPreset = YieldPreset.ENABLED;
 
         uint256 wid1;
         uint256 wid2;
@@ -211,7 +211,7 @@ contract ReleaseEscrowEdgeCasesTest is Test {
         token.approve(address(vault), AMOUNT);
 
         EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
-        settings.yieldPreset = YieldPreset.TO_SENDER;
+        settings.yieldPreset = YieldPreset.ENABLED;
         vm.prank(sender);
         uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT, settings);
 
@@ -246,7 +246,7 @@ contract ReleaseEscrowEdgeCasesTest is Test {
         token.approve(address(vault), AMOUNT);
 
         EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
-        settings.yieldPreset = YieldPreset.TO_SENDER;
+        settings.yieldPreset = YieldPreset.ENABLED;
         vm.prank(sender);
         uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT, settings);
 
@@ -288,7 +288,7 @@ contract ReleaseEscrowEdgeCasesTest is Test {
         token.approve(address(vault), AMOUNT);
 
         EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
-        settings.yieldPreset = YieldPreset.TO_SENDER;
+        settings.yieldPreset = YieldPreset.ENABLED;
         vm.prank(sender);
         uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT, settings);
 
@@ -329,7 +329,7 @@ contract ReleaseEscrowEdgeCasesTest is Test {
         token.approve(address(vault), AMOUNT);
 
         EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
-        settings.yieldPreset = YieldPreset.TO_SENDER;
+        settings.yieldPreset = YieldPreset.ENABLED;
         vm.prank(sender);
         uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT, settings);
 
@@ -366,7 +366,7 @@ contract ReleaseEscrowEdgeCasesTest is Test {
         token.approve(address(vault), AMOUNT);
 
         EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
-        settings.yieldPreset = YieldPreset.TO_SENDER;
+        settings.yieldPreset = YieldPreset.ENABLED;
         vm.prank(sender);
         uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT, settings);
 
@@ -393,7 +393,7 @@ contract ReleaseEscrowEdgeCasesTest is Test {
         token.approve(address(vault), AMOUNT);
 
         EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
-        settings.yieldPreset = YieldPreset.TO_SENDER;
+        settings.yieldPreset = YieldPreset.ENABLED;
         vm.prank(sender);
         uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT, settings);
 

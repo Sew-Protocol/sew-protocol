@@ -70,7 +70,7 @@ contract AaveYieldModuleFailureModeTest is Test {
         vm.prank(escrow); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow);
-        module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.TO_SENDER);
+        module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.ENABLED);
         
         pool.setWithdrawFail(true);
         
@@ -94,7 +94,7 @@ contract AaveYieldModuleFailureModeTest is Test {
         vm.prank(escrow); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow);
-        module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.TO_SENDER);
+        module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.ENABLED);
         
         pool.setWithdrawFail(true);
         
@@ -119,7 +119,7 @@ contract AaveYieldModuleFailureModeTest is Test {
         
         vm.prank(escrow);
         vm.expectRevert();
-        module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.TO_SENDER);
+        module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.ENABLED);
         
         (address posToken, uint256 principal, , ) = module.positions(escrow, 1);
         assertEq(posToken, address(0));
@@ -139,7 +139,7 @@ contract AaveYieldModuleFailureModeTest is Test {
         vm.prank(escrow); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow);
-        uint256 accepted = module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.TO_SENDER);
+        uint256 accepted = module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.ENABLED);
         
         assertEq(accepted, DEPOSIT_AMOUNT / 2);
         
@@ -157,7 +157,7 @@ contract AaveYieldModuleFailureModeTest is Test {
         vm.prank(escrow); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow);
-        module.initializeYield(1, address(token), DEPOSIT_AMOUNT / 2, YieldPreset.TO_SENDER);
+        module.initializeYield(1, address(token), DEPOSIT_AMOUNT / 2, YieldPreset.ENABLED);
         
         // Module will withdraw what's available, not revert
         // Pass the recorded principal (DEPOSIT_AMOUNT / 2) per finding #7.
@@ -177,7 +177,7 @@ contract AaveYieldModuleFailureModeTest is Test {
         vm.prank(escrow); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow);
-        module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.TO_SENDER);
+        module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.ENABLED);
         
         vm.prank(escrow);
         (uint256 principal, uint256 yieldOut) = module.unwindToEscrow(1, address(token), DEPOSIT_AMOUNT);
@@ -193,7 +193,7 @@ contract AaveYieldModuleFailureModeTest is Test {
     function test_unauthorized_escrow_blocked() public {
         vm.prank(attacker);
         vm.expectRevert("UnauthorizedEscrow");
-        module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.TO_SENDER);
+        module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.ENABLED);
     }
 
     /**
@@ -204,7 +204,7 @@ contract AaveYieldModuleFailureModeTest is Test {
         
         vm.prank(escrow);
         vm.expectRevert();
-        module.initializeYield(1, fakeToken, DEPOSIT_AMOUNT, YieldPreset.TO_SENDER);
+        module.initializeYield(1, fakeToken, DEPOSIT_AMOUNT, YieldPreset.ENABLED);
     }
 
     /**
@@ -213,7 +213,7 @@ contract AaveYieldModuleFailureModeTest is Test {
     function test_zero_amount_rejected() public {
         vm.prank(escrow);
         vm.expectRevert("ZeroAmount");
-        module.initializeYield(1, address(token), 0, YieldPreset.TO_SENDER);
+        module.initializeYield(1, address(token), 0, YieldPreset.ENABLED);
     }
 
     /**
@@ -234,7 +234,7 @@ contract AaveYieldModuleFailureModeTest is Test {
         vm.prank(escrow); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow);
-        module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.TO_SENDER);
+        module.initializeYield(1, address(token), DEPOSIT_AMOUNT, YieldPreset.ENABLED);
         
         (address posToken, uint256 principal, , ) = module.positions(escrow, 1);
         assertEq(posToken, address(token));

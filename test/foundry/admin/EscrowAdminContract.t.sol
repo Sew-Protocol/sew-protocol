@@ -518,6 +518,7 @@ contract EscrowGovernanceTimelockTest is Test {
         vault2.grantRole(vault2.ROLE_ADMIN_CONTRACT(), address(adminContract));
         
         vm.prank(timelock);
+        adminContract.registerEscrowContract(address(vault2));
         
         // Queue different values for each vault
         vm.prank(timelock);

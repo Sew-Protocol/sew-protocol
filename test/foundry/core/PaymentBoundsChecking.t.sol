@@ -43,6 +43,7 @@ contract PaymentBoundsCheckingTest is Test {
         // Grant roles
         incentiveModule.grantRole(ROLE_TIMELOCK, address(this));
         incentiveModule.grantRole(ROLE_TIMELOCK, timelock);
+        incentiveModule.registerEscrowContract(escrow);
     }
 
     function test_ValidPaymentCalculation() public {

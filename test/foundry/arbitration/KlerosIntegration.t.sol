@@ -184,6 +184,7 @@ contract KlerosIntegrationTest is Test {
 
     function test_registerEscrowContract_success() public {
         address newEscrow = makeAddr('newEscrow');
+        klerosProxy.registerEscrowContract(newEscrow);
         bytes32 ROLE = klerosProxy.ROLE_ESCROW_CONTRACT();
         assertTrue(klerosProxy.hasRole(ROLE, newEscrow));
     }
@@ -191,10 +192,12 @@ contract KlerosIntegrationTest is Test {
     function test_registerEscrowContract_rejectsNonAdmin() public {
         vm.prank(sender);
         vm.expectRevert();
+        klerosProxy.registerEscrowContract(address(0x123));
     }
 
     function test_registerEscrowContract_rejectsZeroAddress() public {
         vm.expectRevert('Invalid escrow address');
+        klerosProxy.registerEscrowContract(address(0));
     }
 
     function test_createDispute_rejectsGenericEscrowRoleWithoutHandoffRole() public {
@@ -609,6 +612,7 @@ contract KlerosIntegrationTest is Test {
     function test_accessControl_enforceAdmin() public {
         vm.prank(sender);
         vm.expectRevert();
+        klerosProxy.registerEscrowContract(address(0x123));
     }
 
     function test_accessControl_manageRoles() public {

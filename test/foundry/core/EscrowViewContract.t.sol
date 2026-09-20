@@ -142,7 +142,7 @@ contract EscrowViewContractTest is Test {
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0), // Use default resolver
             releaseAddress: address(0),
-            yieldPreset: YieldPreset.TO_SENDER,
+            yieldPreset: YieldPreset.ENABLED,
             autoReleaseTime: block.timestamp + 7 days,
             autoCancelTime: 0
         });
@@ -203,7 +203,7 @@ contract EscrowViewContractTest is Test {
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0), // Use default resolver
             releaseAddress: address(0),
-            yieldPreset: YieldPreset.TO_SENDER,
+            yieldPreset: YieldPreset.ENABLED,
             autoReleaseTime: block.timestamp + 5 days,
             autoCancelTime: 0
         });
@@ -214,7 +214,7 @@ contract EscrowViewContractTest is Test {
         EscrowSettings memory retrieved = escrowView.getEscrowSettings(workflowId);
 
         assertEq(retrieved.customResolver, address(0)); // Default resolver
-        assertEq(uint8(retrieved.yieldPreset), uint8(YieldPreset.TO_SENDER));
+        assertEq(uint8(retrieved.yieldPreset), uint8(YieldPreset.ENABLED));
         assertEq(retrieved.autoReleaseTime, block.timestamp + 5 days);
         assertEq(retrieved.autoCancelTime, 0);
     }
@@ -688,10 +688,10 @@ contract EscrowViewContractTest is Test {
         vm.prank(buyer);
         token.approve(address(vault), INITIAL_AMOUNT * 2);
 
-        // Test each yield preset (only OFF and TO_SENDER are valid)
+        // Test each yield preset (only OFF and ENABLED are valid)
         YieldPreset[] memory presets = new YieldPreset[](2);
         presets[0] = YieldPreset.OFF;
-        presets[1] = YieldPreset.TO_SENDER;
+        presets[1] = YieldPreset.ENABLED;
 
         for (uint256 i = 0; i < presets.length; i++) {
             EscrowSettings memory settings = EscrowSettings({

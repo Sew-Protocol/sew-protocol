@@ -123,7 +123,7 @@ contract EmergencyUnwindBeneficiaryClaimE2ETest is Test {
         return EscrowSettings({
             customResolver: address(0),
             releaseAddress: address(0),
-            yieldPreset: YieldPreset.TO_SENDER,
+            yieldPreset: YieldPreset.ENABLED,
             autoReleaseTime: 0,
             autoCancelTime: 0
         });
@@ -137,7 +137,7 @@ contract EmergencyUnwindBeneficiaryClaimE2ETest is Test {
         assertEq(vault.v25YieldPrincipals(wf), AMOUNT, 'yield principal recorded');
     }
 
-    /// @notice Mutual cancel with emergency fallback: sender (TO_SENDER) claims & withdraws
+    /// @notice Mutual cancel with emergency fallback: sender (ENABLED) claims & withdraws
     ///         the full principal recovered via emergencyUnwind.
     function test_emergencyUnwind_cancel_senderClaimsAndWithdrawsPrincipal() public {
         uint256 wf = _openEscrow();

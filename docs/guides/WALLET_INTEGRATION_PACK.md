@@ -64,7 +64,7 @@ The Sew Protocol enables **escrow-based token transfers** with optional **yield 
 | **amount** | Total amount sender transfers |
 | **amountAfterFee** | Amount recipient gets (after protocol fee) |
 | **escrowFee** | Protocol fee in basis points (bps) |
-| **yieldPreset** | Whether yield is enabled (OFF or TO_SENDER) |
+| **yieldPreset** | Whether yield is enabled (OFF or ENABLED) |
 
 ### Important Protocol Constraint
 
@@ -154,7 +154,7 @@ function escrowTransfers(uint256 workflowId)
 struct EscrowSettings {
     address customResolver;      // Custom dispute resolver (optional)
     address releaseAddress;      // Address that can release (optional)
-    YieldPreset yieldPreset;     // OFF or TO_SENDER
+    YieldPreset yieldPreset;     // OFF or ENABLED
     uint256 autoReleaseTime;     // Automatic release delay (0 = disabled)
     uint256 autoCancelTime;      // Automatic cancel delay (0 = disabled)
 }
@@ -182,7 +182,7 @@ struct EscrowTransfer {
 ```solidity
 enum YieldPreset {
     OFF,                // No yield generation (default)
-    TO_SENDER           // Yield accrues to sender (buyer)
+    ENABLED             // Yield accrues; credited to settlement beneficiary (formerly TO_SENDER)
 }
 ```
 
@@ -278,7 +278,7 @@ await token.approve(escrowVault.address, amount);
 const settings = {
     customResolver: ethers.constants.AddressZero,
     releaseAddress: ethers.constants.AddressZero,
-    yieldPreset: 1,  // YieldPreset.TO_SENDER (yield to buyer)
+    yieldPreset: 1,  // YieldPreset.ENABLED (yield accrues; credited to settlement beneficiary)
     autoReleaseTime: 0,
     autoCancelTime: 0
 };
@@ -606,7 +606,7 @@ async function createYieldEscrow(
     const settings = {
         customResolver: ethers.constants.AddressZero,
         releaseAddress: ethers.constants.AddressZero,
-        yieldPreset: 1,  // TO_SENDER (yield accrues to buyer)
+        yieldPreset: 1,  // ENABLED (yield accrues; credited to settlement beneficiary)
         autoReleaseTime: 0,
         autoCancelTime: 0
     };
@@ -760,7 +760,7 @@ const workflowId = await vault.createEscrow(
     recipientAddress,
     amount,
     {
-        yieldPreset: 1,  // TO_SENDER
+        yieldPreset: 1,  // ENABLED
         autoReleaseTime: 0
     }
 );

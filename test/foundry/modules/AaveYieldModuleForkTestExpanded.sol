@@ -65,7 +65,7 @@ contract AaveYieldModuleForkTestExpanded is Test {
     function test_fork_pinnedBlock_deposit() public {
         _approve(address(this));
         
-        (bool supported,) = module.canHandle(USDC, YieldPreset.TO_SENDER, 1e6);
+        (bool supported,) = module.canHandle(USDC, YieldPreset.ENABLED, 1e6);
         emit log_string("Pinned block test executed");
     }
 
@@ -82,7 +82,7 @@ contract AaveYieldModuleForkTestExpanded is Test {
      * @notice M5: Test USDC support
      */
     function test_fork_canHandle_usdc() public {
-        (bool supported, bytes32 reason) = module.canHandle(USDC, YieldPreset.TO_SENDER, 100e6);
+        (bool supported, bytes32 reason) = module.canHandle(USDC, YieldPreset.ENABLED, 100e6);
         emit log_named_string("USDC supported", supported ? "true" : "false");
     }
 
@@ -90,7 +90,7 @@ contract AaveYieldModuleForkTestExpanded is Test {
      * @notice M5: Test USDT support
      */
     function test_fork_canHandle_usdt() public {
-        (bool supported, bytes32 reason) = module.canHandle(USDT, YieldPreset.TO_SENDER, 100e6);
+        (bool supported, bytes32 reason) = module.canHandle(USDT, YieldPreset.ENABLED, 100e6);
         emit log_named_string("USDT supported", supported ? "true" : "false");
     }
 
@@ -98,7 +98,7 @@ contract AaveYieldModuleForkTestExpanded is Test {
      * @notice M5: Test DAI support
      */
     function test_fork_canHandle_dai() public {
-        (bool supported, bytes32 reason) = module.canHandle(DAI, YieldPreset.TO_SENDER, 100e18);
+        (bool supported, bytes32 reason) = module.canHandle(DAI, YieldPreset.ENABLED, 100e18);
         emit log_named_string("DAI supported", supported ? "true" : "false");
     }
 
@@ -106,7 +106,7 @@ contract AaveYieldModuleForkTestExpanded is Test {
      * @notice M5: Test WETH support
      */
     function test_fork_canHandle_weth() public {
-        (bool supported, bytes32 reason) = module.canHandle(WETH, YieldPreset.TO_SENDER, 1e18);
+        (bool supported, bytes32 reason) = module.canHandle(WETH, YieldPreset.ENABLED, 1e18);
         emit log_named_string("WETH supported", supported ? "true" : "false");
     }
 
@@ -147,7 +147,7 @@ contract AaveYieldModuleForkTestPinned is Test {
     }
 
     function test_fork_pinned_state_reproducible() public {
-        (bool supported,) = module.canHandle(USDC, YieldPreset.TO_SENDER, 100e6);
+        (bool supported,) = module.canHandle(USDC, YieldPreset.ENABLED, 100e6);
         emit log_string("Pinned block test ran successfully");
     }
 

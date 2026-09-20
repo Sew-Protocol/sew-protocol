@@ -41,8 +41,10 @@ contract ModuleSnapshotRaceConditionTest is Test {
         strategyB = new SimpleReleaseStrategy();
         token = new ERC20Mock("Token", "TKN", owner, 1000e18);
 
-        
-        
+        vault = new EscrowVault(0,address(0xFEE),address(mm));
+
+        mm.registerEscrowContract(address(vault));
+
         // Setup initial default strategy.
         mm.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(strategyA));
         vm.warp(block.timestamp + 7 days + 1);

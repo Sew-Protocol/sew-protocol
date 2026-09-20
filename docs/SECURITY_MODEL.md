@@ -88,7 +88,7 @@ threats are explicitly modelled.
 | Incorrect fee accounting | `_recordFee` has overflow protection; `MAX_FEE_BPS` constants enforced in all setters |
 | Module substitution attack | Modules are snapshotted per-escrow at creation; no function can change a snapshotted module address for an existing escrow |
 | Yield integration failure (Aave) | Slippage protection (0.1% tolerance); emergency fallback via `emergencyUnwind`; Guardian can disable Aave without governance delay |
-| Recovery calculation error | `recoverERC20` validates against `available` excess (not total balance); `getAccountingDelta` / `reconcileAccounting` provide reconciliation |
+| Recovery calculation error | Module recovery (`recoverTokens`/`recoverETH`) is scoped to `recoverableAssets`; `getAccountingDelta` / `reconcileAccounting` provide reconciliation |
 | Batch gas DoS | `MAX_BATCH_SIZE = 50` enforced on all batch operations |
 
 ### 2.4 Governance threats
@@ -169,7 +169,7 @@ compromise the stated security guarantees.
 | `ROLE_ADMIN_CONTRACT` | `EscrowAdminContract` | Configure operational parameters within bounds (timeouts, fees, attachments) | Act outside predefined bounds; change existing escrow state |
 | `ROLE_KEEPER` | Keeper EOA or contract | Trigger timed automations (`automateTimedActions`) | Rewire any protocol ops; change any configuration |
 | `ROLE_FEE_RECIPIENT` | Fee recipient address | Withdraw accrued protocol fees | Govern anything |
-| `ROLE_ESCROW_CONTRACT` | Registered escrow contracts | Interact with remaining ops contracts (YieldOps, BondCollector, GuardianOps) | Register new escrow contracts themselves. `EscrowCreationPolicy` needs no registration and has no such gate |
+| `ROLE_ESCROW_CONTRACT` | Registered escrow contracts | Interact with remaining ops contracts (GuardianOps, BondCollector) | Register new escrow contracts themselves. `EscrowCreationPolicy` needs no registration and has no such gate |
 | `DEFAULT_ADMIN_ROLE` | `TimelockController` (transferred at deployment) | Grant / revoke roles | — (held by Timelock, so role changes require governance) |
 
 ### 4.2 TimelockController hardened posture
@@ -231,7 +231,7 @@ All functions that transfer funds follow CEI strictly:
 2. **Effect** all state changes (balances, status, flags).
 3. **Interact** (external call / token transfer) only after state is committed.
 
-The yield module (`AaveYieldGenerationModule`) had a prior HIGH finding (state cleared before
+The yield module (`AaveYieldModule`) had a prior HIGH finding (state cleared before
 withdrawal confirmation) which has been resolved: state is now cleared only after a
 successful withdrawal.
 
@@ -363,9 +363,10 @@ An indefinite pause is not possible; recovery requires governance (48h Timelock)
 The Guardian can call `guardianDisableAave()` to halt all new Aave deposits without
 governance delay. If an active position needs to be unwound:
 
-1. Normal path: `withdrawWithYield()` via `YieldOps`.
-2. Fallback: `emergencyUnwind()` on `AaveYieldGenerationModule` — a separate code path
-   invoked automatically if the primary withdrawal reverts.
+1. Normal path: `unwindToEscrow()` on `AaveYieldModule` (driven by `_handleYieldModuleUnwind`
+   during settlement).
+2. Fallback: `emergencyUnwind()` on `AaveYieldModule` — a separate code path invoked
+   automatically if the primary unwind reverts.
 3. Guardian operations contract (`GuardianOps`) can trigger forced unwinds.
 
 ### 8.3 Exposure caps
@@ -414,9 +415,9 @@ resolved. Key fixes:
 | Severity | Issue | Fix |
 |---|---|---|
 | CRIT | Underflow risk in `_updateEscrowBalance` | Explicit `BalanceUnderflow` guard added |
-| CRIT | `recoverERC20` calculation error | Validated against `available` excess, not total balance |
+| CRIT | `recoverERC20` calculation error (legacy recovery path) | Validated against `available` excess, not total balance |
 | CRIT | Incentive module: balance mismatch on distribution | Balance validation added before fee recording |
-| CRIT | `YieldOps.recoverTokens` missing access control | `ROLE_GUARDIAN` access control added |
+| CRIT | `YieldOps.recoverTokens` missing access control (legacy; `YieldOps` since removed) | `ROLE_GUARDIAN` access control added; superseded by `AaveYieldModule.recoverTokens`/`recoverETH`, timelock-gated and scoped to `recoverableAssets` |
 | HIGH | `withdrawFees` wrong state-clearing order | CEI fixed; state cleared after successful transfer |
 | HIGH | Aave withdrawal: no slippage protection | 0.1% slippage tolerance check added |
 | HIGH | State cleared before withdrawal confirmed in Aave | State cleared only after successful `withdraw()` return |

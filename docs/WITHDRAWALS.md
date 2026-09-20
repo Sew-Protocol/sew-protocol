@@ -7,8 +7,9 @@
 >
 > **Sources:** `contracts/core/BaseEscrow.sol` (`withdrawEscrow`, `claimBondProtocolFees`,
 > `claimExcessEthRefund`, `_creditClaimable`, `_transferTokens`, `totalClaimableAssets`),
-> `contracts/ops/YieldOps.sol` (`claimEscrowYield`, `withdrawClaimableProtocolFee`,
-> `recoverTokens`),
+> `contracts/core/EscrowVault.sol` (`withdrawFees`),
+> `contracts/modules/AaveYieldModule.sol` (`unwindToEscrow`, `emergencyUnwind`,
+> `recoverTokens`, `recoverETH`),
 > `contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV1.sol`
 > (`claimPayment`),
 > `contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV2.sol`
@@ -34,8 +35,7 @@ This design choice applies consistently across all fund types:
 | Excess ETH from bond posting | `claimableExcessEthRefunds[address]` | `claimExcessEthRefund()` |
 | Resolver dispute payments | `claimablePayments[escrow][workflowId][address]` | `claimPayment(workflowId, escrow, token)` |
 | Appeal bond refunds | `claimableBondRefunds[escrow][workflowId][address]` | `claimBondRefund(workflowId, escrow, token)` |
-| Yield for escrow contract | `claimableEscrowYield[token][escrowContract]` | `claimEscrowYield(token, amount)` |
-| Yield protocol fees | `claimableProtocolFees[token][address]` | `withdrawClaimableProtocolFee(token, amount)` |
+| Yield protocol fees | `totalFeesPerToken[token]` (EscrowVault) | `withdrawFees(token)` |
 
 **Why pull-only?**
 
@@ -109,48 +109,38 @@ if (amount > principalExpected) {
 
 ## 3. Yield-related withdrawals
 
-Yield settlement involves two contracts (`BaseEscrow` and `YieldOps`) and three separate
-claimable ledgers.
+Yield accelerates to the escrow's settlement beneficiary through the normal `withdrawEscrow`
+pull described in §2; separately, the protocol harvests a yield fee from the vault via
+`withdrawFees`. There is no per-escrow yield claim and no separate yield ledger.
 
-### 3.1 Escrow-to-YieldOps: `claimEscrowYield`
+### 3.1 Yield to the settlement beneficiary — `withdrawEscrow`
 
-```
-Function: claimEscrowYield(token, amount)
-Ledger: YieldOps.claimableEscrowYield[token][escrowContract]
-Caller: BaseEscrow (via ROLE_ESCROW_CONTRACT)
-```
+When a yield module is active, `_handleYieldModuleUnwind` unwinds the position on settlement
+and credits `principal + beneficiaryYield` to the single settlement beneficiary's
+`claimableBalances[workflowId][address]`. The beneficiary pulls the full amount (principal +
+yield) with `withdrawEscrow(workflowId)` exactly as described in §2 — no separate yield
+claim function exists.
 
-When `YieldOps.handleYield` withdraws from the yield generation module, it credits the
-proceeds to `claimableEscrowYield[token][escrowContract]` rather than pushing them back
-immediately. `BaseEscrow` then pulls by calling `claimEscrowYield`, which validates the
-available balance and transfers tokens:
+`beneficiaryYield = realizedYield − protocolFee` (see 3.2). The fee is carved out of yield
+only, never out of principal.
 
-```solidity
-uint256 available = claimableEscrowYield[token][_msgSender()];
-// reverts if amount > available
-claimableEscrowYield[token][_msgSender()] = available - amount;
-IERC20(token).safeTransfer(_msgSender(), amount);
-```
-
-This two-step pull prevents a compromised or re-entrant yield module from forcing an
-unexpected push back into `BaseEscrow` during state transitions.
-
-### 3.2 Protocol yield fee: `withdrawClaimableProtocolFee`
+### 3.2 Protocol yield fee — `EscrowVault.withdrawFees`
 
 ```
-Function: withdrawClaimableProtocolFee(token, amount)
-Ledger: YieldOps.claimableProtocolFees[token][msg.sender]
-Caller: Protocol fee recipient
+Function: withdrawFees(token)
+Ledger: EscrowVault.totalFeesPerToken[token]
+Caller: ROLE_FEE_RECIPIENT
 ```
 
-When `YieldOps.distributeWithdrawnYield` calculates the protocol fee (`yieldAmount ×
-feeBps / 10,000`), it credits `claimableProtocolFees[token][feeRecipient]`. The fee
-recipient withdraws via `withdrawClaimableProtocolFee`:
+During settlement, `_computeYieldProtocolFee` (in `EscrowSettlement`) applies the snapshotted
+`yieldProtocolFeeBps` (max 3000 bps / 30%) to realized **positive** yield only and credits the
+result to the pull-based `totalFeesPerToken[token]` bucket. No fee is taken when realized
+yield is zero. The fee recipient pulls the accumulated balance with
+`EscrowVault.withdrawFees(token)` (CEI-safe, `nonReentrant`):
 
-- `amount` must be ≤ the caller's claimable balance (no over-draw).
-- Partial claims are permitted — `amount` may be less than the full balance.
-- Immediate `safeTransfer` after ledger update (no slow lane; this is operational income,
-  not governance-controlled pooled funds).
+- `ROLE_FEE_RECIPIENT` only.
+- Fully pull-based — the vault never pushes fees to the treasury.
+- The full `totalFeesPerToken[token]` bucket is transferred and zeroed atomically.
 
 ### 3.3 Bond protocol fees: `claimBondProtocolFees`
 
@@ -280,8 +270,8 @@ throughout the escrow lifetime.
 **Note:** `totalClaimableAssets` tracks principal and yield claimable at the `BaseEscrow`
 level only. Resolver payments (`ResolverIncentiveModuleV1`), bond refunds
 (`ResolverIncentiveModuleV2`), insurance pool balances (`InsurancePoolVault`), and yield
-ops ledgers (`YieldOps`) are each self-contained in their own contracts with their own
-token balances.
+protocol fees (`EscrowVault.totalFeesPerToken` bucket) are each self-contained in their
+own contracts with their own token balances.
 
 ---
 
@@ -352,27 +342,34 @@ Caller: ROLE_GUARDIAN
 Target: BaseEscrow + AaveYieldModule
 ```
 
-If the `AaveYieldModule` becomes inaccessible or holds funds that cannot be withdrawn
-through normal `withdrawWithYield`, the guardian can call
-`emergencyUnwindAavePosition(escrowContract, genModule, workflowId, token, principalExpected)`.
-This calls `IYieldGenerationModule.emergencyUnwind(workflowId, token, principalExpected)`
-directly, bypassing the normal settlement flow.
+If the `AaveYieldModule` becomes inaccessible or holds funds that cannot be unwound
+through the normal `unwindToEscrow` / `emergencyUnwind` flow, the guardian can call
+`emergencyUnwindAavePosition(...)`. This drives `IYieldModule.emergencyUnwind` (or
+`emergencyUnwindForEscrow`) directly, bypassing the normal settlement flow.
 
 The guardian cannot direct recovered funds — they are returned to the escrow contract for
 normal claimable settlement. The guardian cannot divert them to an arbitrary address.
 The function is rate-limited at the `GuardianOps` level to prevent abuse.
 
-### 8.2 YieldOps token recovery — `YieldOps.recoverTokens`
+### 8.2 Module token recovery — `AaveYieldModule.recoverTokens` / `recoverETH`
 
 ```
-Caller: ROLE_GUARDIAN (on YieldOps contract)
+Caller: ROLE_TIMELOCK (on AaveYieldModule)
 ```
 
-If tokens are stranded in the `YieldOps` contract due to a failed distribution or
-protocol error, the guardian can recover them to a specified address via
-`recoverTokens(token, to, amount)`. Supports both ERC20 and native ETH. This path is
-intended for dust or edge-case recovery; it emits `TokensRecovered` for full
-auditability.
+As a last resort when an Aave position cannot be unwound normally (e.g. Aave withdraw is
+unavailable), the timelock can recover stranded funds directly from the module:
+
+- `recoverTokens(token, to, amount)` — recovers ERC-20 where `token` is registered in
+  `recoverableAssets`.
+- `recoverETH(to)` — recovers stranded native ETH.
+
+Recovery is scoped: only the configured underlying tokens and their aTokens are registered
+in `recoverableAssets`, so the module cannot be drained of assets it never held for an
+escrow. This is a timelock-gated, guardian-protective last resort (not the normal path).
+The settlement flow itself always attempts `unwindToEscrow` → `emergencyUnwind` and only
+fails open with `YieldUnwindFailed` (in `EscrowYield`) if both are unavailable — manual
+recovery is never the default.
 
 ---
 
@@ -385,12 +382,11 @@ auditability.
 | Excess ETH from bond posting | `claimExcessEthRefund()` | `BaseEscrow` | Bond poster | None |
 | Resolver dispute payment | `claimPayment(workflowId, escrow, token)` | `ResolverIncentiveModuleV1` | Resolver | Payments must be calculated |
 | Appeal bond refund (V2) | `claimBondRefund(workflowId, escrow, token)` | `ResolverIncentiveModuleV2` | Bond poster | Bond must be marked refundable |
-| Yield protocol fee | `withdrawClaimableProtocolFee(token, amount)` | `YieldOps` | Fee recipient | None |
-| Yield proceeds to escrow | `claimEscrowYield(token, amount)` | `YieldOps` | `BaseEscrow` only (`ROLE_ESCROW_CONTRACT`) | None |
+| Yield protocol fee | `withdrawFees(token)` | `EscrowVault` | Fee recipient (`ROLE_FEE_RECIPIENT`) | None |
 | Insurance payout (normal) | `proposePayout` → `executePayout` | `InsurancePoolVault` | `ROLE_TIMELOCK` | 7-day slow lane |
 | Insurance payout (emergency) | `withdraw(to, amount, workflowId)` | `InsurancePoolVault` | `ROLE_TIMELOCK` | `withdrawalsEnabled` flag (off by default) |
 | Stranded Aave yield | `emergencyUnwindAavePosition(...)` | `GuardianOps` | `ROLE_GUARDIAN` | Rate-limited; proceeds go to escrow |
-| Stranded tokens in YieldOps | `recoverTokens(token, to, amount)` | `YieldOps` | `ROLE_GUARDIAN` | None |
+| Stranded funds in Aave yield module | `recoverTokens(token, to, amount)` / `recoverETH(to)` | `AaveYieldModule` | `ROLE_TIMELOCK` | Scoped to `recoverableAssets`; last resort |
 
 ---
 
@@ -401,4 +397,4 @@ auditability.
 | **Contracts** | `sew-protocol` @ `62fce3a` |
 | **Simulation** | `sew-simulation` @ `5b33486` |
 | **Generated / reviewed** | 2026-05-21 |
-| **Verification status** | Manually checked against `YieldOps.sol`, `EscrowVault.sol`, `withdrawFees()`, and Aave unwind paths. CEI ordering fix for `withdrawFees` verified against `SECURITY_FIXES_COMPLETED.md`. Aave slippage protection verified against `AaveYieldModuleV1.sol`. Simulation does not yet cover Aave emergency unwind scenarios under stress — needs follow-up. |
+| **Verification status** | Manually checked against `AaveYieldModule.sol`, `EscrowVault.sol`, `withdrawFees()`, and Aave unwind paths. CEI ordering fix for `withdrawFees` verified against `SECURITY_FIXES_COMPLETED.md`. Aave slippage protection verified against `AaveYieldModule.sol`. Simulation does not yet cover Aave emergency unwind scenarios under stress — needs follow-up. |

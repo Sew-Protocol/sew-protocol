@@ -34,7 +34,7 @@ library YieldPresetLibrary {
             return ''; // Empty = no distribution
         }
 
-        if (preset == YieldPreset.TO_SENDER) {
+        if (preset == YieldPreset.ENABLED) {
             // Validate sender
             if (sender == address(0)) revert InvalidAddress(ADDR_GENERIC, sender);
 
@@ -75,7 +75,7 @@ library YieldPresetLibrary {
         // Intentionally unused for current presets (kept for forward-compatible preset expansion)
         recipient;
 
-        if (preset == YieldPreset.TO_SENDER) {
+        if (preset == YieldPreset.ENABLED) {
             if (sender == address(0)) revert InvalidAddress(ADDR_GENERIC, sender);
         }
         // OFF preset requires no addresses

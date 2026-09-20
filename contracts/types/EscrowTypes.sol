@@ -46,7 +46,7 @@ error AmountExceedsBalance(uint256 requested, uint256 available);
 struct EscrowSettings {
     address customResolver; // Override default resolver (address(0) = use default)
     address releaseAddress; // Address authorized to release (address(0) = sender only)
-    YieldPreset yieldPreset; // Yield configuration preset (OFF, TO_SENDER, etc.)
+    YieldPreset yieldPreset; // Yield configuration preset (OFF, ENABLED, etc.)
     uint256 autoReleaseTime; // Custom release time (0 = use default)
     uint256 autoCancelTime; // Custom cancel time (0 = use default)
 }

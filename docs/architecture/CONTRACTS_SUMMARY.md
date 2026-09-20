@@ -119,29 +119,24 @@ Succinct overview of the major contracts and their roles.
 
 ## Yield Modules
 
-### `AaveYieldGenerationModule*.sol`
+### `AaveYieldModule.sol`
 
-**Purpose**: Generates yield on escrowed funds using Aave  
+**Purpose**: Generates yield on escrowed funds using Aave v3  
 **Key Features**:
 
-- Deposits tokens to Aave lending pool
-- Tracks yield per escrow
-- Proportional yield calculation
-- Withdrawal with yield
+- Deposits tokens to the Aave lending pool
+- Tracks positions per `(escrow, escrowId)`
+- Unwinds via `unwindToEscrow` / `emergencyUnwind` / `emergencyUnwindForEscrow`
+- Timelock-gated `recoverTokens` / `recoverETH` (scoped to `recoverableAssets`) as last-resort recovery
+- Per-token caps, min-deposit, and slow-lane governance / fast risk-reducing actions
 
 **Use case**: Earn interest on escrowed funds while they're locked
 
----
-
-### `DefaultYieldDistributionModule.sol`
-
-**Purpose**: Distributes yield deterministically by preset  
-**Key Features**:
-
-- Yield distribution derived from `YieldPreset`
-- Simple preset-based distribution (e.g., `OFF`, `TO_SENDER`)
-
-**Use case**: Share yield between parties (e.g., sender and recipient) without per-escrow distributions
+> Yield **distribution** policy is not a separate module — it lives in core
+> (`EscrowYield._handleYieldModuleUnwind`, `EscrowSettlement._computeYieldProtocolFee`).
+> The protocol fee (max 30%) is carved from realized positive yield and credited to
+> `totalFeesPerToken` for pull via `EscrowVault.withdrawFees`; the rest flows to the
+> settlement beneficiary.
 
 ---
 

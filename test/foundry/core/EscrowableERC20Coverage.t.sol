@@ -75,6 +75,7 @@ contract EscrowableERC20CoverageTest is Test {
         vm.warp(block.timestamp + 8 days);
         moduleManagement.activateModule(address(token), BaseEscrow.ModuleType.RELEASE);
 
+        bondCollector.registerEscrowContract(address(token));
 
         token.grantRole(token.ROLE_ADMIN_CONTRACT(), address(this));
         token.setCreationPolicy(address(creationPolicy));
@@ -396,10 +397,12 @@ contract EscrowableERC20CoverageTest is Test {
 
     function test_zero_fee_escrow() public {
         EscrowableERC20 zeroFeeToken = new EscrowableERC20('Zero Fee','ZF',0,feeAddress,address(moduleManagement));
+        moduleManagement.registerEscrowContract(address(zeroFeeToken));
         moduleManagement.queueModule(address(zeroFeeToken), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
         vm.warp(block.timestamp + 8 days);
         moduleManagement.activateModule(address(zeroFeeToken), BaseEscrow.ModuleType.RELEASE);
 
+        bondCollector.registerEscrowContract(address(zeroFeeToken));
 
         zeroFeeToken.grantRole(zeroFeeToken.ROLE_ADMIN_CONTRACT(), address(this));
         zeroFeeToken.setCreationPolicy(address(creationPolicy));

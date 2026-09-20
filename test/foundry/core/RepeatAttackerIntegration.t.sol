@@ -73,8 +73,11 @@ contract RepeatAttackerIntegrationTest is Test {
 
         escrow = new EscrowVault(0,feeAddress,address(moduleManagement));
 
+        moduleManagement.registerEscrowContract(address(escrow));
+        bondCollector.registerEscrowContract(address(escrow));
 
         // Allow test contract to call ops directly (for forceProgress via escrow)
+        bondCollector.registerEscrowContract(address(this));
 
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(this));
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(adminContract));
@@ -84,8 +87,13 @@ contract RepeatAttackerIntegrationTest is Test {
 
         resolutionModule.grantRole(resolutionModule.ROLE_TIMELOCK(), address(this));
         resolutionModule.grantRole(resolutionModule.ROLE_TIMELOCK(), timelockAddr);
+        resolutionModule.registerEscrowContract(address(escrow));
+        resolutionModule.registerEscrowContract(address(this));
 
         incentiveModule.grantRole(incentiveModule.ROLE_TIMELOCK(), address(this));
+        incentiveModule.registerEscrowContract(address(escrow));
+        incentiveModule.registerEscrowContract(address(this));
+        incentiveModule.registerEscrowContract(address(resolutionModule));
 
         resolutionModule.setIncentiveModule(address(incentiveModule));
 

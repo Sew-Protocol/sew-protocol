@@ -26,9 +26,10 @@ contract ModuleSwapExecutableTest is Test {
         releaseV2 = new DefaultReleaseStrategy();
 
         // Minimal escrow deployment. For this test we only need module swapping paths.
-        // Use dummy ops addresses; they won't be called.
+        vault = new EscrowVault(0,address(0xFEE),address(moduleManagement));
 
         // Allow the escrow to call ModuleSnapshotRegistry (ROLE_ESCROW_CONTRACT).
+        moduleManagement.registerEscrowContract(address(vault));
 
         // Ensure our test has timelock role on the escrow (constructor grants it to deployer).
         assertTrue(vault.hasRole(ROLE_TIMELOCK, owner));

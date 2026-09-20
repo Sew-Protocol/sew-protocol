@@ -69,7 +69,7 @@ contract AaveYieldModuleAccountingTest is Test {
         vm.prank(escrow); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow);
-        uint256 accepted = module.initializeYield(1, address(token), smallAmount, YieldPreset.TO_SENDER);
+        uint256 accepted = module.initializeYield(1, address(token), smallAmount, YieldPreset.ENABLED);
         
         assertEq(accepted, smallAmount, "Small amount should be accepted in full");
         
@@ -90,7 +90,7 @@ contract AaveYieldModuleAccountingTest is Test {
         vm.prank(escrow); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow);
-        uint256 accepted = module.initializeYield(1, address(token), amount, YieldPreset.TO_SENDER);
+        uint256 accepted = module.initializeYield(1, address(token), amount, YieldPreset.ENABLED);
         
         // No yield simulated - just withdraw principal
         vm.prank(escrow);
@@ -113,7 +113,7 @@ contract AaveYieldModuleAccountingTest is Test {
         vm.prank(escrow); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow);
-        uint256 accepted = module.initializeYield(1, address(token), largeAmount, YieldPreset.TO_SENDER);
+        uint256 accepted = module.initializeYield(1, address(token), largeAmount, YieldPreset.ENABLED);
         
         assertEq(accepted, largeAmount, "Large amount should be accepted");
         
@@ -140,7 +140,7 @@ contract AaveYieldModuleAccountingTest is Test {
             vm.prank(escrow); token.approve(address(module), type(uint256).max);
             
             vm.prank(escrow);
-            uint256 accepted = module.initializeYield(i, address(token), cycleAmount, YieldPreset.TO_SENDER);
+            uint256 accepted = module.initializeYield(i, address(token), cycleAmount, YieldPreset.ENABLED);
             totalDeposited += accepted;
             
             vm.prank(escrow);
@@ -167,7 +167,7 @@ contract AaveYieldModuleAccountingTest is Test {
         vm.prank(escrow); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow);
-        module.initializeYield(1, address(token), depositAmount, YieldPreset.TO_SENDER);
+        module.initializeYield(1, address(token), depositAmount, YieldPreset.ENABLED);
         
         // Simulate yield accrual (many blocks to generate meaningful yield)
         pool.simulateYield(address(token), 1000000);
@@ -189,14 +189,14 @@ contract AaveYieldModuleAccountingTest is Test {
         token.transfer(escrow, 50e18);
         vm.prank(escrow); token.approve(address(module), type(uint256).max);
         vm.prank(escrow);
-        module.initializeYield(1, address(token), 50e18, YieldPreset.TO_SENDER);
+        module.initializeYield(1, address(token), 50e18, YieldPreset.ENABLED);
         
         // Second position (different ID)
         vm.prank(escrow);
         token.transfer(escrow, 75e18);
         vm.prank(escrow); token.approve(address(module), type(uint256).max);
         vm.prank(escrow);
-        module.initializeYield(2, address(token), 75e18, YieldPreset.TO_SENDER);
+        module.initializeYield(2, address(token), 75e18, YieldPreset.ENABLED);
         
         // Verify both positions
         (, uint256 p1, , ) = module.positions(escrow, 1);
@@ -236,7 +236,7 @@ contract AaveYieldModuleAccountingTest is Test {
         vm.prank(escrow); token.approve(address(module), type(uint256).max);
 
         vm.prank(escrow);
-        uint256 accepted = module.initializeYield(1, address(token), amount, YieldPreset.TO_SENDER);
+        uint256 accepted = module.initializeYield(1, address(token), amount, YieldPreset.ENABLED);
         assertEq(accepted, amount, "Should accept full amount");
 
         // previewPosition must not overstate beyond the deposited principal.
@@ -266,7 +266,7 @@ contract AaveYieldModuleAccountingTest is Test {
         token.transfer(escrow, a);
         vm.prank(escrow); token.approve(address(module), type(uint256).max);
         vm.prank(escrow);
-        module.initializeYield(1, address(token), a, YieldPreset.TO_SENDER);
+        module.initializeYield(1, address(token), a, YieldPreset.ENABLED);
 
         // Yield accrues, then position 2 is deposited at the elevated index.
         pool.simulateYield(address(token), 100);
@@ -274,7 +274,7 @@ contract AaveYieldModuleAccountingTest is Test {
         token.transfer(escrow, b);
         vm.prank(escrow); token.approve(address(module), type(uint256).max);
         vm.prank(escrow);
-        module.initializeYield(2, address(token), b, YieldPreset.TO_SENDER);
+        module.initializeYield(2, address(token), b, YieldPreset.ENABLED);
 
         // More yield accrues for both positions.
         pool.simulateYield(address(token), 100);
@@ -311,7 +311,7 @@ contract AaveYieldModuleAccountingTest is Test {
         token.approve(address(module), type(uint256).max);
 
         vm.prank(escrow);
-        uint256 accepted = module.initializeYield(7, address(token), deposit, YieldPreset.TO_SENDER);
+        uint256 accepted = module.initializeYield(7, address(token), deposit, YieldPreset.ENABLED);
         assertEq(accepted, deposit, "principal must equal the deposit, not deposit minus stray");
 
         // Tiny yield then full unwind: principal fully recovered.
@@ -335,7 +335,7 @@ contract AaveYieldModuleAccountingTest is Test {
         token.approve(address(module), type(uint256).max);
 
         vm.prank(escrow);
-        uint256 accepted = module.initializeYield(8, address(token), deposit, YieldPreset.TO_SENDER);
+        uint256 accepted = module.initializeYield(8, address(token), deposit, YieldPreset.ENABLED);
         assertEq(accepted, deposit, "deposit accepted in full even when module already holds more");
 
         vm.prank(escrow);
@@ -356,16 +356,16 @@ contract AaveYieldModuleAccountingTest is Test {
         token.approve(address(module), type(uint256).max);
 
         vm.prank(escrow);
-        module.initializeYield(1, address(token), amt, YieldPreset.TO_SENDER);
+        module.initializeYield(1, address(token), amt, YieldPreset.ENABLED);
 
         // Same (escrow, escrowId): must revert.
         vm.prank(escrow);
         vm.expectRevert("PositionAlreadyExists");
-        module.initializeYield(1, address(token), amt, YieldPreset.TO_SENDER);
+        module.initializeYield(1, address(token), amt, YieldPreset.ENABLED);
 
         // Different escrowId on the same escrow is still allowed (positions are distinct).
         vm.prank(escrow);
-        uint256 accepted2 = module.initializeYield(2, address(token), amt, YieldPreset.TO_SENDER);
+        uint256 accepted2 = module.initializeYield(2, address(token), amt, YieldPreset.ENABLED);
         assertEq(accepted2, amt, "a different escrowId is still allowed");
     }
 
@@ -405,17 +405,17 @@ contract AaveYieldModuleAccountingTest is Test {
 
         // Position 1 at the initial liquidity index.
         vm.prank(escrow);
-        module.initializeYield(1, address(token), a, YieldPreset.TO_SENDER);
+        module.initializeYield(1, address(token), a, YieldPreset.ENABLED);
 
         // Yield accrues, then position 2 at the elevated index.
         pool.simulateYield(address(token), 50);
         vm.prank(escrow);
-        module.initializeYield(2, address(token), b, YieldPreset.TO_SENDER);
+        module.initializeYield(2, address(token), b, YieldPreset.ENABLED);
 
         // More yield, then position 3.
         pool.simulateYield(address(token), 50);
         vm.prank(escrow);
-        module.initializeYield(3, address(token), c, YieldPreset.TO_SENDER);
+        module.initializeYield(3, address(token), c, YieldPreset.ENABLED);
 
         // Further yield accrues for all positions.
         pool.simulateYield(address(token), 50);

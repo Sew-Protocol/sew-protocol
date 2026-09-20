@@ -84,8 +84,10 @@ contract AppealWindowEnforcementTest is Test {
         escrow = new EscrowVault(ESCROW_FEE,feeAddress,address(moduleManagement));
 
         // Wire ops contracts (EscrowCreationPolicy) and register escrow contract callers
+        bondCollector.registerEscrowContract(address(escrow));
 
         // Also register this test contract as an escrow contract because it calls ops directly
+        bondCollector.registerEscrowContract(address(this));
 
         // Allow this test contract to wire ops on the vault
         escrow.grantRole(escrow.ROLE_ADMIN_CONTRACT(), address(this));
@@ -106,10 +108,15 @@ contract AppealWindowEnforcementTest is Test {
         escrow.grantRole(escrowRoleTimelock, address(this));
 
         // Register escrow contract in resolution module
+        resolutionModule.registerEscrowContract(address(escrow));
+        resolutionModule.registerEscrowContract(address(this)); // Register self because we call setEscrowCategory
         klerosProxy.grantRole(klerosProxy.ROLE_TIMELOCK(), address(this));
         klerosProxy.registerKlerosHandoffEscrow(address(escrow));
 
         // Register escrow contract in incentive module
+        incentiveModule.registerEscrowContract(address(escrow));
+        incentiveModule.registerEscrowContract(address(this));
+        incentiveModule.registerEscrowContract(address(resolutionModule));
 
         // Set incentive module in resolution module
         vm.prank(timelock);

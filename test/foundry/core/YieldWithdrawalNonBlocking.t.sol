@@ -70,7 +70,7 @@ contract YieldWithdrawalNonBlockingTest is Test {
 
         EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
         // Enable yield so BaseEscrow attempts the yield path.
-        settings.yieldPreset = YieldPreset.TO_SENDER;
+        settings.yieldPreset = YieldPreset.ENABLED;
 
         vm.prank(sender);
         uint256 wid = vault.createEscrow(address(token), recipient, AMOUNT, settings);

@@ -109,7 +109,7 @@ contract EmergencyRecoveryFlowTest is Test {
         return EscrowSettings({
             customResolver: address(0),
             releaseAddress: address(0),
-            yieldPreset: YieldPreset.TO_SENDER,
+            yieldPreset: YieldPreset.ENABLED,
             autoReleaseTime: 0,
             autoCancelTime: 0
         });

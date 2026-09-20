@@ -53,6 +53,7 @@ contract CreationLogicEquivalenceTest is Test {
 
     function setUp() public {
         createOps = new CreateOpsReference(address(this));
+        createOps.registerEscrowContract(address(this));
         module = new CreateResolverModule();
         contractResolver = address(module); // any deployed contract
         vm.warp(1_000_000);
@@ -269,7 +270,7 @@ contract CreationLogicEquivalenceTest is Test {
         );
     }
 
-    /// @dev Yield policy guard: paused vs not, preset OFF vs TO_SENDER.
+    /// @dev Yield policy guard: paused vs not, preset OFF vs ENABLED.
     function test_yieldPauseGuard() public {
         // Preset ON, not paused → should attempt deposit.
         _cmp(

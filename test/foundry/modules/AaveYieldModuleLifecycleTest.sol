@@ -75,7 +75,7 @@ contract AaveYieldModuleLifecycleTest is Test {
         vm.prank(escrow1); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow1);
-        module.initializeYield(1, address(token), amount, YieldPreset.TO_SENDER);
+        module.initializeYield(1, address(token), amount, YieldPreset.ENABLED);
         
         // Full unwind
         vm.prank(escrow1);
@@ -102,7 +102,7 @@ contract AaveYieldModuleLifecycleTest is Test {
         vm.prank(escrow1); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow1);
-        module.initializeYield(1, address(token), amount, YieldPreset.TO_SENDER);
+        module.initializeYield(1, address(token), amount, YieldPreset.ENABLED);
         
         // Note: Module withdraws all from aToken on any unwind call
         // So we test by creating a new position for remaining
@@ -125,7 +125,7 @@ contract AaveYieldModuleLifecycleTest is Test {
         vm.prank(escrow1); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow1);
-        module.initializeYield(1, address(token), amount, YieldPreset.TO_SENDER);
+        module.initializeYield(1, address(token), amount, YieldPreset.ENABLED);
         
         // Emergency unwind
         vm.prank(escrow1);
@@ -151,19 +151,19 @@ contract AaveYieldModuleLifecycleTest is Test {
         token.transfer(escrow1, amount1);
         vm.prank(escrow1); token.approve(address(module), type(uint256).max);
         vm.prank(escrow1);
-        module.initializeYield(1, address(token), amount1, YieldPreset.TO_SENDER);
+        module.initializeYield(1, address(token), amount1, YieldPreset.ENABLED);
         
         vm.prank(escrow1);
         token.transfer(escrow1, amount2);
         vm.prank(escrow1); token.approve(address(module), type(uint256).max);
         vm.prank(escrow1);
-        module.initializeYield(2, address(token), amount2, YieldPreset.TO_SENDER);
+        module.initializeYield(2, address(token), amount2, YieldPreset.ENABLED);
         
         vm.prank(escrow2);
         token.transfer(escrow2, amount3);
         vm.prank(escrow2); token.approve(address(module), type(uint256).max);
         vm.prank(escrow2);
-        module.initializeYield(1, address(token), amount3, YieldPreset.TO_SENDER);
+        module.initializeYield(1, address(token), amount3, YieldPreset.ENABLED);
         
         // Verify all positions
         (, uint256 p1, , ) = module.positions(escrow1, 1);
@@ -199,14 +199,14 @@ contract AaveYieldModuleLifecycleTest is Test {
         token.transfer(escrow1, amount1);
         vm.prank(escrow1); token.approve(address(module), type(uint256).max);
         vm.prank(escrow1);
-        module.initializeYield(1, address(token), amount1, YieldPreset.TO_SENDER);
+        module.initializeYield(1, address(token), amount1, YieldPreset.ENABLED);
         
         // Escrow2 deposits
         vm.prank(escrow2);
         token.transfer(escrow2, amount2);
         vm.prank(escrow2); token.approve(address(module), type(uint256).max);
         vm.prank(escrow2);
-        module.initializeYield(1, address(token), amount2, YieldPreset.TO_SENDER);
+        module.initializeYield(1, address(token), amount2, YieldPreset.ENABLED);
         
         // Escrow1 withdraws
         vm.prank(escrow1);
@@ -233,7 +233,7 @@ contract AaveYieldModuleLifecycleTest is Test {
         vm.prank(escrow1); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow1);
-        module.initializeYield(1, address(token), amount, YieldPreset.TO_SENDER);
+        module.initializeYield(1, address(token), amount, YieldPreset.ENABLED);
         
         // Simulate yield over multiple steps
         pool.simulateYield(address(token), 100000);
@@ -259,7 +259,7 @@ contract AaveYieldModuleLifecycleTest is Test {
         vm.prank(escrow1); token.approve(address(module), type(uint256).max);
         
         vm.prank(escrow1);
-        module.initializeYield(1, address(token), amount, YieldPreset.TO_SENDER);
+        module.initializeYield(1, address(token), amount, YieldPreset.ENABLED);
         
         // Generate some yield
         pool.simulateYield(address(token), 50000);

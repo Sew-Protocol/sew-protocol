@@ -92,7 +92,7 @@ contract EscrowableERC20BugsTest is Test {
         escrowToken.approve(address(escrowToken), 100 ether);
         
         EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
-        settings.yieldPreset = YieldPreset.TO_SENDER;
+        settings.yieldPreset = YieldPreset.ENABLED;
 
         vm.expectRevert(); // AccountingDeficit
         escrowToken.createEscrow(address(escrowToken), user2, 100 ether, settings);

@@ -173,7 +173,7 @@ contract EscrowAccountingBugTests is Test {
         token.approve(address(vault), amount);
         
         EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
-        settings.yieldPreset = YieldPreset.TO_SENDER;
+        settings.yieldPreset = YieldPreset.ENABLED;
         
         uint256 wid = vault.createEscrow(address(token), seller, amount, settings);
         vm.stopPrank();

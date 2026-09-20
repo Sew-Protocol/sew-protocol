@@ -73,7 +73,7 @@ contract AaveEscrowE2ETest is Test {
         return EscrowSettings({
             customResolver: address(0),
             releaseAddress: address(0),
-            yieldPreset: YieldPreset.TO_SENDER,
+            yieldPreset: YieldPreset.ENABLED,
             autoReleaseTime: 0,
             autoCancelTime: 0
         });
@@ -107,7 +107,7 @@ contract AaveEscrowE2ETest is Test {
         assertEq(token.balanceOf(address(vault)), 0, 'escrow forwarded the full amount to yield');
         assertEq(buyerBalBefore - token.balanceOf(BUYER), AMOUNT, 'buyer funded exactly AMOUNT');
 
-        // Simulate yield, then mutually cancel: sender (TO_SENDER) receives principal + yield.
+        // Simulate yield, then mutually cancel: sender (ENABLED) receives principal + yield.
         pool.simulateYield(address(token), 10);
 
         vm.prank(BUYER);
@@ -117,7 +117,7 @@ contract AaveEscrowE2ETest is Test {
 
         assertEq(vault.v25YieldModules(wf), address(0), 'position unwound');
         uint256 claimable = vault.claimableBalances(wf, BUYER);
-        assertGt(claimable, AMOUNT, 'sender claimable exceeds principal (yield TO_SENDER)');
+        assertGt(claimable, AMOUNT, 'sender claimable exceeds principal (yield ENABLED)');
 
         vm.prank(BUYER);
         uint256 got = vault.withdrawEscrow(wf);
@@ -207,7 +207,7 @@ contract AaveEscrowE2ETest is Test {
     }
 
     /// @notice Realistic flow: deposit -> let 30 days of yield accrue -> mutually cancel ->
-    ///         sender (TO_SENDER) receives principal + time-accrued yield -> withdraws.
+    ///         sender (ENABLED) receives principal + time-accrued yield -> withdraws.
     function test_escrowLevel_timeAccrual_cancel_yieldToSender() public {
         _enableTimeAccrual();
         uint256 wf = _openFundedEscrow();
