@@ -250,6 +250,122 @@ contract AaveYieldModuleRecoveryTest is Test {
         (, uint256 remaining, , ) = module.positions(escrow, 2);
         assertEq(remaining, DEPOSIT_AMOUNT);
     }
+    // ============ Timelock token/ETH recovery (item 1) ============
+
+    address public receiver;
+
+    event TokensRecovered(address indexed token, address indexed to, uint256 amount);
+    event NativeRecovered(address indexed to, uint256 amount);
+
+    function test_recoverTokens_transfersConfiguredUnderlying() public {
+        receiver = address(0x5001);
+
+        // Seed the module with some underlying (e.g. stray dust before supply).
+        token.mint(address(module), 123);
+
+        // This test contract is the deployer and holds ROLE_TIMELOCK.
+        module.recoverTokens(address(token), receiver, 123);
+
+        assertEq(token.balanceOf(receiver), 123);
+        assertEq(token.balanceOf(address(module)), 0);
+    }
+
+    function test_recoverTokens_transfersAToken() public {
+        receiver = address(0x5001);
+
+        // A deposit leaves aTokens in the module (the asset that is stuck when Aave fails).
+        _deposit(escrow, 1, DEPOSIT_AMOUNT);
+        uint256 aBal = aToken.balanceOf(address(module));
+        assertGt(aBal, 0);
+
+        module.recoverTokens(address(aToken), receiver, aBal);
+
+        assertEq(aToken.balanceOf(receiver), aBal);
+        assertEq(aToken.balanceOf(address(module)), 0);
+    }
+
+    function test_recoverTokens_emits() public {
+        receiver = address(0x5001);
+        token.mint(address(module), 7);
+
+        vm.expectEmit(true, true, true, true, address(module));
+        emit TokensRecovered(address(token), receiver, 7);
+        module.recoverTokens(address(token), receiver, 7);
+    }
+
+    function test_recoverTokens_unrelatedTokenReverts() public {
+        ERC20Mock unrelated = new ERC20Mock("Rando", "RND", address(this), 100);
+
+        vm.expectRevert(
+            abi.encodeWithSignature("RecoveryAssetNotWhitelisted(address)", address(unrelated))
+        );
+        module.recoverTokens(address(unrelated), address(0x5001), 5);
+    }
+
+    function test_recoverTokens_disabledTokenATokenStillRecoverable() public {
+        receiver = address(0x5001);
+
+        _deposit(escrow, 1, DEPOSIT_AMOUNT);
+        module.disableToken(address(token));
+
+        uint256 aBal = aToken.balanceOf(address(module));
+        module.recoverTokens(address(aToken), receiver, aBal);
+        assertEq(aToken.balanceOf(receiver), aBal);
+    }
+
+    function test_recoverTokens_nonTimelockReverts() public {
+        address bob = address(0xB0B);
+        token.mint(address(module), 5);
+        // startPrank so the ROLE_TIMELOCK() view call inside the revert expectation does
+        // not consume the one-shot prank of the single (non-reverting) call.
+        vm.startPrank(bob);
+        vm.expectRevert(
+            abi.encodeWithSignature(
+                "AccessControlUnauthorizedAccount(address,bytes32)", bob, module.ROLE_TIMELOCK()
+            )
+        );
+        module.recoverTokens(address(token), address(0x5001), 5);
+        vm.stopPrank();
+    }
+
+    function test_recoverTokens_zeroToReverts() public {
+        token.mint(address(module), 5);
+        vm.expectRevert("InvalidAddress");
+        module.recoverTokens(address(token), address(0), 5);
+    }
+
+    function test_recoverETH_transfers() public {
+        receiver = address(0x5001);
+
+        vm.deal(address(module), 1 ether);
+        vm.deal(receiver, 0);
+
+        vm.expectEmit(true, true, true, true, address(module));
+        emit NativeRecovered(receiver, 1 ether);
+        module.recoverETH(payable(receiver));
+
+        assertEq(receiver.balance, 1 ether);
+        assertEq(address(module).balance, 0);
+    }
+
+    function test_recoverETH_nonTimelockReverts() public {
+        address bob = address(0xB0B);
+        vm.deal(address(module), 1 ether);
+        vm.startPrank(bob);
+        vm.expectRevert(
+            abi.encodeWithSignature(
+                "AccessControlUnauthorizedAccount(address,bytes32)", bob, module.ROLE_TIMELOCK()
+            )
+        );
+        module.recoverETH(payable(address(0x5001)));
+        vm.stopPrank();
+    }
+
+    function test_recoverETH_noBalanceReverts() public {
+        vm.expectRevert();
+        module.recoverETH(payable(address(0x5001)));
+    }
+
     // ============ #3 Revocation gates new deposits, not exits ============
 
     function test_revokedEscrow_canStillUnwindExistingPosition() public {

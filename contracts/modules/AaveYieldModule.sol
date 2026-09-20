@@ -76,6 +76,11 @@ contract AaveYieldModule is IYieldModule, ERC165, AccessControl, SlowLaneQueueAc
     // of approved escrows during an incident. The escrow itself is always authorized
     // to operate on its own positions.
     mapping(address operator => bool) public recoveryOperators;
+    // Assets the guardian may recover in a last-resort emergency. Both the underlying
+    // token and its aToken are registered on configure. NEVER removed: a disabled
+    // token's already-deployed aToken must remain recoverable (matching the
+    // "revocation stops new exposure, not exits" philosophy).
+    mapping(address asset => bool) public recoverableAssets;
     // Slow-lane (governance) pending state: a single escrow approval, and a
     // per-token aToken configuration. Both are risk-INCREASING changes that require
     // a 7-day slow-lane queue->activate cycle before taking effect.
@@ -104,10 +109,14 @@ contract AaveYieldModule is IYieldModule, ERC165, AccessControl, SlowLaneQueueAc
     event TokenDisabled(address token);
     event TokenCapConfigured(address indexed token, uint256 cap);
     event TokenCapLowered(address indexed token, uint256 newCap);
+    event TokensRecovered(address indexed token, address indexed to, uint256 amount);
+    event NativeRecovered(address indexed to, uint256 amount);
 
     // ============ Errors ============
 
     error TokenNotConfigured(address token);
+    error RecoveryAssetNotWhitelisted(address token);
+    error NoETHToRecover();
 
     // ============ Constructor ============
 
@@ -188,6 +197,10 @@ contract AaveYieldModule is IYieldModule, ERC165, AccessControl, SlowLaneQueueAc
         address aToken = _activateAddress(_pendingTokenConfig[token]);
         require(aToken != address(0), "InvalidAToken");
         tokenToAToken[token] = aToken;
+        // Register both the underlying and its aToken as recoverable by the guardian so a
+        // stranded aToken can be swept out even if this token is later disabled.
+        recoverableAssets[token] = true;
+        recoverableAssets[aToken] = true;
         emit TokenConfigured(token, aToken);
     }
 
@@ -277,6 +290,42 @@ contract AaveYieldModule is IYieldModule, ERC165, AccessControl, SlowLaneQueueAc
         require(operator != address(0), "InvalidAddress");
         recoveryOperators[operator] = allowed;
         emit RecoveryOperatorSet(operator, allowed);
+    }
+
+    // ============ Emergency token recovery (guardian) ============
+
+    /**
+     * @notice [TIMELOCK] Recover stranded ERC-20s (underlying or aTokens) held by the module.
+     * @param token Asset to recover (a configured underlying token or its aToken)
+     * @param to Recipient of the recovered assets
+     * @param amount Amount of `token` to transfer
+     * @dev Last-resort incident recovery for when aavePool.withdraw() is permanently
+     *      unavailable (Aave pause, stuck reserve, broken oracle). Unlike emergencyUnwind*,
+     *      which redeems via Aave, this physically moves the stranded asset to `to` so the
+     *      owning escrow/beneficiary can be made whole out-of-band. Scoped to assets
+     *      registered in recoverableAssets to prevent arbitrary unrelated-token drainage.
+     *      Amounts are tracked via TokensRecovered. Caller must hold ROLE_TIMELOCK.
+     */
+    function recoverTokens(address token, address to, uint256 amount) external onlyRole(ROLE_TIMELOCK) {
+        require(to != address(0), "InvalidAddress");
+        if (!recoverableAssets[token]) revert RecoveryAssetNotWhitelisted(token);
+        IERC20(token).safeTransfer(to, amount);
+        emit TokensRecovered(token, to, amount);
+    }
+
+    /**
+     * @notice [TIMELOCK] Recover stranded native ETH held by the module.
+     * @param to Recipient of the recovered ETH (must accept ETH)
+     * @dev The module only ever holds ERC-20s, so native ETH would only be present via a
+     *      forced transfer; this clears it out to `to`. Caller must hold ROLE_TIMELOCK.
+     */
+    function recoverETH(address payable to) external onlyRole(ROLE_TIMELOCK) {
+        require(to != address(0), "InvalidAddress");
+        uint256 amount = address(this).balance;
+        if (amount == 0) revert NoETHToRecover();
+        (bool ok, ) = to.call{value: amount}("");
+        require(ok, "ETHTransferFailed");
+        emit NativeRecovered(to, amount);
     }
 
     // ============ Core Yield Operations ============
