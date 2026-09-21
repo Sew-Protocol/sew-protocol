@@ -188,7 +188,9 @@ Sew Protocol is built on a modular architecture that enables safe, trustless tra
   - Protected by exposure caps and pause mechanisms
   - Governance-controlled enable/disable
 
-- **DefaultYieldDistributionModule**: Configurable yield distribution to recipients
+- **Yield distribution**: handled by core on settlement — realized yield (after the protocol
+  fee) follows the escrow beneficiary and is claimable via `withdrawEscrow`. Distribution
+  policy lives in core, not in a separate module.
   - Percentage-based allocation
   - Multiple recipients support
   - Immutable at escrow creation
@@ -289,14 +291,30 @@ For launch-safe parameter defaults and rationale (DR v3), see: `docs/dispute-res
 
 ### 3.3 Yield Generation
 
-#### AaveYieldGenerationModule
+#### AaveYieldModule
 
-Optional yield generation on escrowed funds:
+Optional yield generation on escrowed funds via a single simple adapter module:
 
-- **Integration**: Deposits escrowed funds to Aave for yield
-- **Protection**: Exposure caps and pause mechanisms
-- **Governance-Controlled**: Can be enabled/disabled via governance
-- **Use Case**: Generate yield on funds locked in escrow
+- **Integration**: Pulls the accepted principal from the escrow and supplies it to Aave V3
+  (`aavePool.supply`); on unwind it redeems (`aavePool.withdraw`) and returns funds to the
+  escrow owner. The module references an **immutable** Aave pool (no setter); migration is
+  deploy-replacement/approve/switch-new-escrows/unwind-old.
+- **Accounting**: positions are tracked by `(escrow, escrowId)` using **scaled aToken shares**,
+  converted to current underlying exactly once at unwind; principal is recorded as the exact
+  module-balance delta across the supply call. A second initialization for the same position
+  is rejected, so positions can never be silently overwritten.
+- **Yield fee**: realized positive yield is taxed by the snapshotted `yieldProtocolFeeBps`
+  (floor on `Y * feeBps / 10000`, never against principal/losses); fees are credited to a
+  pull-based `totalFeesPerToken` bucket and withdrawn by the fee recipient. Conservation holds
+  exactly: `R = P + B + F`.
+- **Protection**: per-token exposure caps (raise = slow lane, lower = fast), slow-lane
+  governance for risk-increasing changes, fast revocation/disable for risk-reducing ones.
+  Revocation stops new deposits but never freezes exiting an existing position.
+- **Emergency recovery**: operator/escrow-triggered unwind with proceeds forced to the escrow
+  owner, sharing Aave's own withdraw path; partial recovery is rejected, and recovery is
+  intentionally exempt from the protocol yield fee (accepted policy).
+- **Use Case**: Generate yield on funds locked in escrow, distributed to the escrow beneficiary
+  on settlement (yield follows the final beneficiary; no separate distribution module).
 
 ### 3.4 Snapshot Semantics
 

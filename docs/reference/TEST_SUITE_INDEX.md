@@ -1,5 +1,12 @@
 # Aave Yield Generation Module - Complete Test Suite Index
 
+> **⚠️ SUPERSEDED (2026-09-21).** This index documents the **removed** ERC-4626-style vault
+> module and its phase-based test files (`AaveMultiTenant` / `Phase3AaveEmergency` /
+> `Phase4AaveDustDeficit`), which no longer exist. It is superseded by the **simple
+> `AaveYieldModule`** suite. Current runnable suites live under
+> `test/foundry/modules/AaveYieldModule*.t.sol` and `*E2E.t.sol` (see
+> `docs/reference/AAVE_TEST_QUICK_REFERENCE.md` for the current list).
+
 ## 📋 Quick Navigation
 
 ### Start Here

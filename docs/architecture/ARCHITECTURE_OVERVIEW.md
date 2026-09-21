@@ -155,26 +155,20 @@ Determine when and how escrow funds can be released:
 
 Generate yield on escrowed funds:
 
-- **AaveYieldGenerationModule**: Generates yield via Aave integration
+- **AaveYieldModule**: Single simple adapter between the escrow and Aave V3
+  - Pulls the accepted principal from the escrow and supplies it to Aave (`aavePool.supply`)
   - Optional per-escrow yield generation
-  - Protected by exposure caps and pause mechanisms
-  - Governance-controlled enable/disable
-  - Token-specific caps and registration
+  - Protected by per-token exposure caps
+  - Governance-controlled enable/disable (slow-lane for risk-increasing, fast for risk-reducing)
+  - Token registration and caps via slow lane; revocation/disable/lower-cap are fast
 
-**Change Mechanism**: Slow lane (queue/activate)  
-**Configuration**: Standard lane (48h) for token registration, caps, etc.  
-**Emergency Controls**: Guardian can disable Aave or lower caps (down-only)
+**Change Mechanism**: Slow lane (queue/activate) for risk-increasing ops; fast for risk-reducing ops
+**Emergency Controls**: Timelock/guardian can disable a token or lower caps (down-only); recovery
+operators can trigger an emergency unwind (proceeds always to the escrow owner)
 
-#### 4. Yield Distribution Modules
-
-Distribute generated yield to recipients:
-
-- **DefaultYieldDistributionModule**: Configurable yield distribution
-  - Percentage-based allocation
-  - Multiple recipients support
-  - Immutable at escrow creation
-
-**Change Mechanism**: Slow lane (queue/activate)
+Distribution of yield (who gets it, protocol-fee routing) is handled by escrow core on settlement,
+not by a separate module. The module returns gross yield; core classifies principal vs yield and
+applies the snapshotted protocol yield fee (never against principal/losses).
 
 ---
 

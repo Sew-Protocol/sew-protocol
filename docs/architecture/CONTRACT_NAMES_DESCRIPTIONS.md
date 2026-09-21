@@ -56,14 +56,11 @@ configuration.
 #### Yield Generation Modules
 | Name | Type | Description |
 |------|------|-------------|
-| `AaveYieldGenerationModule` | Module | Yield generation module that deposits escrow funds into Aave V3 lending pools with multi-escrow multi-token aggregation and per-escrow position tracking. |
-| `DefaultYieldGenerationModule` (was DefaultYieldModule) | Module | No-op yield generation module that keeps funds in the vault without generating external yield (baseline implementation). |
+| `AaveYieldModule` | Module | Simple adapter that pulls accepted principal from the escrow, supplies it to Aave V3, tracks positions by `(escrow, escrowId)` using scaled aToken shares, and unwinds back to the escrow owner (normal + emergency). Distribution policy lives in escrow core. Supersedes the removed `AaveYieldGenerationModule`. |
+| `IYieldModule` | Interface | Unified yield module interface (`initializeYield`, `unwindToEscrow`, `emergencyUnwind`, `previewPosition`, `canHandle`, `getModuleInfo`). |
 
-#### Yield Distribution Modules
-| Name | Type | Description |
-|------|------|-------------|
-| `DefaultYieldDistributionModule` | Module | Yield distribution module that allocates generated yield between protocol fees, seller allocation, and buyer allocation per escrow-specific settings. |
-| `TestYieldDistributionModule` | Module (Test) | Test implementation of yield distribution module for validating custom distribution logic in development and testing environments. |
+#### Yield Distribution (removed)
+Distribution is no longer a separate module. Yield distribution policy (who gets yield, protocol-fee routing) is owned by escrow core on settlement (`EscrowYield` / `EscrowSettlement`), and realized yield follows the escrow beneficiary. The former `DefaultYieldDistributionModule` / `IYieldDistributionModule` / `YieldOps` were removed.
 
 #### Resolution Modules
 | Name | Type | Description |
@@ -104,8 +101,7 @@ configuration.
 - 1 View: EscrowView
 
 **Modules:**
-- 2 Yield Gen: AaveYieldGenerationModule, DefaultYieldGenerationModule
-- 1 Yield Dist: DefaultYieldDistributionModule
+- 1 Yield Gen: AaveYieldModule (distribution handled by escrow core — no separate distribution module)
 - 2 Resolution: DefaultResolutionModule, DefaultReleaseStrategy
 
 ### Multi-Instance (Deploy Per Type - 3 contracts)

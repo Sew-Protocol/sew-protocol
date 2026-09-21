@@ -46,6 +46,13 @@ abstract contract EscrowYield is EscrowCreation {
                 if (recovered < yieldPrincipal) revert PartialRecoveryNotAllowed();
                 delete v25YieldModules[workflowId];
                 delete v25YieldPrincipals[workflowId];
+                // FEE TREATMENT (policy): emergency recovery returns an UNDIFFERENTIATED
+                // recovered amount, which core does not classify as principal vs yield and so
+                // does not subject to the protocol yield fee (yieldOut = 0 below => zero fee).
+                // This is intentionally asymmetric with the normal unwind path (which splits
+                // principal/yield and taxes realized positive yield) and applies even when the
+                // recovered amount exceeds the recorded principal. Recovery operators are
+                // privileged incident actors; choosing the recovery path may waive yield fees.
                 return (recovered, 0);
             } catch {
                 // Both unwind paths failed — tokens are stuck in yield module.

@@ -106,7 +106,6 @@ struct ModuleSnapshot {
     address releaseStrategy;
     address cancellationStrategy;
     address yieldGenerationModule;
-    address yieldDistributionModule;
     address incentiveModule;
     uint256 yieldProtocolFeeBps;
     uint256 appealBondProtocolFeeBps;
@@ -133,6 +132,11 @@ This is the strongest form of forward-only: **existing escrows are not upgradeab
 | `escrowFeeBps` | The fee rate cannot be raised on funds already in escrow |
 | `appealBondProtocolFeeBps` | Protocol cut of appeal bonds cannot change after creation |
 | `maxDisputeDuration` | The liveness timeout cannot be shortened or lengthened post-creation |
+| `yieldProtocolFeeBps` | The protocol cut of realized positive yield cannot change after creation |
+
+Note there is no separate *distribution* module: `yieldGenerationModule` is the single Aave
+adapter, and yield distribution policy (who gets yield, protocol-fee routing) is owned by escrow
+core on settlement (`EscrowYield` / `EscrowSettlement`).
 | `appealWindowDuration` | The time allowed to appeal a resolution is fixed |
 | `yieldProtocolFeeBps` | Yield fee cannot be altered for deployed positions |
 

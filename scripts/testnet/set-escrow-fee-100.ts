@@ -69,6 +69,18 @@ async function main() {
   console.log(
     `\n⏳ Caller does NOT have ROLE_ADMIN_CONTRACT; queueing via EscrowGovernanceTimelock (slow lane)...`
   );
+
+  // Pre-flight: activation later requires EscrowGovernanceTimelock to hold
+  // ROLE_ADMIN_CONTRACT on the target vault. Warn early if the grant is missing.
+  const adminHoldsRole: boolean = await vault.hasRole(roleAdminContract, adminAddr);
+  if (!adminHoldsRole) {
+    throw new Error(
+      `EscrowGovernanceTimelock ${adminAddr} does NOT hold ROLE_ADMIN_CONTRACT on ` +
+        `EscrowVault ${vaultAddr}; activateEscrowFee() would revert after the ETA. ` +
+        `Ensure the grant from deploy/70_core_escrow.ts was applied.`
+    );
+  }
+
   const txQ = await admin.queueEscrowFee(vaultAddr, ESCROW_FEE_BPS);
   console.log(`  queue tx: ${txQ.hash}`);
   const rcptQ = await txQ.wait();

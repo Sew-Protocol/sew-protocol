@@ -1,3 +1,9 @@
+> **⚠️ SUPERSEDED (2026-09-21).** This summary documents the **removed** ERC-4626-style vault
+> module (`AaveYieldGenerationModule`), whose `AaveMultiTenant` / `Phase3AaveEmergency` /
+> `Phase4AaveDustDeficit` test files no longer exist. It is superseded by the **simple
+> `AaveYieldModule`** suite. For the current test set, see `docs/reference/AAVE_TEST_QUICK_REFERENCE.md`
+> and the runnable `test/foundry/modules/AaveYieldModule*.t.sol` / `*E2E.t.sol` files.
+
 # Comprehensive Aave Test Coverage - Phases 2-4 Complete
 
 ## 📊 Executive Summary

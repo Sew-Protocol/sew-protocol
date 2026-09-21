@@ -1,3 +1,13 @@
+> **⚠️ OUTDATED (2026-09-21).** This dependency map describes a largely **removed**
+> architecture: the `*Ops` computation layer (`CreateOps`, `DisputeOps`, `SettlementOps`,
+> `YieldOps`, `ModuleManagementContract`) and the separate yield **distribution** module
+> (`IYieldDistributionModule` / `DefaultYieldDistributionModule`) no longer exist in the tree.
+> Only `GuardianOps.sol` remains under `contracts/ops/`. Logic now lives in `contracts/libraries/*`
+> and core `contracts/core/*`; yield distribution is owned by escrow core (see
+> `docs/architecture/YIELD_DISTRIBUTION.md`), and yield generation by the single `AaveYieldModule`
+> (see `docs/modules/AAVE_MODULE_TOKEN_HANDLING.md`). Treat the map below as historical until
+> rewritten.
+
 # Sew Protocol: Contract Dependency Map
 
 ## Overview

@@ -98,7 +98,7 @@ interface IYieldModule {
      * @param principalExpected Accepted principal the caller expects (must equal the module's
      *                          recorded principalDeposited — finding #7)
      * @return recovered Amount recovered (always > 0, or reverts)
-     * 
+     *
      * @dev Called after unwindToEscrow fails
      * @dev NOTE (finding #4): this is an escrow-triggered unwind, NOT an independent recovery
      *      mechanism. It uses the same protocol withdraw() path as normal unwinds, so an
@@ -112,6 +112,18 @@ interface IYieldModule {
      * @dev INVARIANT 1: MUST NOT silently abandon yield (emit event if needed)
      * @dev Best-effort recovery; if any recovery is possible, return it
      *      If recovery is impossible, revert with clear reason
+     *
+     * @dev FEE TREATMENT (policy, not accident): the emergency API returns an undifferentiated
+     *      recovered amount — it does NOT classify principal vs yield. By design, core does not
+     *      subject that recovery amount to normal yield-fee classification. This is deliberately
+     *      asymmetric with the normal unwind contract:
+     *        - Normal successful unwind classifies principal/yield and applies the snapshotted
+     *          protocol yield fee (conservation R = P + B + F).
+     *        - Emergency/recovery unwind restores recovered assets to the escrow WITHOUT
+     *          applying a protocol yield fee.
+     *      Recovery operators (and the escrow's own fallback) are privileged incident actors;
+     *      choosing the recovery path may therefore waive protocol yield fees. This is accepted
+     *      policy: recovery is a down-only remediation path, not a revenue path.
      */
     function emergencyUnwind(
         uint256 escrowId,

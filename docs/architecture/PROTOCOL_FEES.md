@@ -166,7 +166,6 @@ struct ModuleSnapshot {
     address resolutionModule;
     address releaseStrategy;
     address yieldGenerationModule;
-    address yieldDistributionModule;
     uint256 yieldProtocolFeeBps;      // Snapshotted at creation
     uint256 appealBondProtocolFeeBps; // Snapshotted at creation
 }
@@ -235,8 +234,8 @@ This ensures that all protocol fees are independently verifiable by users, audit
 
 ### Contract Locations
 
-- **BaseEscrow.sol:** Protocol fee storage, governance functions, and appeal bond fee collection
-- **YieldOps.sol:** Yield protocol fee calculation and collection
+- **Escrow core (`EscrowConfiguration.sol` / `EscrowStorage.sol`):** Protocol fee storage and governance functions
+- **EscrowSettlement.sol:** Yield protocol fee calculation and collection (`_computeYieldProtocolFee`)
 - **EscrowVault.sol / EscrowableERC20.sol:** Protocol fee initialization (3000 bps and 0 bps respectively)
 
 ### Constants

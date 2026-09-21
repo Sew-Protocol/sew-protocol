@@ -262,8 +262,8 @@ Each escrow is a fully independent agreement. At the moment `createEscrow()` exe
 ```
 resolutionModule          — dispute arbitration logic
 releaseStrategy           — release authorization logic
-yieldGenerationModule     — yield accrual (e.g. Aave)
-yieldDistributionModule   — yield distribution logic
+yieldGenerationModule     — yield accrual (e.g. Aave); no separate distribution module,
+                            distribution policy owned by escrow core on settlement
 incentiveModule           — resolver incentive accounting
 yieldProtocolFeeBps       — protocol fee on yield (frozen)
 appealBondProtocolFeeBps  — protocol fee on appeal bonds (frozen)

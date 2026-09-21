@@ -61,8 +61,7 @@ anyone, including governance.
 │     └─ ResolverIncentiveModuleV3  (DR v3) ✅               │       │
 │     └─ KlerosArbitrableProxy      (L2 final escalation)    │       │
 │                                                             │       │
-│   AaveYieldModule                                           │       │
-│   DefaultYieldDistributionModule                            │       │
+│   AaveYieldModule (adapter; distribution handled by escrow core)  │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -196,8 +195,7 @@ and frozen per-escrow at creation.
 | Resolution | `IResolutionModule` | Who resolves disputes; how escalation works |
 | Release strategy | `IReleaseStrategy` | Who can release the escrow and when |
 | Cancellation strategy | `ICancellationStrategy` | Who can cancel the escrow and when |
-| Yield generation | `IYieldGenerationModule` | Where idle funds are deployed (e.g. Aave) |
-| Yield distribution | `IYieldDistributionModule` | How yield is split on settlement |
+| Yield generation | `IYieldModule` | Where idle funds are deployed (e.g. Aave). Distribution (who gets yield, fee routing) is handled by escrow core on settlement, not a separate module. |
 | Incentive | `IIncentiveModule` | Resolver performance tracking and bond logic |
 
 **Snapshot isolation**: at escrow creation, `_snapshotModulesForEscrow(workflowId)` writes a

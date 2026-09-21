@@ -207,15 +207,14 @@ Extracted logic libraries (`using L for ...` or direct call pattern). Key librar
 | `IEscrowCore.sol` | Core escrow interface. |
 | `IReleaseStrategy.sol` | Release strategy module interface. |
 | `ICancellationStrategy.sol` | Cancellation strategy interface. |
-| `IYieldGenerationModule.sol` / `V2` | Yield generation module interface. |
-| `IYieldDistributionModule.sol` | Yield distribution module interface. |
-| `IYieldModule.sol` | Combined yield module interface. |
+| `IYieldGenerationModule.sol` | Legacy yield generation interface (kept for registry/mocks compatibility). |
+| `IYieldModule.sol` | Current combined yield module interface (deposit, track, unwind, emergency recovery). Distribution policy lives in core. |
 | `IResolver.sol` | Resolver interface. |
 | `IModuleRegistry.sol` | Module registry interface. |
 | `IEvidenceModule.sol` | Evidence module interface. |
 | `IResolutionModule.sol` | Resolution module interface (shared). |
 | `IIncentiveModule.sol` | Incentive module interface (shared). |
-| `ISlashingModuleV3.sol` / `IStakingModuleV3.sol` | DR v3 staking/slashing interfaces. |
+| `ISlashingModuleV3.sol` / `IStakingModuleV3.sol` | DR v3 staking/slashing interfaces — removed from `contracts/shared/interfaces/` (deleted in the current tree). |
 | `IFraudProofModule.sol` | Fraud proof module interface. |
 | `aave/AaveV3Interfaces.sol` | Aave v3 pool and aToken interfaces. |
 

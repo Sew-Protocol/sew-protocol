@@ -171,10 +171,7 @@ Succinct overview of the major contracts and their roles.
                │   - DecentralizedResolutionModule (advanced)
                │
                ├─> Yield Generation
-               │   - AaveYieldGenerationModule
-               │
-               ├─> Yield Distribution
-               │   - DefaultYieldDistributionModule
+               │   - AaveYieldModule (simple adapter; distribution handled by escrow core)
                │
                └─> Resolver Incentives
                    - ResolverIncentiveModule*

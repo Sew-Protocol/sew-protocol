@@ -603,7 +603,11 @@ contract AaveYieldModule is IYieldModule, ERC165, AccessControl, SlowLaneQueueAc
         // Try to withdraw
         uint256 out = aavePool.withdraw(token, underlyingToWithdraw, address(this));
 
-        // Transfer to the escrow owner (never the caller/operator)
+        // Transfers the whole recovered value to the escrow owner (never the caller/operator).
+        // The single returned `out` is deliberately undifferentiated: it bundles any accrued
+        // yield with principal. Core treats emergency recovery as fee-exempt (it does not
+        // re-classify this amount into principal/yield for protocol yield-fee purposes), an
+        // accepted policy for the privileged incident-recovery path.
         IERC20(token).safeTransfer(escrowOwner, out);
 
         // INVARIANT 6: Strict semantics - never return 0

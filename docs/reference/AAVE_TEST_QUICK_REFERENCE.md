@@ -1,5 +1,28 @@
 # Aave Yield Generation Module - Test Quick Reference
 
+> **⚠️ SUPERSEDED (2026-09-21).** This reference documents the **removed** ERC-4626-style
+> vault module (`AaveYieldGenerationModule`) and its `AaveMultiTenant` / `Phase3AaveEmergency` /
+> `Phase4AaveDustDeficit` test files, which no longer exist in the tree. Those were replaced by
+> the **simple `AaveYieldModule`** (a pull-based adapter between the escrow and Aave V3). The
+> content below is retained only as a historical record of the earlier design.
+>
+> **Current suites** (all green):
+> - `test/foundry/modules/AaveYieldModule.t.sol` — module unit suite (301 passed / 4 skipped)
+> - `test/foundry/modules/AaveYieldModuleAccountingTest.sol`
+> - `test/foundry/modules/AaveYieldProtocolFee.t.sol` — protocol yield fee
+> - `test/foundry/modules/AaveYieldModuleExposureCapTest.sol` — per-token exposure caps
+> - `test/foundry/modules/AaveYieldModuleAdminTest.t.sol` — governance/roles
+> - `test/foundry/modules/AaveYieldModuleFailureModeTest.sol` / `RecoveryTest` / `LifecycleTest`
+> - `test/foundry/modules/AaveEscrowE2E.t.sol` — escrow-level E2E incl. emergency recovery
+> - `test/foundry/modules/AaveYieldEscrowAppealE2E.t.sol` — appeal/Kleros + Aave E2E
+> - `test/foundry/modules/AaveYieldEscrowE2EFixture.sol` — shared full-stack fixture
+> - `test/foundry/modules/YieldUnwindFailedE2E.t.sol` — both-unwind-fail recovery chronology
+> - fork/accrual: `AaveYieldModuleMainnetAccrualE2E.t.sol`, `AaveYieldModuleForkTest*.sol`
+>
+> For current architecture, see `docs/modules/AAVE_MODULE_TOKEN_HANDLING.md`, `docs/architecture/YIELD_DISTRIBUTION.md`, and `docs/architecture/PROTOCOL_FEES.md`.
+
+---
+
 ## 📊 Test Status at a Glance
 
 | Phase | Tests | Status | Gas | Key Validation |

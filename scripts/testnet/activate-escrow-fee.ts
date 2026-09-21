@@ -8,6 +8,8 @@
 
 import hre from 'hardhat';
 
+const ESCROW_FEE_BPS = 100n;
+
 async function main() {
   if (hre.network.name !== 'baseSepolia') {
     throw new Error(`Run with --network baseSepolia (got: ${hre.network.name})`);
@@ -23,6 +25,28 @@ async function main() {
   const vault = await hre.ethers.getContractAt('EscrowVault', vaultAddr, signer);
   const admin = await hre.ethers.getContractAt('EscrowGovernanceTimelock', adminAddr, signer);
 
+  const roleAdminContract: string = await vault.ROLE_ADMIN_CONTRACT();
+  const roleAdminTimelock: string = await admin.ROLE_TIMELOCK();
+
+  // Pre-flight: the EscrowGovernanceTimelock must hold ROLE_ADMIN_CONTRACT on the
+  // target vault, otherwise activateEscrowFee() will revert with no diagnostic.
+  const adminHoldsRole: boolean = await vault.hasRole(roleAdminContract, adminAddr);
+  if (!adminHoldsRole) {
+    throw new Error(
+      `EscrowGovernanceTimelock ${adminAddr} does NOT hold ROLE_ADMIN_CONTRACT on ` +
+        `EscrowVault ${vaultAddr}; activateEscrowFee() would revert. ` +
+        `Ensure the grant from deploy/70_core_escrow.ts was applied.`
+    );
+  }
+
+  const hasAdminTimelockRole: boolean = await admin.hasRole(roleAdminTimelock, deployer);
+  if (!hasAdminTimelockRole) {
+    throw new Error(
+      `Caller ${deployer} does not have EscrowGovernanceTimelock.ROLE_TIMELOCK; cannot activateEscrowFee(). ` +
+        `Use the original admin/timelock EOA (the one that deployed EscrowGovernanceTimelock) or grant ROLE_TIMELOCK to this EOA.`
+    );
+  }
+
   const pending = await admin.getPendingEscrowFee(vaultAddr);
   const value = pending[0] as bigint;
   const eta = pending[1] as bigint;
@@ -35,6 +59,13 @@ async function main() {
   if (!exists) {
     console.log(`⚠️  No pending escrow fee to activate.`);
     return;
+  }
+
+  if (value !== ESCROW_FEE_BPS) {
+    throw new Error(
+      `Pending escrow fee is ${value.toString()} bps, expected ${ESCROW_FEE_BPS.toString()} bps. ` +
+        `Refusing to activate a mismatched value.`
+    );
   }
 
   const tx = await admin.activateEscrowFee(vaultAddr);
