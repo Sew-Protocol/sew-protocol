@@ -405,7 +405,7 @@ Slow-lane ETA once the Timelock operation has executed (i.e., once `queueX()` ha
 
 ---
 
-## 10. Resolved and outstanding issues
+## 10. Resolved issues
 
 ### 10.1 Resolved (pre-launch)
 
@@ -425,16 +425,6 @@ resolved. Key fixes:
 | HIGH | Duplicate resolver recording in incentive module | Deduplication check added |
 | MEDIUM | Missing zero-address validation in fee setters | Added across all setters |
 | MEDIUM | Fee overflow not guarded | `MAX_PROTOCOL_FEE_BPS = 3000` constant + check |
-
-### 10.2 Outstanding (non-security)
-
-Only LOW-priority cosmetic / gas-optimization items remain:
-
-- Struct packing of `EscrowTransfer` could save ~20,000 gas per creation.
-- Some legacy event parameters use inconsistent naming (`workflowId` vs `id`).
-- Some internal functions lack NatSpec documentation.
-
-None of these affect security.
 
 ---
 
@@ -474,4 +464,4 @@ definition, and acknowledgement process.
 | **Contracts** | `sew-protocol` @ `62fce3a` |
 | **Simulation** | `sew-simulation` @ `5b33486` |
 | **Generated / reviewed** | 2026-05-21 |
-| **Verification status** | Manually checked against `BaseEscrow.sol` (reentrancy guards, SafeERC20, CEI patterns), role constants, `ResolverSlashingModule.sol` (slashing/burn), and `SECURITY_FIXES_COMPLETED.md` (all CRIT/HIGH/MED resolved). Threat model cross-referenced against known attack surfaces. Simulation covers adversarial economic scenarios (Phase F/H/AI). Formal verification of all security properties not yet complete — needs follow-up. |
+| **Verification status** | Manually checked against `BaseEscrow.sol` (reentrancy guards, SafeERC20, CEI patterns), role constants, `ResolverSlashingModule.sol` (slashing/burn), and `SECURITY_FIXES_COMPLETED.md` (all CRIT/HIGH/MED resolved). Threat model cross-referenced against known attack surfaces. Simulation covers adversarial economic scenarios (Phase F/H/AI). Formal verification of all security properties not yet complete |

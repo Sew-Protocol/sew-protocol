@@ -359,4 +359,4 @@ ensuring the contract holds what it promises before recording the entitlement.
 | **Contracts** | `sew-protocol` @ `62fce3a` |
 | **Simulation** | `sew-simulation` @ `5b33486` |
 | **Generated / reviewed** | 2026-05-21 |
-| **Verification status** | Manually checked against finality conditions in `BaseEscrow.sol`, `executePendingSettlement()` appeal deadline enforcement, and `isFinalRound` flag in Kleros integration. Partial finality sub-state (PendingSettlement) verified against contract source. Simulation covers finality timing in appeal window scenarios. Kleros-side finality liveness under congestion not simulation-backed — needs follow-up. |
+| **Verification status** | Manually checked against finality conditions in `BaseEscrow.sol`, `executePendingSettlement()` appeal deadline enforcement, and `isFinalRound` flag in Kleros integration. Partial finality sub-state (PendingSettlement) verified against contract source. Simulation covers finality timing in appeal window scenarios. Kleros-side finality liveness under congestion not simulation-backed |

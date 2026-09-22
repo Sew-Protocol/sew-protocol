@@ -308,4 +308,4 @@ complicates aggregate analysis and fee projection.
 | **Contracts** | `sew-protocol` @ `62fce3a` |
 | **Simulation** | `sew-simulation` @ `5b33486` |
 | **Generated / reviewed** | 2026-05-21 |
-| **Verification status** | Manually checked against upgrade mechanism contracts (`ForwardOnlyUpgrade.sol`, `EscrowFactory.sol`). No-proxy invariant and version-gate logic verified against source. Simulation does not directly cover upgrade paths — needs follow-up with formal invariant tests. |
+| **Verification status** | Manually checked against upgrade mechanism contracts (`ForwardOnlyUpgrade.sol`, `EscrowFactory.sol`). No-proxy invariant and version-gate logic verified against source. Simulation does not directly cover upgrade paths |

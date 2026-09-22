@@ -166,4 +166,4 @@ flowchart TD
 | **Contracts** | `sew-protocol` @ `62fce3a` |
 | **Simulation** | `sew-simulation` @ `5b33486` |
 | **Generated / reviewed** | 2026-05-21 |
-| **Verification status** | Manually reviewed against `BaseEscrow.sol` deposit, release, and refund flows, and `EscrowVault.sol` balance accounting. Yield distribution path verified against `YieldOps.sol`. Payment flow invariants covered by S01–S10 in deterministic scenario suite. Cross-token and multi-yield-protocol edge cases not yet simulation-backed — needs follow-up. |
+| **Verification status** | Manually reviewed against `BaseEscrow.sol` deposit, release, and refund flows, and `EscrowVault.sol` balance accounting. Yield distribution path verified against `YieldOps.sol`. Payment flow invariants covered by S01–S10 in deterministic scenario suite. Cross-token and multi-yield-protocol edge cases not yet simulation-backed |

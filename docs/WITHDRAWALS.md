@@ -395,4 +395,4 @@ recovery is never the default.
 | **Contracts** | `sew-protocol` @ `62fce3a` |
 | **Simulation** | `sew-simulation` @ `5b33486` |
 | **Generated / reviewed** | 2026-05-21 |
-| **Verification status** | Manually checked against `AaveYieldModule.sol`, `EscrowVault.sol`, `withdrawFees()`, and Aave unwind paths. CEI ordering fix for `withdrawFees` verified against `SECURITY_FIXES_COMPLETED.md`. Aave slippage protection verified against `AaveYieldModule.sol`. Simulation does not yet cover Aave emergency unwind scenarios under stress — needs follow-up. |
+| **Verification status** | Manually checked against `AaveYieldModule.sol`, `EscrowVault.sol`, `withdrawFees()`, and Aave unwind paths. CEI ordering fix for `withdrawFees` verified against `SECURITY_FIXES_COMPLETED.md`. Aave slippage protection verified against `AaveYieldModule.sol`. Simulation does not yet cover Aave emergency unwind scenarios under stress |
