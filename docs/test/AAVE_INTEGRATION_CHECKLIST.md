@@ -394,5 +394,5 @@ Given you care about telemetry codes, write tests that assert:
 
 ## Verification (2026-01-23)
 
--   **Gap analysis:** [AAVE_INTEGRATION_CHECKLIST_GAP_ANALYSIS.md](./AAVE_INTEGRATION_CHECKLIST_GAP_ANALYSIS.md) — checklist vs. current tests; most items complete, remaining gaps low priority.
--   **Status and accounting:** [AAVE_INTEGRATION_CHECKLIST_STATUS.md](./AAVE_INTEGRATION_CHECKLIST_STATUS.md) — test inventory, accounting verification (principal, fees, yield, PUSH model, `remainingAllowance`).
+-   **Gap analysis:** [AAVE_INTEGRATION_CHECKLIST_GAP_ANALYSIS.md](../archived/AAVE_INTEGRATION_CHECKLIST_GAP_ANALYSIS.md) — checklist vs. current tests; most items complete, remaining gaps low priority.
+-   **Status and accounting:** [AAVE_INTEGRATION_CHECKLIST_STATUS.md](../archived/AAVE_INTEGRATION_CHECKLIST_STATUS.md) — test inventory, accounting verification (principal, fees, yield, PUSH model, `remainingAllowance`).

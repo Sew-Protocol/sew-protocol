@@ -352,7 +352,7 @@ Escrow funded → Yield Module.depositForYield()
 - **[Governance Surface Map](../governance/GOVERNANCE_SURFACE_MAP.md)** - Complete function → role → lane mapping
 
 ### Security Documentation
-- **[Security Model](../reviews/SECURITY_MODEL.md)** - Security model and threat analysis
+- **[Security Model](../archived/SECURITY_MODEL.md)** - Security model and threat analysis
 
 ### Protocol Documentation
 - **[Whitepaper](../WHITEPAPER.md)** - Complete protocol whitepaper

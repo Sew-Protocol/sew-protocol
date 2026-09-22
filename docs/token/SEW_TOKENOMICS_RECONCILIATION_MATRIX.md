@@ -9,9 +9,9 @@
 
 | Claim | Docs source | Code source | Tests source | Status | Notes / actions |
 |---|---|---|---|---|---|
-| SEW is fixed supply (no minting post-deploy) | `docs/governance/GOVERNANCE_IMPLEMENTATION_STATUS.md` | `contracts/token/SewToken.sol` | `test/hardhat/MainnetReleaseSequence.test.ts` (asserts `totalSupply`) | ✅ | Contract has constructor `_mint` and no `mint()` function. |
-| Intended total supply is **1B** (18 decimals) | `docs/governance/GOVERNANCE_IMPLEMENTATION_STATUS.md` | `deploy/_config.ts` default supply string is 1B * 1e18; `SewToken` mints constructor arg | N/A (tests use smaller supply) | ⚠️ | **Deployment-time param**: exchange must verify deployed `totalSupply()` and constructor args. |
-| Intended symbol is `SEW` | `docs/governance/GOVERNANCE_IMPLEMENTATION_STATUS.md` | `deploy/_config.ts` defaults to `SEW` | `test/hardhat/MainnetReleaseSequence.test.ts` uses `SEW` | ✅ | Exchange should still verify deployed on-chain `symbol()` and constructor args. |
+| SEW is fixed supply (no minting post-deploy) | `docs/archived/GOVERNANCE_IMPLEMENTATION_STATUS.md` | `contracts/token/SewToken.sol` | `test/hardhat/MainnetReleaseSequence.test.ts` (asserts `totalSupply`) | ✅ | Contract has constructor `_mint` and no `mint()` function. |
+| Intended total supply is **1B** (18 decimals) | `docs/archived/GOVERNANCE_IMPLEMENTATION_STATUS.md` | `deploy/_config.ts` default supply string is 1B * 1e18; `SewToken` mints constructor arg | N/A (tests use smaller supply) | ⚠️ | **Deployment-time param**: exchange must verify deployed `totalSupply()` and constructor args. |
+| Intended symbol is `SEW` | `docs/archived/GOVERNANCE_IMPLEMENTATION_STATUS.md` | `deploy/_config.ts` defaults to `SEW` | `test/hardhat/MainnetReleaseSequence.test.ts` uses `SEW` | ✅ | Exchange should still verify deployed on-chain `symbol()` and constructor args. |
 | Governance voting uses ERC20Votes + Governor + Timelock | `docs/WHITEPAPER.md` / governance docs | `contracts/token/SewToken.sol`, `contracts/governance/GovGovernor.sol`, `deploy/30_timelock.ts`, `deploy/40_governor.ts` | `test/hardhat/MainnetReleaseSequence.test.ts` (delegation flows) | ✅ | Exchange diligence should confirm current owners/roles and timelock delay. |
 | Safe is the initial owner before timelock | governance docs | `deploy/10_safe.ts` | N/A | ⚠️ | `deploy/10_safe.ts` is a **placeholder** in parts; provide actual Safe address & policy in exchange package. |
 
@@ -21,10 +21,10 @@
 
 | Claim | Docs source | Code source | Tests source | Status | Notes / actions |
 |---|---|---|---|---|---|
-| Escrow fee exists, charged at creation as `fee = amount * escrowFee / 10000` | `docs/FEE_IMPLEMENTATION_SUMMARY.md` | `contracts/core/BaseEscrow.sol` (fee calc at create) | (find/confirm in hardhat/foundry escrow tests) | ✅🧪 | Fee recipient is `escrowFeeAddress` and is timelock-controlled via slow-lane queue/activate. |
+| Escrow fee exists, charged at creation as `fee = amount * escrowFee / 10000` | `docs/archived/FEE_IMPLEMENTATION_SUMMARY.md` | `contracts/core/BaseEscrow.sol` (fee calc at create) | (find/confirm in hardhat/foundry escrow tests) | ✅🧪 | Fee recipient is `escrowFeeAddress` and is timelock-controlled via slow-lane queue/activate. |
 | Escrow fees are withdrawable by fee recipient | docs (fee summary + plans) | `contracts/core/EscrowVault.sol::withdrawFees` (token-specific) | N/A | ✅ | `EscrowVault` tracks `totalFeesPerToken`. |
-| Yield protocol fee exists and is charged on generated yield only | `docs/FEE_IMPLEMENTATION_SUMMARY.md` | `contracts/core/BaseEscrow.sol` (params + governance), `contracts/YieldOps.sol` (collection) | (add/confirm yield-path tests) | ✅ | Default `yieldProtocolFeeBps` is 3000 (30%). Bounded by `MAX_PROTOCOL_FEE_BPS`. |
-| Appeal bond protocol fee exists but is inactive at launch | `docs/FEE_IMPLEMENTATION_SUMMARY.md` | `contracts/core/BaseEscrow.sol` (deducts during escalation bond posting) | (add/confirm bond-fee tests) | ✅ | Default `appealBondProtocolFeeBps` is 0 (0%). When enabled, fee is deducted at bond posting time. |
+| Yield protocol fee exists and is charged on generated yield only | `docs/archived/FEE_IMPLEMENTATION_SUMMARY.md` | `contracts/core/BaseEscrow.sol` (params + governance), `contracts/YieldOps.sol` (collection) | (add/confirm yield-path tests) | ✅ | Default `yieldProtocolFeeBps` is 3000 (30%). Bounded by `MAX_PROTOCOL_FEE_BPS`. |
+| Appeal bond protocol fee exists but is inactive at launch | `docs/archived/FEE_IMPLEMENTATION_SUMMARY.md` | `contracts/core/BaseEscrow.sol` (deducts during escalation bond posting) | (add/confirm bond-fee tests) | ✅ | Default `appealBondProtocolFeeBps` is 0 (0%). When enabled, fee is deducted at bond posting time. |
 
 ---
 
@@ -33,8 +33,8 @@
 | Claim | Docs source | Code source | Tests source | Status | Notes / actions |
 |---|---|---|---|---|---|
 | Appeal bonds: refunded if outcome flips; paid to prior round resolvers if outcome upheld | `docs/dispute-resolution/RESOLVER_ECONOMICS.md` | `contracts/decentralized-resolution-module/ResolverIncentiveModule.sol` | `test/foundry/decentralized-resolution-module/AppealBondDistribution.unit.t.sol` etc. | ✅🧪 | Implementation includes edge case “no resolvers → bond retained”. |
-| Appeal bond protocol fee is implemented but defaults to 0% at launch | `docs/token/SEW_TOKENOMICS_EXCHANGE_DRAFT.md` / `docs/FEE_IMPLEMENTATION_SUMMARY.md` | `contracts/core/BaseEscrow.sol` (deducts at bond posting when enabled) | (optional: add a focused test) | ✅ | When `appealBondProtocolFeeBps = 0`, bonds are refunded/distributed in full. |
-| Resolver payments weighted by escalation level (1x, 1.5x, 2x) | `docs/test/INCENTIVE_VERIFICATION_PLAN.md` | `contracts/decentralized-resolution-module/PaymentCalculationLibrary.sol` | (find/confirm tests) | ✅🧪 | Payment calculation library is pure and upgradeable by swapping contract address in module. |
+| Appeal bond protocol fee is implemented but defaults to 0% at launch | `docs/token/SEW_TOKENOMICS_EXCHANGE_DRAFT.md` / `docs/archived/FEE_IMPLEMENTATION_SUMMARY.md` | `contracts/core/BaseEscrow.sol` (deducts at bond posting when enabled) | (optional: add a focused test) | ✅ | When `appealBondProtocolFeeBps = 0`, bonds are refunded/distributed in full. |
+| Resolver payments weighted by escalation level (1x, 1.5x, 2x) | `docs/archived/INCENTIVE_VERIFICATION_PLAN.md` | `contracts/decentralized-resolution-module/PaymentCalculationLibrary.sol` | (find/confirm tests) | ✅🧪 | Payment calculation library is pure and upgradeable by swapping contract address in module. |
 
 ---
 

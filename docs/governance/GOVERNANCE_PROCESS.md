@@ -412,7 +412,7 @@ pnpm gov:check governance/proposals/XXXX_description.json --network baseMainnet
 
 ## References
 
-- `governance.md` - Governance model
+- `../archived/governance.md` - Governance model
 - `GOVERNANCE_SURFACE_MAP.md` - Function mapping
 - `UPGRADE_POLICY.md` - Upgrade procedures
 - `EMERGENCY_POLICY.md` - Emergency procedures

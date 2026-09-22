@@ -424,7 +424,7 @@ After successful IEO deployment:
 
 For issues during deployment:
 
-- Check [Emergency Runbook](../../governance/runbooks/emergency.md)
+- Check [Emergency Runbook](../../../governance/runbooks/emergency.md)
 - Review [Deployment Troubleshooting](./DEPLOYMENT_TROUBLESHOOTING.md)
 - Contact deployment team
 

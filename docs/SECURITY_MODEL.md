@@ -34,7 +34,7 @@
 >
 > **Related documents:**
 > - [`docs/governance/GOVERNANCE_CONSTRAINTS.md`](governance/GOVERNANCE_CONSTRAINTS.md) — hard bounds on every governance parameter
-> - [`docs/governance/governance.md`](governance/governance.md) — governance model and operational runbooks
+> - [`docs/governance/governance.md`](archived/governance.md) — governance model and operational runbooks
 > - [`docs/security/SECURITY_MODEL.md`](security/SECURITY_MODEL.md) — original per-escrow isolation reference
 > - [`docs/dispute-resolution/DISPUTE_ECONOMICS.md`](dispute-resolution/DISPUTE_ECONOMICS.md) — bond, slashing, and incentive mechanics
 

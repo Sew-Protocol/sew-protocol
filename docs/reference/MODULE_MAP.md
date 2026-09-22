@@ -240,5 +240,5 @@ Modules should implement `moduleVersion()` returning semantic versioning (e.g., 
 ## References
 
 - `GOVERNANCE_SURFACE_MAP.md` - Complete function mapping
-- `governance.md` - Governance model overview
+- `../archived/governance.md` - Governance model overview
 - `contracts/interfaces/` - Interface definitions

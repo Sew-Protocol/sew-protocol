@@ -273,8 +273,8 @@ If critical issues are discovered:
 
 For issues during activation:
 
-- Check [Emergency Runbook](../../governance/runbooks/emergency.md)
-- Review [Slow Changes Runbook](../../governance/runbooks/slow-changes.md)
+- Check [Emergency Runbook](../../../governance/runbooks/emergency.md)
+- Review [Slow Changes Runbook](../../../governance/runbooks/slow-changes.md)
 - Contact deployment team
 
 ---

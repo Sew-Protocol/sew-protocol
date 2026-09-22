@@ -324,12 +324,12 @@ This checklist ensures all contracts meet security, quality, and deployment stan
 | Contract | Status | Critical Issues | High Issues | Reviewer | Date | Notes |
 |----------|--------|----------------|-------------|----------|------|-------|
 | **CreateOps** | ✅ Approved | 0 | 0 | Security Review | 2026-01-27 | All issues addressed - ready for testnet |
-| **EscrowVault** | ✅ Approved | 0 | 0 | Security Review | 2026-01-27 | ✅ All 14 categories pass - See CORE_CONTRACTS_CHECKLIST_REVIEW.md |
-| **BaseEscrow** | ✅ Approved | 0 | 0 | Security Review | 2026-01-27 | ✅ All 14 categories pass - See CORE_CONTRACTS_CHECKLIST_REVIEW.md |
-| **EscrowableERC20** | ✅ Approved | 0 | 0 | Security Review | 2026-01-27 | ✅ All 14 categories pass - See CORE_CONTRACTS_CHECKLIST_REVIEW.md |
-| **EscrowViewContract** | ✅ Approved | 0 | 0 | Security Review | 2026-01-27 | ✅ All 14 categories pass (view-only) - See CORE_CONTRACTS_CHECKLIST_REVIEW.md |
-| **BondCollector** | ✅ Approved | 0 | 0 | Security Review | 2026-01-27 | ✅ All 14 categories pass - See CORE_CONTRACTS_CHECKLIST_REVIEW.md |
-| **ModuleManagementContract** | ✅ Approved | 0 | 0 | Security Review | 2026-01-27 | ✅ All 14 categories pass - See CORE_CONTRACTS_CHECKLIST_REVIEW.md |
+| **EscrowVault** | ✅ Approved | 0 | 0 | Security Review | 2026-01-27 | ✅ All 14 categories pass - See archived/CORE_CONTRACTS_CHECKLIST_REVIEW.md |
+| **BaseEscrow** | ✅ Approved | 0 | 0 | Security Review | 2026-01-27 | ✅ All 14 categories pass - See archived/CORE_CONTRACTS_CHECKLIST_REVIEW.md |
+| **EscrowableERC20** | ✅ Approved | 0 | 0 | Security Review | 2026-01-27 | ✅ All 14 categories pass - See archived/CORE_CONTRACTS_CHECKLIST_REVIEW.md |
+| **EscrowViewContract** | ✅ Approved | 0 | 0 | Security Review | 2026-01-27 | ✅ All 14 categories pass (view-only) - See archived/CORE_CONTRACTS_CHECKLIST_REVIEW.md |
+| **BondCollector** | ✅ Approved | 0 | 0 | Security Review | 2026-01-27 | ✅ All 14 categories pass - See archived/CORE_CONTRACTS_CHECKLIST_REVIEW.md |
+| **ModuleManagementContract** | ✅ Approved | 0 | 0 | Security Review | 2026-01-27 | ✅ All 14 categories pass - See archived/CORE_CONTRACTS_CHECKLIST_REVIEW.md |
 | **SettlementOps** | 🔄 Pending | - | - | - | - | Needs review |
 | **DisputeOps** | 🔄 Pending | - | - | - | - | Needs review |
 | **YieldOps** | 🔄 Pending | - | - | - | - | Needs review |
@@ -579,7 +579,7 @@ This checklist ensures all contracts meet security, quality, and deployment stan
    - Ops contracts now included in governance role transfer
 
 2. ✅ **HIGH**: Test coverage verified
-   - Created `docs/testing/CREATEOPS_TEST_COVERAGE.md`
+   - Created `docs/archived/CREATEOPS_TEST_COVERAGE.md`
    - Verified 38 test references across 9 test files
    - All functions covered through integration tests
    - Status: ✅ **ADEQUATE** for testnet deployment

@@ -90,9 +90,9 @@ We do not currently operate a formal bug bounty program. However, we may offer r
 
 ## Security Resources
 
-- **Security Model:** See [`docs/SECURITY_MODEL.md`](docs/SECURITY_MODEL.md) for detailed security assumptions and threat model
-- **Governance Security:** See [`docs/governance.md`](docs/governance.md) for governance security model
-- **Audit Status:** See [`docs/AUDIT.md`](docs/AUDIT.md) for audit information
+- **Security Model:** See [`SECURITY_MODEL.md`](SECURITY_MODEL.md) for detailed security assumptions and threat model
+- **Governance Security:** See [`archived/governance.md`](archived/governance.md) for the governance security model (archived)
+- **Audit Status:** See [`archived/AUDIT.md`](archived/AUDIT.md) for audit information (archived)
 
 ---
 
@@ -102,14 +102,14 @@ In the event of a security incident:
 
 1. **Immediate Actions:**
    - Guardian can pause the protocol if needed
-   - Emergency procedures documented in `governance/runbooks/emergency.md`
+   - Emergency procedures documented in [`../governance/runbooks/emergency.md`](../governance/runbooks/emergency.md)
 
 2. **Communication:**
    - We will communicate transparently about any security incidents
    - Updates will be posted on official channels
 
 3. **Recovery:**
-   - Recovery procedures documented in `governance/runbooks/recovery.md`
+   - Recovery procedures documented in [`../governance/runbooks/recovery.md`](../governance/runbooks/recovery.md)
    - All recovery actions require timelock governance
 
 ---

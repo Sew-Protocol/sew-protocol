@@ -35,10 +35,10 @@ This document maps the current system, proposes adaptation paths, and calls out 
 
 | Non-goal | Why |
 |--------|-----|
-| Post-creation module changes | Removed in Phase 5; breaks user expectations and audit story ([governance.md](../governance/governance.md)) |
+| Post-creation module changes | Removed in Phase 5; breaks user expectations and audit story ([governance.md](../archived/governance.md)) |
 | Permissionless module registration | Stays timelock-gated via `ModuleRegistry.addModule` |
-| Per-escrow fee overrides | Separate product decision ([PER_ESCROW_SETTINGS_NORMS.md](../reviews/PER_ESCROW_SETTINGS_NORMS.md)) |
-| Proxy-upgradeable modules | Protocol uses immutable module swap + snapshot ([MODULE_SWAPPING_STRATEGY.md](../reference/MODULE_SWAPPING_STRATEGY.md)) |
+| Per-escrow fee overrides | Separate product decision ([PER_ESCROW_SETTINGS_NORMS.md](../archived/PER_ESCROW_SETTINGS_NORMS.md)) |
+| Proxy-upgradeable modules | Protocol uses immutable module swap + snapshot ([MODULE_SWAPPING_STRATEGY.md](../archived/MODULE_SWAPPING_STRATEGY.md)) |
 
 ---
 
@@ -160,7 +160,7 @@ So for `EscrowVault`, governance changing default release/yield-distribution mod
 
 ### Historical note: Phase 5 removal
 
-Post-creation setters were explicitly removed ([governance.md](../governance/governance.md)):
+Post-creation setters were explicitly removed ([governance.md](../archived/governance.md)):
 
 - `setReleaseStrategyForEscrow`
 - `setResolutionModuleForEscrow`
@@ -444,10 +444,10 @@ function previewModules(
 | Document | Relevance |
 |----------|-----------|
 | [PROTOCOL_MODULARITY.md](./PROTOCOL_MODULARITY.md) | Module types, snapshot model, getter conventions |
-| [governance.md](../governance/governance.md) | Immutability rules; Phase 5 removals |
-| [MODULE_SWAPPING_STRATEGY.md](../reference/MODULE_SWAPPING_STRATEGY.md) | Append-only modules; no post-creation migration |
+| [governance.md](../archived/governance.md) | Immutability rules; Phase 5 removals |
+| [MODULE_SWAPPING_STRATEGY.md](../archived/MODULE_SWAPPING_STRATEGY.md) | Append-only modules; no post-creation migration |
 | [ESCROW_CREATION_AND_SETTINGS.md](./ESCROW_CREATION_AND_SETTINGS.md) | Creation pipeline (update after implementation) |
-| [FUTURE_PROOF_DESIGN_PROPOSAL.md](../reviews/FUTURE_PROOF_DESIGN_PROPOSAL.md) | Earlier registry + per-escrow selection vision |
+| [FUTURE_PROOF_DESIGN_PROPOSAL.md](../archived/FUTURE_PROOF_DESIGN_PROPOSAL.md) | Earlier registry + per-escrow selection vision |
 | [ARCHITECTURE_YIELD_MODULES.md](./ARCHITECTURE_YIELD_MODULES.md) | Phase 4 “module selection at creation” (yield-focused) |
 
 ---

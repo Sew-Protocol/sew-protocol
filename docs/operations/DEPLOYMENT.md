@@ -85,10 +85,10 @@ These are swappable implementations registered in `ModuleRegistry`. Each deploym
 | Contract | Location | Purpose | Instantiation |
 |----------|----------|---------|----------------|
 | **DefaultYieldModule** | `modules/DefaultYieldModule.sol` | No-op yield | Typically 1 instance; escrow defaults here |
-| **AaveYieldGenerationModule** | `modules/AaveYieldGenerationModule.sol` | Aave V3 lending | **Singleton**: 1 instance manages multiple vaults (see [Multi-Vault Architecture](MULTI_VAULT_ARCHITECTURE.md)) |
+| **AaveYieldGenerationModule** | `modules/AaveYieldGenerationModule.sol` | Aave V3 lending | **Singleton**: 1 instance manages multiple vaults (see [Multi-Vault Architecture](../overview/MULTI_VAULT_ARCHITECTURE.md)) |
 | **Custom Yield Modules** | — | User-defined | Any contract implementing `IYieldGenerationModule` can be registered |
 
-**Usage**: Each escrow chooses which yield module to use (or none). **Important**: AaveYieldGenerationModule uses a singleton pattern where one instance manages yield for multiple EscrowVault and EscrowableERC20 contracts. See [MULTI_VAULT_ARCHITECTURE.md](MULTI_VAULT_ARCHITECTURE.md) for details on multi-vault management, governance, and cap enforcement.
+**Usage**: Each escrow chooses which yield module to use (or none). **Important**: AaveYieldGenerationModule uses a singleton pattern where one instance manages yield for multiple EscrowVault and EscrowableERC20 contracts. See [MULTI_VAULT_ARCHITECTURE.md](../overview/MULTI_VAULT_ARCHITECTURE.md) for details on multi-vault management, governance, and cap enforcement.
 
 ### Yield Distribution Modules
 | Contract | Location | Purpose | Instantiation |

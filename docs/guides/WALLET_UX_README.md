@@ -22,7 +22,7 @@ Quick overview of the problem, solution, and 3-day implementation path.
 
 ---
 
-### 2. **WALLET_UX_SUMMARY.md** 📋 OVERVIEW
+### 2. **../archived/WALLET_UX_SUMMARY.md** 📋 OVERVIEW
 **Time**: 10 minutes | **For**: Project leads, stakeholders  
 Executive summary of all 4 documentation files with roadmap.
 
@@ -168,7 +168,7 @@ Detailed optimization for specific L2 networks.
 
 ### Product Manager
 1. Read: `WALLET_UX_QUICK_START.md` (5 min)
-2. Read: `WALLET_UX_SUMMARY.md` (10 min)
+2. Read: `../archived/WALLET_UX_SUMMARY.md` (10 min)
 3. Reference: `WALLET_UX_MULTICHAIN_GUIDE.md` Part 8 (Roadmap)
 
 ### Implementation Architect
@@ -331,7 +331,7 @@ After implementation:
 ## 📋 Document Checklist
 
 - ✅ WALLET_UX_QUICK_START.md
-- ✅ WALLET_UX_SUMMARY.md
+- ✅ ../archived/WALLET_UX_SUMMARY.md
 - ✅ WALLET_UX_MULTICHAIN_GUIDE.md
 - ✅ ACCOUNT_ABSTRACTION_GUIDE.md
 - ✅ OP_STACK_L2_GUIDE.md

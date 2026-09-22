@@ -183,7 +183,7 @@ import { WalletDashboard } from '@/components/WalletDashboard';
 
 | File | Purpose | Time |
 |------|---------|------|
-| `WALLET_UX_SUMMARY.md` | **START HERE** - Overview of all 4 docs | 5 min |
+| `../archived/WALLET_UX_SUMMARY.md` | **START HERE** - Overview of all 4 docs | 5 min |
 | `WALLET_UX_MULTICHAIN_GUIDE.md` | **MAIN REFERENCE** - All implementation details | 30 min |
 | `ACCOUNT_ABSTRACTION_GUIDE.md` | **EIP-4337 Details** - Cross-L2 account ops | 20 min |
 | `OP_STACK_L2_GUIDE.md` | **Chain-specific** - Base, Arbitrum, Optimism | 15 min |
@@ -244,7 +244,7 @@ Track these after launch:
 
 ## Next Steps
 
-1. **Today**: Read `WALLET_UX_SUMMARY.md` (5 min)
+1. **Today**: Read `../archived/WALLET_UX_SUMMARY.md` (5 min)
 2. **Tomorrow**: Read `WALLET_UX_MULTICHAIN_GUIDE.md` (30 min)
 3. **This week**: Plan Phase 1 implementation
 4. **Next week**: Start coding
@@ -282,7 +282,7 @@ Track these after launch:
 ```
 docs/
 ├── WALLET_UX_QUICK_START.md (this file) ← START HERE
-├── WALLET_UX_SUMMARY.md ← OVERVIEW
+├── ../archived/WALLET_UX_SUMMARY.md ← OVERVIEW
 ├── WALLET_UX_MULTICHAIN_GUIDE.md ← MAIN REFERENCE
 ├── ACCOUNT_ABSTRACTION_GUIDE.md ← EIP-4337 DETAILS
 ├── OP_STACK_L2_GUIDE.md ← CHAIN-SPECIFIC

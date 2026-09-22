@@ -8,14 +8,14 @@ It uses:
 
 ## Documentation
 
-- **Start here**: `docs/INDEX.md`
-- **Deployment**: `docs/deployment/`
-  - Base Sepolia core testnet guide: `docs/deployment/BASE_SEPOLIA_CORE_TESTNET_GUIDE.md`
-  - Release tracking: `docs/deployment/RELEASES.md`
-- **Governance**: `docs/governance/` and `governance/runbooks/`
+- **Start here**: [INDEX.md](INDEX.md)
+- **Deployment**: [deployment/](deployment/)
+  - Base Sepolia core testnet guide: [deployment/BASE_SEPOLIA_CORE_TESTNET_GUIDE.md](deployment/BASE_SEPOLIA_CORE_TESTNET_GUIDE.md)
+  - Release tracking: [deployment/RELEASES.md](deployment/RELEASES.md)
+- **Governance**: [governance/](governance/) and [../governance/runbooks/](../governance/runbooks/) (operational runbooks)
 - **Security**:
-  - Responsible disclosure: `SECURITY.md`
-  - Security model: `docs/reviews/SECURITY_MODEL.md`
+  - Responsible disclosure: [SECURITY.md](SECURITY.md)
+  - Security model: [SECURITY_MODEL.md](SECURITY_MODEL.md)
 
 ## Quick start (local)
 
@@ -50,8 +50,8 @@ pnpm deploy --network baseSepolia
 ```
 
 Verification and release workflow docs:
-- `docs/deployment/BASE_SEPOLIA_CORE_TESTNET_GUIDE.md`
-- `docs/deployment/RELEASES.md`
+- [deployment/BASE_SEPOLIA_CORE_TESTNET_GUIDE.md](deployment/BASE_SEPOLIA_CORE_TESTNET_GUIDE.md)
+- [deployment/RELEASES.md](deployment/RELEASES.md)
 
 ## Production safety notes (high level)
 
@@ -63,13 +63,13 @@ Verification and release workflow docs:
 
 The protocol uses onchain governance with `TimelockController` and OpenZeppelin Governor.
 
-- [Governance Model](docs/governance/governance.md) - Overview of governance structure
-- [Governance Surface Map](docs/governance/GOVERNANCE_SURFACE_MAP.md) - Complete function → role → lane mapping
-- [Module Map](docs/reference/MODULE_MAP.md) - Module interface → implementation mapping
-- [Operational Runbooks](governance/runbooks/) - Step-by-step procedures for operations
-- [Upgrade Policy](docs/policies/UPGRADE_POLICY.md) - Upgrade procedures and ossification plan
-- [Emergency Policy](docs/policies/EMERGENCY_POLICY.md) - Emergency controls and procedures
-- [Governance Process](docs/governance/GOVERNANCE_PROCESS.md) - Step-by-step governance workflow
+- [Governance Model](archived/governance.md) - Overview of governance structure (archived)
+- [Governance Surface Map](governance/GOVERNANCE_SURFACE_MAP.md) - Complete function → role → lane mapping
+- [Module Map](reference/MODULE_MAP.md) - Module interface → implementation mapping
+- [Operational Runbooks](../governance/runbooks/) - Step-by-step procedures for operations
+- [Upgrade Policy](policies/UPGRADE_POLICY.md) - Upgrade procedures and ossification plan
+- [Emergency Policy](policies/EMERGENCY_POLICY.md) - Emergency controls and procedures
+- [Governance Process](governance/GOVERNANCE_PROCESS.md) - Step-by-step governance workflow
 
 ### Governance Tooling
 
@@ -90,4 +90,4 @@ pnpm gov:check governance/proposals/0001_set_token_cap.json --network baseMainne
 pnpm gov:emergency pause --contract EscrowableERC20 --network baseMainnet
 ```
 
-See [Governance Documentation](docs/governance/) for complete tooling overview.
+See [Governance Documentation](governance/) for complete tooling overview.

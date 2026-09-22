@@ -159,7 +159,7 @@ forge test --match-test testFuzz
 
 We use **behavior coverage** rather than chasing a single coverage percentage:
 
-1. **Coverage Map:** See `docs/COVERAGE_MAP.md` (to be created)
+1. **Coverage Map:** See `docs/archived/COVERAGE_MAP.md` (to be created)
 2. **Critical Path Coverage:** Documented in test files
 3. **Invariant Tests:** More valuable than line coverage for correctness
 
@@ -182,7 +182,7 @@ forge coverage  # Fails due to stack too deep
 
 ## Test Coverage Map
 
-See `docs/COVERAGE_MAP.md` for detailed mapping of:
+See `docs/archived/COVERAGE_MAP.md` for detailed mapping of:
 
 - Contract → key behaviors → test files
 - Critical paths covered
@@ -225,7 +225,7 @@ See `docs/COVERAGE_MAP.md` for detailed mapping of:
 - ✅ CI runs all checks on every PR
 - ✅ Deterministic test runs
 
-**See `docs/TESTING_GUIDELINES_ASSESSMENT.md` for detailed gap analysis and plan.**
+**See `docs/archived/TESTING_GUIDELINES_ASSESSMENT.md` for detailed gap analysis and plan.**
 
 ---
 
@@ -279,9 +279,9 @@ See `docs/COVERAGE_MAP.md` for detailed mapping of:
 ## Related Documentation
 
 - [`docs/Testing_guidelines.md`](./Testing_guidelines.md) - Testing best practices
-- [`docs/TESTING_GUIDELINES_ASSESSMENT.md`](./TESTING_GUIDELINES_ASSESSMENT.md) - Current state assessment and plan
-- [`docs/COVERAGE_MAP.md`](./COVERAGE_MAP.md) - Detailed coverage mapping (to be created)
-- [`docs/TOP_10_TESTING_PRIORITIES.md`](./TOP_10_TESTING_PRIORITIES.md) - Priority test areas
+- [`docs/archived/TESTING_GUIDELINES_ASSESSMENT.md`](../archived/TESTING_GUIDELINES_ASSESSMENT.md) - Current state assessment and plan
+- [`docs/archived/COVERAGE_MAP.md`](../archived/COVERAGE_MAP.md) - Detailed coverage mapping (to be created)
+- [`docs/archived/TOP_10_TESTING_PRIORITIES.md`](../archived/TOP_10_TESTING_PRIORITIES.md) - Priority test areas
 
 ---
 

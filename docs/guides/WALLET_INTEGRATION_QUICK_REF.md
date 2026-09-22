@@ -245,9 +245,9 @@ cast code 0x13b8b7572c72b46879662BFEA53851cBeD3bC47a \
 ## 📚 Full Documentation
 
 For complete details, see:
-- **WALLET_INTEGRATION_PACK.md** ← Full integration guide
-- **DEPLOYMENT_CURRENT_STATUS.md** ← All addresses & status
-- **ESCROW_VALIDATION_ROOT_CAUSE.md** ← Protocol constraints explained
+- **../archived/WALLET_INTEGRATION_PACK.md** ← Full integration guide
+- **../archived/DEPLOYMENT_CURRENT_STATUS.md** ← All addresses & status
+- **../archived/ESCROW_VALIDATION_ROOT_CAUSE.md** ← Protocol constraints explained
 
 ---
 
@@ -256,7 +256,7 @@ For complete details, see:
 1. **Copy minimal integration** (code above)
 2. **Update addresses** for your network
 3. **Test with small amounts** first
-4. **Check WALLET_INTEGRATION_PACK.md** for edge cases
+4. **Check ../archived/WALLET_INTEGRATION_PACK.md** for edge cases
 5. **Deploy to production**
 
 ---
@@ -273,4 +273,4 @@ For complete details, see:
 
 **Ready to go!** Copy the minimal integration and start testing.
 
-See WALLET_INTEGRATION_PACK.md for complete reference.
+See ../archived/WALLET_INTEGRATION_PACK.md for complete reference.

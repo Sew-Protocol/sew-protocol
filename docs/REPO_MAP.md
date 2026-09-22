@@ -312,13 +312,13 @@ are executed separately.
 
 | File | Content |
 |---|---|
-| [`governance.md`](governance/governance.md) | Full governance model: lanes, roles, snapshot point, invariants, operational runbooks |
+| [`governance.md`](archived/governance.md) | Full governance model: lanes, roles, snapshot point, invariants, operational runbooks |
 | [`GOVERNANCE_CONSTRAINTS.md`](governance/GOVERNANCE_CONSTRAINTS.md) | What governance **cannot** do: per-escrow immutabilities, Guardian bounds, parameter hard limits |
 | [`GOVERNANCE_SURFACE_MAP.md`](governance/GOVERNANCE_SURFACE_MAP.md) | Every governed function: role → lane → delay → bounds |
-| [`GOVERNANCE_STRUCTURE.md`](governance/GOVERNANCE_STRUCTURE.md) | DAO structure, TimelockController posture, role assignment |
+| [`GOVERNANCE_STRUCTURE.md`](archived/GOVERNANCE_STRUCTURE.md) | DAO structure, TimelockController posture, role assignment |
 | [`GOVERNANCE_PROCESS.md`](governance/GOVERNANCE_PROCESS.md) | Proposal lifecycle, voting procedure, execution |
-| [`GOVERNOR_IMPLEMENTATION_ANALYSIS.md`](governance/GOVERNOR_IMPLEMENTATION_ANALYSIS.md) | Governor implementation review |
-| [`QUORUM_CIRCULATING_SUPPLY_ANALYSIS.md`](governance/QUORUM_CIRCULATING_SUPPLY_ANALYSIS.md) | Quorum and circulating supply analysis |
+| [`GOVERNOR_IMPLEMENTATION_ANALYSIS.md`](archived/GOVERNOR_IMPLEMENTATION_ANALYSIS.md) | Governor implementation review |
+| [`QUORUM_CIRCULATING_SUPPLY_ANALYSIS.md`](archived/QUORUM_CIRCULATING_SUPPLY_ANALYSIS.md) | Quorum and circulating supply analysis |
 
 ### Dispute resolution (`docs/dispute-resolution/`)
 
@@ -340,13 +340,25 @@ are executed separately.
 
 | File | Content |
 |---|---|
-| [`SECURITY_FIXES_COMPLETED.md`](security/SECURITY_FIXES_COMPLETED.md) | All CRIT/HIGH/MED issues resolved; archived QA review list |
-| [`ISSUE_RESOLUTION_STATUS.md`](security/ISSUE_RESOLUTION_STATUS.md) | Per-issue fix evidence and contract line references |
-| [`OUTSTANDING_IMPROVEMENTS.md`](security/OUTSTANDING_IMPROVEMENTS.md) | Non-security LOW items remaining (gas, naming, NatSpec) |
-| [`INVARIANT_GUARD_INTEGRATION.md`](security/INVARIANT_GUARD_INTEGRATION.md) | Invariant guard library integration notes |
-| [`BASE_ESCROW_QA_REVIEW.md`](security/BASE_ESCROW_QA_REVIEW.md) | Completed QA review of BaseEscrow |
-| [`APPEAL_BOND_SECURITY_REVIEW.md`](security/APPEAL_BOND_SECURITY_REVIEW.md) | Appeal bond security analysis |
+| [`SECURITY_MODEL.md`](security/SECURITY_MODEL.md) | Protocol threat model and security properties |
 | [`RECOVERY_FUNCTIONALITY.md`](security/RECOVERY_FUNCTIONALITY.md) | Token recovery design and safety constraints |
+| [`INVARIANT_GUARD_INTEGRATION.md`](security/INVARIANT_GUARD_INTEGRATION.md) | Invariant guard library integration notes |
+| [`PATH_TRAVERSAL_AUDIT.md`](security/PATH_TRAVERSAL_AUDIT.md) | Path-traversal audit and fixes |
+| [`BACKWARD_COMPATIBILITY_ANALYSIS.md`](security/BACKWARD_COMPATIBILITY_ANALYSIS.md) | Backward-compatibility analysis across pre-consolidation contract versions |
+Archived security point-in-time reviews/status (see `docs/archived/`):
+
+| File | Content |
+|---|---|
+| [`SECURITY_FIXES_COMPLETED.md`](archived/SECURITY_FIXES_COMPLETED.md) | All CRIT/HIGH/MED issues resolved; archived QA review list |
+| [`ISSUE_RESOLUTION_STATUS.md`](archived/ISSUE_RESOLUTION_STATUS.md) | Per-issue fix evidence and contract line references |
+| [`OUTSTANDING_IMPROVEMENTS.md`](archived/OUTSTANDING_IMPROVEMENTS.md) | Non-security LOW items remaining (gas, naming, NatSpec) |
+| [`BASE_ESCROW_QA_REVIEW.md`](archived/BASE_ESCROW_QA_REVIEW.md) | Completed QA review of BaseEscrow |
+| [`APPEAL_BOND_SECURITY_REVIEW.md`](archived/APPEAL_BOND_SECURITY_REVIEW.md) | Appeal bond security analysis |
+| [`CONTRACT_REVIEW_LIST.md`](archived/CONTRACT_REVIEW_LIST.md) | Historical contract review checklist |
+| [`ETHEREUM_NATIVE_CODE_REVIEW.md`](archived/ETHEREUM_NATIVE_CODE_REVIEW.md) | Historical Ethereum-native code review |
+| [`FEE_SNAPSHOT_IMPLEMENTATION.md`](archived/FEE_SNAPSHOT_IMPLEMENTATION.md) | Fee snapshot implementation notes |
+| [`FUNCTIONAL_ECONOMIC_DESIGN_REVIEW.md`](archived/FUNCTIONAL_ECONOMIC_DESIGN_REVIEW.md) | Functional/economic design review |
+| [`AAVE_YIELD_MODULE_TEST_REVIEW.md`](archived/AAVE_YIELD_MODULE_TEST_REVIEW.md) | AaveYieldModule test review |
 
 ### Top-level standalone documents
 
@@ -380,20 +392,20 @@ are executed separately.
 |---|---|
 | [`MODULE_MAP.md`](reference/MODULE_MAP.md) | Module system map: interface → implementation → snapshot field |
 | [`MODULE_DEVELOPMENT_GUIDE.md`](reference/MODULE_DEVELOPMENT_GUIDE.md) | How to build a new module |
-| [`TEST_SUITE_INDEX.md`](reference/TEST_SUITE_INDEX.md) | Index of all test files and their coverage targets |
-| [`invariants_suite_vaults.md`](reference/invariants_suite_vaults.md) | Vault invariant definitions and test coverage |
+| [`TEST_SUITE_INDEX.md`](archived/TEST_SUITE_INDEX.md) | Index of all test files and their coverage targets |
+| [`invariants_suite_vaults.md`](archived/invariants_suite_vaults.md) | Vault invariant definitions and test coverage |
 | [`ERROR_STANDARDIZATION.md`](reference/ERROR_STANDARDIZATION.md) | Custom error catalogue |
 | [`INTERFACE_VERSIONING.md`](reference/INTERFACE_VERSIONING.md) | Interface versioning policy |
-| [`SLITHER_SUMMARY_AND_RECOMMENDATIONS.md`](reference/SLITHER_SUMMARY_AND_RECOMMENDATIONS.md) | Slither static analysis findings and dispositions |
+| [`SLITHER_SUMMARY_AND_RECOMMENDATIONS.md`](archived/SLITHER_SUMMARY_AND_RECOMMENDATIONS.md) | Slither static analysis findings and dispositions |
 
-### Deployment (`docs/deployment/`, `docs/deployments/`)
+### Deployment (`docs/deployment/`)
 
 | File | Content |
 |---|---|
 | [`deployment/RELEASES.md`](deployment/RELEASES.md) | Release history and deployment manifest |
 | [`deployment/dr3/DR3_ACTIVATION.md`](deployment/dr3/DR3_ACTIVATION.md) | DR v3 activation runbook |
 | [`deployment/ieo/IEO_RELEASE_GUIDE.md`](deployment/ieo/IEO_RELEASE_GUIDE.md) | IEO release procedure |
-| [`deployments/base-sepolia-v1-testnet-addresses.md`](deployments/base-sepolia-v1-testnet-addresses.md) | Base Sepolia testnet contract addresses |
+| [`deployments/base-sepolia-v1-testnet-addresses.md`](archived/base-sepolia-v1-testnet-addresses.md) | Base Sepolia testnet contract addresses |
 | [`deployment/BRANCHING_AND_RELEASE_DISCIPLINE.md`](deployment/BRANCHING_AND_RELEASE_DISCIPLINE.md) | Branch and release naming conventions |
 
 ### Policies (`docs/policies/`)

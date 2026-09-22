@@ -226,7 +226,7 @@ If a critical issue is discovered:
 
 ## References
 
-- `governance.md` - Governance model
+- `../archived/governance.md` - Governance model
 - `GOVERNANCE_PROCESS.md` - Governance process
 - `EMERGENCY_POLICY.md` - Emergency procedures
 - `MODULE_MAP.md` - Module mapping

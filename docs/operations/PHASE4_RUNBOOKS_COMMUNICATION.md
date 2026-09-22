@@ -688,7 +688,7 @@ Risk is always present in DeFi, but we're committed to safety.
 ### Where can I learn more?
 
 - **Documentation**: docs/PHASE1-4_summary.md
-- **Guardian System**: docs/GUARDIAN_PAUSE_SUMMARY.md
+- **Guardian System**: docs/archived/GUARDIAN_PAUSE_SUMMARY.md
 - **Monitoring**: docs/MONITOR_SETUP.md
 - **Recovery Framework**: docs/PHASE3_RECOVERY_FRAMEWORK.md
 - **Discord**: #escrow-help channel

@@ -17,7 +17,7 @@ This solves the bytecode size problem (contracts 12-15% over 24 KB limit) while 
 👉 **Read this file first (you're reading it)**
 
 Then read:
-1. **REVIEW_SUMMARY.md** - Executive summary with key decisions & recommendations
+1. **docs/archived/REVIEW_SUMMARY.md** - Executive summary with key decisions & recommendations
 
 That's it. You'll understand the approach and know whether to approve.
 
@@ -25,7 +25,7 @@ That's it. You'll understand the approach and know whether to approve.
 
 ### For Technical Reviewers (45 minutes)
 
-1. **REVIEW_SUMMARY.md** - Executive overview (15 min)
+1. **docs/archived/REVIEW_SUMMARY.md** - Executive overview (15 min)
 2. **ARCHITECTURE_YIELD_MODULES.md** sections 1-5 - Interface design (20 min)
 3. **IMPLEMENTATION_PLAN_YIELD_MODULES.md** phases 1-4 - Session 1 tasks (10 min)
 
@@ -37,10 +37,10 @@ This gives you technical depth without diving into all implementation details.
 
 Read everything in this order:
 
-1. **REVIEW_SUMMARY.md** (12 KB, 415 lines) - Executive summary
+1. **docs/archived/REVIEW_SUMMARY.md** (12 KB, 415 lines) - Executive summary
 2. **ARCHITECTURE_YIELD_MODULES.md** (32 KB, 696 lines) - Full technical spec
 3. **IMPLEMENTATION_PLAN_YIELD_MODULES.md** (24 KB, 524 lines) - Detailed tasks
-4. **NEXT_STEPS.md** (16 KB, 250 lines) - Current status & what happens next
+4. **archived/NEXT_STEPS.md** - Current status & what happens next (archived)
 
 ---
 
@@ -182,10 +182,10 @@ Phase 2.5-2.8: Fix tests & document      (2.5 hrs) ⏳
 
 | File | Purpose | For Whom |
 |------|---------|----------|
-| **REVIEW_SUMMARY.md** | Executive summary + decisions | Everyone |
+| **docs/archived/REVIEW_SUMMARY.md** | Executive summary + decisions | Everyone |
 | **ARCHITECTURE_YIELD_MODULES.md** | Complete technical spec | Engineers |
 | **IMPLEMENTATION_PLAN_YIELD_MODULES.md** | Phase-by-phase tasks | Engineering leads |
-| **NEXT_STEPS.md** | Current status & decisions | Project managers |
+| **archived/NEXT_STEPS.md** | Current status & decisions (archived) | Project managers |
 | **START_HERE.md** | This file | Everyone |
 
 ---
@@ -302,7 +302,7 @@ Total:                  ~12-13 hours (wallclock ~2-3 days)
 ## Next Actions
 
 ### For You
-1. Read REVIEW_SUMMARY.md (15 min)
+1. Read docs/archived/REVIEW_SUMMARY.md (15 min)
 2. Review decision questions at the end
 3. Approve or request changes
 
@@ -331,7 +331,7 @@ All without touching core escrow logic. That's the power of modularity.
 
 ## Ready?
 
-👉 **Next step**: Read `REVIEW_SUMMARY.md` for executive overview.
+👉 **Next step**: Read `docs/archived/REVIEW_SUMMARY.md` for executive overview.
 
 Questions? Ask in your next message, and I'll clarify.
 

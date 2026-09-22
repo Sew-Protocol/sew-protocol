@@ -5,8 +5,8 @@
 > reference, not a description of how governance works.
 >
 > For the full governance model, lanes, roles, and operational runbooks see
-> [`docs/governance/governance.md`](governance/governance.md) and
-> [`docs/governance/GOVERNANCE_SURFACE_MAP.md`](governance/GOVERNANCE_SURFACE_MAP.md).
+> [`docs/archived/governance.md`](../archived/governance.md) and
+> [`docs/GOVERNANCE_SURFACE_MAP.md`](GOVERNANCE_SURFACE_MAP.md).
 
 ---
 
@@ -165,7 +165,7 @@ override path.
 
 ## Related documents
 
-- [`docs/governance/governance.md`](governance/governance.md) — full governance model and operational runbooks
-- [`docs/governance/GOVERNANCE_SURFACE_MAP.md`](governance/GOVERNANCE_SURFACE_MAP.md) — complete function-by-function mapping with roles, lanes, delays, and bounds
-- [`docs/FORWARD_ONLY_UPGRADES.md`](FORWARD_ONLY_UPGRADES.md) — forward-only upgrade mechanism in detail
-- [`docs/architecture/PROTOCOL_MODULARITY.md`](architecture/PROTOCOL_MODULARITY.md) — snapshot isolation model
+- [`docs/archived/governance.md`](../archived/governance.md) — full governance model and operational runbooks
+- [`docs/GOVERNANCE_SURFACE_MAP.md`](GOVERNANCE_SURFACE_MAP.md) — complete function-by-function mapping with roles, lanes, delays, and bounds
+- [`docs/../FORWARD_ONLY_UPGRADES.md`](../FORWARD_ONLY_UPGRADES.md) — forward-only upgrade mechanism in detail
+- [`docs/../architecture/PROTOCOL_MODULARITY.md`](../architecture/PROTOCOL_MODULARITY.md) — snapshot isolation model

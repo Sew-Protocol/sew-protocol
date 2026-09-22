@@ -174,4 +174,4 @@ This is more gas-efficient than per-escrow module deployments and simplifies gov
 - [AaveYieldModule](../modules/AaveYieldModule.sol)
 - [DefaultYieldGenerationModule](../modules/DefaultYieldGenerationModule.sol)
 - [DefaultYieldDistributionModule](../modules/DefaultYieldDistributionModule.sol)
-- [InvariantGuard Integration](./INVARIANT_GUARD_INTEGRATION.md) - For delegatecall-based patterns
+- [InvariantGuard Integration](../security/INVARIANT_GUARD_INTEGRATION.md) - For delegatecall-based patterns

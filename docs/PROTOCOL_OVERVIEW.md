@@ -301,7 +301,7 @@ The Sew simulator (`sew-simulation` repository) provides three layers of adversa
 
 → Robustness framework: [`../sew-simulation/docs/ROBUSTNESS_FRAMEWORK.md`](../../sew-simulation/docs/ROBUSTNESS_FRAMEWORK.md)  
 → Security model: [`docs/security/SECURITY_MODEL.md`](security/SECURITY_MODEL.md)  
-→ Audit doc: [`docs/reviews/AUDIT.md`](reviews/AUDIT.md)
+→ Audit doc: [`docs/archived/AUDIT.md`](archived/AUDIT.md)
 
 ---
 
@@ -383,11 +383,11 @@ Networks: **Base Mainnet** (production), **Base Sepolia** (testnet), **Hardhat**
 | DR v3 launch defaults | [`docs/dispute-resolution/DR_V3_LAUNCH_SAFE_DEFAULTS.md`](dispute-resolution/DR_V3_LAUNCH_SAFE_DEFAULTS.md) |
 | Kleros integration | [`docs/guides/KLEROS_INTEGRATION_GUIDE.md`](guides/KLEROS_INTEGRATION_GUIDE.md) |
 | Governance surface map | [`docs/governance/GOVERNANCE_SURFACE_MAP.md`](governance/GOVERNANCE_SURFACE_MAP.md) |
-| Governance policy | [`docs/governance/governance.md`](governance/governance.md) |
+| Governance policy | [`docs/archived/governance.md`](archived/governance.md) |
 | Forward-only upgrades | [`docs/FORWARD_ONLY_UPGRADES.md`](FORWARD_ONLY_UPGRADES.md) |
 | Auto-expiry authorisation | [`docs/AUTO_EXPIRY_AUTHORISATION.md`](AUTO_EXPIRY_AUTHORISATION.md) |
 | Security model | [`docs/security/SECURITY_MODEL.md`](security/SECURITY_MODEL.md) |
-| Audit | [`docs/reviews/AUDIT.md`](reviews/AUDIT.md) |
+| Audit | [`docs/archived/AUDIT.md`](archived/AUDIT.md) |
 | Robustness framework (simulation) | [`sew-simulation/docs/ROBUSTNESS_FRAMEWORK.md`](../../sew-simulation/docs/ROBUSTNESS_FRAMEWORK.md) |
 
 ---

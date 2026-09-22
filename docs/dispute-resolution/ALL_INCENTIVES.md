@@ -158,7 +158,7 @@ Penalties for poor performance or misconduct.
 ### Fee-Based Payments
 - `docs/archived/INCENTIVE_MODULE_REVIEW.md`
 - `docs/dispute-resolution/RESOLVER_ECONOMICS.md`
-- `docs/test/INCENTIVE_MODULE_TEST_PLAN.md`
+- `docs/archived/INCENTIVE_MODULE_TEST_PLAN.md`
 - `docs/archived/INCENTIVE_MODULE_V2_ISSUES.md`
 
 ### Staking

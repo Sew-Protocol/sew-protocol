@@ -315,10 +315,10 @@ cat deployments/baseSepolia/EscrowVault.json | jq '.args'
 
 | Document | Purpose |
 |----------|---------|
-| `DEPLOYMENT_CURRENT_STATUS.md` | Overall deployment status (START HERE) |
-| `ESCROW_VALIDATION_ROOT_CAUSE.md` | Protocol constraint explanation |
-| `TESTNET_VALIDATION_COMPLETE.md` | Comprehensive test results |
-| `VERIFICATION_STATUS.md` | Contract verification details |
+| `../archived/DEPLOYMENT_CURRENT_STATUS.md` | Overall deployment status (START HERE) |
+| `../archived/ESCROW_VALIDATION_ROOT_CAUSE.md` | Protocol constraint explanation |
+| `../archived/TESTNET_VALIDATION_COMPLETE.md` | Comprehensive test results |
+| `docs/archived/VERIFICATION_STATUS.md` | Contract verification details |
 | `deploy-registry/base-sepolia-v1-testnet.json` | Machine-readable manifest |
 
 ---

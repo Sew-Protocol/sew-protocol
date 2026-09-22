@@ -231,7 +231,7 @@ All protocol changes go through governance:
 1. **Standard Lane**: Immediate execution (e.g., pause, set max attachments)
 2. **Slow Lane**: 7-day delay (e.g., fee changes, module swaps)
 
-See [Governance Documentation](governance.md) for details.
+See [Governance Documentation](../archived/governance.md) for details.
 
 ### Security Considerations
 
@@ -272,7 +272,7 @@ function createEscrow(
 ### Documentation Files
 
 - Update relevant documentation in `docs/` when making changes
-- Keep `_DOCUMENT_INDEX.md` updated
+- Keep `docs/INDEX.md` updated
 - Document breaking changes in migration guides
 
 ## Pull Request Process
@@ -359,10 +359,10 @@ When reporting issues, include:
 
 For governance-related contributions:
 
-- See [Governance Process](GOVERNANCE_PROCESS.md)
-- Follow [Upgrade Policy](UPGRADE_POLICY.md)
-- Review [Emergency Policy](EMERGENCY_POLICY.md)
-- Check [Governance Surface Map](GOVERNANCE_SURFACE_MAP.md)
+- See [Governance Process](../governance/GOVERNANCE_PROCESS.md)
+- Follow [Upgrade Policy](../policies/UPGRADE_POLICY.md)
+- Review [Emergency Policy](../policies/EMERGENCY_POLICY.md)
+- Check [Governance Surface Map](../governance/GOVERNANCE_SURFACE_MAP.md)
 
 ## Code of Conduct
 
@@ -374,7 +374,7 @@ For governance-related contributions:
 ## Questions?
 
 - Check existing documentation in `docs/`
-- Review [Document Index](_DOCUMENT_INDEX.md)
+- Review [Document Index](../INDEX.md)
 - Open an issue for questions or discussions
 
 Thank you for contributing! 🎉

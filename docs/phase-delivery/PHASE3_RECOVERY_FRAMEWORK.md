@@ -489,7 +489,7 @@ If recovery causes new issues:
 - `contracts/governance/EmergencyRecoveryProposal.sol` - Implementation
 - `test/foundry/governance/EmergencyRecoveryProposal.t.sol` - Tests
 - `contracts/governance/GovGovernor.sol` - Governance
-- `docs/GUARDIAN_PAUSE_SUMMARY.md` - Guardian pause system
+- `docs/archived/GUARDIAN_PAUSE_SUMMARY.md` - Guardian pause system
 
 **Questions**: See Phase 1-2 documentation for Guardian pause system overview.
 

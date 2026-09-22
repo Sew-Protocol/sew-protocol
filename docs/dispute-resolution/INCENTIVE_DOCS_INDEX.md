@@ -12,11 +12,11 @@ This document provides an index of all documentation related to resolver incenti
    - Merged DR incentive module (V1 + V2): performance-based workload routing, EMA scoring, appeal bonds, escalation cost curves, bond distribution.
    - `ResolverIncentiveModuleV2BondLedger.sol` is the BondLedger-backed facade (unchanged).
 
-2. **`docs/more/test/INCENTIVE_MODULE_TEST_PLAN.md`**
+2. **`docs/archived/INCENTIVE_MODULE_TEST_PLAN.md`**
    - Comprehensive test plan for the incentive module (legacy V1/V2 plan).
-3. **`docs/more/test/INCENTIVE_MODULE_TEST_IMPLEMENTATION_TASK.md`**
+3. **`docs/archived/INCENTIVE_MODULE_TEST_IMPLEMENTATION_TASK.md`**
    - Task for implementing missing unit tests.
-4. **`docs/more/test/INCENTIVE_VERIFICATION_PLAN.md`**
+4. **`docs/archived/INCENTIVE_VERIFICATION_PLAN.md`**
    - Verification plan for incentive module correctness.
 5. **`docs/archived/INCENTIVE_MODULE_REVIEW.md`** — archived review of the incentive module design/implementation.
 6. **`docs/archived/INCENTIVE_MODULE_V2_ISSUES.md`** — archived V2 issues/fixes log (superseded by the merged module).
@@ -99,7 +99,7 @@ This document provides an index of all documentation related to resolver incenti
    - Plan for multi-token appeal bond support
    - Governance-controlled whitelist
 
-2. **`docs/more/plans/DECENTRALIZED_RESOLUTION_COMPLETION_PLAN.md`**
+2. **`docs/archived/DECENTRALIZED_RESOLUTION_COMPLETION_PLAN.md`**
    - Overall DR implementation plan
    - Phase completion status
 

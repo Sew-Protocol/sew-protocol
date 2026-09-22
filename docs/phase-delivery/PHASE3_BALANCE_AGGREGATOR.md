@@ -674,5 +674,5 @@ Savings: 70% gas reduction per query
 
 For integration help, refer to:
 - `WALLET_UX_MULTICHAIN_GUIDE.md` - Overall architecture
-- `PREREQUISITES_FOR_MULTIL2.md` - What was needed first
+- `../archived/PREREQUISITES_FOR_MULTIL2.md` - What was needed first
 - Test files for usage examples

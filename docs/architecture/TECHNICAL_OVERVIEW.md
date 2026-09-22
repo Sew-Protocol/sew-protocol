@@ -268,7 +268,7 @@ The protocol uses a **staged rollout approach** for decentralized dispute resolu
 
 ---
 
-_For a complete documentation map, see [`docs/INDEX.md`](../INDEX.md) and the reference index in [`docs/reference/_DOCUMENT_INDEX.md`](../reference/_DOCUMENT_INDEX.md)._
+_For a complete documentation map, see [`docs/INDEX.md`](../INDEX.md) and the reference index in [`docs/archived/_DOCUMENT_INDEX.md`](../archived/_DOCUMENT_INDEX.md)._
 
 
 ---

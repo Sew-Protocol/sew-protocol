@@ -882,21 +882,21 @@ The protocol is designed to become a foundational piece of infrastructure for tr
 
 ### Documentation
 
-- [Technical Overview](TECHNICAL_OVERVIEW.md) - Detailed technical documentation
+- [Technical Overview](architecture/TECHNICAL_OVERVIEW.md) - Detailed technical documentation
 - [Security Model](SECURITY_MODEL.md) - Comprehensive security analysis
-- [Governance Model](governance.md) - Governance structure and procedures
-- [Contracts Summary](CONTRACTS_SUMMARY.md) - Contract overview
-- [Upgrade Policy](UPGRADE_POLICY.md) - Upgrade procedures
+- [Governance Model](archived/governance.md) - Governance structure and procedures (archived)
+- [Contracts Summary](architecture/CONTRACTS_SUMMARY.md) - Contract overview
+- [Upgrade Policy](policies/UPGRADE_POLICY.md) - Upgrade procedures
 
 
 ### Security
 
-- [Security Policy](../SECURITY.md) - Security contact and disclosure policy
-- [Audit Documentation](AUDIT.md) - Audit status and reports
+- [Security Policy](SECURITY.md) - Security contact and disclosure policy
+- [Audit Documentation](archived/AUDIT.md) - Audit status and reports (archived)
 
 ### Governance
 
-- [Governance Surface Map](GOVERNANCE_SURFACE_MAP.md) - Complete function mapping
+- [Governance Surface Map](governance/GOVERNANCE_SURFACE_MAP.md) - Complete function mapping
 - [Operational Runbooks](../governance/runbooks/) - Step-by-step procedures
 
 ---

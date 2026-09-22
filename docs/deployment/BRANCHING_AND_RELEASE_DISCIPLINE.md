@@ -18,7 +18,7 @@
 3) **Append-only discipline**
 - Do not “upgrade-in-place” module contracts; deploy new modules and swap references (where supported).
 - Treat address registries and release tags as append-only history. See:
-  - `docs/reference/MODULE_SWAPPING_STRATEGY.md`
+  - `docs/archived/MODULE_SWAPPING_STRATEGY.md`
 
 ---
 
@@ -97,7 +97,7 @@ Every Base Sepolia release should include, on the same commit:
 - `deploy-registry/chain-84532.json` (new entries appended)
 
 3) **Update human address index**
-- `docs/deployment/deployed.md` (addresses hyperlinked)
+- `docs/archived/deployed.md` (addresses hyperlinked)
 - `docs/deployment/BASE_SEPOLIA_CORE_TESTNET_GUIDE.md` if its index table needs updating
 
 4) **Verify sources (as able)**

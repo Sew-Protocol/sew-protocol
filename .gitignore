@@ -97,9 +97,9 @@ edr-cache
 *.bin
 *.abi
 
-# Archive
-archive/
-archived/
+# Archive (root-level only; docs/archived/ is kept under version control)
+/archive/
+/archived/
 
 # Misc
 *.bak

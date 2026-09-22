@@ -309,10 +309,10 @@ This pattern ensures:
 
 ## References
 
-- `governance.md` - Governance model overview
-- `GOVERNANCE_IMPLEMENTATION_STATUS.md` - Implementation status
+- `../archived/governance.md` - Governance model overview
+- `../archived/GOVERNANCE_IMPLEMENTATION_STATUS.md` - Implementation status
 - `GOVERNANCE_IMPLEMENTATION_PLAN.md` - Implementation plan
-- `../reviews/GOVERNANCE_ROLES_CONSISTENCY.md` - Governance roles consistency review
+- `../archived/GOVERNANCE_ROLES_CONSISTENCY.md` - Governance roles consistency review
 
 ## Change Log### 2026-01-27 - Added ops contracts to governance surface map
   - CreateOps (with yield deposits pause/resume)

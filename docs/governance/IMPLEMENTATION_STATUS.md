@@ -50,10 +50,10 @@
 - `contracts/governance/GovGovernor.sol` - Main governance contract
 
 ### Documentation
-- `docs/governance/GOVERNANCE_STRUCTURE.md` - Complete governance overview
-- `docs/security/QUORUM_APPROACH_COMPARISON.md` - Quorum approach analysis
-- `docs/security/NON_CIRCULATING_TRACKING_BENEFITS.md` - Tracking benefits
-- `docs/security/NON_CIRCULATING_SUPPLY_ISSUE.md` - Issue analysis (resolved)
+- `docs/archived/GOVERNANCE_STRUCTURE.md` - Complete governance overview
+- `docs/archived/QUORUM_APPROACH_COMPARISON.md` - Quorum approach analysis
+- `docs/archived/NON_CIRCULATING_TRACKING_BENEFITS.md` - Tracking benefits
+- `docs/archived/NON_CIRCULATING_SUPPLY_ISSUE.md` - Issue analysis (resolved)
 
 ### Deployment
 - `deploy/40_governor.ts` - Deployment script

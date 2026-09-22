@@ -81,7 +81,7 @@ Protocol fees are primarily charged on escrowed assets (any ERC20), not necessar
 - Escrow fee: configurable (default 1% in docs), charged at escrow creation and routed to `escrowFeeAddress`.
 - Appeal bond fees: not implemented in DR v2 (bonds are refunded in full on success or paid in full to resolvers on failure).
 
-**Doc reference:** `docs/FEE_IMPLEMENTATION_SUMMARY.md`  
+**Doc reference:** `docs/archived/FEE_IMPLEMENTATION_SUMMARY.md`  
 **Implementation reference:** `contracts/core/BaseEscrow.sol` (fee), DR incentive modules for bond handling.
 
 **Tokenomics implication:** These mechanisms create protocol revenue, but **do not directly create SEW buy pressure** unless governance explicitly routes revenue to acquire SEW or uses SEW for fees (not assumed here).
@@ -210,7 +210,7 @@ Exchanges typically assess “who can change what, how fast”:
 **References:**
 - `contracts/token/SewToken.sol` (ownership)
 - `contracts/governance/GovGovernor.sol` (timelocked governance)
-- `docs/token/2026_token_expectations.md` (expectations checklist)
+- `docs/archived/2026_token_expectations.md` (expectations checklist)
 
 ---
 
