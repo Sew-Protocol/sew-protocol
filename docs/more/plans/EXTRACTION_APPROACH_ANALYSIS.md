@@ -61,7 +61,7 @@ decentralized-resolution-module/  (new repo)
 ├── contracts/
 │   ├── DecentralizedResolutionModule.sol
 │   ├── ResolverIncentiveModule.sol
-│   ├── PaymentCalculationLibraryV1.sol
+│   ├── PaymentCalculationLibrary.sol
 │   ├── interfaces/
 │   │   ├── IResolutionModule.sol (copied)
 │   │   └── IPaymentCalculationLibrary.sol
@@ -123,7 +123,7 @@ hardhat-deploy-hybrid/
 │       ├── contracts/
 │       │   ├── DecentralizedResolutionModule.sol
 │       │   ├── ResolverIncentiveModule.sol
-│       │   ├── PaymentCalculationLibraryV1.sol
+│       │   ├── PaymentCalculationLibrary.sol
 │       │   ├── interfaces/
 │       │   │   └── IPaymentCalculationLibrary.sol
 │       │   └── governance/
@@ -341,7 +341,7 @@ mv contracts/modules/DefaultResolutionModule.sol packages/core/contracts/modules
 
 mv contracts/modules/DecentralizedResolutionModule.sol packages/decentralized-resolution-module/contracts/
 mv contracts/modules/ResolverIncentiveModule.sol packages/decentralized-resolution-module/contracts/
-mv contracts/modules/PaymentCalculationLibraryV1.sol packages/decentralized-resolution-module/contracts/
+mv contracts/modules/PaymentCalculationLibrary.sol packages/decentralized-resolution-module/contracts/
 
 mv contracts/interfaces/IResolutionModule.sol packages/shared/contracts/interfaces/
 mv contracts/governance/SlowLaneQueueActivateUpgradeable.sol packages/shared/contracts/governance/
@@ -430,7 +430,7 @@ hardhat-deploy-hybrid/
 │   ├── decentralized-resolution-module/  (new)
 │   │   ├── DecentralizedResolutionModule.sol
 │   │   ├── ResolverIncentiveModule.sol
-│   │   └── PaymentCalculationLibraryV1.sol
+│   │   └── PaymentCalculationLibrary.sol
 │   │
 │   ├── interfaces/        (shared)
 │   │   └── IResolutionModule.sol

@@ -127,7 +127,7 @@ function test_createEscrow_overflow_maxAmount_maxFee() public // NEW - check ove
   - **Action**: Document and standardize post-launch
 
 ### Code Quality Issues
-- [ ] **TODO in ResolverSlashingModuleV1.sol:827**
+- [ ] **TODO in ResolverSlashingModule.sol:827**
   ```solidity
   // TODO: Transfer protocol portion to treasury (when treasury contract exists)
   ```
@@ -153,14 +153,14 @@ function test_createEscrow_overflow_maxAmount_maxFee() public // NEW - check ove
 ## 4. 📋 Documentation TODOs & Actions
 
 ### Unaddressed TODOs in Docs
-- [ ] **docs/dispute-resolution/DR_V3_TODO.md**
+- [ ] **docs/archived/DR_V3_TODO.md**
   - **Action**: Review and determine if relevant for Sepolia launch
   - **Status**: Likely post-launch items
 
-- [ ] **docs/dispute-resolution/TODO_STATUS_UPDATE.md**
+- [ ] **docs/archived/TODO_STATUS_UPDATE.md**
   - **Action**: Review and determine if relevant for Sepolia launch
 
-- [ ] **docs/dispute-resolution/DR_TODOS.md**
+- [ ] **docs/archived/DR_TODOS.md**
   - **Action**: Review and determine if relevant for Sepolia launch
 
 - [ ] **docs/dispute-resolution/RESOLVER_ECONOMICS_TODOS.md**
@@ -202,7 +202,7 @@ function test_createEscrow_overflow_maxAmount_maxFee() public // NEW - check ove
   - **Status**: Acceptable for testnet (clearly marked as deprecated)
 
 ### TODO Comments
-- [ ] **ResolverSlashingModuleV1.sol:827**
+- [ ] **ResolverSlashingModule.sol:827**
   ```solidity
   // TODO: Transfer protocol portion to treasury (when treasury contract exists)
   ```
@@ -283,7 +283,7 @@ function test_createEscrow_overflow_maxAmount_maxFee() public // NEW - check ove
 ### 🟡 **SHOULD DO** Before Sepolia
 5. [ ] **Add overflow test for maximum amount + maximum fee**
 6. [ ] **Review and address dispute-resolution TODOs** (if blocking)
-7. [ ] **Update TODO comment in ResolverSlashingModuleV1** to NatSpec
+7. [ ] **Update TODO comment in ResolverSlashingModule** to NatSpec
 
 ### 🟢 **NICE TO HAVE** (Post-Launch)
 8. [ ] Standardize test file naming

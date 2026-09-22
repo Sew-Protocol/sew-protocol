@@ -112,12 +112,12 @@ require(t > 0 && t <= MAX_DISPUTE_TIMEOUT, "T");
 
 #### 4. revert() with Strings
 
-**Location:** `PaymentCalculationLibraryV1.sol`, `KlerosArbitrableProxy.sol`, mocks
+**Location:** `PaymentCalculationLibrary.sol`, `KlerosArbitrableProxy.sol`, mocks
 
 **Examples:**
 
 ```solidity
-// PaymentCalculationLibraryV1.sol
+// PaymentCalculationLibrary.sol
 revert("Invalid level");
 
 // KlerosArbitrableProxy.sol
@@ -345,10 +345,10 @@ library ValidationErrors {
 
 1. Migrate `DecentralizedResolutionModule.sol` (largest file, ~100+ require statements)
 2. Migrate related contracts:
-   - `ResolverIncentiveModuleV1.sol`
-   - `ResolverIncentiveModuleV2.sol`
-   - `ResolverStakingModuleV1.sol`
-   - `ResolverSlashingModuleV1.sol`
+   - `ResolverIncentiveModule.sol`
+   - `ResolverIncentiveModule.sol`
+   - `ResolverStakingModule.sol`
+   - `ResolverSlashingModule.sol`
    - `InsurancePoolVault.sol`
 
 3. Create resolution-specific error library:
@@ -365,7 +365,7 @@ library ValidationErrors {
 
 1. Migrate all libraries:
    - `SettingsValidationLibrary.sol`
-   - `PaymentCalculationLibraryV1.sol`
+   - `PaymentCalculationLibrary.sol`
    - `ResolutionAnalytics.sol`
    - `BondValuationLibrary.sol`
    - All other libraries
@@ -736,15 +736,15 @@ Create `docs/ERROR_REFERENCE.md` with:
 #### Medium Priority (Modules)
 
 - `contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol` - Many require() strings
-- `contracts/decentralized-resolution-module/ResolverIncentiveModuleV1.sol` - require() strings
-- `contracts/decentralized-resolution-module/ResolverIncentiveModuleV2.sol` - require() strings
+- `contracts/decentralized-resolution-module/ResolverIncentiveModule.sol` - require() strings
+- `contracts/decentralized-resolution-module/ResolverIncentiveModule.sol` - require() strings
 - `contracts/modules/AaveYieldGenerationModule.sol` - Mostly custom errors (good)
 - `contracts/modules/AaveYieldModule.sol` - Mixed
 
 #### Lower Priority (Libraries)
 
 - `contracts/libraries/SettingsValidationLibrary.sol` - Custom errors (good)
-- `contracts/libraries/PaymentCalculationLibraryV1.sol` - require() strings
+- `contracts/libraries/PaymentCalculationLibrary.sol` - require() strings
 - `contracts/libraries/ResolutionAnalytics.sol` - require() strings
 - `contracts/libraries/BondValuationLibrary.sol` - require() strings
 

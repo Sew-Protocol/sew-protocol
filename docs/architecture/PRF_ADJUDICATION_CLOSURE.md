@@ -137,5 +137,5 @@ settlement, no new privileged execution path.
 ## 8. Related docs
 
 - `docs/FINALITY.md`, `docs/SETTLEMENT.md`, `docs/SECURITY_MODEL.md`
-- `docs/dispute-resolution/FINALITY_DISCIPLINE_DEV_PLAN.md`
+- `docs/archived/FINALITY_DISCIPLINE_DEV_PLAN.md`
 - `docs/architecture/ARCHITECTURAL_PRINCIPLES.md` (snapshot / instantiate-vs-authoritative)

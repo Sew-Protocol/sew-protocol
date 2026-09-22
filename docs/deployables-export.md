@@ -60,12 +60,12 @@ only; no contracts are moved between repositories.
 | AaveYieldModule | sew | yield | Aave integration adapter |
 | DecentralizedResolutionModule | sew | resolution | decentralized resolution |
 | InsurancePoolVault | sew | resolution | insurance pool |
-| ResolverStakingModuleV1 | sew | resolution | staking |
-| ResolverSlashingModuleV1 | sew | resolution | slashing |
+| ResolverStakingModule | sew | resolution | staking |
+| ResolverSlashingModule | sew | resolution | slashing |
 | BondTokenRegistry | sew | resolution | bond registry |
 | DRMAdminFacet | sew | resolution | DRM admin facet |
-| ResolverIncentiveModuleV2 | sew | resolution | incentive module |
-| PaymentCalculationLibraryV1 | sew | library | deployed (public) library |
+| ResolverIncentiveModule | sew | resolution | incentive module |
+| PaymentCalculationLibrary | sew | library | deployed (public) library |
 
 A `scopeHint` of `shared` means the contract is **logically shared**
 (governance/infrastructure that may serve both PRF and SEW) even though its

@@ -320,8 +320,8 @@ if (escrowFeeBps > 200) {
 ### 3.2 Warning Locations
 
 **Unused Parameters** (Warning 5667):
-- `ResolverStakingModuleV1.sol`: Lines 599, 626, 666
-- `ResolverSlashingModuleV1.sol`: Lines 205, 294, 443-445
+- `ResolverStakingModule.sol`: Lines 599, 626, 666
+- `ResolverSlashingModule.sol`: Lines 205, 294, 443-445
 - Various test files
 
 **Unused Local Variables** (Warning 2072):
@@ -334,8 +334,8 @@ if (escrowFeeBps > 200) {
 **Action**: Fix unused parameters in production contracts
 
 **Priority Contracts**:
-1. `ResolverStakingModuleV1.sol` - 3 unused parameters
-2. `ResolverSlashingModuleV1.sol` - 5 unused parameters
+1. `ResolverStakingModule.sol` - 3 unused parameters
+2. `ResolverSlashingModule.sol` - 5 unused parameters
 
 **Fix Options**:
 
@@ -501,8 +501,8 @@ ESCROWABLE_TOKEN_SYMBOL="TEST"
    - Verify fee is passed correctly
 
 2. **Fix Compile Warnings** (Production Contracts)
-   - Fix unused parameters in ResolverStakingModuleV1
-   - Fix unused parameters in ResolverSlashingModuleV1
+   - Fix unused parameters in ResolverStakingModule
+   - Fix unused parameters in ResolverSlashingModule
 
 3. **Add Role Transfer** (All Deployment Scripts)
    - Transfer deployer roles to TimelockController
@@ -700,9 +700,9 @@ if (escrowFeeBps > 200) {
 
 ## Appendix B: Compile Warning Fixes
 
-### Fix 1: ResolverStakingModuleV1
+### Fix 1: ResolverStakingModule
 
-**File**: `contracts/decentralized-resolution-module/ResolverStakingModuleV1.sol`
+**File**: `contracts/decentralized-resolution-module/ResolverStakingModule.sol`
 
 **Line 599**:
 ```solidity
@@ -715,9 +715,9 @@ function someFunction(uint256 /* stakeRequired */) external {
 
 **Apply same pattern to lines 626 and 666**
 
-### Fix 2: ResolverSlashingModuleV1
+### Fix 2: ResolverSlashingModule
 
-**File**: `contracts/decentralized-resolution-module/ResolverSlashingModuleV1.sol`
+**File**: `contracts/decentralized-resolution-module/ResolverSlashingModule.sol`
 
 **Apply same pattern to lines 205, 294, 443-445**
 

@@ -918,7 +918,7 @@ try IERC20(token).safeTransfer(recipient, share) {
 
 **Current State:** Direct transfer via incentive module
 
-**Location:** `ResolverIncentiveModuleV2.distributeAppealBond()`
+**Location:** `ResolverIncentiveModule.distributeAppealBond()`
 
 **Current Code:**
 ```solidity
@@ -938,7 +938,7 @@ emit AppealBondRefunded(workflowId, round, bond.depositor, bond.amount, bond.tok
 
 **Proposed Enhancement (Optional):**
 ```solidity
-// In ResolverIncentiveModuleV2
+// In ResolverIncentiveModule
 try IERC20(bond.token).safeTransfer(bond.depositor, bond.amount) {
     emit AppealBondRefunded(workflowId, round, bond.depositor, bond.amount, bond.token);
 } catch {
@@ -956,7 +956,7 @@ try IERC20(bond.token).safeTransfer(bond.depositor, bond.amount) {
 
 **Current State:** Direct transfer to resolvers
 
-**Location:** `ResolverIncentiveModuleV2.distributeAppealBond()` (outcome flipped path)
+**Location:** `ResolverIncentiveModule.distributeAppealBond()` (outcome flipped path)
 
 **Current Code:**
 ```solidity
@@ -1007,7 +1007,7 @@ IERC20(token).safeTransfer(escrowFeeAddress, feeAmount);
 
 **Current State:** Handled by incentive module, varies by module implementation
 
-**Location:** `ResolverIncentiveModuleV1.distributeFees()` or similar
+**Location:** `ResolverIncentiveModule.distributeFees()` or similar
 
 **Analysis:**
 - ⚠️ **Module-specific** - Each incentive module implements differently

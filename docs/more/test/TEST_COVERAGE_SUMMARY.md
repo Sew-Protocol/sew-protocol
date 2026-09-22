@@ -51,7 +51,7 @@
 - ✅ Module snapshot semantics tested
 - ✅ Slow lane queue/activate pattern tested
 - ✅ IEO → DR v1 → DR v2 swap path tested (`ModuleSwapPath.test.t.sol`)
-- ✅ ResolverIncentiveModuleV1 → V2 swap tested (`ModuleSwapPath.test.t.sol`)
+- ✅ ResolverIncentiveModule → V2 swap tested (`ModuleSwapPath.test.t.sol`)
 
 ### 3. DR v1 Tests
 
@@ -328,9 +328,9 @@ max_test_rejects = 65536
 **Key Documents:**
 - ✅ `TESTING.md` - Testing guide exists
 - ✅ `ESCALATION_DEPTH_HISTOGRAM_REVIEW.md` - Test strategy documented
-- ✅ `DR_V1_IMPLEMENTATION_SUMMARY.md` - DR v1 status
-- ✅ `DR_V2_IMPLEMENTATION_SUMMARY.md` - DR v2 status
-- ✅ `STAGED_ROLLOUT_PROGRESS.md` - Progress tracking
+- ✅ `docs/archived/DR_V1_IMPLEMENTATION_SUMMARY.md` - DR v1 status
+- ✅ `docs/archived/DR_V2_IMPLEMENTATION_SUMMARY.md` - DR v2 status
+- ✅ `docs/archived/STAGED_ROLLOUT_PROGRESS.md` - Progress tracking
 
 ---
 

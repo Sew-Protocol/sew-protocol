@@ -30,7 +30,7 @@ Capital at risk creates adversarial pressure. We only introduced this after v1 (
 ### Phase 2: Real Staking ✅
 
 - `BondValuationLibrary.sol` (420 lines)
-- `ResolverStakingModuleV1.sol` (850 lines)
+- `ResolverStakingModule.sol` (850 lines)
 - Mixed stable/SEW bonds (80/20 rule)
 - Oracle-free conservative valuation
 - Delegation coverage (M=3, U=0.5)
@@ -39,7 +39,7 @@ Capital at risk creates adversarial pressure. We only introduced this after v1 (
 
 ### Phase 3: Real Slashing ✅
 
-- `ResolverSlashingModuleV1.sol` (450 lines)
+- `ResolverSlashingModule.sol` (450 lines)
 - Objective triggers (timeouts only)
 - Conservative penalties (2%, 5%, 10%)
 - Waterfall ordering (resolver → senior)
@@ -56,14 +56,14 @@ Capital at risk creates adversarial pressure. We only introduced this after v1 (
 ```
 DecentralizedResolutionModule (stable core)
 ├─ IncentiveModule (v1/v2)
-│  ├─ ResolverIncentiveModuleV1 (workload routing)
-│  └─ ResolverIncentiveModuleV2 (appeal bonds)
+│  ├─ ResolverIncentiveModule (workload routing)
+│  └─ ResolverIncentiveModule (appeal bonds)
 ├─ StakingModule (v3)
 │  ├─ StakingModuleNoOp (testing)
-│  └─ ResolverStakingModuleV1 (production) ✅
+│  └─ ResolverStakingModule (production) ✅
 └─ SlashingModule (v3)
    ├─ SlashingModuleNoOp (testing)
-   └─ ResolverSlashingModuleV1 (production) ✅
+   └─ ResolverSlashingModule (production) ✅
 ```
 
 ### Data Flow
@@ -296,8 +296,8 @@ Senior: 30K bond → provides 15K coverage
 ### Contracts (3 files, 1,720 lines)
 
 - `BondValuationLibrary.sol` (420 lines)
-- `ResolverStakingModuleV1.sol` (850 lines)
-- `ResolverSlashingModuleV1.sol` (450 lines)
+- `ResolverStakingModule.sol` (850 lines)
+- `ResolverSlashingModule.sol` (450 lines)
 
 ### Tests (3 files, 1,980 lines)
 
@@ -308,8 +308,8 @@ Senior: 30K bond → provides 15K coverage
 ### Documentation (3 files)
 
 - `BOND_VALUATION_SUMMARY.md`
-- `DR_V3_PHASE2_SUMMARY.md`
-- `DR_V3_PHASE3_SUMMARY.md`
+- `docs/archived/DR_V3_PHASE2_SUMMARY.md`
+- `docs/archived/DR_V3_PHASE3_SUMMARY.md`
 - `DR_V3_COMPLETE_SUMMARY.md` (this file)
 
 ---
@@ -320,7 +320,7 @@ Senior: 30K bond → provides 15K coverage
 
 **High Priority:**
 
-1. Add `slash()` function to `ResolverStakingModuleV1`
+1. Add `slash()` function to `ResolverStakingModule`
 2. Add `slashCoverage()` for senior slashing
 3. Add freeze check to `requestUnstake()`
 4. Update bond values after slash

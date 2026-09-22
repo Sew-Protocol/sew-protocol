@@ -30,10 +30,10 @@ This plan outlines the extraction of `DecentralizedResolutionModule` and its dep
    - Tightly coupled with DecentralizedResolutionModule
    - Location: `contracts/modules/ResolverIncentiveModule.sol`
 
-3. **`PaymentCalculationLibraryV1.sol`**
+3. **`PaymentCalculationLibrary.sol`**
    - Payment calculation library used by ResolverIncentiveModule
    - Swappable library pattern
-   - Location: `contracts/modules/PaymentCalculationLibraryV1.sol`
+   - Location: `contracts/modules/PaymentCalculationLibrary.sol`
 
 ### Interfaces (Move to New Repo)
 
@@ -65,7 +65,7 @@ This plan outlines the extraction of `DecentralizedResolutionModule` and its dep
 
 1. ✅ **Delete:** `contracts/modules/DecentralizedResolutionModule.sol`
 2. ✅ **Delete:** `contracts/modules/ResolverIncentiveModule.sol`
-3. ✅ **Delete:** `contracts/modules/PaymentCalculationLibraryV1.sol`
+3. ✅ **Delete:** `contracts/modules/PaymentCalculationLibrary.sol`
 4. ✅ **Delete:** `contracts/interfaces/IPaymentCalculationLibrary.sol`
 5. ✅ **Delete:** `contracts/governance/SlowLaneQueueActivateUpgradeable.sol`
 
@@ -255,7 +255,7 @@ decentralized-resolution-module/
 ├── contracts/
 │   ├── DecentralizedResolutionModule.sol
 │   ├── ResolverIncentiveModule.sol
-│   ├── PaymentCalculationLibraryV1.sol
+│   ├── PaymentCalculationLibrary.sol
 │   ├── interfaces/
 │   │   ├── IResolutionModule.sol (copied from main repo)
 │   │   └── IPaymentCalculationLibrary.sol
@@ -297,7 +297,7 @@ decentralized-resolution-module/
 4. **Move core contracts**
    - Move DecentralizedResolutionModule.sol
    - Move ResolverIncentiveModule.sol
-   - Move PaymentCalculationLibraryV1.sol
+   - Move PaymentCalculationLibrary.sol
    - Move IPaymentCalculationLibrary.sol
    - Move SlowLaneQueueActivateUpgradeable.sol
 
@@ -366,7 +366,7 @@ decentralized-resolution-module/
 | ----------------------------------------------------------- | ----- | ------ | ------------------------------------------ |
 | `contracts/modules/DecentralizedResolutionModule.sol`       | ~1963 | Delete | Main module                                |
 | `contracts/modules/ResolverIncentiveModule.sol`             | ~729  | Delete | Coupled with DecentralizedResolutionModule |
-| `contracts/modules/PaymentCalculationLibraryV1.sol`         | TBD   | Delete | Used by ResolverIncentiveModule            |
+| `contracts/modules/PaymentCalculationLibrary.sol`         | TBD   | Delete | Used by ResolverIncentiveModule            |
 | `contracts/interfaces/IPaymentCalculationLibrary.sol`       | TBD   | Delete | Interface for payment library              |
 | `contracts/governance/SlowLaneQueueActivateUpgradeable.sol` | 163   | Delete | Only used by extracted modules             |
 
@@ -553,7 +553,7 @@ The main repo contracts use this interface to interact with resolution modules. 
 
 - ✅ `DecentralizedResolutionModule`
 - ✅ `ResolverIncentiveModule`
-- ✅ `PaymentCalculationLibraryV1`
+- ✅ `PaymentCalculationLibrary`
 - ✅ `IResolutionModule` (copied)
 - ✅ `IPaymentCalculationLibrary`
 - ✅ `SlowLaneQueueActivateUpgradeable`

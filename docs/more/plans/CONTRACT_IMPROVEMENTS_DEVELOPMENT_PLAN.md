@@ -238,7 +238,7 @@ This development plan implements all improvements from the Contract Improvements
 **Files**:
 
 - `contracts/modules/ResolverIncentiveModule.sol`
-- `contracts/modules/PaymentCalculationLibraryV1.sol`
+- `contracts/modules/PaymentCalculationLibrary.sol`
 
 **Changes**:
 
@@ -446,7 +446,7 @@ This development plan implements all improvements from the Contract Improvements
 
 - `contracts/modules/DecentralizedResolutionModule.sol`
 - `contracts/modules/ResolverIncentiveModule.sol`
-- `contracts/modules/PaymentCalculationLibraryV1.sol`
+- `contracts/modules/PaymentCalculationLibrary.sol`
 
 **Changes**:
 
@@ -495,7 +495,7 @@ This development plan implements all improvements from the Contract Improvements
 
 ### Task 3.4: Payment Calculation Improvements
 
-**Files**: `contracts/modules/PaymentCalculationLibraryV1.sol`
+**Files**: `contracts/modules/PaymentCalculationLibrary.sol`
 
 **Changes**:
 

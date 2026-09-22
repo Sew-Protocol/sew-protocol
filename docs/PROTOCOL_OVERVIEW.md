@@ -56,9 +56,7 @@ anyone, including governance.
 │                                                            │       │
 │   DefaultResolutionModule (IEO)                            │       │
 │   DecentralizedResolutionModule (DR v1/v2/v3)              │       │
-│     └─ ResolverIncentiveModuleV1  (DR v1)                  │       │
-│     └─ ResolverIncentiveModuleV2  (DR v2)                  │       │
-│     └─ ResolverIncentiveModuleV3  (DR v3) ✅               │       │
+│     └─ ResolverIncentiveModule  (merged DR v1/v2)          │       │
 │     └─ KlerosArbitrableProxy      (L2 final escalation)    │       │
 │                                                             │       │
 │   AaveYieldModule (adapter; distribution handled by escrow core)  │

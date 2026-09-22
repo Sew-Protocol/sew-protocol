@@ -244,10 +244,10 @@ contracts/
     DefaultResolutionModule.sol
   
   decentralized-resolution-module/
-    ResolverIncentiveModuleV1.sol
-    ResolverIncentiveModuleV2.sol
-    ResolverSlashingModuleV1.sol
-    ResolverStakingModuleV1.sol
+    ResolverIncentiveModule.sol
+    ResolverIncentiveModule.sol
+    ResolverSlashingModule.sol
+    ResolverStakingModule.sol
     StakingModuleNoOp.sol
     SlashingModuleNoOp.sol
     DecentralizedResolutionModule.sol
@@ -278,10 +278,10 @@ contracts/
   
   decentralized-resolution-module/  # DR-specific modules
     DecentralizedResolutionModule.sol
-    ResolverIncentiveModuleV1.sol
-    ResolverIncentiveModuleV2.sol
-    ResolverSlashingModuleV1.sol
-    ResolverStakingModuleV1.sol
+    ResolverIncentiveModule.sol
+    ResolverIncentiveModule.sol
+    ResolverSlashingModule.sol
+    ResolverStakingModule.sol
     StakingModuleNoOp.sol
     SlashingModuleNoOp.sol
   
@@ -339,10 +339,10 @@ contracts/
     resolution/
       DefaultResolutionModule.sol
       DecentralizedResolutionModule.sol
-      ResolverIncentiveModuleV1.sol
-      ResolverIncentiveModuleV2.sol
-      ResolverSlashingModuleV1.sol
-      ResolverStakingModuleV1.sol
+      ResolverIncentiveModule.sol
+      ResolverIncentiveModule.sol
+      ResolverSlashingModule.sol
+      ResolverStakingModule.sol
     
     evidence/
       EvidenceModuleV1.sol
@@ -384,7 +384,7 @@ contracts/
   
   decentralized-resolution-module/  # DR modules stay here
     DecentralizedResolutionModule.sol
-    ResolverIncentiveModuleV1.sol
+    ResolverIncentiveModule.sol
     ...
   
   evidence-module/           # Evidence modules stay here

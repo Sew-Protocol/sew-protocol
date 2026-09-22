@@ -42,18 +42,18 @@ contracts/
 │   │   └── DecentralizedResolutionModule.sol → symlink to ../decentralized-resolution-module/
 │   │
 │   ├── dr2/                       # DR v2: Decentralize Incentives - IMPLEMENTED, NOT ACTIVATED
-│   │   └── ResolverIncentiveModuleV2.sol → symlink to ../decentralized-resolution-module/
+│   │   └── ResolverIncentiveModule.sol → symlink to ../decentralized-resolution-module/
 │   │
 │   └── dr3/                       # DR v3: Decentralize Capital - IMPLEMENTED, NOT ACTIVATED
-│       ├── ResolverStakingModuleV1.sol → symlink to ../decentralized-resolution-module/
-│       └── ResolverSlashingModuleV1.sol → symlink to ../decentralized-resolution-module/
+│       ├── ResolverStakingModule.sol → symlink to ../decentralized-resolution-module/
+│       └── ResolverSlashingModule.sol → symlink to ../decentralized-resolution-module/
 │
 ├── decentralized-resolution-module/  # DR module package (source of truth)
 │   ├── DecentralizedResolutionModule.sol
-│   ├── ResolverIncentiveModuleV1.sol
-│   ├── ResolverIncentiveModuleV2.sol
-│   ├── ResolverStakingModuleV1.sol
-│   ├── ResolverSlashingModuleV1.sol
+│   ├── ResolverIncentiveModule.sol
+│   ├── ResolverIncentiveModule.sol
+│   ├── ResolverStakingModule.sol
+│   ├── ResolverSlashingModule.sol
 │   └── [supporting contracts]
 │
 ├── shared/                        # Shared contracts (all releases)
@@ -147,7 +147,7 @@ contracts/
 │   ├── dr1/
 │   │   └── DecentralizedResolutionModule.sol
 │   └── dr2/
-│       └── ResolverIncentiveModuleV2.sol
+│       └── ResolverIncentiveModule.sol
 │
 └── decentralized-resolution-module/  # DR module package
     └── [all DR contracts]

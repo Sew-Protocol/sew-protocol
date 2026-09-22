@@ -132,18 +132,14 @@
 - **Description**: Main DR module orchestrating decentralized dispute resolution.
 - **Versions**: Supports DR v1 (workload routing), DR v2 (appeal bonds), DR v3 (staking - future)
 
-#### ResolverIncentiveModuleV1
+#### ResolverIncentiveModule
 - **Type**: ✅ Singleton
-- **Description**: DR v1 incentive module with performance-based workload routing (no appeal bonds).
-
-#### ResolverIncentiveModuleV2
-- **Type**: ✅ Singleton
-- **Description**: DR v2 incentive module with appeal bonds and escalation cost curves.
+- **Description**: Merged DR incentive module (v1 + v2): performance-based workload routing plus appeal bonds and escalation cost curves.
 
 #### Additional DR Contracts
-- ResolverStakingModuleV1 (DR v3 - future)
-- ResolverSlashingModuleV1 (DR v3 - future)
-- PaymentCalculationLibraryV1
+- ResolverStakingModule
+- ResolverSlashingModule
+- PaymentCalculationLibrary
 - BondValuationLibrary
 - EscalationCostLibrary
 - InsurancePoolVault

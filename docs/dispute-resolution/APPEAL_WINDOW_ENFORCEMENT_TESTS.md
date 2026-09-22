@@ -266,7 +266,7 @@ The test suite uses:
 
 - **EscrowVault**: Main escrow contract
 - **DecentralizedResolutionModule**: Resolution module with appeal windows
-- **ResolverIncentiveModuleV2**: Incentive module for bond handling
+- **ResolverIncentiveModule**: Incentive module for bond handling
 - **ERC20Mock**: Test token
 
 **Setup Steps**:

@@ -56,7 +56,7 @@ In DR v3 staking design, resolver bonds are intended to be a **mix of stablecoin
 - SEW portion is haircut by **50%** when computing effective bond value (conservative risk treatment).
 - SEW is valued at a **fixed $1 assumption** for bond calculations (oracle-free, conservative; not market-priced).
 
-**Implementation reference:** `contracts/decentralized-resolution-module/ResolverStakingModuleV1.sol`
+**Implementation reference:** `contracts/decentralized-resolution-module/ResolverStakingModule.sol`
 
 **Implications for SEW tokenomics:**
 - Creates potential **structural demand** for SEW by resolvers (to satisfy bond composition up to the cap).
@@ -70,8 +70,8 @@ Slashing can slash both the stablecoin and SEW components of resolver bonds (as 
 - When SEW is slashed from resolver/senior bonds, it is treated as **burned** (deflationary sink), not retained as protocol revenue.
 
 **Implementation references:**
-- `contracts/decentralized-resolution-module/ResolverStakingModuleV1.sol` (slashes transfer both stable + SEW to slashing module)
-- `contracts/decentralized-resolution-module/ResolverSlashingModuleV1.sol`
+- `contracts/decentralized-resolution-module/ResolverStakingModule.sol` (slashes transfer both stable + SEW to slashing module)
+- `contracts/decentralized-resolution-module/ResolverSlashingModule.sol`
 - `contracts/decentralized-resolution-module/InsurancePoolVault.sol` (stable-token insurance pool)
 
 ---
@@ -247,13 +247,13 @@ Deployment config defaults the token symbol to `$EW`, while this document intend
 The protocol supports an appeal bond protocol fee parameter (`appealBondProtocolFeeBps`) but it defaults to **0% at launch**. When set to 0, bonds are refunded/distributed in full; when >0, the protocol fee is deducted when the bond is posted.
 
 ### 9.4 SEW pricing in staking math: docs vs code
-The bond valuation documentation describes a `sewPrice` input. In `ResolverStakingModuleV1`, SEW is valued using a constant `$1` assumption (oracle-free). This must be clearly labeled in any published economic description.
+The bond valuation documentation describes a `sewPrice` input. In `ResolverStakingModule`, SEW is valued using a constant `$1` assumption (oracle-free). This must be clearly labeled in any published economic description.
 
 ### 9.5 Slashing appeal bond is recorded but not collected
-`ResolverSlashingModuleV1.appealSlash()` records an `appealBond` amount but does not transfer/escrow any funds for the appeal. If appeals are meant to be anti-spam bonded, this is a gap to resolve or explicitly disclose.
+`ResolverSlashingModule.appealSlash()` records an `appealBond` amount but does not transfer/escrow any funds for the appeal. If appeals are meant to be anti-spam bonded, this is a gap to resolve or explicitly disclose.
 
 ### 9.6 Slashed SEW handling is unclear
-`ResolverStakingModuleV1` transfers slashed SEW to the slashing module, but `ResolverSlashingModuleV1` distributes only the stable-token component. Decide and document whether slashed SEW is:
+`ResolverStakingModule` transfers slashed SEW to the slashing module, but `ResolverSlashingModule` distributes only the stable-token component. Decide and document whether slashed SEW is:
 - intentionally retained/locked (a sink), or
 - intended to be routed to treasury/insurance/counterparty and needs implementation.
 

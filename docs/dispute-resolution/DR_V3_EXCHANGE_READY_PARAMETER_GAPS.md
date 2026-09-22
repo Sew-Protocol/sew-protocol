@@ -143,9 +143,9 @@ Unless there is a deployed/activated rewards mechanism.
 ---
 
 ## D) Where a reviewer can verify each claim (optional appendix)
-- Mixed bond enforcement + haircut + minimums + capacity gating: `contracts/decentralized-resolution-module/ResolverStakingModuleV1.sol`
+- Mixed bond enforcement + haircut + minimums + capacity gating: `contracts/decentralized-resolution-module/ResolverStakingModule.sol`
 - Bond valuation math: `contracts/decentralized-resolution-module/BondValuationLibrary.sol`
 - Deadlines/windows: `contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol`
-- Slashing penalties/caps/freezes + SEW burn handling: `contracts/decentralized-resolution-module/ResolverSlashingModuleV1.sol`
+- Slashing penalties/caps/freezes + SEW burn handling: `contracts/decentralized-resolution-module/ResolverSlashingModule.sol`
 - Fee params (`yieldProtocolFeeBps`, `appealBondProtocolFeeBps`): `contracts/core/BaseEscrow.sol`, `contracts/YieldOps.sol`
 

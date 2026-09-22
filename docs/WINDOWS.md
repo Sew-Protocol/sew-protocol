@@ -11,7 +11,7 @@
 > `contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol`,
 > `contracts/modules/decentralized-resolution-module/DRMStorageBase.sol`,
 > `contracts/modules/decentralized-resolution-module/DRMAdminFacet.sol`,
-> `contracts/modules/decentralized-resolution-module/ResolverSlashingModuleV1.sol`,
+> `contracts/modules/decentralized-resolution-module/ResolverSlashingModule.sol`,
 > `contracts/modules/decentralized-resolution-module/InsurancePoolVault.sol`.
 
 ---
@@ -241,7 +241,7 @@ if (block.timestamp < dm.resolveBy) revert DisputeNotTimedOut(workflowId, dm.res
 This triggers the DRM-level resolution timeout, which in turn calls back into
 `BaseEscrow.resolveDisputeByTimeout`.
 
-**Missed resolve penalty:** `ResolverSlashingModuleV1` tracks missed resolution
+**Missed resolve penalty:** `ResolverSlashingModule` tracks missed resolution
 deadlines. A `TIMEOUT_RESOLVE` slash is proposed if a resolver fails to submit
 within `resolveBy`. The slash is 200 bps (2%) of the resolver's stake by default.
 

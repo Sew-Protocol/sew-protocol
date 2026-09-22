@@ -17,7 +17,7 @@ DR v2 adds economic incentives to dispute resolution by introducing:
 - **Bond payment** to resolvers on failed appeal (decision upheld)
 - **Anti-griefing measures** (minimum escrow value for escalation)
 
-**Key Change:** Swaps `ResolverIncentiveModuleV1` for `ResolverIncentiveModuleV2` via Slow lane governance.
+**Key Change:** Swaps `ResolverIncentiveModule` for `ResolverIncentiveModule` via Slow lane governance.
 
 ---
 
@@ -35,7 +35,7 @@ DR v2 adds economic incentives to dispute resolution by introducing:
 
 ### DR v2 Readiness
 
-- [ ] `ResolverIncentiveModuleV2` deployed (or deployment script ready)
+- [ ] `ResolverIncentiveModule` deployed (or deployment script ready)
 - [ ] Escalation cost curve parameters decided
 - [ ] Minimum escrow value for escalation decided
 - [ ] All DR v2 tests passing
@@ -54,7 +54,7 @@ DR v2 adds economic incentives to dispute resolution by introducing:
 ### Step 1: Deploy DR v2 Contracts
 
 ```bash
-# Deploy ResolverIncentiveModuleV2
+# Deploy ResolverIncentiveModule
 pnpm hardhat deploy --network baseSepolia --tags dr-v2
 
 # Verify deployments
@@ -62,8 +62,8 @@ pnpm hardhat export --network baseSepolia
 ```
 
 **Expected Output:**
-- `ResolverIncentiveModuleV2` (immutable)
-- `PaymentCalculationLibraryV1` (if not already deployed)
+- `ResolverIncentiveModule` (immutable)
+- `PaymentCalculationLibrary` (if not already deployed)
 - `EscalationCostLibrary` (enhanced version)
 
 ### Step 2: Configure DR v2 Module
@@ -91,7 +91,7 @@ pnpm hardhat export --network baseSepolia
 ### Step 3: Update DecentralizedResolutionModule
 
 ```bash
-# Update DR module to use ResolverIncentiveModuleV2
+# Update DR module to use ResolverIncentiveModule
 # Via governance proposal (if module supports swapping incentive modules)
 ```
 
@@ -218,7 +218,7 @@ If critical issues are discovered:
    pnpm gov:emergency pause --contract EscrowVault --network baseSepolia
    ```
 
-2. **Swap Back to ResolverIncentiveModuleV1** (if needed):
+2. **Swap Back to ResolverIncentiveModule** (if needed):
    - Queue swap back to V1 (Slow lane)
    - Wait 7 days
    - Activate swap

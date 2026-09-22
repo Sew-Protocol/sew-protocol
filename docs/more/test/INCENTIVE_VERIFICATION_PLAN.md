@@ -18,12 +18,12 @@
   - Single resolver, level 0 (1x weight)
   - Multiple resolvers, mixed levels (1x, 1.5x, 2x weights)
   - Edge cases: 0 fees, 100% resolver share, minimum amounts
-- [ ] Compare against `PaymentCalculationLibraryV1.calculatePayment()`
+- [ ] Compare against `PaymentCalculationLibrary.calculatePayment()`
 - [ ] Document any discrepancies
 - [ ] Create unit tests with pre-calculated expected values
 
 **Files to verify:**
-- `contracts/decentralized-resolution-module/PaymentCalculationLibraryV1.sol`
+- `contracts/decentralized-resolution-module/PaymentCalculationLibrary.sol`
 - `docs/dispute-resolution/RESOLVER_ECONOMICS.md` (payment formulas)
 - Existing tests: `test/foundry/core/ResolverIncentiveModuleComprehensive.t.sol`
 
@@ -62,7 +62,7 @@
 - [ ] Rounding when splitting bond across multiple resolvers
 
 **Files to verify:**
-- `contracts/decentralized-resolution-module/ResolverIncentiveModuleV2.sol`:
+- `contracts/decentralized-resolution-module/ResolverIncentiveModule.sol`:
   - `distributeAppealBond()` (lines ~180-210)
   - `_refundBond()` (lines ~217-236)
   - `_payBondToResolvers()` (lines ~246-310)
@@ -103,8 +103,8 @@
 - [ ] Verify `resolverSharePercentage` cannot exceed 10000
 
 **Files to verify:**
-- `contracts/decentralized-resolution-module/ResolverIncentiveModuleV1.sol`
-- `PaymentCalculationLibraryV1.sol`
+- `contracts/decentralized-resolution-module/ResolverIncentiveModule.sol`
+- `PaymentCalculationLibrary.sol`
 
 **Deliverable:** Edge case tests
 

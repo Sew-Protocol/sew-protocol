@@ -102,8 +102,8 @@ These contracts already use the correct governance pattern:
 
 - **BaseEscrow.sol**: Uses `ROLE_GUARDIAN` for pause, `ROLE_TIMELOCK` for unpause
 - **DecentralizedResolutionModule.sol**: Uses `ROLE_TIMELOCK` for all operations
-- **ResolverIncentiveModuleV1.sol**: Uses `ROLE_TIMELOCK` for all operations
-- **ResolverStakingModuleV1.sol**: Uses `ROLE_TIMELOCK` for all operations
+- **ResolverIncentiveModule.sol**: Uses `ROLE_TIMELOCK` for all operations
+- **ResolverStakingModule.sol**: Uses `ROLE_TIMELOCK` for all operations
 - **KlerosArbitrableProxy.sol**: Uses `ROLE_TIMELOCK` for registration
 
 ---

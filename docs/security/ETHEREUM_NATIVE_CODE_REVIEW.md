@@ -239,12 +239,12 @@ uint256 minimumAmount = originalDeposit * (10000 - WITHDRAWAL_SLIPPAGE_TOLERANCE
 
 ### 7. Payment Calculation as Contracts Instead of Libraries
 
-**Location:** `PaymentCalculationLibraryV1.sol` (implemented as contract, not library)
+**Location:** `PaymentCalculationLibrary.sol` (implemented as contract, not library)
 
 **Issue:**
 ```solidity
 // Interface says "library" but implementation is contract
-contract PaymentCalculationLibraryV1 is IPaymentCalculationLibrary {
+contract PaymentCalculationLibrary is IPaymentCalculationLibrary {
     function calculatePayments(...) external pure override returns (...) {
         // Pure function in a contract
     }
@@ -259,7 +259,7 @@ contract PaymentCalculationLibraryV1 is IPaymentCalculationLibrary {
 
 **Standard Ethereum Pattern:**
 ```solidity
-library PaymentCalculationLibraryV1 {
+library PaymentCalculationLibrary {
     function calculatePayments(...) internal pure returns (...) {
         // Implementation
     }
@@ -448,7 +448,7 @@ interface IPoolAddressesProvider {
 
 ### 🟡 MEDIUM (Nice to Have)
 6. **Clarify library vs contract pattern**
-   - Document why `PaymentCalculationLibraryV1` is a contract
+   - Document why `PaymentCalculationLibrary` is a contract
    - Or convert to library if upgradeability isn't needed
 
 7. **Optimize nested mappings**

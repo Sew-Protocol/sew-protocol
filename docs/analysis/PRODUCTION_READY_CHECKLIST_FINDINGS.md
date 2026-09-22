@@ -46,10 +46,10 @@
 **H-5: Contract locks Ether without a withdraw function**
 - **Locations:**
   - `contracts/arbitration/mocks/MockKlerosArbitrator.sol`
-  - `contracts/decentralized-resolution-module/ResolverIncentiveModuleV1.sol`
+  - `contracts/decentralized-resolution-module/ResolverIncentiveModule.sol`
 - **Severity:** HIGH
 - **Status:** ✅ **REVIEWED & ACCEPTABLE**
-- **Justification:** Informational issue. The production contract `ResolverIncentiveModuleV1` does not have any `receive()` or `fallback()` functions, and its only `payable` function reverts. ETH can only enter via `selfdestruct`. This is a common informational finding in automated tools.
+- **Justification:** Informational issue. The production contract `ResolverIncentiveModule` does not have any `receive()` or `fallback()` functions, and its only `payable` function reverts. ETH can only enter via `selfdestruct`. This is a common informational finding in automated tools.
 
 **H-6: Incorrect ERC20 interface**
 - **Location:** `contracts/mocks/MockNonStandardERC20.sol`
@@ -286,7 +286,7 @@
    - **Status:** ✅ REVIEWED (Acceptable for v1)
    - **Priority:** LOW (Post-launch improvement)
 
-2. **H-5: ETH Locked in ResolverIncentiveModuleV1**
+2. **H-5: ETH Locked in ResolverIncentiveModule**
    - **Status:** ✅ REVIEWED (Acceptable, informational only)
    - **Priority:** LOW
 

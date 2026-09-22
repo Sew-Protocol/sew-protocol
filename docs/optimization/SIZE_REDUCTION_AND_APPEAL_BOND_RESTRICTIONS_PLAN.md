@@ -50,7 +50,7 @@
    - Check: `require(approvedBondTokens[bondToken], 'BondTokenNotWhitelisted')`
 
 4. **Single payout token per dispute**:
-   - Already enforced via `_requirePayoutToken()` in `ResolverIncentiveModuleV2`
+   - Already enforced via `_requirePayoutToken()` in `ResolverIncentiveModule`
 
 ### 3. Timing + State Restrictions
 

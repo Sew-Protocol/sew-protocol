@@ -57,8 +57,8 @@ contracts/
   │   │   └── DefaultReleaseStrategy.sol      (singleton)
   │   └── decentralized-resolution/  ← MOVE FROM ROOT
   │       ├── DecentralizedResolutionModule.sol
-  │       ├── ResolverIncentiveModuleV1.sol
-  │       ├── ResolverStakingModuleV1.sol
+  │       ├── ResolverIncentiveModule.sol
+  │       ├── ResolverStakingModule.sol
   │       └── ...
   │
   ├── libraries/               ← EXISTING: No changes

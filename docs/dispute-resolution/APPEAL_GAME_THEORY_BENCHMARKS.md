@@ -18,7 +18,7 @@
 | `K` | MAX_ROUND | `DRMStorageBase.MAX_ROUND` = 2 |
 | `α` | EMA alpha | `emaAlphaBps / 10000` = 0.10 |
 | `R(r)` | Resolver `r` reversal rate | empirical |
-| `S(r)` | Resolver `r` staked bond (effective USD) | `ResolverStakingModuleV1.getEffectiveBond()` |
+| `S(r)` | Resolver `r` staked bond (effective USD) | `ResolverStakingModule.getEffectiveBond()` |
 | `T_r(k)` | Resolve deadline for round `k` | `resolveDeadlines[k]` = [24h, 48h, 7d] |
 | `T_a(k)` | Appeal window for round `k` | `appealWindows[k]` = [2d, 3d, 0] |
 
@@ -222,7 +222,7 @@ assert required_p_to_escalate(0.01, 0.01, 200, 2500, 1) <= 0.25
 
 ### BM-03: Bond Distribution Completeness
 
-**Inputs:** Smart contract state on any network where `ResolverIncentiveModuleV2` is deployed.  
+**Inputs:** Smart contract state on any network where `ResolverIncentiveModule` is deployed.  
 **Computation:** Query all disputes where `dm.status == Final`, check `hasAppealBond(id, escrow, round)` for each `round ∈ {1, 2}`. Count undistributed bonds.  
 **Pass criterion:** Zero disputes with `hasAppealBond == true` and `bond.distributed == false` and `dm.status == Final`.
 

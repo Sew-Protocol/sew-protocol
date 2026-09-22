@@ -18,7 +18,7 @@ DR v3 adds resolver capital at risk by introducing:
 - **Waterfall ordering** (resolver → senior)
 - **Circuit breakers** (mass unavailability)
 
-**Key Change:** Swaps `StakingModuleNoOp` and `SlashingModuleNoOp` for `ResolverStakingModuleV1` and `ResolverSlashingModuleV1` via Slow lane governance.
+**Key Change:** Swaps `StakingModuleNoOp` and `SlashingModuleNoOp` for `ResolverStakingModule` and `ResolverSlashingModule` via Slow lane governance.
 
 ---
 
@@ -37,8 +37,8 @@ DR v3 adds resolver capital at risk by introducing:
 
 ### DR v3 Readiness
 
-- [ ] `ResolverStakingModuleV1` deployed (or deployment script ready)
-- [ ] `ResolverSlashingModuleV1` deployed (or deployment script ready)
+- [ ] `ResolverStakingModule` deployed (or deployment script ready)
+- [ ] `ResolverSlashingModule` deployed (or deployment script ready)
 - [ ] `BondValuationLibrary` deployed (or deployment script ready)
 - [ ] `InsurancePoolVault` deployed (or deployment script ready)
 - [ ] Staking parameters decided:
@@ -74,8 +74,8 @@ pnpm hardhat export --network baseSepolia
 ```
 
 **Expected Output:**
-- `ResolverStakingModuleV1` (immutable)
-- `ResolverSlashingModuleV1` (immutable)
+- `ResolverStakingModule` (immutable)
+- `ResolverSlashingModule` (immutable)
 - `BondValuationLibrary` (immutable)
 - `InsurancePoolVault` (immutable)
 
@@ -106,7 +106,7 @@ pnpm hardhat export --network baseSepolia
 ### Step 3: Update DecentralizedResolutionModule
 
 ```bash
-# Update DR module to use ResolverStakingModuleV1 and ResolverSlashingModuleV1
+# Update DR module to use ResolverStakingModule and ResolverSlashingModule
 # Via governance proposal
 ```
 

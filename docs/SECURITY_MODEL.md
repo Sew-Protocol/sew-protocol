@@ -474,4 +474,4 @@ definition, and acknowledgement process.
 | **Contracts** | `sew-protocol` @ `62fce3a` |
 | **Simulation** | `sew-simulation` @ `5b33486` |
 | **Generated / reviewed** | 2026-05-21 |
-| **Verification status** | Manually checked against `BaseEscrow.sol` (reentrancy guards, SafeERC20, CEI patterns), role constants, `ResolverSlashingModuleV1.sol` (slashing/burn), and `SECURITY_FIXES_COMPLETED.md` (all CRIT/HIGH/MED resolved). Threat model cross-referenced against known attack surfaces. Simulation covers adversarial economic scenarios (Phase F/H/AI). Formal verification of all security properties not yet complete — needs follow-up. |
+| **Verification status** | Manually checked against `BaseEscrow.sol` (reentrancy guards, SafeERC20, CEI patterns), role constants, `ResolverSlashingModule.sol` (slashing/burn), and `SECURITY_FIXES_COMPLETED.md` (all CRIT/HIGH/MED resolved). Threat model cross-referenced against known attack surfaces. Simulation covers adversarial economic scenarios (Phase F/H/AI). Formal verification of all security properties not yet complete — needs follow-up. |

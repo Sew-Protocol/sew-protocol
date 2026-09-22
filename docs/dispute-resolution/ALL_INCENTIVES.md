@@ -12,7 +12,7 @@ The system has **three distinct incentive mechanisms** that operate independentl
 
 ---
 
-## 1. Fee-Based Payments (ResolverIncentiveModuleV1/V2)
+## 1. Fee-Based Payments (ResolverIncentiveModule/V2)
 
 ### Purpose
 Payment to resolvers for their work in resolving disputes.
@@ -31,13 +31,13 @@ Payment to resolvers for their work in resolving disputes.
 ### Distribution
 - Weighted by escalation level (level 0 = 1x, level 1 = 1.5x, level 2 = 2x)
 - Configurable resolver share percentage (governance-controlled)
-- Payments calculated via `PaymentCalculationLibraryV1`
+- Payments calculated via `PaymentCalculationLibrary`
 - Claimable via `claimPayment(workflowId, token)`
 
 ### Code References
-- `ResolverIncentiveModuleV1.sol` - V1 implementation
-- `ResolverIncentiveModuleV2.sol` - V2 adds appeal bonds
-- `PaymentCalculationLibraryV1.sol` - Payment calculation logic
+- `ResolverIncentiveModule.sol` - V1 implementation
+- `ResolverIncentiveModule.sol` - V2 adds appeal bonds
+- `PaymentCalculationLibrary.sol` - Payment calculation logic
 - `BaseEscrow.sol:749` - Records escrow fees with token
 
 ### Key Functions
@@ -50,7 +50,7 @@ Payment to resolvers for their work in resolving disputes.
 
 ---
 
-## 2. Staking Rewards (ResolverStakingModuleV1)
+## 2. Staking Rewards (ResolverStakingModule)
 
 ### Purpose
 Capital at risk mechanism - resolvers stake tokens to participate. This is **NOT a payment mechanism**, but rather a requirement for participation.
@@ -73,7 +73,7 @@ Capital at risk mechanism - resolvers stake tokens to participate. This is **NOT
 - Slashing can reduce staked amounts
 
 ### Code References
-- `ResolverStakingModuleV1.sol` - Staking implementation
+- `ResolverStakingModule.sol` - Staking implementation
 - `IStakingModule.sol` - Staking interface
 - `BondValuationLibrary.sol` - Bond valuation logic
 
@@ -86,7 +86,7 @@ Capital at risk mechanism - resolvers stake tokens to participate. This is **NOT
 
 ---
 
-## 3. Slashing Penalties (ResolverSlashingModuleV1)
+## 3. Slashing Penalties (ResolverSlashingModule)
 
 ### Purpose
 Penalties for poor performance or misconduct.
@@ -111,7 +111,7 @@ Penalties for poor performance or misconduct.
   - Protocol treasury (not implemented, stays in contract)
 
 ### Code References
-- `ResolverSlashingModuleV1.sol` - Slashing implementation
+- `ResolverSlashingModule.sol` - Slashing implementation
 - `ISlashingModule.sol` - Slashing interface
 - `InsurancePoolVault.sol` - Insurance pool for slashed funds
 
@@ -156,20 +156,20 @@ Penalties for poor performance or misconduct.
 ## Documentation References
 
 ### Fee-Based Payments
-- `docs/dispute-resolution/INCENTIVE_MODULE_REVIEW.md`
+- `docs/archived/INCENTIVE_MODULE_REVIEW.md`
 - `docs/dispute-resolution/RESOLVER_ECONOMICS.md`
 - `docs/test/INCENTIVE_MODULE_TEST_PLAN.md`
-- `docs/INCENTIVE_MODULE_V2_ISSUES.md`
+- `docs/archived/INCENTIVE_MODULE_V2_ISSUES.md`
 
 ### Staking
-- `docs/dispute-resolution/DR_V3_TODO.md`
+- `docs/archived/DR_V3_TODO.md`
 - `docs/dispute-resolution/RESOLVER_ECONOMICS.md`
-- `contracts/decentralized-resolution-module/ResolverStakingModuleV1.sol`
+- `contracts/decentralized-resolution-module/ResolverStakingModule.sol`
 
 ### Slashing
-- `docs/dispute-resolution/DR_V3_TODO.md`
+- `docs/archived/DR_V3_TODO.md`
 - `docs/dispute-resolution/RESOLVER_ECONOMICS.md`
-- `contracts/decentralized-resolution-module/ResolverSlashingModuleV1.sol`
+- `contracts/decentralized-resolution-module/ResolverSlashingModule.sol`
 
 ---
 
@@ -181,12 +181,12 @@ Penalties for poor performance or misconduct.
 - ✅ **Integration**: Complete in BaseEscrow
 
 ### Staking
-- ✅ **V1**: Complete (ResolverStakingModuleV1)
+- ✅ **V1**: Complete (ResolverStakingModule)
 - ✅ **Integration**: Complete in DecentralizedResolutionModule
 - ⚠️ **Delegation**: Implemented but not fully tested
 
 ### Slashing
-- ✅ **V1**: Mostly complete (ResolverSlashingModuleV1)
+- ✅ **V1**: Mostly complete (ResolverSlashingModule)
 - ⚠️ **Fraud Slashing**: Implemented but requires TIMELOCK
 - ❌ **Counter-party Compensation**: Not implemented (set to 0)
 - ❌ **Treasury Integration**: Not implemented (funds stay in contract)

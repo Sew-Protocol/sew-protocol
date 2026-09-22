@@ -5,7 +5,7 @@
 Four test files are currently disabled and need to be evaluated:
 
 1. `EscrowVaultComprehensive.t.sol.disabled` - Comprehensive EscrowVault tests
-2. `ResolverIncentiveModuleComprehensive.t.sol.disabled` - Comprehensive ResolverIncentiveModuleV1 tests
+2. `ResolverIncentiveModuleComprehensive.t.sol.disabled` - Comprehensive ResolverIncentiveModule tests
 3. `PaymentBoundsChecking.t.sol.disabled` - **UNIQUE** - Security tests for malicious payment library validation
 4. `EscalationFeeEnforcement.t.sol.disabled` - Escalation fee enforcement tests
 
@@ -29,8 +29,8 @@ Four test files are currently disabled and need to be evaluated:
 
 **What Needs Fixing**:
 
-1. Update deployment pattern: `ResolverIncentiveModuleV1` now uses constructor (not proxy)
-   - Change: `new ResolverIncentiveModuleV1()` → `new ResolverIncentiveModuleV1(owner, address(paymentLib))`
+1. Update deployment pattern: `ResolverIncentiveModule` now uses constructor (not proxy)
+   - Change: `new ResolverIncentiveModule()` → `new ResolverIncentiveModule(owner, address(paymentLib))`
    - Remove: `ERC1967Proxy` deployment and `initialize()` call
    - Remove: `@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol` import
 2. Function names are correct (verified):
@@ -83,8 +83,8 @@ Four test files are currently disabled and need to be evaluated:
 
 **What Needs Fixing**:
 
-1. Update deployment pattern: `ResolverIncentiveModuleV1` now uses constructor
-   - Change: `new ResolverIncentiveModuleV1()` → `new ResolverIncentiveModuleV1(owner, address(paymentLib))`
+1. Update deployment pattern: `ResolverIncentiveModule` now uses constructor
+   - Change: `new ResolverIncentiveModule()` → `new ResolverIncentiveModule(owner, address(paymentLib))`
    - Remove: `ERC1967Proxy` deployment and `initialize()` call
    - Remove: `@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol` import
 2. Update function names if changed:
@@ -138,7 +138,7 @@ Four test files are currently disabled and need to be evaluated:
 
    // KEEP:
    import 'forge-std/Test.sol';
-   import '../../../contracts/decentralized-resolution-module/ResolverIncentiveModuleV1.sol';
+   import '../../../contracts/decentralized-resolution-module/ResolverIncentiveModule.sol';
    // ... other imports
    ```
 
@@ -146,15 +146,15 @@ Four test files are currently disabled and need to be evaluated:
 
    ```solidity
    // BEFORE:
-   ResolverIncentiveModuleV1 implementation = new ResolverIncentiveModuleV1();
+   ResolverIncentiveModule implementation = new ResolverIncentiveModule();
    ERC1967Proxy proxy = new ERC1967Proxy(
        address(implementation),
-       abi.encodeCall(ResolverIncentiveModuleV1.initialize, (owner, address(paymentLib)))
+       abi.encodeCall(ResolverIncentiveModule.initialize, (owner, address(paymentLib)))
    );
-   incentiveModule = ResolverIncentiveModuleV1(address(proxy));
+   incentiveModule = ResolverIncentiveModule(address(proxy));
 
    // AFTER:
-   incentiveModule = new ResolverIncentiveModuleV1(owner, address(paymentLib));
+   incentiveModule = new ResolverIncentiveModule(owner, address(paymentLib));
    ```
 
 4. **Function names verified** (no changes needed):
@@ -211,7 +211,7 @@ Four test files are currently disabled and need to be evaluated:
 
 2. **If keeping, apply same fixes as PaymentBoundsChecking**:
    - Remove proxy deployment
-   - Use constructor: `new ResolverIncentiveModuleV1(owner, address(paymentLib))`
+   - Use constructor: `new ResolverIncentiveModule(owner, address(paymentLib))`
    - Function names are correct (both `arePaymentsCalculated()` and `arePaymentsDistributed()` exist)
    - Verify role constants
 

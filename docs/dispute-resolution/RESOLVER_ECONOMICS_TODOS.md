@@ -153,16 +153,16 @@ _(Derived from `RESOLVER_ECONOMICS_2026.md`)_
 - ✅ On appeal:
   - ✅ Bond amount calculated and collected/stored in BaseEscrow (via `escalateDispute`)
 
-  - ✅ `ResolverIncentiveModuleV2` integrated with `recordAppealBond`, `distributeAppealBond` (bond custody enforced)
+  - ✅ `ResolverIncentiveModule` integrated with `recordAppealBond`, `distributeAppealBond` (bond custody enforced)
 
 ---
 
 ### Bond payout rules
 
 - ⚠️ When round resolves:
-  - ⚠️ `ResolverIncentiveModuleV2` has `handleBondRefund` and `handleBondPayout` but not integrated
+  - ⚠️ `ResolverIncentiveModule` has `handleBondRefund` and `handleBondPayout` but not integrated
 
-  - ⚠️ Events exist: `AppealBondRefunded`, `AppealBondPaidToResolvers` (in ResolverIncentiveModuleV2)
+  - ⚠️ Events exist: `AppealBondRefunded`, `AppealBondPaidToResolvers` (in ResolverIncentiveModule)
 
 ---
 
@@ -183,13 +183,13 @@ _(Derived from `RESOLVER_ECONOMICS_2026.md`)_
 
 - ✅ `minEscrowValueForEscalation` exists (currently 0 by default).
 
-- ⚠️ Bond forfeiture logic exists in `ResolverIncentiveModuleV2.forfeitAppealBond` but not automatically integrated into escalation timeout flow (manual call possible).
+- ⚠️ Bond forfeiture logic exists in `ResolverIncentiveModule.forfeitAppealBond` but not automatically integrated into escalation timeout flow (manual call possible).
 
 ---
 
 ### Reporting & observability
 
-- ✅ Exposed in `ResolverIncentiveModuleV2` (integrated):
+- ✅ Exposed in `ResolverIncentiveModule` (integrated):
   - ✅ `totalBondsPosted`
 
   - ✅ `totalBondsForfeited`
@@ -249,10 +249,10 @@ Interfaces for these may exist but must be inactive.
 - Bond calculation (implemented)
 - Bond storage fields (exist but not populated)
 - Bond collection (not implemented in BaseEscrow)
-- Bond payout logic (exists in ResolverIncentiveModuleV2 but not integrated)
+- Bond payout logic (exists in ResolverIncentiveModule but not integrated)
 
 ### ⚠️ Partially Implemented / Missing
 
 - ⚠️ Increasing delays (fixed arrays instead of calculated - TODO: change to `baseResolve + k * resolveStep`)
-- ✅ Bond integration (ResolverIncentiveModuleV2 integrated with custody enforcement)
+- ✅ Bond integration (ResolverIncentiveModule integrated with custody enforcement)
 - ⚠️ Some events missing (AppealOpened, AppealResolved, DisputeFinalised - but AppealBondRecorded exists)

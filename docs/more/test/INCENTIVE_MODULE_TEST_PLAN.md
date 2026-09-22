@@ -427,9 +427,9 @@ These specifications are in the plan but not yet implemented. They represent edg
 function setUp() public {
   // Deploy contracts
   token = new ERC20Mock();
-  paymentLib = new PaymentCalculationLibraryV1();
-  incentiveModuleV1 = new ResolverIncentiveModuleV1(deployer, address(paymentLib));
-  incentiveModuleV2 = new ResolverIncentiveModuleV2(deployer, address(paymentLib));
+  paymentLib = new PaymentCalculationLibrary();
+  incentiveModuleV1 = new ResolverIncentiveModule(deployer, address(paymentLib));
+  incentiveModuleV2 = new ResolverIncentiveModule(deployer, address(paymentLib));
   resolutionModule = new DecentralizedResolutionModule(deployer);
   escrow = new EscrowVault();
 

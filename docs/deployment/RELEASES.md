@@ -65,7 +65,7 @@
 
 **Contracts:**
 - `DecentralizedResolutionModule.sol`
-- `ResolverIncentiveModuleV1.sol` (workload routing only)
+- `ResolverIncentiveModule.sol` (workload routing only)
 
 **Activation Guide:** [DR v1 Activation Guide](./dr1/DR1_ACTIVATION.md)
 
@@ -99,9 +99,9 @@
 - **Observability metrics** (bonds posted/refunded/forfeited)
 
 **Contracts:**
-- `ResolverIncentiveModuleV2.sol` (appeal bonds)
+- `ResolverIncentiveModule.sol` (appeal bonds)
 - `EscalationCostLibrary.sol`
-- `PaymentCalculationLibraryV1.sol`
+- `PaymentCalculationLibrary.sol`
 
 **Activation Guide:** [DR v2 Activation Guide](./dr2/DR2_ACTIVATION.md)
 
@@ -125,8 +125,8 @@
 
 **What's Complete:**
 - ✅ Phase 1: Interface boundaries (IStakingModule, ISlashingModule, NoOp implementations)
-- ✅ Phase 2: Real staking (ResolverStakingModuleV1, BondValuationLibrary)
-- ✅ Phase 3: Real slashing (ResolverSlashingModuleV1)
+- ✅ Phase 2: Real staking (ResolverStakingModule, BondValuationLibrary)
+- ✅ Phase 3: Real slashing (ResolverSlashingModule)
 
 **What's Pending:**
 - ⏸️ Phase 4-7: Full integration, testing, audit
@@ -142,8 +142,8 @@
 - **Circuit breakers** (mass unavailability)
 
 **Contracts:**
-- `ResolverStakingModuleV1.sol`
-- `ResolverSlashingModuleV1.sol`
+- `ResolverStakingModule.sol`
+- `ResolverSlashingModule.sol`
 - `BondValuationLibrary.sol`
 - `InsurancePoolVault.sol`
 
@@ -266,7 +266,7 @@ Each release activation follows this process:
 
 **Additional Modules:**
 - `DecentralizedResolutionModule.sol`
-- `ResolverIncentiveModuleV1.sol`
+- `ResolverIncentiveModule.sol`
 
 **Supporting:**
 - `ResolutionAnalytics.sol`
@@ -275,17 +275,17 @@ Each release activation follows this process:
 ### DR v2 Contracts
 
 **Additional Modules:**
-- `ResolverIncentiveModuleV2.sol` (replaces or augments V1)
+- `ResolverIncentiveModule.sol` (replaces or augments V1)
 
 **Supporting:**
-- `PaymentCalculationLibraryV1.sol`
+- `PaymentCalculationLibrary.sol`
 - `EscalationCostLibrary.sol` (enhanced)
 
 ### DR v3 Contracts
 
 **Additional Modules:**
-- `ResolverStakingModuleV1.sol`
-- `ResolverSlashingModuleV1.sol`
+- `ResolverStakingModule.sol`
+- `ResolverSlashingModule.sol`
 
 **Supporting:**
 - `BondValuationLibrary.sol`

@@ -13,7 +13,7 @@
 ### SEW Token Slashing Implementation (NEW)
 **Completed:** SEW token burning on slash functionality with comprehensive tests.
 - ✅ Added `ERC20Burnable` to `SewToken` with proper `_update()` override for `ERC20Votes` compatibility
-- ✅ Updated `ResolverStakingModuleV1.slash()` and `slashCoverage()` to burn SEW instead of transferring
+- ✅ Updated `ResolverStakingModule.slash()` and `slashCoverage()` to burn SEW instead of transferring
 - ✅ Added 5 test cases verifying SEW burning behavior in `SlashingModuleUnit.t.sol`
 - ✅ All contracts compile successfully
 
@@ -39,7 +39,7 @@
    - Added `_update()` override to resolve `ERC20Votes` + `ERC20Burnable` inheritance conflict
    - Ensures voting snapshots are updated correctly when tokens are burned
 
-2. **ResolverStakingModuleV1.sol** - Updated slashing functions:
+2. **ResolverStakingModule.sol** - Updated slashing functions:
    - `slash()`: Burns SEW, transfers stable tokens to slashing module
    - `slashCoverage()`: Burns SEW, transfers stable tokens to slashing module
    - Created minimal `IERC20Burnable` interface for type safety
@@ -121,7 +121,7 @@ The `_update()` override is required because:
 
 ## Previously Noted Issues (NOW RESOLVED ✅)
 
-### ✅ Issue #1: ResolverIncentiveModuleV1 Abstract - FIXED
+### ✅ Issue #1: ResolverIncentiveModule Abstract - FIXED
 
 **Status:** ✅ **RESOLVED**
 
@@ -220,7 +220,7 @@ The `_update()` override is required because:
 
 ### How Issues Were Resolved
 
-1. **ResolverIncentiveModuleV1 Abstract** - ✅ RESOLVED
+1. **ResolverIncentiveModule Abstract** - ✅ RESOLVED
    - Stub methods added with appropriate revert/return behavior
    - Contract now implements all interface requirements
    - All tests compile and pass
@@ -262,13 +262,13 @@ The `_update()` override is required because:
 
 - ✅ test/foundry/decentralized-resolution-module/SlashingModuleUnit.t.sol - Added 5 SEW burning tests
 - ✅ contracts/token/SewToken.sol - Added ERC20Burnable, _update() override
-- ✅ contracts/decentralized-resolution-module/ResolverStakingModuleV1.sol - Updated slash/slashCoverage to burn SEW
+- ✅ contracts/decentralized-resolution-module/ResolverStakingModule.sol - Updated slash/slashCoverage to burn SEW
 
 ### Status Summary
 
 - ✅ test/foundry/decentralized-resolution-module/IncentiveModuleIntegration.test.t.sol - **All tests passing**
-- ✅ contracts/decentralized-resolution-module/ResolverIncentiveModuleV1.sol - **All methods implemented**
-- ✅ contracts/decentralized-resolution-module/ResolverIncentiveModuleV2.sol - **Functional**
+- ✅ contracts/decentralized-resolution-module/ResolverIncentiveModule.sol - **All methods implemented**
+- ✅ contracts/decentralized-resolution-module/ResolverIncentiveModule.sol - **Functional**
 - ✅ contracts/mocks/ERC20Mock.sol - **Properly used in all tests**
 
 ---

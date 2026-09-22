@@ -39,7 +39,7 @@ mkdir -p test/hardhat/decentralized-resolution-module
 
 - [ ] `contracts/modules/DecentralizedResolutionModule.sol`
 - [ ] `contracts/modules/ResolverIncentiveModule.sol`
-- [ ] `contracts/modules/PaymentCalculationLibraryV1.sol`
+- [ ] `contracts/modules/PaymentCalculationLibrary.sol`
 - [ ] `contracts/interfaces/IPaymentCalculationLibrary.sol`
 
 **Move to `contracts/core/`:**
@@ -394,7 +394,7 @@ forge-std/=lib/forge-std/src/
 | -------------------------------------- | ----------------------- | -------------------------------------------- | ------ |
 | `DecentralizedResolutionModule.sol`    | `contracts/modules/`    | `contracts/decentralized-resolution-module/` | ⬜     |
 | `ResolverIncentiveModule.sol`          | `contracts/modules/`    | `contracts/decentralized-resolution-module/` | ⬜     |
-| `PaymentCalculationLibraryV1.sol`      | `contracts/modules/`    | `contracts/decentralized-resolution-module/` | ⬜     |
+| `PaymentCalculationLibrary.sol`      | `contracts/modules/`    | `contracts/decentralized-resolution-module/` | ⬜     |
 | `IPaymentCalculationLibrary.sol`       | `contracts/interfaces/` | `contracts/decentralized-resolution-module/` | ⬜     |
 | `BaseEscrow.sol`                       | `contracts/`            | `contracts/core/`                            | ⬜     |
 | `EscrowVault.sol`                      | `contracts/`            | `contracts/core/`                            | ⬜     |

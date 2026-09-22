@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-This document proposes improvements to `DecentralizedResolutionModule`, `ResolverIncentiveModule`, and `PaymentCalculationLibraryV1` from two perspectives:
+This document proposes improvements to `DecentralizedResolutionModule`, `ResolverIncentiveModule`, and `PaymentCalculationLibrary` from two perspectives:
 
 1. **Real-World Use**: Practical usability, edge cases, and operational concerns
 2. **Code Quality**: Security, gas efficiency, maintainability, and best practices

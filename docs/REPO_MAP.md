@@ -102,10 +102,9 @@ The DR v3 subsystem. Implements the full three-round escalation pipeline.
 | `DRMAdminFacet.sol` | Governance-accessible configuration for the DRM. |
 | `DRMAnalytics.sol` | Read-only analytics and metrics views. |
 | `DecentralizedResolverStructs.sol` | Shared struct definitions (`DisputeMetadata`, `ResolverMetadata`, etc.). |
-| `ResolverIncentiveModuleV1.sol` | Incentive accounting v1 (fee tracking per resolver). |
-| `ResolverIncentiveModuleV2.sol` | Incentive accounting v2 (appeal bond recording). |
-| `ResolverStakingModuleV1.sol` | DR v3 resolver staking: bond posting, unbonding delays, capacity gating. |
-| `ResolverSlashingModuleV1.sol` | DR v3 slashing: timeout/fraud slashes, epoch caps, slash appeal. |
+| `ResolverIncentiveModule.sol` | Incentive accounting (merged v1/v2): fee tracking per resolver + appeal bond recording. |
+| `ResolverStakingModule.sol` | DR v3 resolver staking: bond posting, unbonding delays, capacity gating. |
+| `ResolverSlashingModule.sol` | DR v3 slashing: timeout/fraud slashes, epoch caps, slash appeal. |
 | `SlashingModuleNoOp.sol` | No-op slashing implementation (used in v1/v2 rollout phases). |
 | `StakingModuleNoOp.sol` | No-op staking implementation (used in v1/v2 rollout phases). |
 | `BondTokenRegistry.sol` | Whitelist of tokens accepted for appeal bonds. |
@@ -113,7 +112,7 @@ The DR v3 subsystem. Implements the full three-round escalation pipeline.
 | `InsurancePoolVault.sol` | Insurance pool seeded by slashed funds; payer-of-last-resort for resolver insolvency. |
 | `BondValuationLibrary.sol` | Bond valuation with haircut and composition rules (80% stable / 20% SEW). |
 | `EscalationCostLibrary.sol` | Escalation cost curves (linear, quadratic, geometric). |
-| `PaymentCalculationLibraryV1.sol` | Resolver fee distribution weighted by escalation level. |
+| `PaymentCalculationLibrary.sol` | Resolver fee distribution weighted by escalation level. |
 | `ResolutionAnalytics.sol` | EMA reputation scoring, workload routing, attention signals. |
 | `IPaymentCalculationLibrary.sol` | Interface for payment calculation library. |
 | `ISlashingModule.sol` | Slashing module interface. |
@@ -327,7 +326,7 @@ are executed separately.
 |---|---|
 | [`DISPUTE_RESOLUTION_ARCHITECTURE.md`](dispute-resolution/DISPUTE_RESOLUTION_ARCHITECTURE.md) | Three-round escalation pipeline design |
 | [`DISPUTE_ECONOMICS.md`](dispute-resolution/DISPUTE_ECONOMICS.md) | Bond mechanics, escalation cost curves, resolver payment distribution, EMA scoring, slashing, insurance pool |
-| [`DR_V3_IMPLEMENTATION_STATUS.md`](dispute-resolution/DR_V3_IMPLEMENTATION_STATUS.md) | DR v3 implementation status (✅ COMPLETE) |
+| [`DR_V3_IMPLEMENTATION_STATUS.md`](archived/DR_V3_IMPLEMENTATION_STATUS.md) | DR v3 implementation status (✅ COMPLETE, archived) |
 | [`DR_V3_COMPLETE_SUMMARY.md`](dispute-resolution/DR_V3_COMPLETE_SUMMARY.md) | End-to-end DR v3 summary |
 | [`DR_V3_PARAMETERS.md`](dispute-resolution/DR_V3_PARAMETERS.md) | Production parameter values for DR v3 |
 | [`DR_V3_LAUNCH_SAFE_DEFAULTS.md`](dispute-resolution/DR_V3_LAUNCH_SAFE_DEFAULTS.md) | Conservative launch-safe parameter defaults |

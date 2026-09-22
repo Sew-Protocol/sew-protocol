@@ -77,7 +77,7 @@ This structure means a successful challenge is not merely risk-neutral for the c
 
 ## 3. Contract infrastructure
 
-The contract layer already separates `depositor` from `escalatedBy` in `AppealBondRecord` (`ResolverIncentiveModuleV2`):
+The contract layer already separates `depositor` from `escalatedBy` in `AppealBondRecord` (`ResolverIncentiveModule`):
 
 ```solidity
 struct AppealBondRecord {
@@ -172,7 +172,7 @@ The `challenge-window-duration`, `challenge-bond-bps`, and `challenge-bounty-bps
 
 | Item | Status |
 |---|---|
-| `depositor`/`escalatedBy` separation in `ResolverIncentiveModuleV2` | Implemented |
+| `depositor`/`escalatedBy` separation in `ResolverIncentiveModule` | Implemented |
 | `BondCollector.collectBond` supporting distinct depositor | Implemented |
 | Simulation model (`challenge-resolution` in `resolution.clj`) | Implemented (Phase L) |
 | `challengeResolution(workflowId)` entry point in `BaseEscrow` | **Not yet implemented** |
@@ -188,7 +188,7 @@ The primary contract change required is a new `challengeResolution(uint256 workf
 4. Calls `BondCollector.collectBond` with `depositor = msg.sender`, `escalatedBy = msg.sender`.
 5. Proceeds through the existing escalation pipeline.
 
-No changes to `ResolverIncentiveModuleV2`, `BondCollector`, or `PaymentCalculationLibraryV1` are required — the accounting layer already handles a third-party depositor correctly.
+No changes to `ResolverIncentiveModule`, `BondCollector`, or `PaymentCalculationLibrary` are required — the accounting layer already handles a third-party depositor correctly.
 
 ---
 
@@ -199,4 +199,4 @@ No changes to `ResolverIncentiveModuleV2`, `BondCollector`, or `PaymentCalculati
 | **Contracts** | `sew-protocol` @ `e4504e4` |
 | **Simulation** | `sew-simulation` @ `9648743` |
 | **Reviewed** | 2026-05-21 |
-| **Verification status** | Contract infrastructure claims verified against `ResolverIncentiveModuleV2.sol`, `BondCollector.sol`, `BaseEscrow.sol`. Simulation mechanics verified against `protocols/sew/resolution.clj`, `protocols/sew/accounting.clj`, `economics/payoffs.clj`, and scenarios S41, S42. `challengeResolution()` contract entry point does not yet exist — implementation pending. |
+| **Verification status** | Contract infrastructure claims verified against `ResolverIncentiveModule.sol`, `BondCollector.sol`, `BaseEscrow.sol`. Simulation mechanics verified against `protocols/sew/resolution.clj`, `protocols/sew/accounting.clj`, `economics/payoffs.clj`, and scenarios S41, S42. `challengeResolution()` contract entry point does not yet exist — implementation pending. |

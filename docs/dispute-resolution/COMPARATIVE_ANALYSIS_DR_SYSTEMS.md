@@ -83,12 +83,12 @@ Against the design:
 
 | Gap | Impact |
 |---|---|
-| `distributeAppealBond(false)` never triggered from `finalizeDispute` | Appeal bonds from failed escalations are stranded in `ResolverIncentiveModuleV2` — resolver payment path broken for failed appeals |
+| `distributeAppealBond(false)` never triggered from `finalizeDispute` | Appeal bonds from failed escalations are stranded in `ResolverIncentiveModule` — resolver payment path broken for failed appeals |
 | `ISlashingModule.slashForTimeout` / `slashForReversal` not called from DRM | Automated slashing on misbehavior is not live; only manual `slashForFraud` via ROLE_TIMELOCK |
 | Counter-party compensation = 0 | Harmed parties receive nothing from resolver slashes |
-| Treasury transfer from slash proceeds not implemented | Slash proceeds pool in `ResolverSlashingModuleV1`, not routed to treasury |
+| Treasury transfer from slash proceeds not implemented | Slash proceeds pool in `ResolverSlashingModule`, not routed to treasury |
 
-See `docs/dispute-resolution/INCENTIVE_MODULE_REVIEW.md` for full status of each item.
+See `docs/archived/INCENTIVE_MODULE_REVIEW.md` for full status of each item.
 
 ---
 
@@ -266,7 +266,7 @@ The hard per-case limit is `4× bond`, so `BR ≥ 1/(4) = 0.25` by construction.
 
 **Pass criterion:** Zero disputes where `hasAppealBond == true` AND `bond.distributed == false` AND `dm.status == Final`
 
-**Current result:** **FAIL** — as documented in `INCENTIVE_MODULE_REVIEW.md`, `distributeAppealBond(false)` is not called from `finalizeDispute`. Failed-appeal bonds accumulate unresolved.
+**Current result:** **FAIL** — as documented in `docs/archived/INCENTIVE_MODULE_REVIEW.md`, `distributeAppealBond(false)` is not called from `finalizeDispute`. Failed-appeal bonds accumulate unresolved.
 
 **Fix status:** Open. Fix is a loop in `finalizeDispute` calling `distributeAppealBond(r-1, false)` for `r = 1..finalRound`.
 

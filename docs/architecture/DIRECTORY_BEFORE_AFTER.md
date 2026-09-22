@@ -28,7 +28,7 @@ contracts/
 │   ├── TestYieldDistributionModule.sol ← test module
 │   └── decentralized-resolution-module/
 │       ├── DecentralizedResolutionModule.sol
-│       ├── ResolverIncentiveModuleV1.sol
+│       ├── ResolverIncentiveModule.sol
 │       └── ...
 ├── libraries/                          ← shared utilities
 ├── interfaces/                         ← shared interfaces
@@ -86,7 +86,7 @@ contracts/
 │   │   └── DefaultReleaseStrategy.sol       ✓ singleton
 │   └── decentralized-resolution/       ← RENAMED: Better naming
 │       ├── DecentralizedResolutionModule.sol
-│       ├── ResolverIncentiveModuleV1.sol
+│       ├── ResolverIncentiveModule.sol
 │       └── ...
 │
 ├── libraries/                          ← NO CHANGE

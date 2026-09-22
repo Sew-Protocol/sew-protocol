@@ -106,7 +106,7 @@ struct EscalationCostConfig {
 
 ### 4. Resolver Fee Payment Currency
 
-**Location**: `ResolverIncentiveModuleV1/V2` payment distribution
+**Location**: `ResolverIncentiveModule/V2` payment distribution
 
 - **Accepted**: Same token as escrow fee (which matches escrow amount)
 - **Default**: Automatically matches escrow fee token
@@ -117,9 +117,9 @@ struct EscalationCostConfig {
   - **NOTE**: This is separate from staking (which uses USDC + SEW)
 
 **Code References**:
-- `ResolverIncentiveModuleV1.sol:222-227` - `_recordEscrowFee(workflowId, token, amount)` stores token
-- `ResolverIncentiveModuleV1.sol:392-400` - `distributePayments(workflowId, address token, uint256 totalFees)` uses token parameter
-- `ResolverIncentiveModuleV1.sol:422-427` - Payment calculation uses stored escrow fee token
+- `ResolverIncentiveModule.sol:222-227` - `_recordEscrowFee(workflowId, token, amount)` stores token
+- `ResolverIncentiveModule.sol:392-400` - `distributePayments(workflowId, address token, uint256 totalFees)` uses token parameter
+- `ResolverIncentiveModule.sol:422-427` - Payment calculation uses stored escrow fee token
 - `BaseEscrow.sol:749` - Escrow fee recorded with token: `incentiveMod.recordEscrowFee(workflowId, token, escrowFeeAmount)`
 
 **Implementation Details**:
@@ -133,7 +133,7 @@ distributePayments(workflowId, token, totalFees);
 
 ### 5. Resolver Staking Currency
 
-**Location**: `ResolverStakingModuleV1`
+**Location**: `ResolverStakingModule`
 
 - **Accepted**: USDC (stablecoin) + SEW (protocol token)
 - **Default**: Fixed mix (80% USDC minimum, 20% SEW maximum)
@@ -145,8 +145,8 @@ distributePayments(workflowId, token, totalFees);
   - Separate from fee-based payments
 
 **Code References**:
-- `ResolverStakingModuleV1.sol:70-71` - Stable and SEW token addresses
-- `ResolverStakingModuleV1.sol:49-51` - Mix constants (MIN_STABLE_BPS = 8000, MAX_SEW_BPS = 2000)
+- `ResolverStakingModule.sol:70-71` - Stable and SEW token addresses
+- `ResolverStakingModule.sol:49-51` - Mix constants (MIN_STABLE_BPS = 8000, MAX_SEW_BPS = 2000)
 - `BondValuationLibrary.sol` - Bond valuation with haircut
 
 **Implementation Details**:
@@ -159,7 +159,7 @@ stake(uint256 stableAmount, uint256 sewAmount);
 
 ### 6. Slashing Currency
 
-**Location**: `ResolverSlashingModuleV1`
+**Location**: `ResolverSlashingModule`
 
 - **Accepted**: Same as staked tokens (USDC + SEW)
 - **Default**: Automatically matches staked tokens
@@ -170,8 +170,8 @@ stake(uint256 stableAmount, uint256 sewAmount);
   - Separate from fee-based payments
 
 **Code References**:
-- `ResolverSlashingModuleV1.sol:54-56` - Staking module and tokens
-- `ResolverSlashingModuleV1.sol:38-41` - Penalty percentages
+- `ResolverSlashingModule.sol:54-56` - Staking module and tokens
+- `ResolverSlashingModule.sol:38-41` - Penalty percentages
 
 **Implementation Details**:
 ```solidity
@@ -191,18 +191,18 @@ slashForTimeout(...); // 2-10% penalty depending on offense
 2. **Fee-Based Payments = Escrow Fee Token**
    - Resolver fee payments are always in the same token as escrow fees
    - Enforced because fees are recorded per-token and payments come from fees
-   - Location: `ResolverIncentiveModuleV1.sol:222-227`, `392-400`
+   - Location: `ResolverIncentiveModule.sol:222-227`, `392-400`
    - **NOTE**: This is separate from staking (which uses USDC + SEW)
 
 3. **Staking = Fixed Mix (USDC + SEW)**
    - Staking requires 80% USDC minimum, 20% SEW maximum
    - SEW has 50% haircut in valuation
-   - Location: `ResolverStakingModuleV1.sol:49-51`
+   - Location: `ResolverStakingModule.sol:49-51`
    - **NOTE**: Staking is capital at risk, not a payment mechanism
 
 4. **Slashing = Staked Tokens**
    - Slashing reduces staked USDC and SEW amounts
-   - Location: `ResolverSlashingModuleV1.sol:54-56`
+   - Location: `ResolverSlashingModule.sol:54-56`
 
 ### Missing Restrictions (TODO)
 
@@ -224,17 +224,17 @@ All currency handling uses consistent patterns:
 1. **SafeERC20 Library**: Used throughout for ERC20 transfers
    - `BaseEscrow.sol:56` - `using SafeERC20 for IERC20;`
    - `EscrowVault.sol:16` - `using SafeERC20 for IERC20;`
-   - `ResolverIncentiveModuleV1.sol:11` - `using SafeERC20 for IERC20;`
-   - `ResolverIncentiveModuleV2.sol:26` - `using SafeERC20 for IERC20;`
+   - `ResolverIncentiveModule.sol:11` - `using SafeERC20 for IERC20;`
+   - `ResolverIncentiveModule.sol:26` - `using SafeERC20 for IERC20;`
 
 2. **Token Address Handling**: Consistent `address(0)` = ETH pattern
    - `DecentralizedResolverStructs.sol:123` - `address(0) = ETH`
-   - `ResolverIncentiveModuleV2.sol:33` - `address(0) = ETH` in bond records
+   - `ResolverIncentiveModule.sol:33` - `address(0) = ETH` in bond records
    - `BaseEscrow.sol:479` - `_pullTokens()` handles both ERC20 and ETH
 
 3. **Fee Calculation**: Consistent basis points pattern
    - `BaseEscrow.sol:68` - `ESCROW_FEE_DENOMINATOR = 10000`
-   - `PaymentCalculationLibraryV1.sol:15` - `BASIS_POINTS_DENOMINATOR = 10000`
+   - `PaymentCalculationLibrary.sol:15` - `BASIS_POINTS_DENOMINATOR = 10000`
    - `DecentralizedResolutionModule.sol:39` - `BASIS_POINTS_DENOMINATOR = 10000`
 
 ### Inconsistencies Found

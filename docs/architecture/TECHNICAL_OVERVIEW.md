@@ -86,22 +86,20 @@ A decentralized escrow protocol built on Base (Ethereum L2) that enables secure,
 
 **Incentive Modules** (Swappable via Governance):
 
-- `ResolverIncentiveModuleV1` (DR v1) - ✅ Complete
-  - Workload routing only (performance-based assignment)
+- `ResolverIncentiveModule` (merged DR v1/v2) - ✅ Complete
+  - Workload routing (performance-based assignment)
   - EMA-based reputation scoring
-  - No resolver capital at risk
   - Fee tracking and payment distribution
-  
-- `ResolverIncentiveModuleV2` (DR v2) - ✅ Complete
-  - All DR v1 features
   - Appeal bonds (users post bonds to escalate)
   - Escalation cost curves (linear, quadratic, geometric)
   - Bond refund/payment logic
   - Observability metrics
   
-- `ResolverIncentiveModuleV3` (DR v3) - ✅ Complete
-  - All DR v2 features
+- `ResolverStakingModule` (DR v3 capital) - ✅ Complete
   - Resolver staking with mixed bond enforcement (≥80% stable / ≤20% SEW, 50% SEW haircut)
+  - Unbonding delays and capacity gating
+
+- `ResolverSlashingModule` (DR v3 capital) - ✅ Complete
   - Objective slashing schedule with epoch caps and freeze durations
   - Senior resolver coverage and delegation
   - Slashed SEW handled as burned
@@ -115,7 +113,7 @@ A decentralized escrow protocol built on Base (Ethereum L2) that enables secure,
 
 **Payment Calculation**:
 
-- `PaymentCalculationLibraryV1` - Weighted payment calculation (pluggable, swappable via Slow lane)
+- `PaymentCalculationLibrary` - Weighted payment calculation (pluggable, swappable via Slow lane)
 
 ### Design Principles
 

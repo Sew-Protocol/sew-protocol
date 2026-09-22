@@ -2,7 +2,7 @@
 
 **Date:** 2026-01-09  
 **Last Updated:** 2026-01-09  
-**Component:** `ResolverIncentiveModuleV2.escalationDepthHistogram`  
+**Component:** `ResolverIncentiveModule.escalationDepthHistogram`  
 **Status:** ✅ Complete - All Tests Implemented and Compiling
 
 ---
@@ -17,7 +17,7 @@ The `escalationDepthHistogram` is a mapping that tracks the count of appeal bond
 
 ### Code Location
 
-**Contract:** `ResolverIncentiveModuleV2.sol`  
+**Contract:** `ResolverIncentiveModule.sol`  
 **Line:** 51 (declaration), 171 (increment), 410-420 (getter)
 
 ### State Variable

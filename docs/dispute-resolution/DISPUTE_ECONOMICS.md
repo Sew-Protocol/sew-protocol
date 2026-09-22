@@ -10,12 +10,12 @@
 > `contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol`,
 > `contracts/modules/decentralized-resolution-module/EscalationCostLibrary.sol`,
 > `contracts/modules/decentralized-resolution-module/BondValuationLibrary.sol`,
-> `contracts/modules/decentralized-resolution-module/PaymentCalculationLibraryV1.sol`,
+> `contracts/modules/decentralized-resolution-module/PaymentCalculationLibrary.sol`,
 > `contracts/modules/decentralized-resolution-module/InsurancePoolVault.sol`,
 > `contracts/modules/decentralized-resolution-module/ResolutionAnalytics.sol`,
-> `contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV2.sol`,
-> `contracts/modules/decentralized-resolution-module/ResolverSlashingModuleV1.sol`,
-> `contracts/modules/decentralized-resolution-module/ResolverStakingModuleV1.sol`,
+> `contracts/modules/decentralized-resolution-module/ResolverIncentiveModule.sol`,
+> `contracts/modules/decentralized-resolution-module/ResolverSlashingModule.sol`,
+> `contracts/modules/decentralized-resolution-module/ResolverStakingModule.sol`,
 > `contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol`.
 
 ---
@@ -136,9 +136,9 @@ The bond depositor and amount are stored per round in `bondDepositorAtRound` and
 
 ---
 
-## 5. Resolver payment distribution (`PaymentCalculationLibraryV1`)
+## 5. Resolver payment distribution (`PaymentCalculationLibrary`)
 
-**Contract:** `PaymentCalculationLibraryV1` (implements `IPaymentCalculationLibrary`)
+**Contract:** `PaymentCalculationLibrary` (implements `IPaymentCalculationLibrary`)
 
 When a dispute is finalised, fees accumulated across the escrow fee and escalation fees are
 distributed to the resolvers who participated in the dispute, weighted by their escalation
@@ -246,7 +246,7 @@ rate approach zero — without any explicit exclusion action.
 
 ## 8. Bond composition and valuation (DR v3)
 
-**Contract:** `ResolverStakingModuleV1` + `BondValuationLibrary`
+**Contract:** `ResolverStakingModule` + `BondValuationLibrary`
 
 In DR v3, resolvers must post a bond before they can accept disputes. The bond is a mixed
 position of stablecoin and Sew token, subject to enforced composition rules:
@@ -298,7 +298,7 @@ Stakes that are locked to an active dispute cannot be unbonded until the dispute
 
 ## 9. Delegated bond coverage
 
-**Contracts:** `ResolverStakingModuleV1`, `BondValuationLibrary`
+**Contracts:** `ResolverStakingModule`, `BondValuationLibrary`
 
 Delegated coverage is the mechanism by which a junior resolver can be backed by a senior
 resolver's bond. This allows junior resolvers to participate with a smaller personal bond,
@@ -361,7 +361,7 @@ accountability at the senior level.
 
 ## 10. Slashing
 
-**Contract:** `ResolverSlashingModuleV1`
+**Contract:** `ResolverSlashingModule`
 
 Slashing is the DR v3 mechanism for penalising resolvers who fail their obligations. All
 slashes are denominated in basis points of the resolver's bond.
@@ -536,4 +536,4 @@ runner. See the Protocol Robustness Framework repository for evidence reports.
 | **Contracts** | `sew-protocol` @ `763131d` |
 | **Simulation** | `sew-simulation` @ `5b33486` |
 | **Generated / reviewed** | 2026-05-21 |
-| **Verification status** | Bond composition, slashing schedule, and capacity gate manually verified against `ResolverSlashingModuleV1.sol` and `DRMAdminFacet.sol`. Appeal bond quadratic cost curve verified against contract arithmetic. Phase F/H/J/AI simulation phases are implemented in `sew-simulation`; parameter sweep results present in `results/`. Insurance pool yield-sourcing and floor mechanism are specified but not yet fully simulation-backed — needs follow-up. |
+| **Verification status** | Bond composition, slashing schedule, and capacity gate manually verified against `ResolverSlashingModule.sol` and `DRMAdminFacet.sol`. Appeal bond quadratic cost curve verified against contract arithmetic. Phase F/H/J/AI simulation phases are implemented in `sew-simulation`; parameter sweep results present in `results/`. Insurance pool yield-sourcing and floor mechanism are specified but not yet fully simulation-backed — needs follow-up. |

@@ -560,9 +560,9 @@ Before starting migration:
 
 ---
 
-### Task 5.5: Migrate ResolverIncentiveModuleV1.sol
+### Task 5.5: Migrate ResolverIncentiveModule.sol
 
-**File:** `contracts/decentralized-resolution-module/ResolverIncentiveModuleV1.sol`  
+**File:** `contracts/decentralized-resolution-module/ResolverIncentiveModule.sol`  
 **Priority:** MEDIUM  
 **Estimated Time:** 2 hours
 
@@ -592,9 +592,9 @@ Before starting migration:
 
 ---
 
-### Task 5.6: Migrate ResolverIncentiveModuleV2.sol
+### Task 5.6: Migrate ResolverIncentiveModule.sol
 
-**File:** `contracts/decentralized-resolution-module/ResolverIncentiveModuleV2.sol`  
+**File:** `contracts/decentralized-resolution-module/ResolverIncentiveModule.sol`  
 **Priority:** MEDIUM  
 **Estimated Time:** 1 hour
 
@@ -611,9 +611,9 @@ Before starting migration:
 
 ---
 
-### Task 5.7: Migrate ResolverStakingModuleV1.sol
+### Task 5.7: Migrate ResolverStakingModule.sol
 
-**File:** `contracts/decentralized-resolution-module/ResolverStakingModuleV1.sol`  
+**File:** `contracts/decentralized-resolution-module/ResolverStakingModule.sol`  
 **Priority:** MEDIUM  
 **Estimated Time:** 1 hour
 
@@ -629,9 +629,9 @@ Before starting migration:
 
 ---
 
-### Task 5.8: Migrate ResolverSlashingModuleV1.sol
+### Task 5.8: Migrate ResolverSlashingModule.sol
 
-**File:** `contracts/decentralized-resolution-module/ResolverSlashingModuleV1.sol`  
+**File:** `contracts/decentralized-resolution-module/ResolverSlashingModule.sol`  
 **Priority:** MEDIUM  
 **Estimated Time:** 1 hour
 
@@ -667,9 +667,9 @@ Before starting migration:
 
 ## Phase 6: Migrate Libraries (Day 12-15)
 
-### Task 6.1: Migrate PaymentCalculationLibraryV1.sol
+### Task 6.1: Migrate PaymentCalculationLibrary.sol
 
-**File:** `contracts/decentralized-resolution-module/PaymentCalculationLibraryV1.sol`  
+**File:** `contracts/decentralized-resolution-module/PaymentCalculationLibrary.sol`  
 **Priority:** MEDIUM  
 **Estimated Time:** 1 hour
 
@@ -1120,15 +1120,15 @@ Use this checklist to track progress:
 - [ ] Task 5.2: DecentralizedResolutionModule resolver management
 - [ ] Task 5.3: DecentralizedResolutionModule dispute functions
 - [ ] Task 5.4: DecentralizedResolutionModule governance
-- [ ] Task 5.5: ResolverIncentiveModuleV1
-- [ ] Task 5.6: ResolverIncentiveModuleV2
-- [ ] Task 5.7: ResolverStakingModuleV1
-- [ ] Task 5.8: ResolverSlashingModuleV1
+- [ ] Task 5.5: ResolverIncentiveModule
+- [ ] Task 5.6: ResolverIncentiveModule
+- [ ] Task 5.7: ResolverStakingModule
+- [ ] Task 5.8: ResolverSlashingModule
 - [ ] Task 5.9: InsurancePoolVault
 
 ### Phase 6: Libraries
 
-- [ ] Task 6.1: PaymentCalculationLibraryV1
+- [ ] Task 6.1: PaymentCalculationLibrary
 - [ ] Task 6.2: ResolutionAnalytics
 - [ ] Task 6.3: BondValuationLibrary
 - [ ] Task 6.4: Other libraries

@@ -55,7 +55,7 @@ External call to arbitrator occurs before state updates.
 **Severity:** High  
 **Status:** 🔴 **FIX REQUIRED**
 
-**Location:** `contracts/decentralized-resolution-module/ResolverIncentiveModuleV2.sol`
+**Location:** `contracts/decentralized-resolution-module/ResolverIncentiveModule.sol`
 
 **Finding:**
 `recordAppealBond` allows specifying an arbitrary `depositor` address, which is then used as the `from` address in `transferFrom`.
@@ -133,7 +133,7 @@ Critical configuration setters (e.g., `setFeeRecipient`, `setResolutionModule`) 
 #### Finding 3.3: Uninitialized State Variables
 
 **Status:** ✅ **IGNORED**
-- Slither flags `disputeResolvers` in `ResolverIncentiveModuleV1`.
+- Slither flags `disputeResolvers` in `ResolverIncentiveModule`.
 - Mappings don't need initialization.
 
 ---

@@ -197,7 +197,7 @@ Phase 1 Security Tasks are improvements identified in the Contract Improvements 
 
 **Status:** ⬜ Not Implemented  
 **Priority:** 🟡 **MEDIUM** - Safety checks  
-**Location:** `ResolverIncentiveModule`, `PaymentCalculationLibraryV1` (separate package)
+**Location:** `ResolverIncentiveModule`, `PaymentCalculationLibrary` (separate package)
 
 **Description:**
 

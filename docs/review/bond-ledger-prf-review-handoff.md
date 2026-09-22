@@ -17,7 +17,7 @@ three material defects in the existing implementation:
 
 A fourth issue surfaced during the fix:
 
-| D5 | `ResolverIncentiveModuleV1.onResolverAssigned` was `onlyEscrowContract`; the resolution module could not record resolver cohorts through the production path, so a reachable failed-appeal payout could operate against an empty/incomplete resolver set. |
+| D5 | `ResolverIncentiveModule.onResolverAssigned` was `onlyEscrowContract`; the resolution module could not record resolver cohorts through the production path, so a reachable failed-appeal payout could operate against an empty/incomplete resolver set. |
 
 ## 2. Corrected normative behaviour
 
@@ -172,9 +172,9 @@ forge test --match-contract BondBehaviourCorrection -vvv
 sha256sum contracts/shared/BondLedger.sol \
   contracts/shared/interfaces/IBondLedger.sol \
   contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV2BondLedger.sol \
-  contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV2.sol \
+  contracts/modules/decentralized-resolution-module/ResolverIncentiveModule.sol \
   contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol \
-  contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV1.sol
+  contracts/modules/decentralized-resolution-module/ResolverIncentiveModule.sol
 
 # Bytecode commitments
 forge inspect contracts/shared/BondLedger.sol:BondLedger bytecode | sha256sum

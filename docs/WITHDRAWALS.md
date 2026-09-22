@@ -10,10 +10,8 @@
 > `contracts/core/EscrowVault.sol` (`withdrawFees`),
 > `contracts/modules/AaveYieldModule.sol` (`unwindToEscrow`, `emergencyUnwind`,
 > `recoverTokens`, `recoverETH`),
-> `contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV1.sol`
-> (`claimPayment`),
-> `contracts/modules/decentralized-resolution-module/ResolverIncentiveModuleV2.sol`
-> (`claimBondRefund`),
+> `contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModule.sol`
+> (`claimPayment`, `claimBondRefund`),
 > `contracts/modules/decentralized-resolution-module/InsurancePoolVault.sol`
 > (`proposePayout`, `executePayout`, `withdraw`),
 > `contracts/ops/GuardianOps.sol` (`emergencyUnwindAavePosition`).
@@ -164,11 +162,11 @@ rather than being transferred directly. The fee address claims via
 
 ## 4. Resolver withdrawals
 
-### 4.1 Dispute payment: `claimPayment` (V1 incentive module)
+### 4.1 Dispute payment: `claimPayment`
 
 ```
 Function: claimPayment(workflowId, escrowContract, token)
-Ledger: ResolverIncentiveModuleV1.claimablePayments[escrow][workflowId][address]
+Ledger: ResolverIncentiveModule.claimablePayments[escrow][workflowId][address]
 Caller: Resolver who participated in the dispute
 ```
 
@@ -188,11 +186,11 @@ accumulated across multiple events during a dispute. Enforcing a single payout t
 prevents inconsistencies if governance changes the fee token between dispute creation and
 resolution.
 
-### 4.2 Appeal bond refund: `claimBondRefund` (V2 incentive module)
+### 4.2 Appeal bond refund: `claimBondRefund`
 
 ```
 Function: claimBondRefund(workflowId, escrowContract, token)
-Ledger: ResolverIncentiveModuleV2.claimableBondRefunds[escrow][workflowId][address]
+Ledger: ResolverIncentiveModule.claimableBondRefunds[escrow][workflowId][address]
 Caller: Party who posted the appeal bond
 ```
 
@@ -268,8 +266,8 @@ principal was pulled from the creator at escrow creation and is held in the cont
 throughout the escrow lifetime.
 
 **Note:** `totalClaimableAssets` tracks principal and yield claimable at the `BaseEscrow`
-level only. Resolver payments (`ResolverIncentiveModuleV1`), bond refunds
-(`ResolverIncentiveModuleV2`), insurance pool balances (`InsurancePoolVault`), and yield
+level only. Resolver payments (`ResolverIncentiveModule`), bond refunds
+(`ResolverIncentiveModule`), insurance pool balances (`InsurancePoolVault`), and yield
 protocol fees (`EscrowVault.totalFeesPerToken` bucket) are each self-contained in their
 own contracts with their own token balances.
 
@@ -380,8 +378,8 @@ recovery is never the default.
 | Escrow principal + yield after settlement | `withdrawEscrow(workflowId)` | `BaseEscrow` | Entitled party | None — terminal state required |
 | Bond protocol fees | `claimBondProtocolFees(token, recipient)` | `BaseEscrow` | Fee recipient | None |
 | Excess ETH from bond posting | `claimExcessEthRefund()` | `BaseEscrow` | Bond poster | None |
-| Resolver dispute payment | `claimPayment(workflowId, escrow, token)` | `ResolverIncentiveModuleV1` | Resolver | Payments must be calculated |
-| Appeal bond refund (V2) | `claimBondRefund(workflowId, escrow, token)` | `ResolverIncentiveModuleV2` | Bond poster | Bond must be marked refundable |
+| Resolver dispute payment | `claimPayment(workflowId, escrow, token)` | `ResolverIncentiveModule` | Resolver | Payments must be calculated |
+| Appeal bond refund | `claimBondRefund(workflowId, escrow, token)` | `ResolverIncentiveModule` | Bond poster | Bond must be marked refundable |
 | Yield protocol fee | `withdrawFees(token)` | `EscrowVault` | Fee recipient (`ROLE_FEE_RECIPIENT`) | None |
 | Insurance payout (normal) | `proposePayout` → `executePayout` | `InsurancePoolVault` | `ROLE_TIMELOCK` | 7-day slow lane |
 | Insurance payout (emergency) | `withdraw(to, amount, workflowId)` | `InsurancePoolVault` | `ROLE_TIMELOCK` | `withdrawalsEnabled` flag (off by default) |

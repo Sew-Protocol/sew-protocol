@@ -167,8 +167,8 @@ That reads as:
 ---
 
 ## 9) Implementation pointers (where these are enforced)
-- Mixed bond valuation + composition: `contracts/decentralized-resolution-module/ResolverStakingModuleV1.sol`
+- Mixed bond valuation + composition: `contracts/decentralized-resolution-module/ResolverStakingModule.sol`
 - Bond valuation math: `contracts/decentralized-resolution-module/BondValuationLibrary.sol`
-- Slashing schedule, epoch caps, freezes, SEW burn handling: `contracts/decentralized-resolution-module/ResolverSlashingModuleV1.sol`
+- Slashing schedule, epoch caps, freezes, SEW burn handling: `contracts/decentralized-resolution-module/ResolverSlashingModule.sol`
 - Resolver deadlines / appeal windows: `contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol`
 

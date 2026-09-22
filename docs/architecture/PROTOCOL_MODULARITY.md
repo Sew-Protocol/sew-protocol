@@ -260,8 +260,9 @@ can accumulate state for bond/reward calculations.
 
 | Contract | Version | Behaviour |
 |----------|---------|-----------|
-| `ResolverIncentiveModuleV1` | DR v1 | Performance tracking only. EMA quality score per resolver. No bonds. |
-| `ResolverIncentiveModuleV2` | DR v2 | V1 features plus appeal bond receipt, bond distribution to prior-round resolvers on finality, escalation cost curves. |
+| `ResolverIncentiveModule` | DR v1/v2 (merged) | Performance tracking, EMA quality score per resolver, appeal bond receipt, bond distribution to prior-round resolvers on finality, escalation cost curves. |
+| `ResolverStakingModule` | DR v3 | Resolver staking: bond posting, unbonding delays, capacity gating. |
+| `ResolverSlashingModule` | DR v3 | Slashing: timeout/fraud slashes, epoch caps, slash appeal. |
 | `SlashingModuleNoOp` | — | Satisfies `ISlashingModule`; all functions are no-ops. |
 | `StakingModuleNoOp` | — | Satisfies `IStakingModule`; all functions are no-ops. Used until DR v3 staking is live. |
 
@@ -423,8 +424,9 @@ operation from completing; the failure is emitted as an event (e.g.,
 | `DefaultYieldGenerationModule` | Yield generation (no-op) | `IYieldGenerationModule` | `DefaultYieldGenerationModule` | — |
 | `AaveYieldModule` | Yield generation | `IYieldModule` (extends `IYieldGenerationModule`) | `AaveYieldModule` | — |
 | `DefaultYieldDistributionModule` | Yield distribution | `IYieldDistributionModule` | `DefaultYieldDistributionModule` | — |
-| `ResolverIncentiveModuleV1` | Incentive | `IIncentiveModule` | `ResolverIncentiveModuleV1` | DR v1 |
-| `ResolverIncentiveModuleV2` | Incentive (bonds) | `IIncentiveModule` | `ResolverIncentiveModuleV2` | DR v2 |
+| `ResolverIncentiveModule` | Incentive | `IIncentiveModule` | `ResolverIncentiveModule` | DR v1/v2 (merged) |
+| `ResolverStakingModule` | Staking | `IStakingModule` | `ResolverStakingModule` | DR v3 |
+| `ResolverSlashingModule` | Slashing | `ISlashingModule` | `ResolverSlashingModule` | DR v3 |
 | `SlashingModuleNoOp` | Slashing (stub) | `ISlashingModule` | `SlashingModuleNoOp` | — |
 | `StakingModuleNoOp` | Staking (stub) | `IStakingModule` | `StakingModuleNoOp` | — |
 

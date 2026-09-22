@@ -69,10 +69,10 @@ If you deploy the decentralized resolution module subsystem:
 |----------|----------|---------|-------|
 | **DecentralizedResolutionModule** | `decentralized-resolution-module/DecentralizedResolutionModule.sol` | Resolver arbitration | Main resolution module for decentralized dispute resolution |
 | **InsurancePoolVault** | `decentralized-resolution-module/InsurancePoolVault.sol` | Slashing pool | Holds slashed resolver collateral |
-| **ResolverStakingModuleV1** | `decentralized-resolution-module/ResolverStakingModuleV1.sol` | Staking | Manages resolver stake deposits |
-| **ResolverSlashingModuleV1** | `decentralized-resolution-module/ResolverSlashingModuleV1.sol` | Slashing | Penalizes misbehaving resolvers |
-| **ResolverIncentiveModuleV1** | `decentralized-resolution-module/ResolverIncentiveModuleV1.sol` | Incentives | Rewards resolver participation |
-| **PaymentCalculationLibraryV1** | `decentralized-resolution-module/PaymentCalculationLibraryV1.sol` | Payment logic | Calculates resolver rewards (deployed as contract for governance upgrades) |
+| **ResolverStakingModule** | `decentralized-resolution-module/ResolverStakingModule.sol` | Staking | Manages resolver stake deposits |
+| **ResolverSlashingModule** | `decentralized-resolution-module/ResolverSlashingModule.sol` | Slashing | Penalizes misbehaving resolvers |
+| **ResolverIncentiveModule** | `decentralized-resolution-module/ResolverIncentiveModule.sol` | Incentives | Rewards resolver participation |
+| **PaymentCalculationLibrary** | `decentralized-resolution-module/PaymentCalculationLibrary.sol` | Payment logic | Calculates resolver rewards (deployed as contract for governance upgrades) |
 | **ResolutionAnalytics** | `decentralized-resolution-module/ResolutionAnalytics.sol` | Analytics | Tracks resolver stats and metrics |
 
 ---

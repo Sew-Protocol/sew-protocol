@@ -119,7 +119,7 @@ PendingDefaultBondToken private _pendingDefaultBondToken;
 **Changes**:
 1. Validate bond token in `getRequiredAppealBond()` - ensure it's in whitelist
 2. Validate bond token when recording bond in `BaseEscrow.escalateDispute()`
-3. Add validation in `ResolverIncentiveModuleV2.recordAppealBond()`
+3. Add validation in `ResolverIncentiveModule.recordAppealBond()`
 
 **Validation Logic**:
 ```solidity

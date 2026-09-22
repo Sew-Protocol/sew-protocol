@@ -482,9 +482,9 @@ Open → RESOLVED (tokens transferred) → Escalated (cannot reverse transfer)
 
 ## Related Documentation
 
-- `DR_V3_TODO.md` - Section 5.4: Appeal Window Enforcement (Critical)
-- `DR_V3_PHASE5_SUMMARY.md` - Phase 5 implementation details
-- `DR_STAGING_PLAN.md` - Overall staging plan
+- `docs/archived/DR_V3_TODO.md` - Section 5.4: Appeal Window Enforcement (Critical)
+- `docs/archived/DR_V3_PHASE5_SUMMARY.md` - Phase 5 implementation details
+- `docs/archived/DR_STAGING_PLAN.md` - Overall staging plan
 - `RESOLVER_ECONOMICS.md` - 2026 expectations: appeal bonds, curves, liveness, governance boundaries
 - `RESOLVER_ECONOMICS_TODOS.md` - Engineering TODOs for v1/v2 incentive plumbing and appeal-bond infrastructure
 

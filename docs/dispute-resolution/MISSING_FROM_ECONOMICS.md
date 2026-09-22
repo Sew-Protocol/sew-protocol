@@ -9,7 +9,7 @@
 
 ### 1. Appeal Window Enforcement ✅ **COMPLETE**
 
-**From**: `RESOLVER_ECONOMICS.md` Section 1.1, `DR_V3_TODO.md` Phase 5.4  
+**From**: `RESOLVER_ECONOMICS.md` Section 1.1, `docs/archived/DR_V3_TODO.md` Phase 5.4  
 **Status**: ✅ **IMPLEMENTED**  
 **Requirement**:
 
@@ -98,7 +98,7 @@
 
 **Current State**:
 
-- `forfeitAppealBond()` exists in `ResolverIncentiveModuleV2`
+- `forfeitAppealBond()` exists in `ResolverIncentiveModule`
 - Not automatically called from escalation timeout flow
 - Manual forfeiture possible, but not automatic
 
@@ -116,7 +116,7 @@
 
 ### 5. Counter-Party Compensation in Slashing
 
-**From**: `RESOLVER_ECONOMICS.md` Section 6.2, `DR_V3_TODO.md` Phase 3.4  
+**From**: `RESOLVER_ECONOMICS.md` Section 6.2, `docs/archived/DR_V3_TODO.md` Phase 3.4  
 **Status**: ❌ **NOT IMPLEMENTED**  
 **Requirement**:
 
@@ -144,7 +144,7 @@
 
 ### 6. Treasury Contract Integration
 
-**From**: `DR_V3_TODO.md` Phase 3.4, `DR_V3_PHASE5_SUMMARY.md` line 23  
+**From**: `docs/archived/DR_V3_TODO.md` Phase 3.4, `docs/archived/DR_V3_PHASE5_SUMMARY.md` line 23  
 **Status**: ❌ **NOT IMPLEMENTED**  
 **Requirement**: Transfer protocol portion of slashes to treasury
 
@@ -161,7 +161,7 @@
 
 ### 7. Slash Proposer Rewards
 
-**From**: `DR_V3_TODO.md` Phase 3.4  
+**From**: `docs/archived/DR_V3_TODO.md` Phase 3.4  
 **Status**: ❌ **NOT IMPLEMENTED**  
 **Requirement**: Reward users who propose valid slashes
 
@@ -179,7 +179,7 @@
 
 ### 8. Configurable Slash Percentages
 
-**From**: `DR_V3_TODO.md` Phase 3.4  
+**From**: `docs/archived/DR_V3_TODO.md` Phase 3.4  
 **Status**: ⚠️ **PARTIALLY IMPLEMENTED**  
 **Requirement**: Configurable percentages via governance
 

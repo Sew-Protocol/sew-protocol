@@ -34,7 +34,7 @@ DR v1 decentralizes dispute resolution decision-making by introducing:
 ### DR v1 Readiness
 
 - [ ] `DecentralizedResolutionModule` deployed (or deployment script ready)
-- [ ] `ResolverIncentiveModuleV1` deployed (or deployment script ready)
+- [ ] `ResolverIncentiveModule` deployed (or deployment script ready)
 - [ ] Resolver registry prepared (list of approved resolvers)
 - [ ] Kleros integration configured (if using external escalation)
 - [ ] All DR v1 tests passing
@@ -62,7 +62,7 @@ pnpm hardhat export --network baseSepolia
 
 **Expected Output:**
 - `DecentralizedResolutionModule` (immutable)
-- `ResolverIncentiveModuleV1` (immutable)
+- `ResolverIncentiveModule` (immutable)
 
 ### Step 2: Configure DR v1 Module
 

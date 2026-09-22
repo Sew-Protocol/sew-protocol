@@ -16,10 +16,10 @@ The codebase has undergone significant architectural changes. All tests need to 
 **Affected Contracts:**
 
 - `KlerosArbitrableProxy` - now uses `constructor(address _arbitrator, address _admin)`
-- `ResolverIncentiveModuleV1` - now uses `constructor(address initialOwner, address initialLibrary)`
-- `ResolverIncentiveModuleV2` - inherits from V1, uses same constructor pattern
-- `ResolverSlashingModuleV1` - now uses `constructor(address initialOwner, address _stakingModule, address _insurancePoolVault, address _stableToken)`
-- `ResolverStakingModuleV1` - now uses `constructor(address initialOwner, address _stableToken, address _sewToken)`
+- `ResolverIncentiveModule` - now uses `constructor(address initialOwner, address initialLibrary)`
+- `ResolverIncentiveModule` - inherits from V1, uses same constructor pattern
+- `ResolverSlashingModule` - now uses `constructor(address initialOwner, address _stakingModule, address _insurancePoolVault, address _stableToken)`
+- `ResolverStakingModule` - now uses `constructor(address initialOwner, address _stableToken, address _sewToken)`
 - `InsurancePoolVault` - now uses `constructor(address initialOwner, address _stableToken)`
 - `SlashingModuleNoOp` - now uses `constructor(address initialOwner)`
 - `StakingModuleNoOp` - now uses `constructor(address initialOwner)`
@@ -123,13 +123,13 @@ await contract.grantRole(ROLE_TIMELOCK, account);
 
 ```solidity
 // Before (UUPS)
-const impl = await ResolverIncentiveModuleV1.deploy();
+const impl = await ResolverIncentiveModule.deploy();
 const proxy = await ERC1967Proxy.deploy(impl.address, impl.interface.encodeFunctionData("initialize", [owner, library]));
-const module = await ethers.getContractAt("ResolverIncentiveModuleV1", proxy.address);
+const module = await ethers.getContractAt("ResolverIncentiveModule", proxy.address);
 await module.initialize(owner, library);
 
 // After (Immutable)
-const module = await ResolverIncentiveModuleV1.deploy(owner, library);
+const module = await ResolverIncentiveModule.deploy(owner, library);
 ```
 
 **Test Changes Required:**
@@ -143,7 +143,7 @@ const module = await ResolverIncentiveModuleV1.deploy(owner, library);
 
 **Some imports changed:**
 
-- `ResolverIncentiveModuleV1` now imports `@governance/SlowLaneQueueActivate.sol` (note the `@governance` alias)
+- `ResolverIncentiveModule` now imports `@governance/SlowLaneQueueActivate.sol` (note the `@governance` alias)
 - Other modules may have similar import path changes
 
 **Test Changes Required:**

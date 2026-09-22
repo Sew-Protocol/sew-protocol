@@ -87,7 +87,7 @@ Succinct overview of the major contracts and their roles.
 
 ## Payment & Incentive System
 
-### `ResolverIncentiveModule*.sol`
+### `ResolverIncentiveModule.sol`
 
 **Purpose**: Tracks and distributes payments to dispute resolvers  
 **Key Features**:
@@ -103,9 +103,9 @@ Succinct overview of the major contracts and their roles.
 
 ---
 
-### `PaymentCalculationLibraryV1.sol`
+### `PaymentCalculationLibrary.sol`
 
-**Purpose**: Payment calculation library (Version 1)  
+**Purpose**: Payment calculation library  
 **Key Features**:
 
 - Weighted distribution by escalation level
@@ -174,8 +174,8 @@ Succinct overview of the major contracts and their roles.
                │   - AaveYieldModule (simple adapter; distribution handled by escrow core)
                │
                └─> Resolver Incentives
-                   - ResolverIncentiveModule*
-                       └─> PaymentCalculationLibraryV1
+                   - ResolverIncentiveModule
+                       └─> PaymentCalculationLibrary
 ```
 
 

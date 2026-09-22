@@ -47,9 +47,9 @@
 - Add a reentrancy guard and/or write “dispute created / pending” state before the external call.
 - Review the refund path (`msg.value - cost`) for the same pattern (avoid post-send mutations).
 
-### 3) Arbitrary `transferFrom` “from”: `ResolverIncentiveModuleV2.recordAppealBond(...)`
+### 3) Arbitrary `transferFrom` “from”: `ResolverIncentiveModule.recordAppealBond(...)`
 
-- **Slither finding:** `ResolverIncentiveModuleV2.recordAppealBond(...)` uses arbitrary `depositor` in `safeTransferFrom` (`contracts/decentralized-resolution-module/ResolverIncentiveModuleV2.sol#156-204`, transfer at ~`#182`).
+- **Slither finding:** `ResolverIncentiveModule.recordAppealBond(...)` uses arbitrary `depositor` in `safeTransferFrom` (`contracts/decentralized-resolution-module/ResolverIncentiveModule.sol#156-204`, transfer at ~`#182`).
 
 **Why this is P0:** if this function is callable by a party who can choose `depositor`, they can attempt to pull tokens from anyone who has approved the contract. Even if access-controlled today, this is fragile and worth hardening.
 
@@ -108,7 +108,7 @@ Flagged in:
 - `YieldOps.recoverTokens(...)` (`contracts/YieldOps.sol#258-272`)
 - `BaseEscrow.escalateDispute(...)` (`contracts/core/BaseEscrow.sol#763-913`)
 - `BondCollector.collectBond(...)` (`contracts/core/BondCollector.sol#77-160`)
-- `ResolverIncentiveModuleV2.sweep(...)` (`contracts/decentralized-resolution-module/ResolverIncentiveModuleV2.sol#523-549`)
+- `ResolverIncentiveModule.sweep(...)` (`contracts/decentralized-resolution-module/ResolverIncentiveModule.sol#523-549`)
 - plus Kleros arbitration call (`createDispute`).
 
 **Notes / recommendations:**
@@ -118,7 +118,7 @@ Flagged in:
   - clear revert-vs-best-effort policy when sending ETH,
   - no silent ETH trapping (especially when bonding uses ERC-20).
 
-### Uninitialized state: `ResolverIncentiveModuleV1.disputeResolvers`
+### Uninitialized state: `ResolverIncentiveModule.disputeResolvers`
 
 **Recommendation:**
 - If V1 is still used anywhere in deployments, fix initialization.
@@ -127,7 +127,7 @@ Flagged in:
 ### Division-before-multiplication warnings in economic math
 
 Flagged in:
-- `BondValuationLibrary` and parts of `ResolverSlashingModuleV1`.
+- `BondValuationLibrary` and parts of `ResolverSlashingModule`.
 
 **Recommendation:**
 - If values influence caps/bounds, prefer `mulDiv`-style arithmetic to reduce rounding bias.
@@ -174,7 +174,7 @@ Warnings like “local variable never initialized” for locals that default to 
 - **Must fix (P0):**
   - `BaseEscrow.raiseDispute` reentrancy posture
   - `KlerosArbitrableProxy.createDispute` reentrancy posture
-  - harden `ResolverIncentiveModuleV2.recordAppealBond` against arbitrary-from misuse (caller + depositor invariants)
+  - harden `ResolverIncentiveModule.recordAppealBond` against arbitrary-from misuse (caller + depositor invariants)
   - decide and enforce zero-address policy for critical setters
 
 - **Document (if not fixed yet):**

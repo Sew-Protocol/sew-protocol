@@ -67,7 +67,7 @@ The protocol consists of:
 
 3. **Resolver Incentive Module** (in separate package with DecentralizedResolutionModule):
    - `ResolverIncentiveModule`: Tracks resolver activity and distributes fees
-   - Payment calculation libraries: `PaymentCalculationLibraryV1` (swappable)
+   - Payment calculation libraries: `PaymentCalculationLibrary` (swappable)
 
 4. **Yield Generation Module** (optional):
    - `AaveYieldGenerationModule`: Deposits escrowed funds to Aave for yield generation

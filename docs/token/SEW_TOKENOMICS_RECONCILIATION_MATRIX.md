@@ -32,9 +32,9 @@
 
 | Claim | Docs source | Code source | Tests source | Status | Notes / actions |
 |---|---|---|---|---|---|
-| Appeal bonds: refunded if outcome flips; paid to prior round resolvers if outcome upheld | `docs/dispute-resolution/RESOLVER_ECONOMICS.md` | `contracts/decentralized-resolution-module/ResolverIncentiveModuleV2.sol` | `test/foundry/decentralized-resolution-module/AppealBondDistribution.unit.t.sol` etc. | ✅🧪 | Implementation includes edge case “no resolvers → bond retained”. |
+| Appeal bonds: refunded if outcome flips; paid to prior round resolvers if outcome upheld | `docs/dispute-resolution/RESOLVER_ECONOMICS.md` | `contracts/decentralized-resolution-module/ResolverIncentiveModule.sol` | `test/foundry/decentralized-resolution-module/AppealBondDistribution.unit.t.sol` etc. | ✅🧪 | Implementation includes edge case “no resolvers → bond retained”. |
 | Appeal bond protocol fee is implemented but defaults to 0% at launch | `docs/token/SEW_TOKENOMICS_EXCHANGE_DRAFT.md` / `docs/FEE_IMPLEMENTATION_SUMMARY.md` | `contracts/core/BaseEscrow.sol` (deducts at bond posting when enabled) | (optional: add a focused test) | ✅ | When `appealBondProtocolFeeBps = 0`, bonds are refunded/distributed in full. |
-| Resolver payments weighted by escalation level (1x, 1.5x, 2x) | `docs/test/INCENTIVE_VERIFICATION_PLAN.md` | `contracts/decentralized-resolution-module/PaymentCalculationLibraryV1.sol` | (find/confirm tests) | ✅🧪 | Payment calculation library is pure and upgradeable by swapping contract address in module. |
+| Resolver payments weighted by escalation level (1x, 1.5x, 2x) | `docs/test/INCENTIVE_VERIFICATION_PLAN.md` | `contracts/decentralized-resolution-module/PaymentCalculationLibrary.sol` | (find/confirm tests) | ✅🧪 | Payment calculation library is pure and upgradeable by swapping contract address in module. |
 
 ---
 
@@ -42,11 +42,11 @@
 
 | Claim | Docs source | Code source | Tests source | Status | Notes / actions |
 |---|---|---|---|---|---|
-| Resolvers can stake a mix of stable + SEW; enforce 80/20 + haircut | `docs/dispute-resolution/BOND_VALUATION_SUMMARY.md` | `contracts/decentralized-resolution-module/ResolverStakingModuleV1.sol` (+ `BondValuationLibrary`) | `test/foundry/decentralized-resolution-module/*Bond*` invariants | ✅🧪 | Code uses 50% haircut and enforces mix. |
-| SEW price is market-priced via input/oracle | `BOND_VALUATION_SUMMARY.md` describes `sewPrice` input | `ResolverStakingModuleV1` uses constant `sewPrice = $1` (oracle-free) | N/A | ⚠️ | Must be disclosed as **oracle-free fixed price assumption** in staking math. |
-| Slashing distributes slashed value across protocol/insurance/counterparty | DR docs/status mention distribution | `ResolverSlashingModuleV1` distributes based on stable amounts; insurance vault is stable-token-only | `test/foundry/decentralized-resolution-module/Slashing*` invariants | ⚠️🧪 | Counterparty share is currently 0; treasury routing is not integrated; see next rows. |
-| Slashing appeal requires posting an appeal bond (anti-spam) | DR docs mention bonded appeals | `ResolverSlashingModuleV1.appealSlash()` records `appealBond` but does not transfer/escrow funds | N/A | ❌ | Either implement bond custody or remove “bonded” claim. |
-| Slashed SEW is burned (deflationary sink) | `docs/dispute-resolution/DR_V3_LAUNCH_SAFE_DEFAULTS.md` | `contracts/decentralized-resolution-module/ResolverSlashingModuleV1.sol` | `test/foundry/decentralized-resolution-module/SlashingModuleUnit.t.sol` | ✅🧪 | Slashed SEW is handled as burned (not protocol revenue). |
+| Resolvers can stake a mix of stable + SEW; enforce 80/20 + haircut | `docs/dispute-resolution/BOND_VALUATION_SUMMARY.md` | `contracts/decentralized-resolution-module/ResolverStakingModule.sol` (+ `BondValuationLibrary`) | `test/foundry/decentralized-resolution-module/*Bond*` invariants | ✅🧪 | Code uses 50% haircut and enforces mix. |
+| SEW price is market-priced via input/oracle | `BOND_VALUATION_SUMMARY.md` describes `sewPrice` input | `ResolverStakingModule` uses constant `sewPrice = $1` (oracle-free) | N/A | ⚠️ | Must be disclosed as **oracle-free fixed price assumption** in staking math. |
+| Slashing distributes slashed value across protocol/insurance/counterparty | DR docs/status mention distribution | `ResolverSlashingModule` distributes based on stable amounts; insurance vault is stable-token-only | `test/foundry/decentralized-resolution-module/Slashing*` invariants | ⚠️🧪 | Counterparty share is currently 0; treasury routing is not integrated; see next rows. |
+| Slashing appeal requires posting an appeal bond (anti-spam) | DR docs mention bonded appeals | `ResolverSlashingModule.appealSlash()` records `appealBond` but does not transfer/escrow funds | N/A | ❌ | Either implement bond custody or remove “bonded” claim. |
+| Slashed SEW is burned (deflationary sink) | `docs/dispute-resolution/DR_V3_LAUNCH_SAFE_DEFAULTS.md` | `contracts/decentralized-resolution-module/ResolverSlashingModule.sol` | `test/foundry/decentralized-resolution-module/SlashingModuleUnit.t.sol` | ✅🧪 | Slashed SEW is handled as burned (not protocol revenue). |
 
 ---
 

@@ -49,7 +49,7 @@
 
 ### 🔄 In Progress
 
-6. **ResolverIncentiveModuleV1** (`contracts/decentralized-resolution-module/ResolverIncentiveModuleV1.sol`)
+6. **ResolverIncentiveModule** (`contracts/decentralized-resolution-module/ResolverIncentiveModule.sol`)
    - Status: 🔄 REVIEWING
    - Type: Payment distribution module
    - Risk: CRITICAL - Handles resolver payments, fee accounting
@@ -61,25 +61,25 @@
    - Status: ⏳ Pending
    - Type: Main resolution module
    - Risk: CRITICAL - Core dispute resolution logic
-   - Dependencies: ResolverIncentiveModuleV1, ResolverStakingModuleV1, ResolverSlashingModuleV1
+   - Dependencies: ResolverIncentiveModule, ResolverStakingModule, ResolverSlashingModule
 
-8. **ResolverStakingModuleV1** (`contracts/decentralized-resolution-module/ResolverStakingModuleV1.sol`)
+8. **ResolverStakingModule** (`contracts/decentralized-resolution-module/ResolverStakingModule.sol`)
    - Status: ⏳ Pending
    - Type: Staking module
    - Risk: CRITICAL - Manages resolver stakes
    - Notes: Handles SEW token burning on slash
 
-9. **ResolverSlashingModuleV1** (`contracts/decentralized-resolution-module/ResolverSlashingModuleV1.sol`)
+9. **ResolverSlashingModule** (`contracts/decentralized-resolution-module/ResolverSlashingModule.sol`)
    - Status: ⏳ Pending
    - Type: Slashing module
    - Risk: CRITICAL - Handles penalty execution
-   - Dependencies: ResolverStakingModuleV1
+   - Dependencies: ResolverStakingModule
 
-10. **ResolverIncentiveModuleV2** (`contracts/decentralized-resolution-module/ResolverIncentiveModuleV2.sol`)
+10. **ResolverIncentiveModule** (`contracts/decentralized-resolution-module/ResolverIncentiveModule.sol`)
     - Status: ⏳ Pending
     - Type: Enhanced incentive module (extends V1)
     - Risk: CRITICAL - Appeal bond logic
-    - Dependencies: ResolverIncentiveModuleV1
+    - Dependencies: ResolverIncentiveModule
 
 11. **InsurancePoolVault** (`contracts/decentralized-resolution-module/InsurancePoolVault.sol`)
     - Status: ⏳ Pending
@@ -171,10 +171,10 @@
 
 ## Supporting Libraries (MEDIUM)
 
-24. **PaymentCalculationLibraryV1** (`contracts/decentralized-resolution-module/PaymentCalculationLibraryV1.sol`)
+24. **PaymentCalculationLibrary** (`contracts/decentralized-resolution-module/PaymentCalculationLibrary.sol`)
     - Status: ⏳ Pending
     - Type: Payment calculation logic
-    - Risk: MEDIUM - Used by ResolverIncentiveModuleV1
+    - Risk: MEDIUM - Used by ResolverIncentiveModule
     - Notes: Pure functions, but critical for payment correctness
 
 25. **EscalationCostLibrary** (`contracts/decentralized-resolution-module/EscalationCostLibrary.sol`)
@@ -311,9 +311,9 @@
 
 ## Next Steps
 
-1. ✅ Complete ResolverIncentiveModuleV1 review
+1. ✅ Complete ResolverIncentiveModule review
 2. Review DecentralizedResolutionModule (depends on incentive module)
-3. Review ResolverStakingModuleV1 and ResolverSlashingModuleV1
+3. Review ResolverStakingModule and ResolverSlashingModule
 4. Review governance contracts
 5. Review payment calculation libraries
 6. Complete remaining core contracts

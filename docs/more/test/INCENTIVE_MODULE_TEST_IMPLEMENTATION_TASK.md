@@ -31,7 +31,7 @@ Implement the missing unit tests specified in `INCENTIVE_MODULE_TEST_PLAN.md`. I
 contract IncentiveModuleHooksTest is Test {
     EscrowVault public escrow;
     DecentralizedResolutionModule public resolutionModule;
-    ResolverIncentiveModuleV1 public incentiveModule;
+    ResolverIncentiveModule public incentiveModule;
     ERC20Mock public token;
     
     function setUp() public {
@@ -132,8 +132,8 @@ function setUp() public {
     
     // Deploy contracts
     token = new ERC20Mock('Test Token', 'TEST', address(this), 0);
-    paymentLib = new PaymentCalculationLibraryV1();
-    incentiveModule = new ResolverIncentiveModuleV2(deployer, address(paymentLib));
+    paymentLib = new PaymentCalculationLibrary();
+    incentiveModule = new ResolverIncentiveModule(deployer, address(paymentLib));
     resolutionModule = new DecentralizedResolutionModule(deployer);
     
     // Setup roles
@@ -195,7 +195,7 @@ After implementation, verify:
 
 - **Test Plan**: `docs/test/INCENTIVE_MODULE_TEST_PLAN.md`
 - **Existing Integration Tests**: `test/foundry/decentralized-resolution-module/IncentiveModuleIntegration.test.t.sol`
-- **Contract Under Test**: `contracts/decentralized-resolution-module/ResolverIncentiveModuleV2.sol`
+- **Contract Under Test**: `contracts/decentralized-resolution-module/ResolverIncentiveModule.sol`
 - **Interface**: `contracts/decentralized-resolution-module/IIncentiveModule.sol`
 
 ---

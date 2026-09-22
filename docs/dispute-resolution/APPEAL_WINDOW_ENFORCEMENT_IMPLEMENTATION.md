@@ -307,7 +307,7 @@ When a dispute is escalated during the appeal window:
 
 ✅ **IMPLEMENTATION COMPLETE**
 
-All requirements from `DR_V3_TODO.md` Phase 5.4 have been implemented:
+All requirements from `docs/archived/DR_V3_TODO.md` Phase 5.4 have been implemented:
 
 - ✅ Tokens only transferred after appeal window expires
 - ✅ Resolution decision recorded (sets appeal deadline)

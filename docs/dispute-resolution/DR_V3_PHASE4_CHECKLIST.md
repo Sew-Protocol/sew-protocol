@@ -28,7 +28,7 @@
 **Implementation:**
 
 ```solidity
-// ResolverSlashingModuleV1.sol:289-292
+// ResolverSlashingModule.sol:289-292
 if (workflowSlashed[workflowId][resolver]) {
     return 0; // Already slashed, skip
 }
@@ -151,7 +151,7 @@ function selectResolverRoundRobin(...) internal view returns (address) {
 **Implementation:**
 
 ```solidity
-// ResolverStakingModuleV1.sol:276-278
+// ResolverStakingModule.sol:276-278
 require(!isResolverFrozen(resolver), "Resolver frozen");
 ```
 
@@ -177,7 +177,7 @@ require(!isResolverFrozen(resolver), "Resolver frozen");
 **Top-Up Implementation:**
 
 ```solidity
-// ResolverStakingModuleV1.sol:197-250
+// ResolverStakingModule.sol:197-250
 function stakeWithMix(...) public nonReentrant {
     require(!paused, "Paused");
     // NO freeze check - allows top-up ✅
@@ -194,7 +194,7 @@ function stakeWithMix(...) public nonReentrant {
 **Thaw Logic:**
 
 ```solidity
-// ResolverSlashingModuleV1.sol:583-586
+// ResolverSlashingModule.sol:583-586
 function _freezeResolver(address resolver) internal {
   frozenUntil[resolver] = block.timestamp + FREEZE_DURATION; // 7 days
   emit ResolverFrozen(resolver, frozenUntil[resolver]);
@@ -282,7 +282,7 @@ if (address(slashingModule) != address(0)) {
 **Implementation:**
 
 ```solidity
-// ResolverSlashingModuleV1.sol:560-578
+// ResolverSlashingModule.sol:560-578
 function _distributeSlashedFunds(...) internal returns (SlashDistribution memory) {
     // Conservative distribution:
     // - 50% to insurance pool (protect users)
@@ -328,7 +328,7 @@ function _distributeSlashedFunds(...) internal returns (SlashDistribution memory
 **Slash Execution:**
 
 ```solidity
-// ResolverStakingModuleV1.sol:856-862
+// ResolverStakingModule.sol:856-862
 // Transfer slashed funds to slashing module
 if (stableSlashed > 0) {
     stableToken.safeTransfer(msg.sender, stableSlashed); // msg.sender = slashing module
@@ -341,7 +341,7 @@ if (sewSlashed > 0) {
 **Distribution Tracking:**
 
 ```solidity
-// ResolverSlashingModuleV1.sol:575
+// ResolverSlashingModule.sol:575
 insurancePoolBalance += distribution.toInsurancePool;
 ```
 
@@ -378,7 +378,7 @@ Invariant: balanceOf(slashingModule) >= insurancePoolBalance
 **Pause (Staking Module):**
 
 ```solidity
-// ResolverStakingModuleV1.sol:975-978
+// ResolverStakingModule.sol:975-978
 function pause(string memory reason) external onlyRole(ROLE_ADMIN) {
   paused = true;
   emit EmergencyPaused(msg.sender, reason);
@@ -388,7 +388,7 @@ function pause(string memory reason) external onlyRole(ROLE_ADMIN) {
 **Circuit Breaker (Slashing Module):**
 
 ```solidity
-// ResolverSlashingModuleV1.sol:751-754
+// ResolverSlashingModule.sol:751-754
 function triggerCircuitBreaker(string memory reason) external onlyRole(ROLE_ADMIN) {
     _triggerCircuitBreaker(reason);
 }
@@ -436,7 +436,7 @@ function activateStakingModule() external onlyRole(ROLE_TIMELOCK) {
 **Standard Lane (Immediate):**
 
 ```solidity
-// ResolverSlashingModuleV1.sol:735-740
+// ResolverSlashingModule.sol:735-740
 function setSlashPercentage(SlashReason reason, uint256 bps) external onlyRole(ROLE_ADMIN) {
   // Immediate effect
   slashConfig.timeoutSlashBps = bps;
@@ -446,7 +446,7 @@ function setSlashPercentage(SlashReason reason, uint256 bps) external onlyRole(R
 **Emergency Lane (Immediate):**
 
 ```solidity
-// ResolverStakingModuleV1.sol:975
+// ResolverStakingModule.sol:975
 function pause(string memory reason) external onlyRole(ROLE_ADMIN) {
   paused = true; // Immediate
 }

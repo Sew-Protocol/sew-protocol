@@ -108,7 +108,7 @@ EscalationCostConfig {
 
 **For V2 Bond Tests**:
 
-1. Deploy `ResolverIncentiveModuleV2` (not V1)
+1. Deploy `ResolverIncentiveModule` (not V1)
 2. Set incentive module in resolution module: `resolutionModule.setIncentiveModule(address(incentiveModuleV2))`
 3. Configure escalation cost:
    ```solidity
@@ -305,7 +305,7 @@ incentiveModule.recordResolver(workflowId, resolver1, 0); // Round 0
 
 ## Key Contract Interfaces
 
-### ResolverIncentiveModuleV2 Functions
+### ResolverIncentiveModule Functions
 
 ```solidity
 // Record bond (called by BaseEscrow during escalation)

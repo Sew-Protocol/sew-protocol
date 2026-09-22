@@ -278,8 +278,8 @@ constructor(address initialOwner) {
 **Used in:**
 - `YieldOps.sol`
 - `AaveYieldGenerationModule.sol`
-- `ResolverIncentiveModuleV1.sol`
-- `ResolverSlashingModuleV1.sol`
+- `ResolverIncentiveModule.sol`
+- `ResolverSlashingModule.sol`
 
 **Pattern 2: Ownable with initialOwner**
 ```solidity
@@ -314,7 +314,7 @@ constructor(
 }
 ```
 **Used in:**
-- `ResolverStakingModuleV1.sol`
+- `ResolverStakingModule.sol`
 
 **Issues Found:**
 

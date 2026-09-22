@@ -40,7 +40,7 @@ All critical and high-priority security issues identified in the QA reviews have
 
 ---
 
-### Incentive Module (ResolverIncentiveModuleV1)
+### Incentive Module (ResolverIncentiveModule)
 
 **🔴 CRITICAL (Fixed):**
 - ✅ CRIT-1: Added balance validation to ensure balance matches recorded fees
@@ -111,7 +111,7 @@ All critical and high-priority security issues identified in the QA reviews have
 1. `contracts/core/EscrowVault.sol`
 2. `contracts/core/EscrowableERC20.sol`
 3. `contracts/core/BaseEscrow.sol`
-4. `contracts/decentralized-resolution-module/ResolverIncentiveModuleV1.sol`
+4. `contracts/decentralized-resolution-module/ResolverIncentiveModule.sol`
 5. `contracts/YieldOps.sol`
 6. `contracts/modules/AaveYieldGenerationModule.sol`
 

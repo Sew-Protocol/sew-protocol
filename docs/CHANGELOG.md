@@ -24,8 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Dispute liveness timeout (`ACTION_DISPUTE_TIMEOUT`, type 5) — auto-cancels escrows stuck in `DISPUTED` state when `maxDisputeDuration` elapses since `disputeRaisedTimestamp`. On trigger, finalizes the dispute and refunds the sender.
 - Slashing module integration (DR v3): `slashingModule` address in `DRMStorageBase`, wired into `recordResolution` (vindication credit via `restoreReversalSlashOnVindication`) and `recordReversal` (automated slash via `slashForReversal`).
-- `restoreReversalSlashOnVindication` in `ResolverSlashingModuleV1` — iterates prior rounds and credits resolver stake when a higher-level resolution vindicates a prior decision.
-- `creditStakeForVindication` in `ResolverStakingModuleV1` and `IStakingModule` for protocol-backed liability restoration.
+- `restoreReversalSlashOnVindication` in `ResolverSlashingModule` — iterates prior rounds and credits resolver stake when a higher-level resolution vindicates a prior decision.
+- `creditStakeForVindication` in `ResolverStakingModule` and `IStakingModule` for protocol-backed liability restoration.
 - `REVERSED_WITH_CREDIT` status and `SlashRestoredOnVindication` event in `ISlashingModule`.
 - Explicit CodeQL workflow (`.github/workflows/codeql.yml`) with pnpm pre-installed — fixes CI runner "pnpm not found" error on javascript-typescript analysis.
 - V2 Strategic Preparation: Defined semantic identity architecture (bytes32 derived IDs) to achieve cryptographic provenance and eliminate potential identity-confusion risks identified in simulation audits.
@@ -55,8 +55,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Consolidated DR incentive module V1/V2 into one contract** — `ResolverIncentiveModuleV1` and `ResolverIncentiveModuleV2` are merged into a single flat `ResolverIncentiveModule` (`incentive/ResolverIncentiveModule.sol`). V2 extended V1 with appeal-bond functions, so they are now one contract; no separate V1/V2 versions remain. `ResolverIncentiveModuleV2BondLedger` is unchanged.
+- **Renamed DR modules to drop `V1` suffix** — `ResolverStakingModuleV1` → `ResolverStakingModule` (`staking/ResolverStakingModule.sol`), `ResolverSlashingModuleV1` → `ResolverSlashingModule` (`slashing/ResolverSlashingModule.sol`, its import of the staking module updated), and `PaymentCalculationLibraryV1` → `PaymentCalculationLibrary` (`libraries/PaymentCalculationLibrary.sol`). Imports, references, and documentation updated accordingly.
+
 - **Appeal-bond distribution is now atomic in `recordResolution`** — for higher-round decisions the bond is settled as part of the resolution transition: a flipped decision refunds the bond to the escalator, a matching decision pays the prior-round resolvers. A settlement failure reverts the entire resolution (no silent `try/catch` swallow). `recordReversal` is reduced to reversal analytics + automated slashing; distribution is owned by `recordResolution`.
-- **Resolution-module authority** — `ResolverIncentiveModuleV1` gains `resolutionModule` + `setResolutionModule()` (`ROLE_TIMELOCK`). `distributeAppealBond`, `onDisputeFinalized`, and `onResolverAssigned` accept a registered escrow or the configured resolution module (`onlyEscrowOrResolutionModule`), fixing resolver-cohort population through the DRM production path.
+- **Resolution-module authority** — `ResolverIncentiveModule` gains `resolutionModule` + `setResolutionModule()` (`ROLE_TIMELOCK`). `distributeAppealBond`, `onDisputeFinalized`, and `onResolverAssigned` accept a registered escrow or the configured resolution module (`onlyEscrowOrResolutionModule`), fixing resolver-cohort population through the DRM production path.
 - **Forfeited principal is accounted** — explicit forfeiture, no-resolver payout paths, and finalization cleanup now credit `forfeitedBondReserve` instead of leaving tokens stranded with no liability destination. The reserve has no withdrawal authority in this phase.
 
 - Updated CI node-version from 20 to 22 (Node 20 deprecated on GitHub Actions runners). Swapped `setup-node`/`setup-pnpm` order so pnpm is on PATH before store-cache resolution.
@@ -91,7 +94,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Resolver cohorts not populated through the production path** — `onResolverAssigned` was `onlyEscrowContract`, so the DRM could not record round resolvers, leaving failed-appeal payouts to run against empty/incomplete sets. Now uses `onlyEscrowOrResolutionModule`.
 
 - **Resolver rotation capacity leak in `forceProgress()`:** When a resolver times out and `forceProgress` rotates to a new resolver, the old resolver's `resolverActiveDisputes`, `resolverCapacity.currentDisputes`, and `resolverStats.casesAssigned` are now decremented (they were never cleaned up, causing capacity drift). The old resolver's stake is unlocked via `stakingModule.onDisputeEscalated()` and the new resolver's stake is locked via `stakingModule.onResolverAssigned()`.
-- **Escalation/challenge bond leak on `finalize`:** `ResolverIncentiveModuleV2.onDisputeFinalized` was inherited as a no-op from V1, so undistributed appeal/challenge bonds for finalized rounds accumulated indefinitely. The override now iterates rounds 0 to `finalRound` and forfeits any undistributed bonds via `AppealBondForfeited`.
+- **Escalation/challenge bond leak on `finalize`:** `ResolverIncentiveModule.onDisputeFinalized` was inherited as a no-op from V1, so undistributed appeal/challenge bonds for finalized rounds accumulated indefinitely. The override now iterates rounds 0 to `finalRound` and forfeits any undistributed bonds via `AppealBondForfeited`.
 - **`onDisputeFinalized` made virtual in V1:** Allows V2 to override it for bond cleanup.
 
 - **StateManagementLibrary guards:** `transitionToReleased`, `transitionToRefunded`, `transitionToResolved`, and `transitionToDisputed` now revert `AlreadyTerminal` if called on a terminal escrow — prevents silent state corruption.
