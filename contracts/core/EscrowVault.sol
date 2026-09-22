@@ -112,7 +112,7 @@ contract EscrowVault is BaseEscrow {
 
     bytes32 public constant ROLE_FEE_RECIPIENT = keccak256('ROLE_FEE_RECIPIENT');
 
-    function withdrawFees(address token) external onlyRole(ROLE_FEE_RECIPIENT) nonReentrant {
+    function withdrawFees(address token) external nonReentrant onlyRole(ROLE_FEE_RECIPIENT) {
         uint256 feeAmount = FeeWithdrawalLibrary.withdrawFees(totalFeesPerToken, token, escrowFeeAddress);
         emit FeesWithdrawn(token, feeAmount);
     }

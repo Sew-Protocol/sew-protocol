@@ -542,7 +542,7 @@ contract ResolverIncentiveModule is
         uint256 workflowId,
         address escrowContract,
         address token
-    ) public onlyEscrowContract nonReentrant {
+    ) public nonReentrant onlyEscrowContract {
         if (token == address(0)) revert ZeroToken();
         if (paymentsCalculated[escrowContract][workflowId]) revert PaymentsAlreadyCalculated(workflowId);
 
@@ -1413,7 +1413,7 @@ contract ResolverIncentiveModule is
         address escrowContract,
         uint8 round,
         bool outcomeFlipped
-    ) external virtual override onlyEscrowOrResolutionModule nonReentrant {
+    ) external virtual override nonReentrant onlyEscrowOrResolutionModule {
         // Validate round bounds
         require(round < 2, 'Invalid round - no higher round');
 
@@ -1450,7 +1450,7 @@ contract ResolverIncentiveModule is
         address escrowContract,
         uint8 round,
         string calldata reason
-    ) external onlyEscrowContract nonReentrant {
+    ) external nonReentrant onlyEscrowContract {
         AppealBondRecord storage bond = appealBonds[escrowContract][workflowId][round];
         require(bond.amount > 0, 'No bond recorded');
         require(!bond.distributed, 'Bond already distributed');

@@ -87,7 +87,7 @@ contract ResolverIncentiveModuleV2BondLedger is ResolverIncentiveModule {
         address escrowContract,
         uint8 round,
         bool outcomeFlipped
-    ) external override onlyEscrowOrResolutionModule nonReentrant {
+    ) external override nonReentrant onlyEscrowOrResolutionModule {
         require(round < 2, 'Invalid round - no higher round');
         uint8 bondRound = round + 1;
         bytes32 bondId = _bondId(escrowContract, workflowId, bondRound);
@@ -145,7 +145,7 @@ contract ResolverIncentiveModuleV2BondLedger is ResolverIncentiveModule {
         address escrowContract,
         uint8 round,
         string calldata reason
-    ) external onlyEscrowContract nonReentrant {
+    ) external nonReentrant onlyEscrowContract {
         bytes32 bondId = _bondId(escrowContract, workflowId, round);
         IBondLedger.BondPosition memory pos = bondLedger.getBond(bondId);
         require(pos.principal > 0, 'No bond recorded');

@@ -19,6 +19,17 @@ root = "."
 # Example:
 # src = "src/"
 
+# Production-only analysis: exclude mocks, generated code, vendor code, and
+# obvious test-only contracts. Core libraries and interfaces are intentionally
+# NOT excluded so the report keeps full production coverage.
+exclude = [
+  "contracts/mocks/",
+  "contracts/arbitration/mocks/",
+  "contracts/test/",
+  "contracts/generated/",
+  "contracts/vendor/"
+]
+
 # Path segments of contract files to include in the analysis.
 # - It can be a partial match like "/interfaces/", which will include all files with "/interfaces/" in the file path.
 #   Or it can be a full match like "src/counters/Counter.sol", which will include only the file with the exact path.

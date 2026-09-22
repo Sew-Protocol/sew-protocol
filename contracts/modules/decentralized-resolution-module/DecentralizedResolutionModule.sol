@@ -366,7 +366,7 @@ contract DecentralizedResolutionModule is
         bytes calldata escrowData,
         bytes32 resolutionQuoteRoot,
         bytes32 klerosConfigRoot
-    ) external override onlyEscrowContract nonReentrant returns (bytes32 handoffRoot) {
+    ) external override nonReentrant onlyEscrowContract returns (bytes32 handoffRoot) {
         if (escrowContract != _msgSender()) revert NotRegisteredEscrowContract(_msgSender());
         IResolutionModule.ResolutionAppealQuote memory quote = _quoteAppealTransition(workflowId, escrowContract, escrowData);
         if (!quote.appealable || quote.successorRound != 2 || quote.resolutionQuoteRoot != resolutionQuoteRoot) {
@@ -398,7 +398,7 @@ contract DecentralizedResolutionModule is
         bytes32 handoffRoot,
         bytes32 klerosConfigRoot,
         uint256 klerosDisputeId
-    ) external override onlyEscrowContract nonReentrant returns (bool success, address newResolver, uint8 newLevel) {
+    ) external override nonReentrant onlyEscrowContract returns (bool success, address newResolver, uint8 newLevel) {
         if (escrowContract != _msgSender()) revert NotRegisteredEscrowContract(_msgSender());
         PreparedKlerosHandoff memory prepared = _preparedKlerosHandoffs[escrowContract][workflowId];
         if (!prepared.exists || prepared.handoffRoot != handoffRoot || prepared.resolutionQuoteRoot != resolutionQuoteRoot

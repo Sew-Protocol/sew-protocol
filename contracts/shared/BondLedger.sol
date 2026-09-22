@@ -63,7 +63,7 @@ contract BondLedger is IBondLedger, AccessControl, ReentrancyGuard {
         uint256 principal,
         bytes32 contextId,
         bytes32 termsHash
-    ) external payable onlyAuthorized nonReentrant {
+    ) external payable nonReentrant onlyAuthorized {
         BondPosition storage pos = _positions[bondId];
         if (pos.status != uint8(BondStatus.NONE)) revert InvalidStatus();
 
@@ -104,7 +104,7 @@ contract BondLedger is IBondLedger, AccessControl, ReentrancyGuard {
         SettlementKind kind,
         DispositionCauseType causeType,
         bytes32 causeRoot
-    ) external onlyAuthorized nonReentrant {
+    ) external nonReentrant onlyAuthorized {
         _requirePositionOperator(bondId);
         _settleBond(bondId, allocations, kind, causeType, causeRoot);
     }
@@ -170,7 +170,7 @@ contract BondLedger is IBondLedger, AccessControl, ReentrancyGuard {
         _claim(bondId, recipient);
     }
 
-    function claimFor(bytes32 bondId, address recipient) external onlyAuthorized nonReentrant {
+    function claimFor(bytes32 bondId, address recipient) external nonReentrant onlyAuthorized {
         _claim(bondId, recipient);
     }
 

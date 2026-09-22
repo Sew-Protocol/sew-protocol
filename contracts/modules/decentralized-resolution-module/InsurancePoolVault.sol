@@ -120,7 +120,7 @@ contract InsurancePoolVault is AccessControl, ReentrancyGuard {
         ISlashingModule.SlashReason source,
         uint256 workflowId,
         address /* escrowContract */
-    ) external onlyRole(ROLE_SLASHING_MODULE) nonReentrant {
+    ) external nonReentrant onlyRole(ROLE_SLASHING_MODULE) {
         if (amount == 0) revert ZeroAmount();
 
         // Transfer tokens from slashing module
@@ -207,7 +207,7 @@ contract InsurancePoolVault is AccessControl, ReentrancyGuard {
      * @notice Execute pending payout (after slow lane delay)
      * @param payoutId Pending payout ID
      */
-    function executePayout(uint256 payoutId) external onlyRole(ROLE_TIMELOCK) nonReentrant {
+    function executePayout(uint256 payoutId) external nonReentrant onlyRole(ROLE_TIMELOCK) {
         PendingPayout storage payout = pendingPayouts[payoutId];
         if (!payout.exists) revert PayoutNotFound(payoutId);
         if (block.timestamp < payout.eta) revert DelayNotPassed(payout.eta, block.timestamp);
@@ -261,7 +261,7 @@ contract InsurancePoolVault is AccessControl, ReentrancyGuard {
         address to,
         uint256 amount,
         uint256 workflowId
-    ) external onlyRole(ROLE_TIMELOCK) nonReentrant {
+    ) external nonReentrant onlyRole(ROLE_TIMELOCK) {
         require(withdrawalsEnabled, 'Withdrawals disabled');
         if (to == address(0)) revert ZeroAddress();
         if (amount == 0) revert ZeroAmount();
