@@ -2,10 +2,10 @@
 pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModuleV2.sol';
-import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibraryV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModule.sol';
+import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibrary.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
-import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModuleV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModule.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 
@@ -16,8 +16,8 @@ import '../../../contracts/core/ModuleSnapshotRegistry.sol';
  * @dev Tests appeal bond recording with various parameters and edge cases
  */
 contract AppealBondRecordingTest is Test {
-    ResolverIncentiveModuleV2 public incentiveModule;
-    PaymentCalculationLibraryV1 public paymentLib;
+    ResolverIncentiveModule public incentiveModule;
+    PaymentCalculationLibrary public paymentLib;
     EscrowVault public escrow;
     ERC20Mock public token;
     ModuleSnapshotRegistry public moduleManagement;
@@ -37,8 +37,8 @@ contract AppealBondRecordingTest is Test {
         feeAddress = makeAddr('feeAddress');
 
         // Deploy contracts
-        paymentLib = new PaymentCalculationLibraryV1();
-        incentiveModule = new ResolverIncentiveModuleV2(deployer, address(paymentLib));
+        paymentLib = new PaymentCalculationLibrary();
+        incentiveModule = new ResolverIncentiveModule(deployer, address(paymentLib));
         token = new ERC20Mock('Test Token', 'TEST', address(this), 0);
         incentiveModule.grantRole(incentiveModule.ROLE_TIMELOCK(), address(this));
         incentiveModule.registerEscrowContract(address(this));
@@ -72,7 +72,7 @@ contract AppealBondRecordingTest is Test {
         incentiveModule.recordAppealBond(WORKFLOW_ID, address(this), depositor, depositor, amount, address(token), round);
 
         // Verify bond recorded
-        ResolverIncentiveModuleV2.AppealBondRecord memory bond = incentiveModule.getAppealBond(
+        ResolverIncentiveModule.AppealBondRecord memory bond = incentiveModule.getAppealBond(
             WORKFLOW_ID,
             address(this),
             round
@@ -104,7 +104,7 @@ contract AppealBondRecordingTest is Test {
         );
 
         // Verify bond recorded
-        ResolverIncentiveModuleV2.AppealBondRecord memory bond = incentiveModule.getAppealBond(
+        ResolverIncentiveModule.AppealBondRecord memory bond = incentiveModule.getAppealBond(
             WORKFLOW_ID,
             address(this),
             round
@@ -129,7 +129,7 @@ contract AppealBondRecordingTest is Test {
         incentiveModule.recordAppealBond(WORKFLOW_ID, address(this), depositor, depositor, amount, address(token), round);
 
         // Verify bond recorded
-        ResolverIncentiveModuleV2.AppealBondRecord memory bond = incentiveModule.getAppealBond(
+        ResolverIncentiveModule.AppealBondRecord memory bond = incentiveModule.getAppealBond(
             WORKFLOW_ID,
             address(this),
             round

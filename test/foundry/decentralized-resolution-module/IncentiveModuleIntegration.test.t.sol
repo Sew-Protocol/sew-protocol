@@ -2,10 +2,10 @@
 pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModuleV1.sol';
-import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModuleV2.sol';
+import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModule.sol';
+import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModule.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol';
-import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibraryV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibrary.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DRMAdminFacet.sol';
@@ -25,9 +25,9 @@ import '../helpers/KlerosHandoffFixture.sol';
 contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
     EscrowVault public escrow;
     DecentralizedResolutionModule public resolutionModule;
-    ResolverIncentiveModuleV1 public incentiveModuleV1;
-    ResolverIncentiveModuleV2 public incentiveModuleV2;
-    PaymentCalculationLibraryV1 public paymentLib;
+    ResolverIncentiveModule public incentiveModuleV1;
+    ResolverIncentiveModule public incentiveModuleV2;
+    PaymentCalculationLibrary public paymentLib;
     ERC20Mock public token;
     EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
@@ -68,11 +68,11 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
         token.mint(user2, INITIAL_BALANCE);
 
         // Deploy payment library
-        paymentLib = new PaymentCalculationLibraryV1();
+        paymentLib = new PaymentCalculationLibrary();
 
         // Deploy incentive modules
-        incentiveModuleV1 = new ResolverIncentiveModuleV1(deployer, address(paymentLib));
-        incentiveModuleV2 = new ResolverIncentiveModuleV2(deployer, address(paymentLib));
+        incentiveModuleV1 = new ResolverIncentiveModule(deployer, address(paymentLib));
+        incentiveModuleV2 = new ResolverIncentiveModule(deployer, address(paymentLib));
 
         incentiveModuleV1.grantRole(incentiveModuleV1.ROLE_TIMELOCK(), address(this));
         incentiveModuleV2.grantRole(incentiveModuleV2.ROLE_TIMELOCK(), address(this));
@@ -321,7 +321,7 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
         vm.stopPrank();
 
         // Verify bond was recorded
-        ResolverIncentiveModuleV2.AppealBondRecord memory bond = incentiveModuleV2.getAppealBond(
+        ResolverIncentiveModule.AppealBondRecord memory bond = incentiveModuleV2.getAppealBond(
             workflowId,
             address(escrow),
             1
@@ -500,7 +500,7 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
         resolutionModule.recordReversal(workflowId, address(escrow), 0);
 
         // Verify bond was refunded (outcomeFlipped = true)
-        ResolverIncentiveModuleV2.AppealBondRecord memory bond = incentiveModuleV2.getAppealBond(
+        ResolverIncentiveModule.AppealBondRecord memory bond = incentiveModuleV2.getAppealBond(
             workflowId,
             address(escrow),
             1
@@ -590,7 +590,7 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
 
         // Bond distribution triggered by recordResolution above.
         // Verify bond was paid to resolvers (not refunded)
-        ResolverIncentiveModuleV2.AppealBondRecord memory bond = incentiveModuleV2.getAppealBond(
+        ResolverIncentiveModule.AppealBondRecord memory bond = incentiveModuleV2.getAppealBond(
             workflowId,
             address(escrow),
             1
@@ -990,7 +990,7 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
         escrow.escalateDispute(wf);
         vm.stopPrank();
 
-        ResolverIncentiveModuleV2.AppealBondRecord memory bond = incentiveModuleV2.getAppealBond(wf, address(escrow), 1);
+        ResolverIncentiveModule.AppealBondRecord memory bond = incentiveModuleV2.getAppealBond(wf, address(escrow), 1);
         assertEq(bond.amount, expectedBondToRecord, "recorded bond must equal net bond amount");
         assertEq(escrow.claimableBondProtocolFees(bondToken, feeRecipient), expectedFee, "fee must be fully credited");
         assertEq(expectedBondToRecord + expectedFee, bondAmount, "no protocol fee value may disappear");

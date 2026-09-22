@@ -2,14 +2,14 @@
 pragma solidity ^0.8.37;
 
 import "forge-std/Test.sol";
-import "../../contracts/modules/decentralized-resolution-module/staking/ResolverStakingModuleV1.sol";
-import "../../contracts/modules/decentralized-resolution-module/slashing/ResolverSlashingModuleV1.sol";
+import "../../contracts/modules/decentralized-resolution-module/staking/ResolverStakingModule.sol";
+import "../../contracts/modules/decentralized-resolution-module/slashing/ResolverSlashingModule.sol";
 import "../../contracts/modules/decentralized-resolution-module/InsurancePoolVault.sol";
 import "../../contracts/mocks/ERC20Mock.sol";
 
 contract BondWithdrawalGuardTest is Test {
-    ResolverStakingModuleV1 public staking;
-    ResolverSlashingModuleV1 public slashing;
+    ResolverStakingModule public staking;
+    ResolverSlashingModule public slashing;
     InsurancePoolVault public insurance;
     ERC20Mock public stableToken;
     ERC20Mock public sewToken;
@@ -23,8 +23,8 @@ contract BondWithdrawalGuardTest is Test {
         sewToken = new ERC20Mock("SEW", "SEW", admin, 1000000 ether);
         insurance = new InsurancePoolVault(address(stableToken), admin);
         
-        staking = new ResolverStakingModuleV1(admin, address(stableToken), address(sewToken));
-        slashing = new ResolverSlashingModuleV1(admin, address(staking), address(insurance), address(stableToken));
+        staking = new ResolverStakingModule(admin, address(stableToken), address(sewToken));
+        slashing = new ResolverSlashingModule(admin, address(staking), address(insurance), address(stableToken));
         
         // Grant roles for setup
         staking.grantRole(staking.ROLE_TIMELOCK(), admin);

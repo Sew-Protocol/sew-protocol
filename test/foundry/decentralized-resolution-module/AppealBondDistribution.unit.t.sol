@@ -2,21 +2,21 @@
 pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModuleV2.sol';
-import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibraryV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModule.sol';
+import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibrary.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
-import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModuleV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModule.sol';
 /**
  * @title AppealBondDistributionTest
  * @notice Unit tests for distributeAppealBond functionality
  * @dev Tests appeal bond distribution on appeal success and failure
  */
 contract AppealBondDistributionTest is Test {
-    ResolverIncentiveModuleV2 public incentiveModule;
-    PaymentCalculationLibraryV1 public paymentLib;
+    ResolverIncentiveModule public incentiveModule;
+    PaymentCalculationLibrary public paymentLib;
     EscrowVault public escrow;
     ERC20Mock public token;
     ModuleSnapshotRegistry public moduleManagement;
@@ -41,8 +41,8 @@ contract AppealBondDistributionTest is Test {
         feeAddress = makeAddr('feeAddress');
 
         // Deploy contracts
-        paymentLib = new PaymentCalculationLibraryV1();
-        incentiveModule = new ResolverIncentiveModuleV2(deployer, address(paymentLib));
+        paymentLib = new PaymentCalculationLibrary();
+        incentiveModule = new ResolverIncentiveModule(deployer, address(paymentLib));
         token = new ERC20Mock('Test Token', 'TEST', address(this), 0);
         incentiveModule.grantRole(incentiveModule.ROLE_TIMELOCK(), address(this));
         incentiveModule.registerEscrowContract(address(this));
@@ -219,7 +219,7 @@ contract AppealBondDistributionTest is Test {
         incentiveModule.distributeAppealBond(WORKFLOW_ID, address(this), 0, false);
     }
 
-    // Event declarations for testing (matching ResolverIncentiveModuleV2)
+    // Event declarations for testing (matching ResolverIncentiveModule)
     event AppealBondRefunded(
         uint256 indexed escrowId,
         uint8 round,

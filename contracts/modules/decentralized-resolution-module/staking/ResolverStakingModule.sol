@@ -18,7 +18,7 @@ interface IERC20Burnable {
 }
 
 /**
- * @title ResolverStakingModuleV1
+ * @title ResolverStakingModule
  * @notice Real staking implementation for DR v3 with mixed stable/SEW bonds
  * @dev Key Features:
  *      - ERC20 stablecoin staking (primary)
@@ -34,7 +34,7 @@ interface IERC20Burnable {
  *      3. Withdrawals cannot bypass freeze/unbond delays
  *      4. Senior coverage only exposed after resolver exhausted
  */
-contract ResolverStakingModuleV1 is IStakingModule, AccessControl, ReentrancyGuard {
+contract ResolverStakingModule is IStakingModule, AccessControl, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using BondValuationLibrary for *;
 

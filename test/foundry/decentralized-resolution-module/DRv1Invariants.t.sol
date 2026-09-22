@@ -5,10 +5,10 @@ import 'forge-std/Test.sol';
 import 'forge-std/StdInvariant.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DRMAdminFacet.sol';
-import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModuleV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModule.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
 import '../../../contracts/modules/decentralized-resolution-module/analytics/ResolutionAnalytics.sol';
-import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibraryV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibrary.sol';
 
 /**
  * @title DRv1InvariantsTest
@@ -17,8 +17,8 @@ import '../../../contracts/modules/decentralized-resolution-module/libraries/Pay
  */
 contract DRv1InvariantsTest is StdInvariant, Test {
     DecentralizedResolutionModule public resolutionModule;
-    ResolverIncentiveModuleV1 public incentiveModule;
-    PaymentCalculationLibraryV1 public paymentLib;
+    ResolverIncentiveModule public incentiveModule;
+    PaymentCalculationLibrary public paymentLib;
 
     address public admin;
     address public timelock = address(0x2);
@@ -35,10 +35,10 @@ contract DRv1InvariantsTest is StdInvariant, Test {
         admin = address(this); // Use test contract as admin
 
         // Deploy contracts
-        paymentLib = new PaymentCalculationLibraryV1();
+        paymentLib = new PaymentCalculationLibrary();
         resolutionModule = new DecentralizedResolutionModule(admin);
         { DRMAdminFacet drmAdminFacet_ = new DRMAdminFacet(); resolutionModule.setAdminFacet(address(drmAdminFacet_)); }
-        incentiveModule = new ResolverIncentiveModuleV1(admin, address(paymentLib));
+        incentiveModule = new ResolverIncentiveModule(admin, address(paymentLib));
 
         // Register escrow - admin has DEFAULT_ADMIN_ROLE from constructors
         vm.startPrank(admin);
@@ -274,8 +274,8 @@ contract DRv1InvariantsTest is StdInvariant, Test {
  */
 contract DRv1FuzzTest is Test {
     DecentralizedResolutionModule public resolutionModule;
-    ResolverIncentiveModuleV1 public incentiveModule;
-    PaymentCalculationLibraryV1 public paymentLib;
+    ResolverIncentiveModule public incentiveModule;
+    PaymentCalculationLibrary public paymentLib;
 
     address public admin;
     address public timelock = address(0x2);
@@ -291,10 +291,10 @@ contract DRv1FuzzTest is Test {
     function setUp() public {
         admin = address(this); // Use test contract as admin
         
-        paymentLib = new PaymentCalculationLibraryV1();
+        paymentLib = new PaymentCalculationLibrary();
         resolutionModule = new DecentralizedResolutionModule(admin);
         { DRMAdminFacet drmAdminFacet_ = new DRMAdminFacet(); resolutionModule.setAdminFacet(address(drmAdminFacet_)); }
-        incentiveModule = new ResolverIncentiveModuleV1(admin, address(paymentLib));
+        incentiveModule = new ResolverIncentiveModule(admin, address(paymentLib));
 
         // Grant ROLE_TIMELOCK to admin first, then register escrow
         vm.startPrank(admin);

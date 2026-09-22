@@ -3,10 +3,10 @@ pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
 import '../../../contracts/core/EscrowVault.sol';
-import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModuleV2.sol';
+import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModule.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DRMAdminFacet.sol';
-import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibraryV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibrary.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/core/BondCollector.sol';
@@ -21,14 +21,14 @@ import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
  * @notice Tests reentrancy protection for critical functions
  * @dev Focuses on:
  *      - Payment claim reentrancy (ResolverIncentiveModule)
- *      - Bond distribution reentrancy (ResolverIncentiveModuleV2)
+ *      - Bond distribution reentrancy (ResolverIncentiveModule)
  *      - Escrow operation reentrancy (BaseEscrow)
  */
 contract ReentrancyProtectionTest is Test {
     EscrowVault public escrow;
-    ResolverIncentiveModuleV2 public incentiveModule;
+    ResolverIncentiveModule public incentiveModule;
     DecentralizedResolutionModule public resolutionModule;
-    PaymentCalculationLibraryV1 public paymentLib;
+    PaymentCalculationLibrary public paymentLib;
     ERC20Mock public token;
     EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
@@ -68,8 +68,8 @@ contract ReentrancyProtectionTest is Test {
         escrow.setBondCollector(address(bondCollector));
 
         // Deploy modules
-        paymentLib = new PaymentCalculationLibraryV1();
-        incentiveModule = new ResolverIncentiveModuleV2(deployer, address(paymentLib));
+        paymentLib = new PaymentCalculationLibrary();
+        incentiveModule = new ResolverIncentiveModule(deployer, address(paymentLib));
         resolutionModule = new DecentralizedResolutionModule(deployer);
         { DRMAdminFacet drmAdminFacet_ = new DRMAdminFacet(); resolutionModule.setAdminFacet(address(drmAdminFacet_)); }
 

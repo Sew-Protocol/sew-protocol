@@ -2,10 +2,10 @@
 pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModuleV2.sol';
+import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModule.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DRMAdminFacet.sol';
-import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibraryV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibrary.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/core/EscrowCreationPolicy.sol';
@@ -19,7 +19,7 @@ event ResolutionModuleSet(address indexed oldModule, address indexed newModule);
 contract BondBehaviourCorrectionTest is Test {
     EscrowVault public escrow;
     DecentralizedResolutionModule public drm;
-    ResolverIncentiveModuleV2 public v2;
+    ResolverIncentiveModule public v2;
     ERC20Mock public token;
     BondCollector public bondCollector;
     ModuleSnapshotRegistry public moduleMgmt;
@@ -41,8 +41,8 @@ contract BondBehaviourCorrectionTest is Test {
         token = new ERC20Mock('T', 'T', address(this), 0);
         token.mint(buyer, ESCROW_AMT + BOND);
 
-        PaymentCalculationLibraryV1 lib = new PaymentCalculationLibraryV1();
-        v2 = new ResolverIncentiveModuleV2(deployer, address(lib));
+        PaymentCalculationLibrary lib = new PaymentCalculationLibrary();
+        v2 = new ResolverIncentiveModule(deployer, address(lib));
         v2.grantRole(v2.ROLE_TIMELOCK(), address(this));
         v2.grantRole(v2.ROLE_TIMELOCK(), timelock);
         v2.registerEscrowContract(address(this));

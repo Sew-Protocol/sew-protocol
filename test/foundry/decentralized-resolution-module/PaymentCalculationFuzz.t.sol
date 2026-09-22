@@ -2,7 +2,7 @@
 pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibraryV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibrary.sol';
 import { IPaymentCalculationLibrary, PaymentInput, PaymentOutput, ResolverRecord, Weights } from '../../../contracts/modules/decentralized-resolution-module/interfaces/IPaymentCalculationLibrary.sol';
 
 /**
@@ -14,7 +14,7 @@ import { IPaymentCalculationLibrary, PaymentInput, PaymentOutput, ResolverRecord
  *      - Invariants hold across varied inputs
  */
 contract PaymentCalculationFuzzTest is Test {
-    PaymentCalculationLibraryV1 public paymentLib;
+    PaymentCalculationLibrary public paymentLib;
     uint256 constant BASIS_POINTS_DENOMINATOR = 10000;
     uint256 constant MAX_RESOLVERS = 10; // Reasonable upper bound
     uint256 constant MAX_FEE = type(uint128).max; // Reasonable upper bound for fees
@@ -23,7 +23,7 @@ contract PaymentCalculationFuzzTest is Test {
     address[] resolverAddresses;
 
     function setUp() public {
-        paymentLib = new PaymentCalculationLibraryV1();
+        paymentLib = new PaymentCalculationLibrary();
         
         // Pre-generate resolver addresses to avoid zero address issues
         resolverAddresses = new address[](MAX_RESOLVERS);

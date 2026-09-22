@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.37;
 
-import './ResolverIncentiveModuleV2.sol';
+import './ResolverIncentiveModule.sol';
 import '../../../shared/interfaces/IBondLedger.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 
@@ -9,13 +9,13 @@ import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
  * @title ResolverIncentiveModuleV2BondLedger
  * @notice BondLedger-backed compatibility facade for DR v2 incentive module.
  * @dev Substitutes BondLedger for the embedded appeal-bond custody and settlement
- *      that ResolverIncentiveModuleV2 keeps inline. Behavioural semantics (bond
+ *      that ResolverIncentiveModule keeps inline. Behavioural semantics (bond
  *      amounts, refund recipients, resolver allocations, rounding, forfeiture
  *      reserve, metrics, legacy events) are preserved by delegating custody and
  *      exact settlement to BondLedger while retaining Sew-specific allocation
  *      computation, resolver tracking, metrics, and events in this contract.
  */
-contract ResolverIncentiveModuleV2BondLedger is ResolverIncentiveModuleV2 {
+contract ResolverIncentiveModuleV2BondLedger is ResolverIncentiveModule {
     using SafeERC20 for IERC20;
 
     IBondLedger public immutable bondLedger;
@@ -30,7 +30,7 @@ contract ResolverIncentiveModuleV2BondLedger is ResolverIncentiveModuleV2 {
         address initialOwner,
         address initialLibrary,
         address bondLedgerAddr
-    ) ResolverIncentiveModuleV2(initialOwner, initialLibrary) {
+    ) ResolverIncentiveModule(initialOwner, initialLibrary) {
         if (bondLedgerAddr == address(0)) revert BondLedgerRequired();
         bondLedger = IBondLedger(bondLedgerAddr);
     }

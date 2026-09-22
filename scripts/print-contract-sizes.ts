@@ -84,8 +84,7 @@ function findContracts(): ContractSize[] {
     'BasicEscrowVault',
     'BasicEscrowableERC20',
     'decentralized-resolution-module/DecentralizedResolutionModule',
-    'decentralized-resolution-module/incentive/ResolverIncentiveModuleV1',
-    'decentralized-resolution-module/incentive/ResolverIncentiveModuleV2',
+    'decentralized-resolution-module/incentive/ResolverIncentiveModule',
     'shared/BondLedger',
     'decentralized-resolution-module/incentive/ResolverIncentiveModuleV2BondLedger',
   ];

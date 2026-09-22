@@ -2,8 +2,8 @@
 pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModuleV2.sol';
-import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibraryV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModule.sol';
+import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibrary.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 
@@ -16,8 +16,8 @@ import '../../../contracts/mocks/ERC20Mock.sol';
  *      - Edge cases (no resolvers, single resolver, many resolvers)
  */
 contract AppealBondDistributionFuzzTest is Test {
-    ResolverIncentiveModuleV2 public incentiveModule;
-    PaymentCalculationLibraryV1 public paymentLib;
+    ResolverIncentiveModule public incentiveModule;
+    PaymentCalculationLibrary public paymentLib;
     ERC20Mock public token;
 
     address public deployer;
@@ -31,8 +31,8 @@ contract AppealBondDistributionFuzzTest is Test {
         deployer = address(this);
         escrowContract = makeAddr('escrow');
 
-        paymentLib = new PaymentCalculationLibraryV1();
-        incentiveModule = new ResolverIncentiveModuleV2(deployer, address(paymentLib));
+        paymentLib = new PaymentCalculationLibrary();
+        incentiveModule = new ResolverIncentiveModule(deployer, address(paymentLib));
         token = new ERC20Mock('Test Token', 'TEST', deployer, 0);
 
         // Register escrow contract (requires ROLE_TIMELOCK)

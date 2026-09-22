@@ -2,8 +2,8 @@
 pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModuleV2.sol';
-import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibraryV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModule.sol';
+import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibrary.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
@@ -16,8 +16,8 @@ import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
  * @dev Tests histogram invariants hold across random operations
  */
 contract EscalationDepthHistogramInvariantsTest is Test {
-    ResolverIncentiveModuleV2 public incentiveModule;
-    PaymentCalculationLibraryV1 public paymentLib;
+    ResolverIncentiveModule public incentiveModule;
+    PaymentCalculationLibrary public paymentLib;
     ERC20Mock public token;
     EscrowVault public escrow;
     ModuleSnapshotRegistry public moduleManagement;
@@ -41,8 +41,8 @@ contract EscalationDepthHistogramInvariantsTest is Test {
         depositor = makeAddr('depositor');
 
         // Deploy contracts
-        paymentLib = new PaymentCalculationLibraryV1();
-        incentiveModule = new ResolverIncentiveModuleV2(deployer, address(paymentLib));
+        paymentLib = new PaymentCalculationLibrary();
+        incentiveModule = new ResolverIncentiveModule(deployer, address(paymentLib));
         token = new ERC20Mock('Test Token', 'TEST', address(this), 0);
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));

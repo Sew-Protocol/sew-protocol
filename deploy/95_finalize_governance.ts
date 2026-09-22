@@ -44,10 +44,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     'BondCollector',
     'ModuleSnapshotRegistry',
     // ── DR v3 module contracts (85/86) ───────────────────────────────────
-    'ResolverStakingModuleV1',
-    'ResolverSlashingModuleV1',
+    'ResolverStakingModule',
+    'ResolverSlashingModule',
     'InsurancePoolVault',
-    'ResolverIncentiveModuleV2',
+    'ResolverIncentiveModule',
     'DRMAdminFacet',
     'DecentralizedResolutionModule',
   ];

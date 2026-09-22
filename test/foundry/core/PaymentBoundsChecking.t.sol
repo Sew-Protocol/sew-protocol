@@ -2,15 +2,15 @@
 pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModuleV1.sol';
-import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibraryV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModule.sol';
+import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibrary.sol';
 import '../../../contracts/modules/decentralized-resolution-module/interfaces/IPaymentCalculationLibrary.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/types/EscrowTypes.sol';
 
 contract PaymentBoundsCheckingTest is Test {
-    ResolverIncentiveModuleV1 public incentiveModule;
-    PaymentCalculationLibraryV1 public paymentLib;
+    ResolverIncentiveModule public incentiveModule;
+    PaymentCalculationLibrary public paymentLib;
     ERC20Mock public token;
 
     address public owner;
@@ -35,10 +35,10 @@ contract PaymentBoundsCheckingTest is Test {
         token = new ERC20Mock('Test Token', 'TEST', address(this), 0);
 
         // Deploy Payment Library
-        paymentLib = new PaymentCalculationLibraryV1();
+        paymentLib = new PaymentCalculationLibrary();
 
-        // Deploy ResolverIncentiveModuleV1 directly (immutable pattern)
-        incentiveModule = new ResolverIncentiveModuleV1(owner, address(paymentLib));
+        // Deploy ResolverIncentiveModule directly (immutable pattern)
+        incentiveModule = new ResolverIncentiveModule(owner, address(paymentLib));
 
         // Grant roles
         incentiveModule.grantRole(ROLE_TIMELOCK, address(this));

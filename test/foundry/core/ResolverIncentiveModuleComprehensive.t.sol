@@ -3,13 +3,13 @@ import "../../../contracts/types/YieldPresets.sol";
 pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModuleV1.sol';
-import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibraryV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModule.sol';
+import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibrary.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 
 contract ResolverIncentiveModuleComprehensiveTest is Test {
-    ResolverIncentiveModuleV1 public incentiveModule;
-    PaymentCalculationLibraryV1 public paymentLib;
+    ResolverIncentiveModule public incentiveModule;
+    PaymentCalculationLibrary public paymentLib;
     ERC20Mock public token;
 
     address public owner;
@@ -45,10 +45,10 @@ contract ResolverIncentiveModuleComprehensiveTest is Test {
         otherAccount = makeAddr('other');
 
         // Deploy Payment Library
-        paymentLib = new PaymentCalculationLibraryV1();
+        paymentLib = new PaymentCalculationLibrary();
 
-        // Deploy ResolverIncentiveModuleV1 directly (immutable pattern)
-        incentiveModule = new ResolverIncentiveModuleV1(owner, address(paymentLib));
+        // Deploy ResolverIncentiveModule directly (immutable pattern)
+        incentiveModule = new ResolverIncentiveModule(owner, address(paymentLib));
 
         // Setup Roles
         incentiveModule.grantRole(ROLE_TIMELOCK, timelock);
@@ -190,7 +190,7 @@ contract ResolverIncentiveModuleComprehensiveTest is Test {
     }
 
     function test_PaymentLibrary_Update() public {
-        PaymentCalculationLibraryV1 newLib = new PaymentCalculationLibraryV1();
+        PaymentCalculationLibrary newLib = new PaymentCalculationLibrary();
 
         vm.startPrank(timelock);
         incentiveModule.queuePaymentCalculationLibrary(address(newLib));
@@ -204,8 +204,8 @@ contract ResolverIncentiveModuleComprehensiveTest is Test {
     }
 
     function test_PaymentLibrary_Rollback() public {
-        PaymentCalculationLibraryV1 oldLib = PaymentCalculationLibraryV1(incentiveModule.currentPaymentLibrary());
-        PaymentCalculationLibraryV1 newLib = new PaymentCalculationLibraryV1();
+        PaymentCalculationLibrary oldLib = PaymentCalculationLibrary(incentiveModule.currentPaymentLibrary());
+        PaymentCalculationLibrary newLib = new PaymentCalculationLibrary();
 
         vm.startPrank(timelock);
         incentiveModule.rollbackToPreviousLibrary(address(newLib));

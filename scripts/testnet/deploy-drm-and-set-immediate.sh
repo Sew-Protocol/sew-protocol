@@ -2,8 +2,8 @@
 set -euo pipefail
 
 # Deploy the full DR v3 suite (InsurancePoolVault, StakingModule, SlashingModule,
-# BondTokenRegistry, DRMAdminFacet, PaymentCalculationLibraryV1,
-# ResolverIncentiveModuleV2, DecentralizedResolutionModule) and immediately
+# BondTokenRegistry, DRMAdminFacet, PaymentCalculationLibrary,
+# ResolverIncentiveModule, DecentralizedResolutionModule) and immediately
 # activate DRM as the resolution module on EscrowVault (bypasses slow lane).
 #
 # Required env vars:

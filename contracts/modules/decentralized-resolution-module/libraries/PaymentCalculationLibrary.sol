@@ -4,13 +4,13 @@ pragma solidity ^0.8.37;
 import '../interfaces/IPaymentCalculationLibrary.sol';
 
 /**
- * @title PaymentCalculationLibraryV1
+ * @title PaymentCalculationLibrary
  * @notice Version 1 payment calculation contract - weighted distribution by escalation level
  * @dev Pure functions for calculating resolver payments
  *      Distribution: Weighted by escalation level (level 0 = 1x, level 1 = 1.5x, level 2 = 2x)
  *      Implemented as contract (not library) to enable governance-controlled upgrades
  */
-contract PaymentCalculationLibraryV1 is IPaymentCalculationLibrary {
+contract PaymentCalculationLibrary is IPaymentCalculationLibrary {
     // ============ Constants ============
     uint256 public constant BASIS_POINTS_DENOMINATOR = 10000;
 

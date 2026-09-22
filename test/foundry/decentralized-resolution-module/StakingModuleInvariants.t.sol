@@ -2,7 +2,7 @@
 pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/modules/decentralized-resolution-module/staking/ResolverStakingModuleV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/staking/ResolverStakingModule.sol';
 import '../../../contracts/modules/decentralized-resolution-module/libraries/BondValuationLibrary.sol';
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol';
@@ -34,7 +34,7 @@ contract MockSEW is ERC20 {
 
 /**
  * @title StakingModuleInvariantsTest
- * @notice Comprehensive invariant tests for ResolverStakingModuleV1
+ * @notice Comprehensive invariant tests for ResolverStakingModule
  * @dev Tests critical properties:
  *      1. Mix constraints always hold (80% stable, 20% SEW)
  *      2. Reserved coverage <= available coverage
@@ -42,7 +42,7 @@ contract MockSEW is ERC20 {
  *      4. Senior only exposed after resolver exhausted
  */
 contract StakingModuleInvariantsTest is Test {
-    ResolverStakingModuleV1 public stakingModule;
+    ResolverStakingModule public stakingModule;
     MockStable public stableToken;
     MockSEW public sewToken;
 
@@ -67,7 +67,7 @@ contract StakingModuleInvariantsTest is Test {
         sewToken = new MockSEW();
 
         // Deploy staking module directly (immutable)
-        stakingModule = new ResolverStakingModuleV1(admin, address(stableToken), address(sewToken));
+        stakingModule = new ResolverStakingModule(admin, address(stableToken), address(sewToken));
 
         // Setup roles
         vm.startPrank(admin);
@@ -192,7 +192,7 @@ contract StakingModuleInvariantsTest is Test {
             // Should revert with the exact mix percentages
             vm.prank(resolver1);
             vm.expectRevert(
-                abi.encodeWithSelector(ResolverStakingModuleV1.InvalidBondMix.selector, stableBps, sewBps)
+                abi.encodeWithSelector(ResolverStakingModule.InvalidBondMix.selector, stableBps, sewBps)
             );
             stakingModule.stakeWithMix(stableAmount, sewAmount);
         }
@@ -350,7 +350,7 @@ contract StakingModuleInvariantsTest is Test {
         vm.prank(resolver1);
         vm.expectRevert(
             abi.encodeWithSelector(
-                ResolverStakingModuleV1.InsufficientSeniorCoverage.selector,
+                ResolverStakingModule.InsufficientSeniorCoverage.selector,
                 senior1,
                 12500e18,
                 30000e18
@@ -386,7 +386,7 @@ contract StakingModuleInvariantsTest is Test {
         vm.prank(resolver2);
         vm.expectRevert(
             abi.encodeWithSelector(
-                ResolverStakingModuleV1.InsufficientSeniorCoverage.selector,
+                ResolverStakingModule.InsufficientSeniorCoverage.selector,
                 senior1,
                 6000e18,
                 9000e18
@@ -441,7 +441,7 @@ contract StakingModuleInvariantsTest is Test {
         vm.prank(resolver1);
         vm.expectRevert(
             abi.encodeWithSelector(
-                ResolverStakingModuleV1.UnbondDelayNotPassed.selector,
+                ResolverStakingModule.UnbondDelayNotPassed.selector,
                 resolver1,
                 availableAt,
                 block.timestamp
@@ -457,7 +457,7 @@ contract StakingModuleInvariantsTest is Test {
         vm.prank(resolver1);
         vm.expectRevert(
             abi.encodeWithSelector(
-                ResolverStakingModuleV1.UnbondDelayNotPassed.selector,
+                ResolverStakingModule.UnbondDelayNotPassed.selector,
                 resolver1,
                 availableAt2,
                 block.timestamp
@@ -510,7 +510,7 @@ contract StakingModuleInvariantsTest is Test {
         vm.prank(senior1);
         vm.expectRevert(
             abi.encodeWithSelector(
-                ResolverStakingModuleV1.UnbondDelayNotPassed.selector,
+                ResolverStakingModule.UnbondDelayNotPassed.selector,
                 senior1,
                 seniorAvailableAt,
                 block.timestamp
@@ -544,7 +544,7 @@ contract StakingModuleInvariantsTest is Test {
         vm.prank(resolver1);
         vm.expectRevert(
             abi.encodeWithSelector(
-                ResolverStakingModuleV1.StakeLockedInDisputes.selector,
+                ResolverStakingModule.StakeLockedInDisputes.selector,
                 resolver1,
                 lockedAmount
             )
@@ -581,7 +581,7 @@ contract StakingModuleInvariantsTest is Test {
         vm.prank(senior1);
         vm.expectRevert(
             abi.encodeWithSelector(
-                ResolverStakingModuleV1.CoverageAlreadyReserved.selector,
+                ResolverStakingModule.CoverageAlreadyReserved.selector,
                 senior1,
                 reserved
             )
@@ -615,7 +615,7 @@ contract StakingModuleInvariantsTest is Test {
         // Junior tries to unbond
         vm.prank(resolver1);
         vm.expectRevert(
-            abi.encodeWithSelector(ResolverStakingModuleV1.MustUndelegateFirst.selector, resolver1)
+            abi.encodeWithSelector(ResolverStakingModule.MustUndelegateFirst.selector, resolver1)
         );
         stakingModule.requestUnstakeWithMix(1000e6, 0);
 
@@ -795,7 +795,7 @@ contract StakingModuleInvariantsTest is Test {
         vm.prank(resolver1);
         vm.expectRevert(
             abi.encodeWithSelector(
-                ResolverStakingModuleV1.BelowMinimumStake.selector,
+                ResolverStakingModule.BelowMinimumStake.selector,
                 resolver1,
                 200e18,
                 250e18,
@@ -820,7 +820,7 @@ contract StakingModuleInvariantsTest is Test {
         vm.prank(senior1);
         vm.expectRevert(
             abi.encodeWithSelector(
-                ResolverStakingModuleV1.BelowMinimumStake.selector,
+                ResolverStakingModule.BelowMinimumStake.selector,
                 senior1,
                 20000e18,
                 25000e18,

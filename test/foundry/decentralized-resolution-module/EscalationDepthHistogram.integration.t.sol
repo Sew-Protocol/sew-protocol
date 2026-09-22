@@ -2,10 +2,10 @@
 pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModuleV2.sol';
+import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModule.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DRMAdminFacet.sol';
-import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibraryV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibrary.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/core/BaseEscrow.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
@@ -23,8 +23,8 @@ import '../../../contracts/types/EscrowTypes.sol';
 contract EscalationDepthHistogramIntegrationTest is Test {
     EscrowVault public escrow;
     DecentralizedResolutionModule public resolutionModule;
-    ResolverIncentiveModuleV2 public incentiveModule;
-    PaymentCalculationLibraryV1 public paymentLib;
+    ResolverIncentiveModule public incentiveModule;
+    PaymentCalculationLibrary public paymentLib;
     ERC20Mock public token;
     EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
@@ -55,10 +55,10 @@ contract EscalationDepthHistogramIntegrationTest is Test {
         token.mint(user2, INITIAL_BALANCE);
 
         // Deploy payment library
-        paymentLib = new PaymentCalculationLibraryV1();
+        paymentLib = new PaymentCalculationLibrary();
 
         // Deploy incentive module
-        incentiveModule = new ResolverIncentiveModuleV2(deployer, address(paymentLib));
+        incentiveModule = new ResolverIncentiveModule(deployer, address(paymentLib));
         incentiveModule.grantRole(incentiveModule.ROLE_TIMELOCK(), address(this));
         incentiveModule.registerEscrowContract(address(this));
 

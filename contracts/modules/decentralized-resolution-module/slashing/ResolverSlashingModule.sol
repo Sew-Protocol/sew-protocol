@@ -2,7 +2,7 @@
 pragma solidity ^0.8.37;
 
 import '../interfaces/ISlashingModule.sol';
-import '../staking/ResolverStakingModuleV1.sol';
+import '../staking/ResolverStakingModule.sol';
 import '../InsurancePoolVault.sol';
 import '@openzeppelin/contracts/access/AccessControl.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
@@ -10,7 +10,7 @@ import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 
 /**
- * @title ResolverSlashingModuleV1
+ * @title ResolverSlashingModule
  * @notice Real slashing implementation for DR v3 with conservative penalties
  * @dev Key Features:
  *      - Trigger types: missed accept, missed resolve, unresponsive
@@ -25,7 +25,7 @@ import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
  *      3. Freeze logic prevents withdrawal during slash processing
  *      4. Waterfall ordering: junior exhausted before senior exposed
  */
-contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyGuard {
+contract ResolverSlashingModule is ISlashingModule, AccessControl, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     // ============ Custom Errors ============
@@ -84,7 +84,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
 
     // ============ State Variables ============
 
-    ResolverStakingModuleV1 public stakingModule;
+    ResolverStakingModule public stakingModule;
     InsurancePoolVault public insurancePoolVault;
     IERC20 public stableToken;
 
@@ -196,7 +196,7 @@ contract ResolverSlashingModuleV1 is ISlashingModule, AccessControl, ReentrancyG
         // Deployment scripts will transfer this to TimelockController
         _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
 
-        stakingModule = ResolverStakingModuleV1(_stakingModule);
+        stakingModule = ResolverStakingModule(_stakingModule);
         insurancePoolVault = InsurancePoolVault(_insurancePoolVault);
         stableToken = IERC20(_stableToken);
 

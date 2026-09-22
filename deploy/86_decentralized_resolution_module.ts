@@ -5,7 +5,7 @@
  *   1. Deploys DecentralizedResolutionModule
  *   2. Wires DRMAdminFacet as the admin surface (one-time bootstrap)
  *   3. Sets the BondTokenRegistry via the admin facet delegation
- *   4. Sets ResolverIncentiveModuleV2 as the incentive module
+ *   4. Sets ResolverIncentiveModule as the incentive module
  *   5. Grants governance roles (ROLE_TIMELOCK) to TimelockController
  *   6. Registers EscrowVault as an allowed escrow contract on DRM
  *
@@ -13,7 +13,7 @@
  * activate DRM as the live resolution module on EscrowVault.
  *
  * Depends on: 85_dr3_modules (InsurancePoolVault, StakingModule, SlashingModule,
- *             BondTokenRegistry, DRMAdminFacet, ResolverIncentiveModuleV2).
+ *             BondTokenRegistry, DRMAdminFacet, ResolverIncentiveModule).
  */
 
 import { HardhatRuntimeEnvironment } from 'hardhat/types';
@@ -33,7 +33,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const timelockAddr = (await get('TimelockController')).address;
   const bondRegistryAddr = (await get('BondTokenRegistry')).address;
   const adminFacetAddr = (await get('DRMAdminFacet')).address;
-  const incentiveModuleAddr = (await get('ResolverIncentiveModuleV2')).address;
+  const incentiveModuleAddr = (await get('ResolverIncentiveModule')).address;
 
   let escrowVaultAddr: string | undefined;
   try {
@@ -150,7 +150,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   // ── 5. Set incentive module ───────────────────────────────────────────────
 
-  console.log(`\n🔗 Setting ResolverIncentiveModuleV2 as incentiveModule...`);
+  console.log(`\n🔗 Setting ResolverIncentiveModule as incentiveModule...`);
 
   const currentIncentive = await drm.incentiveModule();
   if (

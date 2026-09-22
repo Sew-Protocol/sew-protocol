@@ -13,8 +13,8 @@ import '../../../contracts/types/EscrowTypes.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DRMAdminFacet.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
-import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModuleV2.sol';
-import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibraryV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModule.sol';
+import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibrary.sol';
 import '../helpers/KlerosHandoffFixture.sol';
 
 /// @notice Product-level coverage for direct DRM config selection entry points.
@@ -69,8 +69,8 @@ contract DirectResolutionConfigSelectionIntegrationTest is Test, KlerosHandoffFi
         drm.setResolverCapacity(SENIOR, 0, true);
         drm.setResolverCapacity(RESOLVER, 0, true);
 
-        PaymentCalculationLibraryV1 paymentLibrary = new PaymentCalculationLibraryV1();
-        ResolverIncentiveModuleV2 incentive = new ResolverIncentiveModuleV2(address(this), address(paymentLibrary));
+        PaymentCalculationLibrary paymentLibrary = new PaymentCalculationLibrary();
+        ResolverIncentiveModule incentive = new ResolverIncentiveModule(address(this), address(paymentLibrary));
         incentive.grantRole(incentive.ROLE_TIMELOCK(), address(this));
         incentive.registerEscrowContract(address(vault));
         incentive.registerEscrowContract(address(escrowToken));

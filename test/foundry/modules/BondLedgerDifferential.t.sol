@@ -2,11 +2,11 @@
 pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModuleV2.sol';
+import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModule.sol';
 import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModuleV2BondLedger.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DRMAdminFacet.sol';
-import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibraryV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibrary.sol';
 import '../../../contracts/modules/decentralized-resolution-module/interfaces/IPaymentCalculationLibrary.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
@@ -19,7 +19,7 @@ import '../../../contracts/types/EscrowTypes.sol';
 /**
  * @title BondLedgerDifferential
  * @notice Differential semantic-equivalence suite: corrected embedded behaviour
- *         (ResolverIncentiveModuleV2) vs BondLedger-backed behaviour
+ *         (ResolverIncentiveModule) vs BondLedger-backed behaviour
  *         (ResolverIncentiveModuleV2BondLedger + BondLedger).
  * @dev Compares only semantic projections (refund amounts, resolver allocations,
  *      rounding, reserve, metrics, claims, idempotency, authority). Deliberately
@@ -30,7 +30,7 @@ contract BondLedgerDifferential is Test {
     struct Stack {
         EscrowVault escrow;
         DecentralizedResolutionModule drm;
-        ResolverIncentiveModuleV2 incentive;
+        ResolverIncentiveModule incentive;
         ResolverIncentiveModuleV2BondLedger facade;
         BondLedger ledger;
         ERC20Mock token;
@@ -425,16 +425,16 @@ contract BondLedgerDifferential is Test {
         tk.mint(buyer, ESCROW_AMT + BOND);
         s.token = tk;
 
-        PaymentCalculationLibraryV1 lib = new PaymentCalculationLibraryV1();
+        PaymentCalculationLibrary lib = new PaymentCalculationLibrary();
 
         if (bonded) {
             BondLedger ledger = new BondLedger(address(this));
             s.facade = new ResolverIncentiveModuleV2BondLedger(deployer, address(lib), address(ledger));
             ledger.addAuthorizedCaller(address(s.facade));
             s.ledger = ledger;
-            s.incentive = ResolverIncentiveModuleV2(address(s.facade));
+            s.incentive = ResolverIncentiveModule(address(s.facade));
         } else {
-            s.incentive = new ResolverIncentiveModuleV2(deployer, address(lib));
+            s.incentive = new ResolverIncentiveModule(deployer, address(lib));
         }
         s.bonded = bonded;
 

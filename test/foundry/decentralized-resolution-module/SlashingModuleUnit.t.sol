@@ -2,8 +2,8 @@
 pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/modules/decentralized-resolution-module/slashing/ResolverSlashingModuleV1.sol';
-import '../../../contracts/modules/decentralized-resolution-module/staking/ResolverStakingModuleV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/slashing/ResolverSlashingModule.sol';
+import '../../../contracts/modules/decentralized-resolution-module/staking/ResolverStakingModule.sol';
 import '../../../contracts/modules/decentralized-resolution-module/InsurancePoolVault.sol';
 import '../../../contracts/modules/decentralized-resolution-module/interfaces/ISlashingModule.sol';
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
@@ -36,12 +36,12 @@ contract MockSEW is ERC20, ERC20Burnable {
 
 /**
  * @title SlashingModuleUnitTest
- * @notice Unit tests for ResolverSlashingModuleV1
+ * @notice Unit tests for ResolverSlashingModule
  * @dev Focuses on individual slash function behavior, including fraud slashing
  */
 contract SlashingModuleUnitTest is Test {
-    ResolverSlashingModuleV1 public slashingModule;
-    ResolverStakingModuleV1 public stakingModule;
+    ResolverSlashingModule public slashingModule;
+    ResolverStakingModule public stakingModule;
     InsurancePoolVault public insurancePool;
     MockStable public stableToken;
     MockSEW public sewToken;
@@ -70,13 +70,13 @@ contract SlashingModuleUnitTest is Test {
         sewToken = new MockSEW();
 
         // Deploy staking module
-        stakingModule = new ResolverStakingModuleV1(admin, address(stableToken), address(sewToken));
+        stakingModule = new ResolverStakingModule(admin, address(stableToken), address(sewToken));
 
         // Deploy insurance vault
         insurancePool = new InsurancePoolVault(admin, address(stableToken));
 
         // Deploy slashing module
-        slashingModule = new ResolverSlashingModuleV1(
+        slashingModule = new ResolverSlashingModule(
             admin,
             address(stakingModule),
             address(insurancePool),
@@ -203,7 +203,7 @@ contract SlashingModuleUnitTest is Test {
         bytes memory evidence = 'Evidence';
 
         vm.prank(timelock);
-        vm.expectRevert(ResolverSlashingModuleV1.FraudSlashingNotEnabled.selector);
+        vm.expectRevert(ResolverSlashingModule.FraudSlashingNotEnabled.selector);
         slashingModule.slashForFraud(workflowId, address(this), resolver1, evidence);
     }
 
@@ -401,7 +401,7 @@ contract SlashingModuleUnitTest is Test {
         uint8 priorRound = 0;
 
         vm.prank(resolutionModule);
-        vm.expectRevert(ResolverSlashingModuleV1.ReversalSlashingNotEnabled.selector);
+        vm.expectRevert(ResolverSlashingModule.ReversalSlashingNotEnabled.selector);
         slashingModule.slashForReversal(workflowId, address(this), resolver1, priorRound);
     }
 
@@ -682,7 +682,7 @@ contract SlashingModuleUnitTest is Test {
         uint256 resolverBalAfterFirst = stableToken.balanceOf(resolver1);
 
         vm.prank(resolver1);
-        vm.expectRevert(abi.encodeWithSelector(ResolverSlashingModuleV1.AlreadyAppealed.selector, slashId));
+        vm.expectRevert(abi.encodeWithSelector(ResolverSlashingModule.AlreadyAppealed.selector, slashId));
         slashingModule.appealSlash(slashId, 'second reason', bytes('second evidence'));
 
         ISlashingModule.SlashAppeal memory secondRead = slashingModule.getSlashAppeal(slashId);

@@ -5,9 +5,9 @@ import 'forge-std/Test.sol';
 import 'forge-std/StdInvariant.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DRMAdminFacet.sol';
-import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModuleV2.sol';
+import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModule.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
-import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibraryV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibrary.sol';
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 
 contract MockERC20 is ERC20 {
@@ -27,8 +27,8 @@ contract MockERC20 is ERC20 {
  */
 contract DRv2InvariantsTest is StdInvariant, Test {
     DecentralizedResolutionModule public resolutionModule;
-    ResolverIncentiveModuleV2 public incentiveModuleV2;
-    PaymentCalculationLibraryV1 public paymentLib;
+    ResolverIncentiveModule public incentiveModuleV2;
+    PaymentCalculationLibrary public paymentLib;
     MockERC20 public token;
 
     address public admin;
@@ -42,10 +42,10 @@ contract DRv2InvariantsTest is StdInvariant, Test {
 
         // Deploy contracts
         token = new MockERC20();
-        paymentLib = new PaymentCalculationLibraryV1();
+        paymentLib = new PaymentCalculationLibrary();
         resolutionModule = new DecentralizedResolutionModule(admin);
         { DRMAdminFacet drmAdminFacet_ = new DRMAdminFacet(); resolutionModule.setAdminFacet(address(drmAdminFacet_)); }
-        incentiveModuleV2 = new ResolverIncentiveModuleV2(admin, address(paymentLib));
+        incentiveModuleV2 = new ResolverIncentiveModule(admin, address(paymentLib));
 
         // Register escrow - admin has DEFAULT_ADMIN_ROLE from constructors
         vm.startPrank(admin);
@@ -99,7 +99,7 @@ contract DRv2InvariantsTest is StdInvariant, Test {
         uint256 undistributed = 0;
         for (uint256 workflowId = 0; workflowId < 1000; workflowId++) {
             for (uint8 round = 1; round <= 2; round++) {
-                ResolverIncentiveModuleV2.AppealBondRecord memory bond = incentiveModuleV2
+                ResolverIncentiveModule.AppealBondRecord memory bond = incentiveModuleV2
                     .getAppealBond(workflowId, escrowContract, round);
                 if (bond.amount > 0 && !bond.distributed) {
                     undistributed += bond.amount;
@@ -147,7 +147,7 @@ contract DRv2InvariantsTest is StdInvariant, Test {
     function invariant_BondDistributionFinality() public view {
         for (uint256 workflowId = 0; workflowId < 1000; workflowId++) {
             for (uint8 round = 1; round <= 2; round++) {
-                ResolverIncentiveModuleV2.AppealBondRecord memory bond = incentiveModuleV2
+                ResolverIncentiveModule.AppealBondRecord memory bond = incentiveModuleV2
                     .getAppealBond(workflowId, escrowContract, round);
 
                 // If bond exists and is distributed, verify it's properly marked
@@ -172,7 +172,7 @@ contract DRv2InvariantsTest is StdInvariant, Test {
     function invariant_BondAmountPositive() public view {
         for (uint256 workflowId = 0; workflowId < 1000; workflowId++) {
             for (uint8 round = 1; round <= 2; round++) {
-                ResolverIncentiveModuleV2.AppealBondRecord memory bond = incentiveModuleV2
+                ResolverIncentiveModule.AppealBondRecord memory bond = incentiveModuleV2
                     .getAppealBond(workflowId, escrowContract, round);
 
                 if (bond.depositor != address(0)) {
@@ -260,7 +260,7 @@ contract DRv2InvariantsTest is StdInvariant, Test {
         uint256 undistributed = 0;
         for (uint256 workflowId = 0; workflowId < 1000; workflowId++) {
             for (uint8 round = 1; round <= 2; round++) {
-                ResolverIncentiveModuleV2.AppealBondRecord memory bond = incentiveModuleV2
+                ResolverIncentiveModule.AppealBondRecord memory bond = incentiveModuleV2
                     .getAppealBond(workflowId, escrowContract, round);
                 if (bond.amount > 0 && !bond.distributed && bond.token == address(token)) {
                     undistributed += bond.amount;
@@ -282,8 +282,8 @@ contract DRv2InvariantsTest is StdInvariant, Test {
  */
 contract DRv2FuzzTest is Test {
     DecentralizedResolutionModule public resolutionModule;
-    ResolverIncentiveModuleV2 public incentiveModuleV2;
-    PaymentCalculationLibraryV1 public paymentLib;
+    ResolverIncentiveModule public incentiveModuleV2;
+    PaymentCalculationLibrary public paymentLib;
     MockERC20 public token;
 
     address public admin;
@@ -296,10 +296,10 @@ contract DRv2FuzzTest is Test {
         admin = address(this); // Use test contract as admin
         
         token = new MockERC20();
-        paymentLib = new PaymentCalculationLibraryV1();
+        paymentLib = new PaymentCalculationLibrary();
         resolutionModule = new DecentralizedResolutionModule(admin);
         { DRMAdminFacet drmAdminFacet_ = new DRMAdminFacet(); resolutionModule.setAdminFacet(address(drmAdminFacet_)); }
-        incentiveModuleV2 = new ResolverIncentiveModuleV2(admin, address(paymentLib));
+        incentiveModuleV2 = new ResolverIncentiveModule(admin, address(paymentLib));
 
         // Grant ROLE_TIMELOCK to admin first, then register escrow
         vm.startPrank(admin);
@@ -351,7 +351,7 @@ contract DRv2FuzzTest is Test {
         incentiveModuleV2.recordAppealBond(workflowId, escrowContract, depositor, depositor, amount, address(token), round);
 
         // Verify bond recorded correctly
-        ResolverIncentiveModuleV2.AppealBondRecord memory bond = incentiveModuleV2.getAppealBond(
+        ResolverIncentiveModule.AppealBondRecord memory bond = incentiveModuleV2.getAppealBond(
             workflowId,
             escrowContract,
             round

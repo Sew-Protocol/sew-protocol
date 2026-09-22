@@ -2,8 +2,8 @@
 pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModuleV2.sol';
-import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibraryV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModule.sol';
+import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibrary.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/core/ModuleSnapshotRegistry.sol';
@@ -12,12 +12,12 @@ import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 
 /**
  * @title EscalationDepthHistogram Unit Tests
- * @notice Unit tests for escalationDepthHistogram in ResolverIncentiveModuleV2
+ * @notice Unit tests for escalationDepthHistogram in ResolverIncentiveModule
  * @dev Tests histogram updates in isolation, independent of full escalation flow
  */
 contract EscalationDepthHistogramTest is Test {
-    ResolverIncentiveModuleV2 public incentiveModule;
-    PaymentCalculationLibraryV1 public paymentLib;
+    ResolverIncentiveModule public incentiveModule;
+    PaymentCalculationLibrary public paymentLib;
     ERC20Mock public token;
     EscrowVault public escrow;
     ModuleSnapshotRegistry public moduleManagement;
@@ -41,8 +41,8 @@ contract EscalationDepthHistogramTest is Test {
         feeAddress = makeAddr('feeAddress');
 
         // Deploy contracts
-        paymentLib = new PaymentCalculationLibraryV1();
-        incentiveModule = new ResolverIncentiveModuleV2(deployer, address(paymentLib));
+        paymentLib = new PaymentCalculationLibrary();
+        incentiveModule = new ResolverIncentiveModule(deployer, address(paymentLib));
         token = new ERC20Mock('Test Token', 'TEST', address(this), 0);
         incentiveModule.grantRole(incentiveModule.ROLE_TIMELOCK(), address(this));
         incentiveModule.registerEscrowContract(address(this));

@@ -159,17 +159,17 @@
       "notes": "Insurance pool vault."
     },
     {
-      "artifactName": "ResolverStakingModuleV1",
-      "contractName": "ResolverStakingModuleV1",
-      "sourcePath": "contracts/modules/decentralized-resolution-module/staking/ResolverStakingModuleV1.sol",
+      "artifactName": "ResolverStakingModule",
+      "contractName": "ResolverStakingModule",
+      "sourcePath": "contracts/modules/decentralized-resolution-module/staking/ResolverStakingModule.sol",
       "scopeHint": "sew",
       "category": "resolution",
       "notes": "Resolver staking module."
     },
     {
-      "artifactName": "ResolverSlashingModuleV1",
-      "contractName": "ResolverSlashingModuleV1",
-      "sourcePath": "contracts/modules/decentralized-resolution-module/slashing/ResolverSlashingModuleV1.sol",
+      "artifactName": "ResolverSlashingModule",
+      "contractName": "ResolverSlashingModule",
+      "sourcePath": "contracts/modules/decentralized-resolution-module/slashing/ResolverSlashingModule.sol",
       "scopeHint": "sew",
       "category": "resolution",
       "notes": "Resolver slashing module."
@@ -191,17 +191,17 @@
       "notes": "DRM admin facet."
     },
     {
-      "artifactName": "ResolverIncentiveModuleV2",
-      "contractName": "ResolverIncentiveModuleV2",
-      "sourcePath": "contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModuleV2.sol",
+      "artifactName": "ResolverIncentiveModule",
+      "contractName": "ResolverIncentiveModule",
+      "sourcePath": "contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModule.sol",
       "scopeHint": "sew",
       "category": "resolution",
-      "notes": "Resolver incentive module v2."
+      "notes": "Resolver incentive module."
     },
     {
-      "artifactName": "PaymentCalculationLibraryV1",
-      "contractName": "PaymentCalculationLibraryV1",
-      "sourcePath": "contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibraryV1.sol",
+      "artifactName": "PaymentCalculationLibrary",
+      "contractName": "PaymentCalculationLibrary",
+      "sourcePath": "contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibrary.sol",
       "scopeHint": "sew",
       "category": "library",
       "notes": "Deployed (public) library requiring separate linking/deployment."

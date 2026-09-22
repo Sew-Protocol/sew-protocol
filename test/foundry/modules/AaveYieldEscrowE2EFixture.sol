@@ -11,8 +11,8 @@ import 'contracts/modules/AaveYieldModule.sol';
 import 'contracts/modules/DefaultReleaseStrategy.sol';
 import 'contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol';
 import 'contracts/modules/decentralized-resolution-module/DRMAdminFacet.sol';
-import 'contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModuleV2.sol';
-import 'contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibraryV1.sol';
+import 'contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModule.sol';
+import 'contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibrary.sol';
 import 'contracts/admin/EscrowGovernanceTimelock.sol';
 import 'contracts/arbitration/KlerosArbitrableProxy.sol';
 import 'contracts/arbitration/mocks/MockKlerosArbitrator.sol';
@@ -25,7 +25,7 @@ import 'contracts/types/YieldPresets.sol';
 /**
  * @title AaveYieldEscrowE2EFixture
  * @notice Shared full-stack escrow fixture: EscrowVault + AaveYieldModule (+ MockAavePool)
- *         + DecentralizedResolutionModule + ResolverIncentiveModuleV2 + Kleros proxy +
+ *         + DecentralizedResolutionModule + ResolverIncentiveModule + Kleros proxy +
  *         release strategy + bond collector. Internal scenario runners drive the
  *         settlement/appeal/escalation matrix and apply strong terminal assertions.
  *
@@ -49,8 +49,8 @@ abstract contract AaveYieldEscrowE2EFixture is Test {
     BondCollector internal bondCollector;
     EscrowGovernanceTimelock internal adminContract;
     DecentralizedResolutionModule internal resolutionModule;
-    ResolverIncentiveModuleV2 internal incentiveModule;
-    PaymentCalculationLibraryV1 internal paymentLib;
+    ResolverIncentiveModule internal incentiveModule;
+    PaymentCalculationLibrary internal paymentLib;
     KlerosArbitrableProxy internal klerosProxy;
     MockKlerosArbitrator internal klerosArbitrator;
     DefaultReleaseStrategy internal releaseStrategy;
@@ -111,8 +111,8 @@ abstract contract AaveYieldEscrowE2EFixture is Test {
         pool.enableTimeAccrual(PER_SECOND_RATE);
 
         // --- DRM + incentive + Kleros stack (like AppealWindowEnforcement) ---
-        paymentLib = new PaymentCalculationLibraryV1();
-        incentiveModule = new ResolverIncentiveModuleV2(deployer, address(paymentLib));
+        paymentLib = new PaymentCalculationLibrary();
+        incentiveModule = new ResolverIncentiveModule(deployer, address(paymentLib));
         resolutionModule = new DecentralizedResolutionModule(deployer);
         { DRMAdminFacet a = new DRMAdminFacet(); resolutionModule.setAdminFacet(address(a)); }
         klerosArbitrator = new MockKlerosArbitrator(KLEROS_ARBITRATION_COST);

@@ -7,8 +7,8 @@ import "../../../contracts/core/BaseEscrow.sol";
 import "../../../contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol";
 import "../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol";
 import "../../../contracts/modules/decentralized-resolution-module/DRMAdminFacet.sol";
-import "../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModuleV2.sol";
-import "../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibraryV1.sol";
+import "../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModule.sol";
+import "../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibrary.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
 import "../../../contracts/types/EscrowTypes.sol";
 import "../../../contracts/core/EscrowCreationPolicy.sol";
@@ -31,8 +31,8 @@ import "../../../contracts/modules/decentralized-resolution-module/DRMStorageBas
 contract RepeatAttackerIntegrationTest is Test {
     EscrowVault public escrow;
     DecentralizedResolutionModule public resolutionModule;
-    ResolverIncentiveModuleV2 public incentiveModule;
-    PaymentCalculationLibraryV1 public paymentLib;
+    ResolverIncentiveModule public incentiveModule;
+    PaymentCalculationLibrary public paymentLib;
     ERC20Mock public token;
     EscrowCreationPolicy public creationPolicy;
     BondCollector public bondCollector;
@@ -61,8 +61,8 @@ contract RepeatAttackerIntegrationTest is Test {
         feeAddress     = makeAddr("feeAddress");
 
         token    = new ERC20Mock("Test", "TEST", address(this), 0);
-        paymentLib = new PaymentCalculationLibraryV1();
-        incentiveModule = new ResolverIncentiveModuleV2(deployer, address(paymentLib));
+        paymentLib = new PaymentCalculationLibrary();
+        incentiveModule = new ResolverIncentiveModule(deployer, address(paymentLib));
         resolutionModule = new DecentralizedResolutionModule(deployer);
         { DRMAdminFacet f = new DRMAdminFacet(); resolutionModule.setAdminFacet(address(f)); }
 

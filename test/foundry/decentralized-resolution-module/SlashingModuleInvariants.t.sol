@@ -2,8 +2,8 @@
 pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/modules/decentralized-resolution-module/slashing/ResolverSlashingModuleV1.sol';
-import '../../../contracts/modules/decentralized-resolution-module/staking/ResolverStakingModuleV1.sol';
+import '../../../contracts/modules/decentralized-resolution-module/slashing/ResolverSlashingModule.sol';
+import '../../../contracts/modules/decentralized-resolution-module/staking/ResolverStakingModule.sol';
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol';
 
@@ -31,7 +31,7 @@ contract MockSEW is ERC20 {
 
 /**
  * @title SlashingModuleInvariantsTest
- * @notice Comprehensive invariant tests for ResolverSlashingModuleV1
+ * @notice Comprehensive invariant tests for ResolverSlashingModule
  * @dev Tests critical properties:
  *      1. Slashes never exceed caps (per-offense and per-period)
  *      2. No double slashing (one slash per workflow/resolver pair)
@@ -39,8 +39,8 @@ contract MockSEW is ERC20 {
  *      4. Waterfall ordering: resolver exhausted before senior exposed
  */
 contract SlashingModuleInvariantsTest is Test {
-    ResolverSlashingModuleV1 public slashingModule;
-    ResolverStakingModuleV1 public stakingModule;
+    ResolverSlashingModule public slashingModule;
+    ResolverStakingModule public stakingModule;
     InsurancePoolVault public insurancePool;
     MockStable public stableToken;
     MockSEW public sewToken;
@@ -63,13 +63,13 @@ contract SlashingModuleInvariantsTest is Test {
         sewToken = new MockSEW();
 
         // Deploy staking module
-        stakingModule = new ResolverStakingModuleV1(admin, address(stableToken), address(sewToken));
+        stakingModule = new ResolverStakingModule(admin, address(stableToken), address(sewToken));
 
         // Deploy insurance vault
         insurancePool = new InsurancePoolVault(admin, address(stableToken));
 
         // Deploy slashing module
-        slashingModule = new ResolverSlashingModuleV1(
+        slashingModule = new ResolverSlashingModule(
             admin,
             address(stakingModule),
             address(insurancePool),
@@ -433,7 +433,7 @@ contract SlashingModuleInvariantsTest is Test {
         uint256 availableAt = slashingModule.lastCircuitBreakerTrigger() + 1 hours;
         vm.expectRevert(
             abi.encodeWithSelector(
-                ResolverSlashingModuleV1.CooldownNotPassed.selector,
+                ResolverSlashingModule.CooldownNotPassed.selector,
                 availableAt,
                 block.timestamp
             )

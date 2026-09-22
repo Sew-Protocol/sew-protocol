@@ -100,17 +100,17 @@ async function main() {
     [deployerAddr, stableToken],
   );
 
-  // ── 2. ResolverStakingModuleV1 ────────────────────────────────────────────
+  // ── 2. ResolverStakingModule ────────────────────────────────────────────
   const stakingAddr = await deployOrGet(
-    'ResolverStakingModuleV1',
-    await hreEthers.getContractFactory('ResolverStakingModuleV1', deployer),
+    'ResolverStakingModule',
+    await hreEthers.getContractFactory('ResolverStakingModule', deployer),
     [deployerAddr, stableToken, sewTokenAddr],
   );
 
-  // ── 3. ResolverSlashingModuleV1 ───────────────────────────────────────────
+  // ── 3. ResolverSlashingModule ───────────────────────────────────────────
   const slashingAddr = await deployOrGet(
-    'ResolverSlashingModuleV1',
-    await hreEthers.getContractFactory('ResolverSlashingModuleV1', deployer),
+    'ResolverSlashingModule',
+    await hreEthers.getContractFactory('ResolverSlashingModule', deployer),
     [deployerAddr, stakingAddr, insuranceAddr, stableToken],
   );
 
@@ -128,17 +128,17 @@ async function main() {
     [timelockAddr, stableToken],
   );
 
-  // ── 6. PaymentCalculationLibraryV1 ───────────────────────────────────────
+  // ── 6. PaymentCalculationLibrary ───────────────────────────────────────
   const paymentLibAddr = await deployOrGet(
-    'PaymentCalculationLibraryV1',
-    await hreEthers.getContractFactory('PaymentCalculationLibraryV1', deployer),
+    'PaymentCalculationLibrary',
+    await hreEthers.getContractFactory('PaymentCalculationLibrary', deployer),
     [],
   );
 
-  // ── 7. ResolverIncentiveModuleV2 ─────────────────────────────────────────
+  // ── 7. ResolverIncentiveModule ─────────────────────────────────────────
   const incentiveAddr = await deployOrGet(
-    'ResolverIncentiveModuleV2',
-    await hreEthers.getContractFactory('ResolverIncentiveModuleV2', deployer),
+    'ResolverIncentiveModule',
+    await hreEthers.getContractFactory('ResolverIncentiveModule', deployer),
     [deployerAddr, paymentLibAddr],
   );
 
@@ -155,7 +155,7 @@ async function main() {
 
   // ── 9. Wire staking ↔ slashing ───────────────────────────────────────────
   console.log(`\n🔗 Wiring staking ↔ slashing...`);
-  const staking: any = await hreEthers.getContractAt('ResolverStakingModuleV1', stakingAddr, deployer);
+  const staking: any = await hreEthers.getContractAt('ResolverStakingModule', stakingAddr, deployer);
 
   if (!(await staking.hasRole(ROLE_TIMELOCK, deployerAddr))) {
     await (await staking.grantRole(ROLE_TIMELOCK, deployerAddr)).wait();
@@ -275,12 +275,12 @@ async function main() {
 
   console.log(`\n📋 Deployed addresses:`);
   console.log(`   InsurancePoolVault:            ${insuranceAddr}`);
-  console.log(`   ResolverStakingModuleV1:       ${stakingAddr}`);
-  console.log(`   ResolverSlashingModuleV1:      ${slashingAddr}`);
+  console.log(`   ResolverStakingModule:       ${stakingAddr}`);
+  console.log(`   ResolverSlashingModule:      ${slashingAddr}`);
   console.log(`   BondTokenRegistry:             ${bondRegistryAddr}`);
   console.log(`   DRMAdminFacet:                 ${adminFacetAddr}`);
-  console.log(`   PaymentCalculationLibraryV1:   ${paymentLibAddr}`);
-  console.log(`   ResolverIncentiveModuleV2:     ${incentiveAddr}`);
+  console.log(`   PaymentCalculationLibrary:   ${paymentLibAddr}`);
+  console.log(`   ResolverIncentiveModule:     ${incentiveAddr}`);
   console.log(`   DecentralizedResolutionModule: ${drmAddr}`);
 }
 

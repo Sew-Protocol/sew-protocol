@@ -3,12 +3,12 @@
  *
  * Deploys the supporting contracts for DR v3 (Decentralise Capital):
  *   - InsurancePoolVault       — holds insurance funds funded by slash proceeds + protocol fees
- *   - ResolverStakingModuleV1  — manages resolver bond deposits, tiers, and delegation
- *   - ResolverSlashingModuleV1 — calculates and executes slash penalties
+ *   - ResolverStakingModule  — manages resolver bond deposits, tiers, and delegation
+ *   - ResolverSlashingModule — calculates and executes slash penalties
  *   - BondTokenRegistry        — allowlist of accepted appeal-bond tokens
  *   - DRMAdminFacet            — governance admin surface delegated from DecentralizedResolutionModule
- *   - PaymentCalculationLibraryV1 — pure payment-distribution library for incentive module
- *   - ResolverIncentiveModuleV2   — DR v2 appeal-bond incentive module
+ *   - PaymentCalculationLibrary — pure payment-distribution library for incentive module
+ *   - ResolverIncentiveModule   — DR v2 appeal-bond incentive module
  *
  * Must run before 86_decentralized_resolution_module.ts.
  * Depends on: TimelockController (30_timelock), SewToken (20_gov_token).
@@ -89,11 +89,11 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     console.log(`   ✅ InsurancePoolVault already deployed: ${insuranceDeploy.address}`);
   }
 
-  // ── 2. ResolverStakingModuleV1 ────────────────────────────────────────────
+  // ── 2. ResolverStakingModule ────────────────────────────────────────────
 
-  console.log(`\n📦 Deploying ResolverStakingModuleV1...`);
-  const stakingDeploy = await deploy('ResolverStakingModuleV1', {
-    contract: 'ResolverStakingModuleV1',
+  console.log(`\n📦 Deploying ResolverStakingModule...`);
+  const stakingDeploy = await deploy('ResolverStakingModule', {
+    contract: 'ResolverStakingModule',
     from: deployer,
     args: [deployer, stableToken, sewTokenAddr],
     log: true,
@@ -101,10 +101,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   if (stakingDeploy.newlyDeployed) {
     const url = getBlockExplorerUrl(hre, stakingDeploy.address);
-    console.log(`   ✅ ResolverStakingModuleV1: ${stakingDeploy.address}`);
+    console.log(`   ✅ ResolverStakingModule: ${stakingDeploy.address}`);
     if (url) console.log(`      ${url}`);
     if (stakingDeploy.receipt) {
-      await registerDeployment(hre, 'ResolverStakingModuleV1', {
+      await registerDeployment(hre, 'ResolverStakingModule', {
         address: stakingDeploy.address,
         txHash: stakingDeploy.transactionHash,
         blockNumber: stakingDeploy.receipt.blockNumber,
@@ -113,14 +113,14 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       });
     }
   } else {
-    console.log(`   ✅ ResolverStakingModuleV1 already deployed: ${stakingDeploy.address}`);
+    console.log(`   ✅ ResolverStakingModule already deployed: ${stakingDeploy.address}`);
   }
 
-  // ── 3. ResolverSlashingModuleV1 ───────────────────────────────────────────
+  // ── 3. ResolverSlashingModule ───────────────────────────────────────────
 
-  console.log(`\n📦 Deploying ResolverSlashingModuleV1...`);
-  const slashingDeploy = await deploy('ResolverSlashingModuleV1', {
-    contract: 'ResolverSlashingModuleV1',
+  console.log(`\n📦 Deploying ResolverSlashingModule...`);
+  const slashingDeploy = await deploy('ResolverSlashingModule', {
+    contract: 'ResolverSlashingModule',
     from: deployer,
     args: [deployer, stakingDeploy.address, insuranceDeploy.address, stableToken],
     log: true,
@@ -128,10 +128,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   if (slashingDeploy.newlyDeployed) {
     const url = getBlockExplorerUrl(hre, slashingDeploy.address);
-    console.log(`   ✅ ResolverSlashingModuleV1: ${slashingDeploy.address}`);
+    console.log(`   ✅ ResolverSlashingModule: ${slashingDeploy.address}`);
     if (url) console.log(`      ${url}`);
     if (slashingDeploy.receipt) {
-      await registerDeployment(hre, 'ResolverSlashingModuleV1', {
+      await registerDeployment(hre, 'ResolverSlashingModule', {
         address: slashingDeploy.address,
         txHash: slashingDeploy.transactionHash,
         blockNumber: slashingDeploy.receipt.blockNumber,
@@ -140,7 +140,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       });
     }
   } else {
-    console.log(`   ✅ ResolverSlashingModuleV1 already deployed: ${slashingDeploy.address}`);
+    console.log(`   ✅ ResolverSlashingModule already deployed: ${slashingDeploy.address}`);
   }
 
   // ── 4. BondTokenRegistry ──────────────────────────────────────────────────
@@ -197,11 +197,11 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     console.log(`   ✅ DRMAdminFacet already deployed: ${adminFacetDeploy.address}`);
   }
 
-  // ── 6. PaymentCalculationLibraryV1 ───────────────────────────────────────
+  // ── 6. PaymentCalculationLibrary ───────────────────────────────────────
 
-  console.log(`\n📦 Deploying PaymentCalculationLibraryV1...`);
-  const paymentLibDeploy = await deploy('PaymentCalculationLibraryV1', {
-    contract: 'PaymentCalculationLibraryV1',
+  console.log(`\n📦 Deploying PaymentCalculationLibrary...`);
+  const paymentLibDeploy = await deploy('PaymentCalculationLibrary', {
+    contract: 'PaymentCalculationLibrary',
     from: deployer,
     args: [],
     log: true,
@@ -209,10 +209,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   if (paymentLibDeploy.newlyDeployed) {
     const url = getBlockExplorerUrl(hre, paymentLibDeploy.address);
-    console.log(`   ✅ PaymentCalculationLibraryV1: ${paymentLibDeploy.address}`);
+    console.log(`   ✅ PaymentCalculationLibrary: ${paymentLibDeploy.address}`);
     if (url) console.log(`      ${url}`);
     if (paymentLibDeploy.receipt) {
-      await registerDeployment(hre, 'PaymentCalculationLibraryV1', {
+      await registerDeployment(hre, 'PaymentCalculationLibrary', {
         address: paymentLibDeploy.address,
         txHash: paymentLibDeploy.transactionHash,
         blockNumber: paymentLibDeploy.receipt.blockNumber,
@@ -221,14 +221,14 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       });
     }
   } else {
-    console.log(`   ✅ PaymentCalculationLibraryV1 already deployed: ${paymentLibDeploy.address}`);
+    console.log(`   ✅ PaymentCalculationLibrary already deployed: ${paymentLibDeploy.address}`);
   }
 
-  // ── 7. ResolverIncentiveModuleV2 ─────────────────────────────────────────
+  // ── 7. ResolverIncentiveModule ─────────────────────────────────────────
 
-  console.log(`\n📦 Deploying ResolverIncentiveModuleV2...`);
-  const incentiveDeploy = await deploy('ResolverIncentiveModuleV2', {
-    contract: 'ResolverIncentiveModuleV2',
+  console.log(`\n📦 Deploying ResolverIncentiveModule...`);
+  const incentiveDeploy = await deploy('ResolverIncentiveModule', {
+    contract: 'ResolverIncentiveModule',
     from: deployer,
     args: [deployer, paymentLibDeploy.address],
     log: true,
@@ -236,10 +236,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   if (incentiveDeploy.newlyDeployed) {
     const url = getBlockExplorerUrl(hre, incentiveDeploy.address);
-    console.log(`   ✅ ResolverIncentiveModuleV2: ${incentiveDeploy.address}`);
+    console.log(`   ✅ ResolverIncentiveModule: ${incentiveDeploy.address}`);
     if (url) console.log(`      ${url}`);
     if (incentiveDeploy.receipt) {
-      await registerDeployment(hre, 'ResolverIncentiveModuleV2', {
+      await registerDeployment(hre, 'ResolverIncentiveModule', {
         address: incentiveDeploy.address,
         txHash: incentiveDeploy.transactionHash,
         blockNumber: incentiveDeploy.receipt.blockNumber,
@@ -249,7 +249,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     }
   } else {
     console.log(
-      `   ✅ ResolverIncentiveModuleV2 already deployed: ${incentiveDeploy.address}`,
+      `   ✅ ResolverIncentiveModule already deployed: ${incentiveDeploy.address}`,
     );
   }
 
@@ -257,7 +257,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   console.log(`\n🔗 Wiring staking ↔ slashing modules...`);
   const staking = await ethers.getContractAt(
-    'ResolverStakingModuleV1',
+    'ResolverStakingModule',
     stakingDeploy.address,
     await ethers.getSigner(deployer),
   );
@@ -267,13 +267,13 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   // Grant deployer ROLE_TIMELOCK on staking module so we can call setSlashingModule
   const deployerHasTimelockOnStaking = await staking.hasRole(ROLE_TIMELOCK, deployer);
   if (!deployerHasTimelockOnStaking) {
-    console.log(`   Granting ROLE_TIMELOCK on ResolverStakingModuleV1 to deployer...`);
+    console.log(`   Granting ROLE_TIMELOCK on ResolverStakingModule to deployer...`);
     await (await staking.grantRole(ROLE_TIMELOCK, deployer)).wait();
   }
 
   const currentSlashingModule = await staking.slashingModule();
   if (currentSlashingModule.toLowerCase() !== slashingDeploy.address.toLowerCase()) {
-    console.log(`   Setting slashingModule on ResolverStakingModuleV1...`);
+    console.log(`   Setting slashingModule on ResolverStakingModule...`);
     await (await staking.setSlashingModule(slashingDeploy.address)).wait();
     console.log(`   ✅ slashingModule set to ${slashingDeploy.address}`);
   } else {
@@ -283,7 +283,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   // Grant TimelockController ROLE_TIMELOCK on staking module
   const timelockHasTimelockOnStaking = await staking.hasRole(ROLE_TIMELOCK, timelockAddr);
   if (!timelockHasTimelockOnStaking) {
-    console.log(`   Granting ROLE_TIMELOCK on ResolverStakingModuleV1 to TimelockController...`);
+    console.log(`   Granting ROLE_TIMELOCK on ResolverStakingModule to TimelockController...`);
     await (await staking.grantRole(ROLE_TIMELOCK, timelockAddr)).wait();
     console.log(`   ✅ Done`);
   }
@@ -318,9 +318,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   // ── 10. Wire incentive module ROLE_TIMELOCK ───────────────────────────────
 
-  console.log(`\n🔗 Granting ROLE_TIMELOCK on ResolverIncentiveModuleV2 to TimelockController...`);
+  console.log(`\n🔗 Granting ROLE_TIMELOCK on ResolverIncentiveModule to TimelockController...`);
   const incentive = await ethers.getContractAt(
-    'ResolverIncentiveModuleV2',
+    'ResolverIncentiveModule',
     incentiveDeploy.address,
     await ethers.getSigner(deployer),
   );
@@ -335,12 +335,12 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   console.log(`\n✅ DR v3 module deployment complete`);
   console.log(`\n   InsurancePoolVault:        ${insuranceDeploy.address}`);
-  console.log(`   ResolverStakingModuleV1:   ${stakingDeploy.address}`);
-  console.log(`   ResolverSlashingModuleV1:  ${slashingDeploy.address}`);
+  console.log(`   ResolverStakingModule:   ${stakingDeploy.address}`);
+  console.log(`   ResolverSlashingModule:  ${slashingDeploy.address}`);
   console.log(`   BondTokenRegistry:         ${bondRegistryDeploy.address}`);
   console.log(`   DRMAdminFacet:             ${adminFacetDeploy.address}`);
-  console.log(`   PaymentCalculationLibraryV1: ${paymentLibDeploy.address}`);
-  console.log(`   ResolverIncentiveModuleV2: ${incentiveDeploy.address}`);
+  console.log(`   PaymentCalculationLibrary: ${paymentLibDeploy.address}`);
+  console.log(`   ResolverIncentiveModule: ${incentiveDeploy.address}`);
   console.log(`\n   ➡ Next step: run 86_decentralized_resolution_module.ts`);
 };
 
