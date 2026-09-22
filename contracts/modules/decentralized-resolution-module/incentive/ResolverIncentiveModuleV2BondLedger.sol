@@ -99,7 +99,7 @@ contract ResolverIncentiveModuleV2BondLedger is ResolverIncentiveModuleV2 {
             // Appeal succeeded - refund to economic payer (escalator)
             IBondLedger.Allocation[] memory allocs = new IBondLedger.Allocation[](1);
             allocs[0] = IBondLedger.Allocation(pos.payer, pos.principal);
-            bondLedger.settleBondWithRoot(
+            bondLedger.settleBond(
                 bondId, allocs, IBondLedger.SettlementKind.REFUND,
                 IBondLedger.DispositionCauseType.RULING_OUTCOME,
                 _rulingCauseRoot(escrowContract, workflowId, round, true)
@@ -112,7 +112,7 @@ contract ResolverIncentiveModuleV2BondLedger is ResolverIncentiveModuleV2 {
             if (count == 0) {
                 IBondLedger.Allocation[] memory allocs = new IBondLedger.Allocation[](1);
                 allocs[0] = IBondLedger.Allocation(FORFEIT_DESTINATION, pos.principal);
-                bondLedger.settleBondWithRoot(
+                bondLedger.settleBond(
                     bondId, allocs, IBondLedger.SettlementKind.FORFEIT,
                     IBondLedger.DispositionCauseType.RULING_OUTCOME,
                     _rulingCauseRoot(escrowContract, workflowId, round, false)
@@ -129,7 +129,7 @@ contract ResolverIncentiveModuleV2BondLedger is ResolverIncentiveModuleV2 {
                     allocs[i] = IBondLedger.Allocation(resolvers[i], payment);
                 }
                 _sortAllocationsByRecipient(allocs);
-                bondLedger.settleBondWithRoot(
+                bondLedger.settleBond(
                     bondId, allocs, IBondLedger.SettlementKind.RESOLVER_PAYOUT,
                     IBondLedger.DispositionCauseType.RULING_OUTCOME,
                     _rulingCauseRoot(escrowContract, workflowId, round, false)
@@ -152,7 +152,7 @@ contract ResolverIncentiveModuleV2BondLedger is ResolverIncentiveModuleV2 {
 
         IBondLedger.Allocation[] memory allocs = new IBondLedger.Allocation[](1);
         allocs[0] = IBondLedger.Allocation(FORFEIT_DESTINATION, pos.principal);
-        bondLedger.settleBondWithRoot(
+        bondLedger.settleBond(
             bondId, allocs, IBondLedger.SettlementKind.FORFEIT,
             IBondLedger.DispositionCauseType.EXPLICIT_FORFEIT,
             keccak256(abi.encode("EXPLICIT_FORFEIT", escrowContract, workflowId, round, reason))
@@ -176,7 +176,7 @@ contract ResolverIncentiveModuleV2BondLedger is ResolverIncentiveModuleV2 {
 
             IBondLedger.Allocation[] memory allocs = new IBondLedger.Allocation[](1);
             allocs[0] = IBondLedger.Allocation(FORFEIT_DESTINATION, pos.principal);
-            bondLedger.settleBondWithRoot(
+            bondLedger.settleBond(
                 bondId, allocs, IBondLedger.SettlementKind.FORFEIT,
                 IBondLedger.DispositionCauseType.DISPUTE_FINALIZED,
                 keccak256(abi.encode("DISPUTE_FINALIZED", escrowContract, workflowId, finalRound, finalDecision))

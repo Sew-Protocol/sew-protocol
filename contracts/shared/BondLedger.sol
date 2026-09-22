@@ -88,10 +88,10 @@ contract BondLedger is IBondLedger, AccessControl, ReentrancyGuard {
         });
         _positionRoles[bondId] = PositionRoles({
             funder: funder,
-            // Legacy posting API has no distinct action caller. The authorized
-            // application is therefore recorded as the operator until callers
-            // migrate to a dedicated position-opening entry point.
-            operator: application,
+            // The authorized caller that opened the position is the only caller
+            // permitted to settle it. `application` identifies the protocol
+            // integration, while `operator` identifies its custody authority.
+            operator: _msgSender(),
             beneficiary: payer
         });
 
@@ -101,19 +101,17 @@ contract BondLedger is IBondLedger, AccessControl, ReentrancyGuard {
     function settleBond(
         bytes32 bondId,
         Allocation[] calldata allocations,
-        SettlementKind kind
-    ) external onlyAuthorized nonReentrant {
-        _settleBond(bondId, allocations, kind, DispositionCauseType.EXPLICIT_FORFEIT, bytes32(0));
-    }
-
-    function settleBondWithRoot(
-        bytes32 bondId,
-        Allocation[] calldata allocations,
         SettlementKind kind,
         DispositionCauseType causeType,
         bytes32 causeRoot
     ) external onlyAuthorized nonReentrant {
+        _requirePositionOperator(bondId);
         _settleBond(bondId, allocations, kind, causeType, causeRoot);
+    }
+
+    function _requirePositionOperator(bytes32 bondId) internal view {
+        if (_positions[bondId].status == uint8(BondStatus.NONE)) revert InvalidStatus();
+        if (_positionRoles[bondId].operator != _msgSender()) revert NotAuthorized();
     }
 
     function _settleBond(
@@ -125,6 +123,7 @@ contract BondLedger is IBondLedger, AccessControl, ReentrancyGuard {
     ) internal {
         BondPosition storage pos = _positions[bondId];
         if (pos.status != uint8(BondStatus.PENDING)) revert InvalidStatus();
+        if (causeRoot == bytes32(0)) revert InvalidCauseRoot();
 
         uint256 len = allocations.length;
         if (len == 0) revert InvalidAllocations();
@@ -252,4 +251,5 @@ contract BondLedger is IBondLedger, AccessControl, ReentrancyGuard {
     error InvalidAllocations();
     error NothingClaimable();
     error ClaimFailed();
+    error InvalidCauseRoot();
 }

@@ -61,8 +61,7 @@ interface IBondLedger {
         bytes32 termsHash
     ) external payable;
 
-    function settleBond(bytes32 bondId, Allocation[] calldata allocations, SettlementKind kind) external;
-    function settleBondWithRoot(
+    function settleBond(
         bytes32 bondId,
         Allocation[] calldata allocations,
         SettlementKind kind,

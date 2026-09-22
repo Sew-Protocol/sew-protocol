@@ -375,7 +375,177 @@ Before structural edits, inventory references across these categories:
 
 Generated outputs are not authoritative source. After structural cleanup they must be regenerated from source; do not manually path-edit or hand-maintain them.
 
-## 11. Cleanup acceptance criteria
+## 11. BondLedger canonicalization gate
+
+The BondLedger primitive surface is frozen pending the final PRF comparison. No further primitive design changes are authorized unless the comparison exposes a concrete semantic mismatch.
+
+### Frozen custody contract
+
+```text
+open position
+  -> exact custody
+  -> operator-bound authority
+  -> one terminal settlement
+       -> complete principal allocation
+       -> typed disposition
+       -> nonzero authoritative cause root
+       -> canonical realized distribution
+  -> one-time claims
+```
+
+The supported ERC20 domain requires exact receipt of the declared principal. Fee-on-transfer and transfer-time rebasing assets are unsupported; BondLedger's exact-receipt check is intentional.
+
+### Frozen semantic projection
+
+The final PRF comparison must run identical canonical scenario inputs against the corrected embedded V2 reference and the BondLedger-backed candidate, then normalize both results to:
+
+- scenario identity;
+- admitted/rejected transition and resulting DRM state/round;
+- authority;
+- bond obligation, asset, principal, payer, and funder semantics;
+- refund, resolver-payout, or forfeiture disposition;
+- realized `recipient -> total amount` distribution;
+- claimable and claimed amounts by recipient;
+- disposition cause class and authoritative cause identity/root;
+- principal/refund/payout/forfeiture accounting and conservation;
+- terminal status.
+
+The comparison must require equality of both admitted and rejected transitions. It must ignore contract addresses, storage layout, event emitters, internal call topology, physical custody location, and pre-normalization allocation ordering.
+
+The preserved evidence artifact must record reference and candidate identities, corpus/projection roots and versions, scenario counts, admitted/rejected counts, result roots, and semantic mismatch count. The gate closes only with zero mismatches.
+
+### Bounded DRM allocation invariant
+
+A valid DRM resolver payout cannot exceed `BondLedger.MAX_ALLOCATIONS`:
+
+```text
+eligible payout rows <= unique recorded resolvers
+                     <= MAX_RESOLVERS_PER_DISPUTE
+                     = 50
+                     = BondLedger.MAX_ALLOCATIONS
+```
+
+The facade sorts allocations before settlement; resolver identity uniqueness prevents duplicate payout rows.
+
+### PRF model-enrichment gate before projection
+
+The PRF appeal-bond projection must remain blocked until the authoritative Sew model can reconstruct one complete scenario bond-by-bond without inference from aggregate totals.
+
+Authoritative bond records must distinguish:
+
+```text
+bond/posted-amount   = gross amount
+bond/posting-fee     = posting fee
+bond/custodied-amount = gross amount - posting fee
+```
+
+The accounting layers are separate:
+
+```text
+posted amount = posting fee + custodied amount
+custodied amount = terminal allocations + remaining bond custody
+```
+
+Failed operations must remain outside protocol world-state mutation. Transition evidence may record:
+
+- operation identity;
+- applied/reverted status;
+- pre domain-state root;
+- post domain-state root;
+- pre/post appeal-bond-state roots.
+
+A reverted operation is valid only when its canonical appeal-bond substate root is unchanged. A failure receipt must not be appended to the reverted protocol world merely to make the failure observable.
+
+Bond disposition and claiming are distinct lifecycle stages:
+
+```text
+bond/status: open -> disposed
+
+one terminal disposition
+    -> allocations / entitlement
+    -> claimable balances
+    -> claimed balances
+```
+
+A disposed bond remains claimable until its allocations are fully claimed. Reconciliation must compare allocated entitlement with `claimable + claimed`, not allocation directly with current claimable balances.
+
+For every bond, local conservation must hold before any aggregate reconciliation:
+
+```text
+custodied amount
+  = terminal allocation total
+  + remaining bond custody
+```
+
+Lifecycle constraints are explicit:
+
+```text
+open bond:
+  terminal allocation total = 0
+  remaining bond custody = custodied amount
+  terminal disposition count = 0
+
+disposed ordinary appeal bond:
+  terminal disposition count = 1
+  terminal allocation total = custodied amount
+  remaining bond custody = 0
+
+disposed bond with an explicit retained-remainder policy:
+  terminal allocation total + remaining bond custody = custodied amount
+```
+
+For every recipient and asset:
+
+```text
+allocated entitlement = currently claimable + already claimed
+```
+
+Claims consume entitlement only; they do not alter the historical terminal disposition or its allocation/cause record. A failed operation changes none of the obligation, custody, disposition, or entitlement state.
+
+Appeal identity must preserve the appealed ordinal and both escalation levels. The exact semantics must be explicit, for example:
+
+```text
+appeal/ordinal
+escalation/from-level
+escalation/to-level
+```
+
+A bond identity must be derived from stable lineage such as workflow, dispute, appeal ordinal, and posting-operation identity. Payer, asset, and amount are committed content, not identity substitutes.
+
+Before `appeal_bond_projection.clj` is implemented, the enrichment must demonstrate:
+
+- every posted bond has one unique identity;
+- posted amount, fee, and custodied amount reconcile;
+- every successful terminal action identifies its exact bond;
+- every terminal allocation is preserved by recipient;
+- every disposition has mandatory cause type and nonzero cause root;
+- reverted operations leave the appeal-bond-state root unchanged;
+- aggregate accounting fields reconcile independently against the authoritative records.
+
+The aggregate fields remain reconciliation surfaces, not reconstruction sources:
+
+```text
+Σ posted amounts       ↔ total-bonds-posted
+Σ posting fees         ↔ bond-fees
+Σ open custody         ↔ bond-balances / held accounting
+Σ refund entitlement   ↔ claimable + claimed bond refunds
+Σ distributions        ↔ appeal-bond-distributions-by-token
+Σ forfeitures          ↔ appeal-bonds-forfeited-insurance
+```
+
+### Deployment gate after PRF
+
+Only after the semantic gate passes may the source architecture become:
+
+```text
+DecentralizedResolutionModule
+  -> ResolverIncentiveModule
+      -> BondLedger
+```
+
+The already-deployed embedded V2 remains historical on-chain code for existing snapshotted escrows and is not a future source-tree alternative.
+
+## 12. Cleanup acceptance criteria
 
 A structural cleanup is accepted only if all applicable conditions hold:
 

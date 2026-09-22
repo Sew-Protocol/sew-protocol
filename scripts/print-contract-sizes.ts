@@ -105,7 +105,6 @@ function findContracts(): ContractSize[] {
         sizeKB,
         overLimit,
         overLimitPercent,
-        overLimit,
       });
     }
   }
