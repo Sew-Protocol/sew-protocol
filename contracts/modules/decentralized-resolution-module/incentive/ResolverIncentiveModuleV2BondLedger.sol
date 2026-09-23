@@ -71,7 +71,7 @@ contract ResolverIncentiveModuleV2BondLedger is ResolverIncentiveModule {
                 bondId, escrowContract, escalatedBy, address(this), token, amount,
                 keccak256(abi.encode(workflowId, round)), bytes32(0)
             );
-            IERC20(token).approve(address(bondLedger), 0);
+            IERC20(token).forceApprove(address(bondLedger), 0);
         }
 
         totalBondsPosted += amount;

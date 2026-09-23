@@ -6,7 +6,6 @@ import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/utils/Address.sol';
 import '@openzeppelin/contracts/utils/Context.sol';
 import '../interfaces/IYieldModule.sol';
-import '../interfaces/aave/AaveV3Interfaces.sol';
 import '../modules/AaveYieldModule.sol';
 import '../core/BaseEscrow.sol';
 import '../core/ModuleSnapshotRegistry.sol';

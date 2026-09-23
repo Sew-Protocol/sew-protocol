@@ -71,7 +71,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         uint256 amount,
         uint256 autoReleaseTime,
         uint256 autoCancelTime
-    ) public returns (uint256) {
+    ) external returns (uint256) {
         EscrowSettings memory settings = EscrowSettings({
             customResolver: address(0),
             releaseAddress: address(0),
@@ -217,7 +217,7 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
      * @return success True if withdrawal was successful
      * @dev Only the fee address can withdraw fees. Transfers all accumulated fees to the fee address.
      */
-    function withdrawFees() public nonReentrant returns (bool) {
+    function withdrawFees() external nonReentrant returns (bool) {
         if (_msgSender() != escrowFeeAddress) {
             revert NotFeeAddress(_msgSender(), escrowFeeAddress);
         }
@@ -253,7 +253,7 @@ contract EscrowableERC20Factory {
         uint256 escrowFee,
         address escrowFeeAddress,
         address moduleManagement
-    ) public returns (address) {
+    ) external returns (address) {
         return
             address(
                 new EscrowableERC20(

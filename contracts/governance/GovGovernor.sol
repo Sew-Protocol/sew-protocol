@@ -197,7 +197,7 @@ contract GovGovernor is
      * @notice Get current circulating supply
      * @return Current circulating supply
      */
-    function getCurrentCirculatingSupply() public view returns (uint256) {
+    function getCurrentCirculatingSupply() external view returns (uint256) {
         return getCirculatingSupply(block.number);
     }
 

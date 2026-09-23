@@ -184,10 +184,10 @@ contract BondCollector is AccessControl {
         if (bondToRecord > 0) {
             IERC20(bondToken).safeIncreaseAllowance(address(incentiveMod), bondToRecord);
             try incentiveMod.recordAppealBond(workflowId, _msgSender(), depositor, escalatedBy, bondToRecord, bondToken, newLevel) {
-                IERC20(bondToken).approve(address(incentiveMod), 0);
+                IERC20(bondToken).forceApprove(address(incentiveMod), 0);
                 return true;
             } catch {
-                IERC20(bondToken).approve(address(incentiveMod), 0);
+                IERC20(bondToken).forceApprove(address(incentiveMod), 0);
                 return false;
             }
         }
@@ -212,7 +212,7 @@ contract BondCollector is AccessControl {
      * @dev Best practice to avoid leaving allowances lingering on third-party contracts.
      */
     function resetBondSpender(address token, address spender) external onlyRole(ROLE_ESCROW_CONTRACT) {
-        IERC20(token).approve(spender, 0);
+        IERC20(token).forceApprove(spender, 0);
     }
 
     /**

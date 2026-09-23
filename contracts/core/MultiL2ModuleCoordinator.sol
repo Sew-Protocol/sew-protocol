@@ -143,7 +143,8 @@ contract MultiL2ModuleCoordinator {
 
         // Create bitmask for all supported chains
         uint256 chainsMask = 0;
-        for (uint256 i = 0; i < supportedChains.length; i++) {
+        uint256 supportedChainsLen = supportedChains.length;
+        for (uint256 i = 0; i < supportedChainsLen; i++) {
             chainsMask |= (1 << i);
         }
 
@@ -179,7 +180,8 @@ contract MultiL2ModuleCoordinator {
         // Verify chain is supported
         bool chainSupported = false;
         uint256 chainIndex = 0;
-        for (uint256 i = 0; i < supportedChains.length; i++) {
+        uint256 supportedChainsLen = supportedChains.length;
+        for (uint256 i = 0; i < supportedChainsLen; i++) {
             if (supportedChains[i] == chainId) {
                 chainSupported = true;
                 chainIndex = i;
@@ -270,7 +272,8 @@ contract MultiL2ModuleCoordinator {
     /// @notice Get list of pending updates
     function getPendingUpdates() external view returns (bytes32[] memory) {
         uint256 count = 0;
-        for (uint256 i = 0; i < updateIds.length; i++) {
+        uint256 updateIdsLen = updateIds.length;
+        for (uint256 i = 0; i < updateIdsLen; i++) {
             if (!moduleUpdates[updateIds[i]].completed) {
                 count++;
             }
@@ -278,7 +281,7 @@ contract MultiL2ModuleCoordinator {
 
         bytes32[] memory pending = new bytes32[](count);
         uint256 idx = 0;
-        for (uint256 i = 0; i < updateIds.length; i++) {
+        for (uint256 i = 0; i < updateIdsLen; i++) {
             if (!moduleUpdates[updateIds[i]].completed) {
                 pending[idx] = updateIds[i];
                 idx++;
