@@ -30,7 +30,7 @@ contract InsurancePoolVault is AccessControl, ReentrancyGuard {
 
     // ============ State Variables ============
 
-    IERC20 public stableToken;
+    IERC20 public immutable stableToken;
 
     // Source-tagged accounting
     struct SourceBalance {

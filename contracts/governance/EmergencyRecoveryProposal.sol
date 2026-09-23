@@ -30,8 +30,8 @@ contract EmergencyRecoveryProposal is AccessControl {
     bytes32 public constant ROLE_EXECUTOR = keccak256('ROLE_EXECUTOR');
 
     // Reference to escrow vault being recovered
-    BaseEscrow public escrowVault;
-    GuardianOps public guardianOps;
+    BaseEscrow public immutable escrowVault;
+    GuardianOps public immutable guardianOps;
 
     // Recovery proposal state
     enum RecoveryStatus {

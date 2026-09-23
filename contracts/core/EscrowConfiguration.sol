@@ -20,6 +20,10 @@ abstract contract EscrowConfiguration is AccessControl, EscrowStorage {
     event MinDisputeEscrowValueUpdated(uint256 newValue);
     event MaxDisputesPerSenderPerDayUpdated(uint32 newMax);
     event EscalationCooldownUpdated(uint64 newCooldown);
+    event FeeRecipientUpdated(address indexed oldAddr, address indexed newAddr);
+    event EscrowFeeBpsUpdated(uint256 oldFeeBps, uint256 newFeeBps);
+    event CreationPolicyUpdated(address indexed oldPolicy, address indexed newPolicy);
+    event BondCollectorUpdated(address indexed oldCollector, address indexed newCollector);
 
     function pause(string calldata) external pure { revert PausedNotSupported(); }
     function unpause() external pure { revert PausedNotSupported(); }
@@ -31,12 +35,16 @@ abstract contract EscrowConfiguration is AccessControl, EscrowStorage {
 
     function setFeeRecipient(address newAddr) external onlyRole(ROLE_ADMIN_CONTRACT) {
         if (newAddr == address(0)) revert InvalidAddress(ADDR_FEE_RECIPIENT, newAddr);
+        address oldAddr = escrowFeeAddress;
         escrowFeeAddress = newAddr;
+        emit FeeRecipientUpdated(oldAddr, newAddr);
     }
 
     function setEscrowFeeBps(uint256 feeBps) external onlyRole(ROLE_ADMIN_CONTRACT) {
         if (feeBps > MAX_ESCROW_FEE_BPS) revert InvalidEscrowFee(feeBps, MAX_ESCROW_FEE_BPS);
+        uint256 oldFee = escrowFee;
         escrowFee = feeBps;
+        emit EscrowFeeBpsUpdated(oldFee, feeBps);
     }
 
     function setYieldProtocolFeeBps(uint256 feeBps) external onlyRole(ROLE_ADMIN_CONTRACT) {
@@ -86,12 +94,16 @@ abstract contract EscrowConfiguration is AccessControl, EscrowStorage {
 
     function setCreationPolicy(address policy) external onlyRole(ROLE_TIMELOCK) {
         if (policy == address(0)) revert ZeroCreationPolicy();
+        address oldPolicy = address(creationPolicy);
         creationPolicy = EscrowCreationPolicy(policy);
+        emit CreationPolicyUpdated(oldPolicy, policy);
     }
 
     function setBondCollector(address collector) external onlyRole(ROLE_TIMELOCK) {
         if (collector == address(0)) revert ZeroBondCollector();
+        address oldCollector = address(bondCollector);
         bondCollector = BondCollector(collector);
+        emit BondCollectorUpdated(oldCollector, collector);
     }
 }
 

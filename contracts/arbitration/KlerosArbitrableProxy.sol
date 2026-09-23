@@ -31,7 +31,7 @@ contract KlerosArbitrableProxy is AccessControl, ReentrancyGuard, IArbitrable, I
     /// @dev V1 arbitrator and handoff configuration are immutable. If either becomes
     /// mutable, committed dispute identity must include arbitrator/config lineage and
     /// rulings must validate that lineage before settlement.
-    IArbitrator public arbitrator;
+    IArbitrator public immutable arbitrator;
 
     // Mapping: escrowContract => workflowId => klerosDisputeID + 1 (0 means no dispute)
     mapping(address => mapping(uint256 => uint256)) public workflowToKlerosDispute;

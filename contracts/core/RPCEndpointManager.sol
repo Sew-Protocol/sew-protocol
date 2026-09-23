@@ -82,6 +82,12 @@ contract RPCEndpointManager {
     event ManagerAdded(address indexed manager);
     event ManagerRemoved(address indexed manager);
     event RateLimitUpdated(uint256 indexed chainId, uint256 newLimit);
+    event EndpointActiveUpdated(
+        uint256 indexed chainId,
+        bool isPrimary,
+        bool active,
+        uint64 timestamp
+    );
 
     // Errors
     error NotManager(address caller);
@@ -234,6 +240,7 @@ contract RPCEndpointManager {
         } else {
             backupEndpoints[chainId].active = false;
         }
+        emit EndpointActiveUpdated(chainId, isPrimary, false, uint64(block.timestamp));
     }
 
     /// @notice Re-enable an endpoint
@@ -243,6 +250,7 @@ contract RPCEndpointManager {
         } else {
             backupEndpoints[chainId].active = true;
         }
+        emit EndpointActiveUpdated(chainId, isPrimary, true, uint64(block.timestamp));
     }
 
     /// @notice Add a manager

@@ -52,8 +52,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `setStakingModule()` admin function on `DecentralizedResolutionModule` for configuring per-resolver staking limits
 - `InsufficientResolverStake` error raised when escrow value exceeds a resolver's staked capacity
 - `StakingModuleUpdated` event emitted on staking module changes
+- Added configuration and administration events across `EvidenceModuleV1`, `AaveYieldModule`, `DRMAdminFacet`, `DecentralizedResolutionModule`, and `ResolverSlashingModule` to improve observability; no protocol state-transition semantics or callable selectors changed. Note: generated contract ABIs and the observable log surface expand accordingly (new events); storage layout and callable function selectors are unchanged.
 
 ### Changed
+
+- **`DecentralizedResolutionModule.setAdminFacet` now rejects `address(0)`** — passing the zero address (which can never be a functional admin facet) now reverts with `ZeroAddress('adminFacet')` at set time instead of failing later at delegatecall with `AdminFacetNotSet()`. No valid configuration is affected; only a previously-accepted-but-broken input now fails fast. Tests: `AdminFacetZeroAddress.t.sol`.
 
 - **Consolidated DR incentive module V1/V2 into one contract** — `ResolverIncentiveModuleV1` and `ResolverIncentiveModuleV2` are merged into a single flat `ResolverIncentiveModule` (`incentive/ResolverIncentiveModule.sol`). V2 extended V1 with appeal-bond functions, so they are now one contract; no separate V1/V2 versions remain. `ResolverIncentiveModuleV2BondLedger` is unchanged.
 - **Renamed DR modules to drop `V1` suffix** — `ResolverStakingModuleV1` → `ResolverStakingModule` (`staking/ResolverStakingModule.sol`), `ResolverSlashingModuleV1` → `ResolverSlashingModule` (`slashing/ResolverSlashingModule.sol`, its import of the staking module updated), and `PaymentCalculationLibraryV1` → `PaymentCalculationLibrary` (`libraries/PaymentCalculationLibrary.sol`). Imports, references, and documentation updated accordingly.

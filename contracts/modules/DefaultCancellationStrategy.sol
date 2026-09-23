@@ -24,6 +24,8 @@ contract DefaultCancellationStrategy is ICancellationStrategy {
 
     error NotAuthorizedToCancelYet(uint256 workflowId, address caller);
 
+    event CancellationAttemptRecorded(uint256 indexed workflowId, address indexed caller, uint256 pendingCount);
+
     /// @notice Check if cancellation is allowed
     /// @dev First caller (any participant): can initiate request
     /// @dev Second caller (other participant): can execute
@@ -72,11 +74,13 @@ contract DefaultCancellationStrategy is ICancellationStrategy {
             // First caller - record them if successful
             if (isSuccess) {
                 pendingCancel[workflowId] = caller;
+                emit CancellationAttemptRecorded(workflowId, caller, 1);
             }
         } else {
             // Second caller - clear on success (cancel executed)
             if (isSuccess) {
                 delete pendingCancel[workflowId];
+                emit CancellationAttemptRecorded(workflowId, caller, 0);
             }
             // If unsuccessful, keep pending state (allow retry)
         }

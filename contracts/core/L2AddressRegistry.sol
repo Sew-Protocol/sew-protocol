@@ -56,8 +56,8 @@ contract L2AddressRegistry {
 
     /// @notice Governance: authorized signers for updates
     mapping(address => bool) public isGovernor;
-    uint256 public governorCount;
-    uint256 public requiredSignatures;
+    uint256 public immutable governorCount;
+    uint256 public immutable requiredSignatures;
 
     /// @notice Pending updates (for multi-sig)
     struct PendingUpdate {

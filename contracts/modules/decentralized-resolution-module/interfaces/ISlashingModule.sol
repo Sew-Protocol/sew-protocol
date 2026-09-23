@@ -141,6 +141,10 @@ interface ISlashingModule {
 
     event InsurancePoolFunded(uint256 amount, uint256 newBalance);
     event InsurancePoolPayout(address indexed to, uint256 amount, uint256 indexed workflowId);
+    event MaxSlashPerPeriodUpdated(uint256 oldMax, uint256 oldPeriod, uint256 newMax, uint256 newPeriod);
+    event AppealWindowUpdated(uint256 oldWindow, uint256 newWindow);
+    event AppealBondUpdated(uint256 oldBond, uint256 newBond);
+    event InsurancePoolVaultUpdated(address indexed oldVault, address indexed newVault);
 
     /**
      * @notice Check if a resolver has a pending slash proposal

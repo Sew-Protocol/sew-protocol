@@ -63,6 +63,9 @@ contract EvidenceModuleV1 is IEvidenceModule, AccessControlUpgradeable, Reentran
         bool allowPostResolution
     );
 
+    event EscrowContractSet(address indexed oldEscrowContract, address indexed newEscrowContract);
+    event ResolutionModuleSet(address indexed oldResolutionModule, address indexed newResolutionModule);
+
     // ============ Modifiers ============
 
     modifier onlyEscrowContract() {
@@ -344,11 +347,15 @@ contract EvidenceModuleV1 is IEvidenceModule, AccessControlUpgradeable, Reentran
     }
 
     function setEscrowContract(address _escrowContract) external onlyRole(ROLE_TIMELOCK) {
+        address old = escrowContract;
         escrowContract = _escrowContract;
+        emit EscrowContractSet(old, _escrowContract);
     }
 
     function setResolutionModule(address _resolutionModule) external onlyRole(ROLE_TIMELOCK) {
+        address old = resolutionModule;
         resolutionModule = _resolutionModule;
+        emit ResolutionModuleSet(old, _resolutionModule);
     }
 
     // ============ ERC-165 ============

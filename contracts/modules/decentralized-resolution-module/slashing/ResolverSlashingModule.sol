@@ -179,6 +179,7 @@ contract ResolverSlashingModule is ISlashingModule, AccessControl, ReentrancyGua
 
     event SlashedSEWHandled(uint256 indexed workflowId, uint256 amount, bool supplyReduced);
     event SlashReservesUpdated(uint256 addedAmount, uint256 newTotal, uint256 indexed workflowId);
+    event UnavailabilityStatsUpdated(uint256 totalResolvers, uint256 unavailableCount, uint256 lastUpdate);
 
     // ============ Initialization ============
 
@@ -1277,16 +1278,23 @@ contract ResolverSlashingModule is ISlashingModule, AccessControl, ReentrancyGua
     }
 
     function setMaxSlashPerPeriod(uint256 max, uint256 period) external override onlyRole(ROLE_TIMELOCK) {
+        uint256 oldMax = slashConfig.maxSlashPerPeriod;
+        uint256 oldPeriod = slashConfig.slashPeriod;
         slashConfig.maxSlashPerPeriod = max;
         slashConfig.slashPeriod = period;
+        emit MaxSlashPerPeriodUpdated(oldMax, oldPeriod, max, period);
     }
 
     function setAppealWindow(uint256 window) external override onlyRole(ROLE_TIMELOCK) {
+        uint256 old = slashConfig.appealWindow;
         slashConfig.appealWindow = window;
+        emit AppealWindowUpdated(old, window);
     }
 
     function setAppealBond(uint256 bond) external override onlyRole(ROLE_TIMELOCK) {
+        uint256 old = slashConfig.appealBond;
         slashConfig.appealBond = bond;
+        emit AppealBondUpdated(old, bond);
     }
 
     function fundInsurancePool(uint256 amount) external override {
@@ -1301,7 +1309,9 @@ contract ResolverSlashingModule is ISlashingModule, AccessControl, ReentrancyGua
      * @notice Set insurance pool vault (governance)
      */
     function setInsurancePoolVault(address vault) external onlyRole(ROLE_TIMELOCK) {
+        address old = address(insurancePoolVault);
         insurancePoolVault = InsurancePoolVault(vault);
+        emit InsurancePoolVaultUpdated(old, vault);
     }
 
     function triggerCircuitBreaker(string memory reason) external override onlyRole(ROLE_TIMELOCK) {
@@ -1330,5 +1340,6 @@ contract ResolverSlashingModule is ISlashingModule, AccessControl, ReentrancyGua
         unavailabilityStats.totalResolvers = totalResolvers;
         unavailabilityStats.unavailableCount = unavailableCount;
         unavailabilityStats.lastUpdate = block.timestamp;
+        emit UnavailabilityStatsUpdated(totalResolvers, unavailableCount, unavailabilityStats.lastUpdate);
     }
 }

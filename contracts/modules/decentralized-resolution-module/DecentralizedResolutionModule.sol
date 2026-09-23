@@ -73,6 +73,7 @@ contract DecentralizedResolutionModule is
     event RoundRobinCounterAdvanced(bytes32 indexed category, bool seniorResolvers, uint256 newIndex);
     event AdminFacetUpdated(address indexed oldFacet, address indexed newFacet);
     event DisputeClosedByMutualAgreement(uint256 indexed workflowId, address indexed escrowContract);
+    event EscrowCategorySet(uint256 indexed workflowId, address indexed escrowContract, bytes32 category);
 
     // ============ Modifiers ============
     modifier onlyEscrowContract() {
@@ -126,6 +127,7 @@ contract DecentralizedResolutionModule is
     bool private _adminFacetSet;
 
     function setAdminFacet(address newFacet) external {
+        if (newFacet == address(0)) revert ZeroAddress('adminFacet');
         if (_adminFacetSet) {
             if (!hasRole(ROLE_TIMELOCK, _msgSender())) revert Unauthorized(_msgSender());
         } else {
@@ -545,6 +547,7 @@ contract DecentralizedResolutionModule is
         bytes32 categoryKey
     ) external onlyEscrowContract {
         escrowCategory[escrowContract][workflowId] = categoryKey;
+        emit EscrowCategorySet(workflowId, escrowContract, categoryKey);
     }
 
     function initializeDispute(

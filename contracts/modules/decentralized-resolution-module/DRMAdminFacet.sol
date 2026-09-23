@@ -64,6 +64,7 @@ contract DRMAdminFacet is SlowLaneQueueActivate, AccessControl, ReentrancyGuard,
     event EscalationCostConfigActivated(EscalationCostConfig oldConfig, EscalationCostConfig newConfig);
     event AppealBondRequired(uint256 indexed workflowId, uint8 round, uint256 amount, address token);
     event MinEscrowValueUpdated(uint256 oldValue, uint256 newValue);
+    event DisputeTimeoutUpdated(uint256 oldTimeout, uint256 newTimeout);
     event BondTokenRegistryUpdated(address indexed oldRegistry, address indexed newRegistry);
     event NewAssignmentsPaused(address indexed pausedBy, string reason);
     event NewAssignmentsResumed(address indexed resumedBy);
@@ -275,7 +276,9 @@ contract DRMAdminFacet is SlowLaneQueueActivate, AccessControl, ReentrancyGuard,
         if (t == 0 || t > MAX_DISPUTE_TIMEOUT) {
             revert InvalidDisputeTimeout(t, 1, MAX_DISPUTE_TIMEOUT);
         }
+        uint256 old = disputeTimeout;
         disputeTimeout = t;
+        emit DisputeTimeoutUpdated(old, t);
     }
 
     // ============ Versioned Resolution Configuration ==========

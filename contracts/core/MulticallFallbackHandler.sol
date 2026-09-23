@@ -79,11 +79,13 @@ contract MulticallFallbackHandler is Ownable {
     function disableEndpoint(uint256 _chainId) external onlyOwner {
         if (_chainId == 0) revert InvalidChainId();
         endpoints[_chainId].enabled = false;
+        emit EndpointUpdated(_chainId, endpoints[_chainId].rpcUrl);
     }
 
     function enableEndpoint(uint256 _chainId) external onlyOwner {
         if (_chainId == 0) revert InvalidChainId();
         endpoints[_chainId].enabled = true;
+        emit EndpointUpdated(_chainId, endpoints[_chainId].rpcUrl);
     }
 
     function executeWithFallback(

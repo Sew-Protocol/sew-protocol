@@ -111,6 +111,9 @@ contract AaveYieldModule is IYieldModule, ERC165, AccessControl, SlowLaneQueueAc
     event TokenCapLowered(address indexed token, uint256 newCap);
     event TokensRecovered(address indexed token, address indexed to, uint256 amount);
     event NativeRecovered(address indexed to, uint256 amount);
+    event EscrowApprovalQueued(address indexed escrow, uint64 eta);
+    event TokenConfigQueued(address indexed token, address indexed aToken, uint64 eta);
+    event TokenCapQueued(address indexed token, uint256 cap, uint64 eta);
 
     // ============ Errors ============
 
@@ -144,6 +147,7 @@ contract AaveYieldModule is IYieldModule, ERC165, AccessControl, SlowLaneQueueAc
     function queueApproveEscrow(address escrow) external onlyRole(ROLE_TIMELOCK) {
         require(escrow != address(0), "InvalidAddress");
         _queueAddress(_pendingApproveEscrow, escrow);
+        emit EscrowApprovalQueued(escrow, _pendingApproveEscrow.eta);
     }
 
     /**
@@ -186,6 +190,7 @@ contract AaveYieldModule is IYieldModule, ERC165, AccessControl, SlowLaneQueueAc
         require(token != address(0), "InvalidAddress");
         require(aToken != address(0), "InvalidAToken");
         _queueAddress(_pendingTokenConfig[token], aToken);
+        emit TokenConfigQueued(token, aToken, _pendingTokenConfig[token].eta);
     }
 
     /**
@@ -243,6 +248,7 @@ contract AaveYieldModule is IYieldModule, ERC165, AccessControl, SlowLaneQueueAc
     function queueConfigureTokenCap(address token, uint256 cap) external onlyRole(ROLE_TIMELOCK) {
         require(token != address(0), "InvalidAddress");
         _queueUint(_pendingTokenCap[token], cap);
+        emit TokenCapQueued(token, cap, _pendingTokenCap[token].eta);
     }
 
     /**
