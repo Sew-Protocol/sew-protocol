@@ -20,6 +20,7 @@ import { sha256HexOfBuffer } from './_lib/hash';
 
 const OUT_DIR = path.resolve(process.cwd(), 'out');
 const ALLOWLIST = loadAllowlist();
+const BONDLEDGER_ALLOWLIST_PATH = path.resolve(process.cwd(), 'config', 'deployable-allowlist-bondledger.json');
 
 let passed = 0;
 let failed = 0;
@@ -89,6 +90,27 @@ function main(): void {
     if (ra.manifest.source.commit !== rb.manifest.source.commit) {
       throw new Error('source commit differs between runs (unexpected)');
     }
+  });
+
+  test('Profile-B (bondledger) re-export is deterministic + validates against its allow-list', () => {
+    const allowlist = loadAllowlist(BONDLEDGER_ALLOWLIST_PATH);
+    const a = tmpdir();
+    const b = tmpdir();
+    const ra = exportDeployables({ allowlist, exportDir: a });
+    const rb = exportDeployables({ allowlist, exportDir: b });
+    if (ra.manifest.bundleRoot !== rb.manifest.bundleRoot) {
+      throw new Error(`Profile-B bundleRoot differs: ${ra.manifest.bundleRoot} vs ${rb.manifest.bundleRoot}`);
+    }
+    if (ra.manifest.build.profile !== 'sew-dr-v2-bondledger') {
+      throw new Error(`Profile-B build.profile is '${ra.manifest.build.profile}', expected sew-dr-v2-bondledger`);
+    }
+    for (const name of Object.keys(ra.manifest.artifacts)) {
+      const fa = sha256HexOfBuffer(fs.readFileSync(path.join(a, 'artifacts', `${name}.json`)));
+      const fb = sha256HexOfBuffer(fs.readFileSync(path.join(b, 'artifacts', `${name}.json`)));
+      if (fa !== fb) throw new Error(`Profile-B artifact '${name}' file differs between runs`);
+    }
+    // validate the second export against the Profile-B allow-list (must not fall back to Profile A)
+    validateDeployables({ allowlist, exportDir: b });
   });
 
   test('tampered artifact file fails validation', () => {

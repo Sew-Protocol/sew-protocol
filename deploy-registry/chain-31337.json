@@ -165,11 +165,11 @@
       "chainId": 31337,
       "networkName": "hardhat",
       "contractName": "SewToken",
-      "address": "0x0165878A594ca255338adfa4d48449f69242Eb8F",
-      "deploymentTxHash": "0xf5318e56e84cf968b534ae76d417f4120884a8428495385d4f3a1528adbf1511",
-      "blockNumber": 7,
+      "address": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+      "deploymentTxHash": "0xf3175708f1f2920967695d691960ec303f95d57ce9579afa69bf1b0707205452",
+      "blockNumber": 2,
       "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-      "timestamp": "2026-09-17T14:31:54.300Z",
+      "timestamp": "2026-09-28T09:30:34.754Z",
       "verified": false,
       "blockExplorerUrl": "",
       "constructorArgs": [
@@ -185,18 +185,18 @@
       "compilerVersion": "0.8.37",
       "optimizationRuns": 1000,
       "gasUsed": "1828600",
-      "deploymentCost": "0.0025887319299044",
+      "deploymentCost": "0.0020507960404446",
       "proxyType": "none"
     },
     {
       "chainId": 31337,
       "networkName": "hardhat",
       "contractName": "TimelockController",
-      "address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
-      "deploymentTxHash": "0x8d9a1509f02a628f1f771c15a1adfe341a2c671445cb06f99d77cd65972601a8",
-      "blockNumber": 8,
+      "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+      "deploymentTxHash": "0x3983058eb2d5090aa5ba6736e3cfe18d75c2237f2b400a254f8ffb373301d66a",
+      "blockNumber": 1,
       "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-      "timestamp": "2026-09-17T14:31:54.446Z",
+      "timestamp": "2026-09-28T09:30:33.145Z",
       "verified": false,
       "blockExplorerUrl": "",
       "constructorArgs": [
@@ -214,7 +214,7 @@
       "compilerVersion": "0.8.37",
       "optimizationRuns": 1000,
       "gasUsed": "1335911",
-      "deploymentCost": "0.001830283241005805",
+      "deploymentCost": "0.001690762359375",
       "proxyType": "none"
     },
     {
@@ -309,6 +309,302 @@
       "optimizationRuns": 1000,
       "gasUsed": "534128",
       "deploymentCost": "0.000856349905138112",
+      "proxyType": "none"
+    },
+    {
+      "chainId": 31337,
+      "networkName": "hardhat",
+      "contractName": "InsurancePoolVault",
+      "address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+      "deploymentTxHash": "0x3a2f1775598b08626b9e9c2a7e6270efc61ad963c2c5b1e388893e7686335df1",
+      "blockNumber": 3,
+      "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "timestamp": "2026-09-28T09:30:36.096Z",
+      "verified": false,
+      "blockExplorerUrl": "",
+      "constructorArgs": [
+        "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+        "0x0000000000000000000000000000000000000001"
+      ],
+      "tags": [
+        "dr3",
+        "insurance"
+      ],
+      "compilerVersion": "0.8.37",
+      "optimizationRuns": 1000,
+      "gasUsed": "1226188",
+      "deploymentCost": "0.001224241528323604",
+      "proxyType": "none"
+    },
+    {
+      "chainId": 31337,
+      "networkName": "hardhat",
+      "contractName": "ResolverStakingModule",
+      "address": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+      "deploymentTxHash": "0x1afce8761dadaad1992375c6793167fc26ae45aebcb34e1355f246e4a5a493fc",
+      "blockNumber": 4,
+      "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "timestamp": "2026-09-28T09:30:37.411Z",
+      "verified": false,
+      "blockExplorerUrl": "",
+      "constructorArgs": [
+        "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+        "0x0000000000000000000000000000000000000001",
+        "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+      ],
+      "tags": [
+        "dr3",
+        "staking"
+      ],
+      "compilerVersion": "0.8.37",
+      "optimizationRuns": 1000,
+      "gasUsed": "3896578",
+      "deploymentCost": "0.003443846385431872",
+      "proxyType": "none"
+    },
+    {
+      "chainId": 31337,
+      "networkName": "hardhat",
+      "contractName": "ResolverSlashingModule",
+      "address": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+      "deploymentTxHash": "0x72648681d5da1f675b716aa26671a68604cf1d3a34d8b2579bd2571c02a4c466",
+      "blockNumber": 5,
+      "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "timestamp": "2026-09-28T09:30:38.683Z",
+      "verified": false,
+      "blockExplorerUrl": "",
+      "constructorArgs": [
+        "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+        "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+        "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+        "0x0000000000000000000000000000000000000001"
+      ],
+      "tags": [
+        "dr3",
+        "slashing"
+      ],
+      "compilerVersion": "0.8.37",
+      "optimizationRuns": 1000,
+      "gasUsed": "4980526",
+      "deploymentCost": "0.003994556748151016",
+      "proxyType": "none"
+    },
+    {
+      "chainId": 31337,
+      "networkName": "hardhat",
+      "contractName": "BondTokenRegistry",
+      "address": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
+      "deploymentTxHash": "0x5c5a6d6bf505059fb0e86f57a779c8f5c74d39a7a33dc6cfd69e1434d9a2f0a5",
+      "blockNumber": 6,
+      "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "timestamp": "2026-09-28T09:30:39.783Z",
+      "verified": false,
+      "blockExplorerUrl": "",
+      "constructorArgs": [
+        "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+        "0x0000000000000000000000000000000000000001"
+      ],
+      "tags": [
+        "dr3",
+        "bond-registry"
+      ],
+      "compilerVersion": "0.8.37",
+      "optimizationRuns": 1000,
+      "gasUsed": "945567",
+      "deploymentCost": "0.0006950567054529",
+      "proxyType": "none"
+    },
+    {
+      "chainId": 31337,
+      "networkName": "hardhat",
+      "contractName": "DRMAdminFacet",
+      "address": "0x0165878A594ca255338adfa4d48449f69242Eb8F",
+      "deploymentTxHash": "0x432d08c833560e42fdf55cb14d2404b5ac69ffeb4c9c06501e1eac25a12f455b",
+      "blockNumber": 7,
+      "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "timestamp": "2026-09-28T09:30:41.035Z",
+      "verified": false,
+      "blockExplorerUrl": "",
+      "constructorArgs": [],
+      "tags": [
+        "dr3",
+        "drm-admin"
+      ],
+      "compilerVersion": "0.8.37",
+      "optimizationRuns": 1000,
+      "gasUsed": "4926366",
+      "deploymentCost": "0.003197099473952598",
+      "proxyType": "none"
+    },
+    {
+      "chainId": 31337,
+      "networkName": "hardhat",
+      "contractName": "PaymentCalculationLibrary",
+      "address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
+      "deploymentTxHash": "0x127ce381636b1d9c94e853e18f2075f22b43a47c1dea70cbcd8de2a345563988",
+      "blockNumber": 8,
+      "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "timestamp": "2026-09-28T09:30:42.238Z",
+      "verified": false,
+      "blockExplorerUrl": "",
+      "constructorArgs": [],
+      "tags": [
+        "dr3",
+        "payment-lib"
+      ],
+      "compilerVersion": "0.8.37",
+      "optimizationRuns": 1000,
+      "gasUsed": "528961",
+      "deploymentCost": "0.000314466040761912",
+      "proxyType": "none"
+    },
+    {
+      "chainId": 31337,
+      "networkName": "hardhat",
+      "contractName": "ResolverIncentiveModule",
+      "address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
+      "deploymentTxHash": "0x440d073bf3bb7b04c859648f0644f9d2ab808760c799d4e91b4d229e4b7c9cb1",
+      "blockNumber": 9,
+      "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "timestamp": "2026-09-28T09:30:43.477Z",
+      "verified": false,
+      "blockExplorerUrl": "",
+      "constructorArgs": [
+        "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+        "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
+      ],
+      "tags": [
+        "dr3",
+        "incentive"
+      ],
+      "compilerVersion": "0.8.37",
+      "optimizationRuns": 1000,
+      "gasUsed": "4617057",
+      "deploymentCost": "0.002413824843386808",
+      "proxyType": "none"
+    },
+    {
+      "chainId": 31337,
+      "networkName": "hardhat",
+      "contractName": "DecentralizedResolutionModule",
+      "address": "0x0B306BF915C4d645ff596e518fAf3F9669b97016",
+      "deploymentTxHash": "0x22cc3a8a96c88d7abe76c5d22f85b13a4af6557d3e57c759aa6ba18c19404dc6",
+      "blockNumber": 16,
+      "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "timestamp": "2026-09-28T09:30:45.178Z",
+      "verified": false,
+      "blockExplorerUrl": "",
+      "constructorArgs": [
+        "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+      ],
+      "tags": [
+        "dr3",
+        "resolution-module"
+      ],
+      "compilerVersion": "0.8.37",
+      "optimizationRuns": 1000,
+      "gasUsed": "7914604",
+      "deploymentCost": "0.001701665368768692",
+      "proxyType": "none"
+    },
+    {
+      "chainId": 31337,
+      "networkName": "hardhat",
+      "contractName": "DecentralizedResolutionModuleProfileB",
+      "address": "0x59b670e9fA9D0A427751Af201D676719a970857b",
+      "deploymentTxHash": "0x05f8c85e73185b27bd6957ce14882474600b60ae7fafe417eecab116a9d6c00c",
+      "blockNumber": 22,
+      "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "timestamp": "2026-09-28T09:30:46.684Z",
+      "verified": false,
+      "blockExplorerUrl": "",
+      "constructorArgs": [
+        "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+      ],
+      "tags": [
+        "profile-b",
+        "resolution-module"
+      ],
+      "compilerVersion": "0.8.37",
+      "optimizationRuns": 1000,
+      "gasUsed": "7914604",
+      "deploymentCost": "0.000823491443470924",
+      "proxyType": "none"
+    },
+    {
+      "chainId": 31337,
+      "networkName": "hardhat",
+      "contractName": "BondLedger",
+      "address": "0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1",
+      "deploymentTxHash": "0x37cfd0444f9c7802de24b662d1430d0ec293afdc8957e8375b15c54356d695a1",
+      "blockNumber": 23,
+      "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "timestamp": "2026-09-28T09:30:47.918Z",
+      "verified": false,
+      "blockExplorerUrl": "",
+      "constructorArgs": [
+        "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+      ],
+      "tags": [
+        "profile-b",
+        "bondledger"
+      ],
+      "compilerVersion": "0.8.37",
+      "optimizationRuns": 1000,
+      "gasUsed": "1563549",
+      "deploymentCost": "0.000153077114965125",
+      "proxyType": "none"
+    },
+    {
+      "chainId": 31337,
+      "networkName": "hardhat",
+      "contractName": "ResolverIncentiveModuleV2BondLedger",
+      "address": "0x322813Fd9A801c5507c9de605d63CEA4f2CE6c44",
+      "deploymentTxHash": "0x1f456e2b00659c6fceb7f8c2195c624e0810b8dd1aac8a3dce02df2f06b2c6ba",
+      "blockNumber": 24,
+      "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "timestamp": "2026-09-28T09:30:49.205Z",
+      "verified": false,
+      "blockExplorerUrl": "",
+      "constructorArgs": [
+        "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+        "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
+        "0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1"
+      ],
+      "tags": [
+        "profile-b",
+        "incentive"
+      ],
+      "compilerVersion": "0.8.37",
+      "optimizationRuns": 1000,
+      "gasUsed": "5736460",
+      "deploymentCost": "0.0004987353758449",
+      "proxyType": "none"
+    },
+    {
+      "chainId": 31337,
+      "networkName": "hardhat",
+      "contractName": "EscrowVaultProfileB",
+      "address": "0x7a2088a1bFc9d81c55368AE168C2C02570cB814F",
+      "deploymentTxHash": "0x289dfee61172c3093a5103f40c986faea2fd0733e82a037aab1c2813700e4145",
+      "blockNumber": 27,
+      "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "timestamp": "2026-09-28T09:30:53.067Z",
+      "verified": false,
+      "blockExplorerUrl": "",
+      "constructorArgs": [
+        0,
+        "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+        "0xa85233C63b9Ee964Add6F2cffe00Fd84eb32338f"
+      ],
+      "tags": [
+        "profile-b",
+        "escrow"
+      ],
+      "compilerVersion": "0.8.37",
+      "optimizationRuns": 1000,
+      "gasUsed": "8469152",
+      "deploymentCost": "0.0005252375397192",
       "proxyType": "none"
     }
   ],

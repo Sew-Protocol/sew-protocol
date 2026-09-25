@@ -1,0 +1,27 @@
+{
+  "build": {
+   "artifactSource": "forge",
+   "compiler": {
+    "name": "solc",
+    "version": "0.8.37+commit.f401782d"
+  },
+   "profile": "sew-dr-v2-bondledger",
+   "settings": {
+    "evmVersion": "osaka",
+    "optimizerRuns": 200,
+    "viaIR": true
+  }
+ },
+  "generated": {
+   "exporter": "sew-protocol/deployables-export",
+   "manifestSchemaVersion": 1
+ },
+  "schemaVersion": 1,
+  "source": {
+   "commit": "tmznvrqnmtzvxvzyuzkvukmqtuztzlon",
+   "commitOverride": false,
+   "commitSource": "jj",
+   "dirty": true,
+   "repository": "sew/sew-protocol"
+ }
+}
