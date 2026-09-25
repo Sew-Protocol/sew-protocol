@@ -8,7 +8,7 @@
     "test:foundry": "bash scripts/check-foundry-deps.sh && forge test -vvv",
     "test:foundry:invariants": "forge test --match-path 'test/foundry/invariants/*.t.sol' -vvv",
     "test:foundry:core": "forge test --match-path 'test/foundry/core/*.t.sol' --no-match-path '*disabled*' -vvv",
-    "test:foundry:modules": "forge test test/foundry/core/ModuleMetadataSimple.t.sol test/foundry/decentralized-resolution-module -vvv",
+    "test:foundry:modules": "forge test --match-path 'test/foundry/core/ModuleMetadataSimple.t.sol' -vvv && forge test --match-path 'test/foundry/decentralized-resolution-module/*' -vvv",
     "test:halmos:smoke": "/usr/bin/python3 -m halmos --root . --contract HalmosEscrowProperties --function check_solvency_after_create --profile halmos --loop 3",
     "test:formal:smoke": "pnpm test:foundry:invariants && pnpm test:halmos:smoke",
     "test:foundry:release-resolution": "bash scripts/test-core-modules.sh",
