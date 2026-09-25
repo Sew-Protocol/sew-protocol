@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "packageName": "@sew/deployables-bondledger",
+  "bundleVersion": "0.1.0",
+  "buildArtifactSource": "forge",
+  "buildProfile": "sew-dr-v2-bondledger",
+  "entries": [
+    {
+      "artifactName": "BondLedger",
+      "contractName": "BondLedger",
+      "sourcePath": "contracts/shared/BondLedger.sol",
+      "scopeHint": "sew",
+      "category": "resolution",
+      "notes": "Profile-B extracted appeal-bond custody/settlement ledger (Profile-B specific)."
+    },
+    {
+      "artifactName": "ResolverIncentiveModuleV2BondLedger",
+      "contractName": "ResolverIncentiveModuleV2BondLedger",
+      "sourcePath": "contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModuleV2BondLedger.sol",
+      "scopeHint": "sew",
+      "category": "resolution",
+      "notes": "Profile-B facade: extends ResolverIncentiveModule, delegates custody/settlement to BondLedger."
+    },
+    {
+      "artifactName": "DecentralizedResolutionModule",
+      "contractName": "DecentralizedResolutionModule",
+      "sourcePath": "contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol",
+      "scopeHint": "sew",
+      "category": "resolution",
+      "notes": "Profile-B fresh DRM instance (same bytecode identity as Profile A; distinct deployment)."
+    },
+    {
+      "artifactName": "EscrowVault",
+      "contractName": "EscrowVault",
+      "sourcePath": "contracts/core/EscrowVault.sol",
+      "scopeHint": "sew",
+      "category": "core",
+      "notes": "Profile-B EscrowVault/DRM binding (dedicated vault or explicit shared-vault reuse)."
+    },
+    {
+      "artifactName": "ResolverStakingModule",
+      "contractName": "ResolverStakingModule",
+      "sourcePath": "contracts/modules/decentralized-resolution-module/staking/ResolverStakingModule.sol",
+      "scopeHint": "shared",
+      "category": "resolution",
+      "notes": "Shared protocol, reused by Profile B unchanged."
+    },
+    {
+      "artifactName": "ResolverSlashingModule",
+      "contractName": "ResolverSlashingModule",
+      "sourcePath": "contracts/modules/decentralized-resolution-module/slashing/ResolverSlashingModule.sol",
+      "scopeHint": "shared",
+      "category": "resolution",
+      "notes": "Shared protocol, reused by Profile B unchanged."
+    },
+    {
+      "artifactName": "InsurancePoolVault",
+      "contractName": "InsurancePoolVault",
+      "sourcePath": "contracts/modules/decentralized-resolution-module/InsurancePoolVault.sol",
+      "scopeHint": "shared",
+      "category": "resolution",
+      "notes": "Shared protocol, reused by Profile B unchanged."
+    },
+    {
+      "artifactName": "BondTokenRegistry",
+      "contractName": "BondTokenRegistry",
+      "sourcePath": "contracts/modules/decentralized-resolution-module/bond/BondTokenRegistry.sol",
+      "scopeHint": "shared",
+      "category": "resolution",
+      "notes": "Shared protocol, reused by Profile B unchanged."
+    },
+    {
+      "artifactName": "DRMAdminFacet",
+      "contractName": "DRMAdminFacet",
+      "sourcePath": "contracts/modules/decentralized-resolution-module/DRMAdminFacet.sol",
+      "scopeHint": "shared",
+      "category": "resolution",
+      "notes": "Shared admin facet governing DRM wiring, reused by Profile B."
+    },
+    {
+      "artifactName": "PaymentCalculationLibrary",
+      "contractName": "PaymentCalculationLibrary",
+      "sourcePath": "contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibrary.sol",
+      "scopeHint": "shared",
+      "category": "library",
+      "notes": "Deployed (public) library requiring separate linking/deployment; bound in Profile-B manifest."
+    },
+    {
+      "artifactName": "TimelockController",
+      "contractName": "TimelockController",
+      "sourcePath": "node_modules/@openzeppelin/contracts/governance/TimelockController.sol",
+      "origin": "openzeppelin",
+      "scopeHint": "shared",
+      "category": "governance",
+      "notes": "OpenZeppelin timelock execution lane; shared governance."
+    },
+    {
+      "artifactName": "EscrowGovernanceTimelock",
+      "contractName": "EscrowGovernanceTimelock",
+      "sourcePath": "contracts/admin/EscrowGovernanceTimelock.sol",
+      "scopeHint": "shared",
+      "category": "governance",
+      "notes": "Escrow admin timelock; shared governance."
+    },
+    {
+      "artifactName": "SewToken",
+      "contractName": "SewToken",
+      "sourcePath": "contracts/token/SewToken.sol",
+      "scopeHint": "shared",
+      "category": "governance",
+      "notes": "Governance voting token; shared governance."
+    },
+    {
+      "artifactName": "GovGovernor",
+      "contractName": "GovGovernor",
+      "sourcePath": "contracts/governance/GovGovernor.sol",
+      "scopeHint": "shared",
+      "category": "governance",
+      "notes": "Governor (timelock control); shared governance."
+    }
+  ]
+}

@@ -72,6 +72,16 @@ const config: HardhatUserConfig = {
       allowUnlimitedContractSize: true, // Allow large contracts in test environment only
       chainId: 31337,
     },
+    // Local anvil node for faithful EIP-170 deployments (start with a raised
+    // code-size limit; anvil enforces the real 24KB EIP-170 limit by default).
+    // Use the canonical anvil dev account (deployer = account 0).
+    anvil: {
+      url: 'http://127.0.0.1:8545',
+      chainId: 31337,
+      accounts: [
+        '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
+      ],
+    },
     baseSepolia: {
       url: rpc('RPC_BASE_SEPOLIA'),
       // Allow a dedicated deploy key for Base Sepolia testnet deployments.

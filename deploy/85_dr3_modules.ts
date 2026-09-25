@@ -176,7 +176,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const adminFacetDeploy = await deploy('DRMAdminFacet', {
     contract: 'DRMAdminFacet',
     from: deployer,
-    args: [timelockAddr, stableToken],
+    args: [],
     log: true,
   });
 
@@ -189,7 +189,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
         address: adminFacetDeploy.address,
         txHash: adminFacetDeploy.transactionHash,
         blockNumber: adminFacetDeploy.receipt.blockNumber,
-        constructorArgs: [timelockAddr, stableToken],
+        constructorArgs: [],
         tags: ['dr3', 'drm-admin'],
       });
     }
@@ -346,4 +346,5 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
 export default func;
 func.tags = ['dr3', 'dr3-modules'];
-func.dependencies = ['core', 'module-management', 'governance'];
+// Precise phase tags only: 85 requires TimelockController (30) + SewToken (20) via get().
+func.dependencies = ['timelock', 'token'];

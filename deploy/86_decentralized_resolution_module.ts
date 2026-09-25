@@ -178,17 +178,27 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     }
   }
 
-  // ── 7. Grant ROLE_TIMELOCK on DRMAdminFacet to TimelockController ─────────
-  // DRMAdminFacet's own role registry must also have TimelockController as ROLE_TIMELOCK
-  // so that direct calls to the facet (not via DRM delegation) are also authorized.
+  // ── 7. Seed DRMAdminFacet's DIRECT-call role registry (best-effort) ──────
+  // DRMAdminFacet is governed via DELEGATECALL from DRM, where ROLE_TIMELOCK on the DRM
+  // (granted in step 3) authorizes facet functions. The facet's OWN AccessControl registry is
+  // only consulted for DIRECT calls to the facet address. DRMAdminFacet has a zero-arg
+  // constructor that grants DEFAULT_ADMIN_ROLE to no one, so its registry cannot be seeded after
+  // deployment unless an admin was established some other way. If no admin exists, skip rather
+  // than revert: direct facet calls are not part of the supported governance path (governance
+  // acts through the DRM).
 
-  console.log(`\n🔗 Granting governance roles on DRMAdminFacet...`);
+  console.log(`\n🔗 Checking DRMAdminFacet direct-call role registry...`);
   const adminFacet = await ethers.getContractAt('DRMAdminFacet', adminFacetAddr, signer);
+  const deployerIsFacetAdmin = await adminFacet.hasRole(ethers.ZeroHash, deployer);
   const facetTimelockGranted = await adminFacet.hasRole(ROLE_TIMELOCK, timelockAddr);
-  if (!facetTimelockGranted) {
+  if (!facetTimelockGranted && deployerIsFacetAdmin) {
     console.log(`   Granting ROLE_TIMELOCK to TimelockController on DRMAdminFacet...`);
     await (await adminFacet.grantRole(ROLE_TIMELOCK, timelockAddr)).wait();
     console.log(`   ✅ Done`);
+  } else if (!facetTimelockGranted) {
+    console.log(`   ⚠  DRMAdminFacet has no DEFAULT_ADMIN (zero-arg constructor);`);
+    console.log(`      direct-call ROLE_TIMELOCK cannot be seeded. Governance flows through DRM`);
+    console.log(`      delegation, where TimelockController already holds ROLE_TIMELOCK (step 3).`);
   } else {
     console.log(`   ✅ TimelockController already has ROLE_TIMELOCK on DRMAdminFacet`);
   }

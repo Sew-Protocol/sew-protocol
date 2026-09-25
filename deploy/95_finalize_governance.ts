@@ -93,11 +93,8 @@ export default func;
 func.tags = ['governance', 'finalize', 'ownership'];
 func.dependencies = [
   'aave-yield-module',
-  'dr3',
-  'dr3-modules',
-  'governance',
   'guardian',
-  'core',
+  'escrow',
   'module-management',
   'decentralized-resolution-module',
 ];
