@@ -1,0 +1,579 @@
+{:baseline/id :sew-pre25jan-aderyn
+ :baseline/report-path "docs/archived/report-before25jan.md"
+ :baseline/report-sha256 "2f91229ef4fd64d494019740cef0cc85a7323c1c2bd050109986541eee13cd84"
+ ;; verified by sha256sum on 2026-09-28; matches previously recorded value.
+ :baseline/source-revision :unknown        ;; report carries no commit/tree root
+ :baseline/deployment-binding :unknown     ;; no deployment/runtime evidence in report
+ :baseline/scope {:sol-files 97 :nsloc 11680 :high 7 :low 28 :total-occurrences 774}
+ :baseline/note "Report contains no date, Aderyn version, compiler version, optimizer config, or source root. Filename is not evidence it describes exact Jan-25 source. Old pre-refactor file layout (contracts/decentralized-resolution-module/*V1.sol, contracts/ops/*, monolithic core/BaseEscrow.sol)."
+
+ :finding-numbering-caveat
+ "Aderyn H-x/L-x numbers are NOT stable identifiers across runs. Commit 6006e723 'address Aderyn high-priority issues H-4 and H-6' uses a DIFFERENT run's numbering: its H-4 = Unsafe Casting (SafeCast), its H-6 = Contract Name Reused (= archived H-2). It does NOT address archived H-4 (Weak Randomness) or H-6 (Incorrect ERC20 interface). Findings must be keyed by detector identity + surface, not by H/L number."
+
+ :findings
+ [;; ---------------- HIGH ----------------
+  {:finding/id :pre25jan-H-01
+   :historical {:severity :high :title "Arbitrary `from` Passed to `transferFrom`"
+                :aderyn-id "H-1" :occurrences [{:file "contracts/mocks/MockRevertingERC20.sol" :line 46}]}
+   :lineage {:disposition :still-present-reviewed-safe :confidence :high
+             :repair-commits [] :evidence ["mock is non-production (aderyn.toml excludes contracts/mocks/)" "file unchanged & present"]}
+   :repair {:depth 0 :production-contracts-touched [] :architecture-domains-touched []
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? false
+            :cross-contract-behaviour-change? false}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  {:finding/id :pre25jan-H-02
+   :historical {:severity :high :title "Contract Name Reused in Different Files"
+                :aderyn-id "H-2" :occurrences [{:file "contracts/decentralized-resolution-module/ISlashingModule.sol"}
+                                               {:file "contracts/decentralized-resolution-module/IStakingModule.sol"}
+                                               {:file "contracts/shared/interfaces/ISlashingModule.sol"}
+                                               {:file "contracts/shared/interfaces/IStakingModule.sol"}]}
+   :lineage {:disposition :directly-repaired :confidence :high
+             :repair-commits ["6006e723" "ce786459"]
+             :evidence ["commit 6006e723 (its H-6) 'Contract Name Reused...; Rename shared interface placeholders ISlashingModule->ISlashingModuleV3, IStakingModule->IStakingModuleV3; delete legacy duplicates'"
+                        "current tree: single canonical DRM interfaces/ISlashingModule.sol + IStakingModule.sol; shared/interfaces duplicates dropped"]}
+   :repair {:depth 1 :production-contracts-touched ["interfaces/ISlashingModule.sol" "interfaces/IStakingModule.sol"]
+            :architecture-domains-touched [:interface-namespace]
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? false
+            :cross-contract-behaviour-change? false}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  {:finding/id :pre25jan-H-03
+   :historical {:severity :high :title "ETH transferred without address checks"
+                :aderyn-id "H-3" :occurrences [{:file "contracts/mocks/SafeMock.sol" :line 51}]}
+   :lineage {:disposition :still-present-reviewed-safe :confidence :high
+             :repair-commits [] :evidence ["mock (Gnosis-Safe-style) non-production; aderyn.toml excludes mocks" "file present unchanged"]}
+   :repair {:depth 0 :production-contracts-touched [] :architecture-domains-touched []
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? false
+            :cross-contract-behaviour-change? false}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  {:finding/id :pre25jan-H-04
+   :historical {:severity :high :title "Weak Randomness"
+                :aderyn-id "H-4" :occurrences [{:file "contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol" :line 821}
+                                               {:file "contracts/mocks/SafeMock.sol" :line 59}]}
+   :lineage {:disposition :still-present-open :confidence :high
+             :repair-commits [] :evidence ["PRODUCTION occurrence in DRM resolver-selection seed: keccak256(abi.encodePacked(blockHash, category, ...)) still present at multiple sites (L938/990/1045)"
+                        "block.timestamp input replaced by rotation index curIdx between Feb (2a4982ce) and Apr (2e52982f) via resolver-rotation REFACTOR, NOT a randomness remediation; no VRF/Chainlink"
+                        "commit 6006e723 does NOT address this (numbering mismatch; its H-4 = Unsafe Casting)"
+                        "current ADERYN_FINDINGS.md INTENTIONAL disposition covers only nonce-derivation at Kleros/L2AddressRegistry/MultiL2; DRM seed is NOT covered -> currently undispositioned/open"
+                        "mock SafeMock sub-occurrence is non-production"]}
+   :repair {:depth 0 :production-contracts-touched ["modules/decentralized-resolution-module/DecentralizedResolutionModule.sol"]
+            :architecture-domains-touched [:resolver-selection]
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? false
+            :cross-contract-behaviour-change? false}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  {:finding/id :pre25jan-H-05
+   :historical {:severity :high :title "Contract locks Ether without a withdraw function"
+                :aderyn-id "H-5" :occurrences [{:file "contracts/arbitration/mocks/MockKlerosArbitrator.sol"}
+                                               {:file "contracts/decentralized-resolution-module/ResolverIncentiveModuleV1.sol" :line 62}]}
+   :lineage {:disposition :superseded :confidence :medium-high
+             :repair-commits ["49593286" "82c7160f"]
+             :evidence ["PRODUCTION V1 occurrence superseded: V1/V2 merged into ResolverIncentiveModule (82c7160f) with explicit pull-payout claim path; bond/ETH custody extracted to BondLedger (49593286)"
+                        "mock MockKlerosArbitrator still present (non-production)"]
+             :note "Architectural replacement occurred in the Sew-Next candidate/review lineage (BondLedger PRF_REVIEW), not the Feb deployed reference."}
+   :repair {:depth 4 :production-contracts-touched ["modules/decentralized-resolution-module/incentive/ResolverIncentiveModule.sol" "shared/BondLedger.sol"]
+            :architecture-domains-touched [:bond-custody :payout-model]
+            :custody-boundary-changed? true :settlement-authority-changed? true
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? true :external-interface-breaking-change? true
+            :cross-contract-behaviour-change? true}
+   :release-binding {:status :unknown} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  {:finding/id :pre25jan-H-06
+   :historical {:severity :high :title "Incorrect ERC20 interface"
+                :aderyn-id "H-6" :occurrences [{:file "contracts/mocks/MockNonStandardERC20.sol"}]}
+   :lineage {:disposition :still-present-reviewed-safe :confidence :high
+             :repair-commits [] :evidence ["mock non-standard token (transfer/transferFrom without return), non-production; deliberately non-standard to test handling"
+                        "commit 6006e723 does NOT address this (numbering mismatch; its H-6 = Contract Name Reused)"]}
+   :repair {:depth 0 :production-contracts-touched [] :architecture-domains-touched []
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? false
+            :cross-contract-behaviour-change? false}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  {:finding/id :pre25jan-H-07
+   :historical {:severity :high :title "Reentrancy: State change after external call"
+                :aderyn-id "H-7" :occurrences [{:file "contracts/arbitration/KlerosArbitrableProxy.sol"}
+                                               {:file "contracts/core/BaseEscrow.sol"}
+                                               {:file "contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol"}
+                                               {:file "contracts/decentralized-resolution-module/ResolverIncentiveModuleV1.sol"}
+                                               {:file "contracts/mocks/MockAavePool.sol"}
+                                               {:file "contracts/mocks/MockAavePoolReverting.sol"}
+                                               {:file "contracts/modules/AaveYieldGenerationModule.sol"}
+                                               {:file "contracts/registry/ModuleRegistry.sol"}]}
+   :lineage {:disposition :still-present-reviewed-safe :confidence :medium-high
+             :repair-commits []
+             :evidence ["surviving PRODUCTION occurrences guarded by nonReentrant / CEI pull-payment / view-or-read paths (KlerosArbitrableProxy.createDispute nonReentrant; DRM resolve/escalate/forceProgress nonReentrant; BaseEscrow decomposed into Escrow*.sol with CEI)"
+                        "ADERYN_FINDINGS.md dispositions the reentrancy class as FALSE-POSITIVE/REVIEWED, explicitly advising against mass-applying nonReentrant"
+                        "some original occurrences SUPERSEDED by architectural rewrites: AaveYieldModule pull-model, ResolverIncentiveModule V1/V2 merge + BondLedger (candidate lineage); mocks non-production"]}
+   :repair {:depth 1 :production-contracts-touched ["arbitration/KlerosArbitrableProxy.sol" "modules/decentralized-resolution-module/DecentralizedResolutionModule.sol" "core/Escrow*.sol" "modules/AaveYieldModule.sol" "modules/decentralized-resolution-module/incentive/ResolverIncentiveModule.sol"]
+            :architecture-domains-touched [:reentrancy-guards :external-call-ordering]
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? false
+            :cross-contract-behaviour-change? true}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  ;; ---------------- LOW: L-1..L-6 ----------------
+  {:finding/id :pre25jan-L-01
+   :historical {:severity :low :title "Centralization Risk" :aderyn-id "L-1"
+                :occurrences [{:file "contracts/ops/*"} {:file "contracts/admin/EscrowAdminContract.sol"}
+                              {:file "contracts/core/*"} {:file "contracts/decentralized-resolution-module/*"} {:file "contracts/registry/ModuleRegistry.sol"} {:file "contracts/modules/*"}]
+                :occurrence-count 190 :file-count 26}
+   :lineage {:disposition :still-present-reviewed-safe :confidence :high
+             :repair-commits []
+             :evidence ["centralization is BY DESIGN (governance/DAO timelock role, not single EOA)"
+                        "role model SUPERSEDED: consolidated to single ROLE_TIMELOCK; ROLE_MODULE_DEVELOPER removed (CHANGELOG L84); Ownable removed for proxy/aggregator (CHANGELOG L87)"]}
+   :repair {:depth 0 :production-contracts-touched [] :architecture-domains-touched [:governance-roles]
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? true :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? false
+            :cross-contract-behaviour-change? false}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  {:finding/id :pre25jan-L-02
+   :historical {:severity :low :title "Unsafe ERC20 Operation" :aderyn-id "L-2"
+                :occurrences [{:file "contracts/core/BaseEscrow.sol"} {:file "contracts/core/BondCollector.sol"} {:file "contracts/mocks/MockRevertingERC20.sol"}]
+                :occurrence-count 7 :file-count 3}
+   :lineage {:disposition :directly-repaired :confidence :high
+             :repair-commits []
+             :evidence ["production uses OpenZeppelin SafeERC20 throughout; BondCollector uses forceApprove; global grep finds no raw .transfer/.transferFrom/.approve in production"
+                        "old PUSH_FAILED_FALLBACK_TO_PULL push/pull mechanism removed"
+                        "mock instances non-production"]}
+   :repair {:depth 2 :production-contracts-touched ["core/BaseEscrow.sol" "core/BondCollector.sol" "core/EscrowVault.sol" "modules/AaveYieldModule.sol" "shared/BondLedger.sol" "libraries/*"]
+            :architecture-domains-touched [:token-transfer-safety]
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? false
+            :cross-contract-behaviour-change? false}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  {:finding/id :pre25jan-L-03
+   :historical {:severity :low :title "Unspecific Solidity Pragma" :aderyn-id "L-3"
+                :occurrences [] :occurrence-count 60 :file-count 60}
+   :lineage {:disposition :still-present-reviewed-safe :confidence :high
+             :repair-commits []
+             :evidence ["all production .sol still use caret pragma (^0.8.33 -> ^0.8.37); compiler minor bumped, never pinned"
+                        "not a deployed-bytecode defect; build toolchain pins the actual compiler; best-practice Low only"]}
+   :repair {:depth 0 :production-contracts-touched [] :architecture-domains-touched []
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? false
+            :cross-contract-behaviour-change? false}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  {:finding/id :pre25jan-L-04
+   :historical {:severity :low :title "Address State Variable Set Without Checks" :aderyn-id "L-4"
+                :occurrences [{:file "contracts/core/modules/DefaultResolutionModule.sol"} {:file "contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol"}
+                              {:file "contracts/decentralized-resolution-module/ResolverStakingModuleV1.sol"} {:file "contracts/decentralized-resolution-module/StakingModuleNoOp.sol"}
+                              {:file "contracts/evidence-module/EvidenceModuleV1.sol"} {:file "contracts/mocks/MockAavePool.sol"} {:file "contracts/mocks/MockFeeOnTransfer.sol"}]
+                :occurrence-count 11 :file-count 7}
+   :lineage {:disposition :still-present-reviewed-safe :confidence :high
+             :repair-commits []
+             :evidence ["most historical instances remain as UNCHANGED sentinel/design (EvidenceModuleV1 escrowContract/resolutionModule zero=disabled; ResolverStakingModule slashingModule; DRMAdminFacet setters) per ADERYN_FINDINGS L-13 review"
+                        "StakingModuleNoOp CODE_REMOVED; mocks non-production; DefaultResolutionModule.setResolver still unguarded (STILL_PRESENT)"
+                        "NEWER instance repaired: DRM.setAdminFacet now reverts ZeroAddress('adminFacet') with tests (AdminFacetZeroAddress.t.sol) - the '1 of 12 repaired'"]}
+   :repair {:depth 1 :production-contracts-touched ["modules/decentralized-resolution-module/DecentralizedResolutionModule.sol"]
+            :architecture-domains-touched [:address-validation]
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? false
+            :cross-contract-behaviour-change? false}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  {:finding/id :pre25jan-L-05
+   :historical {:severity :low :title "Public Function Not Used Internally" :aderyn-id "L-5"
+                :occurrences [{:file "contracts/ops/YieldOps.sol"} {:file "contracts/core/EscrowVault.sol"} {:file "contracts/core/EscrowableERC20.sol"}
+                              {:file "contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol"} {:file "contracts/evidence-module/EvidenceModuleV1.sol"}
+                              {:file "contracts/governance/GovGovernor.sol"} {:file "contracts/modules/AaveYieldGenerationModule.sol"}]
+                :occurrence-count 28 :file-count 9}
+   :lineage {:disposition :likely-repaired :confidence :medium
+             :repair-commits []
+             :evidence ["visibility converted public->external for production functions (DRM.autoCategorizeEscrow/getAmountTier, GovGovernor.getCurrentCirculatingSupply, EscrowableERC20.withdrawFees/createEscrow) matching 'public->external' prior cleanup (AGENTS.md)"
+                        "mocks non-production; Ops files consolidated into core/Escrow*"]}
+   :repair {:depth 1 :production-contracts-touched ["core/EscrowVault.sol" "core/EscrowableERC20.sol" "governance/GovGovernor.sol" "modules/decentralized-resolution-module/DecentralizedResolutionModule.sol"]
+            :architecture-domains-touched [:visibility]
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? false
+            :cross-contract-behaviour-change? false}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  {:finding/id :pre25jan-L-06
+   :historical {:severity :low :title "Literal Instead of Constant" :aderyn-id "L-6"
+                :occurrences [] :occurrence-count 79 :file-count 15}
+   :lineage {:disposition :still-present-reviewed-safe :confidence :high
+             :repair-commits []
+             :evidence ["partially mitigated: many literals promoted to named constants (MAX_DISPUTE_TIMEOUT, MAX_ESCROW_DURATION, DEFAULT_ALPHA_BPS, SENIOR_UNBOND_DELAY, RATE_LIMIT_WINDOW)"
+                        "inline literals REMAIN (EscrowGovernanceTimelock maxFee 200/3000, 7 days/365 days, /10000 bps divisions) - style/readability low, not systematically resolved"]}
+   :repair {:depth 1 :production-contracts-touched [] :architecture-domains-touched [:readability]
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? false
+            :cross-contract-behaviour-change? false}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  ;; ---------------- LOW: L-7..L-28 ----------------
+  {:finding/id :pre25jan-L-07
+   :historical {:severity :low :title "`nonReentrant` is Not the First Modifier" :aderyn-id "L-7"
+                :occurrences [{:file "contracts/arbitration/KlerosArbitrableProxy.sol"} {:file "contracts/core/BaseEscrow.sol"} {:file "contracts/core/EscrowVault.sol"}
+                              {:file "contracts/core/EscrowableERC20.sol"} {:file "contracts/decentralized-resolution-module/InsurancePoolVault.sol"}
+                              {:file "contracts/decentralized-resolution-module/ResolverIncentiveModuleV1.sol"} {:file "contracts/decentralized-resolution-module/ResolverIncentiveModuleV2.sol"}]
+                :occurrence-count 12 :file-count 7}
+   :lineage {:disposition :directly-repaired :confidence :high
+             :repair-commits []
+             :evidence ["current production shows nonReentrant FIRST at all flagged sites (InsurancePoolVault executePayout/withdraw, ResolverIncentiveModule distributeAppealBond/forfeitAppealBond, BaseEscrow/EscrowVault/EscrowableERC20 withdrawEscrow)"
+                        "matches 'reordered modifiers to put nonReentrant first' documented prior-cleanup (ADERYN_FINDINGS L159)"]}
+   :repair {:depth 1 :production-contracts-touched ["arbitration/KlerosArbitrableProxy.sol" "core/*" "modules/decentralized-resolution-module/InsurancePoolVault.sol" "modules/decentralized-resolution-module/incentive/ResolverIncentiveModule.sol"]
+            :architecture-domains-touched [:modifier-order]
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? false
+            :cross-contract-behaviour-change? false}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  {:finding/id :pre25jan-L-08
+   :historical {:severity :low :title "PUSH0 Opcode" :aderyn-id "L-8" :occurrences [] :occurrence-count 93 :file-count 93}
+   :lineage {:disposition :false-positive-or-detector-mismatch :confidence :high
+             :repair-commits []
+             :evidence ["compiler(target-chain) compatibility note, not code defect: Cancun evmVersion (hardhat evmVersion 'cancun', solc 0.8.37 default) emits PUSH0; Base is post-Shanghai so valid on-chain"]}
+   :repair {:depth 0 :production-contracts-touched [] :architecture-domains-touched []
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? false
+            :cross-contract-behaviour-change? false}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  {:finding/id :pre25jan-L-09
+   :historical {:severity :low :title "Modifier Invoked Only Once" :aderyn-id "L-9"
+                :occurrences [{:file "contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol"} {:file "contracts/evidence-module/EvidenceModuleV1.sol"}]
+                :occurrence-count 2 :file-count 2}
+   :lineage {:disposition :still-present-reviewed-safe :confidence :medium
+             :repair-commits []
+             :evidence ["onlySeniorResolver moved to DRMAdminFacet as part of admin-facet refactor (now guards appointResolver) - benign single-use facade guard"
+                        "onlyEscrowContract still single-use in EvidenceModuleV1 - intentional benign guard"]}
+   :repair {:depth 0 :production-contracts-touched [] :architecture-domains-touched []
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? false
+            :cross-contract-behaviour-change? false}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  {:finding/id :pre25jan-L-10
+   :historical {:severity :low :title "Empty Block" :aderyn-id "L-10"
+                :occurrences [{:file "contracts/core/EscrowVault.sol"} {:file "contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol"}
+                              {:file "contracts/decentralized-resolution-module/ResolverIncentiveModuleV1.sol"} {:file "contracts/evidence-module/EvidenceModuleV1.sol"}
+                              {:file "contracts/mocks/TestnetForwardingResolver.sol"}] :occurrence-count 10 :file-count 5}
+   :lineage {:disposition :still-present-reviewed-safe :confidence :high
+             :repair-commits []
+             :evidence ["remaining empty blocks are intentional no-op extension hooks (_emit* adapter hooks in Escrow*, onDisputeOpened/on* in EvidenceModule/ResolverIncentiveModule, V1 non-hooks); TestnetForwardingResolver is mock"
+                        "DRM queueEscalationCostConfig resolved via delegation refactor (now _delegateAdmin())"]}
+   :repair {:depth 0 :production-contracts-touched [] :architecture-domains-touched []
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? false
+            :cross-contract-behaviour-change? false}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  {:finding/id :pre25jan-L-11
+   :historical {:severity :low :title "Large Numeric Literal" :aderyn-id "L-11" :occurrences [] :occurrence-count 42 :file-count 24}
+   :lineage {:disposition :still-present-reviewed-safe :confidence :medium
+             :repair-commits [] :evidence ["style detector on numeric literals; no semantic issue; no behavior change"]}
+   :repair {:depth 0 :production-contracts-touched [] :architecture-domains-touched []
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? false
+            :cross-contract-behaviour-change? false}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  {:finding/id :pre25jan-L-12
+   :historical {:severity :low :title "Internal Function Used Only Once" :aderyn-id "L-12"
+                :occurrences [{:file "contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol"} {:file "contracts/decentralized-resolution-module/EscalationCostLibrary.sol"}
+                              {:file "contracts/decentralized-resolution-module/ResolutionAnalytics.sol"} {:file "contracts/decentralized-resolution-module/ResolverIncentiveModuleV1.sol"}
+                              {:file "contracts/libraries/ResolutionTableLibrary.sol"} {:file "contracts/libraries/ResolverLogicLibrary.sol"}]
+                :occurrence-count 8 :file-count 6}
+   :lineage {:disposition :still-present-reviewed-safe :confidence :medium
+             :repair-commits [] :evidence ["single-use library read helpers are legitimate extraction (clarity/testability); Aderyn misidentifies value; readability/gas micro-optimization only"]}
+   :repair {:depth 0 :production-contracts-touched [] :architecture-domains-touched []
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? false
+            :cross-contract-behaviour-change? false}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  {:finding/id :pre25jan-L-13
+   :historical {:severity :low :title "Contract has TODO Comments" :aderyn-id "L-13"
+                :occurrences [{:file "contracts/decentralized-resolution-module/ResolverSlashingModuleV1.sol"}] :occurrence-count 1 :file-count 1}
+   :lineage {:disposition :directly-repaired :confidence :high
+             :repair-commits []
+             :evidence ["current ResolverSlashingModule has no TODO; old V1 consolidated into slashing/ResolverSlashingModule.sol and TODO dropped"]}
+   :repair {:depth 0 :production-contracts-touched [] :architecture-domains-touched []
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? false
+            :cross-contract-behaviour-change? false}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  {:finding/id :pre25jan-L-14
+   :historical {:severity :low :title "Unused Error" :aderyn-id "L-14"
+                :occurrences [{:file "contracts/admin/EscrowAdminContract.sol"} {:file "contracts/core/BaseEscrow.sol"}
+                              {:file "contracts/decentralized-resolution-module/ResolverIncentiveModuleV1.sol"} {:file "contracts/modules/AaveYieldGenerationModule.sol"}
+                              {:file "contracts/registry/ModuleRegistry.sol"} {:file "contracts/types/EscrowTypes.sol"}]
+                :occurrence-count 15 :file-count 6}
+   :lineage {:disposition :likely-repaired :confidence :low-medium
+             :repair-commits []
+             :evidence ["many flagged errors tied to old monolithic BaseEscrow/Aave files, decomposed/consolidated (errors absorbed); unused-error declarations are inert (no bytecode impact)
+                        " "cannot enumerate all 15 post-refactor without live lint; commit attribution unresolved"]}
+   :repair {:depth 1 :production-contracts-touched [] :architecture-domains-touched [:hygiene]
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? false
+            :cross-contract-behaviour-change? false}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  {:finding/id :pre25jan-L-15
+   :historical {:severity :low :title "Loop Contains `require`/`revert`" :aderyn-id "L-15"
+                :occurrences [{:file "contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol"} {:file "contracts/decentralized-resolution-module/PaymentCalculationLibraryV1.sol"}
+                              {:file "contracts/decentralized-resolution-module/ResolverIncentiveModuleV1.sol"} {:file "contracts/evidence-module/EvidenceModuleV1.sol"}
+                              {:file "contracts/modules/AaveYieldGenerationModule.sol"} {:file "contracts/modules/DefaultYieldDistributionModule.sol"} {:file "contracts/modules/TestYieldDistributionModule.sol"}]
+                :occurrence-count 11 :file-count 7}
+   :lineage {:disposition :still-present-reviewed-safe :confidence :medium
+             :repair-commits [] :evidence ["loop require/revvert is INTENTIONAL all-or-nothing invariant (single invalid payment/resolver must revert whole distribution, not partially apply)"]}
+   :repair {:depth 0 :production-contracts-touched [] :architecture-domains-touched []
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? false
+            :cross-contract-behaviour-change? false}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  {:finding/id :pre25jan-L-16
+   :historical {:severity :low :title "Redundant Statement" :aderyn-id "L-16"
+                :occurrences [{:file "contracts/ops/SettlementOps.sol"} {:file "contracts/core/BaseEscrow.sol"} {:file "contracts/core/EscrowableERC20.sol"}
+                              {:file "contracts/decentralized-resolution-module/ResolverIncentiveModuleV2.sol"} {:file "contracts/decentralized-resolution-module/ResolverStakingModuleV1.sol"}
+                              {:file "contracts/governance/GovGovernor.sol"} {:file "contracts/libraries/DisputeManagementLibrary.sol"} {:file "contracts/libraries/YieldPresetLibrary.sol"}]
+                :occurrence-count 25 :file-count 8}
+   :lineage {:disposition :still-present-reviewed-safe :confidence :medium
+             :repair-commits [] :evidence ["flagged 'redundant statements' are bare identifiers used to silence unused-parameter warnings (deliberate, commented); benign"]}
+   :repair {:depth 0 :production-contracts-touched [] :architecture-domains-touched []
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? false
+            :cross-contract-behaviour-change? false}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  {:finding/id :pre25jan-L-17
+   :historical {:severity :low :title "Unused State Variable" :aderyn-id "L-17"
+                :occurrences [{:file "contracts/decentralized-resolution-module/SlashingModuleNoOp.sol"} {:file "contracts/decentralized-resolution-module/StakingModuleNoOp.sol"}]
+                :occurrence-count 4 :file-count 2}
+   :lineage {:disposition :code-removed :confidence :high
+             :repair-commits []
+             :evidence ["SlashingModuleNoOp and StakingModuleNoOp are GONE from the tree (removed during DRM consolidation) - non-production no-op stubs"]}
+   :repair {:depth 0 :production-contracts-touched [] :architecture-domains-touched []
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? false
+            :cross-contract-behaviour-change? false}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  {:finding/id :pre25jan-L-18
+   :historical {:severity :low :title "Local Variable Shadows State Variable" :aderyn-id "L-18"
+                :occurrences [{:file "contracts/mocks/MockAavePool.sol"}] :occurrence-count 1 :file-count 1}
+   :lineage {:disposition :still-present-reviewed-safe :confidence :high
+             :repair-commits [] :evidence ["mock, non-production; shadowing cosmetic"]}
+   :repair {:depth 0 :production-contracts-touched [] :architecture-domains-touched []
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? false
+            :cross-contract-behaviour-change? false}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  {:finding/id :pre25jan-L-19
+   :historical {:severity :low :title "Uninitialized Local Variable" :aderyn-id "L-19"
+                :occurrences [{:file "contracts/evidence-module/EvidenceModuleV1.sol"}] :occurrence-count 1 :file-count 1}
+   :lineage {:disposition :still-present-reviewed-safe :confidence :high
+             :repair-commits [] :evidence ["bytes memory emptyEscrowData; defaulted to empty before first write, functionally correct; cosmetic"]}
+   :repair {:depth 0 :production-contracts-touched [] :architecture-domains-touched []
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? false
+            :cross-contract-behaviour-change? false}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  {:finding/id :pre25jan-L-20
+   :historical {:severity :low :title "Dead Code" :aderyn-id "L-20"
+                :occurrences [{:file "contracts/decentralized-resolution-module/ResolverSlashingModuleV1.sol"}] :occurrence-count 1 :file-count 1}
+   :lineage {:disposition :directly-repaired :confidence :high
+             :repair-commits [] :evidence ["dead private _freezeResolverInsufficientBond removed during V1 -> ResolverSlashingModule consolidation"]}
+   :repair {:depth 0 :production-contracts-touched [] :architecture-domains-touched []
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? false
+            :cross-contract-behaviour-change? false}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  {:finding/id :pre25jan-L-21
+   :historical {:severity :low :title "Storage Array Length not Cached" :aderyn-id "L-21"
+                :occurrences [{:file "contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol"}] :occurrence-count 2 :file-count 1}
+   :lineage {:disposition :directly-repaired :confidence :high
+             :repair-commits []
+             :evidence ["current DRM caches lengths: getV1PhaseGateMetrics (uint256 count = ...length + ...length; i<count), _advanceRoundRobinCounter (uint256 len = ...length) - matches 'cache array length in loops' cleanup"]}
+   :repair {:depth 1 :production-contracts-touched ["modules/decentralized-resolution-module/DecentralizedResolutionModule.sol"]
+            :architecture-domains-touched [:gas]
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? false
+            :cross-contract-behaviour-change? false}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  {:finding/id :pre25jan-L-22
+   :historical {:severity :low :title "Costly operations inside loop" :aderyn-id "L-22"
+                :occurrences [{:file "contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol"} {:file "contracts/decentralized-resolution-module/ResolverIncentiveModuleV1.sol"}
+                              {:file "contracts/decentralized-resolution-module/ResolverIncentiveModuleV2.sol"} {:file "contracts/governance/GovGovernor.sol"}
+                              {:file "contracts/modules/AaveYieldGenerationModule.sol"} {:file "contracts/registry/ModuleRegistry.sol"}]
+                :occurrence-count 6 :file-count 6}
+   :lineage {:disposition :still-present-reviewed-safe :confidence :medium
+             :repair-commits [] :evidence ["loops perform bounded per-item writes that are semantically necessary (DRM escalation, incentive payout, ModuleRegistry deprecateModule find+remove swap-pop); gas advisory only"]}
+   :repair {:depth 0 :production-contracts-touched [] :architecture-domains-touched []
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? false
+            :cross-contract-behaviour-change? false}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  {:finding/id :pre25jan-L-23
+   :historical {:severity :low :title "Missing Inheritance" :aderyn-id "L-23"
+                :occurrences [{:file "contracts/mocks/MockAavePool.sol"} {:file "contracts/mocks/MockNonStandardERC20.sol"}]
+                :occurrence-count 2 :file-count 2}
+   :lineage {:disposition :still-present-reviewed-safe :confidence :high
+             :repair-commits [] :evidence ["mocks, non-production; MockNonStandardERC20 deliberately does NOT inherit IERC20/ERC20 (that is the point)"]}
+   :repair {:depth 0 :production-contracts-touched [] :architecture-domains-touched []
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? false
+            :cross-contract-behaviour-change? false}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  {:finding/id :pre25jan-L-24
+   :historical {:severity :low :title "Unused Import" :aderyn-id "L-24"
+                :occurrences [{:file "contracts/core/BaseEscrow.sol"} {:file "contracts/core/EscrowVault.sol"}
+                              {:file "contracts/decentralized-resolution-module/ResolverIncentiveModuleV1.sol"} {:file "contracts/decentralized-resolution-module/ResolverIncentiveModuleV2.sol"}
+                              {:file "contracts/libraries/FeeWithdrawalLibrary.sol"} {:file "contracts/libraries/ModuleManagementLibrary.sol"}
+                              {:file "contracts/libraries/TokenRecoveryLibrary.sol"} {:file "contracts/modules/AaveYieldGenerationModule.sol"}]
+                :occurrence-count 11 :file-count 8}
+   :lineage {:disposition :directly-repaired :confidence :medium
+             :repair-commits [] :evidence ["'removed unused imports' documented prior-cleanup; current ResolverIncentiveModule import block clean; many flagged imports lived in pre-decomposition files"]}
+   :repair {:depth 1 :production-contracts-touched [] :architecture-domains-touched [:hygiene]
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? false
+            :cross-contract-behaviour-change? false}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  {:finding/id :pre25jan-L-25
+   :historical {:severity :low :title "State Variable Could Be Constant" :aderyn-id "L-25"
+                :occurrences [{:file "contracts/mocks/MockNonStandardERC20.sol"}] :occurrence-count 1 :file-count 1}
+   :lineage {:disposition :still-present-reviewed-safe :confidence :high
+             :repair-commits [] :evidence ["mock, non-production; mutability intended to mimic non-standard token metadata"]}
+   :repair {:depth 0 :production-contracts-touched [] :architecture-domains-touched []
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? false
+            :cross-contract-behaviour-change? false}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  {:finding/id :pre25jan-L-26
+   :historical {:severity :low :title "State Change Without Event" :aderyn-id "L-26"
+                :occurrences [{:file "contracts/arbitration/mocks/MockKlerosArbitrator.sol"} {:file "contracts/core/BaseEscrow.sol"}
+                              {:file "contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol"} {:file "contracts/decentralized-resolution-module/ResolverSlashingModuleV1.sol"}
+                              {:file "contracts/decentralized-resolution-module/SlashingModuleNoOp.sol"} {:file "contracts/evidence-module/EvidenceModuleV1.sol"}]
+                :occurrence-count 34 :file-count 9}
+   :lineage {:disposition :likely-repaired :confidence :high
+             :repair-commits []
+             :evidence ["substantially RESOLVED by adding events (per ADERYN_FINDINGS L-12 /*Queued/resolved*/): EvidenceModuleV1 setEscrowContract/setResolutionModule; AaveYieldModule queue* *Queued; DRMAdminFacet setDisputeTimeout->DisputeTimeoutUpdated; DRM setEscrowCategory->EscrowCategorySet; ResolverSlashingModule 5 setters"
+                        "remaining accepted INTENTIONAL (EmergencyRecoveryProposal logged by caller, DRM prepareKlerosHandoff transient, decrementResolverActiveDisputes mirror counter); mocks non-production"]}
+   :repair {:depth 1 :production-contracts-touched ["evidence-module/EvidenceModuleV1.sol" "modules/AaveYieldModule.sol" "modules/decentralized-resolution-module/DecentralizedResolutionModule.sol" "modules/decentralized-resolution-module/slashing/ResolverSlashingModule.sol"]
+            :architecture-domains-touched [:observability :events]
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? true
+            :cross-contract-behaviour-change? false}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  {:finding/id :pre25jan-L-27
+   :historical {:severity :low :title "State Variable Could Be Immutable" :aderyn-id "L-27"
+                :occurrences [{:file "contracts/arbitration/KlerosArbitrableProxy.sol"} {:file "contracts/core/BaseEscrow.sol"} {:file "contracts/core/EscrowVault.sol"}
+                              {:file "contracts/core/EscrowableERC20.sol"} {:file "contracts/decentralized-resolution-module/InsurancePoolVault.sol"}
+                              {:file "contracts/decentralized-resolution-module/ResolverSlashingModuleV1.sol"} {:file "contracts/decentralized-resolution-module/ResolverStakingModuleV1.sol"}]
+                :occurrence-count 17 :file-count 11}
+   :lineage {:disposition :likely-repaired :confidence :medium
+             :repair-commits []
+             :evidence ["some REPAIRED to immutable: KlerosArbitrableProxy.arbitrator is immutable; InsurancePoolVault.stableToken is immutable"
+                        "some NOT converted: ResolverStakingModule.stableToken/sewToken remain non-immutable (constructed only, no setter) - inconsistent with documented 'immutable conversions done'; mocks may stay mutable (test flexibility)"]}
+   :repair {:depth 1 :production-contracts-touched ["arbitration/KlerosArbitrableProxy.sol" "modules/decentralized-resolution-module/InsurancePoolVault.sol" "modules/decentralized-resolution-module/staking/ResolverStakingModule.sol"]
+            :architecture-domains-touched [:gas]
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? false
+            :cross-contract-behaviour-change? false}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}
+
+  {:finding/id :pre25jan-L-28
+   :historical {:severity :low :title "Unchecked Return" :aderyn-id "L-28"
+                :occurrences [] :occurrence-count 51 :file-count 22}
+   :lineage {:disposition :likely-repaired :confidence :medium-high
+             :repair-commits []
+             :evidence ["bulk are _grantRole/approve/high-level interface calls whose return is auto-handled (high-level calls revert on failure) - false positives"
+                        "the one real concern - raw IERC20.approve return in BondCollector - REPAIRED to forceApprove (and forceApprove(spender,0))"]}
+   :repair {:depth 1 :production-contracts-touched ["core/BondCollector.sol"]
+            :architecture-domains-touched [:token-transfer-safety]
+            :custody-boundary-changed? false :settlement-authority-changed? false
+            :privilege-or-governance-boundary-changed? false :escrow-state-machine-changed? false
+            :module-selection-model-changed? false :active-escrow-snapshot-model-changed? false
+            :storage-migration-required? false :external-interface-breaking-change? false
+            :cross-contract-behaviour-change? false}
+   :release-binding {:status :not-applicable} :deployment-binding {:status :unknown} :chain-instance-binding {:status :not-applicable}}]}
