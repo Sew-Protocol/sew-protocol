@@ -79,7 +79,9 @@ async function main() {
           workflowId = parsed.args[0] as bigint;
           break;
         }
-      } catch {}
+      } catch {
+        // Ignore logs that do not match EscrowCreated.
+      }
     }
   }
 

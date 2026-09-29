@@ -56,7 +56,11 @@ async function main() {
   const escrowVaultAddr = (await deployments.get('EscrowVault')).address;
 
   let escrowAdminAddr: string | undefined;
-  try { escrowAdminAddr = (await deployments.get('EscrowGovernanceTimelock')).address; } catch {}
+  try {
+    escrowAdminAddr = (await deployments.get('EscrowGovernanceTimelock')).address;
+  } catch {
+    // EscrowGovernanceTimelock is not present on every network — leave undefined.
+  }
 
   let sewTokenAddr: string;
   try {

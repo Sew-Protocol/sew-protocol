@@ -42,9 +42,9 @@ contract CirculatingSupplyQuorumTest is Test {
         token = new SewToken('Sew Token', 'SEW', deployer, TOTAL_SUPPLY);
 
         // Distribute initial circulating supply
-        token.transfer(voter1, 30_000_000 ether);
-        token.transfer(voter2, 30_000_000 ether);
-        token.transfer(voter3, 40_000_000 ether);
+        assertTrue(token.transfer(voter1, 30_000_000 ether), 'voter1 transfer failed');
+        assertTrue(token.transfer(voter2, 30_000_000 ether), 'voter2 transfer failed');
+        assertTrue(token.transfer(voter3, 40_000_000 ether), 'voter3 transfer failed');
 
         // Delegate voting power
         vm.stopPrank();
@@ -57,8 +57,8 @@ contract CirculatingSupplyQuorumTest is Test {
         vm.startPrank(deployer);
 
         // Transfer non-circulating tokens to vesting/locked addresses
-        token.transfer(vestingContract, 450_000_000 ether);
-        token.transfer(lockedTokens, 450_000_000 ether);
+        assertTrue(token.transfer(vestingContract, 450_000_000 ether), 'vesting transfer failed');
+        assertTrue(token.transfer(lockedTokens, 450_000_000 ether), 'locked transfer failed');
 
         // Delegate non-circulating tokens (they have voting power but shouldn't count)
         vm.stopPrank();
@@ -138,9 +138,9 @@ contract CirculatingSupplyQuorumTest is Test {
         address newVesting = address(0x8);
         // Move tokens from circulating holders into a new non-circulating address
         vm.prank(voter1);
-        token.transfer(newVesting, 30_000_000 ether);
+        assertTrue(token.transfer(newVesting, 30_000_000 ether), 'voter1->newVesting transfer failed');
         vm.prank(voter2);
-        token.transfer(newVesting, 20_000_000 ether);
+        assertTrue(token.transfer(newVesting, 20_000_000 ether), 'voter2->newVesting transfer failed');
         vm.prank(newVesting);
         token.delegate(newVesting);
 
@@ -174,7 +174,7 @@ contract CirculatingSupplyQuorumTest is Test {
         // Add more non-circulating
         address newVesting = address(0x9);
         vm.prank(voter3);
-        token.transfer(newVesting, 10_000_000 ether);
+        assertTrue(token.transfer(newVesting, 10_000_000 ether), 'voter3->newVesting transfer failed');
         vm.prank(newVesting);
         token.delegate(newVesting);
 
@@ -228,7 +228,7 @@ contract CirculatingSupplyQuorumTest is Test {
     function test_AddNonCirculatingAddress_RevertsIfMaxReached() public {
         // Add addresses up to max
         for (uint256 i = 0; i < governor.MAX_NON_CIRCULATING_ADDRESSES() - 2; i++) {
-            address addr = address(uint160(1000 + i));
+            address addr = address(uint160(1000 + i)); // forge-lint: disable-line(unsafe-typecast)
             vm.prank(address(timelock));
             governor.addNonCirculatingAddress(addr);
         }
@@ -293,7 +293,7 @@ contract CirculatingSupplyQuorumTest is Test {
                     // Give some addresses tokens for testing
                     if (balance == 0) {
                         vm.prank(vestingContract);
-                        token.transfer(addr, 1 ether);
+                        assertTrue(token.transfer(addr, 1 ether), 'fuzz transfer failed');
                         vm.prank(addr);
                         token.delegate(addr);
                     }
@@ -341,7 +341,7 @@ contract CirculatingSupplyQuorumTest is Test {
 
         // Give tokens to address
         vm.prank(voter3);
-        token.transfer(nonCirculatingAddr, nonCirculatingAmount);
+        assertTrue(token.transfer(nonCirculatingAddr, nonCirculatingAmount), 'fuzz transfer failed');
         vm.prank(nonCirculatingAddr);
         token.delegate(nonCirculatingAddr);
 
@@ -407,11 +407,11 @@ contract CirculatingSupplyQuorumTest is Test {
         uint256 b2 = token.balanceOf(voter2);
         uint256 b3 = token.balanceOf(voter3);
         vm.prank(voter1);
-        token.transfer(allTokens, b1);
+        assertTrue(token.transfer(allTokens, b1), 'voter1->allTokens transfer failed');
         vm.prank(voter2);
-        token.transfer(allTokens, b2);
+        assertTrue(token.transfer(allTokens, b2), 'voter2->allTokens transfer failed');
         vm.prank(voter3);
-        token.transfer(allTokens, b3);
+        assertTrue(token.transfer(allTokens, b3), 'voter3->allTokens transfer failed');
         vm.prank(allTokens);
         token.delegate(allTokens);
 

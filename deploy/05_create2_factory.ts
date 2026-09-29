@@ -17,9 +17,15 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deploy } = deployments;
   const { deployer } = await getNamedAccounts();
 
-  console.log('\n=== Skipping CREATE2 Factory (contract too large for testnet) ===');
-  console.log('⚠ CREATE2EscrowFactory deployment skipped due to size constraints');
-  return;
+  // CREATE2EscrowFactory is skipped on testnet due to contract size. Opt in
+  // explicitly (DEPLOY_CREATE2_FACTORY=true) to enable deployment, e.g. on a
+  // network where the size constraint does not apply.
+  if (process.env.DEPLOY_CREATE2_FACTORY !== 'true') {
+    console.log('\n=== Skipping CREATE2 Factory (contract too large for testnet) ===');
+    console.log('⚠ CREATE2EscrowFactory deployment skipped due to size constraints');
+    console.log('  Set DEPLOY_CREATE2_FACTORY=true to enable deployment');
+    return;
+  }
 
   // Deploy CREATE2EscrowFactory
   const factoryDeployment = await deploy('CREATE2EscrowFactory', {

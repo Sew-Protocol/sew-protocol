@@ -20,7 +20,7 @@ sew-protocol/
 │   ├── foundry/        ← Primary test suite (Foundry / Forge)
 │   └── mocks/          ← Shared mock helpers for Hardhat tests
 ├── docs/               ← All documentation
-├── lib/                ← Foundry dependencies (git submodules)
+├── lib/                ← Foundry dependencies (vendored by scripts/fetch-foundry-deps.sh; gitignored)
 ├── script/             ← Forge deployment and differential scripts
 ├── deploy/             ← Hardhat deploy scripts
 ├── certora/            ← Certora formal verification harnesses

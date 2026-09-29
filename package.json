@@ -12,6 +12,7 @@
     "test:halmos:smoke": "/usr/bin/python3 -m halmos --root . --contract HalmosEscrowProperties --function check_solvency_after_create --profile halmos --loop 3",
     "test:formal:smoke": "pnpm test:foundry:invariants && pnpm test:halmos:smoke",
     "test:foundry:release-resolution": "bash scripts/test-core-modules.sh",
+    "deps:foundry": "bash scripts/fetch-foundry-deps.sh",
     "coverage": "forge coverage --report lcov --ir-minimum && node scripts/filter-coverage.js",
     "coverage:summary": "bash scripts/coverage-summary.sh",
     "coverage:report": "bash scripts/coverage-summary.sh > report 2>&1",

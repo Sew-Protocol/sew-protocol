@@ -1,8 +1,12 @@
 packages: []
-# Approve native build scripts (pnpm 9 mechanism). keccak / secp256k1 are
-# transitive native (build-script) dependencies pulled in via ethers/hardhat.
-# Without approving them, pnpm 9 would not run their postinstall builds and the
-# toolchain would fail at runtime.
+# Approve native build scripts for keccak / secp256k1 (transitive deps pulled in
+# via ethers/hardhat). Without approval their postinstall builds do not run.
+# pnpm 9 reads `onlyBuiltDependencies`; pnpm 10/11 read `allowBuilds`. Both keys
+# are declared so CI (pnpm 9) and local (pnpm 10/11) agree, and `packages: []`
+# keeps pnpm 9's `store path` from failing on a missing packages field.
+allowBuilds:
+  keccak: true
+  secp256k1: true
 onlyBuiltDependencies:
   - keccak
   - secp256k1

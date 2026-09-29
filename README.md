@@ -16,6 +16,8 @@ The architecture is designed to be modular and composable, allowing new modules 
 
 This repository serves as the reference implementation of Sew Protocol's onchain payment framework.
 
+> **First-time setup:** the Foundry libraries `lib/forge-std` and `lib/halmos-cheatcodes` are **not committed** (they are gitignored and vendored on demand). After cloning, run `pnpm deps:foundry` once — or simply run `pnpm test`/`pnpm build`, which fetch them automatically on first run. See [Quick Start](#quick-start).
+
 ## Security Model
 
 The protocol is built on three core security principles:
@@ -51,13 +53,21 @@ See **[docs/INDEX.md](./docs/INDEX.md)** for complete documentation index with 1
 
 ## Quick Start
 
-> **Foundry dependency prerequisite:** Foundry commands require both `lib/forge-std` and `lib/halmos-cheatcodes`. In a normal Git checkout, run `git submodule update --init --recursive`. In a JJ workspace, make sure `lib/forge-std` is a symlink or directory containing forge-std and that the Halmos cheatcodes source is present under `lib/halmos-cheatcodes`. `pnpm test` and `pnpm build` check these paths and print a setup error before running Foundry.
+### Prerequisites
+- **Node.js 22** and **pnpm 9** for the Hardhat/TypeScript tooling
+- **Foundry** (`forge`) — see [book.getfoundry.sh](https://book.getfoundry.sh/getting-started/installation). `pnpm test`/`pnpm build` use it.
+- **Foundry libraries** — `lib/forge-std` and `lib/halmos-cheatcodes` are **not committed** (gitignored, vendored on demand). They auto-fetch on first `pnpm test`/`pnpm build`, or you can fetch them explicitly:
+
+```bash
+pnpm deps:foundry
+# or: scripts/fetch-foundry-deps.sh
+```
 
 ```bash
 # Install dependencies
 pnpm install
 
-# Run tests (Foundry + Hardhat)
+# Run tests (Foundry + Hardhat) — fetches Foundry libraries on first run
 pnpm test
 
 # Build contracts
