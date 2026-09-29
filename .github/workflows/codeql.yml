@@ -3,7 +3,7 @@ name: CodeQL
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [appeal-primitive]
 
 concurrency:
   group: codeql-${{ github.ref }}
