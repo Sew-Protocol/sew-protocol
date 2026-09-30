@@ -7,16 +7,20 @@
 # cloning, or rely on scripts/check-foundry-deps.sh to prompt when they are
 # missing.
 #
-# Idempotent: skips a dependency if it is already present.
+# Idempotent: skips a dependency whose files are present AND whose recorded
+# commit (.foundry-commit) matches the pinned commit. If the pinned commit was
+# bumped, the dependency is re-fetched at the new commit so existing checkouts
+# stay in sync with CI.
 set -euo pipefail
 
-FORGE_STD_COMMIT="e3386f2f9cc5ebf16ec5370869d5a49cdb85a0cb"        # v1.14.0
+FORGE_STD_COMMIT="f3dae6e6ee381f25eb6a246f7da9b85c91a68219"        # v1.17.0
 HALMOS_CHEATCODES_COMMIT="6da4e692c357ba6d641a2e677a28298cac9f76ab" # main HEAD
 
 fetch() {
   local dir="$1" url="$2" sha="$3" marker="$4"
-  if [[ -f "$dir/$marker" ]]; then
-    printf '%s already present (%s).\n' "$dir" "$dir/$marker"
+  local commit_marker="$dir/.foundry-commit"
+  if [[ -f "$dir/$marker" && -f "$commit_marker" && "$(cat "$commit_marker")" == "$sha" ]]; then
+    printf '%s up to date (%s).\n' "$dir" "$sha"
     return
   fi
   printf 'Fetching %s @ %s into %s ...\n' "$url" "$sha" "$dir"
@@ -24,6 +28,7 @@ fetch() {
   git clone --quiet --no-checkout "$url" "$dir"
   git -C "$dir" checkout --quiet "$sha"
   rm -rf "$dir/.git"
+  printf '%s' "$sha" > "$commit_marker"
 }
 
 fetch lib/forge-std "https://github.com/foundry-rs/forge-std" \
