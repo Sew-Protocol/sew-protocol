@@ -4,7 +4,7 @@ pragma solidity ^0.8.37;
 import "forge-std/Test.sol";
 import {SymTest} from "halmos-cheatcodes/src/SymTest.sol";
 import "../../../contracts/core/EscrowVault.sol";
-import "../../../contracts/core/EscrowVaultAnalytics.sol";
+import "../helpers/EscrowVaultAnalytics.sol";
 import "../../../contracts/modules/DefaultResolutionModule.sol";
 import "../../../contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/core/EscrowCreationPolicy.sol";

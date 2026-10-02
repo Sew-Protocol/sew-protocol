@@ -58,7 +58,6 @@ import '../interfaces/IYieldModule.sol';
 import '../libraries/EscrowEncodingLibrary.sol';
 import '../arbitration/IKlerosArbitrableProxy.sol';
 import '../modules/decentralized-resolution-module/interfaces/IKlerosHandoffResolutionModule.sol';
-import '../libraries/ResolverLogicLibrary.sol';
 import '../libraries/StateManagementLibrary.sol';
 import '../libraries/DisputeInitializationLibrary.sol';
 import '../libraries/DisputeRaiseLibrary.sol';

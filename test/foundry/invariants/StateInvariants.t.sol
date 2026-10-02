@@ -3,7 +3,7 @@ pragma solidity ^0.8.37;
 
 import "forge-std/Test.sol";
 import "./EscrowInvariantHandler.t.sol";
-import "../../../contracts/core/EscrowVaultAnalytics.sol";
+import "../helpers/EscrowVaultAnalytics.sol";
 import "../../../contracts/types/EscrowTypes.sol";
 
 /// @title StateInvariants

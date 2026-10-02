@@ -2,16 +2,14 @@
 pragma solidity ^0.8.37;
 
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
-import './EscrowVault.sol';
+import '../../../contracts/core/EscrowVault.sol';
 
 /**
  * @title EscrowVaultAnalytics
  * @notice Provides analytics and accounting breakdown for EscrowVault
- * @dev This is an optional helper contract for off-chain analysis and reporting.
- *      Core protocol logic remains in EscrowVault.
- *      
- *      Pattern: This follows the same architecture as EscrowViewContract,
- *      separating optional analytics from core escrow state machine.
+ * @dev This is a test/off-chain helper contract for accounting analysis and reporting.
+ *      It is not a deployed production contract; it is used by the test suite as a
+ *      cast-based reader over an existing EscrowVault.
  */
 contract EscrowVaultAnalytics {
     EscrowVault public immutable vault;

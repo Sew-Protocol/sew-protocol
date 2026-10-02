@@ -4,7 +4,7 @@ pragma solidity ^0.8.37;
 import "forge-std/Test.sol";
 import "../../../contracts/core/EscrowVault.sol";
 import "../../../contracts/modules/DefaultReleaseStrategy.sol";
-import '../../../contracts/core/EscrowVaultAnalytics.sol';
+import '../helpers/EscrowVaultAnalytics.sol';
 import "../../../contracts/modules/DefaultResolutionModule.sol";
 import "../../../contracts/types/EscrowTypes.sol";
 import "../../../contracts/core/EscrowCreationPolicy.sol";

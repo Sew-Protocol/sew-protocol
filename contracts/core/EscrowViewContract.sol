@@ -5,7 +5,6 @@ import './BaseEscrow.sol';
 import '../types/EscrowTypes.sol';
 import '../types/YieldPresets.sol';
 import '../libraries/SettingsValidationLibrary.sol';
-import '../libraries/DisputeManagementLibrary.sol';
 import '../libraries/EscrowSettlementLogic.sol';
 import '../interfaces/IYieldModule.sol';
 import '@openzeppelin/contracts/utils/math/SafeCast.sol';

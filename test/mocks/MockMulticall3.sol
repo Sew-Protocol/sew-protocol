@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.37;
 
-import { IMulticall3 } from "../../interfaces/IMulticall3.sol";
+import { IMulticall3 } from "../../contracts/interfaces/IMulticall3.sol";
 
 contract MockMulticall3 is IMulticall3 {
     IMulticall3.Result[] public returnData;
