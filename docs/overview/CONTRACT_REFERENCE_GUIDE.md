@@ -206,7 +206,6 @@
 ### Core Libraries
 - **SettingsValidationLibrary**: Validates escrow configuration parameters
 - **EscrowEncodingLibrary**: Encoding/decoding for escrow data structures
-- **ResolverLogicLibrary**: Resolver selection and logic
 - **RecoveryLibrary**: Emergency recovery operations
 - **ModuleProposalLibrary**: Module swap proposals
 - **ResolverActionLibrary**: Resolver action processing
@@ -214,7 +213,6 @@
 
 ### Dispute Libraries
 - **DisputeInitializationLibrary**: Dispute setup and initialization
-- **DisputeManagementLibrary**: Dispute state management
 - **DisputeRaiseLibrary**: Dispute raising logic
 - **DisputeEscalationLibrary**: Appeal and escalation handling
 
@@ -228,9 +226,6 @@
 - **ModuleSnapshotLibrary**: Module snapshot creation/retrieval
 - **ModuleGetterLibrary**: Optimized module address retrieval
 - **BondHandlingLibrary**: Bond processing and fee calculation
-
-### Resolution Libraries
-- **ResolutionTableLibrary**: Resolution table management (DR module)
 
 ---
 

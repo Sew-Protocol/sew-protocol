@@ -285,7 +285,6 @@ Change takes effect — for new escrows only
 ### Core guarantees
 
 - Core contracts (`BaseEscrow`, `EscrowVault`, `EscrowableERC20`) are **not upgradeable via proxy**. Protocol evolution happens through module swaps only.
-- Invariant guards (`InvariantGuardInternal.sol`) enforce accounting properties on every state transition on-chain.
 - Reentrancy protection on all external-facing functions.
 - Pausable at the contract level (Guardian only).
 

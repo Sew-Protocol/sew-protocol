@@ -55,8 +55,6 @@ The kernel of the protocol. All escrow lifecycle logic is rooted here.
 | `ModuleSnapshotRegistry.sol` | Stores per-escrow module snapshots (`ModuleSnapshot`); written once at `createEscrow()`, never mutated. |
 | `CREATE2EscrowFactory.sol` | Deterministic deployment of escrow contracts via CREATE2. |
 | `EscrowViewContract.sol` | Read-only view aggregator for off-chain tooling and frontends. |
-| `EscrowVaultHelper.sol` | Helper view functions for `EscrowVault`. |
-| `EscrowVaultAnalytics.sol` | Analytics and reporting views over vault state. |
 | `BalanceAggregator.sol` | Aggregates balances across multiple vaults. |
 | `MultiL2EscrowAggregator.sol` | Cross-L2 escrow state aggregation. |
 | `MultiL2ViewAggregator.sol` | Cross-L2 view queries. |
@@ -154,16 +152,6 @@ The DR v3 subsystem. Implements the full three-round escalation pipeline.
 | `DeferredFundingBridge.sol` | Bridge that allows deferred / conditional funding of escrows. |
 | `SpendingLimitProxy.sol` | Proxy enforcing spending limits on escrow creation. |
 
-### Guards (`contracts/guards/`)
-
-Invariant-guard libraries for yield operations.
-
-| File | Role |
-|---|---|
-| `InvariantGuardedAaveYieldLibrary.sol` | Aave-specific invariant checks wrapping yield operations. |
-| `InvariantGuardHelper.sol` | Shared guard helpers. |
-| `InvariantGuardInternal.sol` | Internal guard implementation. |
-
 ### Libraries (`contracts/libraries/`)
 
 Extracted logic libraries (`using L for ...` or direct call pattern). Key libraries:
@@ -175,7 +163,6 @@ Extracted logic libraries (`using L for ...` or direct call pattern). Key librar
 | `EscrowSettlementLogic.sol` | Internalized settlement derivation (formerly `SettlementOps`). |
 | `EscrowEncodingLibrary.sol` | ABI encoding helpers for escrow data. |
 | `DisputeRaiseLibrary.sol` | Dispute initiation validation. |
-| `DisputeManagementLibrary.sol` | Dispute state transitions. |
 | `DisputeEscalationLibrary.sol` | Escalation round management. |
 | `DisputeInitializationLibrary.sol` | Dispute metadata initialization. |
 | `StateManagementLibrary.sol` | Escrow state machine transitions. |
@@ -185,8 +172,6 @@ Extracted logic libraries (`using L for ...` or direct call pattern). Key librar
 | `FeeRecordingLibrary.sol` | Protocol fee accrual. |
 | `FeeWithdrawalLibrary.sol` | Fee withdrawal CEI pattern. |
 | `RecoveryLibrary.sol` | Token recovery (excess balance extraction). |
-| `ResolverLogicLibrary.sol` | Resolver assignment and round management. |
-| `ResolutionTableLibrary.sol` | Resolution outcome lookup. |
 | `ProtocolMathLibrary.sol` | Shared fixed-point math. |
 | `BalanceUpdateLibrary.sol` | Balance update coordination. |
 | `YieldPresetLibrary.sol` | Yield preset selection and configuration. |
@@ -331,7 +316,6 @@ are executed separately.
 | [`DR_V3_PARAMETERS.md`](dispute-resolution/DR_V3_PARAMETERS.md) | Production parameter values for DR v3 |
 | [`DR_V3_LAUNCH_SAFE_DEFAULTS.md`](dispute-resolution/DR_V3_LAUNCH_SAFE_DEFAULTS.md) | Conservative launch-safe parameter defaults |
 | [`KLEROS_INTEGRATION.md`](dispute-resolution/KLEROS_INTEGRATION.md) | Kleros integration design (round 2 backstop) |
-| [`ESCALATION_CONFIG_AND_RESOLVER_TABLE.md`](dispute-resolution/ESCALATION_CONFIG_AND_RESOLVER_TABLE.md) | Escalation configuration and resolver routing |
 | [`APPEAL_GAME_THEORY_BENCHMARKS.md`](dispute-resolution/APPEAL_GAME_THEORY_BENCHMARKS.md) | Game-theoretic analysis of appeal incentives |
 | [`BOND_VALUATION_SUMMARY.md`](dispute-resolution/BOND_VALUATION_SUMMARY.md) | Bond composition, haircut, and valuation mechanics |
 | [`COMPARATIVE_ANALYSIS_DR_SYSTEMS.md`](dispute-resolution/COMPARATIVE_ANALYSIS_DR_SYSTEMS.md) | Comparison of Sew DR with other decentralized dispute systems |
@@ -342,7 +326,6 @@ are executed separately.
 |---|---|
 | [`SECURITY_MODEL.md`](security/SECURITY_MODEL.md) | Protocol threat model and security properties |
 | [`RECOVERY_FUNCTIONALITY.md`](security/RECOVERY_FUNCTIONALITY.md) | Token recovery design and safety constraints |
-| [`INVARIANT_GUARD_INTEGRATION.md`](security/INVARIANT_GUARD_INTEGRATION.md) | Invariant guard library integration notes |
 | [`PATH_TRAVERSAL_AUDIT.md`](security/PATH_TRAVERSAL_AUDIT.md) | Path-traversal audit and fixes |
 | [`BACKWARD_COMPATIBILITY_ANALYSIS.md`](security/BACKWARD_COMPATIBILITY_ANALYSIS.md) | Backward-compatibility analysis across pre-consolidation contract versions |
 Archived security point-in-time reviews/status (see `docs/archived/`):
@@ -359,6 +342,8 @@ Archived security point-in-time reviews/status (see `docs/archived/`):
 | [`FEE_SNAPSHOT_IMPLEMENTATION.md`](archived/FEE_SNAPSHOT_IMPLEMENTATION.md) | Fee snapshot implementation notes |
 | [`FUNCTIONAL_ECONOMIC_DESIGN_REVIEW.md`](archived/FUNCTIONAL_ECONOMIC_DESIGN_REVIEW.md) | Functional/economic design review |
 | [`AAVE_YIELD_MODULE_TEST_REVIEW.md`](archived/AAVE_YIELD_MODULE_TEST_REVIEW.md) | AaveYieldModule test review |
+| [`INVARIANT_GUARD_INTEGRATION.md`](archived/INVARIANT_GUARD_INTEGRATION.md) | Invariant guard integration notes (archived) |
+| [`ESCALATION_CONFIG_AND_RESOLVER_TABLE.md`](archived/ESCALATION_CONFIG_AND_RESOLVER_TABLE.md) | Escalation configuration and resolver routing (archived) |
 
 ### Top-level standalone documents
 

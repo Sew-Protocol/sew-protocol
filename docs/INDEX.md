@@ -88,7 +88,6 @@ documentation organized by topic and use case. Paths are relative to `docs/`.
 - [dispute-resolution/DR_V3_PARAMETERS.md](./dispute-resolution/DR_V3_PARAMETERS.md) - Production parameter values
 - [dispute-resolution/DR_V3_LAUNCH_SAFE_DEFAULTS.md](./dispute-resolution/DR_V3_LAUNCH_SAFE_DEFAULTS.md) - Launch-safe default parameters
 - [dispute-resolution/KLEROS_INTEGRATION.md](./dispute-resolution/KLEROS_INTEGRATION.md) - Kleros integration design
-- [dispute-resolution/ESCALATION_CONFIG_AND_RESOLVER_TABLE.md](./dispute-resolution/ESCALATION_CONFIG_AND_RESOLVER_TABLE.md) - Escalation configuration and resolver routing
 - [dispute-resolution/APPEAL_GAME_THEORY_BENCHMARKS.md](./dispute-resolution/APPEAL_GAME_THEORY_BENCHMARKS.md) - Appeal incentive game theory
 - [dispute-resolution/BOND_VALUATION_SUMMARY.md](./dispute-resolution/BOND_VALUATION_SUMMARY.md) - Bond composition and valuation
 - [dispute-resolution/COMPARATIVE_ANALYSIS_DR_SYSTEMS.md](./dispute-resolution/COMPARATIVE_ANALYSIS_DR_SYSTEMS.md) - Comparison with other dispute systems
@@ -99,7 +98,6 @@ documentation organized by topic and use case. Paths are relative to `docs/`.
 - [SECURITY_MODEL.md](./SECURITY_MODEL.md) - Core security model and principles
 - [security/SECURITY_MODEL.md](./security/SECURITY_MODEL.md) - Original per-escrow isolation reference
 - [security/BACKWARD_COMPATIBILITY_ANALYSIS.md](./security/BACKWARD_COMPATIBILITY_ANALYSIS.md) - Backward-compatibility analysis
-- [security/INVARIANT_GUARD_INTEGRATION.md](./security/INVARIANT_GUARD_INTEGRATION.md) - Invariant guard integration
 - [security/PATH_TRAVERSAL_AUDIT.md](./security/PATH_TRAVERSAL_AUDIT.md) - Path-traversal audit
 - [security/RECOVERY_FUNCTIONALITY.md](./security/RECOVERY_FUNCTIONALITY.md) - Token recovery design
 - [policies/EMERGENCY_POLICY.md](./policies/EMERGENCY_POLICY.md) - Emergency response policy

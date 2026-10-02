@@ -445,7 +445,6 @@ BaseEscrow                         — escrow lifecycle and state machine
   ├── DisputeInitializationLibrary — module initialization and resolver callback
   ├── DisputeRaiseLibrary          — incentive module hook on dispute open
   ├── DisputeEscalationLibrary     — bond query, validation, and processing helpers
-  ├── DisputeManagementLibrary     — timeout check helpers
   └── ModuleSnapshot               — immutable per-escrow configuration record
 
 IResolutionModule (interface)      — pluggable resolution contract contract
@@ -453,7 +452,6 @@ IResolutionModule (interface)      — pluggable resolution contract contract
   │     ├── DRMAdminFacet          — governance functions (delegatecall pattern)
   │     ├── DRMStorageBase         — shared storage layout
   │     ├── DecentralizedResolverStructs — types: ResolverRole, DisputeMetadata, EscalationConfig
-  │     ├── ResolutionTableLibrary — category-key generation and amount tier routing
   │     ├── EscalationCostLibrary  — cost curve calculation (LINEAR/QUADRATIC/GEOMETRIC)
   │     ├── ResolutionAnalytics    — resolver attention flags, quality metrics
   │     └── BondTokenRegistry      — approved appeal bond tokens (DR v2)

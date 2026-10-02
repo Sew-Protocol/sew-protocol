@@ -181,7 +181,7 @@ _(Derived from `RESOLVER_ECONOMICS_2026.md`)_
 
 - ✅ `MAX_ROUND = 2` cap exists.
 
-- ✅ `minEscrowValueForEscalation` exists (currently 0 by default).
+- ⚠️ Value-based escalation gate NOT implemented (`minEscrowValueForEscalation` was dead config — never enforced — and has been removed).
 
 - ⚠️ Bond forfeiture logic exists in `ResolverIncentiveModule.forfeitAppealBond` but not automatically integrated into escalation timeout flow (manual call possible).
 
