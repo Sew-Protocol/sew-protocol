@@ -5,7 +5,8 @@
  * - EscrowVault: Main escrow contract for ERC20 tokens
  * - EscrowableERC20: ERC20 token with built-in escrow functionality
  *
- * These contracts require YieldOps to be deployed first.
+ * Requires EscrowCreationPolicy, BondCollector, ModuleSnapshotRegistry,
+ * and EscrowGovernanceTimelock to be deployed first.
  */
 
 import { HardhatRuntimeEnvironment } from 'hardhat/types';
@@ -28,7 +29,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   console.log(`\n📦 Deploying Core Escrow Contracts...`);
 
   // Get dependencies
-  const yieldOpsDeployment = await get('YieldOps');
   const creationPolicyDeployment = await get('EscrowCreationPolicy');
   const bondCollectorDeployment = await get('BondCollector');
   const moduleManagementDeployment = await get('ModuleSnapshotRegistry');
@@ -46,7 +46,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   console.log(`\n   Configuration:`);
   console.log(`      Escrow Fee: ${escrowFeeBps} bps (${(escrowFeeBps / 100).toFixed(2)}%)`);
   console.log(`      Fee Recipient: ${feeRecipient}`);
-  console.log(`      YieldOps: ${yieldOpsDeployment.address}`);
   console.log(`      EscrowCreationPolicy: ${creationPolicyDeployment.address}`);
   console.log(`      BondCollector: ${bondCollectorDeployment.address}`);
   console.log(`      ModuleManagement: ${moduleManagementDeployment.address}`);
@@ -60,7 +59,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     args: [
       escrowFee, // fee (in fee denominator units, 10000 = 100%)
       feeRecipient, // feeAddress
-      yieldOpsDeployment.address, // yieldOps
       moduleManagementDeployment.address, // moduleManagement
     ],
     log: true,
@@ -81,7 +79,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
         constructorArgs: [
           escrowFee,
           feeRecipient,
-          yieldOpsDeployment.address,
           moduleManagementDeployment.address,
         ],
         tags: ['core', 'escrow'],
@@ -97,23 +94,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   
   // Get ops contracts
   const creationPolicyContract = await ethers.getContractAt('EscrowCreationPolicy', creationPolicyDeployment.address);
-  const yieldOpsContract = await ethers.getContractAt('YieldOps', yieldOpsDeployment.address);
   const bondCollectorContract = await ethers.getContractAt('BondCollector', bondCollectorDeployment.address);
 
   // EscrowCreationPolicy is a shared policy authority: no per-escrow registration required.
-
-  // Register with YieldOps
-  try {
-    const yieldOpsTx = await yieldOpsContract.registerEscrowContract(escrowVaultDeployment.address);
-    await yieldOpsTx.wait();
-    console.log(`   ✅ Registered EscrowVault with YieldOps`);
-  } catch (error: any) {
-    if (error.message?.includes('AccessControlUnauthorizedAccount') || error.message?.includes('already has role')) {
-      console.log(`   ℹ️  EscrowVault already registered with YieldOps`);
-    } else {
-      throw error;
-    }
-  }
+  // YieldOps is no longer deployed; yield wiring lives in EscrowYield + yield modules.
 
   // Register with BondCollector
   try {
@@ -191,7 +175,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
         tokenSymbol, // symbol
         escrowFee, // fee
         feeRecipient, // feeAddress
-        yieldOpsDeployment.address, // yieldOps
         moduleManagementDeployment.address, // moduleManagement
       ],
       log: true,
@@ -214,7 +197,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
             tokenSymbol,
             escrowFee,
             feeRecipient,
-            yieldOpsDeployment.address,
             moduleManagementDeployment.address,
           ],
           tags: ['core', 'escrow', 'token'],
@@ -229,19 +211,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     const escrowableERC20Contract = await ethers.getContractAt('EscrowableERC20', escrowableERC20Deployment.address);
 
     // EscrowCreationPolicy is a shared policy authority: no per-escrow registration required.
-
-    // Register with YieldOps
-    try {
-      const yieldOpsTx = await yieldOpsContract.registerEscrowContract(escrowableERC20Deployment.address);
-      await yieldOpsTx.wait();
-      console.log(`   ✅ Registered EscrowableERC20 with YieldOps`);
-    } catch (error: any) {
-      if (error.message?.includes('AccessControlUnauthorizedAccount') || error.message?.includes('already has role')) {
-        console.log(`   ℹ️  EscrowableERC20 already registered with YieldOps`);
-      } else {
-        throw error;
-      }
-    }
+    // YieldOps is no longer deployed; yield wiring lives in EscrowYield + yield modules.
 
     // Register with BondCollector
     try {
@@ -291,7 +261,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 export default func;
 func.tags = ['core', 'escrow'];
 func.dependencies = [
-  'yield-ops',
   'creation-policy',
   'bond-collector',
   'module-management',

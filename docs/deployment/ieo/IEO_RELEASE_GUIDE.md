@@ -69,19 +69,19 @@ pnpm hardhat console --network baseSepolia
 ### Step 2: Deploy Ops Contracts
 
 ```bash
-# Deploy ops contracts (required before core escrow contracts)
-pnpm hardhat deploy --network baseSepolia --tags yield-ops,dispute-ops,settlement-ops,create-ops,bond-collector
+# Deploy ops + module management + escrow admin (required before core escrow contracts)
+# (`core` covers creation-policy / bond-collector / module-management; `escrow-admin` adds the helper)
+pnpm hardhat deploy --network baseSepolia --tags core,escrow-admin
 
 # Verify deployments
 pnpm hardhat export --network baseSepolia
 ```
 
 **Expected Output:**
-- `YieldOps` (Yield withdrawal and distribution)
-- `DisputeOps` (Dispute escalation orchestration)
-- `SettlementOps` (Settlement execution operations)
-- `CreateOps` (Escrow creation validation and computation)
+- `EscrowCreationPolicy` (Escrow creation validation and liquidity computation)
 - `BondCollector` (Escalation bond collection)
+- `ModuleSnapshotRegistry` (Module management)
+- `EscrowGovernanceTimelock` (Escrow admin helper)
 
 **Note**: These contracts are deployed with the deployer as `initialOwner`. Admin roles will be transferred to TimelockController in Step 5.
 
@@ -194,30 +194,24 @@ pnpm hardhat verify --network baseSepolia <CONTRACT_ADDRESS> <CONSTRUCTOR_ARGS>
 
 ## Post-Deployment Configuration
 
-### 1. Verify Ops Contract Registration
+### 1. Verify Contract Registration
 
 ```bash
-# Verify EscrowVault is registered with all ops contracts
-# This should have been done automatically in Step 4
-# Check via:
-pnpm hardhat run scripts/verify-ops-registration.ts --network baseSepolia
+# Verify deployments recorded in the ledger + on-chain artifact verification
+pnpm hardhat export --network baseSepolia
+pnpm hardhat run scripts/verify-base-sepolia.ts --network baseSepolia
 ```
 
 **Verification Checklist**:
-- [ ] EscrowVault registered with CreateOps
-- [ ] EscrowVault registered with SettlementOps
-- [ ] EscrowVault registered with DisputeOps
-- [ ] EscrowVault registered with YieldOps
 - [ ] EscrowVault registered with BondCollector
-- [ ] CreateOps set in EscrowVault
-- [ ] SettlementOps set in EscrowVault
-- [ ] BondCollector set in EscrowVault
+- [ ] EscrowVault wired to EscrowCreationPolicy
+- [ ] Yield module (if enabled) wired via EscrowYield
 
 ### 2. Verify Role Transfers
 
 ```bash
 # Verify TimelockController has DEFAULT_ADMIN_ROLE on all contracts
-pnpm hardhat run scripts/verify-roles.ts --network baseSepolia
+pnpm hardhat run scripts/verify-base-sepolia.ts --network baseSepolia
 ```
 
 **Verification Checklist**:

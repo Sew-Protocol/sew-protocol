@@ -47,7 +47,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     'DefaultResolutionModule',
     // Ops contracts
     'EscrowCreationPolicy', // Has ROLE_TIMELOCK and ROLE_GUARDIAN for yield deposits control
-    'YieldOps', // Has ROLE_TIMELOCK and ROLE_GUARDIAN
     'BondCollector',
     'ModuleSnapshotRegistry',
     // DecentralizedResolutionModule is in separate package

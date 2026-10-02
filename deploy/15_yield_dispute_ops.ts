@@ -2,11 +2,13 @@
  * Deploy Ops Contracts
  *
  * These are utility contracts required by the core escrow contracts.
- * - YieldOps: Handles yield withdrawal and distribution
  * - (Dispute derivation now lives in EscrowDisputeLogic; no deployed DisputeOps)
  * - (Settlement derivation now lives in EscrowSettlementLogic; no deployed SettlementOps)
  * - EscrowCreationPolicy: Handles escrow creation validation and computation
  * - BondCollector: Handles escalation bond collection
+ *
+ * YieldOps is no longer deployed; yield withdrawal/distribution is handled by
+ * EscrowYield and the yield modules (e.g. AaveYieldModule).
  */
 
 import { HardhatRuntimeEnvironment } from 'hardhat/types';
@@ -55,36 +57,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const txOverrides = getTxOverrides(ethers);
 
   console.log(`\n📦 Deploying Ops Contracts...`);
-
-  // Deploy YieldOps
-  console.log(`\n   Deploying YieldOps...`);
-  const yieldOpsDeployment = await deploy('YieldOps', {
-    contract: 'YieldOps',
-    from: deployer,
-    args: [deployer], // initialOwner
-    ...txOverrides,
-    log: true,
-  });
-
-  if (yieldOpsDeployment.newlyDeployed) {
-    const explorerUrl = getBlockExplorerUrl(hre, yieldOpsDeployment.address);
-    console.log(`   ✅ YieldOps deployed at: ${yieldOpsDeployment.address}`);
-    if (explorerUrl) {
-      console.log(`      📊 View on ${chainConfig.blockExplorer.name}: ${explorerUrl}`);
-    }
-
-    if (yieldOpsDeployment.receipt) {
-      await registerDeployment(hre, 'YieldOps', {
-        address: yieldOpsDeployment.address,
-        txHash: yieldOpsDeployment.transactionHash,
-        blockNumber: yieldOpsDeployment.receipt.blockNumber,
-        constructorArgs: [deployer],
-        tags: ['core', 'yield'],
-      });
-    }
-  } else {
-    console.log(`   ✅ YieldOps already deployed at: ${yieldOpsDeployment.address}`);
-  }
 
   // Deploy EscrowCreationPolicy
   console.log(`\n   Deploying EscrowCreationPolicy...`);
@@ -154,7 +126,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     const DEFAULT_ADMIN_ROLE = ethers.ZeroHash; // AccessControl uses bytes32(0)
 
     const opsContracts = [
-      { name: 'YieldOps', deployment: yieldOpsDeployment },
       { name: 'EscrowCreationPolicy', deployment: creationPolicyDeployment },
       { name: 'BondCollector', deployment: bondCollectorDeployment },
     ];
@@ -197,5 +168,5 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 };
 
 export default func;
-func.tags = ['core', 'yield-ops', 'creation-policy', 'bond-collector'];
+func.tags = ['core', 'creation-policy', 'bond-collector'];
 func.dependencies = [];

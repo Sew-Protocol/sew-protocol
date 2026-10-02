@@ -60,7 +60,7 @@ pnpm hardhat console --network baseSepolia
 2) **Deploy ops + module management + escrow admin helper**
 
 ```bash
-pnpm hardhat deploy --network baseSepolia --tags yield-ops,dispute-ops,settlement-ops,create-ops,bond-collector,module-management,escrow-admin
+pnpm hardhat deploy --network baseSepolia --tags core,escrow-admin
 ```
 
 **If you hit** `replacement fee too low` / `REPLACEMENT_UNDERPRICED`:
@@ -71,7 +71,7 @@ pnpm hardhat deploy --network baseSepolia --tags yield-ops,dispute-ops,settlemen
 # Example values (tweak as needed)
 export TX_MAX_FEE_GWEI=2
 export TX_PRIORITY_FEE_GWEI=1
-pnpm hardhat deploy --network baseSepolia --tags yield-ops,dispute-ops,settlement-ops,create-ops,bond-collector,module-management,escrow-admin
+pnpm hardhat deploy --network baseSepolia --tags core,escrow-admin
 ```
 
 3) **Deploy core escrow**

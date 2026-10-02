@@ -51,8 +51,9 @@ VOTING_PERIOD=45818  # ~1 week @ 13s/block
 For testnet deployment, you can use the deployer address for Safe and Guardian (not recommended for mainnet):
 
 ```bash
-# Get your deployer address
-DEPLOYER=$(pnpm hardhat run scripts/get-deployer-address.ts --network baseSepolia 2>/dev/null || echo "0x...")
+# The deployer is the address derived from the PRIVATE_KEY used for deployment.
+# Print it with (hardhat console):
+#   const { getSigners } = require('ethers'); (await (await ethers.getSigners())[0].getAddress())
 
 # For testnet, you can use deployer address multiple times
 SAFE_OWNER_1=$DEPLOYER
@@ -81,19 +82,19 @@ pnpm hardhat console --network baseSepolia
 # console.log('Current block:', blockNumber);
 ```
 
-### Step 2: Deploy Ops Contracts
+### Step 2: Deploy Ops, Module Management & Escrow Admin
 
 ```bash
-# Deploy ops contracts (required before core escrow contracts)
-pnpm hardhat deploy --network baseSepolia --tags yield-ops,dispute-ops,settlement-ops,create-ops,bond-collector
+# Deploy ops (creation-policy, bond-collector) + module management + escrow admin
+# (required before core escrow contracts)
+pnpm hardhat deploy --network baseSepolia --tags core,escrow-admin
 ```
 
 This deploys:
-- **YieldOps** (Yield withdrawal and distribution)
-- **DisputeOps** (Dispute escalation orchestration)
-- **SettlementOps** (Settlement execution operations)
-- **CreateOps** (Escrow creation validation and computation)
+- **EscrowCreationPolicy** (Escrow creation validation and computation)
 - **BondCollector** (Escalation bond collection)
+- **ModuleSnapshotRegistry** (Module management)
+- **EscrowGovernanceTimelock** (Escrow admin helper)
 
 **Note**: These contracts are deployed with the deployer as `initialOwner`. Roles will be transferred to TimelockController in Step 4.
 
@@ -197,7 +198,7 @@ After deployment, you may need to:
    - Verify roles were transferred correctly:
      ```bash
      # Check that TimelockController has DEFAULT_ADMIN_ROLE on all contracts
-     pnpm hardhat run scripts/verify-roles.ts --network baseSepolia
+     pnpm hardhat run scripts/verify-base-sepolia.ts --network baseSepolia
      ```
 
 3. **Verify Ops Contract Registration**:

@@ -9,7 +9,6 @@ This document lists critical post-deployment steps that must be executed after d
 **Problem**: EscrowVault (and EscrowableERC20) must be registered with the remaining Ops contracts before it can be used. This requires calling `registerEscrowContract()` on each Ops contract that gates on `ROLE_ESCROW_CONTRACT`.
 
 **Contracts Affected**:
-- `YieldOps` - requires EscrowVault to have `ROLE_ESCROW_CONTRACT` (if used)
 - `BondCollector` - requires EscrowVault to have `ROLE_ESCROW_CONTRACT` (if used)
 
 **Not affected**: `EscrowCreationPolicy` is a shared, protocol-wide policy authority. It has no per-escrow registration and no `ROLE_ESCROW_CONTRACT` gate.
@@ -32,7 +31,6 @@ This document lists critical post-deployment steps that must be executed after d
 **Contracts Affected**:
 - `EscrowVault` - ✅ Already granted in latest deployment
 - `EscrowCreationPolicy` - Needs Timelock to grant (gates `pauseYieldDeposits`)
-- `YieldOps` - Needs Timelock to grant
 
 **How to Fix**:
 ```bash
@@ -57,6 +55,6 @@ pnpm hardhat run --network baseSepolia scripts/testnet/check-escrow-registration
 
 To prevent this in future deployments, `deploy/60_protocol_governance.ts` should:
 
-1. Call `registerEscrowContract(EscrowVault)` on `YieldOps` and `BondCollector` after deploying EscrowVault
+1. Call `registerEscrowContract(EscrowVault)` on `BondCollector` after deploying EscrowVault
 2. Grant Guardian roles in the same script
 3. Include verification steps

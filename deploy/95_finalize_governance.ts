@@ -40,7 +40,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     'AaveYieldModule',
     'DefaultResolutionModule',
     'EscrowCreationPolicy',
-    'YieldOps',
     'BondCollector',
     'ModuleSnapshotRegistry',
     // ── DR v3 module contracts (85/86) ───────────────────────────────────
