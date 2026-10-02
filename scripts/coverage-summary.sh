@@ -1,52 +1,33 @@
 #!/bin/bash
 # Coverage Summary Script
-# Provides quick coverage overview with adjusted estimates
+# Computes measured project-contract coverage from coverage/lcov.filtered.info
+# (produced by scripts/filter-coverage.js from `forge coverage --report lcov`).
 
-echo "════════════════════════════════════════════════════"
-echo "            COVERAGE SUMMARY (REPORTED)             "
-echo "════════════════════════════════════════════════════"
+set -euo pipefail
+
+lcov="${COVERAGE_LCONV:-coverage/lcov.filtered.info}"
+
+if [ ! -f "$lcov" ]; then
+  echo "error: $lcov not found. Run \`forge coverage --report lcov\` then scripts/filter-coverage.js first." >&2
+  exit 2
+fi
+
+awk '
+  function pct(l,h){ return h>0 ? (h*100.0)/l : 0 }
+  /^SF:/{files++}
+  /^LF:/{lf += substr($0,4)}
+  /^LH:/{lh += substr($0,4)}
+  /^FNF:/{fnf += substr($0,5)}
+  /^FNH:/{fnh += substr($0,5)}
+  /^BRF:/{brf += substr($0,5)}
+  /^BRH:/{brh += substr($0,5)}
+  END{
+    printf "Files:      %d\n", files
+    printf "Lines:      %d/%d (%.1f%%)\n", lh, lf, pct(lf,lh)
+    printf "Functions:  %d/%d (%.1f%%)\n", fnh, fnf, pct(fnf,fnh)
+    printf "Branches:   %d/%d (%.1f%%)\n", brh, brf, pct(brf,brh)
+  }
+' "$lcov"
+
 echo ""
-echo "Lines:      309/2113 (14.62%)"
-echo "Functions:  65/387 (16.80%)"
-echo "Branches:   137/1250 (10.96%)"
-echo ""
-echo "Average Coverage: 14.13%"
-echo "Tests Running Under Coverage: 48/70 suites"
-echo ""
-echo "⚠️  WARNING: Coverage artificially low due to known tooling limitation"
-echo "   22 test suites fail during coverage (gas limits with viaIR)"
-echo "   These suites test core contracts but fail at deployment under instrumentation"
-echo ""
-echo "════════════════════════════════════════════════════"
-echo "         ESTIMATED ACTUAL COVERAGE (ADJUSTED)       "
-echo "════════════════════════════════════════════════════"
-echo ""
-echo "Lines:      ~1309/2113 (~61.95%)"
-echo "Functions:  ~215/387 (~55.56%)"
-echo "Branches:   ~437/1250 (~34.96%)"
-echo ""
-echo "Estimated Average: ~50.82%"
-echo "Total Tests: 595 (all passing when run normally)"
-echo ""
-echo "Adjustment Basis:"
-echo "  - 22 failing test suites cover core contracts (BaseEscrow, EscrowVault, etc.)"
-echo "  - Conservative estimate: +1000 lines, +150 functions, +300 branches"
-echo "  - Foundry tests (236) provide additional coverage not measured by hardhat"
-echo ""
-echo "✓ Coverage analysis complete"
-echo ""
-echo "📚 See docs/COVERAGE_REPORTING_STATUS.md for detailed analysis"
-echo ""
-echo "Test Breakdown:"
-echo "  Hardhat tests:  359 (70 suites)"
-echo "  Foundry tests:  236 (17 suites)"
-echo "  Total:          595 tests"
-echo ""
-echo "Critical Path Coverage (Manual Analysis):"
-echo "  Escrow Lifecycle:      ✅ 70-80%"
-echo "  Access Control:        ✅ 85%"
-echo "  Module Management:     ✅ 75%"
-echo "  Yield Distribution:    ✅ 85%"
-echo "  Governance:            ⚠️  60%"
-echo "  Emergency Controls:    ✅ 80%"
-echo ""
+echo "Source: $lcov"

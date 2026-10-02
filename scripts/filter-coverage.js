@@ -15,11 +15,18 @@ let include = false;
 for (let i = 0; i < data.length; i++) {
   const line = data[i];
   if (line.startsWith('SF:')) {
-    // include only if path contains /contracts/ (or starts with contracts/) and exclude node_modules or test dirs
+    // Include only project contracts: path contains /contracts/ (or starts with
+    // contracts/) AND is not under node_modules or test dirs.
+    // node_modules must be checked without a leading slash: forge emits paths like
+    // "node_modules/@openzeppelin/contracts/..." which also contain "/contracts/",
+    // so dependency sources would otherwise leak into the filtered report.
     const p = line.slice(3);
     const normalized = p.replace(/\\/g, '/');
-    include = normalized.includes('/contracts/') || normalized.startsWith('contracts/');
-    if (normalized.includes('/node_modules/') || normalized.includes('/test/')) include = false;
+    if (normalized.includes('node_modules') || normalized.includes('/test/')) {
+      include = false;
+    } else {
+      include = normalized.includes('/contracts/') || normalized.startsWith('contracts/');
+    }
   }
   if (include) out.push(line);
 }
