@@ -12,7 +12,6 @@ import './interfaces/ISlashingModule.sol';
 import './analytics/ResolutionAnalytics.sol';
 import './libraries/EscalationCostLibrary.sol';
 import './interfaces/IKlerosHandoffResolutionModule.sol';
-import '../../libraries/ResolutionTableLibrary.sol';
 
 /**
  * @title DecentralizedResolutionModule
@@ -231,9 +230,6 @@ contract DecentralizedResolutionModule is
         return (true, resolutionConfigSelectable[version] && !config.deprecated, config.deprecated, config.root);
     }
     function generateCategoryKey(address token, uint256 amount, string memory t) external pure returns (bytes32) { return keccak256(abi.encode(token, amount, t)); }
-    function autoCategorizeEscrow(bytes calldata d) external pure returns (bytes32) { return ResolutionTableLibrary.autoCategorize(d); }
-    function getAmountTier(uint256 a) external pure returns (string memory) { return ResolutionTableLibrary.getAmountTier(a); }
-    function getAmountCategory(uint256 a) external pure returns (bytes32) { return keccak256(abi.encode(ResolutionTableLibrary.getAmountTier(a))); }
 
     // reversalRate = reversals / casesDecided * 10000 bps (not a true escalation rate)
     function getV1PhaseGateMetrics() external view returns (uint256 reversalRate, uint256 avgResponseTime, uint256 activeResolvers) {

@@ -8,7 +8,6 @@ import '../../shared/interfaces/IIncentiveModule.sol';
 import './DRMStorageBase.sol';
 import './analytics/ResolutionAnalytics.sol';
 import './libraries/EscalationCostLibrary.sol';
-import '../../libraries/ResolutionTableLibrary.sol';
 
 /**
  * @title DRMAdminFacet
@@ -63,7 +62,6 @@ contract DRMAdminFacet is SlowLaneQueueActivate, AccessControl, ReentrancyGuard,
     event EscalationCostConfigQueued(EscalationCostConfig config, uint64 eta);
     event EscalationCostConfigActivated(EscalationCostConfig oldConfig, EscalationCostConfig newConfig);
     event AppealBondRequired(uint256 indexed workflowId, uint8 round, uint256 amount, address token);
-    event MinEscrowValueUpdated(uint256 oldValue, uint256 newValue);
     event DisputeTimeoutUpdated(uint256 oldTimeout, uint256 newTimeout);
     event BondTokenRegistryUpdated(address indexed oldRegistry, address indexed newRegistry);
     event NewAssignmentsPaused(address indexed pausedBy, string reason);
@@ -423,12 +421,6 @@ contract DRMAdminFacet is SlowLaneQueueActivate, AccessControl, ReentrancyGuard,
         return (pending.config, pending.eta, pending.exists);
     }
 
-    function setMinEscrowValueForEscalation(uint256 minValue) external onlyRole(ROLE_TIMELOCK) {
-        uint256 oldValue = minEscrowValueForEscalation;
-        minEscrowValueForEscalation = minValue;
-        emit MinEscrowValueUpdated(oldValue, minValue);
-    }
-
     // ============ External Resolver & Registry ============
 
     function setExternalResolver(address resolver) external onlyRole(ROLE_TIMELOCK) {
@@ -531,17 +523,5 @@ contract DRMAdminFacet is SlowLaneQueueActivate, AccessControl, ReentrancyGuard,
         string memory categoryType
     ) external pure returns (bytes32) {
         return keccak256(abi.encode(token, amount, categoryType));
-    }
-
-    function autoCategorizeEscrow(bytes calldata escrowData) external pure returns (bytes32) {
-        return ResolutionTableLibrary.autoCategorize(escrowData);
-    }
-
-    function getAmountTier(uint256 amount) external pure returns (string memory) {
-        return ResolutionTableLibrary.getAmountTier(amount);
-    }
-
-    function getAmountCategory(uint256 amount) external pure returns (bytes32) {
-        return keccak256(abi.encode(ResolutionTableLibrary.getAmountTier(amount)));
     }
 }

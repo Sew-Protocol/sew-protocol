@@ -38,7 +38,6 @@ abstract contract DRMStorageBase is DecentralizedResolverStructs {
     // ============ DR v2: Escalation Cost Configuration ============
     EscalationCostConfig public escalationCostConfig;
     PendingEscalationCostConfig internal _pendingEscalationCostConfig;
-    uint256 public minEscrowValueForEscalation;
 
     // ============ DR v2: Bond Token Registry ============
     IBondTokenRegistry public bondTokenRegistry;
