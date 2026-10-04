@@ -59,9 +59,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `setStakingModule()` admin function on `DecentralizedResolutionModule` for configuring per-resolver staking limits
 - `InsufficientResolverStake` error raised when escrow value exceeds a resolver's staked capacity
 - `StakingModuleUpdated` event emitted on staking module changes
-- Added configuration and administration events across `EvidenceModuleV1`, `AaveYieldModule`, `DRMAdminFacet`, `DecentralizedResolutionModule`, and `ResolverSlashingModule` to improve observability; no protocol state-transition semantics or callable selectors changed. Note: generated contract ABIs and the observable log surface expand accordingly (new events); storage layout and callable function selectors are unchanged.
+ - Added configuration and administration events across `EvidenceModuleV1`, `AaveYieldModule`, `DRMAdminFacet`, `DecentralizedResolutionModule`, and `ResolverSlashingModule` to improve observability; no protocol state-transition semantics or callable selectors changed. Note: generated contract ABIs and the observable log surface expand accordingly (new events); storage layout and callable function selectors are unchanged.
+
+### Removed
+
+- **Removed dead/unused contracts and libraries** — `DisputeManagementLibrary`, `ResolverLogicLibrary`, `ResolutionTableLibrary`, `RecoveryLibrary`, `EscrowVaultHelper`, `EscrowableERC20View`, the dormant `InvariantGuard` subsystem (`InvariantGuardInternal`/`InvariantGuardHelper`), and the standalone `EvidenceModuleV1` / `SlowLaneQueueActivateUpgradeable`. None were imported by a production contract or deployed; `RecoveryLibrary` duplicated `BondCollector`'s own recovery functions, and the guard subsystem was unwired. `EscrowVaultAnalytics` was relocated to `test/foundry/helpers/` as a test-only reader. ~22 unused custom errors were also deleted.
+- **Removed the pre-standards L2/cross-L2 UX contracts** — `BalanceAggregator`, `MultiL2EscrowAggregator`, `MulticallFallbackHandler`, `MultiL2ModuleCoordinator`, and `RPCEndpointManager`. These were written (~Apr) before the ecosystem converged on accepted standards and were **never deployed** (not in the deployable allowlist, not imported by any contract, no deploy script). Rationale:
+  - `MulticallFallbackHandler` — superseded by Safe's standard `CompatibilityFallbackHandler` (ERC-1271 + `multiSend`/multicall); a custom Safe fallback handler is not auto-integrated by Safe frontends.
+  - `BalanceAggregator` / `MultiL2EscrowAggregator` — redundant with **Multicall3** (the canonical standard, deployed on 250+ chains and an OP-Stack preinstall, natively supported by viem/ethers).
+  - `RPCEndpointManager` — an anti-pattern: RPC endpoints are off-chain client configuration; no standard stores them on-chain.
+  - `MultiL2ModuleCoordinator` — superseded by the actually-deployed governance path (allowlist + timelock + per-chain deployments).
+  - The deployed cross-L2 contracts `L2AddressRegistry` and `MultiL2ViewAggregator` are retained.
+- **Removed orphaned hardhat-era TypeScript tests** — `test/Phase1_CREATE2Factory.t.ts`, `test/Phase1_MultiL2ViewAggregator.t.ts`, `test/Phase2_InfrastructureContracts.t.ts`, `test/Phase3_BalanceAggregator.t.ts`. Not referenced by any npm script, Makefile, or CI (CI runs the foundry suite); their coverage is now provided by foundry tests.
 
 ### Changed
+
 
 - **`YieldOps` removed from the deploy chain** — the `YieldOps` contract is no longer deployed or registered during deployment. Deploy scripts `deploy/15`, `deploy/60`, `deploy/70`, `deploy/76`, and `deploy/95` no longer reference `YieldOps`; the ops deploy step now uses `--tags core,escrow-admin` (creation-policy, bond-collector, module-management, escrow-admin). Yield withdrawal/distribution is handled by `EscrowYield` and the yield modules (e.g. `AaveYieldModule`), which were already the active path; no existing on-chain dependency changes. Deployment guides updated accordingly.
 

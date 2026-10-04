@@ -55,13 +55,8 @@ The kernel of the protocol. All escrow lifecycle logic is rooted here.
 | `ModuleSnapshotRegistry.sol` | Stores per-escrow module snapshots (`ModuleSnapshot`); written once at `createEscrow()`, never mutated. |
 | `CREATE2EscrowFactory.sol` | Deterministic deployment of escrow contracts via CREATE2. |
 | `EscrowViewContract.sol` | Read-only view aggregator for off-chain tooling and frontends. |
-| `BalanceAggregator.sol` | Aggregates balances across multiple vaults. |
-| `MultiL2EscrowAggregator.sol` | Cross-L2 escrow state aggregation. |
 | `MultiL2ViewAggregator.sol` | Cross-L2 view queries. |
-| `MultiL2ModuleCoordinator.sol` | Module coordination across L2 deployments. |
 | `L2AddressRegistry.sol` | Registry of canonical contract addresses per L2 network. |
-| `RPCEndpointManager.sol` | On-chain registry of RPC endpoints for keeper automation. |
-| `MulticallFallbackHandler.sol` | EIP-1271-compatible multicall fallback for Safe wallets. |
 | `modules/DefaultResolutionModule.sol` | Simple resolution module for non-DR escrows (no incentives). |
 
 ### Ops contracts (`contracts/ops/`)
