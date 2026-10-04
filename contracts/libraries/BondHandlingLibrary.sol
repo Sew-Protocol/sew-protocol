@@ -125,6 +125,4 @@ library BondHandlingLibrary {
         );
         bondCollector.resetBondSpender(bondToken, address(incentiveMod));
     }
-
-    error TransferFailed(uint8 kind, address token, address to, uint256 amount);
 }

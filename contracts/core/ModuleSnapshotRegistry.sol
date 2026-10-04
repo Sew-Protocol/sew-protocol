@@ -77,9 +77,6 @@ contract ModuleSnapshotRegistry is AccessControl, SlowLaneQueueActivate {
     /// @notice Error when escrow contract is not registered
     error EscrowNotRegistered(address escrowContract);
     
-    /// @notice Error when yield module is already assigned to another escrow contract
-    error YieldModuleAlreadyAssigned(address yieldModule, address assignedEscrow);
-
     /**
      * @notice Deploy ModuleSnapshotRegistry with initial admin
      * @param initialAdmin Initial admin address (typically timelock)

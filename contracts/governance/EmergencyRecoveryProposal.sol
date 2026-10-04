@@ -106,7 +106,6 @@ contract EmergencyRecoveryProposal is AccessControl {
 
     // Custom errors
     error ProposalNotApproved(uint256 proposalId, RecoveryStatus currentStatus);
-    error NoActionsProvided();
     error TimelockDelayNotMet(uint256 approvedAt, uint256 currentTime);
     error OnlyGovernor(address caller);
     error InvalidRecoveryAction(RecoveryAction action);

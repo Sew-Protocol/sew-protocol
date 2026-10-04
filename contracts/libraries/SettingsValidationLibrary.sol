@@ -22,11 +22,6 @@ library SettingsValidationLibrary {
     uint256 public constant MIN_ESCROW_AMOUNT = 1000; // Minimum escrow amount (1000 wei)
     uint256 public constant MAX_ESCROW_DURATION = 365 days; // Maximum escrow duration (1 year)
 
-    error InvalidArrayLength(uint256 a, uint256 b);
-    error InvalidBpsSum(uint256 sum);
-    error TooManyRecipients(uint256 n, uint256 max);
-    error DuplicateRecipient(address recipient);
-
     /**
      * @dev Validate a single auto time value
      * @param autoTime The auto time to validate (0 means no auto time, which is valid)

@@ -107,7 +107,6 @@ contract L2AddressRegistry {
 
     // Errors
     error NotGovernor(address caller);
-    error InvalidRequiredSignatures(uint256 required, uint256 available);
     error ContractAlreadyRegistered(string contractName);
     error ContractNotRegistered(string contractName);
     error AddressNotFound(uint256 chainId, string contractName, string version);
