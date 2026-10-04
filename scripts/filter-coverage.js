@@ -1,11 +1,15 @@
 const fs = require('fs');
 const path = require('path');
 
-const inPath = path.join(process.cwd(), 'coverage', 'lcov.info');
+// forge coverage --report lcov writes lcov.info to the repo root (./lcov.info).
+// Accept that as the primary source, with coverage/lcov.info as a fallback.
+const inRoot = path.join(process.cwd(), 'lcov.info');
+const inCoverage = path.join(process.cwd(), 'coverage', 'lcov.info');
+const inPath = fs.existsSync(inRoot) ? inRoot : inCoverage;
 const outPath = path.join(process.cwd(), 'coverage', 'lcov.filtered.info');
 
 if (!fs.existsSync(inPath)) {
-  console.error('coverage/lcov.info not found. Run `forge coverage --report lcov` first.');
+  console.error('lcov.info not found. Run `forge coverage --report lcov` first.');
   process.exit(2);
 }
 
