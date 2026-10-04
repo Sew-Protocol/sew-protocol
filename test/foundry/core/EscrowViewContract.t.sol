@@ -709,4 +709,43 @@ contract EscrowViewContractTest is Test {
             assertEq(uint8(retrieved.yieldPreset), uint8(presets[i]));
         }
     }
+
+    function _createEscrowForBuyer() internal returns (uint256) {
+        token.transfer(buyer, INITIAL_AMOUNT);
+        vm.startPrank(buyer);
+        token.approve(address(vault), INITIAL_AMOUNT);
+        uint256 id = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, SettingsValidationLibrary.getDefaultSettings());
+        vm.stopPrank();
+        return id;
+    }
+
+    function test_getResolutionMode_resolutionModule() public {
+        uint256 workflowId = _createEscrowForBuyer();
+        assertEq(uint(escrowView.getResolutionMode(workflowId)), uint(ResolutionMode.RESOLUTION_MODULE));
+    }
+
+    function test_getResolutionMode_invalidWorkflow() public {
+        assertEq(uint(escrowView.getResolutionMode(9999)), uint(ResolutionMode.DIRECT));
+    }
+
+    function test_getActiveDisputeHandler_notDisputed() public {
+        uint256 workflowId = _createEscrowForBuyer();
+        assertEq(escrowView.getActiveDisputeHandler(workflowId), address(0));
+    }
+
+    function test_getConsensusStatus_pending() public {
+        uint256 workflowId = _createEscrowForBuyer();
+        CollaborationStatus memory status = escrowView.getConsensusStatus(workflowId);
+        assertFalse(status.senderAgreed);
+        assertFalse(status.recipientAgreed);
+        assertFalse(status.canFinalize);
+    }
+
+    function test_getUserEscrowStats_buyer() public {
+        _createEscrowForBuyer();
+        (uint256 asBuyer, uint256 asSeller, uint256 asResolver) = escrowView.getUserEscrowStats(buyer);
+        assertEq(asBuyer, 1);
+        assertEq(asSeller, 0);
+        assertEq(asResolver, 0);
+    }
 }
