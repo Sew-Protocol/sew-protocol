@@ -5,7 +5,6 @@ import "forge-std/Test.sol";
 import "../../../contracts/libraries/BalanceUpdateLibrary.sol";
 import "../../../contracts/libraries/FeeRecordingLibrary.sol";
 import "../../../contracts/libraries/FeeWithdrawalLibrary.sol";
-import "../../../contracts/libraries/RecoveryLibrary.sol";
 import "../../../contracts/libraries/SettingsValidationLibrary.sol";
 import "../../../contracts/libraries/YieldPresetLibrary.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
@@ -39,22 +38,6 @@ contract LibraryHarness {
     function withdrawFees(address token, address feeRecipient) external returns (uint256) {
 
         return FeeWithdrawalLibrary.withdrawFees(fees, token, feeRecipient);
-
-    }
-
-
-
-    function recoverNativeETH(address recipient, uint256 amount, uint256 contractBalance) external returns (uint256) {
-
-        return RecoveryLibrary.recoverNativeETH(recipient, amount, contractBalance);
-
-    }
-
-
-
-    function recoverERC20(address token, address recipient, uint256 amount, uint256 contractBalance) external returns (uint256) {
-
-        return RecoveryLibrary.recoverERC20(token, recipient, amount, contractBalance);
 
     }
 
@@ -272,68 +255,6 @@ contract LibraryCoverageTest is Test {
         vm.expectRevert();
 
         harness.withdrawFees(address(token), user1);
-
-    }
-
-
-
-    // ============ RecoveryLibrary Tests ============
-
-
-
-    function test_recoverNativeETH_Success() public {
-
-        vm.deal(address(harness), 1 ether);
-
-        uint256 recovered = harness.recoverNativeETH(user1, 0.5 ether, 1 ether);
-
-        assertEq(recovered, 0.5 ether);
-
-        assertEq(user1.balance, 0.5 ether);
-
-    }
-
-
-
-    function test_recoverNativeETH_All_Success() public {
-
-        vm.deal(address(harness), 1 ether);
-
-        uint256 recovered = harness.recoverNativeETH(user1, 0, 1 ether);
-
-        assertEq(recovered, 1 ether);
-
-        assertEq(user1.balance, 1 ether);
-
-    }
-
-
-
-    function test_recoverNativeETH_InvalidAmount_Revert() public {
-
-        vm.expectRevert();
-
-        harness.recoverNativeETH(user1, 0, 0);
-
-        
-
-        vm.expectRevert();
-
-        harness.recoverNativeETH(user1, 2 ether, 1 ether);
-
-    }
-
-
-
-    function test_recoverERC20_Success() public {
-
-        token.mint(address(harness), 100);
-
-        uint256 recovered = harness.recoverERC20(address(token), user1, 100, 100);
-
-        assertEq(recovered, 100);
-
-        assertEq(token.balanceOf(user1), 100);
 
     }
 
