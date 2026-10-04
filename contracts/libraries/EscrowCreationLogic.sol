@@ -24,9 +24,9 @@ import '../shared/interfaces/IResolutionModule.sol';
  *      then applies the derived result to escrow state. This keeps the
  *      derive -> result -> apply boundary.
  *
- *      NOTE: this library is not yet wired into production; it is introduced to
- *      establish differential equivalence against CreateOps before the runtime
- *      boundary is removed and policy ownership is decided.
+ *      NOTE: this library is wired into production — `EscrowCreation.computeEscrowCreation`
+ *      is the authoritative derivation path. Differential equivalence against the legacy
+ *      CreateOps reference is preserved in test/foundry/ops/CreationLogicEquivalence.t.sol.
  */
 library EscrowCreationLogic {
     uint256 private constant ESCROW_FEE_DENOMINATOR = 10000;
