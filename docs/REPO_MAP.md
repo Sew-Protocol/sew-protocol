@@ -50,7 +50,7 @@ The kernel of the protocol. All escrow lifecycle logic is rooted here.
 | `BaseEscrow.sol` | Abstract base for all escrow vaults. State machine, dispute lifecycle, module dispatch, CEI-safe settlement and release flows. All public functions are `nonReentrant`. |
 | `EscrowCreationPolicy.sol` | Shared protocol-wide creation policy (yield-deposit pause, resolver policy). No calculation. |
 | `EscrowVault.sol` | Concrete vault for native ERC-20 tokens. Extends `BaseEscrow`; adds per-token balance tracking, fee withdrawal, and accounting reconciliation. |
-| `EscrowableERC20.sol` | Placeholder ERC-20 vault variant; constructor reverts — not deployable in current release. |
+| `EscrowableERC20.sol` | ERC-20 token with built-in escrow vault functionality. Deployable (validated constructor params). |
 | `BondCollector.sol` | Collects and holds appeal bonds posted during dispute escalation. |
 | `ModuleSnapshotRegistry.sol` | Stores per-escrow module snapshots (`ModuleSnapshot`); written once at `createEscrow()`, never mutated. |
 | `CREATE2EscrowFactory.sol` | Deterministic deployment of escrow contracts via CREATE2. |
