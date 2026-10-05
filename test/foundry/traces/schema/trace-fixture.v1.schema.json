@@ -26,6 +26,31 @@
       "description": "Human-readable summary of what this trace exercises."
     },
 
+    "generated_by": {
+      "type": "string",
+      "description": "Simulator/model that produced this trace (e.g. 'resolver-sim/cdrs-0.2'). Deterministic provenance of the generator."
+    },
+
+    "sew_protocol_revision": {
+      "type": "string",
+      "description": "sew-protocol commit or tag this trace was generated against (e.g. 'appeal-primitive-v1-2026-10' or a commit hash). Stamped at sync time so it is clear which Solidity revision the expected behavior targets."
+    },
+
+    "sew_protocol_branch": {
+      "type": "string",
+      "description": "sew-protocol branch this trace targets (e.g. 'main' or 'appeal-primitive')."
+    },
+
+    "sew_protocol_tag": {
+      "type": "string",
+      "description": "sew-protocol tag resolved at the recorded revision (e.g. 'appeal-primitive-v1-2026-10'), for human readability. Authoritative identity is the commit SHA in sew_protocol_revision."
+    },
+
+    "resolver_sim_revision": {
+      "type": "string",
+      "description": "resolver-sim (model) commit SHA that generated this trace. Together with sew_protocol_revision this pins the exact model↔Solidity comparison."
+    },
+
     "phase": {
       "type": "string",
       "description": "Optional simulation phase label this trace was generated from (e.g. 'Z' for Phase Z legitimacy tests)."
