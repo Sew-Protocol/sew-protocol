@@ -372,7 +372,7 @@ class CrossL2IntentExecutor {
   }
   
   private async queryBalances(userAddress: string): Promise<Map<number, bigint>> {
-    // Use BalanceAggregator
+    // Use Multicall3 (canonical address) for batched balance reads
     return new Map();
   }
   

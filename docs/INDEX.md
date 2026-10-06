@@ -60,12 +60,9 @@ documentation organized by topic and use case. Paths are relative to `docs/`.
 **Integrating with wallets, frontend, and user experience**
 
 - [guides/WALLET_UX_README.md](./guides/WALLET_UX_README.md) - Wallet UX overview
-- [guides/WALLET_UX_QUICK_START.md](./guides/WALLET_UX_QUICK_START.md) - Quick start for wallet integration
-- [guides/WALLET_UX_MULTICHAIN_GUIDE.md](./guides/WALLET_UX_MULTICHAIN_GUIDE.md) - Multi-chain wallet guide
 - [guides/WALLET_INTEGRATION_GUIDE.md](./guides/WALLET_INTEGRATION_GUIDE.md) - Wallet integration guide
 - [guides/WALLET_INTEGRATION_QUICK_REF.md](./guides/WALLET_INTEGRATION_QUICK_REF.md) - Wallet integration quick reference
 - [guides/VIEM_WAGMI_QUICK_START.md](./guides/VIEM_WAGMI_QUICK_START.md) - Viem/Wagmi quick start
-- [guides/EXPO_INTEGRATION_GUIDE.md](./guides/EXPO_INTEGRATION_GUIDE.md) - Expo mobile app integration
 - [guides/ACCOUNT_ABSTRACTION_GUIDE.md](./guides/ACCOUNT_ABSTRACTION_GUIDE.md) - Account abstraction integration
 - [guides/KLEROS_INTEGRATION_GUIDE.md](./guides/KLEROS_INTEGRATION_GUIDE.md) - Kleros integration guide
 - [guides/CODING_STANDARDS.md](./guides/CODING_STANDARDS.md) - Solidity coding standards
@@ -155,10 +152,8 @@ security review checklists, naming reviews, and other pre-cleanup material) are 
 3. Review [deployment/RELEASES.md](./deployment/RELEASES.md)
 
 ### "I want to integrate a wallet"
-1. Start with [guides/WALLET_UX_QUICK_START.md](./guides/WALLET_UX_QUICK_START.md)
-2. Read [guides/VIEM_WAGMI_QUICK_START.md](./guides/VIEM_WAGMI_QUICK_START.md) for web3 libraries
-3. Check [guides/EXPO_INTEGRATION_GUIDE.md](./guides/EXPO_INTEGRATION_GUIDE.md) for mobile
-4. Review [guides/WALLET_INTEGRATION_GUIDE.md](./guides/WALLET_INTEGRATION_GUIDE.md)
+1. Read [guides/VIEM_WAGMI_QUICK_START.md](./guides/VIEM_WAGMI_QUICK_START.md) for web3 libraries
+2. Review [guides/WALLET_INTEGRATION_GUIDE.md](./guides/WALLET_INTEGRATION_GUIDE.md)
 
 ### "I want to understand the architecture"
 1. Read [overview/COMPLETE_SYSTEM_SUMMARY.md](./overview/COMPLETE_SYSTEM_SUMMARY.md)

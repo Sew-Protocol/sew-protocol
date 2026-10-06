@@ -296,7 +296,6 @@ complicates aggregate analysis and fee projection.
 | Bond token registry queue → activate | 7 days | `BondTokenRegistry.SLOW_DELAY` |
 | Insurance pool parameter queue → activate | 7 days | `InsurancePoolVault.SLOW_DELAY` |
 | Emergency recovery: approval → execution | 2 days | `EmergencyRecoveryProposal` |
-| Multi-L2 module coordinator activation | 48 hours minimum | `MultiL2ModuleCoordinator.MIN_ACTIVATION_DELAY` |
 | Escrow module snapshot | Permanent (creation-time freeze) | `BaseEscrow.moduleSnapshots` |
 
 ---

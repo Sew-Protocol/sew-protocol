@@ -135,7 +135,7 @@ async function getBalanceOnBase(userAddress: string): Promise<Balance> {
   const baseProvider = new ethers.JsonRpcProvider(process.env.RPC_BASE);
   
   const multicall = new ethers.Contract(
-    '0x5FF137D4b0FDCD49DcA30c7B57b04b0541c8F434', // multicall on base
+    '0xcA11bde05977b3631167028862bE2a173976CA11', // multicall on base
     [
       'function multicall(tuple(address target, bytes callData)[] calls) returns (tuple(bool success, bytes returnData)[] results)',
     ],
@@ -345,7 +345,7 @@ const optimismMainnet = {
   contracts: {
     escrow: '0x...',
     vault: '0x...',
-    multicall: '0x5FF137D4b0FDCD49DcA30c7B57b04b0541c8F434',
+    multicall: '0xcA11bde05977b3631167028862bE2a173976CA11',
   },
 };
 
@@ -357,7 +357,7 @@ const optimismSepolia = {
   contracts: {
     escrow: '0x...',
     vault: '0x...',
-    multicall: '0x5FF137D4b0FDCD49DcA30c7B57b04b0541c8F434',
+    multicall: '0xcA11bde05977b3631167028862bE2a173976CA11',
   },
 };
 ```
@@ -366,33 +366,37 @@ const optimismSepolia = {
 
 ## Part 4: Unified L2 Query Pattern
 
-### 4.1 Multi-L2 Aggregator with Chain-Specific Optimization
+### 4.1 Multi-L2 Query Pattern (client-side, via Multicall3)
+
+> Cross-L2 reads use **Multicall3** directly at its canonical address
+> (`0xcA11bde05977b3631167028862bE2a173976CA11`, an OP-Stack preinstall and the
+> standard on 250+ chains). No custom on-chain aggregator is required.
 
 ```typescript
 /**
- * Query balances across all L2s using chain-specific optimizations
+ * Query balances across all L2s by batching reads through the canonical Multicall3
  */
-class MultiL2BalanceAggregator {
+class MultiL2BalanceQuery {
   private chains = [
     {
       name: 'Base',
       chainId: 8453,
       rpcUrl: process.env.RPC_BASE,
-      multicall: '0x5FF137D4b0FDCD49DcA30c7B57b04b0541c8F434',
+      multicall: '0xcA11bde05977b3631167028862bE2a173976CA11',
       optimization: 'compress-calldata',
     },
     {
       name: 'Arbitrum',
       chainId: 42161,
       rpcUrl: process.env.RPC_ARBITRUM,
-      multicall: '0x5FF137D4b0FDCD49DcA30c7B57b04b0541c8F434',
+      multicall: '0xcA11bde05977b3631167028862bE2a173976CA11',
       optimization: 'batch-similar-ops',
     },
     {
       name: 'Optimism',
       chainId: 10,
       rpcUrl: process.env.RPC_OPTIMISM,
-      multicall: '0x5FF137D4b0FDCD49DcA30c7B57b04b0541c8F434',
+      multicall: '0xcA11bde05977b3631167028862bE2a173976CA11',
       optimization: 'standard',
     },
   ];

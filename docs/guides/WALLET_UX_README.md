@@ -232,7 +232,7 @@ Week 9-10:  Phase 5 Polish & Testing (~30h)
                │
 ┌──────────────▼──────────────────────┐
 │   Application Layer                 │
-│ (BalanceAggregator, ChainSelector)  │
+│ (Multicall3, ChainSelector)         │
 └──────────────┬──────────────────────┘
                │
 ┌──────────────▼──────────────────────┐
