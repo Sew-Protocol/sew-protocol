@@ -18,9 +18,9 @@
  },
   "schemaVersion": 1,
   "source": {
-   "commit": "unknown-local",
+   "commit": "ukqvkxyqpvpxzlolusynwzronwkqooqq",
    "commitOverride": false,
-   "commitSource": "unknown",
+   "commitSource": "jj",
    "dirty": true,
    "repository": "sew/sew-protocol"
  }
