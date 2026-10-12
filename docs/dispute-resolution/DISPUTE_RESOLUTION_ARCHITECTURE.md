@@ -384,10 +384,6 @@ The propagation calls `IBaseEscrowSettlement.releaseAsDisputeResolver` or
 during an open dispute. It emits `EvidenceSubmitted` with an IPFS hash or URL string. No on-chain
 validation of the evidence content is performed; the Kleros front-end indexes these events.
 
-`EvidenceModuleV1` provides an alternative on-chain evidence commitment layer: it stores
-`keccak256(evidenceContent)` in contract storage for lifecycle-gated, access-controlled evidence
-records. This is independent of the Kleros evidence submission path.
-
 #### 4.8.4 Finality
 
 `KlerosArbitrableProxy` implements `canEscalate` as a constant `(false, address(0), 0)` and
@@ -461,7 +457,6 @@ IResolutionModule (interface)      — pluggable resolution contract contract
 
 ModuleSnapshotRegistry             — default module management with slow-lane activation
 
-EvidenceModuleV1                   — on-chain evidence hash storage (optional, per-escrow)
 BondCollector                      — ERC-20 appeal bond custody
 BondHandlingLibrary                — ETH and ERC-20 bond handling helpers
 ```

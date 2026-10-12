@@ -386,7 +386,6 @@ library ValidationErrors {
    - `MockKlerosArbitrator.sol`
 
 2. Migrate other contracts:
-   - `EvidenceModuleV1.sol`
    - Governance contracts
 
 ---

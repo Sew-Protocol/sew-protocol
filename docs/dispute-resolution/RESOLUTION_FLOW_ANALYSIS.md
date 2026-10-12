@@ -16,7 +16,7 @@ This section captures the **table-stakes expectations** for any “court-like”
 - **Ordered evidence log**: append-only; clear cutoffs for when new evidence is admissible.
 - **Attestation plumbing**: the protocol supports attaching signed statements as evidence (even if v1 UX doesn’t expose it yet).
 
-**Status in repo:** Evidence is designed as a **module boundary** (`IEvidenceModule` / `EvidenceModuleV1`) and should be treated as a first-class primitive. This analysis doc focuses primarily on **finality discipline** (see below), but the settlement/finality work must not assume “evidence is a PDF upload”.
+**Status in repo:** Evidence is designed as a **module boundary** (`IEvidenceModule` interface) and should be treated as a first-class primitive. This analysis doc focuses primarily on **finality discipline** (see below), but the settlement/finality work must not assume “evidence is a PDF upload”.
 
 ### 2) Expert attestations (optional per category, but first-class)
 

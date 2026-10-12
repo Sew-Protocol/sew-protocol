@@ -206,7 +206,6 @@
 ### Core Libraries
 - **SettingsValidationLibrary**: Validates escrow configuration parameters
 - **EscrowEncodingLibrary**: Encoding/decoding for escrow data structures
-- **RecoveryLibrary**: Emergency recovery operations
 - **ModuleProposalLibrary**: Module swap proposals
 - **ResolverActionLibrary**: Resolver action processing
 - **StateManagementLibrary**: Escrow state transitions

@@ -110,11 +110,6 @@ These are swappable implementations registered in `ModuleRegistry`. Each deploym
 
 **Usage**: Each escrow selects one active resolution module. Can be changed via slow-lane governance.
 
-### Evidence Modules
-| Contract | Location | Purpose | Instantiation |
-|----------|----------|---------|----------------|
-| **EvidenceModuleV1** | `evidence-module/EvidenceModuleV1.sol` | Evidence management | 0 or 1 (optional) |
-
 ---
 
 ## Integration Contracts (Optional)

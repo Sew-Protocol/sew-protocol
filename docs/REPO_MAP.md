@@ -134,12 +134,6 @@ The DR v3 subsystem. Implements the full three-round escalation pipeline.
 | `IArbitrator.sol` | Kleros `IArbitrator` interface. |
 | `mocks/MockKlerosArbitrator.sol` | Mock Kleros arbitrator for testing. |
 
-### Evidence module (`contracts/evidence-module/`)
-
-| File | Role |
-|---|---|
-| `EvidenceModuleV1.sol` | On-chain evidence submission and retrieval for disputes. |
-
 ### Bridges (`contracts/bridges/`)
 
 | File | Role |
@@ -166,7 +160,6 @@ Extracted logic libraries (`using L for ...` or direct call pattern). Key librar
 | `BondHandlingLibrary.sol` | Appeal bond posting and release. |
 | `FeeRecordingLibrary.sol` | Protocol fee accrual. |
 | `FeeWithdrawalLibrary.sol` | Fee withdrawal CEI pattern. |
-| `RecoveryLibrary.sol` | Token recovery (excess balance extraction). |
 | `ProtocolMathLibrary.sol` | Shared fixed-point math. |
 | `BalanceUpdateLibrary.sol` | Balance update coordination. |
 | `YieldPresetLibrary.sol` | Yield preset selection and configuration. |
