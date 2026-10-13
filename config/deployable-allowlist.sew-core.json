@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "packageName": "@sew/deployables",
+  "bundleVersion": "0.1.1",
+  "buildArtifactSource": "forge",
+  "buildProfile": "sew-core",
+  "entries": [
+    {
+      "artifactName": "TimelockController",
+      "contractName": "TimelockController",
+      "sourcePath": "node_modules/@openzeppelin/contracts/governance/TimelockController.sol",
+      "origin": "openzeppelin",
+      "scopeHint": "shared",
+      "category": "governance",
+      "notes": "Minimal timelock authority for Sew core; source/version is pinned by the Sew lockfile."
+    },
+    {
+      "artifactName": "EscrowVaultAccountingLibrary",
+      "contractName": "EscrowVaultAccountingLibrary",
+      "sourcePath": "contracts/libraries/EscrowVaultAccountingLibrary.sol",
+      "scopeHint": "sew",
+      "category": "library",
+      "notes": "Fully qualified linked library required by EscrowVault."
+    },
+    {
+      "artifactName": "ModuleSnapshotRegistry",
+      "contractName": "ModuleSnapshotRegistry",
+      "sourcePath": "contracts/core/ModuleSnapshotRegistry.sol",
+      "scopeHint": "sew",
+      "category": "infra",
+      "notes": "Per-vault module registry for release and resolution snapshots."
+    },
+    {
+      "artifactName": "DefaultResolutionModule",
+      "contractName": "DefaultResolutionModule",
+      "sourcePath": "contracts/modules/DefaultResolutionModule.sol",
+      "scopeHint": "sew",
+      "category": "resolution",
+      "notes": "Single-resolver default topology; no bonded escalation or appeals."
+    },
+    {
+      "artifactName": "DefaultReleaseStrategy",
+      "contractName": "DefaultReleaseStrategy",
+      "sourcePath": "contracts/modules/DefaultReleaseStrategy.sol",
+      "scopeHint": "sew",
+      "category": "core",
+      "notes": "Default participant-authorized escrow release strategy."
+    },
+    {
+      "artifactName": "EscrowCreationPolicy",
+      "contractName": "EscrowCreationPolicy",
+      "sourcePath": "contracts/core/EscrowCreationPolicy.sol",
+      "scopeHint": "sew",
+      "category": "core",
+      "notes": "Mandatory escrow creation policy."
+    },
+    {
+      "artifactName": "EscrowVault",
+      "contractName": "EscrowVault",
+      "sourcePath": "contracts/core/EscrowVault.sol",
+      "scopeHint": "sew",
+      "category": "core",
+      "notes": "Vault artifact includes guardian intake pause; existing escrow settlement remains available while paused."
+    }
+  ]
+}

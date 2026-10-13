@@ -33,6 +33,7 @@ abstract contract EscrowCreation is ReentrancyGuard, EscrowConfiguration {
         uint256 requestedResolutionConfigVersion, bool explicitResolutionConfigSelection)
         internal returns (uint256)
     {
+        _requireNotPaused();
         uint256 workflowId = escrowTransfers.length;
         if (address(creationPolicy) == address(0)) revert ZeroCreationPolicy();
         IResolutionModule resolutionModule = _getResolutionModule(workflowId);

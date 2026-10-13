@@ -39,7 +39,7 @@ contract DefaultCancellationStrategyTest is Test {
 
     // ============ Test: Initial State ============
     function test_InitialStateHasNoPendingCancel() public view {
-        address pending = strategy.pendingCancel(WORKFLOW_ID);
+        address pending = strategy.pendingCancel(address(this), WORKFLOW_ID);
         assertEq(pending, address(0), "Should have no pending cancel initially");
     }
 
@@ -71,7 +71,7 @@ contract DefaultCancellationStrategyTest is Test {
         assertTrue(senderCanInitiate, "Sender can initiate");
 
         strategy.onCancelAttempt(WORKFLOW_ID, sender, true);
-        address pending = strategy.pendingCancel(WORKFLOW_ID);
+        address pending = strategy.pendingCancel(address(this), WORKFLOW_ID);
         assertEq(pending, sender, "Sender should be recorded as pending");
 
         // Recipient completes
@@ -79,7 +79,7 @@ contract DefaultCancellationStrategyTest is Test {
         assertTrue(recipientCanComplete, "Recipient can complete cancel initiated by sender");
 
         strategy.onCancelAttempt(WORKFLOW_ID, recipient, true);
-        pending = strategy.pendingCancel(WORKFLOW_ID);
+        pending = strategy.pendingCancel(address(this), WORKFLOW_ID);
         assertEq(pending, address(0), "Pending should be cleared after successful completion");
     }
 
@@ -92,7 +92,7 @@ contract DefaultCancellationStrategyTest is Test {
         assertTrue(recipientCanInitiate, "Recipient can initiate");
 
         strategy.onCancelAttempt(WORKFLOW_ID, recipient, true);
-        address pending = strategy.pendingCancel(WORKFLOW_ID);
+        address pending = strategy.pendingCancel(address(this), WORKFLOW_ID);
         assertEq(pending, recipient, "Recipient should be recorded as pending");
 
         // Sender completes
@@ -100,7 +100,7 @@ contract DefaultCancellationStrategyTest is Test {
         assertTrue(senderCanComplete, "Sender can complete cancel initiated by recipient");
 
         strategy.onCancelAttempt(WORKFLOW_ID, sender, true);
-        pending = strategy.pendingCancel(WORKFLOW_ID);
+        pending = strategy.pendingCancel(address(this), WORKFLOW_ID);
         assertEq(pending, address(0), "Pending should be cleared");
     }
 
@@ -135,7 +135,7 @@ contract DefaultCancellationStrategyTest is Test {
         // Sender attempts but fails
         strategy.onCancelAttempt(WORKFLOW_ID, sender, false);
 
-        address pending = strategy.pendingCancel(WORKFLOW_ID);
+        address pending = strategy.pendingCancel(address(this), WORKFLOW_ID);
         assertEq(pending, address(0), "Failed cancel should not record pending");
 
         // Both parties should still be able to initiate
@@ -152,13 +152,13 @@ contract DefaultCancellationStrategyTest is Test {
 
         // Sender initiates successfully
         strategy.onCancelAttempt(WORKFLOW_ID, sender, true);
-        address pending = strategy.pendingCancel(WORKFLOW_ID);
+        address pending = strategy.pendingCancel(address(this), WORKFLOW_ID);
         assertEq(pending, sender, "Sender recorded as pending");
 
         // Recipient's completion fails
         strategy.onCancelAttempt(WORKFLOW_ID, recipient, false);
 
-        pending = strategy.pendingCancel(WORKFLOW_ID);
+        pending = strategy.pendingCancel(address(this), WORKFLOW_ID);
         assertEq(pending, sender, "Pending should still be sender after failed completion");
 
         // Recipient should still be able to try again
@@ -178,15 +178,15 @@ contract DefaultCancellationStrategyTest is Test {
         strategy.onCancelAttempt(WORKFLOW_ID + 1, recipient, true);
 
         // Check both are recorded separately
-        assertEq(strategy.pendingCancel(WORKFLOW_ID), sender);
-        assertEq(strategy.pendingCancel(WORKFLOW_ID + 1), recipient);
+        assertEq(strategy.pendingCancel(address(this), WORKFLOW_ID), sender);
+        assertEq(strategy.pendingCancel(address(this), WORKFLOW_ID + 1), recipient);
 
         // Workflow 1: recipient completes
         strategy.onCancelAttempt(WORKFLOW_ID, recipient, true);
 
         // Workflow 2 should still have pending
-        assertEq(strategy.pendingCancel(WORKFLOW_ID), address(0));
-        assertEq(strategy.pendingCancel(WORKFLOW_ID + 1), recipient);
+        assertEq(strategy.pendingCancel(address(this), WORKFLOW_ID), address(0));
+        assertEq(strategy.pendingCancel(address(this), WORKFLOW_ID + 1), recipient);
     }
 
     // ============ Test: Recipient cannot cancel without being in the transfer ============
@@ -218,19 +218,19 @@ contract DefaultCancellationStrategyTest is Test {
         // First cycle: sender initiates, recipient completes
         strategy.onCancelAttempt(WORKFLOW_ID, sender, true);
         strategy.onCancelAttempt(WORKFLOW_ID, recipient, true);
-        assertEq(strategy.pendingCancel(WORKFLOW_ID), address(0));
+        assertEq(strategy.pendingCancel(address(this), WORKFLOW_ID), address(0));
 
         // Second cycle: recipient initiates, sender completes (should work the same way)
         bool recipientCanInitiate = strategy.canCancel(WORKFLOW_ID, recipient, et);
         assertTrue(recipientCanInitiate, "Recipient should be able to initiate new cancel");
 
         strategy.onCancelAttempt(WORKFLOW_ID, recipient, true);
-        assertEq(strategy.pendingCancel(WORKFLOW_ID), recipient);
+        assertEq(strategy.pendingCancel(address(this), WORKFLOW_ID), recipient);
 
         bool senderCanComplete = strategy.canCancel(WORKFLOW_ID, sender, et);
         assertTrue(senderCanComplete, "Sender should be able to complete");
 
         strategy.onCancelAttempt(WORKFLOW_ID, sender, true);
-        assertEq(strategy.pendingCancel(WORKFLOW_ID), address(0));
+        assertEq(strategy.pendingCancel(address(this), WORKFLOW_ID), address(0));
     }
 }

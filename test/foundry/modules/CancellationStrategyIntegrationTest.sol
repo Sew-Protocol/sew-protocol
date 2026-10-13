@@ -142,6 +142,36 @@ contract CancellationStrategyIntegrationTest is Test {
         assertEq(uint8(state), uint8(EscrowState.REFUNDED), "Should be refunded");
     }
 
+    function test_externalCallerCannotPreseedVaultStrategyState() public {
+        _setStrategy(address(cancellationStrategy));
+
+        vm.prank(sender);
+        token.approve(address(vault), 100e18);
+
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
+        settings.yieldPreset = YieldPreset.OFF;
+
+        vm.prank(sender);
+        uint256 wid = vault.createEscrow(address(token), recipient, 100e18, settings);
+
+        address attacker = address(0xDEAD);
+        vm.prank(attacker);
+        cancellationStrategy.onCancelAttempt(wid, recipient, true);
+
+        assertEq(cancellationStrategy.pendingCancel(attacker, wid), recipient);
+        assertEq(cancellationStrategy.pendingCancel(address(vault), wid), address(0));
+
+        vm.prank(sender);
+        vault.senderCancel(wid);
+        (,,,,,,, EscrowState state,,) = vault.escrowTransfers(wid);
+        assertEq(uint8(state), uint8(EscrowState.PENDING), "Forged consent must not cancel the escrow");
+
+        vm.prank(recipient);
+        vault.recipientCancel(wid);
+        (,,,,,,, state,,) = vault.escrowTransfers(wid);
+        assertEq(uint8(state), uint8(EscrowState.REFUNDED), "Both actual participants must consent");
+    }
+
     /**
      * @notice Test that non-participant cannot cancel
      */

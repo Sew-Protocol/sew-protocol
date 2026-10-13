@@ -11,7 +11,10 @@ abstract contract EscrowConfiguration is AccessControl, EscrowStorage {
     error InvalidEscrowFee(uint256 fee, uint256 maxFee);
     error FeeExceedsMaximum(uint256 feeBps, uint256 maxFeeBps);
     error InvalidConfig(uint8 code, uint256 value);
-    error PausedNotSupported();
+    error AlreadyPausedCannotRepause();
+    error NotPaused();
+    error EnforcedPause();
+    error UnauthorizedPauseCaller(address caller);
     error ZeroBondCollector();
     event YieldProtocolFeeBpsUpdated(uint256 oldFeeBps, uint256 newFeeBps);
     event AppealBondProtocolFeeBpsUpdated(uint256 oldFeeBps, uint256 newFeeBps);
@@ -24,14 +27,52 @@ abstract contract EscrowConfiguration is AccessControl, EscrowStorage {
     event EscrowFeeBpsUpdated(uint256 oldFeeBps, uint256 newFeeBps);
     event CreationPolicyUpdated(address indexed oldPolicy, address indexed newPolicy);
     event BondCollectorUpdated(address indexed oldCollector, address indexed newCollector);
+    event IncidentPauseTriggered(string reason, uint256 timestamp, uint256 pauseCycleCount);
+    event SystemResumed(uint256 timestamp);
 
-    function pause(string calldata) external pure { revert PausedNotSupported(); }
-    function unpause() external pure { revert PausedNotSupported(); }
-    function paused() external pure returns (bool) { return false; }
-    function pauseState() external pure returns (uint256, uint256, uint256, uint256) {
-        return (0, 0, 0, 0);
+    /// @notice Stop creation of new escrows during an incident.
+    /// @dev Existing escrow settlement, disputes, claims and withdrawals remain available.
+    ///      The guardian can only pause; governance timelock controls recovery.
+    function pause(string calldata reason) external {
+        if (!hasRole(ROLE_GUARDIAN, _msgSender()) && !hasRole(ROLE_TIMELOCK, _msgSender())) {
+            revert UnauthorizedPauseCaller(_msgSender());
+        }
+        if (emergencyPaused) revert AlreadyPausedCannotRepause();
+        emergencyPaused = true;
+        pauseStartedAt = block.timestamp;
+        pauseCycles += 1;
+        emit IncidentPauseTriggered(reason, block.timestamp, pauseCycles);
     }
-    function pauseCycleCount() external pure returns (uint256) { return 0; }
+
+    /// @notice Resume new escrow creation after governance reviews the incident.
+    function unpause() external onlyRole(ROLE_TIMELOCK) {
+        if (!emergencyPaused) revert NotPaused();
+        accumulatedPausedDuration += block.timestamp - pauseStartedAt;
+        emergencyPaused = false;
+        pauseStartedAt = 0;
+        lastUnpausedAt = block.timestamp;
+        emit SystemResumed(block.timestamp);
+    }
+
+    function paused() external view returns (bool) { return emergencyPaused; }
+
+    /// @return pausedAt Current pause start, or zero when not paused.
+    /// @return unpausedAt Most recent resume timestamp, or zero before first resume.
+    /// @return cycleCount Number of pause cycles since the last cycle reset.
+    /// @return lastResetAt Timestamp of the most recent cycle reset (zero until reset).
+    function pauseState() external view returns (uint256 pausedAt, uint256 unpausedAt, uint256 cycleCount, uint256 lastResetAt) {
+        return (pauseStartedAt, lastUnpausedAt, pauseCycles, 0);
+    }
+
+    function pauseCycleCount() external view returns (uint256) { return pauseCycles; }
+
+    function totalPausedDuration() external view returns (uint256) {
+        return accumulatedPausedDuration + (emergencyPaused ? block.timestamp - pauseStartedAt : 0);
+    }
+
+    function _requireNotPaused() internal view {
+        if (emergencyPaused) revert EnforcedPause();
+    }
 
     function setFeeRecipient(address newAddr) external onlyRole(ROLE_ADMIN_CONTRACT) {
         if (newAddr == address(0)) revert InvalidAddress(ADDR_FEE_RECIPIENT, newAddr);

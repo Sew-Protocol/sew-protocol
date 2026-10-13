@@ -76,6 +76,7 @@ export function exportDeployables(opts: ExportOptions = {}): ExportResult {
     const exported: ExportedArtifactFile = {
       name: entry.artifactName,
       contractName: entry.contractName,
+      fullyQualifiedName: `${entry.sourcePath}:${entry.contractName}`,
       sourcePath: entry.sourcePath,
       origin: entry.origin,
       scopeHint: entry.scopeHint,
@@ -99,6 +100,7 @@ export function exportDeployables(opts: ExportOptions = {}): ExportResult {
 
     manifestArtifacts[entry.artifactName] = {
       contractName: entry.contractName,
+      fullyQualifiedName: `${entry.sourcePath}:${entry.contractName}`,
       sourcePath: entry.sourcePath,
       origin: entry.origin,
       scopeHint: entry.scopeHint,

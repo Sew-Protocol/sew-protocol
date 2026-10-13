@@ -5,6 +5,7 @@ import "forge-std/Test.sol";
 import "./AppealWindowEnforcement.t.sol";
 import "../../../contracts/shared/interfaces/IResolutionModule.sol";
 import "../../../contracts/libraries/EscrowEncodingLibrary.sol";
+import "../decentralized-resolution-module/mocks/MockIncentiveModule.sol";
 
 /// @dev Focused closure tests for the quote-bound BaseEscrow appeal composition.
 contract AppealAuthoritativePathTest is AppealWindowEnforcementTest {
@@ -1372,5 +1373,152 @@ contract AppealAuthoritativePathTest is AppealWindowEnforcementTest {
         assertEq(escrow.addressEscalationCount(buyer), 0);
         assertEq(escrow.claimableBondProtocolFees(address(token), feeAddress), 0);
         assertEq(token.balanceOf(address(bondCollector)), 0);
+    }
+
+    function _openRoundOneDecisionFailureCase() internal returns (uint256 workflowId, address roundOneResolver) {
+        workflowId = createEscrow();
+        raiseDispute(workflowId);
+        bytes memory data = _escrowData(workflowId);
+        (address resolver,) = resolutionModule.getDisputeResolver(workflowId, address(escrow), data);
+        vm.prank(resolver);
+        escrow.releaseAsDisputeResolver(workflowId, bytes32(0));
+
+        (uint256 bond,) = resolutionModule.getRequiredAppealBond(workflowId, address(escrow), 0, data);
+        vm.prank(buyer);
+        token.approve(address(escrow), bond);
+        vm.prank(buyer);
+        escrow.escalateDispute(workflowId);
+        (roundOneResolver,) = resolutionModule.getDisputeResolver(workflowId, address(escrow), data);
+    }
+
+    function test_failedMandatoryDecisionRecordingRollsBackAndAllowsRetry() public {
+        (uint256 workflowId, address resolver) = _openRoundOneDecisionFailureCase();
+        ResolverIncentiveModule.AppealBondRecord memory bondBefore =
+            incentiveModule.getAppealBond(workflowId, address(escrow), 1);
+        assertGt(bondBefore.amount, 0);
+        assertFalse(bondBefore.distributed);
+
+        MockIncentiveModule revertingDependency = new MockIncentiveModule();
+        revertingDependency.setRevertOnDistributeAppealBond(true);
+        vm.prank(timelock);
+        resolutionModule.setIncentiveModule(address(revertingDependency));
+
+        uint256 escrowBalanceBefore = token.balanceOf(address(escrow));
+        uint256 sellerBalanceBefore = token.balanceOf(seller);
+        uint256 bondCollectorBalanceBefore = token.balanceOf(address(bondCollector));
+        uint256 incentiveBalanceBefore = token.balanceOf(address(incentiveModule));
+        uint256 paidToResolversBefore = incentiveModule.totalBondsPaidToResolvers();
+        uint256 claimableBefore = incentiveModule.getClaimablePayment(workflowId, address(escrow), resolver1);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                bytes4(keccak256("ResolutionDecisionRecordingFailed(uint256,address)")),
+                workflowId,
+                address(resolutionModule)
+            )
+        );
+        vm.prank(resolver);
+        escrow.releaseAsDisputeResolver(workflowId, bytes32(0));
+
+        assertEq(resolutionModule.getDecisionAtRound(workflowId, address(escrow), 1), 0);
+        (bool pending, bool isRelease,,) = escrow.pendingSettlements(workflowId);
+        assertFalse(pending);
+        assertFalse(isRelease);
+        assertEq(uint8(escrow.getEscrowState(workflowId)), uint8(EscrowState.DISPUTED));
+        assertEq(token.balanceOf(address(escrow)), escrowBalanceBefore);
+        assertEq(token.balanceOf(seller), sellerBalanceBefore);
+        assertEq(token.balanceOf(address(bondCollector)), bondCollectorBalanceBefore);
+        assertEq(token.balanceOf(address(incentiveModule)), incentiveBalanceBefore);
+        assertEq(escrow.claimableBalances(workflowId, seller), 0);
+        assertEq(resolutionModule.getDecisionAtRound(workflowId, address(escrow), 0), 1);
+
+        ResolverIncentiveModule.AppealBondRecord memory bondAfter =
+            incentiveModule.getAppealBond(workflowId, address(escrow), 1);
+        assertEq(bondAfter.amount, bondBefore.amount);
+        assertFalse(bondAfter.distributed);
+        assertEq(incentiveModule.totalBondsPaidToResolvers(), paidToResolversBefore);
+        assertEq(
+            incentiveModule.getClaimablePayment(workflowId, address(escrow), resolver1),
+            claimableBefore
+        );
+
+        vm.prank(timelock);
+        resolutionModule.setIncentiveModule(address(incentiveModule));
+        vm.prank(resolver);
+        assertTrue(escrow.releaseAsDisputeResolver(workflowId, bytes32(0)));
+        assertEq(resolutionModule.getDecisionAtRound(workflowId, address(escrow), 1), 1);
+        (pending, isRelease,,) = escrow.pendingSettlements(workflowId);
+        assertTrue(pending);
+        assertTrue(isRelease);
+        bondAfter = incentiveModule.getAppealBond(workflowId, address(escrow), 1);
+        assertEq(bondAfter.amount, 0);
+        assertTrue(bondAfter.distributed);
+        assertEq(incentiveModule.totalBondsPaidToResolvers(), paidToResolversBefore + bondBefore.amount);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                bytes4(keccak256("ResolutionDecisionRecordingFailed(uint256,address)")),
+                workflowId,
+                address(resolutionModule)
+            )
+        );
+        vm.prank(resolver);
+        escrow.releaseAsDisputeResolver(workflowId, bytes32(0));
+        assertEq(resolutionModule.getDecisionAtRound(workflowId, address(escrow), 1), 1);
+        bondAfter = incentiveModule.getAppealBond(workflowId, address(escrow), 1);
+        assertEq(bondAfter.amount, 0);
+        assertTrue(bondAfter.distributed);
+        assertEq(incentiveModule.totalBondsPaidToResolvers(), paidToResolversBefore + bondBefore.amount);
+    }
+
+    function test_optionalDecisionTelemetryFailureDoesNotBlockResolution() public {
+        uint256 workflowId = createEscrow();
+        raiseDispute(workflowId);
+        (address resolver,) = resolutionModule.getDisputeResolver(
+            workflowId, address(escrow), _escrowData(workflowId)
+        );
+        MockIncentiveModule revertingTelemetry = new MockIncentiveModule();
+        revertingTelemetry.setRevertOnDecisionTelemetry(true);
+        vm.prank(timelock);
+        resolutionModule.setIncentiveModule(address(revertingTelemetry));
+
+        vm.prank(resolver);
+        assertTrue(escrow.releaseAsDisputeResolver(workflowId, bytes32(0)));
+        assertEq(resolutionModule.getDecisionAtRound(workflowId, address(escrow), 0), 1);
+        (bool pending, bool isRelease,,) = escrow.pendingSettlements(workflowId);
+        assertTrue(pending);
+        assertTrue(isRelease);
+    }
+
+    function test_resolutionCallbackCannotReenterEscrowDecision() public {
+        uint256 workflowId = createEscrow();
+        raiseDispute(workflowId);
+        (address resolver,) = resolutionModule.getDisputeResolver(
+            workflowId, address(escrow), _escrowData(workflowId)
+        );
+
+        MockIncentiveModule callbackModule = new MockIncentiveModule();
+        callbackModule.setDecisionCallback(
+            address(escrow),
+            abi.encodeWithSignature("releaseAsDisputeResolver(uint256,bytes32)", workflowId, bytes32(0))
+        );
+        vm.prank(timelock);
+        resolutionModule.setIncentiveModule(address(callbackModule));
+
+        vm.prank(resolver);
+        assertTrue(escrow.releaseAsDisputeResolver(workflowId, bytes32(0)));
+
+        assertTrue(callbackModule.decisionCallbackAttempted());
+        assertFalse(callbackModule.decisionCallbackSucceeded());
+        bytes memory callbackError = callbackModule.decisionCallbackRevertData();
+        assertEq(
+            bytes4(callbackError),
+            bytes4(keccak256("ReentrancyGuardReentrantCall()")),
+            "nested decision rejected by escrow reentrancy guard"
+        );
+        assertEq(resolutionModule.getDecisionAtRound(workflowId, address(escrow), 0), 1);
+        (bool pending, bool isRelease,,) = escrow.pendingSettlements(workflowId);
+        assertTrue(pending);
+        assertTrue(isRelease);
     }
 }

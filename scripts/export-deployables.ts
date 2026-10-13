@@ -9,7 +9,7 @@
  * Usage:
  *   pnpm deployables:export
  *   SEW_SOURCE_COMMIT=<sha> pnpm deployables:export   # optional commit override
- *   pnpm deployables:export -- <allowlist-path> [export-dir]   # non-default profile/bundle
+ *   pnpm deployables:export -- <allowlist-path> [export-dir] [--out-dir <forge-output>]
  */
 import * as path from 'path';
 import { exportDeployables, DEFAULT_EXPORT_DIR, DEFAULT_OUT_DIR } from './_lib/deployables/export';
@@ -19,12 +19,23 @@ import { loadAllowlist, DEFAULT_ALLOWLIST_PATH } from './_lib/deployables/allowl
 function main(): void {
   let allowlistPath: string | undefined;
   let exportDir: string | undefined;
+  let outDir: string | undefined;
 
   const pos = process.argv.indexOf('--');
   if (pos >= 0) {
-    const args = process.argv.slice(pos + 1).filter((a) => a.length > 0 && !a.startsWith('-'));
-    allowlistPath = args[0] ? path.resolve(args[0]) : DEFAULT_ALLOWLIST_PATH;
-    exportDir = args[1] ? path.resolve(args[1]) : undefined;
+    const positional: string[] = [];
+    const args = process.argv.slice(pos + 1);
+    for (let i = 0; i < args.length; i++) {
+      const arg = args[i]!;
+      if (arg === '--out-dir') {
+        const value = args[++i];
+        if (!value) throw new Error('--out-dir requires a path');
+        outDir = path.resolve(value);
+      } else if (!arg.startsWith('-')) positional.push(arg);
+      else throw new Error(`Unknown argument '${arg}'`);
+    }
+    allowlistPath = positional[0] ? path.resolve(positional[0]) : DEFAULT_ALLOWLIST_PATH;
+    exportDir = positional[1] ? path.resolve(positional[1]) : undefined;
   }
 
   const allowlist = loadAllowlist(allowlistPath ?? DEFAULT_ALLOWLIST_PATH);
@@ -37,7 +48,7 @@ function main(): void {
     );
   }
 
-  const result = exportDeployables({ allowlist, exportDir: resolvedExportDir });
+  const result = exportDeployables({ allowlist, exportDir: resolvedExportDir, outDir: outDir ?? DEFAULT_OUT_DIR });
   // Immediately validate what we just exported.
   validateDeployables({ allowlist, exportDir: result.exportDir });
 

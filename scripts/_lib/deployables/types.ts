@@ -57,6 +57,7 @@ export interface ForgeArtifact {
 
 export interface ManifestArtifactRecord {
   contractName: string;
+  fullyQualifiedName: string;
   sourcePath: string;
   origin?: 'sew' | 'openzeppelin' | 'safe';
   scopeHint: ScopeHint;
@@ -98,6 +99,7 @@ export interface Manifest {
 export interface ExportedArtifactFile {
   name: string;
   contractName: string;
+  fullyQualifiedName: string;
   sourcePath: string;
   origin?: 'sew' | 'openzeppelin' | 'safe';
   scopeHint: ScopeHint;

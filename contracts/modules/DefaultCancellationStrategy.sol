@@ -20,7 +20,10 @@ contract DefaultCancellationStrategy is ICancellationStrategy {
 
     /// @notice Track which party has initiated cancellation for each escrow
     /// @dev address(0) = no pending cancel, otherwise = address of initiating party
-    mapping(uint256 => address) public pendingCancel;
+    // Escrow ids are only unique within a vault. Key the consent state by the
+    // calling escrow as well so a shared strategy cannot mix workflows across
+    // vaults, and so external callers cannot pre-seed a vault's consent state.
+    mapping(address => mapping(uint256 => address)) public pendingCancel;
 
     error NotAuthorizedToCancelYet(uint256 workflowId, address caller);
 
@@ -39,7 +42,7 @@ contract DefaultCancellationStrategy is ICancellationStrategy {
             return false;
         }
 
-        address pending = pendingCancel[workflowId];
+        address pending = pendingCancel[msg.sender][workflowId];
         
         if (pending == address(0)) {
             // No pending cancel yet - first caller can always initiate
@@ -68,18 +71,18 @@ contract DefaultCancellationStrategy is ICancellationStrategy {
         address caller,
         bool isSuccess
     ) external {
-        address pending = pendingCancel[workflowId];
+        address pending = pendingCancel[msg.sender][workflowId];
 
         if (pending == address(0)) {
             // First caller - record them if successful
             if (isSuccess) {
-                pendingCancel[workflowId] = caller;
+                pendingCancel[msg.sender][workflowId] = caller;
                 emit CancellationAttemptRecorded(workflowId, caller, 1);
             }
         } else {
             // Second caller - clear on success (cancel executed)
             if (isSuccess) {
-                delete pendingCancel[workflowId];
+                delete pendingCancel[msg.sender][workflowId];
                 emit CancellationAttemptRecorded(workflowId, caller, 0);
             }
             // If unsuccessful, keep pending state (allow retry)

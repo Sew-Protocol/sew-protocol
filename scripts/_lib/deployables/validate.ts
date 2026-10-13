@@ -74,7 +74,11 @@ export function validateDeployables(opts: {
   // --- per-artifact integrity ---------------------------------------------------
   for (const entry of allowlist.entries) {
     const record = manifest.artifacts[entry.artifactName]!;
-    verifyArtifact(entry.artifactName, record, exportDir, fail);
+    const expectedFqn = `${entry.sourcePath}:${entry.contractName}`;
+    if (record.fullyQualifiedName !== expectedFqn) {
+      fail('ARTIFACT_FQN_MISMATCH', `Manifest FQN for '${entry.artifactName}' must be '${expectedFqn}'`);
+    }
+    verifyArtifact(entry.artifactName, expectedFqn, record, exportDir, fail);
     issues.push({ code: 'ARTIFACT_OK', message: `artifact '${entry.artifactName}' verified` });
   }
 
@@ -83,6 +87,7 @@ export function validateDeployables(opts: {
 
 function verifyArtifact(
   artifactName: string,
+  expectedFqn: string,
   record: ManifestArtifactRecord,
   exportDir: string,
   fail: (code: string, message: string, details?: Record<string, unknown>) => never,
@@ -106,6 +111,10 @@ function verifyArtifact(
 
   normalizeBytecode(exported.bytecode);
   normalizeBytecode(exported.deployedBytecode);
+
+  if (exported.fullyQualifiedName !== expectedFqn) {
+    fail('ARTIFACT_FQN_MISMATCH', `Artifact FQN for '${artifactName}' must be '${expectedFqn}'`);
+  }
 
   const abiSha = sha256Hex(canonicalJson(exported.abi));
   if (abiSha !== record.abiSha256) {

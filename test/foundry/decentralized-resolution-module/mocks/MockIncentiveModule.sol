@@ -10,6 +10,8 @@ import '../../../../contracts/modules/decentralized-resolution-module/Decentrali
  */
 contract MockIncentiveModule is IIncentiveModule {
     error RecordAppealBondReverted();
+    error DistributeAppealBondReverted();
+    error DecisionTelemetryReverted();
 
     mapping(uint256 => bool) public onDisputeOpenedCalled;
     mapping(uint256 => uint256) public recordedWorkflowId;
@@ -18,9 +20,29 @@ contract MockIncentiveModule is IIncentiveModule {
     mapping(uint256 => uint256) public recordedEscrowFee;
     mapping(uint256 => uint8) public recordedRound;
     bool public revertOnRecordAppealBond;
+    bool public revertOnDistributeAppealBond;
+    bool public revertOnDecisionTelemetry;
+    address public decisionCallbackTarget;
+    bytes public decisionCallbackData;
+    bool public decisionCallbackAttempted;
+    bool public decisionCallbackSucceeded;
+    bytes public decisionCallbackRevertData;
 
     function setRevertOnRecordAppealBond(bool shouldRevert) external {
         revertOnRecordAppealBond = shouldRevert;
+    }
+
+    function setRevertOnDistributeAppealBond(bool shouldRevert) external {
+        revertOnDistributeAppealBond = shouldRevert;
+    }
+
+    function setRevertOnDecisionTelemetry(bool shouldRevert) external {
+        revertOnDecisionTelemetry = shouldRevert;
+    }
+
+    function setDecisionCallback(address target, bytes calldata data) external {
+        decisionCallbackTarget = target;
+        decisionCallbackData = data;
     }
 
     function onDisputeOpened(
@@ -50,7 +72,13 @@ contract MockIncentiveModule is IIncentiveModule {
         uint8,
         ResolutionOutcome,
         uint256
-    ) external override {}
+    ) external override {
+        if (revertOnDecisionTelemetry) revert DecisionTelemetryReverted();
+        if (decisionCallbackTarget != address(0)) {
+            decisionCallbackAttempted = true;
+            (decisionCallbackSucceeded, decisionCallbackRevertData) = decisionCallbackTarget.call(decisionCallbackData);
+        }
+    }
 
     function onEscalated(uint256, address, uint8, uint8, address) external override {}
 
@@ -86,5 +114,7 @@ contract MockIncentiveModule is IIncentiveModule {
         return false;
     }
 
-    function distributeAppealBond(uint256, address, uint8, bool) external override {}
+    function distributeAppealBond(uint256, address, uint8, bool) external override {
+        if (revertOnDistributeAppealBond) revert DistributeAppealBondReverted();
+    }
 }

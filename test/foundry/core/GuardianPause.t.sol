@@ -14,20 +14,14 @@ import '../../../contracts/types/YieldPresets.sol';
 import '../../../contracts/libraries/SettingsValidationLibrary.sol';
 import '../../../contracts/core/EscrowCreationPolicy.sol';
 import '../../../contracts/ops/GuardianOps.sol';
-import '../TestConfig.sol';
 
 /**
  * @title GuardianPause
  * @notice Tests for guardian pause/unpause functionality and its effects on escrow operations
  * @dev Phase 1: Verify pause prevents new escrows, allows recovery
- * @dev Tests skipped - pause functionality removed for size optimization
+ * @dev Guardian pauses new escrow intake; governance timelock resumes it.
  */
 contract GuardianPause is Test {
-    modifier skipIfPauseNotSupported() {
-        vm.skip(true);
-        _;
-    }
-
     EscrowVault public vault;
     EscrowGovernanceTimelock public adminContract;
     ModuleSnapshotRegistry public moduleManagement;
@@ -53,7 +47,6 @@ contract GuardianPause is Test {
     }
 
     function setUp() public {
-        vm.skip(!TestConfig.RUN_PAUSE_TESTS); // Skip if pause tests disabled
         owner = address(this);
         timelock = address(0x1111);
         guardian = address(0x2222);
@@ -123,6 +116,12 @@ contract GuardianPause is Test {
         vault.pause('Emergency: Suspicious activity detected');
         
         assertTrue(vault.paused(), 'Escrow should be paused after guardian call');
+        (uint256 activeSince, uint256 lastUnpausedAt, uint256 cycles, uint256 lastResetAt) = vault.pauseState();
+        assertEq(activeSince, block.timestamp);
+        assertEq(lastUnpausedAt, 0);
+        assertEq(cycles, 1);
+        assertEq(lastResetAt, 0);
+        assertEq(vault.totalPausedDuration(), 0);
     }
 
     // ============ Test 2: Non-guardian cannot pause ============
@@ -170,6 +169,22 @@ contract GuardianPause is Test {
         assertTrue(vault.paused(), 'Guardian should not be able to unpause');
     }
 
+    function test_GuardianCannotChangeConfigurationOrGrantRoles() public {
+        assertTrue(vault.hasRole(vault.ROLE_GUARDIAN(), guardian));
+        assertFalse(vault.hasRole(vault.ROLE_TIMELOCK(), guardian));
+        assertFalse(vault.hasRole(vault.ROLE_ADMIN_CONTRACT(), guardian));
+        bytes32 timelockRole = vault.ROLE_TIMELOCK();
+
+        vm.startPrank(guardian);
+        vm.expectRevert();
+        vault.setFeeRecipient(address(0xBEEF));
+        vm.expectRevert();
+        vault.setEscrowFeeBps(1);
+        vm.expectRevert();
+        vault.grantRole(timelockRole, guardian);
+        vm.stopPrank();
+    }
+
     // ============ Test 5: Pause prevents new escrow creation ============
     function test_PausePreventsNewEscrowCreation() public {
         uint256 amount = 100e18;
@@ -178,17 +193,17 @@ contract GuardianPause is Test {
         vm.prank(guardian);
         vault.pause('Emergency pause');
 
-        // NEW SEMANTICS: Can still create escrow while paused (settlement allowed)
+        uint256 balanceBefore = token.balanceOf(buyer);
         vm.prank(buyer);
-        uint256 workflowId = vault.createEscrow(
+        vm.expectRevert(bytes4(keccak256('EnforcedPause()')));
+        vault.createEscrow(
             address(token),
             seller,
             amount,
             _getDefaultSettings()
         );
-        
-        // Verify escrow was created (should be >= 0, indicating success)
-        assertGe(workflowId, 0, "Escrow should be created even while paused");
+        assertEq(vault.totalHeldInEscrowPerToken(address(token)), 0, "Paused creation must not custody funds");
+        assertEq(token.balanceOf(buyer), balanceBefore, "Paused creation must not transfer tokens");
     }
 
     // ============ Test 6: Pause allows settlement (release) ============
@@ -215,6 +230,22 @@ contract GuardianPause is Test {
         // Verify escrow was released even while paused
         EscrowState state = vault.getEscrowState(workflowId);
         assertEq(uint8(state), uint8(EscrowState.RELEASED));
+    }
+
+    function test_PauseBlocksOpeningDisputesButKeepsSettlementAvailable() public {
+        vm.prank(buyer);
+        uint256 workflowId = vault.createEscrow(address(token), seller, 100e18, _getDefaultSettings());
+
+        vm.prank(guardian);
+        vault.pause('Stop new exposure');
+
+        vm.prank(buyer);
+        vm.expectRevert(bytes4(keccak256('EnforcedPause()')));
+        vault.raiseDispute(workflowId);
+
+        vm.prank(buyer);
+        vault.release(workflowId);
+        assertEq(uint8(vault.getEscrowState(workflowId)), uint8(EscrowState.RELEASED));
     }
 
     // ============ Test 7: Resume allows operations ============
@@ -262,6 +293,28 @@ contract GuardianPause is Test {
             vault.unpause();
             assertFalse(vault.paused());
         }
+        assertEq(vault.pauseCycleCount(), 3);
+    }
+
+    function test_PauseDurationAccumulatesAndGovernanceCanRestartIntake() public {
+        vm.prank(guardian);
+        vault.pause('Incident');
+        (uint256 pauseAt,,,) = vault.pauseState();
+        vm.warp(pauseAt + 1 days);
+        vm.prank(timelock);
+        vault.unpause();
+
+        (uint256 activeSince, uint256 lastUnpausedAt, uint256 cycles, uint256 lastResetAt) = vault.pauseState();
+        assertEq(activeSince, 0);
+        assertGt(lastUnpausedAt, pauseAt);
+        assertEq(cycles, 1);
+        assertEq(lastResetAt, 0);
+        assertEq(vault.totalPausedDuration(), 1 days);
+        assertFalse(vault.paused());
+
+        vm.prank(buyer);
+        uint256 workflowId = vault.createEscrow(address(token), seller, 100e18, _getDefaultSettings());
+        assertEq(workflowId, 0);
     }
 
     // ============ Test 9: Pause reason recorded ============

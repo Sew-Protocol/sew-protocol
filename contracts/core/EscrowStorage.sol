@@ -61,4 +61,11 @@ abstract contract EscrowStorage {
     mapping(uint256 => uint256) public workflowResolutionConfigVersion;
     BondCollector public bondCollector;
     EscrowCreationPolicy public creationPolicy;
+
+    // Emergency intake-pause state is appended so existing storage offsets stay stable.
+    bool internal emergencyPaused;
+    uint256 internal pauseStartedAt;
+    uint256 internal accumulatedPausedDuration;
+    uint256 internal pauseCycles;
+    uint256 internal lastUnpausedAt;
 }

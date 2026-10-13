@@ -702,7 +702,14 @@ contract DecentralizedResolutionModule is
             ResolutionOutcome priorDecision = dm.decisionAtRound[priorRound];
             if (priorDecision != ResolutionOutcome.NONE) {
                 bool outcomeFlipped = priorDecision != outcome;
-                if (address(incentiveModule) != address(0)) {
+                // A configured external resolver at round 2 is funded by its
+                // arbitration fee, not an appeal bond (see getRequiredAppealBond).
+                // Do not ask the incentive ledger to distribute a bond that the
+                // protocol transition explicitly did not require or collect.
+                bool appealBondRequired = !(
+                    currentRound == 2 && _resolutionConfig(escrowContract, workflowId).externalResolver != address(0)
+                );
+                if (address(incentiveModule) != address(0) && appealBondRequired) {
                     // Atomic: if bond distribution fails, the entire resolution reverts.
                     incentiveModule.distributeAppealBond(
                         workflowId, escrowContract, priorRound, outcomeFlipped

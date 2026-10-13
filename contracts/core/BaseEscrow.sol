@@ -122,8 +122,8 @@ error UnauthorizedTimedExecutor(address caller);
 error AppealsNotEnabledInV1();
 error DisputeAmountBelowMinimum(uint256 workflowId, uint256 amount, uint256 minimum);
 error DisputeRateLimitExceeded(address sender, uint32 count, uint32 maxCount);
+error ResolutionDecisionRecordingFailed(uint256 workflowId, address resolutionModule);
 error AlreadyPausedCannotRepause();
-error PausedNotSupported();
     error EscalationResultMismatch(uint8 expectedLevel, uint8 actualLevel, address expectedResolver, address actualResolver);
     error AppealsUnsupportedForCustomResolver(uint256 workflowId, address customResolver);
 
@@ -246,14 +246,6 @@ abstract contract BaseEscrow is EscrowLifecycle {
     );
 
     // Monitoring & Safety Events (v1)
-    event IncidentPauseTriggered(
-        string reason,
-        uint256 timestamp,
-        uint256 pauseCycleCount
-    );
-    event SystemResumed(
-        uint256 timestamp
-    );
     event EscrowPartiallyReleased(
         uint256 indexed workflowId,
         address indexed token,
@@ -468,6 +460,7 @@ abstract contract BaseEscrow is EscrowLifecycle {
 
     // slither-disable-next-line reentrancy-no-eth
     function raiseDispute(uint256 workflowId) external nonReentrant {
+        _requireNotPaused();
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
         ModuleSnapshot storage snap = moduleSnapshots[workflowId];
@@ -616,6 +609,7 @@ abstract contract BaseEscrow is EscrowLifecycle {
     function _appealDispute(uint256 workflowId, AppealRequest memory request)
         internal returns (bool success, address newDisputeResolver, uint8 newLevel)
     {
+        _requireNotPaused();
         address caller = _msgSender();
         if (request.operator != caller) revert InvalidAppealRequestRole(1, request.operator, caller);
         if (request.funder != caller) revert InvalidAppealRequestRole(2, request.funder, caller);
@@ -1265,6 +1259,6 @@ abstract contract BaseEscrow is EscrowLifecycle {
                 resolutionTime
             )
         );
-        success;
+        if (!success) revert ResolutionDecisionRecordingFailed(workflowId, module);
     }
 }
