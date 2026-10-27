@@ -62,7 +62,7 @@ function main(): void {
   assert(Boolean(first.manifest.artifacts.EscrowVaultAccountingLibrary), 'linked accounting library is absent from export');
   const exportedVault = JSON.parse(fs.readFileSync(path.join(a, 'artifacts', 'EscrowVault.json'), 'utf8')) as Record<string, any>;
   const forgeVault = JSON.parse(fs.readFileSync(path.join(outDir, 'EscrowVault.sol', 'EscrowVault.json'), 'utf8')) as Record<string, any>;
-  assert(JSON.stringify(exportedVault.immutableReferences) === JSON.stringify(forgeVault.deployedBytecode.immutableReferences),
+  assert(canonicalJson(exportedVault.immutableReferences) === canonicalJson(forgeVault.deployedBytecode.immutableReferences),
     'EscrowVault immutable references differ from the Forge artifact');
 
   const tampered = JSON.parse(fs.readFileSync(path.join(a, 'manifest.json'), 'utf8')) as Record<string, any>;
