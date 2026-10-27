@@ -32,7 +32,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const { deployments, getNamedAccounts, ethers } = hre;
   const { deploy, get } = deployments;
-  const { deployer } = await getNamedAccounts();
+  const deployer = (await getNamedAccounts()).deployer;
+  if (!deployer) throw new Error('Named deployer account is not configured');
   const chainConfig = getChainConfig(hre);
   const config = getGovConfig(hre);
 
@@ -89,7 +90,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (guardianOpsDeployment.receipt) {
       await registerDeployment(hre, 'GuardianOps', {
         address: guardianOpsDeployment.address,
-        txHash: guardianOpsDeployment.transactionHash,
+        txHash: guardianOpsDeployment.transactionHash ?? guardianOpsDeployment.receipt.transactionHash,
         blockNumber: guardianOpsDeployment.receipt.blockNumber,
         constructorArgs: [vaultAddress],
         tags: ['guardian', 'emergency', 'yield', 'aave'],
@@ -144,7 +145,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (recoveryProposalDeployment.receipt) {
       await registerDeployment(hre, 'EmergencyRecoveryProposal', {
         address: recoveryProposalDeployment.address,
-        txHash: recoveryProposalDeployment.transactionHash,
+        txHash: recoveryProposalDeployment.transactionHash ?? recoveryProposalDeployment.receipt.transactionHash,
         blockNumber: recoveryProposalDeployment.receipt.blockNumber,
         constructorArgs: [vaultAddress, guardianOpsDeployment.address, adminAddress],
         tags: ['guardian', 'emergency', 'recovery', 'governance'],

@@ -33,7 +33,7 @@ library SettingsValidationLibrary {
     function validateAutoTime(
         uint256 autoTime,
         uint256 currentTime
-    ) internal pure {
+    ) public pure {
         if (autoTime == 0) {
             return; // 0 means no auto time, which is valid
         }
@@ -66,7 +66,7 @@ library SettingsValidationLibrary {
         EscrowSettings memory settings,
         uint256 currentTime,
         bool resolverMustBeContract
-    ) internal view {
+    ) public view {
         // Validate auto times
         if (settings.autoReleaseTime != 0 && settings.autoCancelTime != 0) {
             revert CannotSetBothAutoTimes(settings.autoReleaseTime, settings.autoCancelTime);
@@ -99,7 +99,7 @@ library SettingsValidationLibrary {
      * @param amount The escrow amount to validate
      * @dev Reverts if amount is below minimum
      */
-    function validateEscrowAmount(uint256 amount) internal pure {
+    function validateEscrowAmount(uint256 amount) public pure {
         if (amount < MIN_ESCROW_AMOUNT) {
             revert InvalidAmount(AMOUNT_EMPTY);
         }
@@ -112,7 +112,7 @@ library SettingsValidationLibrary {
      * @param releaseAddress The release address (if any)
      * @dev Reverts if recipient is zero address, same as sender, or same as releaseAddress
      */
-    function validateRecipient(address recipient, address sender, address releaseAddress) internal pure {
+    function validateRecipient(address recipient, address sender, address releaseAddress) public pure {
         if (recipient == address(0)) {
             revert InvalidAddress(ADDR_RECIPIENT, address(0));
         }
@@ -131,7 +131,7 @@ library SettingsValidationLibrary {
      * @return shouldEnableYield Whether yield should actually be enabled
      * @dev Simplified: No longer uses hardcoded MIN_YIELD_DEPOSIT
      */
-    function validateYieldOptIn(uint256 amount, bool yieldEnabled) internal pure returns (bool shouldEnableYield) {
+    function validateYieldOptIn(uint256 amount, bool yieldEnabled) public pure returns (bool shouldEnableYield) {
         amount; // Unused
         return yieldEnabled;
     }
@@ -140,7 +140,7 @@ library SettingsValidationLibrary {
      * @dev Get default escrow settings
      * @return Default settings struct with all fields set to default values
      */
-    function getDefaultSettings() internal pure returns (EscrowSettings memory) {
+    function getDefaultSettings() public pure returns (EscrowSettings memory) {
         return
             EscrowSettings({
                 customResolver: address(0),
@@ -157,7 +157,7 @@ library SettingsValidationLibrary {
      * @param d Delay in seconds (0 means disabled, which is valid)
      * @dev Bounds: d must be <= MAX_AUTO_TIME_DAYS
      */
-    function validateAutoCancel(uint256 d) internal pure {
+    function validateAutoCancel(uint256 d) public pure {
         if (d == 0) {
             return; // 0 means disabled, which is valid
         }
@@ -171,7 +171,7 @@ library SettingsValidationLibrary {
      * @param d Delay in seconds (0 means disabled, which is valid)
      * @dev Bounds: d must be <= MAX_AUTO_TIME_DAYS
      */
-    function validateAutoRelease(uint256 d) internal pure {
+    function validateAutoRelease(uint256 d) public pure {
         if (d == 0) {
             return; // 0 means disabled, which is valid
         }
@@ -185,7 +185,7 @@ library SettingsValidationLibrary {
      * @param n Maximum number of attachments
      * @dev Bounds: 0 <= n <= 20
      */
-    function validateMaxAttachments(uint256 n) internal pure {
+    function validateMaxAttachments(uint256 n) public pure {
         if (n > MAX_ATTACHMENTS) {
             revert InvalidAmount(AMOUNT_GENERIC);
         }
@@ -196,7 +196,7 @@ library SettingsValidationLibrary {
      * @param bps Fee in basis points (100 = 1%)
      * @dev Bounds: 0 <= bps <= 200 (0% to 2%)
      */
-    function validateFeeBps(uint256 bps) internal pure {
+    function validateFeeBps(uint256 bps) public pure {
         if (bps > MAX_FEE_BPS) {
             revert FeeOverflow();
         }
@@ -207,7 +207,7 @@ library SettingsValidationLibrary {
      * @param d Delay in seconds
      * @dev Bounds: 48h <= d <= 30 days
      */
-    function validateResolutionDelay(uint256 d) internal pure {
+    function validateResolutionDelay(uint256 d) public pure {
         if (d < MIN_RESOLUTION_DELAY || d > MAX_RESOLUTION_DELAY) {
             revert InvalidAutoTime(AUTO_TIME_TOO_LARGE, d, 0);
         }
@@ -219,7 +219,7 @@ library SettingsValidationLibrary {
      * @param a Address to validate
      * @param which Key for error message
      */
-    function validateNonZero(address a, uint8 which) internal pure {
+    function validateNonZero(address a, uint8 which) public pure {
         if (a == address(0)) {
             revert InvalidAddress(which, address(0));
         }

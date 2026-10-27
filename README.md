@@ -108,6 +108,7 @@ The protocol has been deployed to:
 For deployment documentation, see:
 - [docs/deployment/](./docs/deployment/) - Deployment guides
 - [docs/DEPLOYMENT_POST_ROLES.md](./docs/DEPLOYMENT_POST_ROLES.md) - Post-deployment checklist
+- [docs/deployment/monad-testnet.md](./docs/deployment/monad-testnet.md) - Monad Testnet core deployment alternative
 
 ## Project Status
 

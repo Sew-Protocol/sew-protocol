@@ -31,7 +31,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const { deployments, getNamedAccounts, ethers } = hre;
   const { deploy, get } = deployments;
-  const { deployer } = await getNamedAccounts();
+  const deployer = (await getNamedAccounts()).deployer;
+  if (!deployer) throw new Error('Named deployer account is not configured');
   const chainConfig = getChainConfig(hre);
 
   const stableToken = USDC[chainConfig.chainId] ?? process.env.STABLE_TOKEN_ADDRESS;
@@ -79,7 +80,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (insuranceDeploy.receipt) {
       await registerDeployment(hre, 'InsurancePoolVault', {
         address: insuranceDeploy.address,
-        txHash: insuranceDeploy.transactionHash,
+        txHash: insuranceDeploy.transactionHash ?? insuranceDeploy.receipt.transactionHash,
         blockNumber: insuranceDeploy.receipt.blockNumber,
         constructorArgs: [deployer, stableToken],
         tags: ['dr3', 'insurance'],
@@ -106,7 +107,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (stakingDeploy.receipt) {
       await registerDeployment(hre, 'ResolverStakingModule', {
         address: stakingDeploy.address,
-        txHash: stakingDeploy.transactionHash,
+        txHash: stakingDeploy.transactionHash ?? stakingDeploy.receipt.transactionHash,
         blockNumber: stakingDeploy.receipt.blockNumber,
         constructorArgs: [deployer, stableToken, sewTokenAddr],
         tags: ['dr3', 'staking'],
@@ -133,7 +134,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (slashingDeploy.receipt) {
       await registerDeployment(hre, 'ResolverSlashingModule', {
         address: slashingDeploy.address,
-        txHash: slashingDeploy.transactionHash,
+        txHash: slashingDeploy.transactionHash ?? slashingDeploy.receipt.transactionHash,
         blockNumber: slashingDeploy.receipt.blockNumber,
         constructorArgs: [deployer, stakingDeploy.address, insuranceDeploy.address, stableToken],
         tags: ['dr3', 'slashing'],
@@ -160,7 +161,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (bondRegistryDeploy.receipt) {
       await registerDeployment(hre, 'BondTokenRegistry', {
         address: bondRegistryDeploy.address,
-        txHash: bondRegistryDeploy.transactionHash,
+        txHash: bondRegistryDeploy.transactionHash ?? bondRegistryDeploy.receipt.transactionHash,
         blockNumber: bondRegistryDeploy.receipt.blockNumber,
         constructorArgs: [timelockAddr, stableToken],
         tags: ['dr3', 'bond-registry'],
@@ -187,7 +188,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (adminFacetDeploy.receipt) {
       await registerDeployment(hre, 'DRMAdminFacet', {
         address: adminFacetDeploy.address,
-        txHash: adminFacetDeploy.transactionHash,
+        txHash: adminFacetDeploy.transactionHash ?? adminFacetDeploy.receipt.transactionHash,
         blockNumber: adminFacetDeploy.receipt.blockNumber,
         constructorArgs: [],
         tags: ['dr3', 'drm-admin'],
@@ -214,7 +215,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (paymentLibDeploy.receipt) {
       await registerDeployment(hre, 'PaymentCalculationLibrary', {
         address: paymentLibDeploy.address,
-        txHash: paymentLibDeploy.transactionHash,
+        txHash: paymentLibDeploy.transactionHash ?? paymentLibDeploy.receipt.transactionHash,
         blockNumber: paymentLibDeploy.receipt.blockNumber,
         constructorArgs: [],
         tags: ['dr3', 'payment-lib'],
@@ -241,7 +242,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (incentiveDeploy.receipt) {
       await registerDeployment(hre, 'ResolverIncentiveModule', {
         address: incentiveDeploy.address,
-        txHash: incentiveDeploy.transactionHash,
+        txHash: incentiveDeploy.transactionHash ?? incentiveDeploy.receipt.transactionHash,
         blockNumber: incentiveDeploy.receipt.blockNumber,
         constructorArgs: [deployer, paymentLibDeploy.address],
         tags: ['dr3', 'incentive'],

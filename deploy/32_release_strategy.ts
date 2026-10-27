@@ -14,7 +14,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const { deployments, getNamedAccounts, ethers } = hre;
   const { deploy, get } = deployments;
-  const { deployer } = await getNamedAccounts();
+  const deployer = (await getNamedAccounts()).deployer;
+  if (!deployer) throw new Error('Named deployer account is not configured');
   const chainConfig = getChainConfig(hre);
 
   console.log(`\n📦 Deploying DefaultReleaseStrategy...`);
@@ -36,7 +37,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (deployment.receipt) {
       await registerDeployment(hre, 'DefaultReleaseStrategy', {
         address: deployment.address,
-        txHash: deployment.transactionHash,
+        txHash: deployment.transactionHash ?? deployment.receipt.transactionHash,
         blockNumber: deployment.receipt.blockNumber,
         constructorArgs: [],
         tags: ['release-strategy'],

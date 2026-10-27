@@ -17,7 +17,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const { deployments, getNamedAccounts, ethers } = hre;
   const { deploy } = deployments;
-  const { deployer } = await getNamedAccounts();
+  const deployer = (await getNamedAccounts()).deployer;
+  if (!deployer) throw new Error('Named deployer account is not configured');
 
   const config = getGovConfig(hre);
   validateGovConfig(config, hre);
@@ -53,7 +54,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (tokenDeployment.receipt) {
       await registerDeployment(hre, 'SewToken', {
         address: tokenDeployment.address,
-        txHash: tokenDeployment.transactionHash,
+        txHash: tokenDeployment.transactionHash ?? tokenDeployment.receipt.transactionHash,
         blockNumber: tokenDeployment.receipt.blockNumber,
         constructorArgs: [
           config.token.name,
@@ -65,23 +66,12 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       });
     }
 
-    // Mint initial tokens to configured addresses (for testing)
+    // SewToken has a fixed supply minted to its owner in the constructor; it
+    // intentionally has no post-deployment mint function.
     if (config.initialGovTokenMints.length > 0) {
-      const token = await ethers.getContractAt('SewToken', tokenDeployment.address);
-      console.log(`\n💰 Minting tokens to initial recipients...`);
-
-      for (const mint of config.initialGovTokenMints) {
-        try {
-          const tx = await token.mint(mint.to, mint.amount);
-          await tx.wait();
-          const mintAmountFormatted = (BigInt(mint.amount) / BigInt(10 ** 18)).toString();
-          console.log(`   ✅ Minted ${mintAmountFormatted} tokens to ${mint.to}`);
-        } catch (error: any) {
-          console.log(`   ⚠️  Failed to mint to ${mint.to}: ${error.message}`);
-          // SewToken doesn't have a mint function (fixed supply), so this will fail
-          // This is expected - tokens are minted in constructor
-        }
-      }
+      console.warn(
+        '   ⚠️  Initial GOV mints were skipped: SewToken has fixed constructor supply and cannot mint after deployment.',
+      );
     }
 
     // Verify token balance (with retry for timing issues)

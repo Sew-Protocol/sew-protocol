@@ -13,6 +13,8 @@ import { HardhatRuntimeEnvironment } from 'hardhat/types';
 export interface ChainConfig {
   // Basic info
   chainId: number;
+  /** Optional signer identity pinned for a deployment network. */
+  expectedDeployerAddress?: string;
   name: string; // "base", "baseSepolia", etc.
   displayName: string; // "Base Mainnet", "Base Sepolia"
   networkType: 'mainnet' | 'testnet' | 'local';
@@ -106,6 +108,27 @@ export const CHAIN_CONFIGS: Record<string, ChainConfig> = {
         poolAddressesProvider: '0x012bAC54348C0E635dCAc9D5FB99f06F24136C9A',
       },
     },
+    deployment: {
+      confirmRequired: false,
+    },
+  },
+  monadTestnet: {
+    chainId: 10143,
+    name: 'monadTestnet',
+    displayName: 'Monad Testnet',
+    networkType: 'testnet',
+    rpcUrl: process.env.RPC_MONAD_TESTNET || 'https://testnet-rpc.monad.xyz/',
+    blockExplorer: {
+      name: 'Monad Explorer',
+      url: 'https://testnet.monadexplorer.com/',
+    },
+    nativeCurrency: {
+      name: 'Monad',
+      symbol: 'MON',
+      decimals: 18,
+    },
+    contracts: {},
+    expectedDeployerAddress: '0xE8d7Fbd5Db3ad910370Be315f21D4596ed45122f',
     deployment: {
       confirmRequired: false,
     },

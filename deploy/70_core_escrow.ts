@@ -22,7 +22,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const { deployments, getNamedAccounts, ethers } = hre;
   const { deploy, get } = deployments;
-  const { deployer } = await getNamedAccounts();
+  const deployer = (await getNamedAccounts()).deployer;
+  if (!deployer) throw new Error('Named deployer account is not configured');
   const config = getGovConfig(hre);
   const chainConfig = getChainConfig(hre);
 
@@ -74,7 +75,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (escrowVaultDeployment.receipt) {
       await registerDeployment(hre, 'EscrowVault', {
         address: escrowVaultDeployment.address,
-        txHash: escrowVaultDeployment.transactionHash,
+        txHash: escrowVaultDeployment.transactionHash ?? escrowVaultDeployment.receipt.transactionHash,
         blockNumber: escrowVaultDeployment.receipt.blockNumber,
         constructorArgs: [
           escrowFee,
@@ -190,7 +191,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       if (escrowableERC20Deployment.receipt) {
         await registerDeployment(hre, 'EscrowableERC20', {
           address: escrowableERC20Deployment.address,
-          txHash: escrowableERC20Deployment.transactionHash,
+          txHash: escrowableERC20Deployment.transactionHash ?? escrowableERC20Deployment.receipt.transactionHash,
           blockNumber: escrowableERC20Deployment.receipt.blockNumber,
           constructorArgs: [
             tokenName,

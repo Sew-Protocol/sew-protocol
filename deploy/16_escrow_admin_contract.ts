@@ -11,7 +11,8 @@ import { registerDeployment } from '../config/deployments.registry';
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts } = hre;
   const { deploy } = deployments;
-  const { deployer } = await getNamedAccounts();
+  const deployer = (await getNamedAccounts()).deployer;
+  if (!deployer) throw new Error('Named deployer account is not configured');
 
   console.log(`\n📦 Deploying EscrowGovernanceTimelock...`);
 
@@ -28,7 +29,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (deployment.receipt) {
       await registerDeployment(hre, 'EscrowGovernanceTimelock', {
         address: deployment.address,
-        txHash: deployment.transactionHash,
+        txHash: deployment.transactionHash ?? deployment.receipt.transactionHash,
         blockNumber: deployment.receipt.blockNumber,
         constructorArgs: [deployer],
         tags: ['escrow-admin', 'governance'],

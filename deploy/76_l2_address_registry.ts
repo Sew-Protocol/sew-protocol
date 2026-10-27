@@ -19,7 +19,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const { deployments, getNamedAccounts, ethers } = hre;
   const { deploy, get, all } = deployments;
-  const { deployer } = await getNamedAccounts();
+  const deployer = (await getNamedAccounts()).deployer;
+  if (!deployer) throw new Error('Named deployer account is not configured');
   const chainConfig = getChainConfig(hre);
 
   console.log(`\n📦 Deploying L2AddressRegistry...`);
@@ -47,7 +48,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (registryDeployment.receipt) {
       await registerDeployment(hre, 'L2AddressRegistry', {
         address: registryDeployment.address,
-        txHash: registryDeployment.transactionHash,
+        txHash: registryDeployment.transactionHash ?? registryDeployment.receipt.transactionHash,
         blockNumber: registryDeployment.receipt.blockNumber,
         constructorArgs: [initialGovernors, requiredSignatures],
         tags: ['registry', 'multi-l2'],

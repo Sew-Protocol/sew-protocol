@@ -16,7 +16,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const { deployments, getNamedAccounts, ethers } = hre;
   const { deploy } = deployments;
-  const { deployer } = await getNamedAccounts();
+  const deployer = (await getNamedAccounts()).deployer;
+  if (!deployer) throw new Error('Named deployer account is not configured');
   const chainConfig = getChainConfig(hre);
 
   console.log(`\n📦 Deploying ModuleSnapshotRegistry...`);
@@ -38,7 +39,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (moduleManagementDeployment.receipt) {
       await registerDeployment(hre, 'ModuleSnapshotRegistry', {
         address: moduleManagementDeployment.address,
-        txHash: moduleManagementDeployment.transactionHash,
+        txHash: moduleManagementDeployment.transactionHash ?? moduleManagementDeployment.receipt.transactionHash,
         blockNumber: moduleManagementDeployment.receipt.blockNumber,
         constructorArgs: [deployer],
         tags: ['core', 'module-management'],

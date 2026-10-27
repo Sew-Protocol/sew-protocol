@@ -71,7 +71,7 @@ library EscrowDisputeLogic {
         uint256 amountAfterFee,
         EscrowState escrowState,
         address currentResolver
-    ) internal view returns (DisputeOpeningResult memory result) {
+    ) public view returns (DisputeOpeningResult memory result) {
         result.success = false;
 
         if (escrowState != EscrowState.PENDING) {
@@ -121,7 +121,7 @@ library EscrowDisputeLogic {
         address token,
         uint256 amountAfterFee,
         EscrowState escrowState
-    ) internal view returns (EscalationResult memory result) {
+    ) public view returns (EscalationResult memory result) {
         // Escrow owns all fee and net-bond derivation. Keep these inputs in the
         // stable helper ABI, but do not compose economics outside BaseEscrow.
         bondFeeBps;

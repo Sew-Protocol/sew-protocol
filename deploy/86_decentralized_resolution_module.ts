@@ -27,7 +27,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const { deployments, getNamedAccounts, ethers } = hre;
   const { deploy, get } = deployments;
-  const { deployer } = await getNamedAccounts();
+  const deployer = (await getNamedAccounts()).deployer;
+  if (!deployer) throw new Error('Named deployer account is not configured');
 
   // Resolve dependencies
   const timelockAddr = (await get('TimelockController')).address;
@@ -72,7 +73,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (drmDeploy.receipt) {
       await registerDeployment(hre, 'DecentralizedResolutionModule', {
         address: drmDeploy.address,
-        txHash: drmDeploy.transactionHash,
+        txHash: drmDeploy.transactionHash ?? drmDeploy.receipt.transactionHash,
         blockNumber: drmDeploy.receipt.blockNumber,
         constructorArgs: [deployer],
         tags: ['dr3', 'resolution-module'],

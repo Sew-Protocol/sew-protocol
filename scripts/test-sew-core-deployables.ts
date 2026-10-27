@@ -57,16 +57,26 @@ function main(): void {
     assert(sha256HexOfBuffer(fs.readFileSync(path.join(a, 'artifacts', `${entry.artifactName}.json`))) ===
       sha256HexOfBuffer(fs.readFileSync(path.join(b, 'artifacts', `${entry.artifactName}.json`))), `artifact bytes differ for ${entry.artifactName}`);
   }
-  const vault = first.manifest.artifacts.EscrowVault;
-  assert(vault?.hasLinkReferences && vault.hasDeployedLinkReferences, 'EscrowVault link metadata is incomplete');
-  assert(Boolean(first.manifest.artifacts.EscrowVaultAccountingLibrary), 'linked accounting library is absent from export');
-  const exportedVault = JSON.parse(fs.readFileSync(path.join(a, 'artifacts', 'EscrowVault.json'), 'utf8')) as Record<string, any>;
-  const forgeVault = JSON.parse(fs.readFileSync(path.join(outDir, 'EscrowVault.sol', 'EscrowVault.json'), 'utf8')) as Record<string, any>;
+  const vault = first.manifest.artifacts.SewCoreVault;
+  assert(vault?.hasLinkReferences && vault.hasDeployedLinkReferences, 'SewCoreVault link metadata is incomplete');
+  for (const library of [
+    'SettingsValidationLibrary',
+    'EscrowCreationLogic',
+    'EscrowDisputeLogic',
+    'EscrowSettlementLogic',
+    'DisputeInitializationLibrary',
+    'DisputeRaiseLibrary',
+    'StateManagementLibrary',
+  ]) {
+    assert(Boolean(first.manifest.artifacts[library]), `linked library ${library} is absent from export`);
+  }
+  const exportedVault = JSON.parse(fs.readFileSync(path.join(a, 'artifacts', 'SewCoreVault.json'), 'utf8')) as Record<string, any>;
+  const forgeVault = JSON.parse(fs.readFileSync(path.join(outDir, 'SewCoreVault.sol', 'SewCoreVault.json'), 'utf8')) as Record<string, any>;
   assert(canonicalJson(exportedVault.immutableReferences) === canonicalJson(forgeVault.deployedBytecode.immutableReferences),
-    'EscrowVault immutable references differ from the Forge artifact');
+    'SewCoreVault immutable references differ from the Forge artifact');
 
   const tampered = JSON.parse(fs.readFileSync(path.join(a, 'manifest.json'), 'utf8')) as Record<string, any>;
-  tampered.artifacts.EscrowVault.fullyQualifiedName = 'contracts/Other.sol:EscrowVault';
+  tampered.artifacts.SewCoreVault.fullyQualifiedName = 'contracts/Other.sol:SewCoreVault';
   const { bundleRoot: _oldRoot, ...body } = tampered;
   tampered.bundleRoot = sha256Hex(canonicalJson(body));
   fs.writeFileSync(path.join(a, 'manifest.json'), JSON.stringify(tampered, null, 2) + '\n');

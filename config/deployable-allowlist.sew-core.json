@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "packageName": "@sew/deployables",
-  "bundleVersion": "0.1.1",
+  "bundleVersion": "0.1.2",
   "buildArtifactSource": "forge",
   "buildProfile": "sew-core",
   "entries": [
@@ -15,12 +15,60 @@
       "notes": "Minimal timelock authority for Sew core; source/version is pinned by the Sew lockfile."
     },
     {
-      "artifactName": "EscrowVaultAccountingLibrary",
-      "contractName": "EscrowVaultAccountingLibrary",
-      "sourcePath": "contracts/libraries/EscrowVaultAccountingLibrary.sol",
+      "artifactName": "SettingsValidationLibrary",
+      "contractName": "SettingsValidationLibrary",
+      "sourcePath": "contracts/libraries/SettingsValidationLibrary.sol",
       "scopeHint": "sew",
       "category": "library",
-      "notes": "Fully qualified linked library required by EscrowVault."
+      "notes": "Linked by EscrowCreationLogic for the Sew core vault."
+    },
+    {
+      "artifactName": "EscrowCreationLogic",
+      "contractName": "EscrowCreationLogic",
+      "sourcePath": "contracts/libraries/EscrowCreationLogic.sol",
+      "scopeHint": "sew",
+      "category": "library",
+      "notes": "Linked creation derivation, config resolution, escrow settings and module snapshot logic."
+    },
+    {
+      "artifactName": "EscrowDisputeLogic",
+      "contractName": "EscrowDisputeLogic",
+      "sourcePath": "contracts/libraries/EscrowDisputeLogic.sol",
+      "scopeHint": "sew",
+      "category": "library",
+      "notes": "Linked single-resolver dispute derivation logic."
+    },
+    {
+      "artifactName": "EscrowSettlementLogic",
+      "contractName": "EscrowSettlementLogic",
+      "sourcePath": "contracts/libraries/EscrowSettlementLogic.sol",
+      "scopeHint": "sew",
+      "category": "library",
+      "notes": "Linked resolution and pending-settlement execution logic."
+    },
+    {
+      "artifactName": "DisputeInitializationLibrary",
+      "contractName": "DisputeInitializationLibrary",
+      "sourcePath": "contracts/libraries/DisputeInitializationLibrary.sol",
+      "scopeHint": "sew",
+      "category": "library",
+      "notes": "Linked resolution-module dispute initialization."
+    },
+    {
+      "artifactName": "DisputeRaiseLibrary",
+      "contractName": "DisputeRaiseLibrary",
+      "sourcePath": "contracts/libraries/DisputeRaiseLibrary.sol",
+      "scopeHint": "sew",
+      "category": "library",
+      "notes": "Linked optional incentive hook for dispute opening."
+    },
+    {
+      "artifactName": "StateManagementLibrary",
+      "contractName": "StateManagementLibrary",
+      "sourcePath": "contracts/libraries/StateManagementLibrary.sol",
+      "scopeHint": "sew",
+      "category": "library",
+      "notes": "Linked canonical escrow state transitions."
     },
     {
       "artifactName": "ModuleSnapshotRegistry",
@@ -28,7 +76,7 @@
       "sourcePath": "contracts/core/ModuleSnapshotRegistry.sol",
       "scopeHint": "sew",
       "category": "infra",
-      "notes": "Per-vault module registry for release and resolution snapshots."
+      "notes": "Per-vault slow-lane release and module registry. Yield and cancellation defaults remain zero."
     },
     {
       "artifactName": "DefaultResolutionModule",
@@ -36,7 +84,7 @@
       "sourcePath": "contracts/modules/DefaultResolutionModule.sol",
       "scopeHint": "sew",
       "category": "resolution",
-      "notes": "Single-resolver default topology; no bonded escalation or appeals."
+      "notes": "Pinned single-resolver module; no bonded escalation or appeal requirement."
     },
     {
       "artifactName": "DefaultReleaseStrategy",
@@ -52,15 +100,15 @@
       "sourcePath": "contracts/core/EscrowCreationPolicy.sol",
       "scopeHint": "sew",
       "category": "core",
-      "notes": "Mandatory escrow creation policy."
+      "notes": "Mandatory creation policy; yield opt-in is rejected by the Sew core vault profile."
     },
     {
-      "artifactName": "EscrowVault",
-      "contractName": "EscrowVault",
-      "sourcePath": "contracts/core/EscrowVault.sol",
+      "artifactName": "SewCoreVault",
+      "contractName": "SewCoreVault",
+      "sourcePath": "contracts/core/SewCoreVault.sol",
       "scopeHint": "sew",
       "category": "core",
-      "notes": "Vault artifact includes guardian intake pause; existing escrow settlement remains available while paused."
+      "notes": "Size-qualified profile for ERC-20 creation, release, bilateral cancellation, single-resolver dispute, timeout, pull settlement and guardian pause; appeals, split settlement, partial release and yield are absent."
     }
   ]
 }

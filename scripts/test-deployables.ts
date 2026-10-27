@@ -18,6 +18,7 @@ import { loadAllowlist } from './_lib/deployables/allowlist';
 import { ConfigError } from './_lib/deployables/errors';
 import { sha256Hex, sha256HexOfBuffer } from './_lib/hash';
 import { canonicalJson } from './_lib/canonical-json';
+import { sourceCommitFromEnvironment } from './_lib/source-commit';
 
 const OUT_DIR = path.resolve(process.env.SEW_FORGE_OUT_DIR ?? path.resolve(process.cwd(), 'out'));
 const ALLOWLIST = loadAllowlist();
@@ -60,6 +61,21 @@ function expectNotThrows(fn: () => void): void {
 }
 
 function main(): void {
+  test('source override cannot falsely attest dirty or unverifiable artifacts as clean', () => {
+    if (sourceCommitFromEnvironment('abc123', 'abc123', '').dirty !== false) {
+      throw new Error('expected a matching clean Git checkout to be clean');
+    }
+    if (!sourceCommitFromEnvironment('abc123', 'abc123', ' M contracts/core/SewCoreVault.sol').dirty) {
+      throw new Error('dirty checkout was marked clean');
+    }
+    if (!sourceCommitFromEnvironment('abc123', null, null).dirty) {
+      throw new Error('unverifiable source override was marked clean');
+    }
+    if (!sourceCommitFromEnvironment('abc123', 'different', '').dirty) {
+      throw new Error('source revision mismatch was marked clean');
+    }
+  });
+
   if (!fs.existsSync(path.join(OUT_DIR, 'EscrowVault.sol', 'EscrowVault.json'))) {
     console.error('Foundry build output not found. Run `pnpm compile` (or `forge build`) first.');
     process.exit(2);
@@ -130,9 +146,15 @@ function main(): void {
       const record = ra.manifest.artifacts[entry.artifactName];
       if (record?.fullyQualifiedName !== expectedFqn) throw new Error(`FQN mismatch for ${entry.artifactName}`);
     }
-    const vault = ra.manifest.artifacts.EscrowVault;
-    if (!vault?.hasLinkReferences || !vault.hasDeployedLinkReferences) throw new Error('EscrowVault library links are missing from sew-core artifact metadata');
-    if (!ra.manifest.artifacts.EscrowVaultAccountingLibrary) throw new Error('linked accounting library is missing from sew-core inventory');
+    const vault = ra.manifest.artifacts.SewCoreVault;
+    if (!vault?.hasLinkReferences || !vault.hasDeployedLinkReferences) throw new Error('SewCoreVault library links are missing from sew-core artifact metadata');
+    for (const library of [
+      'SettingsValidationLibrary', 'EscrowCreationLogic', 'EscrowDisputeLogic',
+      'EscrowSettlementLogic', 'DisputeInitializationLibrary', 'DisputeRaiseLibrary',
+      'StateManagementLibrary',
+    ]) {
+      if (!ra.manifest.artifacts[library]) throw new Error(`linked library ${library} is missing from sew-core inventory`);
+    }
   });
 
   test('tampered fully qualified manifest identity fails validation', () => {
@@ -141,7 +163,7 @@ function main(): void {
     exportDeployables({ allowlist, outDir: OUT_DIR, exportDir: dir });
     const manifestPath = path.join(dir, 'manifest.json');
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as Record<string, any>;
-    manifest.artifacts.EscrowVault.fullyQualifiedName = 'contracts/Other.sol:EscrowVault';
+    manifest.artifacts.SewCoreVault.fullyQualifiedName = 'contracts/Other.sol:SewCoreVault';
     const { bundleRoot: _oldRoot, ...rootedBody } = manifest;
     manifest.bundleRoot = sha256Hex(canonicalJson(rootedBody));
     fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');

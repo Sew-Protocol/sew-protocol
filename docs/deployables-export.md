@@ -149,7 +149,11 @@ pnpm deployables:pack        # tar.gz the bundle -> dist-deployables/
 pnpm deployables:all         # export + validate + test
 ```
 
-Optional commit override: `GIT_SHA=<sha> pnpm deployables:export` (used by CI).
+Optional revision label: `GIT_SHA=<sha> pnpm deployables:export` (used by CI).
+The label is not a cleanliness attestation: it is marked clean only when it
+matches the checked-out Git `HEAD` and Git successfully reports an empty
+working tree. A mismatch, unavailable Git checkout, or failed status check is
+recorded as dirty and cannot qualify as a pinned live-deployment artifact.
 
 ## Integrity guarantees
 
@@ -207,7 +211,9 @@ states what a contract **is**, not how a deployment governs it.
 - **Library link references** are preserved as `__$...$__` placeholders and
   `linkReferences`; hashes are computed over the unlinked bytecode string.
 - **Source revision** resolves from `GIT_SHA` (CI), `git rev-parse HEAD`, then
-  the jj change id (this repo is developed as a jj workspace).
+  the jj change id (this repo is developed as a jj workspace). A jj or local
+  fallback revision remains dirty unless a clean Git checkout independently
+  confirms the exact revision.
 - **`@sew/deployables` package name is provisional** and configurable in the
   allow-list.
 

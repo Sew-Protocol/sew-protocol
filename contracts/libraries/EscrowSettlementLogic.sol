@@ -67,7 +67,7 @@ library EscrowSettlementLogic {
         bool isRelease,
         TimeoutConfig memory timeoutConfig,
         address escrowContract
-    ) internal view returns (ResolutionResult memory result) {
+    ) public view returns (ResolutionResult memory result) {
         result.isRelease = isRelease;
         result.shouldExecute = false;
         result.appealDeadline = 0;
@@ -143,7 +143,7 @@ library EscrowSettlementLogic {
         uint256 workflowId,
         SettlementPendingSettlement memory pending,
         EscrowState escrowState
-    ) internal view returns (bool canExecute, bool isRelease) {
+    ) public view returns (bool canExecute, bool isRelease) {
         // Intentionally unused (kept for interface/telemetry parity with other ops functions)
         workflowId;
 
@@ -184,7 +184,7 @@ library EscrowSettlementLogic {
         TimeoutConfig memory timeoutConfig,
         bool pendingAutoCancelEnabled,
         uint256 disputeRaisedTimestamp
-    ) internal view returns (uint8 actionType, bool isRelease) {
+    ) public view returns (uint8 actionType, bool isRelease) {
         // Check for pending settlement execution (appeal window enforcement)
         if (
             pending.exists &&
@@ -237,7 +237,7 @@ library EscrowSettlementLogic {
         EscrowTransfer memory et,
         SettlementPendingSettlement memory pending,
         TimeoutConfig memory timeoutConfig
-    ) internal view returns (uint8 actionType, bool isRelease) {
+    ) public view returns (uint8 actionType, bool isRelease) {
         bool pendingAutoCancelEnabled = timeoutConfig.defaultAutoCancelDelay > 0;
         return computeTimedActions(workflowId, et, pending, timeoutConfig, pendingAutoCancelEnabled, 0);
     }

@@ -3,7 +3,7 @@ pragma solidity ^0.8.37;
 
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
-import './BaseEscrow.sol';
+import './EscrowAppealEnabled.sol';
 import '../types/EscrowTypes.sol';
 import '../types/YieldPresets.sol';
 import '../interfaces/IReleaseStrategy.sol';
@@ -18,7 +18,7 @@ import '../libraries/FeeWithdrawalLibrary.sol';
 import '../libraries/EscrowEncodingLibrary.sol';
 import '../libraries/StateManagementLibrary.sol';
 
-contract EscrowVault is BaseEscrow {
+contract EscrowVault is EscrowAppealEnabled {
     using SafeERC20 for IERC20;
 
 

@@ -19,7 +19,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const { deployments, getNamedAccounts, ethers } = hre;
   const { deploy, get } = deployments;
-  const { deployer } = await getNamedAccounts();
+  const deployer = (await getNamedAccounts()).deployer;
+  if (!deployer) throw new Error('Named deployer account is not configured');
   const chainConfig = getChainConfig(hre);
 
   console.log(`\n📦 Deploying AaveYieldModule...`);
@@ -45,7 +46,13 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     poolAddress = addressesProvider;
     console.log(`   Using addresses provider: ${poolAddress}`);
   } else {
-    poolAddress = "0x0000000000000000000000000000000000000000";
+    throw new Error(
+      `Aave V3 Pool is not configured for ${chainConfig.displayName}; refusing to deploy AaveYieldModule without a verified pool address`,
+    );
+  }
+
+  if (poolAddress === ethers.ZeroAddress) {
+    throw new Error(`Aave V3 Pool is not configured for ${chainConfig.displayName}`);
   }
 
   console.log(`   Pool address: ${poolAddress}`);
@@ -68,7 +75,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (aaveYieldModuleDeployment.receipt) {
       await registerDeployment(hre, 'AaveYieldModule', {
         address: aaveYieldModuleDeployment.address,
-        txHash: aaveYieldModuleDeployment.transactionHash,
+        txHash: aaveYieldModuleDeployment.transactionHash ?? aaveYieldModuleDeployment.receipt.transactionHash,
         blockNumber: aaveYieldModuleDeployment.receipt.blockNumber,
         constructorArgs: [poolAddress],
         tags: ['yield', 'aave'],
@@ -96,7 +103,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       const qTx = await aaveModule.queueApproveEscrow(escrowVaultDeployment.address);
       await qTx.wait();
       const [, pendingEta] = await aaveModule.getPendingApproveEscrow();
-      if (BigInt(pendingEta) <= BigInt((await ethers.provider.getBlock('latest')).timestamp)) {
+      const latestBlock = await ethers.provider.getBlock('latest');
+      if (!latestBlock) throw new Error('Could not read latest block while checking Aave escrow approval delay');
+      if (BigInt(pendingEta) <= BigInt(latestBlock.timestamp)) {
         const aTx = await aaveModule.activateApproveEscrow();
         await aTx.wait();
         console.log(`      ✅ EscrowVault approved`);
@@ -162,7 +171,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       const qTx = await aaveModule.queueApproveEscrow(escrowableERC20Deployment.address);
       await qTx.wait();
       const [, pendingEta] = await aaveModule.getPendingApproveEscrow();
-      if (BigInt(pendingEta) <= BigInt((await ethers.provider.getBlock('latest')).timestamp)) {
+      const latestBlock = await ethers.provider.getBlock('latest');
+      if (!latestBlock) throw new Error('Could not read latest block while checking Aave escrow approval delay');
+      if (BigInt(pendingEta) <= BigInt(latestBlock.timestamp)) {
         const aTx = await aaveModule.activateApproveEscrow();
         await aTx.wait();
         console.log(`      ✅ EscrowableERC20 approved`);

@@ -15,7 +15,8 @@ import { registerDeployment } from '../config/deployments.registry';
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts, ethers } = hre;
   const { deploy } = deployments;
-  const { deployer } = await getNamedAccounts();
+  const deployer = (await getNamedAccounts()).deployer;
+  if (!deployer) throw new Error('Named deployer account is not configured');
 
   const config = getGovConfig(hre);
   validateGovConfig(config, hre);
@@ -73,7 +74,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (timelockDeployment.receipt) {
       await registerDeployment(hre, 'TimelockController', {
         address: timelockDeployment.address,
-        txHash: timelockDeployment.transactionHash,
+        txHash: timelockDeployment.transactionHash ?? timelockDeployment.receipt.transactionHash,
         blockNumber: timelockDeployment.receipt.blockNumber,
         constructorArgs: [
           config.timelock.minDelaySec,

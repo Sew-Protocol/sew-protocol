@@ -16,7 +16,8 @@ import { registerDeployment } from '../config/deployments.registry';
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts, ethers } = hre;
   const { deploy, get } = deployments;
-  const { deployer } = await getNamedAccounts();
+  const deployer = (await getNamedAccounts()).deployer;
+  if (!deployer) throw new Error('Named deployer account is not configured');
 
   const config = getGovConfig(hre);
   validateGovConfig(config, hre);
@@ -87,7 +88,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
           if (governorDeployment.receipt) {
             await registerDeployment(hre, 'GovGovernor', {
               address: governorDeployment.address,
-              txHash: governorDeployment.transactionHash,
+              txHash: governorDeployment.transactionHash ?? governorDeployment.receipt.transactionHash,
               blockNumber: governorDeployment.receipt.blockNumber,
               constructorArgs: [
                 tokenDeployment.address,
@@ -108,7 +109,12 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       }
     }
 
-    if (votingDelay !== undefined) {
+    if (
+      votingDelay !== undefined &&
+      votingPeriod !== undefined &&
+      proposalThreshold !== undefined &&
+      absoluteQuorum !== undefined
+    ) {
       console.log(`\n📊 Governor Configuration:`);
       console.log(`   Voting Delay: ${votingDelay.toString()} blocks`);
       console.log(`   Voting Period: ${votingPeriod.toString()} blocks`);
@@ -126,7 +132,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (governorDeployment.receipt) {
       await registerDeployment(hre, 'GovGovernor', {
         address: governorDeployment.address,
-        txHash: governorDeployment.transactionHash,
+        txHash: governorDeployment.transactionHash ?? governorDeployment.receipt.transactionHash,
         blockNumber: governorDeployment.receipt.blockNumber,
               constructorArgs: [
                 tokenDeployment.address,

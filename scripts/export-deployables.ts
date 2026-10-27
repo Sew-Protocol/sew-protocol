@@ -8,7 +8,7 @@
  *
  * Usage:
  *   pnpm deployables:export
- *   SEW_SOURCE_COMMIT=<sha> pnpm deployables:export   # optional commit override
+ *   GIT_SHA=<sha> pnpm deployables:export   # optional revision label; must match a clean Git checkout to qualify as clean
  *   pnpm deployables:export -- <allowlist-path> [export-dir] [--out-dir <forge-output>]
  */
 import * as path from 'path';

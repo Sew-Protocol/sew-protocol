@@ -14,7 +14,8 @@ import { registerDeployment } from '../config/deployments.registry';
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts, ethers } = hre;
   const { deploy, get } = deployments;
-  const { deployer } = await getNamedAccounts();
+  const deployer = (await getNamedAccounts()).deployer;
+  if (!deployer) throw new Error('Named deployer account is not configured');
   const chainConfig = getChainConfig(hre);
 
   console.log(`\n📦 Deploying Cancellation Strategy Module...`);
@@ -44,7 +45,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (defaultCancellationStrategyDeployment.receipt) {
       await registerDeployment(hre, 'DefaultCancellationStrategy', {
         address: defaultCancellationStrategyDeployment.address,
-        txHash: defaultCancellationStrategyDeployment.transactionHash,
+        txHash: defaultCancellationStrategyDeployment.transactionHash ?? defaultCancellationStrategyDeployment.receipt.transactionHash,
         blockNumber: defaultCancellationStrategyDeployment.receipt.blockNumber,
         constructorArgs: [],
         tags: ['module', 'cancellation-strategy'],

@@ -19,7 +19,7 @@ library StateManagementLibrary {
     function transitionToReleased(
         EscrowTransfer storage et,
         uint256 workflowId
-    ) internal returns (EscrowState oldStatus) {
+    ) public returns (EscrowState oldStatus) {
         oldStatus = et.escrowState;
         if (oldStatus == EscrowState.RELEASED || oldStatus == EscrowState.REFUNDED) {
             revert AlreadyTerminal(workflowId, oldStatus);
@@ -36,7 +36,7 @@ library StateManagementLibrary {
     function transitionToRefunded(
         EscrowTransfer storage et,
         uint256 workflowId
-    ) internal returns (EscrowState oldStatus) {
+    ) public returns (EscrowState oldStatus) {
         oldStatus = et.escrowState;
         if (oldStatus == EscrowState.RELEASED || oldStatus == EscrowState.REFUNDED) {
             revert AlreadyTerminal(workflowId, oldStatus);
@@ -53,7 +53,7 @@ library StateManagementLibrary {
     function transitionToResolved(
         EscrowTransfer storage et,
         uint256 workflowId
-    ) internal returns (EscrowState oldStatus) {
+    ) public returns (EscrowState oldStatus) {
         oldStatus = et.escrowState;
         if (oldStatus == EscrowState.RELEASED || oldStatus == EscrowState.REFUNDED) {
             revert AlreadyTerminal(workflowId, oldStatus);
@@ -72,7 +72,7 @@ library StateManagementLibrary {
         EscrowTransfer storage et,
         uint256 workflowId,
         bool isSender
-    ) internal returns (EscrowState oldStatus) {
+    ) public returns (EscrowState oldStatus) {
         oldStatus = et.escrowState;
         if (oldStatus != EscrowState.PENDING) {
             revert AlreadyTerminal(workflowId, oldStatus);

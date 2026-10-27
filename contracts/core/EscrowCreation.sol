@@ -34,6 +34,7 @@ abstract contract EscrowCreation is ReentrancyGuard, EscrowConfiguration {
         internal returns (uint256)
     {
         _requireNotPaused();
+        _validateProfileSettings(settings);
         uint256 workflowId = escrowTransfers.length;
         if (address(creationPolicy) == address(0)) revert ZeroCreationPolicy();
         IResolutionModule resolutionModule = _getResolutionModule(workflowId);
@@ -77,49 +78,20 @@ abstract contract EscrowCreation is ReentrancyGuard, EscrowConfiguration {
     function _resolveResolutionConfigVersion(address resolutionModule, uint256 requestedVersion, address customResolver, bool explicitSelection)
         internal view returns (uint256 version)
     {
-        if (explicitSelection && customResolver != address(0)) revert ResolutionConfigWithCustomResolver(customResolver);
-        if (explicitSelection && requestedVersion == 0) revert ResolutionConfigUnavailable(resolutionModule, requestedVersion);
-        if (resolutionModule == address(0) || resolutionModule.code.length == 0) {
-            if (requestedVersion != 0) revert ResolutionConfigUnavailable(resolutionModule, requestedVersion);
-            return 0;
-        }
-        if (requestedVersion == 0) {
-            (bool ok, bytes memory data) = resolutionModule.staticcall(abi.encodeWithSignature('activeResolutionConfigVersion()'));
-            if (!ok || data.length < 32) return 0;
-            version = abi.decode(data, (uint256));
-        } else version = requestedVersion;
-        if (!explicitSelection) return version;
-        (bool selectable, bytes memory selectableData) = resolutionModule.staticcall(
-            abi.encodeWithSignature('isResolutionConfigSelectable(uint256)', version)
-        );
-        if (!selectable || selectableData.length < 32 || !abi.decode(selectableData, (bool))) {
-            revert ResolutionConfigUnavailable(resolutionModule, version);
-        }
+        return EscrowCreationLogic.resolveResolutionConfigVersion(resolutionModule, requestedVersion, customResolver, explicitSelection);
     }
 
+    function _validateProfileSettings(EscrowSettings memory settings) internal view virtual { settings; }
+
     function _snapshotModulesForEscrow(uint256 workflowId, uint256 resolutionConfigVersion) internal {
-        address resModule = address(_getResolutionModule(workflowId));
-        moduleSnapshots[workflowId] = ModuleSnapshot({
-            resolutionModule: resModule, releaseStrategy: address(_getReleaseStrategy(workflowId)),
-            cancellationStrategy: _getCancellationStrategy(workflowId),
-            yieldGenerationModule: address(_getYieldGenerationModule(workflowId)),
-            incentiveModule: ModuleSnapshotLibrary.getIncentiveModule(resModule),
-            yieldProtocolFeeBps: yieldProtocolFeeBps, appealBondProtocolFeeBps: appealBondProtocolFeeBps,
-            escrowFeeBps: escrowFee, defaultAutoReleaseDelay: timeoutConfig.defaultAutoReleaseDelay,
-            defaultAutoCancelDelay: timeoutConfig.defaultAutoCancelDelay, maxDisputeDuration: timeoutConfig.maxDisputeDuration,
-            appealWindowDuration: timeoutConfig.appealWindowDuration
-        });
-        if (resolutionConfigVersion != 0) {
-            workflowResolutionConfigVersion[workflowId] = resolutionConfigVersion;
-            (bool ok, bytes memory data) = resModule.staticcall(abi.encodeWithSignature('resolutionConfigRoot(uint256)', resolutionConfigVersion));
-            bytes32 root = ok && data.length >= 32 ? abi.decode(data, (bytes32)) : bytes32(0);
-            emit ResolutionConfigBound(workflowId, resModule, resolutionConfigVersion, root);
-        }
-        bool pending = timeoutConfig.defaultAutoCancelDelay > 0;
-        bool disputed = timeoutConfig.maxDisputeDuration > 0;
-        timeoutPolicySnapshots[workflowId] = EscrowTimeoutPolicySnapshot(pending, disputed);
-        appealBondFeeRecipients[workflowId] = escrowFeeAddress;
-        emit TimeoutPolicySnapshotted(workflowId, pending, disputed);
+        EscrowCreationLogic.snapshotModulesForEscrow(
+            moduleSnapshots, workflowResolutionConfigVersion, timeoutPolicySnapshots,
+            appealBondFeeRecipients, workflowId, address(_getResolutionModule(workflowId)),
+            address(_getReleaseStrategy(workflowId)), _getCancellationStrategy(workflowId),
+            address(_getYieldGenerationModule(workflowId)), resolutionConfigVersion,
+            yieldProtocolFeeBps, appealBondProtocolFeeBps, escrowFee,
+            timeoutConfig, escrowFeeAddress
+        );
     }
 
     /// @dev Creation-time derivation/materialization of a workflow's settings.
@@ -127,32 +99,10 @@ abstract contract EscrowCreation is ReentrancyGuard, EscrowConfiguration {
     ///      creation-time defaults, enforces mutual exclusion, stores the settings,
     ///      and emits the configuration event.
     function _applyEscrowSettings(uint256 workflowId, EscrowSettings memory settings) internal {
-        EscrowTransfer storage et = escrowTransfers[workflowId];
-        if (settings.customResolver != address(0)) et.disputeResolver = settings.customResolver;
-        bool useDefaults = (settings.autoReleaseTime == 0 && settings.autoCancelTime == 0);
-
-        uint256 relTime = settings.autoReleaseTime;
-        if (relTime == 0 && useDefaults && timeoutConfig.defaultAutoReleaseDelay > 0) {
-            relTime = block.timestamp + timeoutConfig.defaultAutoReleaseDelay;
-        }
-        if (relTime > type(uint64).max) revert InvalidAutoTime(AUTO_TIME_TOO_LARGE, relTime, block.timestamp);
-        et.autoReleaseTime = uint64(relTime);
-
-        uint256 cancTime = settings.autoCancelTime;
-        if (cancTime == 0 && useDefaults && timeoutConfig.defaultAutoCancelDelay > 0) {
-            cancTime = block.timestamp + timeoutConfig.defaultAutoCancelDelay;
-        }
-        if (cancTime > type(uint64).max) revert InvalidAutoTime(AUTO_TIME_TOO_LARGE, cancTime, block.timestamp);
-        et.autoCancelTime = uint64(cancTime);
-
-        // Independent mutual-exclusion check (guards against setTimeoutConfig bypass
-        // or future code changes that could set both defaults simultaneously).
-        if (et.autoReleaseTime > 0 && et.autoCancelTime > 0) {
-            revert BothAutoTimesSet(workflowId, et.autoReleaseTime, et.autoCancelTime);
-        }
-
-        escrowSettings[workflowId] = settings;
-        emit EscrowSettingsUpdated(workflowId, settings);
+        EscrowCreationLogic.applyEscrowSettings(
+            escrowTransfers[workflowId], escrowSettings, workflowId, settings,
+            timeoutConfig.defaultAutoReleaseDelay, timeoutConfig.defaultAutoCancelDelay
+        );
     }
 
     function _pullTokens(address token, address from, uint256 amount) internal virtual;

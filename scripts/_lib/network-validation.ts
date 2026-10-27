@@ -32,6 +32,17 @@ export async function validateNetwork(
     );
   }
 
+  if (chainConfig.expectedDeployerAddress) {
+    const [signer] = await hre.ethers.getSigners();
+    const actualAddress = signer ? await signer.getAddress() : undefined;
+    if (actualAddress?.toLowerCase() !== chainConfig.expectedDeployerAddress.toLowerCase()) {
+      throw new Error(
+        `Deployer mismatch for ${chainConfig.displayName}: expected ${chainConfig.expectedDeployerAddress}, ` +
+          `received ${actualAddress ?? 'no configured signer'}`,
+      );
+    }
+  }
+
   // Validate RPC endpoint (basic check)
   if (chainConfig.rpcUrl && !chainConfig.rpcUrl.includes('localhost')) {
     try {

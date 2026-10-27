@@ -24,7 +24,7 @@ library DisputeInitializationLibrary {
         address disputeResolver,
         uint256 configVersion,
         bytes memory escrowData
-    ) internal returns (uint256) {
+    ) public returns (uint256) {
         if (disputeResolutionModule == address(0)) {
             return 0;
         }
@@ -106,7 +106,7 @@ library DisputeInitializationLibrary {
      * @param disputeResolver Dispute resolver address
      * @param workflowId Escrow workflow ID
      */
-    function callResolverCallback(address disputeResolver, uint256 workflowId) internal {
+    function callResolverCallback(address disputeResolver, uint256 workflowId) public {
         if (disputeResolver.code.length == 0) {
             return; // Not a contract
         }

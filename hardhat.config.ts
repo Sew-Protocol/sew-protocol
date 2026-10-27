@@ -27,6 +27,7 @@ extendEnvironment(async (hre) => {
 
 const PRIVATE_KEY = process.env.PRIVATE_KEY || '';
 const SEPOLIA_DEPLOY_KEY = process.env.SEPOLIA_DEPLOY_KEY || '';
+const MONAD_DEPLOY_KEY = process.env.TESTNET_MONAD_DEPLOY_KEY || '';
 const DEPLOY_CONFIRM = (process.env.DEPLOY_CONFIRM || 'NO').toUpperCase();
 // Keep runs low to minimize deployed bytecode size (EIP-170).
 // With viaIR enabled, runs=10 optimizes for contract size over gas costs.
@@ -88,6 +89,11 @@ const config: HardhatUserConfig = {
       // This is useful if you want governance infra deployed from one EOA and core escrow from another.
       accounts: accountsFor('baseSepolia', SEPOLIA_DEPLOY_KEY || undefined),
       chainId: 84532,
+    },
+    monadTestnet: {
+      url: rpc('RPC_MONAD_TESTNET') || 'https://testnet-rpc.monad.xyz/',
+      accounts: accountsFor('monadTestnet', MONAD_DEPLOY_KEY || undefined),
+      chainId: 10143,
     },
     base: { url: rpc('RPC_BASE_MAINNET'), accounts: accountsFor('base'), chainId: 8453 },
     ethereum: { url: rpc('RPC_ETHEREUM'), accounts: accountsFor('ethereum'), chainId: 1 },

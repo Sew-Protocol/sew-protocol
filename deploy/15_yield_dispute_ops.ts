@@ -52,7 +52,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const { deployments, getNamedAccounts, ethers } = hre;
   const { deploy, get } = deployments;
-  const { deployer } = await getNamedAccounts();
+  const deployer = (await getNamedAccounts()).deployer;
+  if (!deployer) throw new Error('Named deployer account is not configured');
   const chainConfig = getChainConfig(hre);
   const txOverrides = getTxOverrides(ethers);
 
@@ -78,7 +79,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (creationPolicyDeployment.receipt) {
       await registerDeployment(hre, 'EscrowCreationPolicy', {
         address: creationPolicyDeployment.address,
-        txHash: creationPolicyDeployment.transactionHash,
+        txHash: creationPolicyDeployment.transactionHash ?? creationPolicyDeployment.receipt.transactionHash,
         blockNumber: creationPolicyDeployment.receipt.blockNumber,
         constructorArgs: [deployer],
         tags: ['core', 'create'],
@@ -108,7 +109,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (bondCollectorDeployment.receipt) {
       await registerDeployment(hre, 'BondCollector', {
         address: bondCollectorDeployment.address,
-        txHash: bondCollectorDeployment.transactionHash,
+        txHash: bondCollectorDeployment.transactionHash ?? bondCollectorDeployment.receipt.transactionHash,
         blockNumber: bondCollectorDeployment.receipt.blockNumber,
         constructorArgs: [deployer],
         tags: ['core', 'bond'],

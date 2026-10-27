@@ -72,7 +72,7 @@ export function readForgeArtifact(outDir: string, contractName: string): ForgeAr
     }
   }
 
-  const sourcePath: string = raw.ast?.absolutePath ?? metadataCompilationTarget(metadata) ?? 'unknown';
+  const sourcePath: string = canonicalSourcePath(raw.ast?.absolutePath ?? metadataCompilationTarget(metadata) ?? 'unknown');
 
   return {
     contractName,
@@ -91,6 +91,24 @@ export function readForgeArtifact(outDir: string, contractName: string): ForgeAr
     viaIR,
     methodIdentifiers: raw.methodIdentifiers ?? {},
   };
+}
+
+/**
+ * Foundry records pnpm's physical store path in artifact ASTs. Export stable,
+ * package-manager-independent FQNs while keeping the locked package name and
+ * version in the source lockfile/provenance. Non-pnpm and project paths are
+ * returned unchanged.
+ */
+function canonicalSourcePath(sourcePath: string): string {
+  const pnpmStoreMarker = 'node_modules/.pnpm/';
+  const storeIndex = sourcePath.indexOf(pnpmStoreMarker);
+  if (storeIndex < 0) return sourcePath;
+
+  const nestedNodeModulesMarker = 'node_modules/';
+  const nestedIndex = sourcePath.indexOf(nestedNodeModulesMarker, storeIndex + pnpmStoreMarker.length);
+  if (nestedIndex < 0) return sourcePath;
+
+  return `node_modules/${sourcePath.slice(nestedIndex + nestedNodeModulesMarker.length)}`;
 }
 
 function metadataCompilationTarget(metadata: unknown): string | null {

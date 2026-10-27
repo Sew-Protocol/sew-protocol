@@ -15,7 +15,8 @@ import { ethers } from 'hardhat';
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts } = hre;
   const { deploy } = deployments;
-  const { deployer } = await getNamedAccounts();
+  const deployer = (await getNamedAccounts()).deployer;
+  if (!deployer) throw new Error('Named deployer account is not configured');
 
   // CREATE2EscrowFactory is skipped on testnet due to contract size. Opt in
   // explicitly (DEPLOY_CREATE2_FACTORY=true) to enable deployment, e.g. on a

@@ -26,7 +26,7 @@ library DisputeRaiseLibrary {
         uint256 amountAfterFee,
         uint256 escrowFee,
         uint256 escrowFeeDenominator
-    ) internal returns (bool shouldEmitFailure) {
+    ) public returns (bool shouldEmitFailure) {
         if (incentiveModAddr == address(0)) {
             return false; // No incentive module, no failure to emit
         }
