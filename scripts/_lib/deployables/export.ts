@@ -86,6 +86,7 @@ export function exportDeployables(opts: ExportOptions = {}): ExportResult {
       deployedBytecode: fa.deployedBytecodeObject,
       linkReferences: fa.bytecodeLinkReferences,
       deployedLinkReferences: fa.deployedLinkReferences,
+      immutableReferences: fa.deployedImmutableReferences,
       metadata: fa.metadataBase64,
     };
 

@@ -82,6 +82,7 @@ export function readForgeArtifact(outDir: string, contractName: string): ForgeAr
     deployedBytecodeObject,
     bytecodeLinkReferences: raw.bytecode?.linkReferences ?? {},
     deployedLinkReferences: raw.deployedBytecode?.linkReferences ?? {},
+    deployedImmutableReferences: raw.deployedBytecode?.immutableReferences ?? {},
     metadataBase64,
     metadata,
     compilerVersion,

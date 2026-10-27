@@ -46,6 +46,7 @@ export interface ForgeArtifact {
   deployedBytecodeObject: string;
   bytecodeLinkReferences: LinkReferencesMap;
   deployedLinkReferences: LinkReferencesMap;
+  deployedImmutableReferences: Record<string, Array<{ start: number; length: number }>>;
   metadataBase64: string;
   metadata: unknown;
   compilerVersion: string;
@@ -109,5 +110,6 @@ export interface ExportedArtifactFile {
   deployedBytecode: string;
   linkReferences: LinkReferencesMap;
   deployedLinkReferences: LinkReferencesMap;
+  immutableReferences: Record<string, Array<{ start: number; length: number }>>;
   metadata: string;
 }
