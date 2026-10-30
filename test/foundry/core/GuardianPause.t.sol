@@ -43,7 +43,13 @@ contract GuardianPause is Test {
     uint256 public constant INITIAL_BALANCE = 1_000_000e18;
 
     function _getDefaultSettings() internal pure returns (EscrowSettings memory) {
-        return SettingsValidationLibrary.getDefaultSettings();
+        return EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        });
     }
 
     function setUp() public {

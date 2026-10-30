@@ -43,7 +43,13 @@ contract BaseEscrowComprehensive is Test {
     uint256 public constant ESCROW_FEE = 100; // 1%
 
     function _getDefaultSettings() internal pure returns (EscrowSettings memory) {
-        return SettingsValidationLibrary.getDefaultSettings();
+        return EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        });
     }
 
     function _loadTransfer(uint256 workflowId) internal view returns (EscrowTransfer memory et) {
@@ -302,7 +308,13 @@ contract BaseEscrowComprehensive is Test {
         token.approve(address(vault), amount);
 
         vm.prank(buyer);
-        uint256 workflowId = vault.createEscrow(address(token), seller, amount, SettingsValidationLibrary.getDefaultSettings());
+        uint256 workflowId = vault.createEscrow(address(token), seller, amount, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
 
         vm.prank(buyer);
         vault.raiseDispute(workflowId);
@@ -320,7 +332,13 @@ contract BaseEscrowComprehensive is Test {
         token.approve(address(vault), amount);
 
         vm.prank(buyer);
-        uint256 workflowId = vault.createEscrow(address(token), seller, amount, SettingsValidationLibrary.getDefaultSettings());
+        uint256 workflowId = vault.createEscrow(address(token), seller, amount, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
 
         vm.prank(buyer);
         vault.raiseDispute(workflowId);
@@ -362,7 +380,13 @@ contract BaseEscrowComprehensive is Test {
         // Create escrow - it will use default auto cancel delay
         uint256 startTime = block.timestamp;
         vm.prank(buyer);
-        uint256 workflowId = vault.createEscrow(address(token), seller, amount, SettingsValidationLibrary.getDefaultSettings());
+        uint256 workflowId = vault.createEscrow(address(token), seller, amount, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
 
         // Get the escrow to verify auto cancel time
         EscrowTransfer memory et = _loadTransfer(workflowId);
@@ -393,11 +417,29 @@ contract BaseEscrowComprehensive is Test {
         // Create escrows - they will use default auto cancel delay
         uint256 startTime = block.timestamp;
         vm.prank(buyer);
-        uint256 workflowId1 = vault.createEscrow(address(token), seller, amount, SettingsValidationLibrary.getDefaultSettings());
+        uint256 workflowId1 = vault.createEscrow(address(token), seller, amount, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
         vm.prank(buyer);
-        vault.createEscrow(address(token), seller, amount, SettingsValidationLibrary.getDefaultSettings());
+        vault.createEscrow(address(token), seller, amount, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
         vm.prank(buyer);
-        vault.createEscrow(address(token), seller, amount, SettingsValidationLibrary.getDefaultSettings());
+        vault.createEscrow(address(token), seller, amount, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
 
         vm.warp(startTime + autoCancelDelay + 1);
 

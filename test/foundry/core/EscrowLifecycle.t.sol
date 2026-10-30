@@ -90,7 +90,13 @@ contract EscrowLifecycleTest is Test {
         
         // Should revert with AccountingDeficit
         vm.expectRevert();
-        vault.createEscrow(address(fotToken), seller, 1000e18, SettingsValidationLibrary.getDefaultSettings());
+        vault.createEscrow(address(fotToken), seller, 1000e18, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
         vm.stopPrank();
     }
 
@@ -99,7 +105,13 @@ contract EscrowLifecycleTest is Test {
         token.mint(buyer, amount);
         vm.startPrank(buyer);
         token.approve(address(vault), amount);
-        uint256 wid = vault.createEscrow(address(token), seller, amount, SettingsValidationLibrary.getDefaultSettings());
+        uint256 wid = vault.createEscrow(address(token), seller, amount, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
         
         vault.senderCancel(wid);
         vm.stopPrank();

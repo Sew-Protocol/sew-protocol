@@ -31,9 +31,14 @@ contract BondLedger is IBondLedger, AccessControl, ReentrancyGuard {
     mapping(bytes32 => bytes32) private _authoritativeCauseRoots;
     mapping(bytes32 => DispositionCauseType) private _dispositionCauseTypes;
     mapping(address => uint256) public forfeitedBondReserve;
+    /// @notice Number of unsettled positions opened by each authorized operator.
+    /// @dev Prevents governance from removing a facade while it still owns
+    ///      settlement authority for outstanding liabilities.
+    mapping(address => uint256) public pendingBondsByOperator;
 
     error NotAuthorized();
     error ZeroAddress();
+    error AuthorizedCallerHasPendingBonds(address caller, uint256 pendingCount);
 
     modifier onlyAuthorized() {
         if (!hasRole(AUTHORIZED_CALLER, _msgSender())) revert NotAuthorized();
@@ -51,6 +56,8 @@ contract BondLedger is IBondLedger, AccessControl, ReentrancyGuard {
     }
 
     function removeAuthorizedCaller(address caller) external onlyRole(ROLE_TIMELOCK) {
+        uint256 pendingCount = pendingBondsByOperator[caller];
+        if (pendingCount != 0) revert AuthorizedCallerHasPendingBonds(caller, pendingCount);
         _revokeRole(AUTHORIZED_CALLER, caller);
     }
 
@@ -66,6 +73,7 @@ contract BondLedger is IBondLedger, AccessControl, ReentrancyGuard {
     ) external payable nonReentrant onlyAuthorized {
         BondPosition storage pos = _positions[bondId];
         if (pos.status != uint8(BondStatus.NONE)) revert InvalidStatus();
+        if (termsHash == bytes32(0)) revert InvalidTermsHash();
 
         if (asset == address(0)) {
             if (msg.value != principal) revert InvalidAmount();
@@ -94,6 +102,7 @@ contract BondLedger is IBondLedger, AccessControl, ReentrancyGuard {
             operator: _msgSender(),
             beneficiary: payer
         });
+        pendingBondsByOperator[_msgSender()] += 1;
 
         emit BondPosted(bondId, application, payer, funder, asset, principal, contextId, termsHash);
     }
@@ -152,6 +161,7 @@ contract BondLedger is IBondLedger, AccessControl, ReentrancyGuard {
 
         pos.status = uint8(BondStatus.SETTLED);
         pos.allocationCount = uint8(len);
+        pendingBondsByOperator[_positionRoles[bondId].operator] -= 1;
 
         Allocation[] storage stored = _settlementAllocations[bondId];
         for (uint256 i = 0; i < len; i++) {
@@ -252,4 +262,5 @@ contract BondLedger is IBondLedger, AccessControl, ReentrancyGuard {
     error NothingClaimable();
     error ClaimFailed();
     error InvalidCauseRoot();
+    error InvalidTermsHash();
 }

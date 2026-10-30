@@ -23,7 +23,8 @@ contract WalletEscrowCapabilitiesTest is AppealWindowEnforcementTest {
         EscrowableERC20 escrowToken = new EscrowableERC20('Escrow Token','ESC',ESCROW_FEE,feeAddress,address(moduleManagement));
         assertTrue(escrowToken.supportsInterface(type(IEscrowLifecycle).interfaceId));
         assertTrue(escrowToken.supportsInterface(type(IEscrowDispute).interfaceId));
-        assertTrue(escrowToken.supportsInterface(type(IEscrowAppeal).interfaceId));
+        // EscrowableERC20 inherits BaseEscrow directly and does not enable appeals.
+        assertFalse(escrowToken.supportsInterface(type(IEscrowAppeal).interfaceId));
         assertTrue(escrowToken.supportsInterface(type(IEscrowSettlement).interfaceId));
         assertTrue(escrowToken.supportsInterface(type(IEscrowViews).interfaceId));
     }

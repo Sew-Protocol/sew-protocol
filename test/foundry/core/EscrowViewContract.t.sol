@@ -117,7 +117,13 @@ contract EscrowViewContractTest is Test {
         vm.prank(buyer);
         token.approve(address(vault), INITIAL_AMOUNT);
         vm.prank(buyer);
-        uint256 workflowId = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, SettingsValidationLibrary.getDefaultSettings());
+        uint256 workflowId = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
 
         // Get summary
         EscrowViewContract.EscrowSummary memory summary = escrowView.getEscrowSummary(workflowId);
@@ -175,7 +181,13 @@ contract EscrowViewContractTest is Test {
         vm.prank(buyer);
         token.approve(address(vault), INITIAL_AMOUNT);
         vm.prank(buyer);
-        uint256 workflowId = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, SettingsValidationLibrary.getDefaultSettings());
+        uint256 workflowId = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
 
         // Test PENDING state
         EscrowViewContract.EscrowSummary memory summary = escrowView.getEscrowSummary(workflowId);
@@ -225,7 +237,13 @@ contract EscrowViewContractTest is Test {
         vm.prank(buyer);
         token.approve(address(vault), INITIAL_AMOUNT);
         vm.prank(buyer);
-        uint256 workflowId = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, SettingsValidationLibrary.getDefaultSettings());
+        uint256 workflowId = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
 
         EscrowSettings memory retrieved = escrowView.getEscrowSettings(workflowId);
 
@@ -252,7 +270,13 @@ contract EscrowViewContractTest is Test {
         vm.prank(buyer);
         token.approve(address(vault), INITIAL_AMOUNT);
         vm.prank(buyer);
-        uint256 workflowId = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, SettingsValidationLibrary.getDefaultSettings());
+        uint256 workflowId = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
 
         (EscrowState status, bool isActive, bool isPending) = escrowView.getEscrowStatusInfo(workflowId);
 
@@ -266,7 +290,13 @@ contract EscrowViewContractTest is Test {
         vm.prank(buyer);
         token.approve(address(vault), INITIAL_AMOUNT);
         vm.prank(buyer);
-        uint256 workflowId = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, SettingsValidationLibrary.getDefaultSettings());
+        uint256 workflowId = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
 
         // Raise dispute
         vm.prank(buyer);
@@ -284,7 +314,13 @@ contract EscrowViewContractTest is Test {
         vm.prank(buyer);
         token.approve(address(vault), INITIAL_AMOUNT);
         vm.prank(buyer);
-        uint256 workflowId = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, SettingsValidationLibrary.getDefaultSettings());
+        uint256 workflowId = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
 
         vm.prank(buyer);
         vault.release(workflowId);
@@ -301,7 +337,13 @@ contract EscrowViewContractTest is Test {
         vm.prank(buyer);
         token.approve(address(vault), INITIAL_AMOUNT);
         vm.prank(buyer);
-        uint256 workflowId = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, SettingsValidationLibrary.getDefaultSettings());
+        uint256 workflowId = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
 
         // Both agree to cancel
         vm.prank(buyer);
@@ -321,7 +363,13 @@ contract EscrowViewContractTest is Test {
         vm.prank(buyer);
         token.approve(address(vault), INITIAL_AMOUNT);
         vm.prank(buyer);
-        uint256 workflowId = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, SettingsValidationLibrary.getDefaultSettings());
+        uint256 workflowId = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
 
         // Raise dispute and resolve
         vm.prank(buyer);
@@ -361,7 +409,13 @@ contract EscrowViewContractTest is Test {
         vm.prank(buyer);
         token.approve(address(vault), INITIAL_AMOUNT);
         vm.prank(buyer);
-        uint256 workflowId = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, SettingsValidationLibrary.getDefaultSettings());
+        uint256 workflowId = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
 
         (address from, address to) = escrowView.getEscrowParticipants(workflowId);
 
@@ -392,7 +446,13 @@ contract EscrowViewContractTest is Test {
         vm.prank(buyer);
         token.approve(address(vault), INITIAL_AMOUNT);
         vm.prank(buyer);
-        uint256 workflowId = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, SettingsValidationLibrary.getDefaultSettings());
+        uint256 workflowId = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
 
         uint256 totalDeposited = escrowView.getTotalDeposited(workflowId);
 
@@ -416,7 +476,13 @@ contract EscrowViewContractTest is Test {
         vm.prank(buyer);
         token.approve(address(vault), INITIAL_AMOUNT);
         vm.prank(buyer);
-        vault.createEscrow(address(token), seller, INITIAL_AMOUNT, SettingsValidationLibrary.getDefaultSettings());
+        vault.createEscrow(address(token), seller, INITIAL_AMOUNT, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
         
         uint256 count = escrowView.getEscrowCount();
         assertEq(count, 1);
@@ -440,7 +506,13 @@ contract EscrowViewContractTest is Test {
         vm.prank(buyer);
         token.approve(address(vault), INITIAL_AMOUNT);
         vm.prank(buyer);
-        uint256 workflowId = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, SettingsValidationLibrary.getDefaultSettings());
+        uint256 workflowId = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
 
         (bool exists, bool isRelease, uint256 appealDeadline, bytes32 resolutionHash, bool canExecute) = 
             escrowView.getPendingSettlement(workflowId);
@@ -457,7 +529,13 @@ contract EscrowViewContractTest is Test {
         vm.prank(buyer);
         token.approve(address(vault), INITIAL_AMOUNT);
         vm.prank(buyer);
-        uint256 workflowId = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, SettingsValidationLibrary.getDefaultSettings());
+        uint256 workflowId = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
 
         // Raise dispute
         vm.prank(buyer);
@@ -485,7 +563,13 @@ contract EscrowViewContractTest is Test {
         vm.prank(buyer);
         token.approve(address(vault), INITIAL_AMOUNT);
         vm.prank(buyer);
-        uint256 workflowId = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, SettingsValidationLibrary.getDefaultSettings());
+        uint256 workflowId = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
 
         // Raise dispute
         vm.prank(buyer);
@@ -561,7 +645,13 @@ contract EscrowViewContractTest is Test {
     function test_getEscrowTimeline_pending() public {
         uint256 amount = 1000e18;
         uint256 autoReleaseTime = block.timestamp + 10 days;
-        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
+        EscrowSettings memory settings = EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        });
         settings.autoReleaseTime = autoReleaseTime;
 
         token.transfer(buyer, amount);
@@ -580,7 +670,13 @@ contract EscrowViewContractTest is Test {
     function test_getEscrowTimeline_actionable() public {
         uint256 amount = 1000e18;
         uint256 autoReleaseTime = block.timestamp + 1 days;
-        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
+        EscrowSettings memory settings = EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        });
         settings.autoReleaseTime = autoReleaseTime;
 
         token.transfer(buyer, amount);
@@ -603,9 +699,21 @@ contract EscrowViewContractTest is Test {
         token.approve(address(vault), INITIAL_AMOUNT * 2);
         
         vm.prank(buyer);
-        vault.createEscrow(address(token), seller, INITIAL_AMOUNT, SettingsValidationLibrary.getDefaultSettings());
+        vault.createEscrow(address(token), seller, INITIAL_AMOUNT, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
         vm.prank(buyer);
-        vault.createEscrow(address(token), seller, INITIAL_AMOUNT, SettingsValidationLibrary.getDefaultSettings());
+        vault.createEscrow(address(token), seller, INITIAL_AMOUNT, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
 
         uint256[] memory ids = escrowView.getWorkflowsByRole(buyer, UserRole.BUYER, 0, 10);
         assertEq(ids.length, 2);
@@ -620,11 +728,29 @@ contract EscrowViewContractTest is Test {
 
         // Create multiple escrows
         vm.prank(buyer);
-        uint256 workflowId1 = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, SettingsValidationLibrary.getDefaultSettings());
+        uint256 workflowId1 = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
         vm.prank(buyer);
-        uint256 workflowId2 = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, SettingsValidationLibrary.getDefaultSettings());
+        uint256 workflowId2 = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
         vm.prank(buyer);
-        uint256 workflowId3 = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, SettingsValidationLibrary.getDefaultSettings());
+        uint256 workflowId3 = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
 
         // Verify all can be queried
         EscrowViewContract.EscrowSummary memory summary1 = escrowView.getEscrowSummary(workflowId1);
@@ -644,7 +770,13 @@ contract EscrowViewContractTest is Test {
         vm.prank(buyer);
         token.approve(address(vault), INITIAL_AMOUNT);
         vm.prank(buyer);
-        uint256 workflowId = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, SettingsValidationLibrary.getDefaultSettings());
+        uint256 workflowId = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
 
         // PENDING -> DISPUTED
         vm.prank(buyer);
@@ -676,7 +808,13 @@ contract EscrowViewContractTest is Test {
         vm.prank(buyer);
         token.approve(address(vault), minAmount);
         vm.prank(buyer);
-        uint256 workflowId = vault.createEscrow(address(token), seller, minAmount, SettingsValidationLibrary.getDefaultSettings());
+        uint256 workflowId = vault.createEscrow(address(token), seller, minAmount, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
 
         EscrowViewContract.EscrowSummary memory summary = escrowView.getEscrowSummary(workflowId);
         assertGt(summary.amountAfterFee, 0);
@@ -714,7 +852,13 @@ contract EscrowViewContractTest is Test {
         token.transfer(buyer, INITIAL_AMOUNT);
         vm.startPrank(buyer);
         token.approve(address(vault), INITIAL_AMOUNT);
-        uint256 id = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, SettingsValidationLibrary.getDefaultSettings());
+        uint256 id = vault.createEscrow(address(token), seller, INITIAL_AMOUNT, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
         vm.stopPrank();
         return id;
     }

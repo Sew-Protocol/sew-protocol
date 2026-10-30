@@ -100,7 +100,13 @@ contract PerEscrowSettingsTest is Test {
         uint256 amount = 100e18;
         uint256 autoReleaseTime = block.timestamp + 10 days;
         
-        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
+        EscrowSettings memory settings = EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        });
         settings.autoReleaseTime = autoReleaseTime;
         
         vm.prank(buyer);
@@ -122,7 +128,13 @@ contract PerEscrowSettingsTest is Test {
         uint256 amount = 100e18;
         uint256 autoCancelTime = block.timestamp + 5 days;
         
-        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
+        EscrowSettings memory settings = EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        });
         settings.autoCancelTime = autoCancelTime;
         
         vm.prank(buyer);
@@ -141,7 +153,13 @@ contract PerEscrowSettingsTest is Test {
     function test_PerEscrow_ModuleSnapshotting() public {
         // Escrow 1 created with V1 modules
         vm.prank(buyer);
-        uint256 wid1 = vault.createEscrow(address(token), seller, 100e18, SettingsValidationLibrary.getDefaultSettings());
+        uint256 wid1 = vault.createEscrow(address(token), seller, 100e18, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
         
         // Change Global Default Release Strategy
         moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.RELEASE, address(releaseV2));
@@ -153,7 +171,13 @@ contract PerEscrowSettingsTest is Test {
         
         // Escrow 2 created with V2 modules
         vm.prank(buyer);
-        uint256 wid2 = vault.createEscrow(address(token), seller, 100e18, SettingsValidationLibrary.getDefaultSettings());
+        uint256 wid2 = vault.createEscrow(address(token), seller, 100e18, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
         
         // Verify Escrow 1 still points to V1
         assertEq(vault.getReleaseStrategyAddr(wid1), address(releaseV1));
@@ -166,7 +190,13 @@ contract PerEscrowSettingsTest is Test {
 
     function test_PerEscrow_CustomResolver() public {
         address customResolver = address(resolutionV2);
-        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
+        EscrowSettings memory settings = EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        });
         settings.customResolver = customResolver;
         settings.releaseAddress = address(0); // Explicitly set to 0 for this test
         
@@ -184,7 +214,13 @@ contract PerEscrowSettingsTest is Test {
         (uint256 principalBefore, uint256 feesBefore, uint256 balanceBefore, ) =
             EscrowVaultAnalytics(address(vault)).getAccountingBreakdown(address(token));
 
-        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
+        EscrowSettings memory settings = EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        });
         settings.customResolver = address(resolutionV2); // non-zero contract address
         settings.releaseAddress = address(0); // Added default releaseAddress
         settings.yieldPreset = YieldPreset.ENABLED;
@@ -235,7 +271,13 @@ contract PerEscrowSettingsTest is Test {
         });
         vault.setTimeoutConfig(cfg);
 
-        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
+        EscrowSettings memory settings = EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        });
         // Both auto times zero -> should use defaults from timeoutConfig
 
         vm.prank(buyer);
@@ -255,7 +297,13 @@ contract PerEscrowSettingsTest is Test {
 
     function test_PerEscrow_InvalidCustomResolver_RevertsAndDoesNotCreateEscrow() public {
         uint256 amount = 100e18;
-        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
+        EscrowSettings memory settings = EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        });
         // EOA address (no code) should be rejected as customResolver
         settings.customResolver = address(0x1234);
 
@@ -270,7 +318,13 @@ contract PerEscrowSettingsTest is Test {
 
     function test_PerEscrow_BothAutoTimesSet_Reverts() public {
         uint256 amount = 100e18;
-        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
+        EscrowSettings memory settings = EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        });
         settings.autoReleaseTime = block.timestamp + 5 days;
         settings.autoCancelTime = block.timestamp + 6 days;
 
@@ -284,7 +338,13 @@ contract PerEscrowSettingsTest is Test {
 
     function test_PerEscrow_AutoReleaseInPast_Reverts() public {
         uint256 amount = 100e18;
-        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
+        EscrowSettings memory settings = EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        });
         settings.autoReleaseTime = block.timestamp - 1;
 
         vm.startPrank(buyer);

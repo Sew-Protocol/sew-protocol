@@ -75,8 +75,20 @@ contract EscrowVaultAccountingTest is Test {
         tokenA.approve(address(vault), amountA);
         tokenB.approve(address(vault), amountB);
 
-        vault.createEscrow(address(tokenA), seller, amountA, SettingsValidationLibrary.getDefaultSettings());
-        vault.createEscrow(address(tokenB), seller, amountB, SettingsValidationLibrary.getDefaultSettings());
+        vault.createEscrow(address(tokenA), seller, amountA, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
+        vault.createEscrow(address(tokenB), seller, amountB, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
         vm.stopPrank();
 
         (uint256 principalA, uint256 feesA, , ) = vault.getAccountingBreakdown(address(tokenA));
@@ -97,7 +109,13 @@ contract EscrowVaultAccountingTest is Test {
 
         vm.startPrank(buyer);
         tokenA.approve(address(vault), amount);
-        uint256 wid = vault.createEscrow(address(tokenA), seller, amount, SettingsValidationLibrary.getDefaultSettings());
+        uint256 wid = vault.createEscrow(address(tokenA), seller, amount, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
         vault.release(wid);
         vm.stopPrank();
 
@@ -116,7 +134,13 @@ contract EscrowVaultAccountingTest is Test {
 
         vm.startPrank(buyer);
         tokenA.approve(address(vault), amount);
-        uint256 wid = vault.createEscrow(address(tokenA), seller, amount, SettingsValidationLibrary.getDefaultSettings());
+        uint256 wid = vault.createEscrow(address(tokenA), seller, amount, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
         vm.stopPrank();
 
         vm.prank(seller);
@@ -141,7 +165,13 @@ contract EscrowVaultAccountingTest is Test {
 
         vm.startPrank(buyer);
         revertingToken.approve(address(vault), amount);
-        uint256 wid = vault.createEscrow(address(revertingToken), seller, amount, SettingsValidationLibrary.getDefaultSettings());
+        uint256 wid = vault.createEscrow(address(revertingToken), seller, amount, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
         
         revertingToken.setShouldRevert(true);
         
@@ -172,7 +202,13 @@ contract EscrowVaultAccountingTest is Test {
 
         vm.startPrank(buyer);
         tokenA.approve(address(vault), amount);
-        vault.createEscrow(address(tokenA), seller, amount, SettingsValidationLibrary.getDefaultSettings());
+        vault.createEscrow(address(tokenA), seller, amount, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
         vm.stopPrank();
 
         vault.grantRole(vault.ROLE_FEE_RECIPIENT(), address(this));
@@ -195,7 +231,13 @@ contract EscrowVaultAccountingTest is Test {
         tokenA.approve(address(vault), 0);
         
         vm.expectRevert(AmountZero.selector);
-        vault.createEscrow(address(tokenA), seller, 0, SettingsValidationLibrary.getDefaultSettings());
+        vault.createEscrow(address(tokenA), seller, 0, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
         vm.stopPrank();
     }
 
@@ -205,7 +247,13 @@ contract EscrowVaultAccountingTest is Test {
 
         vm.startPrank(buyer);
         tokenA.approve(address(vault), amount);
-        vault.createEscrow(address(tokenA), seller, amount, SettingsValidationLibrary.getDefaultSettings());
+        vault.createEscrow(address(tokenA), seller, amount, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
         vm.stopPrank();
 
         uint256 expectedFee = amount * FEE_BPS / 10000;

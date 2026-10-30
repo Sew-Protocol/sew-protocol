@@ -89,7 +89,13 @@ contract EscrowEdgeCasesTest is Test {
         // Policy: Fee-on-transfer / deflationary tokens are rejected at creation time,
         // because they create an accounting deficit (recorded > actual).
         vm.expectRevert(abi.encodeWithSelector(AccountingDeficit.selector, address(feeToken), 10e18));
-        vault.createEscrow(address(feeToken), seller, amount, SettingsValidationLibrary.getDefaultSettings());
+        vault.createEscrow(address(feeToken), seller, amount, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
         vm.stopPrank();
     }
 
@@ -109,7 +115,13 @@ contract EscrowEdgeCasesTest is Test {
         
         // Should revert due to arithmetic overflow when calculating fee
         vm.expectRevert(); // Arithmetic overflow/panic
-        vault.createEscrow(address(token), seller, unsafeAmount, SettingsValidationLibrary.getDefaultSettings());
+        vault.createEscrow(address(token), seller, unsafeAmount, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
         vm.stopPrank();
     }
 
@@ -120,7 +132,13 @@ contract EscrowEdgeCasesTest is Test {
         vm.startPrank(buyer);
         token.approve(address(vault), maxSafeAmount);
         
-        uint256 escrowId = vault.createEscrow(address(token), seller, maxSafeAmount, SettingsValidationLibrary.getDefaultSettings());
+        uint256 escrowId = vault.createEscrow(address(token), seller, maxSafeAmount, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
         
         uint256 fee = (maxSafeAmount * 100) / 10000;
         uint256 expectedAmountAfterFee = maxSafeAmount - fee;

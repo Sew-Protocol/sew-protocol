@@ -18,6 +18,9 @@ import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 contract ResolverIncentiveModuleV2BondLedger is ResolverIncentiveModule {
     using SafeERC20 for IERC20;
 
+    bytes32 private constant APPEAL_BOND_TERMS_DOMAIN = keccak256("SEW_APPEAL_BOND_TERMS_V1");
+    bytes32 private constant APPEAL_BOND_CONTEXT_DOMAIN = keccak256("SEW_APPEAL_BOND_CONTEXT_V1");
+
     IBondLedger public immutable bondLedger;
 
     /// @notice Protocol address receiving forfeited bond principal as a reserve.
@@ -59,7 +62,8 @@ contract ResolverIncentiveModuleV2BondLedger is ResolverIncentiveModule {
             require(depositor == escalatedBy, 'Depositor must be escalator for ETH bonds');
             bondLedger.postBond{value: amount}(
                 bondId, escrowContract, escalatedBy, escalatedBy, address(0), amount,
-                keccak256(abi.encode(workflowId, round)), bytes32(0)
+                _bondContext(escrowContract, workflowId, round),
+                _bondTermsHash(escrowContract, workflowId, round, depositor, escalatedBy, address(0), amount)
             );
         } else {
             _requirePayoutToken(escrowContract, workflowId, token);
@@ -69,7 +73,8 @@ contract ResolverIncentiveModuleV2BondLedger is ResolverIncentiveModule {
             IERC20(token).safeIncreaseAllowance(address(bondLedger), amount);
             bondLedger.postBond(
                 bondId, escrowContract, escalatedBy, address(this), token, amount,
-                keccak256(abi.encode(workflowId, round)), bytes32(0)
+                _bondContext(escrowContract, workflowId, round),
+                _bondTermsHash(escrowContract, workflowId, round, depositor, escalatedBy, token, amount)
             );
             IERC20(token).forceApprove(address(bondLedger), 0);
         }
@@ -189,13 +194,19 @@ contract ResolverIncentiveModuleV2BondLedger is ResolverIncentiveModule {
 
     // ============ Claims ============
 
+    /// @notice Claim refund liabilities for one asset; the emitted token is the
+    ///         asset recorded in each matching BondLedger position.
     function claimBondRefundLedger(uint256 workflowId, address escrowContract, address token) external nonReentrant {
         uint256 total;
         for (uint8 round = 1; round <= 2; round++) {
             bytes32 bondId = _bondId(escrowContract, workflowId, round);
             uint256 amt = bondLedger.getClaimable(bondId, _msgSender());
             if (amt > 0) {
-                bondLedger.claimFor(bondId, _msgSender());
+                IBondLedger.BondPosition memory pos = bondLedger.getBond(bondId);
+                if (pos.asset != token) continue;
+                // Claim is permissionless but pays only the named beneficiary;
+                // this keeps pull claims live after the posting facade is retired.
+                bondLedger.claim(bondId, _msgSender());
                 total += amt;
             }
         }
@@ -204,13 +215,19 @@ contract ResolverIncentiveModuleV2BondLedger is ResolverIncentiveModule {
         emit BondRefundClaimed(workflowId, _msgSender(), total, token);
     }
 
+    /// @notice Claim resolver payout liabilities for one asset. A workflow may
+    ///         have bonds in different assets across rounds, so claims are asset-scoped.
     function claimPaymentLedger(uint256 workflowId, address escrowContract, address token) external nonReentrant {
         uint256 total;
         for (uint8 round = 1; round <= 2; round++) {
             bytes32 bondId = _bondId(escrowContract, workflowId, round);
             uint256 amt = bondLedger.getClaimable(bondId, _msgSender());
             if (amt > 0) {
-                bondLedger.claimFor(bondId, _msgSender());
+                IBondLedger.BondPosition memory pos = bondLedger.getBond(bondId);
+                if (pos.asset != token) continue;
+                // Claim is permissionless but pays only the named beneficiary;
+                // this keeps pull claims live after the posting facade is retired.
+                bondLedger.claim(bondId, _msgSender());
                 total += amt;
             }
         }
@@ -222,6 +239,33 @@ contract ResolverIncentiveModuleV2BondLedger is ResolverIncentiveModule {
 
     function _bondId(address escrowContract, uint256 workflowId, uint8 round) internal pure returns (bytes32) {
         return keccak256(abi.encode(escrowContract, workflowId, round));
+    }
+
+    function _bondContext(address escrowContract, uint256 workflowId, uint8 round) internal view returns (bytes32) {
+        return keccak256(abi.encode(APPEAL_BOND_CONTEXT_DOMAIN, block.chainid, escrowContract, workflowId, round));
+    }
+
+    function _bondTermsHash(
+        address escrowContract,
+        uint256 workflowId,
+        uint8 round,
+        address depositor,
+        address escalatedBy,
+        address asset,
+        uint256 principal
+    ) internal view returns (bytes32) {
+        return keccak256(abi.encode(
+            APPEAL_BOND_TERMS_DOMAIN,
+            block.chainid,
+            address(this),
+            escrowContract,
+            workflowId,
+            round,
+            depositor,
+            escalatedBy,
+            asset,
+            principal
+        ));
     }
 
     function _rulingCauseRoot(

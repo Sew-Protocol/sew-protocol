@@ -72,7 +72,21 @@ contract BondLedgerDifferential is Test {
         _runRefundScenario(s);
 
         bytes32 bondId = _bondId(address(s.escrow), WID, 1);
+        IBondLedger.BondPosition memory position = s.ledger.getBond(bondId);
         IBondLedger.Allocation[] memory allocations = s.ledger.getSettlementAllocations(bondId);
+        assertTrue(position.contextId != bytes32(0), "bond context must be committed");
+        assertTrue(position.termsHash != bytes32(0), "bond terms must be committed");
+        assertEq(
+            position.contextId,
+            keccak256(abi.encode(keccak256("SEW_APPEAL_BOND_CONTEXT_V1"), block.chainid, address(s.escrow), WID, uint8(1)))
+        );
+        assertEq(
+            position.termsHash,
+            keccak256(abi.encode(
+                keccak256("SEW_APPEAL_BOND_TERMS_V1"), block.chainid, address(s.facade), address(s.escrow),
+                WID, uint8(1), address(s.escrow.bondCollector()), buyer, address(s.token), BOND
+            ))
+        );
         assertEq(allocations.length, 1);
         assertEq(allocations[0].recipient, buyer);
         assertEq(allocations[0].amount, BOND);
@@ -151,6 +165,15 @@ contract BondLedgerDifferential is Test {
 
         _runRefundScenario(a);
         _runRefundScenario(b);
+
+        // Once settled, governance may remove the facade without breaking
+        // beneficiary pull claims through its public claim helper.
+        b.ledger.removeAuthorizedCaller(address(b.facade));
+        uint256 buyerBeforeWrongAssetClaim = _balanceOf(b, buyer);
+        vm.prank(buyer);
+        vm.expectRevert(bytes("Nothing to claim"));
+        b.facade.claimBondRefundLedger(WID, address(b.escrow), address(0xdead));
+        assertEq(_balanceOf(b, buyer), buyerBeforeWrongAssetClaim, "wrong-asset claim moved funds");
 
         // Claim from both and compare recipient balances
         _claimRefund(a);

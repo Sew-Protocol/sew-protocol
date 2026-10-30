@@ -36,7 +36,7 @@ contract BondLedgerTest is Test {
         token.approve(address(ledger), PRINCIPAL);
 
         vm.prank(authorized);
-        ledger.postBond(BOND_ID, app, payer, funder, address(token), PRINCIPAL, bytes32(0), bytes32(0));
+        ledger.postBond(BOND_ID, app, payer, funder, address(token), PRINCIPAL, keccak256("context"), keccak256("terms"));
 
         IBondLedger.BondPosition memory pos = ledger.getBond(BOND_ID);
         assertEq(uint256(pos.status), uint256(IBondLedger.BondStatus.PENDING));
@@ -47,7 +47,7 @@ contract BondLedgerTest is Test {
     function test_postBond_ETH() public {
         vm.deal(authorized, PRINCIPAL);
         vm.prank(authorized);
-        ledger.postBond{value: PRINCIPAL}(BOND_ID, app, payer, funder, address(0), PRINCIPAL, bytes32(0), bytes32(0));
+        ledger.postBond{value: PRINCIPAL}(BOND_ID, app, payer, funder, address(0), PRINCIPAL, keccak256("context"), keccak256("terms"));
 
         IBondLedger.BondPosition memory pos = ledger.getBond(BOND_ID);
         assertEq(pos.principal, PRINCIPAL);
@@ -218,7 +218,7 @@ contract BondLedgerTest is Test {
         token.approve(address(ledger), PRINCIPAL);
         vm.prank(authorized);
         vm.expectRevert();
-        ledger.postBond(BOND_ID, app, payer, funder, address(token), PRINCIPAL, bytes32(0), bytes32(0));
+        ledger.postBond(BOND_ID, app, payer, funder, address(token), PRINCIPAL, keccak256("context"), keccak256("terms"));
     }
 
     function test_unauthorizedPostReverts() public {
@@ -227,7 +227,7 @@ contract BondLedgerTest is Test {
         token.approve(address(ledger), PRINCIPAL);
         vm.prank(makeAddr("stranger"));
         vm.expectRevert();
-        ledger.postBond(BOND_ID, app, payer, funder, address(token), PRINCIPAL, bytes32(0), bytes32(0));
+        ledger.postBond(BOND_ID, app, payer, funder, address(token), PRINCIPAL, keccak256("context"), keccak256("terms"));
     }
 
     function test_unauthorizedSettleReverts() public {
@@ -237,6 +237,32 @@ contract BondLedgerTest is Test {
         vm.prank(makeAddr("stranger"));
         vm.expectRevert();
         ledger.settleBond(BOND_ID, allocs, IBondLedger.SettlementKind.REFUND, IBondLedger.DispositionCauseType.RULING_OUTCOME, keccak256("test-cause"));
+    }
+
+    function test_termsHashMustBePresent() public {
+        vm.deal(authorized, PRINCIPAL);
+        vm.prank(authorized);
+        vm.expectRevert(BondLedger.InvalidTermsHash.selector);
+        ledger.postBond{value: PRINCIPAL}(
+            BOND_ID, app, payer, funder, address(0), PRINCIPAL, keccak256("context"), bytes32(0)
+        );
+    }
+
+    function test_authorizedCallerCannotBeRemovedWhilePositionsArePending() public {
+        _postBond();
+        assertEq(ledger.pendingBondsByOperator(authorized), 1);
+
+        vm.prank(admin);
+        vm.expectRevert(
+            abi.encodeWithSelector(BondLedger.AuthorizedCallerHasPendingBonds.selector, authorized, 1)
+        );
+        ledger.removeAuthorizedCaller(authorized);
+
+        _settleRefund();
+        assertEq(ledger.pendingBondsByOperator(authorized), 0);
+        vm.prank(admin);
+        ledger.removeAuthorizedCaller(authorized);
+        assertFalse(ledger.hasRole(ledger.AUTHORIZED_CALLER(), authorized));
     }
 
     function test_authorizedCallerCannotSettleAnotherOperatorsPosition() public {
@@ -262,7 +288,7 @@ contract BondLedgerTest is Test {
 
         // Fee deducted before postBond - only net arrives
         vm.prank(authorized);
-        ledger.postBond(BOND_ID, app, payer, funder, address(token), net, bytes32(0), bytes32(0));
+        ledger.postBond(BOND_ID, app, payer, funder, address(token), net, keccak256("context"), keccak256("terms"));
 
         IBondLedger.BondPosition memory pos = ledger.getBond(BOND_ID);
         assertEq(pos.principal, net);
@@ -353,7 +379,7 @@ contract BondLedgerTest is Test {
         vm.prank(funder);
         token.approve(address(ledger), PRINCIPAL);
         vm.prank(authorized);
-        ledger.postBond(BOND_ID, app, payer, funder, address(token), PRINCIPAL, bytes32(0), bytes32(0));
+        ledger.postBond(BOND_ID, app, payer, funder, address(token), PRINCIPAL, keccak256("context"), keccak256("terms"));
     }
 
     function _settleRefund() internal {

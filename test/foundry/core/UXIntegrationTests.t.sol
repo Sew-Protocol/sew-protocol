@@ -58,7 +58,13 @@ contract UXIntegrationTests is Test {
     function test_UrgencyLevels_Transitions() public {
         uint256 offset = 50 hours;
         uint256 autoReleaseTime = block.timestamp + offset;
-        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
+        EscrowSettings memory settings = EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        });
         settings.autoReleaseTime = autoReleaseTime;
 
         vm.prank(buyer);
@@ -84,7 +90,13 @@ contract UXIntegrationTests is Test {
 
     function test_TimedActionTriggered_Event() public {
         uint256 autoReleaseTime = block.timestamp + 1 days;
-        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
+        EscrowSettings memory settings = EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        });
         settings.autoReleaseTime = autoReleaseTime;
 
         vm.prank(buyer);
@@ -101,9 +113,21 @@ contract UXIntegrationTests is Test {
 
     function test_WorkflowsByRole_Filtering() public {
         vm.prank(buyer);
-        vault.createEscrow(address(token), seller, 1000e18, SettingsValidationLibrary.getDefaultSettings());
+        vault.createEscrow(address(token), seller, 1000e18, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
         vm.prank(buyer);
-        vault.createEscrow(address(token), seller, 1000e18, SettingsValidationLibrary.getDefaultSettings());
+        vault.createEscrow(address(token), seller, 1000e18, EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        }));
 
         uint256[] memory buyerEscrows = escrowView.getWorkflowsByRole(buyer, UserRole.BUYER, 0, 10);
         assertEq(buyerEscrows.length, 2);
@@ -119,7 +143,13 @@ contract UXIntegrationTests is Test {
 
     function test_canAutomate_View() public {
         uint256 autoReleaseTime = block.timestamp + 1 days;
-        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
+        EscrowSettings memory settings = EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        });
         settings.autoReleaseTime = autoReleaseTime;
 
         vm.prank(buyer);
@@ -139,7 +169,13 @@ contract UXIntegrationTests is Test {
     }
 
     function test_PremiumUX_Helpers() public {
-        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
+        EscrowSettings memory settings = EscrowSettings({
+            customResolver: address(0),
+            releaseAddress: address(0),
+            yieldPreset: YieldPreset.OFF,
+            autoReleaseTime: 0,
+            autoCancelTime: 0
+        });
         settings.customResolver = address(resolutionModule);
         
         vm.prank(buyer);
