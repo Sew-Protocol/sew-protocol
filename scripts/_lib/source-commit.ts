@@ -62,7 +62,8 @@ export function resolveSourceCommit(): SourceCommit {
   }
 
   const jjStatus = run('jj status --no-pager');
-  const jj = jjStatus?.includes('Working copy clean')
+  const jjIsClean = jjStatus?.includes('Working copy clean') || jjStatus?.includes('The working copy has no changes.');
+  const jj = jjIsClean
     ? run("jj log -r @- -n 1 --no-graph -T 'commit_id'")
     : null;
   if (jj) {
