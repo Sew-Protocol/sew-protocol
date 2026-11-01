@@ -27,7 +27,7 @@ artifacts and five application/authority artifacts.
 
 | Order | Logical artifact | FQN | Constructor bindings / dependencies |
 |---:|---|---|---|
-| 0 | `TimelockController` | `node_modules/@openzeppelin/contracts/governance/TimelockController.sol:TimelockController` | `minDelay`, proposer set, executor set, admin; all authority addresses must be explicitly approved |
+| 0 | `TimelockController` (local rehearsal only) | `node_modules/@openzeppelin/contracts/governance/TimelockController.sol:TimelockController` | Local rehearsal deploys a fixture. Base Sepolia reuses the Governor-linked controller `0xD62A6C62233357B6681F9410218FE53BA931fDD1`; do not deploy a replacement. |
 | 1 | `SettingsValidationLibrary` | `contracts/libraries/SettingsValidationLibrary.sol:SettingsValidationLibrary` | none |
 | 2 | `EscrowCreationLogic` | `contracts/libraries/EscrowCreationLogic.sol:EscrowCreationLogic` | linked `SettingsValidationLibrary` |
 | 3 | `EscrowDisputeLogic` | `contracts/libraries/EscrowDisputeLogic.sol:EscrowDisputeLogic` | none |
@@ -103,11 +103,26 @@ unapproved for any external deployment.
 | Fee recipient | withdraw accrued protocol fees | role administration or escrow configuration |
 | Deployer | temporary bootstrap role only | any protected authority after handoff |
 
-Bootstrap actions must be declared, journaled, and read back in order:
+Bootstrap actions must be declared, journaled, and read back in order. On
+Base Sepolia, bind the existing Governor-linked Timelock and Sew Token as
+external dependencies; the local rehearsal may deploy its own Timelock fixture.
+The selected Base Sepolia governance addresses are `GovGovernor`
+`0xa9d598AE5b185dd249A1E4b64c32f18f4500d2fA`, token
+`0x62BD47154D0b5Fe435F220E1294405040102b2ba`, and Timelock
+`0xD62A6C62233357B6681F9410218FE53BA931fDD1`. The Timelock has a 48-hour
+delay, Governor proposer/canceller roles, self-admin, and open execution. The
+token currently has zero delegated votes, so governance proposal/quorum
+liveness must be established before relying on Governor operations. The
+existing Timelock runtime hash differs from the pinned Sew bundle artifact;
+deployment-engine support for an explicitly pinned observed external runtime
+hash is still required.
 
-1. Deploy Timelock, linked libraries, registry, policy, resolver module,
+1. For Base Sepolia, verify the existing Timelock's runtime hash, chain ID,
+   delay, roles and Governor/token getter linkage; do not deploy a new
+   Timelock. Deploy linked libraries, registry, policy, resolver module,
    release strategy, and vault; verify each successful canonical receipt and
-   runtime hash before consuming its address as a binding.
+   runtime hash before consuming its address as a binding. For local rehearsal,
+   deploy the isolated Timelock fixture.
 2. Install creation policy; register the vault; set dispute minimum/rate
    limit; grant Timelock, guardian and fee-recipient roles; verify each state.
 3. Queue release and resolution modules; remain partial for the full delay;
