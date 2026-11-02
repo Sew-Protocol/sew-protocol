@@ -5,10 +5,10 @@ import 'forge-std/Test.sol';
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
 import '../../../contracts/core/EscrowVault.sol';
-import '../../../contracts/modules/DefaultResolutionModule.sol';
-import '../../../contracts/types/EscrowTypes.sol';
-import '../../../contracts/governance/SlowLaneQueueActivate.sol';
-import '../../../contracts/core/ModuleSnapshotRegistry.sol';
+import '../../../packages/sew-core/contracts/modules/DefaultResolutionModule.sol';
+import '../../../packages/sew-core/contracts/types/EscrowTypes.sol';
+import '../../../packages/sew-core/contracts/governance/SlowLaneQueueActivate.sol';
+import '../../../packages/sew-core/contracts/core/ModuleSnapshotRegistry.sol';
 
 /**
  * @title EscrowGovernanceTimelockTest

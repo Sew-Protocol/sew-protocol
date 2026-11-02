@@ -28,8 +28,8 @@
 > Sew Protocol. It covers every state, every transition, every guard condition, and the
 > sub-state model that sits within `DISPUTED`.
 >
-> **Sources:** `contracts/core/BaseEscrow.sol`, `contracts/libraries/StateManagementLibrary.sol`,
-> `contracts/types/EscrowTypes.sol`, `contracts/libraries/EscrowSettlementLogic.sol`.
+> **Sources:** `packages/sew-core/contracts/core/BaseEscrow.sol`, `packages/sew-core/contracts/libraries/StateManagementLibrary.sol`,
+> `packages/sew-core/contracts/types/EscrowTypes.sol`, `packages/sew-core/contracts/libraries/EscrowSettlementLogic.sol`.
 
 ---
 

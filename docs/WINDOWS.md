@@ -6,8 +6,8 @@
 > delays. For each window this document covers: what it is, where it is set, how long
 > it lasts, who it protects, and what happens when it expires.
 >
-> **Sources:** `contracts/core/BaseEscrow.sol`, `contracts/ops/SettlementOps.sol`,
-> `contracts/libraries/SettingsValidationLibrary.sol`,
+> **Sources:** `packages/sew-core/contracts/core/BaseEscrow.sol`, `contracts/ops/SettlementOps.sol`,
+> `packages/sew-core/contracts/libraries/SettingsValidationLibrary.sol`,
 > `contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol`,
 > `contracts/modules/decentralized-resolution-module/DRMStorageBase.sol`,
 > `contracts/modules/decentralized-resolution-module/DRMAdminFacet.sol`,

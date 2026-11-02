@@ -2,8 +2,8 @@
 pragma solidity ^0.8.37;
 
 import '../shared/interfaces/IResolutionModule.sol';
-import '../libraries/EscrowEncodingLibrary.sol';
-import '../libraries/BondHandlingLibrary.sol';
+import './EscrowEncodingLibrary.sol';
+import './BondHandlingLibrary.sol';
 import '../shared/interfaces/IIncentiveModule.sol';
 import '../core/BondCollector.sol';
 import '../types/EscrowTypes.sol';

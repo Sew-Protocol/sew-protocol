@@ -1,22 +1,24 @@
 {
   "name": "@sew/sew-core",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "license": "Apache-2.0",
   "description": "In-tree Sew core source and release boundary",
   "scripts": {
-    "build": "forge build --root ../..",
-    "test:profile": "forge test --root ../.. --match-path test/foundry/core/SewCoreVaultProfile.t.sol",
-    "deployables:export": "pnpm --dir ../.. run deployables:export -- packages/sew-core/deployables.allowlist.json deployables/sew-core",
-    "deployables:validate": "pnpm --dir ../.. run deployables:validate -- --allowlist packages/sew-core/deployables.allowlist.json --export-dir deployables/sew-core",
-    "test:artifacts": "pnpm --dir ../.. run deployables:test:sew-core",
+    "build": "forge build",
+    "source:inventory": "node ../../scripts/generate-sew-core-source-boundary.mjs",
+    "source:check": "node ../../scripts/generate-sew-core-source-boundary.mjs --check && node ../../scripts/check-sew-core-boundary.mjs",
+    "test:profile": "forge test --match-path test/SewCoreVaultProfile.t.sol",
+    "deployables:export": "pnpm --dir ../.. run deployables:export -- packages/sew-core/deployables.allowlist.json packages/sew-core/deployables/sew-core --out-dir packages/sew-core/out",
+    "deployables:validate": "pnpm --dir ../.. run deployables:validate -- --allowlist packages/sew-core/deployables.allowlist.json --export-dir packages/sew-core/deployables/sew-core",
+    "test:artifacts": "SEW_FORGE_OUT_DIR=packages/sew-core/out pnpm --dir ../.. run deployables:test:sew-core",
     "test": "pnpm test:profile && pnpm test:artifacts",
     "deployables": "pnpm deployables:export && pnpm deployables:validate"
   },
   "sewCore": {
     "spec": "../../docs/deployment/sew-core-standalone-profile.md",
     "deployableAllowlist": "deployables.allowlist.json",
-    "sourceRoot": "../../contracts",
-    "sourceOwnership": "shared-monorepo-transitional"
+    "sourceRoot": "contracts",
+    "sourceOwnership": "canonical-sew-core-closure"
   }
 }

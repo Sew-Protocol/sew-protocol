@@ -65,7 +65,7 @@ pnpm coverage:summary
 
 ### Core Contracts
 
-**`BaseEscrow`** (`contracts/core/BaseEscrow.sol`) is the heart of the protocol. It implements the full escrow lifecycle and remains the visible authoritative orchestrator. Deterministic settlement and dispute derivation are compiled-in internal libraries (`EscrowSettlementLogic`, `EscrowDisputeLogic`) — the derive → result → apply boundary is preserved without a runtime/deployment trust boundary. Creation derivation is compiled in via `EscrowCreationLogic`, while the protocol-wide policy flags (`yieldDepositsPaused`, `resolverMustBeContract`) remain in a narrow shared authority, `EscrowCreationPolicy`, so a single emergency action still affects all escrows. Some computation is still delegated to externally deployed stateless **Ops contracts** (YieldOps, BondCollector, GuardianOps): the ops contract computes the result (pure/view) and BaseEscrow applies state changes. This split exists to keep BaseEscrow under the EIP-170 bytecode limit given `via_ir=true, optimizer_runs=1`.
+**`BaseEscrow`** (`packages/sew-core/contracts/core/BaseEscrow.sol`) is the heart of the protocol. It implements the full escrow lifecycle and remains the visible authoritative orchestrator. Deterministic settlement and dispute derivation are compiled-in internal libraries (`EscrowSettlementLogic`, `EscrowDisputeLogic`) — the derive → result → apply boundary is preserved without a runtime/deployment trust boundary. Creation derivation is compiled in via `EscrowCreationLogic`, while the protocol-wide policy flags (`yieldDepositsPaused`, `resolverMustBeContract`) remain in a narrow shared authority, `EscrowCreationPolicy`, so a single emergency action still affects all escrows. Some computation is still delegated to externally deployed stateless **Ops contracts** (YieldOps, BondCollector, GuardianOps): the ops contract computes the result (pure/view) and BaseEscrow applies state changes. This split exists to keep BaseEscrow under the EIP-170 bytecode limit given `via_ir=true, optimizer_runs=1`.
 
 **`EscrowVault`** (`contracts/core/EscrowVault.sol`) is the concrete implementation. It holds ERC20 tokens and tracks per-token balances (`totalHeldInEscrowPerToken`, `totalFeesPerToken`, `totalClaimableAssets`).
 
@@ -85,7 +85,7 @@ State is stored in `EscrowTransfer.state`. Transitions always go through `BaseEs
 
 ### Module System
 
-Every escrow snapshots its active modules at creation via **`ModuleSnapshotRegistry`** (`contracts/core/ModuleSnapshotRegistry.sol`). This means governance module upgrades never affect live escrows — only new ones. Four module types are snapshotted per escrow:
+Every escrow snapshots its active modules at creation via **`ModuleSnapshotRegistry`** (`packages/sew-core/contracts/core/ModuleSnapshotRegistry.sol`). This means governance module upgrades never affect live escrows — only new ones. Four module types are snapshotted per escrow:
 
 | Type | Interface | Current Default |
 |---|---|---|

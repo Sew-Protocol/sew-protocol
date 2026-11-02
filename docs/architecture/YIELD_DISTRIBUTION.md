@@ -71,11 +71,11 @@ a full recovered amount (`>= principal`) is routed to the beneficiary with zero 
 
 ## Code locations
 
-- **Unwind orchestration**: `contracts/core/EscrowYield.sol::_handleYieldModuleUnwind`
-- **Fee computation**: `contracts/core/EscrowSettlement.sol::_computeYieldProtocolFee` / `_finalizeClaimableSettlement` / `_acceptSplitProposal`
+- **Unwind orchestration**: `packages/sew-core/contracts/core/EscrowYield.sol::_handleYieldModuleUnwind`
+- **Fee computation**: `packages/sew-core/contracts/core/EscrowSettlement.sol::_computeYieldProtocolFee` / `_finalizeClaimableSettlement` / `_acceptSplitProposal`
 - **Fee storage & withdrawal**: `contracts/core/EscrowVault.sol` (`_recordFee`, `withdrawFees`)
 - **Module (gross yield)**: `contracts/modules/AaveYieldModule.sol` (`unwindToEscrow`, `emergencyUnwind`)
-- **Interface/policy**: `contracts/interfaces/IYieldModule.sol`
+- **Interface/policy**: `packages/sew-core/contracts/interfaces/IYieldModule.sol`
 
 ## Summary table
 

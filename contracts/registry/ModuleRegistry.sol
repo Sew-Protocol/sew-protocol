@@ -4,11 +4,11 @@ pragma solidity ^0.8.37;
 import '@openzeppelin/contracts/access/AccessControl.sol';
 import '@openzeppelin/contracts/utils/introspection/IERC165.sol';
 import '../interfaces/IModuleRegistry.sol';
-import '../interfaces/IYieldModule.sol';
-import '../interfaces/IReleaseStrategy.sol';
-import '../interfaces/ICancellationStrategy.sol';
-import '../shared/interfaces/IResolutionModule.sol';
-import '../types/EscrowTypes.sol';
+import '../../packages/sew-core/contracts/interfaces/IYieldModule.sol';
+import '../../packages/sew-core/contracts/interfaces/IReleaseStrategy.sol';
+import '../../packages/sew-core/contracts/interfaces/ICancellationStrategy.sol';
+import '../../packages/sew-core/contracts/shared/interfaces/IResolutionModule.sol';
+import '../../packages/sew-core/contracts/types/EscrowTypes.sol';
 
 /**
  * @title ModuleRegistry

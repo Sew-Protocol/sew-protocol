@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.37;
 
-import '../DecentralizedResolverStructs.sol';
+import '../../../../packages/sew-core/contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
 
 /**
  * @title EscalationCostLibrary

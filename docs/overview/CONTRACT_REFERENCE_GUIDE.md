@@ -31,7 +31,7 @@
 - **Registrations**: Target escrow contracts must grant ROLE_ADMIN_CONTRACT
 
 ### ModuleSnapshotRegistry
-- **Location**: `contracts/core/ModuleSnapshotRegistry.sol`
+- **Location**: `packages/sew-core/contracts/core/ModuleSnapshotRegistry.sol`
 - **Previously**: ModuleManagementContract
 - **Type**: ✅ Singleton
 - **Description**: Registry for module snapshots frozen at escrow creation time. Stores immutable module configurations per escrow contract.
@@ -39,7 +39,7 @@
 - **Registrations**: New escrow contracts register on deployment
 
 ### BondCollector
-- **Location**: `contracts/core/BondCollector.sol`
+- **Location**: `packages/sew-core/contracts/core/BondCollector.sol`
 - **Type**: ✅ Singleton
 - **Description**: External contract for collecting escalation bonds (ETH or ERC20) with protocol fee deduction. Handles custody and incentive module recording.
 - **Key Functions**: Collect ETH/ERC20 appeal bonds, deduct protocol fees, record to incentive module
@@ -59,7 +59,7 @@
 **Pattern**: Deployed MULTIPLE times, one per escrow type or configuration
 
 ### BaseEscrow (Abstract)
-- **Location**: `contracts/core/BaseEscrow.sol`
+- **Location**: `packages/sew-core/contracts/core/BaseEscrow.sol`
 - **Type**: ⚠️ Abstract (not deployed directly)
 - **Description**: Base implementation for all escrow contracts. Provides core lifecycle, disputes, settlements, yield, and module management.
 - **Inherited By**: EscrowVault, EscrowableERC20
@@ -111,13 +111,13 @@
 ### Resolution Modules
 
 #### DefaultResolutionModule
-- **Location**: `contracts/modules/DefaultResolutionModule.sol`
+- **Location**: `packages/sew-core/contracts/modules/DefaultResolutionModule.sol`
 - **Type**: ✅ Singleton
 - **Description**: Basic resolution module for dispute handling without decentralized resolution.
 - **Use Case**: Simple disputes, admin-based resolution
 
 #### DefaultReleaseStrategy
-- **Location**: `contracts/modules/DefaultReleaseStrategy.sol`
+- **Location**: `packages/sew-core/contracts/modules/DefaultReleaseStrategy.sol`
 - **Type**: ✅ Singleton
 - **Description**: Default release strategy (buyer-initiated release).
 - **Behavior**: Matches current EscrowableERC20 behavior
@@ -153,12 +153,12 @@
 **Pattern**: Stateless libraries deployed once, called by escrow contracts
 
 ### EscrowCreationPolicy
-- **Location**: `contracts/core/EscrowCreationPolicy.sol`
+- **Location**: `packages/sew-core/contracts/core/EscrowCreationPolicy.sol`
 - **Type**: ✅ Singleton (shared policy authority)
 - **Description**: Holds only protocol-wide creation policy (`yieldDepositsPaused`, `resolverMustBeContract`) with its governance surface. No calculation, no resolver lookup, no creation orchestration. Requires no per-escrow registration.
 
 ### EscrowCreationLogic (internal library)
-- **Location**: `contracts/libraries/EscrowCreationLogic.sol`
+- **Location**: `packages/sew-core/contracts/libraries/EscrowCreationLogic.sol`
 - **Description**: Deterministic escrow creation derivation (validation, fee math, resolver lookup, yield configuration), internalized from the former CreateOps contract.
 
 ### YieldOps
@@ -167,12 +167,12 @@
 - **Handles**: Yield module calls, distribution logic, withdrawal orchestration
 
 ### EscrowDisputeLogic (internal library)
-- **Location**: `contracts/libraries/EscrowDisputeLogic.sol`
+- **Location**: `packages/sew-core/contracts/libraries/EscrowDisputeLogic.sol`
 - **Description**: Compile-time dispute derivation (`computeDisputeOpening`, `computeEscalation`), internalized from the former DisputeOps contract.
 - **Handles**: Resolver selection, escalation levels, appealability/deadlines, bond asset/amount, predecessor/successor facts
 
 ### EscrowSettlementLogic (internal library)
-- **Location**: `contracts/libraries/EscrowSettlementLogic.sol`
+- **Location**: `packages/sew-core/contracts/libraries/EscrowSettlementLogic.sol`
 - **Description**: Compile-time settlement derivation, internalized from the former SettlementOps contract.
 - **Handles**: Timed actions, pending-settlement execution, resolution execution
 
@@ -186,7 +186,7 @@
 ## Governance Contracts
 
 ### SlowLaneQueueActivate (Base Contract)
-- **Location**: `contracts/governance/SlowLaneQueueActivate.sol`
+- **Location**: `packages/sew-core/contracts/governance/SlowLaneQueueActivate.sol`
 - **Type**: ✅ Base Contract (inherited)
 - **Description**: Abstract base providing queue/activate pattern with configurable delays.
 - **Used By**: EscrowGovernanceTimelock, ModuleSnapshotRegistry, AaveYieldGenerationModule

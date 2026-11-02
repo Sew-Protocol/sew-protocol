@@ -272,6 +272,6 @@ We'll measure success of `IEscrowCore` by:
 
 - `INTERFACE_DISCOVERY_MAP.md` - What implements what, where to find methods
 - `contracts/interfaces/IEscrowCore.sol` - The actual interface
-- `contracts/core/BaseEscrow.sol` - Reference implementation of IEscrowCore semantics
+- `packages/sew-core/contracts/core/BaseEscrow.sol` - Reference implementation of IEscrowCore semantics
 - `contracts/core/EscrowVault.sol` - Multi-token escrow (implements IEscrowCore)
 - `contracts/core/EscrowableERC20.sol` - Single-token escrow (implements IEscrowCore)

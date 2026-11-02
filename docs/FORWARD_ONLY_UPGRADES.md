@@ -2,10 +2,10 @@
 
 ## 5. Forward-Only Upgrades
 
-> **Source**: Derived from `contracts/governance/SlowLaneQueueActivate.sol`,
-> `contracts/admin/EscrowGovernanceTimelock.sol`, `contracts/core/ModuleSnapshotRegistry.sol`,
+> **Source**: Derived from `packages/sew-core/contracts/governance/SlowLaneQueueActivate.sol`,
+> `contracts/admin/EscrowGovernanceTimelock.sol`, `packages/sew-core/contracts/core/ModuleSnapshotRegistry.sol`,
 > `contracts/governance/GovGovernor.sol`, `contracts/governance/EmergencyRecoveryProposal.sol`,
-> `contracts/types/EscrowTypes.sol` (`ModuleSnapshot`), and `contracts/core/BaseEscrow.sol`.
+> `packages/sew-core/contracts/types/EscrowTypes.sol` (`ModuleSnapshot`), and `packages/sew-core/contracts/core/BaseEscrow.sol`.
 
 ---
 

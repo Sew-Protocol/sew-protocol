@@ -21,7 +21,7 @@ Each module type has an interface, and multiple implementations can exist. The p
 
 | Implementation         | Contract                                       | Status    | Change Mechanism           |
 | ---------------------- | ---------------------------------------------- | --------- | -------------------------- |
-| DefaultReleaseStrategy | `contracts/modules/DefaultReleaseStrategy.sol` | ✅ Active | Slow lane (queue/activate) |
+| DefaultReleaseStrategy | `packages/sew-core/contracts/modules/DefaultReleaseStrategy.sol` | ✅ Active | Slow lane (queue/activate) |
 
 **Interface Methods**:
 

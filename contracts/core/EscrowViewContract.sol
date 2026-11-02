@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.37;
 
-import './BaseEscrow.sol';
-import '../types/EscrowTypes.sol';
-import '../types/YieldPresets.sol';
-import '../libraries/SettingsValidationLibrary.sol';
-import '../libraries/EscrowSettlementLogic.sol';
-import '../interfaces/IYieldModule.sol';
+import '../../packages/sew-core/contracts/core/BaseEscrow.sol';
+import '../../packages/sew-core/contracts/types/EscrowTypes.sol';
+import '../../packages/sew-core/contracts/types/YieldPresets.sol';
+import '../../packages/sew-core/contracts/libraries/SettingsValidationLibrary.sol';
+import '../../packages/sew-core/contracts/libraries/EscrowSettlementLogic.sol';
+import '../../packages/sew-core/contracts/interfaces/IYieldModule.sol';
 import '@openzeppelin/contracts/utils/math/SafeCast.sol';
 
 /**

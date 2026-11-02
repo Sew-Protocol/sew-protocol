@@ -3,7 +3,7 @@ pragma solidity ^0.8.37;
 
 import { ERC165 } from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 
-import { IResolver, Payout } from "../interfaces/IResolver.sol";
+import { IResolver, Payout } from "../../packages/sew-core/contracts/interfaces/IResolver.sol";
 
 interface IEscrowResolverActions {
     function cancelAsDisputeResolver(uint256 workflowId, bytes32 resolutionHash) external returns (bool);

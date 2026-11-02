@@ -4,15 +4,15 @@ pragma solidity ^0.8.37;
 import 'forge-std/Test.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/core/EscrowableERC20.sol';
-import '../../../contracts/core/ModuleSnapshotRegistry.sol';
-import '../../../contracts/core/BondCollector.sol';
+import '../../../packages/sew-core/contracts/core/ModuleSnapshotRegistry.sol';
+import '../../../packages/sew-core/contracts/core/BondCollector.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
-import '../../../contracts/core/EscrowCreationPolicy.sol';
-import '../../../contracts/libraries/SettingsValidationLibrary.sol';
-import '../../../contracts/types/EscrowTypes.sol';
+import '../../../packages/sew-core/contracts/core/EscrowCreationPolicy.sol';
+import '../../../packages/sew-core/contracts/libraries/SettingsValidationLibrary.sol';
+import '../../../packages/sew-core/contracts/types/EscrowTypes.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DRMAdminFacet.sol';
-import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
+import '../../../packages/sew-core/contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
 import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModule.sol';
 import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibrary.sol';
 import '../helpers/KlerosHandoffFixture.sol';
@@ -127,12 +127,13 @@ contract DirectResolutionConfigSelectionIntegrationTest is Test, KlerosHandoffFi
     }
 
     function _createVault(uint256 version) internal returns (uint256 workflowId) {
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
         vm.prank(BUYER);
         if (version == 0) {
-            workflowId = vault.createEscrow(address(paymentToken), SELLER, 100 ether, SettingsValidationLibrary.getDefaultSettings());
+            workflowId = vault.createEscrow(address(paymentToken), SELLER, 100 ether, settings);
         } else {
             workflowId = vault.createEscrowWithResolutionConfig(
-                address(paymentToken), SELLER, 100 ether, SettingsValidationLibrary.getDefaultSettings(), version
+                address(paymentToken), SELLER, 100 ether, settings, version
             );
         }
     }
@@ -149,10 +150,12 @@ contract DirectResolutionConfigSelectionIntegrationTest is Test, KlerosHandoffFi
     function test_directApisBindExplicitBAndEmitAuditEventsMatchingDRMState() public {
         uint256 policyB = _publishPolicyB();
         bytes32 root = drm.resolutionConfigRoot(policyB);
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
 
         vm.expectEmit(true, true, true, true, address(vault));
         emit ResolutionConfigBound(0, address(drm), policyB, root);
-        uint256 vaultWorkflow = _createVault(policyB);
+        vm.prank(BUYER);
+        uint256 vaultWorkflow = vault.createEscrowWithResolutionConfig(address(paymentToken), SELLER, 100 ether, settings, policyB);
 
         vm.expectEmit(true, true, true, true, address(escrowToken));
         emit ResolutionConfigBound(0, address(drm), policyB, root);
@@ -222,19 +225,20 @@ contract DirectResolutionConfigSelectionIntegrationTest is Test, KlerosHandoffFi
 
     function test_explicitDirectInvalidVersionsHaveParityAcrossProductsIncludingZero() public {
         uint256 policyB = _publishPolicyB();
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
         drm.setResolutionConfigSelectable(policyB, false);
 
         vm.startPrank(BUYER);
         vm.expectRevert(abi.encodeWithSelector(ResolutionConfigUnavailable.selector, address(drm), 0));
-        vault.createEscrowWithResolutionConfig(address(paymentToken), SELLER, 1 ether, SettingsValidationLibrary.getDefaultSettings(), 0);
+        vault.createEscrowWithResolutionConfig(address(paymentToken), SELLER, 1 ether, settings, 0);
         vm.expectRevert(abi.encodeWithSelector(ResolutionConfigUnavailable.selector, address(drm), 0));
         escrowToken.createEscrowWithResolutionConfig(SELLER, 1 ether, 0, 0, 0);
         vm.expectRevert(abi.encodeWithSelector(ResolutionConfigUnavailable.selector, address(drm), 99));
-        vault.createEscrowWithResolutionConfig(address(paymentToken), SELLER, 1 ether, SettingsValidationLibrary.getDefaultSettings(), 99);
+        vault.createEscrowWithResolutionConfig(address(paymentToken), SELLER, 1 ether, settings, 99);
         vm.expectRevert(abi.encodeWithSelector(ResolutionConfigUnavailable.selector, address(drm), 99));
         escrowToken.createEscrowWithResolutionConfig(SELLER, 1 ether, 0, 0, 99);
         vm.expectRevert(abi.encodeWithSelector(ResolutionConfigUnavailable.selector, address(drm), policyB));
-        vault.createEscrowWithResolutionConfig(address(paymentToken), SELLER, 1 ether, SettingsValidationLibrary.getDefaultSettings(), policyB);
+        vault.createEscrowWithResolutionConfig(address(paymentToken), SELLER, 1 ether, settings, policyB);
         vm.expectRevert(abi.encodeWithSelector(ResolutionConfigUnavailable.selector, address(drm), policyB));
         escrowToken.createEscrowWithResolutionConfig(SELLER, 1 ether, 0, 0, policyB);
         vm.stopPrank();
@@ -245,7 +249,7 @@ contract DirectResolutionConfigSelectionIntegrationTest is Test, KlerosHandoffFi
         _activateCAndDeprecateB(policyB);
         vm.startPrank(BUYER);
         vm.expectRevert(abi.encodeWithSelector(ResolutionConfigUnavailable.selector, address(drm), policyB));
-        vault.createEscrowWithResolutionConfig(address(paymentToken), SELLER, 1 ether, SettingsValidationLibrary.getDefaultSettings(), policyB);
+        vault.createEscrowWithResolutionConfig(address(paymentToken), SELLER, 1 ether, settings, policyB);
         vm.expectRevert(abi.encodeWithSelector(ResolutionConfigUnavailable.selector, address(drm), policyB));
         escrowToken.createEscrowWithResolutionConfig(SELLER, 1 ether, 0, 0, policyB);
         vm.stopPrank();

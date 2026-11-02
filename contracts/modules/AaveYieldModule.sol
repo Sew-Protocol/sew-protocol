@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.37;
 
-import '../interfaces/IYieldModule.sol';
+import '../../packages/sew-core/contracts/interfaces/IYieldModule.sol';
 import '../interfaces/aave/AaveV3Interfaces.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/access/AccessControl.sol';
 import '@openzeppelin/contracts/utils/introspection/ERC165.sol';
 import '@openzeppelin/contracts/utils/math/Math.sol';
-import './../governance/SlowLaneQueueActivate.sol';
+import '../../packages/sew-core/contracts/governance/SlowLaneQueueActivate.sol';
 
 /**
  * @title AaveYieldModule

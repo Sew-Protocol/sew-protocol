@@ -4,17 +4,17 @@ pragma solidity ^0.8.37;
 import "forge-std/Test.sol";
 
 import { EscrowVault } from "../../../contracts/core/EscrowVault.sol";
-import { BaseEscrow } from "../../../contracts/core/BaseEscrow.sol";
+import { BaseEscrow } from "../../../packages/sew-core/contracts/core/BaseEscrow.sol";
 import { ERC20Mock } from "../../../contracts/mocks/ERC20Mock.sol";
-import { DefaultResolutionModule } from "../../../contracts/modules/DefaultResolutionModule.sol";
-import { EscrowSettings, EscrowState, SenderStatus, RecipientStatus } from "../../../contracts/types/EscrowTypes.sol";
-import { YieldPreset } from "../../../contracts/types/YieldPresets.sol";
-import { EscrowCreationPolicy } from "../../../contracts/core/EscrowCreationPolicy.sol";
-import { BondCollector } from "../../../contracts/core/BondCollector.sol";
-import { ModuleSnapshotRegistry } from "../../../contracts/core/ModuleSnapshotRegistry.sol";
-import { DefaultReleaseStrategy } from "../../../contracts/modules/DefaultReleaseStrategy.sol";
+import { DefaultResolutionModule } from "../../../packages/sew-core/contracts/modules/DefaultResolutionModule.sol";
+import { EscrowSettings, EscrowState, SenderStatus, RecipientStatus } from "../../../packages/sew-core/contracts/types/EscrowTypes.sol";
+import { YieldPreset } from "../../../packages/sew-core/contracts/types/YieldPresets.sol";
+import { EscrowCreationPolicy } from "../../../packages/sew-core/contracts/core/EscrowCreationPolicy.sol";
+import { BondCollector } from "../../../packages/sew-core/contracts/core/BondCollector.sol";
+import { ModuleSnapshotRegistry } from "../../../packages/sew-core/contracts/core/ModuleSnapshotRegistry.sol";
+import { DefaultReleaseStrategy } from "../../../packages/sew-core/contracts/modules/DefaultReleaseStrategy.sol";
 import { EscrowGovernanceTimelock } from "../../../contracts/admin/EscrowGovernanceTimelock.sol";
-import { SettingsValidationLibrary } from "../../../contracts/libraries/SettingsValidationLibrary.sol";
+import { SettingsValidationLibrary } from "../../../packages/sew-core/contracts/libraries/SettingsValidationLibrary.sol";
 
 /**
  * @title EscrowStateMachineTest

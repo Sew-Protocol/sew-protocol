@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.37;
 
-import './BaseEscrow.sol';
+import '../../packages/sew-core/contracts/core/BaseEscrow.sol';
 import './EscrowVault.sol';
-import '../types/EscrowTypes.sol';
+import '../../packages/sew-core/contracts/types/EscrowTypes.sol';
 
 /**
  * @title MultiL2ViewAggregator

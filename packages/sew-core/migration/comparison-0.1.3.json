@@ -1,0 +1,153 @@
+{
+  "baselineBundle": "@sew/deployables@0.1.2",
+  "baselineSourceRevision": "17bf2f0693367bfa3909a5aa186f4e806a76a5ea",
+  "candidateBundle": "@sew/deployables@0.1.3",
+  "candidateBundleRoot": "ab6fbab287e5a7c3b8b94b9b5b08194dbd41a3dbf233738b17d28fa409214cfb",
+  "summary": {
+    "artifactCount": 13,
+    "allAbisUnchanged": true,
+    "allRuntimeExecutableCodeUnchanged": true,
+    "allStatefulStorageLayoutsUnchanged": true,
+    "changedArtifactIdentities": [
+      "DefaultReleaseStrategy",
+      "DefaultResolutionModule",
+      "DisputeInitializationLibrary",
+      "DisputeRaiseLibrary",
+      "EscrowCreationLogic",
+      "EscrowCreationPolicy",
+      "EscrowDisputeLogic",
+      "ModuleSnapshotRegistry",
+      "SewCoreVault",
+      "TimelockController"
+    ]
+  },
+  "artifactComparisons": [
+    {
+      "artifact": "DefaultReleaseStrategy",
+      "abiUnchanged": true,
+      "runtimeExecutableUnchanged": true,
+      "fullyQualifiedNameUnchanged": true,
+      "creationBytecodeHashUnchanged": false,
+      "runtimeBytecodeHashUnchanged": false
+    },
+    {
+      "artifact": "DefaultResolutionModule",
+      "abiUnchanged": true,
+      "runtimeExecutableUnchanged": true,
+      "fullyQualifiedNameUnchanged": true,
+      "creationBytecodeHashUnchanged": false,
+      "runtimeBytecodeHashUnchanged": false
+    },
+    {
+      "artifact": "DisputeInitializationLibrary",
+      "abiUnchanged": true,
+      "runtimeExecutableUnchanged": true,
+      "fullyQualifiedNameUnchanged": true,
+      "creationBytecodeHashUnchanged": false,
+      "runtimeBytecodeHashUnchanged": false
+    },
+    {
+      "artifact": "DisputeRaiseLibrary",
+      "abiUnchanged": true,
+      "runtimeExecutableUnchanged": true,
+      "fullyQualifiedNameUnchanged": true,
+      "creationBytecodeHashUnchanged": false,
+      "runtimeBytecodeHashUnchanged": false
+    },
+    {
+      "artifact": "EscrowCreationLogic",
+      "abiUnchanged": true,
+      "runtimeExecutableUnchanged": true,
+      "fullyQualifiedNameUnchanged": true,
+      "creationBytecodeHashUnchanged": false,
+      "runtimeBytecodeHashUnchanged": false
+    },
+    {
+      "artifact": "EscrowCreationPolicy",
+      "abiUnchanged": true,
+      "runtimeExecutableUnchanged": true,
+      "fullyQualifiedNameUnchanged": true,
+      "creationBytecodeHashUnchanged": false,
+      "runtimeBytecodeHashUnchanged": false
+    },
+    {
+      "artifact": "EscrowDisputeLogic",
+      "abiUnchanged": true,
+      "runtimeExecutableUnchanged": true,
+      "fullyQualifiedNameUnchanged": true,
+      "creationBytecodeHashUnchanged": false,
+      "runtimeBytecodeHashUnchanged": false
+    },
+    {
+      "artifact": "EscrowSettlementLogic",
+      "abiUnchanged": true,
+      "runtimeExecutableUnchanged": true,
+      "fullyQualifiedNameUnchanged": true,
+      "creationBytecodeHashUnchanged": true,
+      "runtimeBytecodeHashUnchanged": true
+    },
+    {
+      "artifact": "ModuleSnapshotRegistry",
+      "abiUnchanged": true,
+      "runtimeExecutableUnchanged": true,
+      "fullyQualifiedNameUnchanged": true,
+      "creationBytecodeHashUnchanged": false,
+      "runtimeBytecodeHashUnchanged": false
+    },
+    {
+      "artifact": "SettingsValidationLibrary",
+      "abiUnchanged": true,
+      "runtimeExecutableUnchanged": true,
+      "fullyQualifiedNameUnchanged": true,
+      "creationBytecodeHashUnchanged": true,
+      "runtimeBytecodeHashUnchanged": true
+    },
+    {
+      "artifact": "SewCoreVault",
+      "abiUnchanged": true,
+      "runtimeExecutableUnchanged": true,
+      "fullyQualifiedNameUnchanged": true,
+      "creationBytecodeHashUnchanged": false,
+      "runtimeBytecodeHashUnchanged": false
+    },
+    {
+      "artifact": "StateManagementLibrary",
+      "abiUnchanged": true,
+      "runtimeExecutableUnchanged": true,
+      "fullyQualifiedNameUnchanged": true,
+      "creationBytecodeHashUnchanged": true,
+      "runtimeBytecodeHashUnchanged": true
+    },
+    {
+      "artifact": "TimelockController",
+      "abiUnchanged": true,
+      "runtimeExecutableUnchanged": true,
+      "fullyQualifiedNameUnchanged": false,
+      "creationBytecodeHashUnchanged": false,
+      "runtimeBytecodeHashUnchanged": false
+    }
+  ],
+  "storageLayouts": {
+    "SewCoreVault": {
+      "baseline": "b8a4cda5d691f2b374288f33a6fad492daf32735f2d0191b48fd891da3d4c2c9",
+      "candidate": "b8a4cda5d691f2b374288f33a6fad492daf32735f2d0191b48fd891da3d4c2c9",
+      "unchanged": true
+    },
+    "ModuleSnapshotRegistry": {
+      "baseline": "9dad748bbc58f46529ca6bf2772d19be0a1c814f22b8b2cbb4b10cbc5cf91456",
+      "candidate": "9dad748bbc58f46529ca6bf2772d19be0a1c814f22b8b2cbb4b10cbc5cf91456",
+      "unchanged": true
+    },
+    "EscrowCreationPolicy": {
+      "baseline": "718631b7ab89406deea08b7c58b29ac7bee0fa15424c6789fdc8549349330720",
+      "candidate": "718631b7ab89406deea08b7c58b29ac7bee0fa15424c6789fdc8549349330720",
+      "unchanged": true
+    },
+    "DefaultResolutionModule": {
+      "baseline": "3cee461d7c362ee136b8924e6442cd1b90741de56802a85e6e3ac6c18c24bc71",
+      "candidate": "3cee461d7c362ee136b8924e6442cd1b90741de56802a85e6e3ac6c18c24bc71",
+      "unchanged": true
+    }
+  },
+  "assessment": "ABIs, metadata-stripped runtime code, and captured storage layouts are unchanged. Full bytecode hashes and the local Timelock FQN differ where Solidity source/remapping metadata changed. Candidate deployment identity remains unqualified pending review."
+}

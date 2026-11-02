@@ -6,10 +6,10 @@
 > an implementer must follow to write a conformant module.
 >
 > **Sources:** `contracts/interfaces/I*.sol`, `contracts/shared/interfaces/I*.sol`,
-> `contracts/core/ModuleSnapshotRegistry.sol`, `contracts/core/BaseEscrow.sol`
+> `packages/sew-core/contracts/core/ModuleSnapshotRegistry.sol`, `packages/sew-core/contracts/core/BaseEscrow.sol`
 > (`ModuleType` enum, `ModuleSnapshot`, `_snapshotModulesForEscrow`, `EscrowSettings`),
-> `contracts/types/EscrowTypes.sol` (`ModuleSnapshot`, `EscrowSettings`),
-> `contracts/governance/SlowLaneQueueActivate.sol`,
+> `packages/sew-core/contracts/types/EscrowTypes.sol` (`ModuleSnapshot`, `EscrowSettings`),
+> `packages/sew-core/contracts/governance/SlowLaneQueueActivate.sol`,
 > `contracts/modules/` (concrete implementations).
 
 ---

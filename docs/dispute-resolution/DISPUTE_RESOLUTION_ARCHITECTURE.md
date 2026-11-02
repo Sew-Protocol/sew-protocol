@@ -24,10 +24,10 @@
 >   realization; no bridge/message endpoint is settlement authority.
 
 > **Source**: Derived directly from the Sew Protocol smart contracts
-> (`contracts/core/BaseEscrow.sol`, `contracts/ops/DisputeOps.sol`,
+> (`packages/sew-core/contracts/core/BaseEscrow.sol`, `contracts/ops/DisputeOps.sol`,
 > `contracts/modules/decentralized-resolution-module/`,
 > `contracts/arbitration/KlerosArbitrableProxy.sol`,
-> `contracts/types/EscrowTypes.sol`, and supporting libraries).
+> `packages/sew-core/contracts/types/EscrowTypes.sol`, and supporting libraries).
 > All claims in this section are grounded in contract code, not design intent docs.
 
 ---

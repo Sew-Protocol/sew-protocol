@@ -84,7 +84,7 @@ sequenceDiagram
 
 Relevant code:
 
-```477:520:contracts/core/BaseEscrow.sol
+```477:520:packages/sew-core/contracts/core/BaseEscrow.sol
     function createEscrow(
         address token,
         address to,
@@ -106,7 +106,7 @@ Relevant code:
 
 ### What creators can already override (module-adjacent)
 
-From `EscrowSettings` ([EscrowTypes.sol](../../contracts/types/EscrowTypes.sol)):
+From `EscrowSettings` ([EscrowTypes.sol](../../packages/sew-core/contracts/types/EscrowTypes.sol)):
 
 | Field | Effect |
 |-------|--------|
@@ -130,7 +130,7 @@ These are **not** full module selection; they tune behavior inside (or beside) t
 
 **EscrowableERC20** uses `ModuleGetterLibrary`: snapshot field first, then `ModuleSnapshotRegistry` default.
 
-```24:69:contracts/libraries/ModuleGetterLibrary.sol
+```24:69:packages/sew-core/contracts/libraries/ModuleGetterLibrary.sol
     function getModuleAddress(
         uint256 workflowId,
         BaseEscrow.ModuleType moduleType,

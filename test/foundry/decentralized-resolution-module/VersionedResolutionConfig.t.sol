@@ -4,9 +4,9 @@ pragma solidity ^0.8.37;
 import 'forge-std/Test.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DRMAdminFacet.sol';
-import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
-import '../../../contracts/types/EscrowTypes.sol';
-import '../../../contracts/shared/interfaces/IResolutionModule.sol';
+import '../../../packages/sew-core/contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
+import '../../../packages/sew-core/contracts/types/EscrowTypes.sol';
+import '../../../packages/sew-core/contracts/shared/interfaces/IResolutionModule.sol';
 
 contract VersionedResolutionConfigTest is Test {
     DecentralizedResolutionModule internal drm;

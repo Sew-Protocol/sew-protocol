@@ -147,5 +147,5 @@ Unless there is a deployed/activated rewards mechanism.
 - Bond valuation math: `contracts/decentralized-resolution-module/BondValuationLibrary.sol`
 - Deadlines/windows: `contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol`
 - Slashing penalties/caps/freezes + SEW burn handling: `contracts/decentralized-resolution-module/ResolverSlashingModule.sol`
-- Fee params (`yieldProtocolFeeBps`, `appealBondProtocolFeeBps`): `contracts/core/BaseEscrow.sol`, `contracts/YieldOps.sol`
+- Fee params (`yieldProtocolFeeBps`, `appealBondProtocolFeeBps`): `packages/sew-core/contracts/core/BaseEscrow.sol`, `contracts/YieldOps.sol`
 

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.37;
 
 import "forge-std/Test.sol";
-import "../../../contracts/governance/SlowLaneQueueActivate.sol";
+import "../../../packages/sew-core/contracts/governance/SlowLaneQueueActivate.sol";
 
 // Harness contract to expose internal functions
 contract SlowLaneHarness is SlowLaneQueueActivate {

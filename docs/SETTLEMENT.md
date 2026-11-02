@@ -25,19 +25,19 @@
 > pull-only fund delivery model, yield unwind mechanics, and the `SettlementOps`
 > compute/apply separation pattern.
 >
-> **Sources:** `contracts/core/BaseEscrow.sol` (`release`, `recipientCancel`, `senderCancel`,
+> **Sources:** `packages/sew-core/contracts/core/BaseEscrow.sol` (`release`, `recipientCancel`, `senderCancel`,
 > `proposeSplit`, `acceptSplit`, `releaseAsDisputeResolver`, `cancelAsDisputeResolver`,
 > `executePendingSettlement`, `automateTimedActions`, `resolveDisputeByTimeout`,
 > `_releaseEscrowTransfer`, `_cancelAndRefund`, `_finalizeClaimableSettlement`,
 > `_creditClaimable`, `_handleYieldModuleUnwind`),
-> `contracts/libraries/EscrowSettlementLogic.sol`,
-> `contracts/core/EscrowYield.sol` (`_handleYieldModuleUnwind`),
-> `contracts/core/EscrowSettlement.sol` (`_computeYieldProtocolFee`),
+> `packages/sew-core/contracts/libraries/EscrowSettlementLogic.sol`,
+> `packages/sew-core/contracts/core/EscrowYield.sol` (`_handleYieldModuleUnwind`),
+> `packages/sew-core/contracts/core/EscrowSettlement.sol` (`_computeYieldProtocolFee`),
 > `contracts/core/EscrowVault.sol` (`withdrawFees`),
 > `contracts/modules/AaveYieldModule.sol` (`unwindToEscrow`, `emergencyUnwind`,
 > `recoverTokens`, `recoverETH`),
-> `contracts/types/EscrowTypes.sol` (`EscrowState`, `PendingSettlement`, `SplitProposal`),
-> `contracts/types/YieldPresets.sol`.
+> `packages/sew-core/contracts/types/EscrowTypes.sol` (`EscrowState`, `PendingSettlement`, `SplitProposal`),
+> `packages/sew-core/contracts/types/YieldPresets.sol`.
 
 ---
 

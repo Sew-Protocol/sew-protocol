@@ -4,10 +4,10 @@ pragma solidity ^0.8.37;
 import '../types/EscrowTypes.sol';
 import '../types/YieldPresets.sol';
 import '../core/EscrowStorage.sol';
-import '../libraries/ModuleSnapshotLibrary.sol';
-import '../libraries/SettingsValidationLibrary.sol';
-import '../libraries/YieldPresetLibrary.sol';
-import '../libraries/EscrowEncodingLibrary.sol';
+import './ModuleSnapshotLibrary.sol';
+import './SettingsValidationLibrary.sol';
+import './YieldPresetLibrary.sol';
+import './EscrowEncodingLibrary.sol';
 import '../shared/interfaces/IResolutionModule.sol';
 
 /**

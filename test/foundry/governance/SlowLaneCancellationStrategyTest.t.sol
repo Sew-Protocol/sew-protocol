@@ -4,12 +4,12 @@ pragma solidity ^0.8.37;
 import "forge-std/Test.sol";
 import "../../../contracts/modules/DefaultCancellationStrategy.sol";
 import "../../../contracts/core/EscrowVault.sol";
-import "../../../contracts/core/EscrowCreationPolicy.sol";
-import "../../../contracts/core/BondCollector.sol";
-import "../../../contracts/core/ModuleSnapshotRegistry.sol";
-import "../../../contracts/types/EscrowTypes.sol";
-import "../../../contracts/types/YieldPresets.sol";
-import "../../../contracts/libraries/SettingsValidationLibrary.sol";
+import "../../../packages/sew-core/contracts/core/EscrowCreationPolicy.sol";
+import "../../../packages/sew-core/contracts/core/BondCollector.sol";
+import "../../../packages/sew-core/contracts/core/ModuleSnapshotRegistry.sol";
+import "../../../packages/sew-core/contracts/types/EscrowTypes.sol";
+import "../../../packages/sew-core/contracts/types/YieldPresets.sol";
+import "../../../packages/sew-core/contracts/libraries/SettingsValidationLibrary.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
 
 /**

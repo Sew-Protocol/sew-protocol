@@ -3,7 +3,7 @@ pragma solidity ^0.8.37;
 
 import "forge-std/Test.sol";
 import "./EscrowInvariantHandler.t.sol";
-import "../../../contracts/types/EscrowTypes.sol";
+import "../../../packages/sew-core/contracts/types/EscrowTypes.sol";
 /// @notice Foundry invariant tests for resolver authority and appeal window enforcement.
 ///
 /// Invariants:

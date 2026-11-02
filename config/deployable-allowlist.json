@@ -33,7 +33,7 @@
     {
       "artifactName": "DefaultReleaseStrategy",
       "contractName": "DefaultReleaseStrategy",
-      "sourcePath": "contracts/modules/DefaultReleaseStrategy.sol",
+      "sourcePath": "packages/sew-core/contracts/modules/DefaultReleaseStrategy.sol",
       "scopeHint": "shared",
       "category": "governance",
       "notes": "Release/governance strategy infrastructure; may serve both PRF and SEW."
@@ -97,7 +97,7 @@
     {
       "artifactName": "EscrowCreationPolicy",
       "contractName": "EscrowCreationPolicy",
-      "sourcePath": "contracts/core/EscrowCreationPolicy.sol",
+      "sourcePath": "packages/sew-core/contracts/core/EscrowCreationPolicy.sol",
       "scopeHint": "sew",
       "category": "core",
       "notes": "Escrow creation policy."
@@ -105,7 +105,7 @@
     {
       "artifactName": "BondCollector",
       "contractName": "BondCollector",
-      "sourcePath": "contracts/core/BondCollector.sol",
+      "sourcePath": "packages/sew-core/contracts/core/BondCollector.sol",
       "scopeHint": "sew",
       "category": "core",
       "notes": "Bond collection and management."
@@ -129,7 +129,7 @@
     {
       "artifactName": "ModuleSnapshotRegistry",
       "contractName": "ModuleSnapshotRegistry",
-      "sourcePath": "contracts/core/ModuleSnapshotRegistry.sol",
+      "sourcePath": "packages/sew-core/contracts/core/ModuleSnapshotRegistry.sol",
       "scopeHint": "sew",
       "category": "infra",
       "notes": "Module snapshot/metadata registry."

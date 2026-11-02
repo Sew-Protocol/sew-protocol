@@ -2,7 +2,7 @@
 pragma solidity ^0.8.37;
 
 import '@openzeppelin/contracts/access/AccessControl.sol';
-import '../core/BaseEscrow.sol';
+import '../../packages/sew-core/contracts/core/BaseEscrow.sol';
 import '../ops/GuardianOps.sol';
 
 /**

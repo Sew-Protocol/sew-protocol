@@ -59,7 +59,7 @@ These are **deployment-time defaults** (can be overridden via environment variab
 
 ## Complete Function Mapping
 
-### BaseEscrow.sol (`contracts/core/BaseEscrow.sol`)
+### BaseEscrow.sol (`packages/sew-core/contracts/core/BaseEscrow.sol`)
 
 | Function                                            | Role            | Lane      | Delay     | Bounds                         | Notes                                                                                                                                                                                   |
 | --------------------------------------------------- | --------------- | --------- | --------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -190,7 +190,7 @@ These are **deployment-time defaults** (can be overridden via environment variab
 
 **Note**: `YieldOps` is an external helper contract that handles yield withdrawal and distribution operations. It uses `ROLE_TIMELOCK` for all operational functions.
 
-### BondCollector.sol (`contracts/core/BondCollector.sol`)
+### BondCollector.sol (`packages/sew-core/contracts/core/BondCollector.sol`)
 
 | Function                      | Role            | Lane     | Delay | Bounds           | Notes                                    |
 | ----------------------------- | --------------- | -------- | ----- | ---------------- | ---------------------------------------- |

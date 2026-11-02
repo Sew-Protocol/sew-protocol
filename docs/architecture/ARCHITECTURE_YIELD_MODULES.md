@@ -59,7 +59,7 @@ TOTAL YIELD GLUE IN CORE:               ~440 bytes
 
 ### 1. IYieldModule Interface
 
-**File:** `contracts/interfaces/IYieldModule.sol`
+**File:** `packages/sew-core/contracts/interfaces/IYieldModule.sol`
 
 ```solidity
 // SPDX-License-Identifier: Apache-2.0

@@ -4,8 +4,8 @@ pragma solidity ^0.8.37;
 import 'forge-std/Test.sol';
 import '../../../contracts/registry/ModuleRegistry.sol';
 import '../../../contracts/interfaces/IModuleRegistry.sol';
-import '../../../contracts/interfaces/IYieldModule.sol';
-import '../../../contracts/shared/interfaces/IResolutionModule.sol';
+import '../../../packages/sew-core/contracts/interfaces/IYieldModule.sol';
+import '../../../packages/sew-core/contracts/shared/interfaces/IResolutionModule.sol';
 
 contract ModuleRegistryGapsTest is Test {
     ModuleRegistry public registry;

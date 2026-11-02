@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.37;
 
-import 'contracts/shared/interfaces/IResolutionModule.sol';
+import '../../packages/sew-core/contracts/shared/interfaces/IResolutionModule.sol';
 
 import '@openzeppelin/contracts/utils/introspection/ERC165.sol';
 

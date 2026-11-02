@@ -2,7 +2,7 @@
 pragma solidity ^0.8.37;
 
 import {Test} from "forge-std/Test.sol";
-import {BaseEscrow} from "contracts/core/BaseEscrow.sol";
+import {BaseEscrow} from "../../../packages/sew-core/contracts/core/BaseEscrow.sol";
 import {EscrowVault} from "contracts/core/EscrowVault.sol";
 import {AaveYieldModule} from "contracts/modules/AaveYieldModule.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";

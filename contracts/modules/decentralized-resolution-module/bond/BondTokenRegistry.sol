@@ -2,7 +2,7 @@
 pragma solidity ^0.8.37;
 
 import '@openzeppelin/contracts/access/AccessControl.sol';
-import '../../../governance/SlowLaneQueueActivate.sol';
+import '../../../../packages/sew-core/contracts/governance/SlowLaneQueueActivate.sol';
 import '../interfaces/IBondTokenRegistry.sol';
 
 /**

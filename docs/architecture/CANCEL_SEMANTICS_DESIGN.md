@@ -349,9 +349,9 @@ Check in order:
 - `test/foundry/core/CancellationStrategies.t.sol` - Tests
 
 ### Modified Files
-- `contracts/core/BaseEscrow.sol` - Integrate strategy calls
-- `contracts/types/EscrowTypes.sol` - Add cancellationStrategy to EscrowSettings
-- `contracts/core/ModuleSnapshotRegistry.sol` - Snapshot strategies
+- `packages/sew-core/contracts/core/BaseEscrow.sol` - Integrate strategy calls
+- `packages/sew-core/contracts/types/EscrowTypes.sol` - Add cancellationStrategy to EscrowSettings
+- `packages/sew-core/contracts/core/ModuleSnapshotRegistry.sol` - Snapshot strategies
 - `contracts/ops/SettlementOps.sol` - Auto-cancel precedence
 - Website documentation - Cancel semantics guide
 

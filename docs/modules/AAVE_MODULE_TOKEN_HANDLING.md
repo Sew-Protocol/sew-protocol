@@ -170,9 +170,9 @@ deterministic admissibility checks (`ZERO_AMOUNT`, `TOKEN_NOT_CONFIGURED`, `BELO
 
 ## Related
 
-- Interface & policy: `contracts/interfaces/IYieldModule.sol`
-- Core orchestration: `contracts/core/EscrowYield.sol`
-- Fee computation: `contracts/core/EscrowSettlement.sol` (`_computeYieldProtocolFee`)
+- Interface & policy: `packages/sew-core/contracts/interfaces/IYieldModule.sol`
+- Core orchestration: `packages/sew-core/contracts/core/EscrowYield.sol`
+- Fee computation: `packages/sew-core/contracts/core/EscrowSettlement.sol` (`_computeYieldProtocolFee`)
 - Fee storage/withdrawal: `contracts/core/EscrowVault.sol` (`_recordFee`, `withdrawFees`)
 - End-to-end coverage: `test/foundry/modules/AaveEscrowE2E.t.sol`,
   `test/foundry/modules/AaveYieldEscrowAppealE2E.t.sol`,

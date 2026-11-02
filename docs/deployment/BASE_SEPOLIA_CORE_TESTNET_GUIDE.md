@@ -85,7 +85,7 @@ pnpm hardhat deploy --network baseSepolia --tags escrow
 
 ```bash
 pnpm hardhat deploy --network baseSepolia --tags default-resolution
-# Deploy default release strategy module (`contracts/modules/DefaultReleaseStrategy.sol`)
+# Deploy default release strategy module (`packages/sew-core/contracts/modules/DefaultReleaseStrategy.sol`)
 pnpm hardhat deploy --network baseSepolia --tags release-strategy
 # Optional yield modules if you want to test yield flows
 pnpm hardhat deploy --network baseSepolia --tags yield-modules
@@ -167,7 +167,7 @@ and capture gas deltas across commits.
 
 | Contract | Description | Deploy tag | Address |
 |---|---|---|---|
-| `DefaultReleaseStrategy` | Default release strategy module (`contracts/modules/DefaultReleaseStrategy.sol`) | `release-strategy` | `0x9738584Db6D171e6BE9d0F104aAbF4C1cAd0fb3b` |
+| `DefaultReleaseStrategy` | Default release strategy module (`packages/sew-core/contracts/modules/DefaultReleaseStrategy.sol`) | `release-strategy` | `0x9738584Db6D171e6BE9d0F104aAbF4C1cAd0fb3b` |
 
 ### What to tell the exchange partner (prepared message template)
 Subject: Base Sepolia escrow integration — testnet contract addresses + scope

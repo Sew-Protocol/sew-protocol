@@ -4,8 +4,8 @@ pragma solidity ^0.8.37;
 import "forge-std/Test.sol";
 import "forge-std/StdJson.sol";
 
-import { EscrowSettings, EscrowState } from "../../../contracts/types/EscrowTypes.sol";
-    import { YieldPreset } from "../../../contracts/types/YieldPresets.sol";
+import { EscrowSettings, EscrowState } from "../../../packages/sew-core/contracts/types/EscrowTypes.sol";
+    import { YieldPreset } from "../../../packages/sew-core/contracts/types/YieldPresets.sol";
 
 interface IEscrowVaultAttackTarget {
     function escrowFee() external view returns (uint256);

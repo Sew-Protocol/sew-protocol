@@ -3,8 +3,8 @@ pragma solidity ^0.8.37;
 
 import './IArbitrator.sol';
 import './IArbitrable.sol';
-import '../shared/interfaces/IResolutionModule.sol';
-import '../modules/decentralized-resolution-module/interfaces/IKlerosHandoffResolutionModule.sol';
+import '../../packages/sew-core/contracts/shared/interfaces/IResolutionModule.sol';
+import '../../packages/sew-core/contracts/modules/decentralized-resolution-module/interfaces/IKlerosHandoffResolutionModule.sol';
 import '@openzeppelin/contracts/access/AccessControl.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 import '@openzeppelin/contracts/utils/introspection/IERC165.sol';

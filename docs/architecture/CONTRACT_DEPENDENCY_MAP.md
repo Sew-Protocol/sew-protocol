@@ -105,7 +105,7 @@ This helps developers understand how contracts relate to each other.
 ### TIER 1: CORE ESCROW CONTRACTS
 
 #### 1. **BaseEscrow** (Abstract)
-**Location:** `contracts/core/BaseEscrow.sol`
+**Location:** `packages/sew-core/contracts/core/BaseEscrow.sol`
 
 **Purpose:** 
 - Central state holder for all escrow operations
@@ -632,7 +632,7 @@ BaseEscrow applies change
 ---
 
 #### 10. **BondCollector**
-**Location:** `contracts/core/BondCollector.sol`
+**Location:** `packages/sew-core/contracts/core/BondCollector.sol`
 
 **Purpose:**
 - External contract for bond collection (extracted to reduce size)

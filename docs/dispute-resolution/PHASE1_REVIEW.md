@@ -80,7 +80,7 @@ function recordResolution(
 
 ### 1. Pending Settlement Storage ✅ (Already Added)
 
-**Location:** `contracts/core/BaseEscrow.sol`
+**Location:** `packages/sew-core/contracts/core/BaseEscrow.sol`
 
 **Added:**
 
@@ -222,7 +222,7 @@ function _getAppealInfo(
 
 ### 6. Update `escalateDispute()` to Cancel Pending Settlements
 
-**Location:** `contracts/core/BaseEscrow.sol:escalateDispute()`
+**Location:** `packages/sew-core/contracts/core/BaseEscrow.sol:escalateDispute()`
 
 **Add logic at start of function:**
 

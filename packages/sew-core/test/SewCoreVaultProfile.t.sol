@@ -3,16 +3,39 @@ pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
 import '@openzeppelin/contracts/governance/TimelockController.sol';
-import '../../../contracts/core/SewCoreVault.sol';
-import '../../../contracts/core/EscrowCreationPolicy.sol';
-import '../../../contracts/core/ModuleSnapshotRegistry.sol';
-import '../../../contracts/modules/DefaultResolutionModule.sol';
-import '../../../contracts/modules/DefaultReleaseStrategy.sol';
-import '../../../contracts/mocks/ERC20Mock.sol';
-import '../../../contracts/mocks/MockRevertingERC20.sol';
-import '../../../contracts/interfaces/IEscrowAppeal.sol';
-import '../../../contracts/types/EscrowTypes.sol';
-import '../../../contracts/types/YieldPresets.sol';
+import '../contracts/core/SewCoreVault.sol';
+import '../contracts/core/EscrowCreationPolicy.sol';
+import '../contracts/core/ModuleSnapshotRegistry.sol';
+import '../contracts/modules/DefaultResolutionModule.sol';
+import '../contracts/modules/DefaultReleaseStrategy.sol';
+import '../contracts/interfaces/IEscrowAppeal.sol';
+import '../contracts/types/EscrowTypes.sol';
+import '../contracts/types/YieldPresets.sol';
+
+
+import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
+
+contract ERC20Mock is ERC20 {
+    constructor(string memory name_, string memory symbol_, address initialAccount, uint256 initialBalance) ERC20(name_, symbol_) {
+        _mint(initialAccount, initialBalance);
+    }
+}
+
+contract MockRevertingERC20 is ERC20 {
+    bool public shouldRevert;
+    constructor(string memory name_, string memory symbol_, address initialAccount, uint256 initialBalance) ERC20(name_, symbol_) {
+        _mint(initialAccount, initialBalance);
+    }
+    function setShouldRevert(bool value) external { shouldRevert = value; }
+    function transfer(address to, uint256 amount) public override returns (bool) {
+        require(!shouldRevert, 'MockRevertingERC20: Transfer reverted');
+        return super.transfer(to, amount);
+    }
+    function transferFrom(address from, address to, uint256 amount) public override returns (bool) {
+        require(!shouldRevert, 'MockRevertingERC20: TransferFrom reverted');
+        return super.transferFrom(from, to, amount);
+    }
+}
 
 contract SewCoreVaultProfileTest is Test {
     SewCoreVault internal vault;

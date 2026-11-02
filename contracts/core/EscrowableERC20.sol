@@ -2,14 +2,14 @@
 pragma solidity ^0.8.37;
 
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
-import './BaseEscrow.sol';
-import '../types/EscrowTypes.sol';
-import '../types/YieldPresets.sol';
-import '../interfaces/IReleaseStrategy.sol';
-import '../shared/interfaces/IResolutionModule.sol';
-import '../interfaces/IYieldModule.sol';
-import './ModuleSnapshotRegistry.sol';
-import '../libraries/ModuleGetterLibrary.sol';
+import '../../packages/sew-core/contracts/core/BaseEscrow.sol';
+import '../../packages/sew-core/contracts/types/EscrowTypes.sol';
+import '../../packages/sew-core/contracts/types/YieldPresets.sol';
+import '../../packages/sew-core/contracts/interfaces/IReleaseStrategy.sol';
+import '../../packages/sew-core/contracts/shared/interfaces/IResolutionModule.sol';
+import '../../packages/sew-core/contracts/interfaces/IYieldModule.sol';
+import '../../packages/sew-core/contracts/core/ModuleSnapshotRegistry.sol';
+import '../../packages/sew-core/contracts/libraries/ModuleGetterLibrary.sol';
 
 /**
  * @title EscrowableERC20

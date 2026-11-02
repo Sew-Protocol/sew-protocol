@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.37;
 
-import "../interfaces/ICancellationStrategy.sol";
-import "../types/EscrowTypes.sol";
+import "../../packages/sew-core/contracts/interfaces/ICancellationStrategy.sol";
+import "../../packages/sew-core/contracts/types/EscrowTypes.sol";
 
 /// @title DefaultCancellationStrategy
 /// @notice Implements mutual consent cancellation (default behavior)

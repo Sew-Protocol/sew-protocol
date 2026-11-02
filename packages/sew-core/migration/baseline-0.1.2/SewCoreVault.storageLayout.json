@@ -1,0 +1,898 @@
+{
+  "storage": [
+    {
+      "astId": 14282,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "_status",
+      "offset": 0,
+      "slot": "0",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 12815,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "_roles",
+      "offset": 0,
+      "slot": "1",
+      "type": "t_mapping(t_bytes32,t_struct(RoleData)12810_storage)"
+    },
+    {
+      "astId": 5725,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "escrowFee",
+      "offset": 0,
+      "slot": "2",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 5744,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "escrowTransfers",
+      "offset": 0,
+      "slot": "3",
+      "type": "t_array(t_struct(EscrowTransfer)12665_storage)dyn_storage"
+    },
+    {
+      "astId": 5746,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "escrowFeeAddress",
+      "offset": 0,
+      "slot": "4",
+      "type": "t_address"
+    },
+    {
+      "astId": 5748,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "yieldProtocolFeeBps",
+      "offset": 0,
+      "slot": "5",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 5750,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "appealBondProtocolFeeBps",
+      "offset": 0,
+      "slot": "6",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 5752,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "disputeResolutionModule",
+      "offset": 0,
+      "slot": "7",
+      "type": "t_address"
+    },
+    {
+      "astId": 5755,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "timeoutConfig",
+      "offset": 0,
+      "slot": "8",
+      "type": "t_struct(TimeoutConfig)12781_storage"
+    },
+    {
+      "astId": 5759,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "disputeRaisedTimestamp",
+      "offset": 0,
+      "slot": "12",
+      "type": "t_mapping(t_uint256,t_uint256)"
+    },
+    {
+      "astId": 5764,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "escrowSettings",
+      "offset": 0,
+      "slot": "13",
+      "type": "t_mapping(t_uint256,t_struct(EscrowSettings)12622_storage)"
+    },
+    {
+      "astId": 5768,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "amountReleased",
+      "offset": 0,
+      "slot": "14",
+      "type": "t_mapping(t_uint256,t_uint256)"
+    },
+    {
+      "astId": 5774,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "claimableBalances",
+      "offset": 0,
+      "slot": "15",
+      "type": "t_mapping(t_uint256,t_mapping(t_address,t_uint256))"
+    },
+    {
+      "astId": 5778,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "totalClaimableAssets",
+      "offset": 0,
+      "slot": "16",
+      "type": "t_mapping(t_address,t_uint256)"
+    },
+    {
+      "astId": 5784,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "claimableBondProtocolFees",
+      "offset": 0,
+      "slot": "17",
+      "type": "t_mapping(t_address,t_mapping(t_address,t_uint256))"
+    },
+    {
+      "astId": 5788,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "claimableExcessEthRefunds",
+      "offset": 0,
+      "slot": "18",
+      "type": "t_mapping(t_address,t_uint256)"
+    },
+    {
+      "astId": 5802,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "pendingSettlements",
+      "offset": 0,
+      "slot": "19",
+      "type": "t_mapping(t_uint256,t_struct(PendingSettlement)5797_storage)"
+    },
+    {
+      "astId": 5818,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "splitProposals",
+      "offset": 0,
+      "slot": "20",
+      "type": "t_mapping(t_uint256,t_struct(SplitProposal)5813_storage)"
+    },
+    {
+      "astId": 5820,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "minDisputeEscrowValue",
+      "offset": 0,
+      "slot": "21",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 5822,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "maxDisputesPerSenderPerDay",
+      "offset": 0,
+      "slot": "22",
+      "type": "t_uint32"
+    },
+    {
+      "astId": 5826,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "senderDisputeWindowStart",
+      "offset": 0,
+      "slot": "23",
+      "type": "t_mapping(t_address,t_uint64)"
+    },
+    {
+      "astId": 5830,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "senderDisputeCount",
+      "offset": 0,
+      "slot": "24",
+      "type": "t_mapping(t_address,t_uint32)"
+    },
+    {
+      "astId": 5832,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "escalationCooldown",
+      "offset": 0,
+      "slot": "25",
+      "type": "t_uint64"
+    },
+    {
+      "astId": 5836,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "lastEscalationTimestamp",
+      "offset": 0,
+      "slot": "26",
+      "type": "t_mapping(t_address,t_uint64)"
+    },
+    {
+      "astId": 5840,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "addressEscalationCount",
+      "offset": 0,
+      "slot": "27",
+      "type": "t_mapping(t_address,t_uint32)"
+    },
+    {
+      "astId": 5850,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "timeoutPolicySnapshots",
+      "offset": 0,
+      "slot": "28",
+      "type": "t_mapping(t_uint256,t_struct(EscrowTimeoutPolicySnapshot)5845_storage)"
+    },
+    {
+      "astId": 5854,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "v25YieldModules",
+      "offset": 0,
+      "slot": "29",
+      "type": "t_mapping(t_uint256,t_address)"
+    },
+    {
+      "astId": 5858,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "v25YieldPrincipals",
+      "offset": 0,
+      "slot": "30",
+      "type": "t_mapping(t_uint256,t_uint256)"
+    },
+    {
+      "astId": 5863,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "moduleSnapshots",
+      "offset": 0,
+      "slot": "31",
+      "type": "t_mapping(t_uint256,t_struct(ModuleSnapshot)12690_storage)"
+    },
+    {
+      "astId": 5867,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "appealBondFeeRecipients",
+      "offset": 0,
+      "slot": "32",
+      "type": "t_mapping(t_uint256,t_address)"
+    },
+    {
+      "astId": 5871,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "workflowResolutionConfigVersion",
+      "offset": 0,
+      "slot": "33",
+      "type": "t_mapping(t_uint256,t_uint256)"
+    },
+    {
+      "astId": 5874,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "bondCollector",
+      "offset": 0,
+      "slot": "34",
+      "type": "t_contract(BondCollector)3533"
+    },
+    {
+      "astId": 5877,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "creationPolicy",
+      "offset": 0,
+      "slot": "35",
+      "type": "t_contract(EscrowCreationPolicy)5317"
+    },
+    {
+      "astId": 5879,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "emergencyPaused",
+      "offset": 20,
+      "slot": "35",
+      "type": "t_bool"
+    },
+    {
+      "astId": 5881,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "pauseStartedAt",
+      "offset": 0,
+      "slot": "36",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 5883,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "accumulatedPausedDuration",
+      "offset": 0,
+      "slot": "37",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 5885,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "pauseCycles",
+      "offset": 0,
+      "slot": "38",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 5887,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "lastUnpausedAt",
+      "offset": 0,
+      "slot": "39",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 6793,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "totalFeesPerToken",
+      "offset": 0,
+      "slot": "40",
+      "type": "t_mapping(t_address,t_uint256)"
+    },
+    {
+      "astId": 6797,
+      "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+      "label": "totalHeldInEscrowPerToken",
+      "offset": 0,
+      "slot": "41",
+      "type": "t_mapping(t_address,t_uint256)"
+    }
+  ],
+  "types": {
+    "t_address": {
+      "encoding": "inplace",
+      "label": "address",
+      "numberOfBytes": "20"
+    },
+    "t_array(t_struct(EscrowTransfer)12665_storage)dyn_storage": {
+      "encoding": "dynamic_array",
+      "label": "struct EscrowTransfer[]",
+      "numberOfBytes": "32",
+      "base": "t_struct(EscrowTransfer)12665_storage"
+    },
+    "t_bool": {
+      "encoding": "inplace",
+      "label": "bool",
+      "numberOfBytes": "1"
+    },
+    "t_bytes32": {
+      "encoding": "inplace",
+      "label": "bytes32",
+      "numberOfBytes": "32"
+    },
+    "t_contract(BondCollector)3533": {
+      "encoding": "inplace",
+      "label": "contract BondCollector",
+      "numberOfBytes": "20"
+    },
+    "t_contract(EscrowCreationPolicy)5317": {
+      "encoding": "inplace",
+      "label": "contract EscrowCreationPolicy",
+      "numberOfBytes": "20"
+    },
+    "t_enum(EscrowState)12629": {
+      "encoding": "inplace",
+      "label": "enum EscrowState",
+      "numberOfBytes": "1"
+    },
+    "t_enum(RecipientStatus)12637": {
+      "encoding": "inplace",
+      "label": "enum RecipientStatus",
+      "numberOfBytes": "1"
+    },
+    "t_enum(SenderStatus)12633": {
+      "encoding": "inplace",
+      "label": "enum SenderStatus",
+      "numberOfBytes": "1"
+    },
+    "t_enum(YieldPreset)12787": {
+      "encoding": "inplace",
+      "label": "enum YieldPreset",
+      "numberOfBytes": "1"
+    },
+    "t_mapping(t_address,t_bool)": {
+      "encoding": "mapping",
+      "key": "t_address",
+      "label": "mapping(address => bool)",
+      "numberOfBytes": "32",
+      "value": "t_bool"
+    },
+    "t_mapping(t_address,t_mapping(t_address,t_uint256))": {
+      "encoding": "mapping",
+      "key": "t_address",
+      "label": "mapping(address => mapping(address => uint256))",
+      "numberOfBytes": "32",
+      "value": "t_mapping(t_address,t_uint256)"
+    },
+    "t_mapping(t_address,t_uint256)": {
+      "encoding": "mapping",
+      "key": "t_address",
+      "label": "mapping(address => uint256)",
+      "numberOfBytes": "32",
+      "value": "t_uint256"
+    },
+    "t_mapping(t_address,t_uint32)": {
+      "encoding": "mapping",
+      "key": "t_address",
+      "label": "mapping(address => uint32)",
+      "numberOfBytes": "32",
+      "value": "t_uint32"
+    },
+    "t_mapping(t_address,t_uint64)": {
+      "encoding": "mapping",
+      "key": "t_address",
+      "label": "mapping(address => uint64)",
+      "numberOfBytes": "32",
+      "value": "t_uint64"
+    },
+    "t_mapping(t_bytes32,t_struct(RoleData)12810_storage)": {
+      "encoding": "mapping",
+      "key": "t_bytes32",
+      "label": "mapping(bytes32 => struct AccessControl.RoleData)",
+      "numberOfBytes": "32",
+      "value": "t_struct(RoleData)12810_storage"
+    },
+    "t_mapping(t_uint256,t_address)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => address)",
+      "numberOfBytes": "32",
+      "value": "t_address"
+    },
+    "t_mapping(t_uint256,t_mapping(t_address,t_uint256))": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => mapping(address => uint256))",
+      "numberOfBytes": "32",
+      "value": "t_mapping(t_address,t_uint256)"
+    },
+    "t_mapping(t_uint256,t_struct(EscrowSettings)12622_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => struct EscrowSettings)",
+      "numberOfBytes": "32",
+      "value": "t_struct(EscrowSettings)12622_storage"
+    },
+    "t_mapping(t_uint256,t_struct(EscrowTimeoutPolicySnapshot)5845_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => struct EscrowStorage.EscrowTimeoutPolicySnapshot)",
+      "numberOfBytes": "32",
+      "value": "t_struct(EscrowTimeoutPolicySnapshot)5845_storage"
+    },
+    "t_mapping(t_uint256,t_struct(ModuleSnapshot)12690_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => struct ModuleSnapshot)",
+      "numberOfBytes": "32",
+      "value": "t_struct(ModuleSnapshot)12690_storage"
+    },
+    "t_mapping(t_uint256,t_struct(PendingSettlement)5797_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => struct EscrowStorage.PendingSettlement)",
+      "numberOfBytes": "32",
+      "value": "t_struct(PendingSettlement)5797_storage"
+    },
+    "t_mapping(t_uint256,t_struct(SplitProposal)5813_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => struct EscrowStorage.SplitProposal)",
+      "numberOfBytes": "32",
+      "value": "t_struct(SplitProposal)5813_storage"
+    },
+    "t_mapping(t_uint256,t_uint256)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => uint256)",
+      "numberOfBytes": "32",
+      "value": "t_uint256"
+    },
+    "t_struct(EscrowSettings)12622_storage": {
+      "encoding": "inplace",
+      "label": "struct EscrowSettings",
+      "numberOfBytes": "128",
+      "members": [
+        {
+          "astId": 12612,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "customResolver",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_address"
+        },
+        {
+          "astId": 12614,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "releaseAddress",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_address"
+        },
+        {
+          "astId": 12617,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "yieldPreset",
+          "offset": 20,
+          "slot": "1",
+          "type": "t_enum(YieldPreset)12787"
+        },
+        {
+          "astId": 12619,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "autoReleaseTime",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 12621,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "autoCancelTime",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_uint256"
+        }
+      ]
+    },
+    "t_struct(EscrowTimeoutPolicySnapshot)5845_storage": {
+      "encoding": "inplace",
+      "label": "struct EscrowStorage.EscrowTimeoutPolicySnapshot",
+      "numberOfBytes": "32",
+      "members": [
+        {
+          "astId": 5842,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "pendingAutoCancelEnabled",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_bool"
+        },
+        {
+          "astId": 5844,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "disputedTimeoutEnabled",
+          "offset": 1,
+          "slot": "0",
+          "type": "t_bool"
+        }
+      ]
+    },
+    "t_struct(EscrowTransfer)12665_storage": {
+      "encoding": "inplace",
+      "label": "struct EscrowTransfer",
+      "numberOfBytes": "192",
+      "members": [
+        {
+          "astId": 12643,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "token",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_address"
+        },
+        {
+          "astId": 12645,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "to",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_address"
+        },
+        {
+          "astId": 12647,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "from",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_address"
+        },
+        {
+          "astId": 12649,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "disputeResolver",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_address"
+        },
+        {
+          "astId": 12651,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "amountAfterFee",
+          "offset": 0,
+          "slot": "4",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 12653,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "autoReleaseTime",
+          "offset": 0,
+          "slot": "5",
+          "type": "t_uint64"
+        },
+        {
+          "astId": 12655,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "autoCancelTime",
+          "offset": 8,
+          "slot": "5",
+          "type": "t_uint64"
+        },
+        {
+          "astId": 12658,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "escrowState",
+          "offset": 16,
+          "slot": "5",
+          "type": "t_enum(EscrowState)12629"
+        },
+        {
+          "astId": 12661,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "senderStatus",
+          "offset": 17,
+          "slot": "5",
+          "type": "t_enum(SenderStatus)12633"
+        },
+        {
+          "astId": 12664,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "recipientStatus",
+          "offset": 18,
+          "slot": "5",
+          "type": "t_enum(RecipientStatus)12637"
+        }
+      ]
+    },
+    "t_struct(ModuleSnapshot)12690_storage": {
+      "encoding": "inplace",
+      "label": "struct ModuleSnapshot",
+      "numberOfBytes": "384",
+      "members": [
+        {
+          "astId": 12667,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "resolutionModule",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_address"
+        },
+        {
+          "astId": 12669,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "releaseStrategy",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_address"
+        },
+        {
+          "astId": 12671,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "cancellationStrategy",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_address"
+        },
+        {
+          "astId": 12673,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "yieldGenerationModule",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_address"
+        },
+        {
+          "astId": 12675,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "incentiveModule",
+          "offset": 0,
+          "slot": "4",
+          "type": "t_address"
+        },
+        {
+          "astId": 12677,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "yieldProtocolFeeBps",
+          "offset": 0,
+          "slot": "5",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 12679,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "appealBondProtocolFeeBps",
+          "offset": 0,
+          "slot": "6",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 12681,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "escrowFeeBps",
+          "offset": 0,
+          "slot": "7",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 12683,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "defaultAutoReleaseDelay",
+          "offset": 0,
+          "slot": "8",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 12685,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "defaultAutoCancelDelay",
+          "offset": 0,
+          "slot": "9",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 12687,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "maxDisputeDuration",
+          "offset": 0,
+          "slot": "10",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 12689,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "appealWindowDuration",
+          "offset": 0,
+          "slot": "11",
+          "type": "t_uint256"
+        }
+      ]
+    },
+    "t_struct(PendingSettlement)5797_storage": {
+      "encoding": "inplace",
+      "label": "struct EscrowStorage.PendingSettlement",
+      "numberOfBytes": "96",
+      "members": [
+        {
+          "astId": 5790,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "exists",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_bool"
+        },
+        {
+          "astId": 5792,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "isRelease",
+          "offset": 1,
+          "slot": "0",
+          "type": "t_bool"
+        },
+        {
+          "astId": 5794,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "appealDeadline",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 5796,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "resolutionHash",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_bytes32"
+        }
+      ]
+    },
+    "t_struct(RoleData)12810_storage": {
+      "encoding": "inplace",
+      "label": "struct AccessControl.RoleData",
+      "numberOfBytes": "64",
+      "members": [
+        {
+          "astId": 12807,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "hasRole",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_mapping(t_address,t_bool)"
+        },
+        {
+          "astId": 12809,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "adminRole",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_bytes32"
+        }
+      ]
+    },
+    "t_struct(SplitProposal)5813_storage": {
+      "encoding": "inplace",
+      "label": "struct EscrowStorage.SplitProposal",
+      "numberOfBytes": "128",
+      "members": [
+        {
+          "astId": 5804,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "proposer",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_address"
+        },
+        {
+          "astId": 5806,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "buyerAmount",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 5808,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "sellerAmount",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 5810,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "expiry",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_uint64"
+        },
+        {
+          "astId": 5812,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "active",
+          "offset": 8,
+          "slot": "3",
+          "type": "t_bool"
+        }
+      ]
+    },
+    "t_struct(TimeoutConfig)12781_storage": {
+      "encoding": "inplace",
+      "label": "struct TimeoutConfig",
+      "numberOfBytes": "128",
+      "members": [
+        {
+          "astId": 12774,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "defaultAutoReleaseDelay",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 12776,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "defaultAutoCancelDelay",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 12778,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "maxDisputeDuration",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 12780,
+          "contract": "contracts/core/SewCoreVault.sol:SewCoreVault",
+          "label": "appealWindowDuration",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_uint256"
+        }
+      ]
+    },
+    "t_uint256": {
+      "encoding": "inplace",
+      "label": "uint256",
+      "numberOfBytes": "32"
+    },
+    "t_uint32": {
+      "encoding": "inplace",
+      "label": "uint32",
+      "numberOfBytes": "4"
+    },
+    "t_uint64": {
+      "encoding": "inplace",
+      "label": "uint64",
+      "numberOfBytes": "8"
+    }
+  }
+}

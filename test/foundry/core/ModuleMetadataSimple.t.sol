@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
-import "../../../contracts/types/YieldPresets.sol";
+import "../../../packages/sew-core/contracts/types/YieldPresets.sol";
 pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
-import {DefaultResolutionModule} from '../../../contracts/modules/DefaultResolutionModule.sol';
-import {DefaultReleaseStrategy} from '../../../contracts/modules/DefaultReleaseStrategy.sol';
-import {IResolutionModule} from '../../../contracts/shared/interfaces/IResolutionModule.sol';
-import {IReleaseStrategy} from '../../../contracts/interfaces/IReleaseStrategy.sol';
+import {DefaultResolutionModule} from '../../../packages/sew-core/contracts/modules/DefaultResolutionModule.sol';
+import {DefaultReleaseStrategy} from '../../../packages/sew-core/contracts/modules/DefaultReleaseStrategy.sol';
+import {IResolutionModule} from '../../../packages/sew-core/contracts/shared/interfaces/IResolutionModule.sol';
+import {IReleaseStrategy} from '../../../packages/sew-core/contracts/interfaces/IReleaseStrategy.sol';
 
 contract ModuleMetadataSimple is Test {
     function test_DefaultResolutionModule_metadataAndInterface() public {

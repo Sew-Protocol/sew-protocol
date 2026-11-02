@@ -3,13 +3,13 @@ pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
 import '../../mocks/legacy/CreateOpsReference.sol';
-import '../../../contracts/interfaces/IYieldModule.sol';
+import '../../../packages/sew-core/contracts/interfaces/IYieldModule.sol';
 import '../../mocks/legacy/SettlementOpsReference.sol';
 import '../../mocks/legacy/DisputeOpsReference.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
-import '../../../contracts/types/EscrowTypes.sol';
-import '../../../contracts/types/YieldPresets.sol';
-import '../../../contracts/shared/interfaces/IResolutionModule.sol';
+import '../../../packages/sew-core/contracts/types/EscrowTypes.sol';
+import '../../../packages/sew-core/contracts/types/YieldPresets.sol';
+import '../../../packages/sew-core/contracts/shared/interfaces/IResolutionModule.sol';
 
 contract OpsCoverageTest is Test {
     CreateOpsReference public createOps;

@@ -4,16 +4,16 @@ pragma solidity ^0.8.37;
 import "forge-std/Test.sol";
 import "../../../contracts/core/EscrowVault.sol";
 import '../helpers/EscrowVaultAnalytics.sol';
-import "../../../contracts/core/BaseEscrow.sol";
-import "../../../contracts/core/ModuleSnapshotRegistry.sol";
-import "../../../contracts/modules/DefaultReleaseStrategy.sol";
-import "../../../contracts/modules/DefaultResolutionModule.sol";
+import "../../../packages/sew-core/contracts/core/BaseEscrow.sol";
+import "../../../packages/sew-core/contracts/core/ModuleSnapshotRegistry.sol";
+import "../../../packages/sew-core/contracts/modules/DefaultReleaseStrategy.sol";
+import "../../../packages/sew-core/contracts/modules/DefaultResolutionModule.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
-import "../../../contracts/types/EscrowTypes.sol";
-import "../../../contracts/types/YieldPresets.sol";
-import "../../../contracts/libraries/SettingsValidationLibrary.sol";
-import "../../../contracts/core/EscrowCreationPolicy.sol";
-import "../../../contracts/core/BondCollector.sol";
+import "../../../packages/sew-core/contracts/types/EscrowTypes.sol";
+import "../../../packages/sew-core/contracts/types/YieldPresets.sol";
+import "../../../packages/sew-core/contracts/libraries/SettingsValidationLibrary.sol";
+import "../../../packages/sew-core/contracts/core/EscrowCreationPolicy.sol";
+import "../../../packages/sew-core/contracts/core/BondCollector.sol";
 
 contract PerEscrowSettingsHarness is EscrowVault {
     constructor(

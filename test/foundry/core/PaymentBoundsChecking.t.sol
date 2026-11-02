@@ -6,7 +6,7 @@ import '../../../contracts/modules/decentralized-resolution-module/incentive/Res
 import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibrary.sol';
 import '../../../contracts/modules/decentralized-resolution-module/interfaces/IPaymentCalculationLibrary.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
-import '../../../contracts/types/EscrowTypes.sol';
+import '../../../packages/sew-core/contracts/types/EscrowTypes.sol';
 
 contract PaymentBoundsCheckingTest is Test {
     ResolverIncentiveModule public incentiveModule;

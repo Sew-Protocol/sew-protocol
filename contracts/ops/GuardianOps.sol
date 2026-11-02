@@ -5,10 +5,10 @@ import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/utils/Address.sol';
 import '@openzeppelin/contracts/utils/Context.sol';
-import '../interfaces/IYieldModule.sol';
+import '../../packages/sew-core/contracts/interfaces/IYieldModule.sol';
 import '../modules/AaveYieldModule.sol';
-import '../core/BaseEscrow.sol';
-import '../core/ModuleSnapshotRegistry.sol';
+import '../../packages/sew-core/contracts/core/BaseEscrow.sol';
+import '../../packages/sew-core/contracts/core/ModuleSnapshotRegistry.sol';
 
 /**
  * @title GuardianOps

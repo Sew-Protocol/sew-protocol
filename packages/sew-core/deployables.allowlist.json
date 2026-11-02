@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
   "packageName": "@sew/deployables",
-  "bundleVersion": "0.1.2",
+  "bundleVersion": "0.1.3",
   "buildArtifactSource": "forge",
   "buildProfile": "sew-core",
   "entries": [
     {
       "artifactName": "TimelockController",
       "contractName": "TimelockController",
-      "sourcePath": "node_modules/@openzeppelin/contracts/governance/TimelockController.sol",
+      "sourcePath": "../../node_modules/@openzeppelin/contracts/governance/TimelockController.sol",
       "origin": "openzeppelin",
       "scopeHint": "shared",
       "category": "governance",

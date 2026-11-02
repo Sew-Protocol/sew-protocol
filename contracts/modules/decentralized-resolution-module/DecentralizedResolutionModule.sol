@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.37;
 
-import '../../shared/interfaces/IResolutionModule.sol';
+import '../../../packages/sew-core/contracts/shared/interfaces/IResolutionModule.sol';
 import '@openzeppelin/contracts/access/AccessControl.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
-import '../../governance/SlowLaneQueueActivate.sol';
-import '../../shared/interfaces/IIncentiveModule.sol';
+import '../../../packages/sew-core/contracts/governance/SlowLaneQueueActivate.sol';
+import '../../../packages/sew-core/contracts/shared/interfaces/IIncentiveModule.sol';
 import './DRMStorageBase.sol';
 import './interfaces/IStakingModule.sol';
 import './interfaces/ISlashingModule.sol';
 import './analytics/ResolutionAnalytics.sol';
 import './libraries/EscalationCostLibrary.sol';
-import './interfaces/IKlerosHandoffResolutionModule.sol';
+import '../../../packages/sew-core/contracts/modules/decentralized-resolution-module/interfaces/IKlerosHandoffResolutionModule.sol';
 
 /**
  * @title DecentralizedResolutionModule

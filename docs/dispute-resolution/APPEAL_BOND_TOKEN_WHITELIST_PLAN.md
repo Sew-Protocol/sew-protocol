@@ -114,7 +114,7 @@ PendingDefaultBondToken private _pendingDefaultBondToken;
 
 **Files to Modify**:
 - `contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol`
-- `contracts/core/BaseEscrow.sol`
+- `packages/sew-core/contracts/core/BaseEscrow.sol`
 
 **Changes**:
 1. Validate bond token in `getRequiredAppealBond()` - ensure it's in whitelist

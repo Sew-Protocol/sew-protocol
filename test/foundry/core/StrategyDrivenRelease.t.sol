@@ -2,11 +2,11 @@
 pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
-import 'contracts/core/BaseEscrow.sol';
-import 'contracts/modules/DefaultReleaseStrategy.sol';
-import 'contracts/types/EscrowTypes.sol';
-import 'contracts/libraries/EscrowEncodingLibrary.sol';
-import 'contracts/interfaces/IReleaseStrategy.sol';
+import '../../../packages/sew-core/contracts/core/BaseEscrow.sol';
+import '../../../packages/sew-core/contracts/modules/DefaultReleaseStrategy.sol';
+import '../../../packages/sew-core/contracts/types/EscrowTypes.sol';
+import '../../../packages/sew-core/contracts/libraries/EscrowEncodingLibrary.sol';
+import '../../../packages/sew-core/contracts/interfaces/IReleaseStrategy.sol';
 import '@openzeppelin/contracts/utils/introspection/ERC165.sol';
 
 /**

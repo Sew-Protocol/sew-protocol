@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.37;
 
-import './BaseEscrow.sol';
-import '../types/EscrowTypes.sol';
-import '../libraries/StateManagementLibrary.sol';
+import '../../packages/sew-core/contracts/core/BaseEscrow.sol';
+import '../../packages/sew-core/contracts/types/EscrowTypes.sol';
+import '../../packages/sew-core/contracts/libraries/StateManagementLibrary.sol';
 
 error NotParticipant(uint256 workflowId, address caller, address sender, address recipient);
 error NotCounterparty(uint256 workflowId, address caller);

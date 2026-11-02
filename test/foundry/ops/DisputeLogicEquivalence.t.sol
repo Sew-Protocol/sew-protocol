@@ -3,9 +3,9 @@ pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
 import '../../mocks/legacy/DisputeOpsReference.sol';
-import '../../../contracts/libraries/EscrowDisputeLogic.sol';
-import '../../../contracts/shared/interfaces/IResolutionModule.sol';
-import '../../../contracts/types/EscrowTypes.sol';
+import '../../../packages/sew-core/contracts/libraries/EscrowDisputeLogic.sol';
+import '../../../packages/sew-core/contracts/shared/interfaces/IResolutionModule.sol';
+import '../../../packages/sew-core/contracts/types/EscrowTypes.sol';
 
 /// @notice Configurable resolution module for exercising quote branches.
 contract DisputeQuoteModule {

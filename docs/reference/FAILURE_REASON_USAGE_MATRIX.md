@@ -1,6 +1,6 @@
 # FailureReason usage matrix (current reality vs intended telemetry)
 
-**Scope:** `contracts/core/BaseEscrow.sol` `FailureReason` enum + related “insufficient balance / transfer failed” behaviors.  
+**Scope:** `packages/sew-core/contracts/core/BaseEscrow.sol` `FailureReason` enum + related “insufficient balance / transfer failed” behaviors.  
 **Audience:** protocol devs + indexer/backend consumers who need consistent operational signals.  
 **Status:** snapshot of **current code behavior** (not aspirational), with staged recommendations.
 
@@ -15,7 +15,7 @@
 
 ## FailureReason enum (as defined)
 
-From `contracts/core/BaseEscrow.sol`:
+From `packages/sew-core/contracts/core/BaseEscrow.sol`:
 
 - `CALL_FAILED`
 - `MALFORMED_RETURN_DATA`

@@ -2,9 +2,9 @@
 pragma solidity ^0.8.37;
 
 import "forge-std/Test.sol";
-import "../../../contracts/core/BondCollector.sol";
+import "../../../packages/sew-core/contracts/core/BondCollector.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
-import "../../../contracts/shared/interfaces/IIncentiveModule.sol";
+import "../../../packages/sew-core/contracts/shared/interfaces/IIncentiveModule.sol";
 
 contract BondCollectorHardeningTest is Test {
     BondCollector public collector;

@@ -6,7 +6,7 @@ import 'forge-std/StdInvariant.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DRMAdminFacet.sol';
 import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModule.sol';
-import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
+import '../../../packages/sew-core/contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
 import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibrary.sol';
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 

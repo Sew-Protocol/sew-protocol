@@ -9,12 +9,12 @@ import '../../../contracts/modules/decentralized-resolution-module/libraries/Pay
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
 import '../../../contracts/modules/decentralized-resolution-module/DRMAdminFacet.sol';
-import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
-import '../../../contracts/types/EscrowTypes.sol';
-import '../../../contracts/core/EscrowCreationPolicy.sol';
-import '../../../contracts/core/ModuleSnapshotRegistry.sol';
+import '../../../packages/sew-core/contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
+import '../../../packages/sew-core/contracts/types/EscrowTypes.sol';
+import '../../../packages/sew-core/contracts/core/EscrowCreationPolicy.sol';
+import '../../../packages/sew-core/contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
-import '../../../contracts/core/BondCollector.sol';
+import '../../../packages/sew-core/contracts/core/BondCollector.sol';
 import '../helpers/KlerosHandoffFixture.sol';
 
 /**

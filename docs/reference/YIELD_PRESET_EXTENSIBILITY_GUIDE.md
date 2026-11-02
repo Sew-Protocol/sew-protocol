@@ -16,7 +16,7 @@ This guide demonstrates how to add new yield presets to the system. As an exampl
 ### **Initial Presets (v1.0 - Launch)**
 
 ```solidity
-// contracts/types/YieldPresets.sol
+// packages/sew-core/contracts/types/YieldPresets.sol
 enum YieldPreset {
     OFF,           // No yield (default)
     TO_SENDER      // Yield goes to sender (buyer) - 100%
@@ -26,7 +26,7 @@ enum YieldPreset {
 ### **Preset Derivation Logic**
 
 ```solidity
-// contracts/libraries/YieldPresetLibrary.sol
+// packages/sew-core/contracts/libraries/YieldPresetLibrary.sol
 library YieldPresetLibrary {
     function deriveDistributionData(
         YieldPreset preset,
@@ -67,7 +67,7 @@ library YieldPresetLibrary {
 
 ### **Step 1: Add Enum Value** 🔴 **REQUIRED**
 
-**File:** `contracts/types/YieldPresets.sol`
+**File:** `packages/sew-core/contracts/types/YieldPresets.sol`
 
 ```solidity
 enum YieldPreset {
@@ -87,7 +87,7 @@ enum YieldPreset {
 
 ### **Step 2: Update Derivation Function** 🔴 **REQUIRED**
 
-**File:** `contracts/libraries/YieldPresetLibrary.sol`
+**File:** `packages/sew-core/contracts/libraries/YieldPresetLibrary.sol`
 
 **Challenge:** `deriveDistributionData()` currently only receives `sender` address. For `YIELD_BOTH`, we need both `sender` and `recipient`.
 
@@ -181,7 +181,7 @@ library YieldPresetLibrary {
 
 ### **Step 3: Update Caller (BaseEscrow.createEscrow)** 🔴 **REQUIRED**
 
-**File:** `contracts/core/BaseEscrow.sol`
+**File:** `packages/sew-core/contracts/core/BaseEscrow.sol`
 
 ```solidity
 function createEscrow(
@@ -225,8 +225,8 @@ function createEscrow(
 pragma solidity ^0.8.33;
 
 import 'forge-std/Test.sol';
-import '../../contracts/libraries/YieldPresetLibrary.sol';
-import '../../contracts/types/YieldPresets.sol';
+import '../../packages/sew-core/contracts/libraries/YieldPresetLibrary.sol';
+import '../../packages/sew-core/contracts/types/YieldPresets.sol';
 
 contract YieldPresetTest is Test {
     address constant SENDER = address(0x1);
@@ -449,7 +449,7 @@ When adding a new preset, ensure:
 ### **1. Enum Addition**
 
 ```solidity
-// contracts/types/YieldPresets.sol
+// packages/sew-core/contracts/types/YieldPresets.sol
 enum YieldPreset {
     OFF,
     TO_SENDER,
@@ -460,7 +460,7 @@ enum YieldPreset {
 ### **2. Library Update**
 
 ```solidity
-// contracts/libraries/YieldPresetLibrary.sol
+// packages/sew-core/contracts/libraries/YieldPresetLibrary.sol
 function deriveDistributionData(
     YieldPreset preset,
     address sender,
@@ -511,7 +511,7 @@ function validatePresetParams(
 ### **4. BaseEscrow Integration**
 
 ```solidity
-// contracts/core/BaseEscrow.sol - createEscrow()
+// packages/sew-core/contracts/core/BaseEscrow.sol - createEscrow()
 address sender = _msgSender();
 
 // Validate preset parameters

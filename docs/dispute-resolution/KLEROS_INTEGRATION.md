@@ -27,7 +27,7 @@
 > `contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol`,
 > `contracts/modules/decentralized-resolution-module/DRMAdminFacet.sol`,
 > `contracts/modules/decentralized-resolution-module/DRMStorageBase.sol`,
-> `contracts/ops/DisputeOps.sol`, `contracts/core/BaseEscrow.sol`.
+> `contracts/ops/DisputeOps.sol`, `packages/sew-core/contracts/core/BaseEscrow.sol`.
 
 ---
 

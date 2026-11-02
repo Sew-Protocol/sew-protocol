@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.37;
 
-import '../../../../contracts/shared/interfaces/IIncentiveModule.sol';
-import '../../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
+import '../../../../packages/sew-core/contracts/shared/interfaces/IIncentiveModule.sol';
+import '../../../../packages/sew-core/contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
 
 /**
  * @title MockIncentiveModule

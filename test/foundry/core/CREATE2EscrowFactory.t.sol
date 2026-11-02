@@ -4,7 +4,7 @@ pragma solidity ^0.8.37;
 import 'forge-std/Test.sol';
 import '../../../contracts/core/CREATE2EscrowFactory.sol';
 import '../../../contracts/core/EscrowVault.sol';
-import '../../../contracts/core/ModuleSnapshotRegistry.sol';
+import '../../../packages/sew-core/contracts/core/ModuleSnapshotRegistry.sol';
 
 /// @notice Verifies CREATE2 derivation after the DisputeOps constructor argument
 /// was removed: prediction, deployment, and detection must agree on the new

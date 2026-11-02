@@ -6,7 +6,7 @@ import 'contracts/modules/AaveYieldModule.sol';
 import 'contracts/mocks/MockAavePool.sol';
 import 'contracts/mocks/ERC20Mock.sol';
 import 'contracts/mocks/FeeOnTransferERC20Mock.sol';
-import 'contracts/interfaces/IYieldModule.sol';
+import '../../../packages/sew-core/contracts/interfaces/IYieldModule.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 
 /**

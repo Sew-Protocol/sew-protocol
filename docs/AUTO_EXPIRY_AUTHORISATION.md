@@ -5,13 +5,13 @@
 > prevents unauthorised or premature execution, and how governance changes to timeout
 > parameters are isolated from in-flight escrows.
 >
-> **Sources:** `contracts/core/BaseEscrow.sol` (`automateTimedActions`,
+> **Sources:** `packages/sew-core/contracts/core/BaseEscrow.sol` (`automateTimedActions`,
 > `resolveDisputeByTimeout`, `executePendingSettlement`, `_authorizeTimedAction`,
 > `_authorizeTimedActionAndSource`, `_applyEscrowSettings`, `_snapshotModulesForEscrow`,
 > `setTimeoutConfig`), `contracts/ops/SettlementOps.sol` (`computeTimedActions`,
 > `computePendingSettlementExecution`, `computeResolutionExecution`),
-> `contracts/libraries/SettingsValidationLibrary.sol`,
-> `contracts/types/EscrowTypes.sol` (`TimeoutConfig`, `EscrowSettings`,
+> `packages/sew-core/contracts/libraries/SettingsValidationLibrary.sol`,
+> `packages/sew-core/contracts/types/EscrowTypes.sol` (`TimeoutConfig`, `EscrowSettings`,
 > `ModuleSnapshot`, `EscrowTimeoutPolicySnapshot`, `ExecutionSource`, action constants).
 
 ---

@@ -5,19 +5,19 @@ import "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import { EscrowVault } from "../../../contracts/core/EscrowVault.sol";
-import { ModuleSnapshotRegistry } from "../../../contracts/core/ModuleSnapshotRegistry.sol";
-import { EscrowCreationPolicy } from "../../../contracts/core/EscrowCreationPolicy.sol";
-import { BondCollector } from "../../../contracts/core/BondCollector.sol";
-import { DefaultResolutionModule } from "../../../contracts/modules/DefaultResolutionModule.sol";
+import { ModuleSnapshotRegistry } from "../../../packages/sew-core/contracts/core/ModuleSnapshotRegistry.sol";
+import { EscrowCreationPolicy } from "../../../packages/sew-core/contracts/core/EscrowCreationPolicy.sol";
+import { BondCollector } from "../../../packages/sew-core/contracts/core/BondCollector.sol";
+import { DefaultResolutionModule } from "../../../packages/sew-core/contracts/modules/DefaultResolutionModule.sol";
 import { ERC20Mock } from "../../../contracts/mocks/ERC20Mock.sol";
 
-import { IReleaseStrategy } from "../../../contracts/interfaces/IReleaseStrategy.sol";
+import { IReleaseStrategy } from "../../../packages/sew-core/contracts/interfaces/IReleaseStrategy.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import { ERC165 } from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 
-import { EscrowSettings } from "../../../contracts/types/EscrowTypes.sol";
-import { YieldPreset } from "../../../contracts/types/YieldPresets.sol";
-import { BaseEscrow } from "../../../contracts/core/BaseEscrow.sol";
+import { EscrowSettings } from "../../../packages/sew-core/contracts/types/EscrowTypes.sol";
+import { YieldPreset } from "../../../packages/sew-core/contracts/types/YieldPresets.sol";
+import { BaseEscrow } from "../../../packages/sew-core/contracts/core/BaseEscrow.sol";
 
 contract ReleaseStrategyMockS1 is ERC165, IReleaseStrategy {
     function canRelease(

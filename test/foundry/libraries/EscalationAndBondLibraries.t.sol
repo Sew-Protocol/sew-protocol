@@ -2,10 +2,10 @@
 pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/libraries/EscrowEncodingLibrary.sol';
-import '../../../contracts/libraries/BondHandlingLibrary.sol';
-import '../../../contracts/libraries/DisputeEscalationLibrary.sol';
-import '../../../contracts/shared/interfaces/IIncentiveModule.sol';
+import '../../../packages/sew-core/contracts/libraries/EscrowEncodingLibrary.sol';
+import '../../../packages/sew-core/contracts/libraries/BondHandlingLibrary.sol';
+import '../../../packages/sew-core/contracts/libraries/DisputeEscalationLibrary.sol';
+import '../../../packages/sew-core/contracts/shared/interfaces/IIncentiveModule.sol';
 
 /// @notice Harness exposing internal library functions for direct testing.
 contract EscalationBondHarness {

@@ -96,19 +96,10 @@ contract SewCoreVault is BaseEscrow {
         return IResolutionModule(moduleAddr != address(0) ? moduleAddr : disputeResolutionModule);
     }
 
-
-
-
-
     function withdrawFees(address token) external nonReentrant onlyRole(ROLE_FEE_RECIPIENT) {
         uint256 amount = FeeWithdrawalLibrary.withdrawFees(totalFeesPerToken, token, escrowFeeAddress);
         emit FeesWithdrawn(token, amount);
     }
-
-
-
-
-
 
     function _supportsAppealInterface() internal pure override returns (bool) { return false; }
 

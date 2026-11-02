@@ -2,11 +2,11 @@
 pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/core/BondCollector.sol';
+import '../../../packages/sew-core/contracts/core/BondCollector.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
-import '../../../contracts/types/EscrowTypes.sol';
-import '../../../contracts/shared/interfaces/IIncentiveModule.sol';
-import '../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
+import '../../../packages/sew-core/contracts/types/EscrowTypes.sol';
+import '../../../packages/sew-core/contracts/shared/interfaces/IIncentiveModule.sol';
+import '../../../packages/sew-core/contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 

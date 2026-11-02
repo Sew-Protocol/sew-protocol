@@ -3,8 +3,8 @@ pragma solidity ^0.8.37;
 
 import "forge-std/Test.sol";
 import "./AppealWindowEnforcement.t.sol";
-import "../../../contracts/shared/interfaces/IResolutionModule.sol";
-import "../../../contracts/libraries/EscrowEncodingLibrary.sol";
+import "../../../packages/sew-core/contracts/shared/interfaces/IResolutionModule.sol";
+import "../../../packages/sew-core/contracts/libraries/EscrowEncodingLibrary.sol";
 import "../decentralized-resolution-module/mocks/MockIncentiveModule.sol";
 
 /// @dev Focused closure tests for the quote-bound BaseEscrow appeal composition.

@@ -2,14 +2,14 @@
 pragma solidity ^0.8.37;
 
 import "forge-std/Test.sol";
-import "../../../contracts/libraries/BalanceUpdateLibrary.sol";
-import "../../../contracts/libraries/FeeRecordingLibrary.sol";
-import "../../../contracts/libraries/FeeWithdrawalLibrary.sol";
-import "../../../contracts/libraries/SettingsValidationLibrary.sol";
-import "../../../contracts/libraries/YieldPresetLibrary.sol";
+import "../../../packages/sew-core/contracts/libraries/BalanceUpdateLibrary.sol";
+import "../../../packages/sew-core/contracts/libraries/FeeRecordingLibrary.sol";
+import "../../../packages/sew-core/contracts/libraries/FeeWithdrawalLibrary.sol";
+import "../../../packages/sew-core/contracts/libraries/SettingsValidationLibrary.sol";
+import "../../../packages/sew-core/contracts/libraries/YieldPresetLibrary.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
-import "../../../contracts/types/EscrowTypes.sol";
-import "../../../contracts/types/YieldPresets.sol";
+import "../../../packages/sew-core/contracts/types/EscrowTypes.sol";
+import "../../../packages/sew-core/contracts/types/YieldPresets.sol";
 
 contract LibraryHarness {
 

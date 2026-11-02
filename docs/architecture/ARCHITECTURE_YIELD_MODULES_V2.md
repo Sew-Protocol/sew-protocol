@@ -62,7 +62,7 @@ Move yield mechanisms to external module; keep yield distribution policy in core
 
 ### 1. IYieldModule v2 Interface
 
-**File:** `contracts/interfaces/IYieldModule.sol`
+**File:** `packages/sew-core/contracts/interfaces/IYieldModule.sol`
 
 ```solidity
 // SPDX-License-Identifier: Apache-2.0

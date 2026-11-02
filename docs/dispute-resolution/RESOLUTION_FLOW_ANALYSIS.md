@@ -257,7 +257,7 @@ sequenceDiagram
 
 #### 1. Resolution Decision (`BaseEscrow._executeFullResolution`)
 
-**Location:** `contracts/core/BaseEscrow.sol:308-341`
+**Location:** `packages/sew-core/contracts/core/BaseEscrow.sol:308-341`
 
 ```solidity
 function _executeFullResolution(
@@ -296,7 +296,7 @@ function _executeFullResolution(
 
 #### 2. Recording Resolution Outcome (`BaseEscrow._recordResolutionOutcome`)
 
-**Location:** `contracts/core/BaseEscrow.sol:608-615`
+**Location:** `packages/sew-core/contracts/core/BaseEscrow.sol:608-615`
 
 ```solidity
 function _recordResolutionOutcome(

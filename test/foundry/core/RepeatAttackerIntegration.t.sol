@@ -3,20 +3,20 @@ pragma solidity ^0.8.37;
 
 import "forge-std/Test.sol";
 import "../../../contracts/core/EscrowVault.sol";
-import "../../../contracts/core/BaseEscrow.sol";
+import "../../../packages/sew-core/contracts/core/BaseEscrow.sol";
 import "../../../contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol";
-import "../../../contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol";
+import "../../../packages/sew-core/contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol";
 import "../../../contracts/modules/decentralized-resolution-module/DRMAdminFacet.sol";
 import "../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModule.sol";
 import "../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibrary.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
-import "../../../contracts/types/EscrowTypes.sol";
-import "../../../contracts/core/EscrowCreationPolicy.sol";
-import "../../../contracts/core/BondCollector.sol";
-import "../../../contracts/core/ModuleSnapshotRegistry.sol";
+import "../../../packages/sew-core/contracts/types/EscrowTypes.sol";
+import "../../../packages/sew-core/contracts/core/EscrowCreationPolicy.sol";
+import "../../../packages/sew-core/contracts/core/BondCollector.sol";
+import "../../../packages/sew-core/contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../contracts/admin/EscrowGovernanceTimelock.sol";
-import "../../../contracts/libraries/EscrowEncodingLibrary.sol";
-import "../../../contracts/libraries/SettingsValidationLibrary.sol";
+import "../../../packages/sew-core/contracts/libraries/EscrowEncodingLibrary.sol";
+import "../../../packages/sew-core/contracts/libraries/SettingsValidationLibrary.sol";
 import "../../../contracts/modules/decentralized-resolution-module/DRMStorageBase.sol";
 
 /**

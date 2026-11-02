@@ -3,9 +3,9 @@ pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
 import '../../mocks/legacy/CreateOpsReference.sol';
-import '../../../contracts/libraries/EscrowCreationLogic.sol';
-import '../../../contracts/types/EscrowTypes.sol';
-import '../../../contracts/types/YieldPresets.sol';
+import '../../../packages/sew-core/contracts/libraries/EscrowCreationLogic.sol';
+import '../../../packages/sew-core/contracts/types/EscrowTypes.sol';
+import '../../../packages/sew-core/contracts/types/YieldPresets.sol';
 
 /// @notice Configurable resolution module for exercising resolver lookup branches.
 contract CreateResolverModule {

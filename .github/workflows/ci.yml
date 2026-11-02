@@ -60,6 +60,15 @@ jobs:
       - name: Tests (Foundry)
         run: pnpm test:foundry
 
+      - name: Sew core scoped qualification
+        run: |
+          pnpm --filter @sew/sew-core source:check
+          pnpm --filter @sew/sew-core build
+          pnpm --filter @sew/sew-core test:profile
+          pnpm --filter @sew/sew-core deployables:export
+          pnpm --filter @sew/sew-core deployables:validate
+          pnpm --filter @sew/sew-core test:artifacts
+
       - name: Contract size check
         run: pnpm size:check
 

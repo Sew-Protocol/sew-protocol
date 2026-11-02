@@ -26,8 +26,8 @@
 > reached, and — critically — what constitutes *partial finality*: states in which the
 > escrow outcome is determined but fund delivery is not yet complete.
 >
-> **Sources:** `contracts/core/BaseEscrow.sol`, `contracts/libraries/StateManagementLibrary.sol`,
-> `contracts/types/EscrowTypes.sol`, `contracts/libraries/EscrowSettlementLogic.sol`.
+> **Sources:** `packages/sew-core/contracts/core/BaseEscrow.sol`, `packages/sew-core/contracts/libraries/StateManagementLibrary.sol`,
+> `packages/sew-core/contracts/types/EscrowTypes.sol`, `packages/sew-core/contracts/libraries/EscrowSettlementLogic.sol`.
 
 ---
 

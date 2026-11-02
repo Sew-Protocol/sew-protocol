@@ -3,11 +3,11 @@ pragma solidity ^0.8.37;
 
 import './AppealWindowEnforcement.t.sol';
 import '../../../contracts/core/EscrowableERC20.sol';
-import '../../../contracts/interfaces/IEscrowLifecycle.sol';
-import '../../../contracts/interfaces/IEscrowDispute.sol';
-import '../../../contracts/interfaces/IEscrowAppeal.sol';
-import '../../../contracts/interfaces/IEscrowSettlement.sol';
-import '../../../contracts/interfaces/IEscrowViews.sol';
+import '../../../packages/sew-core/contracts/interfaces/IEscrowLifecycle.sol';
+import '../../../packages/sew-core/contracts/interfaces/IEscrowDispute.sol';
+import '../../../packages/sew-core/contracts/interfaces/IEscrowAppeal.sol';
+import '../../../packages/sew-core/contracts/interfaces/IEscrowSettlement.sol';
+import '../../../packages/sew-core/contracts/interfaces/IEscrowViews.sol';
 
 contract WalletEscrowCapabilitiesTest is AppealWindowEnforcementTest {
     function test_supportsWalletCapabilityInterfaces() public view {

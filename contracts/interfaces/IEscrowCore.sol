@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.37;
 
-import '../types/EscrowTypes.sol';
+import '../../packages/sew-core/contracts/types/EscrowTypes.sol';
 
 /**
  * @title IEscrowCore

@@ -5,7 +5,7 @@
 > them, and the administrative recovery paths available for yield emergencies and
 > insurance-pool disbursements.
 >
-> **Sources:** `contracts/core/BaseEscrow.sol` (`withdrawEscrow`, `claimBondProtocolFees`,
+> **Sources:** `packages/sew-core/contracts/core/BaseEscrow.sol` (`withdrawEscrow`, `claimBondProtocolFees`,
 > `claimExcessEthRefund`, `_creditClaimable`, `_transferTokens`, `totalClaimableAssets`),
 > `contracts/core/EscrowVault.sol` (`withdrawFees`),
 > `contracts/modules/AaveYieldModule.sol` (`unwindToEscrow`, `emergencyUnwind`,

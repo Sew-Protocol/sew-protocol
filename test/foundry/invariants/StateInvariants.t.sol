@@ -4,7 +4,7 @@ pragma solidity ^0.8.37;
 import "forge-std/Test.sol";
 import "./EscrowInvariantHandler.t.sol";
 import "../helpers/EscrowVaultAnalytics.sol";
-import "../../../contracts/types/EscrowTypes.sol";
+import "../../../packages/sew-core/contracts/types/EscrowTypes.sol";
 
 /// @title StateInvariants
 /// @notice Foundry invariant tests derived from contract_model/invariants.clj.

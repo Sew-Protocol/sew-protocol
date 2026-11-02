@@ -16,7 +16,7 @@
 > `contracts/modules/decentralized-resolution-module/ResolverIncentiveModule.sol`,
 > `contracts/modules/decentralized-resolution-module/ResolverSlashingModule.sol`,
 > `contracts/modules/decentralized-resolution-module/ResolverStakingModule.sol`,
-> `contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol`.
+> `packages/sew-core/contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol`.
 
 ---
 

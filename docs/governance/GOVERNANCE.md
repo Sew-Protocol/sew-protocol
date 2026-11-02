@@ -6,12 +6,12 @@
 >
 > **Sources:** `contracts/governance/GovGovernor.sol`,
 > `contracts/admin/EscrowGovernanceTimelock.sol`,
-> `contracts/governance/SlowLaneQueueActivate.sol`,
+> `packages/sew-core/contracts/governance/SlowLaneQueueActivate.sol`,
 > `contracts/governance/EmergencyRecoveryProposal.sol`,
 > `contracts/token/SewToken.sol`,
-> `contracts/core/BaseEscrow.sol` (role constants, setters),
+> `packages/sew-core/contracts/core/BaseEscrow.sol` (role constants, setters),
 > `contracts/ops/GuardianOps.sol`,
-> `contracts/core/ModuleSnapshotRegistry.sol`.
+> `packages/sew-core/contracts/core/ModuleSnapshotRegistry.sol`.
 
 ---
 

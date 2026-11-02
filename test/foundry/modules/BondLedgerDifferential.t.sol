@@ -10,11 +10,11 @@ import '../../../contracts/modules/decentralized-resolution-module/libraries/Pay
 import '../../../contracts/modules/decentralized-resolution-module/interfaces/IPaymentCalculationLibrary.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
-import '../../../contracts/core/EscrowCreationPolicy.sol';
-import '../../../contracts/core/ModuleSnapshotRegistry.sol';
-import '../../../contracts/core/BondCollector.sol';
+import '../../../packages/sew-core/contracts/core/EscrowCreationPolicy.sol';
+import '../../../packages/sew-core/contracts/core/ModuleSnapshotRegistry.sol';
+import '../../../packages/sew-core/contracts/core/BondCollector.sol';
 import '../../../contracts/shared/BondLedger.sol';
-import '../../../contracts/types/EscrowTypes.sol';
+import '../../../packages/sew-core/contracts/types/EscrowTypes.sol';
 
 /**
  * @title BondLedgerDifferential

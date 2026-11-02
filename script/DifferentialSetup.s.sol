@@ -6,8 +6,8 @@ import "forge-std/console.sol";
 import { MockERC20 } from "../contracts/mocks/MockERC20.sol";
 import { EscrowVault } from "../contracts/core/EscrowVault.sol";
 import { EscrowViewContract } from "../contracts/core/EscrowViewContract.sol";
-import { DefaultResolutionModule } from "../contracts/modules/DefaultResolutionModule.sol";
-import { ModuleSnapshotRegistry } from "../contracts/core/ModuleSnapshotRegistry.sol";
+import { DefaultResolutionModule } from "../packages/sew-core/contracts/modules/DefaultResolutionModule.sol";
+import { ModuleSnapshotRegistry } from "../packages/sew-core/contracts/core/ModuleSnapshotRegistry.sol";
 
 /**
  * @title DifferentialSetup

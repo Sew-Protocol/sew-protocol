@@ -2,10 +2,10 @@
 pragma solidity ^0.8.37;
 
 import '@openzeppelin/contracts/access/AccessControl.sol';
-import '../governance/SlowLaneQueueActivate.sol';
-import '../core/BaseEscrow.sol';
-import '../types/EscrowTypes.sol';
-import '../libraries/SettingsValidationLibrary.sol';
+import '../../packages/sew-core/contracts/governance/SlowLaneQueueActivate.sol';
+import '../../packages/sew-core/contracts/core/BaseEscrow.sol';
+import '../../packages/sew-core/contracts/types/EscrowTypes.sol';
+import '../../packages/sew-core/contracts/libraries/SettingsValidationLibrary.sol';
 
 // Error definitions (matching BaseEscrow for consistency)
 error InvalidValue();

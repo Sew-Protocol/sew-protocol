@@ -22,11 +22,11 @@
 > Two Mermaid diagrams derived directly from the contract source.
 >
 > **Sources:**
-> `contracts/types/EscrowTypes.sol` (state enum),
-> `contracts/core/BaseEscrow.sol` (transitions and guards),
-> `contracts/libraries/StateManagementLibrary.sol`,
-> `contracts/libraries/EscrowDisputeLogic.sol`,
-> `contracts/libraries/EscrowSettlementLogic.sol`,
+> `packages/sew-core/contracts/types/EscrowTypes.sol` (state enum),
+> `packages/sew-core/contracts/core/BaseEscrow.sol` (transitions and guards),
+> `packages/sew-core/contracts/libraries/StateManagementLibrary.sol`,
+> `packages/sew-core/contracts/libraries/EscrowDisputeLogic.sol`,
+> `packages/sew-core/contracts/libraries/EscrowSettlementLogic.sol`,
 > `contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol`,
 > `contracts/arbitration/KlerosArbitrableProxy.sol`.
 >

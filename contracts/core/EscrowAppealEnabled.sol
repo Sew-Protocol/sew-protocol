@@ -3,17 +3,17 @@ pragma solidity ^0.8.37;
 
 import './EscrowOptionalSplits.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
-import '../shared/interfaces/IResolutionModule.sol';
-import '../interfaces/IEscrowAppeal.sol';
-import '../libraries/EscrowEncodingLibrary.sol';
-import '../libraries/DisputeEscalationLibrary.sol';
-import '../libraries/EscrowDisputeLogic.sol';
-import '../libraries/BondHandlingLibrary.sol';
-import '../shared/interfaces/IIncentiveModule.sol';
-import './BondCollector.sol';
-import '../arbitration/IKlerosArbitrableProxy.sol';
-import '../modules/decentralized-resolution-module/interfaces/IKlerosHandoffResolutionModule.sol';
-import '../types/EscrowTypes.sol';
+import '../../packages/sew-core/contracts/shared/interfaces/IResolutionModule.sol';
+import '../../packages/sew-core/contracts/interfaces/IEscrowAppeal.sol';
+import '../../packages/sew-core/contracts/libraries/EscrowEncodingLibrary.sol';
+import '../../packages/sew-core/contracts/libraries/DisputeEscalationLibrary.sol';
+import '../../packages/sew-core/contracts/libraries/EscrowDisputeLogic.sol';
+import '../../packages/sew-core/contracts/libraries/BondHandlingLibrary.sol';
+import '../../packages/sew-core/contracts/shared/interfaces/IIncentiveModule.sol';
+import '../../packages/sew-core/contracts/core/BondCollector.sol';
+import '../../packages/sew-core/contracts/arbitration/IKlerosArbitrableProxy.sol';
+import '../../packages/sew-core/contracts/modules/decentralized-resolution-module/interfaces/IKlerosHandoffResolutionModule.sol';
+import '../../packages/sew-core/contracts/types/EscrowTypes.sol';
 
 /// @notice Optional appeal and Kleros authority transition extension.
 /// @dev The Sew core profile inherits BaseEscrow directly and omits this extension.

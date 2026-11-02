@@ -3,8 +3,8 @@ pragma solidity ^0.8.37;
 
 import '@openzeppelin/contracts/access/AccessControl.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
-import '../../governance/SlowLaneQueueActivate.sol';
-import '../../shared/interfaces/IIncentiveModule.sol';
+import '../../../packages/sew-core/contracts/governance/SlowLaneQueueActivate.sol';
+import '../../../packages/sew-core/contracts/shared/interfaces/IIncentiveModule.sol';
 import './DRMStorageBase.sol';
 import './analytics/ResolutionAnalytics.sol';
 import './libraries/EscalationCostLibrary.sol';

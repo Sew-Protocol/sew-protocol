@@ -2,10 +2,10 @@
 pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
-import '../../../contracts/modules/DefaultReleaseStrategy.sol';
-import '../../../contracts/modules/DefaultResolutionModule.sol';
+import '../../../packages/sew-core/contracts/modules/DefaultReleaseStrategy.sol';
+import '../../../packages/sew-core/contracts/modules/DefaultResolutionModule.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
-import '../../../contracts/libraries/EscrowEncodingLibrary.sol';
+import '../../../packages/sew-core/contracts/libraries/EscrowEncodingLibrary.sol';
 
 contract ModulesCoverageTest is Test {
     DefaultReleaseStrategy public relStrategy;

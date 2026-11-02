@@ -6,7 +6,7 @@ import '../../../contracts/modules/decentralized-resolution-module/incentive/Res
 import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibrary.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/mocks/ERC20Mock.sol';
-import '../../../contracts/core/ModuleSnapshotRegistry.sol';
+import '../../../packages/sew-core/contracts/core/ModuleSnapshotRegistry.sol';
 import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 

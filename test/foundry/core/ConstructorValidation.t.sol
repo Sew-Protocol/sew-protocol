@@ -4,8 +4,8 @@ pragma solidity ^0.8.37;
 import 'forge-std/Test.sol';
 import '../../../contracts/core/EscrowVault.sol';
 import '../../../contracts/core/EscrowableERC20.sol';
-import '../../../contracts/core/BaseEscrow.sol';
-import '../../../contracts/core/ModuleSnapshotRegistry.sol';
+import '../../../packages/sew-core/contracts/core/BaseEscrow.sol';
+import '../../../packages/sew-core/contracts/core/ModuleSnapshotRegistry.sol';
 
 /**
  * @title ConstructorValidation

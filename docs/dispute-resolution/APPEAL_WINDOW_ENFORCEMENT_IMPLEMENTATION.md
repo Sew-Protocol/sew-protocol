@@ -272,7 +272,7 @@ When a dispute is escalated during the appeal window:
 
 ## Files Modified
 
-1. **`contracts/core/BaseEscrow.sol`**:
+1. **`packages/sew-core/contracts/core/BaseEscrow.sol`**:
    - Modified `_executeResolution()` to query appeal deadline and store pending settlement
    - Added `executePendingSettlement()` function
    - Updated `automateTimedActions()` to execute pending settlements

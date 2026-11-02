@@ -6,14 +6,14 @@
 > the configurable parameters that adapt it to different commercial contexts, and the
 > failure modes and their protections.
 >
-> **Sources:** `contracts/core/BaseEscrow.sol` (`createEscrow`, `release`, `raiseDispute`,
+> **Sources:** `packages/sew-core/contracts/core/BaseEscrow.sol` (`createEscrow`, `release`, `raiseDispute`,
 > `senderCancel`, `recipientCancel`, `automateTimedActions`),
 > `contracts/ops/CreateOps.sol`, `contracts/ops/SettlementOps.sol`,
-> `contracts/modules/DefaultReleaseStrategy.sol`,
+> `packages/sew-core/contracts/modules/DefaultReleaseStrategy.sol`,
 > `contracts/modules/DefaultCancellationStrategy.sol`,
 > `contracts/modules/BuyerOnlyCancellationStrategy.sol`,
-> `contracts/types/EscrowTypes.sol` (`EscrowSettings`, `EscrowState`),
-> `contracts/libraries/SettingsValidationLibrary.sol`.
+> `packages/sew-core/contracts/types/EscrowTypes.sol` (`EscrowSettings`, `EscrowState`),
+> `packages/sew-core/contracts/libraries/SettingsValidationLibrary.sol`.
 
 ---
 

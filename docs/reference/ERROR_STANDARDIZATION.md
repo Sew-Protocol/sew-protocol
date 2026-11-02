@@ -289,7 +289,7 @@ library ValidationErrors {
    - `"R"` → `error RefundFailed(address recipient, uint256 amount);`
 
 2. Files to fix:
-   - `contracts/core/BaseEscrow.sol` (3 instances)
+   - `packages/sew-core/contracts/core/BaseEscrow.sol` (3 instances)
    - `contracts/decentralized-resolution-module/DecentralizedResolutionModule.sol` (1 instance)
 
 ---
@@ -726,7 +726,7 @@ Create `docs/ERROR_REFERENCE.md` with:
 
 #### High Priority (Core)
 
-- `contracts/core/BaseEscrow.sol` - Mixed (custom errors + requires)
+- `packages/sew-core/contracts/core/BaseEscrow.sol` - Mixed (custom errors + requires)
 - `contracts/core/EscrowVault.sol` - Mostly custom errors
 - `contracts/core/EscrowableERC20.sol` - Custom errors
 - `contracts/YieldOps.sol` - require() strings
@@ -742,7 +742,7 @@ Create `docs/ERROR_REFERENCE.md` with:
 
 #### Lower Priority (Libraries)
 
-- `contracts/libraries/SettingsValidationLibrary.sol` - Custom errors (good)
+- `packages/sew-core/contracts/libraries/SettingsValidationLibrary.sol` - Custom errors (good)
 - `contracts/libraries/PaymentCalculationLibrary.sol` - require() strings
 - `contracts/libraries/ResolutionAnalytics.sol` - require() strings
 - `contracts/libraries/BondValuationLibrary.sol` - require() strings

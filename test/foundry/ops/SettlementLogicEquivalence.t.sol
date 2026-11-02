@@ -3,8 +3,8 @@ pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
 import '../../mocks/legacy/SettlementOpsReference.sol';
-import '../../../contracts/libraries/EscrowSettlementLogic.sol';
-import '../../../contracts/types/EscrowTypes.sol';
+import '../../../packages/sew-core/contracts/libraries/EscrowSettlementLogic.sol';
+import '../../../packages/sew-core/contracts/types/EscrowTypes.sol';
 
 /// @notice Minimal module returning a fixed appeal deadline/round response.
 contract DeadlineModule {

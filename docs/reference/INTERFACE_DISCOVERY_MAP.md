@@ -25,7 +25,7 @@ We're documenting **what exists today** (v1) for clarity, not prescribing what m
 
 | Contract | File | Status | Notes |
 |----------|------|--------|-------|
-| `BaseEscrow` | `contracts/core/BaseEscrow.sol` | ✅ Partial | Abstract base; public methods exist but not formally implementing interface |
+| `BaseEscrow` | `packages/sew-core/contracts/core/BaseEscrow.sol` | ✅ Partial | Abstract base; public methods exist but not formally implementing interface |
 | `EscrowVault` | `contracts/core/EscrowVault.sol` | ✅ Partial | Multi-token implementation, inherits from BaseEscrow |
 | `EscrowableERC20` | `contracts/core/EscrowableERC20.sol` | ✅ Partial | Single-token (ERC20) implementation, inherits from BaseEscrow |
 

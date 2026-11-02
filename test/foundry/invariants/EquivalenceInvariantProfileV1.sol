@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.37;
 
-import { EscrowState } from "../../../contracts/types/EscrowTypes.sol";
+import { EscrowState } from "../../../packages/sew-core/contracts/types/EscrowTypes.sol";
 
 /// @notice Vault state snapshot for cross-step invariant evaluation.
 struct VaultSnapshot {

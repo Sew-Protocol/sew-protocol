@@ -3,17 +3,17 @@ pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
 import 'contracts/core/EscrowVault.sol'; // Or EscrowableERC20, depending on which is more representative
-import 'contracts/modules/DefaultReleaseStrategy.sol';
-import 'contracts/types/EscrowTypes.sol';
-import 'contracts/libraries/EscrowEncodingLibrary.sol';
-import 'contracts/interfaces/IReleaseStrategy.sol';
+import '../../../packages/sew-core/contracts/modules/DefaultReleaseStrategy.sol';
+import '../../../packages/sew-core/contracts/types/EscrowTypes.sol';
+import '../../../packages/sew-core/contracts/libraries/EscrowEncodingLibrary.sol';
+import '../../../packages/sew-core/contracts/interfaces/IReleaseStrategy.sol';
 import 'contracts/interfaces/IEscrowCore.sol';
-import 'contracts/core/EscrowCreationPolicy.sol';
-import 'contracts/core/BondCollector.sol';
+import '../../../packages/sew-core/contracts/core/EscrowCreationPolicy.sol';
+import '../../../packages/sew-core/contracts/core/BondCollector.sol';
 import 'contracts/mocks/MockERC20.sol';
 import 'contracts/mocks/MockResolutionModule.sol';
 import 'contracts/mocks/MockModuleSnapshotRegistry.sol';
-import { ADDR_RECIPIENT } from "contracts/types/EscrowTypes.sol";
+import { ADDR_RECIPIENT } from "../../../packages/sew-core/contracts/types/EscrowTypes.sol";
 import { TestConfig } from "../TestConfig.sol";
 
 uint8 constant ADDR_RECIPIENT_CODE = ADDR_RECIPIENT; // Using the imported constant

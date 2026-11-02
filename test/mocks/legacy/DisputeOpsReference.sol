@@ -8,9 +8,9 @@ pragma solidity ^0.8.37;
 // ============================================================================
 
 import '@openzeppelin/contracts/access/AccessControl.sol';
-import '../../../contracts/shared/interfaces/IResolutionModule.sol';
-import '../../../contracts/types/EscrowTypes.sol';
-import '../../../contracts/libraries/EscrowEncodingLibrary.sol';
+import '../../../packages/sew-core/contracts/shared/interfaces/IResolutionModule.sol';
+import '../../../packages/sew-core/contracts/types/EscrowTypes.sol';
+import '../../../packages/sew-core/contracts/libraries/EscrowEncodingLibrary.sol';
 
 /**
  * @title DisputeOpsReference

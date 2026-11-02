@@ -21,6 +21,7 @@ import { canonicalJson } from './_lib/canonical-json';
 import { sourceCommitFromEnvironment } from './_lib/source-commit';
 
 const OUT_DIR = path.resolve(process.env.SEW_FORGE_OUT_DIR ?? path.resolve(process.cwd(), 'out'));
+const SEW_CORE_OUT_DIR = path.resolve(process.env.SEW_CORE_FORGE_OUT_DIR ?? path.join(process.cwd(), 'packages', 'sew-core', 'out'));
 const ALLOWLIST = loadAllowlist();
 const BONDLEDGER_ALLOWLIST_PATH = path.resolve(process.cwd(), 'config', 'deployable-allowlist-bondledger.json');
 const SEW_CORE_ALLOWLIST_PATH = path.resolve(process.cwd(), 'packages', 'sew-core', 'deployables.allowlist.json');
@@ -65,7 +66,7 @@ function main(): void {
     if (sourceCommitFromEnvironment('abc123', 'abc123', '').dirty !== false) {
       throw new Error('expected a matching clean Git checkout to be clean');
     }
-    if (!sourceCommitFromEnvironment('abc123', 'abc123', ' M contracts/core/SewCoreVault.sol').dirty) {
+    if (!sourceCommitFromEnvironment('abc123', 'abc123', ' M packages/sew-core/contracts/core/SewCoreVault.sol').dirty) {
       throw new Error('dirty checkout was marked clean');
     }
     if (!sourceCommitFromEnvironment('abc123', null, null).dirty) {
@@ -135,8 +136,8 @@ function main(): void {
     const allowlist = loadAllowlist(SEW_CORE_ALLOWLIST_PATH);
     const a = tmpdir();
     const b = tmpdir();
-    const ra = exportDeployables({ allowlist, outDir: OUT_DIR, exportDir: a });
-    const rb = exportDeployables({ allowlist, outDir: OUT_DIR, exportDir: b });
+    const ra = exportDeployables({ allowlist, outDir: SEW_CORE_OUT_DIR, exportDir: a });
+    const rb = exportDeployables({ allowlist, outDir: SEW_CORE_OUT_DIR, exportDir: b });
     validateDeployables({ allowlist, exportDir: a });
     validateDeployables({ allowlist, exportDir: b });
     if (ra.manifest.build.profile !== 'sew-core') throw new Error(`sew-core profile label is '${ra.manifest.build.profile}'`);
@@ -160,7 +161,7 @@ function main(): void {
   test('tampered fully qualified manifest identity fails validation', () => {
     const dir = tmpdir();
     const allowlist = loadAllowlist(SEW_CORE_ALLOWLIST_PATH);
-    exportDeployables({ allowlist, outDir: OUT_DIR, exportDir: dir });
+    exportDeployables({ allowlist, outDir: SEW_CORE_OUT_DIR, exportDir: dir });
     const manifestPath = path.join(dir, 'manifest.json');
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as Record<string, any>;
     manifest.artifacts.SewCoreVault.fullyQualifiedName = 'contracts/Other.sol:SewCoreVault';

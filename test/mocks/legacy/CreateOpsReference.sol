@@ -8,12 +8,12 @@ pragma solidity ^0.8.37;
 // ============================================================================
 
 import '@openzeppelin/contracts/access/AccessControl.sol';
-import '../../../contracts/types/EscrowTypes.sol';
-import '../../../contracts/types/YieldPresets.sol';
-import '../../../contracts/libraries/SettingsValidationLibrary.sol';
-import '../../../contracts/libraries/YieldPresetLibrary.sol';
-import '../../../contracts/libraries/EscrowEncodingLibrary.sol';
-import '../../../contracts/shared/interfaces/IResolutionModule.sol';
+import '../../../packages/sew-core/contracts/types/EscrowTypes.sol';
+import '../../../packages/sew-core/contracts/types/YieldPresets.sol';
+import '../../../packages/sew-core/contracts/libraries/SettingsValidationLibrary.sol';
+import '../../../packages/sew-core/contracts/libraries/YieldPresetLibrary.sol';
+import '../../../packages/sew-core/contracts/libraries/EscrowEncodingLibrary.sol';
+import '../../../packages/sew-core/contracts/shared/interfaces/IResolutionModule.sol';
 import '../../../contracts/interfaces/IYieldGenerationModule.sol';
 
 /**

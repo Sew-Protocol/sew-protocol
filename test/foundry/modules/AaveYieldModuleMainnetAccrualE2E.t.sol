@@ -3,13 +3,13 @@ pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
 import 'contracts/core/EscrowVault.sol';
-import 'contracts/core/BaseEscrow.sol';
+import '../../../packages/sew-core/contracts/core/BaseEscrow.sol';
 import 'contracts/modules/AaveYieldModule.sol';
-import 'contracts/core/ModuleSnapshotRegistry.sol';
-import 'contracts/core/EscrowCreationPolicy.sol';
-import 'contracts/modules/DefaultReleaseStrategy.sol';
-import 'contracts/types/EscrowTypes.sol';
-import 'contracts/types/YieldPresets.sol';
+import '../../../packages/sew-core/contracts/core/ModuleSnapshotRegistry.sol';
+import '../../../packages/sew-core/contracts/core/EscrowCreationPolicy.sol';
+import '../../../packages/sew-core/contracts/modules/DefaultReleaseStrategy.sol';
+import '../../../packages/sew-core/contracts/types/EscrowTypes.sol';
+import '../../../packages/sew-core/contracts/types/YieldPresets.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 
 /**

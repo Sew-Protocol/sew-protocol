@@ -2,8 +2,8 @@
 pragma solidity ^0.8.37;
 
 import './interfaces/IBondTokenRegistry.sol';
-import '../../shared/interfaces/IIncentiveModule.sol';
-import './DecentralizedResolverStructs.sol';
+import '../../../packages/sew-core/contracts/shared/interfaces/IIncentiveModule.sol';
+import '../../../packages/sew-core/contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
 
 /**
  * @title DRMStorageBase

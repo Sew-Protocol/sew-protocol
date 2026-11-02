@@ -5,7 +5,7 @@ import 'forge-std/Test.sol';
 import 'contracts/modules/AaveYieldModule.sol';
 import 'contracts/mocks/MockAavePool.sol';
 import 'contracts/mocks/ERC20Mock.sol';
-import 'contracts/types/YieldPresets.sol';
+import '../../../packages/sew-core/contracts/types/YieldPresets.sol';
 
 /**
  * @title AaveYieldModuleInvariantTest

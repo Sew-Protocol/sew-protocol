@@ -5,13 +5,13 @@ import "forge-std/Test.sol";
 import {SymTest} from "halmos-cheatcodes/src/SymTest.sol";
 import "../../../contracts/core/EscrowVault.sol";
 import "../helpers/EscrowVaultAnalytics.sol";
-import "../../../contracts/modules/DefaultResolutionModule.sol";
-import "../../../contracts/core/ModuleSnapshotRegistry.sol";
-import "../../../contracts/core/EscrowCreationPolicy.sol";
-import "../../../contracts/core/BondCollector.sol";
+import "../../../packages/sew-core/contracts/modules/DefaultResolutionModule.sol";
+import "../../../packages/sew-core/contracts/core/ModuleSnapshotRegistry.sol";
+import "../../../packages/sew-core/contracts/core/EscrowCreationPolicy.sol";
+import "../../../packages/sew-core/contracts/core/BondCollector.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
-import "../../../contracts/libraries/SettingsValidationLibrary.sol";
-import "../../../contracts/types/EscrowTypes.sol";
+import "../../../packages/sew-core/contracts/libraries/SettingsValidationLibrary.sol";
+import "../../../packages/sew-core/contracts/types/EscrowTypes.sol";
 import "./mocks/MockCustomResolver.sol";
 
 /// @title HalmosEscrowProperties
