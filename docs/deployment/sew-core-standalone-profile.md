@@ -1,8 +1,10 @@
 # Standalone Sew core deployment profile
 
-Status: **source topology selected; deployment package and live execution are
-not qualified**. This document records the minimum candidate graph for
-`protocol-deployments`. It does not authorize signing or broadcasting.
+Status: **candidate topology selected; an in-tree package/release boundary is
+established, but the source is not yet independently buildable and live
+execution is not qualified**. This document records the minimum candidate
+graph for `protocol-deployments`. It does not authorize signing or
+broadcasting.
 
 ## Selected operations and topology
 
@@ -111,11 +113,13 @@ The selected Base Sepolia governance addresses are `GovGovernor`
 `0x62BD47154D0b5Fe435F220E1294405040102b2ba`, and Timelock
 `0xD62A6C62233357B6681F9410218FE53BA931fDD1`. The Timelock has a 48-hour
 delay, Governor proposer/canceller roles, self-admin, and open execution. The
-token currently has zero delegated votes, so governance proposal/quorum
-liveness must be established before relying on Governor operations. The
-existing Timelock runtime hash differs from the pinned Sew bundle artifact;
-deployment-engine support for an explicitly pinned observed external runtime
-hash is still required.
+token observation recorded zero delegated votes. A pinned local Base Sepolia
+fork rehearsal subsequently demonstrated proposal, quorum vote, Governor
+queueing and Timelock execution after simulated self-delegation; public votes
+remain zero unless a public delegation is authorized. The existing Timelock
+runtime differs from the pinned Sew bundle artifact. The deployment engine
+supports an explicit runtime hash pin, but the Sew-specific Base Sepolia
+environment still needs to bind it and assert the live interface and roles.
 
 1. For Base Sepolia, verify the existing Timelock's runtime hash, chain ID,
    delay, roles and Governor/token getter linkage; do not deploy a new
@@ -143,7 +147,7 @@ hash is still required.
 
 | Dependency | Classification | Required qualification |
 |---|---|---|
-| Base Sepolia ERC-20 test asset | external contract, not deployed by this package | approve address; independently check chain ID, code/runtime identity, decimals, pause/proxy implementation, balances and allowances immediately before run; establish exact-transfer behavior for deposit and withdrawal (fee-on-transfer/rebasing assets are unsupported) |
+| Base Sepolia ERC-20 test asset | external contract, not deployed by this package | use the operator-approved USDC test asset; independently refresh chain ID, code/runtime identity, decimals, pause/proxy implementation, balances and allowances immediately before run; establish exact-transfer behavior for deposit and withdrawal (fee-on-transfer/rebasing assets are unsupported) |
 | Governance proposer/executor identities | external signers/contracts | approve identities, threshold and actual post-handoff schedule/execute reachability |
 | Guardian, resolver, fee recipient | external identities | approve distinct roles and verify intended permissions on-chain |
 | Base Sepolia EVM code-size behavior | network rule | linked vault runtime must fit active rule; latest source candidate build is 23,586 bytes versus observed 24,576-byte EIP-170 limit, but live network acceptance remains unverified |
@@ -154,16 +158,31 @@ The latest local source build uses solc `0.8.37+commit.f401782d`, EVM
 `osaka`, optimizer 200 and `viaIR=true`; `SewCoreVault` runtime is 23,586
 bytes and initcode is 24,317 bytes. The 13-artifact export passes manifest,
 FQN, link-reference, bytecode-hash and deterministic re-export checks.
-Focused Sew tests pass (10 profile tests, plus 63 legacy extension tests).
+Focused Sew tests have passed (10 profile tests, plus 63 legacy extension
+tests). The existing `@sew/deployables@0.1.2` bundle is pinned to clean source
+revision `17bf2f0693367bfa3909a5aa186f4e806a76a5ea`. The deployment repository
+records generic engine local and fork rehearsals for this bundle; the forked
+executor used local chain ID 31337, so it does not qualify Base Sepolia
+governance behavior. A separate pinned governance fork rehearsal at chain ID
+84532 passed the Governor proposal/vote/queue/Timelock execution path after
+simulated self-delegation. No Base Sepolia transaction has been signed or
+broadcast.
 
-The export currently records a dirty Jujutsu working-copy revision. Its local
-bundle root is therefore a rehearsal candidate only, not a pinned release.
-The deployment repository still contains the 0.1.1 oversized `EscrowVault`
-profile. Its generic plan must be updated to this exact graph and the local
-deployment runner must use the generic executor/bootstrap/manifest path before
-package qualification. Anvil could not bind a local port in this environment,
-so engine-level local/fork rehearsal evidence for this 0.1.2 bundle is absent.
-No Base Sepolia transaction has been signed or broadcast.
+### In-tree package extraction status
+
+The workspace package `packages/sew-core` now owns the Sew-core deployable
+allowlist, scope documentation entrypoint, and package commands. Its source
+root still points at the monorepo `contracts/` tree, and its Foundry build uses
+the root project configuration; this is a source boundary, not yet an
+independently buildable source package.
+
+The 13 artifact roots import 51 local Solidity files and 22 OpenZeppelin
+sources. `SewCoreVault` inherits `BaseEscrow`, whose source imports appeal,
+yield, Kleros and incentive components shared with the full protocol. Several
+of the allowlisted libraries and default modules are also used by full-protocol
+contracts. The next extraction step is to define a shared escrow-kernel
+workspace dependency, then move Sew-owned contracts and focused tests into
+`packages/sew-core` while retaining one canonical copy of shared source.
 
 ### Generic deployment-engine integration blocker
 
@@ -176,17 +195,17 @@ performs bootstrap via its own direct send helper, so it does not get the
 generic bootstrap attempt journal/recovery guarantees. Do not copy those
 execution helpers into Sew-specific code.
 
-The smallest shared correction is a profile-aware general deployment-plan
+The remaining shared correction is a profile-aware general deployment-plan
 schema: preserve the PRF-specific unit/root/approval checks only for the PRF
 plan identity, allow a Sew-only plan with generic `deploy` and
 `external-preflight` stages, and require PRF approvals only when the selected
-plan includes PRF units/contracts. The Sew package can then run through the
-same CLI deployment ledger, stage outputs, constructor/library bindings,
-bootstrap journal, external-contract verification and manifest generation.
-Add independent tests that a Sew-only plan resolves without PRF inputs while
-PRF plans still fail closed without their approvals. The deployment checkout
-is outside this workspace's writable roots, so this generic correction and
-the Sew plan integration have not been applied here.
+plan includes PRF units/contracts. Then integrate the Sew plan with the generic
+deployment ledger, stage outputs, constructor/library bindings, bootstrap
+journal, external-contract verification and manifest generation. The external
+runtime-hash pin capability exists in the deployment repository, but the Sew
+environment and plan have not yet been wired to it. Add independent checks
+that a Sew-only plan resolves without PRF inputs while PRF plans still fail
+closed without their approvals.
 
 The deployment checkout's full suite currently has missing error-code
 coverage for transaction replacement branches; Anvil-dependent engine tests

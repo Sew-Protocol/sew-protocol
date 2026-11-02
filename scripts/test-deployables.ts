@@ -23,7 +23,7 @@ import { sourceCommitFromEnvironment } from './_lib/source-commit';
 const OUT_DIR = path.resolve(process.env.SEW_FORGE_OUT_DIR ?? path.resolve(process.cwd(), 'out'));
 const ALLOWLIST = loadAllowlist();
 const BONDLEDGER_ALLOWLIST_PATH = path.resolve(process.cwd(), 'config', 'deployable-allowlist-bondledger.json');
-const SEW_CORE_ALLOWLIST_PATH = path.resolve(process.cwd(), 'config', 'deployable-allowlist.sew-core.json');
+const SEW_CORE_ALLOWLIST_PATH = path.resolve(process.cwd(), 'packages', 'sew-core', 'deployables.allowlist.json');
 
 let passed = 0;
 let failed = 0;

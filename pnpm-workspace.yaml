@@ -1,4 +1,5 @@
-packages: []
+packages:
+  - packages/*
 # Approve native build scripts for keccak / secp256k1 (transitive deps pulled in
 # via ethers/hardhat). Without approval their postinstall builds do not run.
 # pnpm 9 reads `onlyBuiltDependencies`; pnpm 10/11 read `allowBuilds`. Both keys

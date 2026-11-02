@@ -11,7 +11,7 @@ import { canonicalJson } from './_lib/canonical-json';
 
 const root = process.cwd();
 const outDir = path.resolve(process.env.SEW_FORGE_OUT_DIR ?? path.join(root, 'out'));
-const allowlist = loadAllowlist(path.join(root, 'config/deployable-allowlist.sew-core.json'));
+const allowlist = loadAllowlist(path.join(root, 'packages/sew-core/deployables.allowlist.json'));
 const scratch: string[] = [];
 
 function tempdir(): string {

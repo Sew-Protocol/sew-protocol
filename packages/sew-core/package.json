@@ -1,0 +1,22 @@
+{
+  "name": "@sew/sew-core",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "description": "In-tree Sew core source and release boundary",
+  "scripts": {
+    "build": "forge build --root ../..",
+    "test:profile": "forge test --root ../.. --match-path test/foundry/core/SewCoreVaultProfile.t.sol",
+    "deployables:export": "pnpm --dir ../.. run deployables:export -- packages/sew-core/deployables.allowlist.json deployables/sew-core",
+    "deployables:validate": "pnpm --dir ../.. run deployables:validate -- --allowlist packages/sew-core/deployables.allowlist.json --export-dir deployables/sew-core",
+    "test:artifacts": "pnpm --dir ../.. run deployables:test:sew-core",
+    "test": "pnpm test:profile && pnpm test:artifacts",
+    "deployables": "pnpm deployables:export && pnpm deployables:validate"
+  },
+  "sewCore": {
+    "spec": "../../docs/deployment/sew-core-standalone-profile.md",
+    "deployableAllowlist": "deployables.allowlist.json",
+    "sourceRoot": "../../contracts",
+    "sourceOwnership": "shared-monorepo-transitional"
+  }
+}
