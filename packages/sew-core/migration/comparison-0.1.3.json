@@ -2,7 +2,9 @@
   "baselineBundle": "@sew/deployables@0.1.2",
   "baselineSourceRevision": "17bf2f0693367bfa3909a5aa186f4e806a76a5ea",
   "candidateBundle": "@sew/deployables@0.1.3",
-  "candidateBundleRoot": "ab6fbab287e5a7c3b8b94b9b5b08194dbd41a3dbf233738b17d28fa409214cfb",
+  "preCommitCandidateBundleRoot": "ab6fbab287e5a7c3b8b94b9b5b08194dbd41a3dbf233738b17d28fa409214cfb",
+  "preCommitCandidateSourceRevision": "ostqkqnutknvykwkuusrprlxzznnovsu",
+  "preCommitCandidateSourceDirty": true,
   "summary": {
     "artifactCount": 13,
     "allAbisUnchanged": true,
