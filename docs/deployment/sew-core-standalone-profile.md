@@ -202,31 +202,33 @@ pass. The root core suite passed 613 tests (three skipped). The complete root
 Foundry suite has now passed end to end: 1,540 passed, zero failed, and 11
 skipped across 150 suites, including the long invariant workloads.
 
-### Generic deployment-engine integration blocker
+### Shared deployment-engine qualification
 
-The current plan API is named and validated as a PRF successor plan, not a
-reusable standalone Sew plan: its schema requires PRF unit fields,
-`validatePlanAgainstUnits` rejects selecting `sew-protocol`, and both resolve
-and deploy CLIs demand PRF initial-input approval whenever `--plan` is used.
-The existing local Sew rehearsal script calls the generic deploy function but
-performs bootstrap via its own direct send helper, so it does not get the
-generic bootstrap attempt journal/recovery guarantees. Do not copy those
-execution helpers into Sew-specific code.
+The deployment engine now accepts a standalone Sew plan through the shared
+plan schema and resolver. PRF initial-input approvals are required only for
+plans that select PRF units or contracts. Qualification confirmed that the
+Sew plan resolves without PRF inputs and that a PRF plan still fails closed
+when its approvals are missing.
 
-The remaining shared correction is a profile-aware general deployment-plan
-schema: preserve the PRF-specific unit/root/approval checks only for the PRF
-plan identity, allow a Sew-only plan with generic `deploy` and
-`external-preflight` stages, and require PRF approvals only when the selected
-plan includes PRF units/contracts. Then integrate the Sew plan with the generic
-deployment ledger, stage outputs, constructor/library bindings, bootstrap
-journal, external-contract verification and manifest generation. The external
-runtime-hash pin capability exists in the deployment repository, but the Sew
-environment and plan have not yet been wired to it. Add independent checks
-that a Sew-only plan resolves without PRF inputs while PRF plans still fail
-closed without their approvals.
+The pinned `@sew/deployables` 0.1.2 profile was rehearsed through the normal
+deployment CLI, durable deployment record, bootstrap journal, linked library
+bindings, and manifest generation on an isolated Anvil chain with the normal
+EIP-170 size limit. The run verified 14 deployments, 49 bootstrap actions and
+31 final assertions, with one local slow-lane time advance and zero public
+network transactions. Evidence is retained in
+`protocol-deployments/config/sew-core/observations/engine-rehearsal-20261116.json`.
+The deployment repository's full suite passed 477 tests with five skipped;
+its opt-in PRF adapter integration suite passed all five tests.
 
-The deployment checkout's full suite currently has missing error-code
-coverage for transaction replacement branches; Anvil-dependent engine tests
-also cannot start in this sandbox, and two tests require write access to the
-repository root for temporary fixtures. These are engine/rehearsal blockers,
-not failures of the Sew Solidity profile tests.
+This qualifies the generic local execution path, not Base Sepolia deployment.
+The Base Sepolia profile still needs an executable plan that models the
+existing Governor-linked Timelock and Sew Token as external contracts,
+including the observed Timelock runtime hash and live ABI/role assertions.
+Then the exact plan must pass a pinned Base Sepolia fork rehearsal with the
+existing governance handoff. Base Sepolia signer keys and an RPC provider
+credential were exposed during local inspection and must be rotated before
+any signing. Governance
+delegate choice, guardian/resolver/fee-recipient assignments, dispute bounds,
+fresh asset and governance observations, and independent review also remain
+launch gates. The deployment profile remains blocked and the 0.1.2 bundle has
+not been replaced or requalified.
