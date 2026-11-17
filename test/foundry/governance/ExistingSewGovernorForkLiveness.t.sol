@@ -12,7 +12,7 @@ import '../../../contracts/token/SewToken.sol';
 ///      is loaded and this test cannot broadcast transactions to Base Sepolia.
 contract ExistingSewGovernorForkLivenessTest is Test {
     uint256 private constant BASE_SEPOLIA_CHAIN_ID = 84532;
-    uint256 private constant FORK_BLOCK = 53_114_463;
+    uint256 private constant FORK_BLOCK = 59_952_917;
     address private constant GOVERNOR_ADDRESS = 0xa9d598AE5b185dd249A1E4b64c32f18f4500d2fA;
     address private constant TOKEN_ADDRESS = 0x62BD47154D0b5Fe435F220E1294405040102b2ba;
     address private constant TIMELOCK_ADDRESS = 0xD62A6C62233357B6681F9410218FE53BA931fDD1;
