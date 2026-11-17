@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "packageName": "@sew/deployables",
-  "bundleVersion": "0.1.3",
+  "bundleVersion": "0.1.4",
   "buildArtifactSource": "forge",
   "buildProfile": "sew-core",
   "entries": [
@@ -108,7 +108,7 @@
       "sourcePath": "contracts/core/SewCoreVault.sol",
       "scopeHint": "sew",
       "category": "core",
-      "notes": "Size-qualified profile for ERC-20 creation, release, bilateral cancellation, single-resolver dispute, timeout, pull settlement and guardian pause; appeals, split settlement, partial release and yield are absent."
+      "notes": "Sew Core V1: immutable supported-token allowlist, strict default-resolver-only creation, dispute-capable intake pause, release, bilateral cancellation, timeout and pull settlement; appeals, split settlement, partial release and yield are absent."
     }
   ]
 }

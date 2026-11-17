@@ -25,22 +25,28 @@ contract SewCoreVault is BaseEscrow {
     mapping(address => uint256) public totalFeesPerToken;
     mapping(address => uint256) public totalHeldInEscrowPerToken;
     ModuleSnapshotRegistry public immutable moduleManagement;
+    address public immutable supportedToken;
     bytes32 public constant ROLE_FEE_RECIPIENT = keccak256('ROLE_FEE_RECIPIENT');
 
     event FeesWithdrawn(address indexed token, uint256 amount);
 
     error CoreFeatureDisabled();
+    error UnsupportedToken(address token);
 
-    constructor(uint256 escrowFeeBps, address feeAddress, address moduleManagementAddress) {
+    constructor(uint256 escrowFeeBps, address feeAddress, address moduleManagementAddress, address supportedTokenAddress) {
         address deployer = _msgSender();
         _grantRole(DEFAULT_ADMIN_ROLE, deployer);
         _grantRole(ROLE_TIMELOCK, deployer);
         if (escrowFeeBps > MAX_ESCROW_FEE_BPS) revert InvalidEscrowFee(escrowFeeBps, MAX_ESCROW_FEE_BPS);
         if (feeAddress == address(0)) revert ZeroAddress(1);
         if (moduleManagementAddress == address(0) || moduleManagementAddress.code.length == 0) revert ZeroAddress(4);
+        if (supportedTokenAddress == address(0) || supportedTokenAddress.code.length == 0) {
+            revert UnsupportedToken(supportedTokenAddress);
+        }
         escrowFee = escrowFeeBps;
         escrowFeeAddress = feeAddress;
         moduleManagement = ModuleSnapshotRegistry(moduleManagementAddress);
+        supportedToken = supportedTokenAddress;
         timeoutConfig.maxDisputeDuration = 90 days;
         timeoutConfig.appealWindowDuration = 0;
     }
@@ -53,8 +59,13 @@ contract SewCoreVault is BaseEscrow {
         FeeRecordingLibrary.recordFee(totalFeesPerToken, token, amount);
     }
 
-    function _validateProfileSettings(EscrowSettings memory settings) internal pure override {
-        if (settings.yieldPreset != YieldPreset.OFF) revert CoreFeatureDisabled();
+    function _validateProfileSettings(EscrowSettings memory settings, address token) internal view override {
+        if (token != supportedToken) revert UnsupportedToken(token);
+        // Sew Core V1 selects one governance-configured default resolver. Do not
+        // let a caller snapshot an alternate resolver for a permissionless escrow.
+        if (settings.yieldPreset != YieldPreset.OFF || settings.customResolver != address(0)) {
+            revert CoreFeatureDisabled();
+        }
     }
 
     function _depositForYield(IYieldModule, uint256, address, uint256) internal pure override {

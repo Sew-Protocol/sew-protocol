@@ -6,14 +6,18 @@ scope in `../../docs/deployment/sew-core-standalone-profile.md` and the
 
 ## Included product scope
 
-ERC-20 escrow creation/funding, participant release, bilateral cancellation,
-single-resolver disputes, timeout refund, pull settlement, and guardian intake
-pause. The profile omits appeals and Kleros escalation, yield generation,
+Single-token ERC-20 escrow creation/funding, participant release, bilateral
+cancellation, default-resolver-only disputes, timeout refund, pull settlement,
+and guardian intake pause. A guardian pause stops new escrow creation while
+leaving dispute initiation, existing settlement, claims, and withdrawals
+available. The profile omits appeals and Kleros escalation, yield generation,
 split settlement, partial release, staking/slashing, DR3, EAE, PRF, pro-rata
 settlement, and multi-L2 deployment. These are product-profile exclusions;
 some related implementation code remains in the shared inherited source
-closure. `SewCoreVault` disables yield and omits appeal and split entrypoints.
-Disputes use one resolver per escrow snapshot.
+closure. `SewCoreVault` disables yield, rejects nonzero per-escrow resolver
+overrides, and omits appeal and split entrypoints. Its constructor pins one
+supported ERC-20 address; the Base Sepolia candidate pins Circle test USDC.
+Token transfers must deliver at least the requested amount.
 
 ## Workspace commands
 
@@ -40,9 +44,22 @@ sources. The package does not import from the root `contracts/` tree.
 The supported in-repository consumers are the standalone Sew-core deployable
 profile and the root full-protocol build/tests. This package is an experimental
 in-tree boundary; it does not establish a public API, independent audit claim,
-or external compatibility promise. Bundle 0.1.3 is a source-migration
-candidate, not a deployment-qualified release. The pinned 0.1.2 bundle remains
-the deployment baseline.
+or external compatibility promise. Bundle 0.1.4 is the current behavior-change
+candidate; it is not deployment-qualified. The 0.1.2 baseline and 0.1.3
+source-migration candidate remain retained for comparison.
+
+## Review-driven behavior gates
+
+The candidate uses a zero minimum dispute escrow value so the dispute threshold
+cannot make an otherwise valid small escrow undisputable. A separate minimum
+creation amount still applies. Creation accepts only the constructor-pinned
+token and rejects nonzero custom resolver overrides. While intake is paused,
+participants can still open disputes on existing escrows.
+
+These changes produce a new executable candidate and require a new deterministic
+export, exact linked-bytecode qualification, local and Base Sepolia fork
+rehearsals, and independent review. They do not qualify the prior 0.1.2 or 0.1.3
+artifacts.
 
 The generated source/consumer inventory is in
 [`source-boundary.json`](./source-boundary.json). Regenerate it with

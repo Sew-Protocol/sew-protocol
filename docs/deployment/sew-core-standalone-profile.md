@@ -9,9 +9,10 @@ broadcasting.
 
 ## Selected operations and topology
 
-The v1 core is an ERC-20 escrow with participant release, bilateral
-cancellation, one resolver dispute, timeout refund, pull settlement, and
-guardian intake pause. Appeals, Kleros, split settlement, partial release,
+The v1 core is a single-token ERC-20 escrow with participant release, bilateral
+cancellation, one default resolver dispute, timeout refund, pull settlement, and
+guardian intake pause. A pause stops new escrow creation but leaves disputes on
+existing escrows, settlement, claims, and withdrawals available. Appeals, Kleros, split settlement, partial release,
 yield, staking/slashing, DR3, EAE, PRF, pro-rata, and multi-L2 are excluded.
 
 Use `SewCoreVault` with `DefaultResolutionModule` as the default resolver
@@ -42,7 +43,7 @@ artifacts and five application/authority artifacts.
 | 9 | `EscrowCreationPolicy` | `contracts/core/EscrowCreationPolicy.sol:EscrowCreationPolicy` | `initialOwner = TimelockController` |
 | 10 | `DefaultResolutionModule` | `contracts/modules/DefaultResolutionModule.sol:DefaultResolutionModule` | `initialOwner = TimelockController`, `initialResolver = approved resolver` |
 | 11 | `DefaultReleaseStrategy` | `contracts/modules/DefaultReleaseStrategy.sol:DefaultReleaseStrategy` | none |
-| 12 | `SewCoreVault` | `contracts/core/SewCoreVault.sol:SewCoreVault` | `escrowFeeBps`, nonzero `feeAddress`, `moduleManagementAddress = ModuleSnapshotRegistry`; links `DisputeInitializationLibrary`, `DisputeRaiseLibrary`, `EscrowCreationLogic`, `EscrowDisputeLogic`, `EscrowSettlementLogic`, `StateManagementLibrary` |
+| 12 | `SewCoreVault` | `contracts/core/SewCoreVault.sol:SewCoreVault` | `escrowFeeBps`, nonzero `feeAddress`, `moduleManagementAddress = ModuleSnapshotRegistry`, immutable `supportedToken`; links `DisputeInitializationLibrary`, `DisputeRaiseLibrary`, `EscrowCreationLogic`, `EscrowDisputeLogic`, `EscrowSettlementLogic`, `StateManagementLibrary` |
 
 The seven-library closure is transitive: `EscrowCreationLogic` also links
 `SettingsValidationLibrary`. `EscrowVaultAccountingLibrary` is not part of

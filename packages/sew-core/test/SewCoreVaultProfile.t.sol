@@ -37,6 +37,22 @@ contract MockRevertingERC20 is ERC20 {
     }
 }
 
+contract FeeOnTransferERC20 is ERC20 {
+    constructor(address initialAccount, uint256 initialBalance) ERC20('Fee token', 'FEE') {
+        _mint(initialAccount, initialBalance);
+    }
+
+    function _update(address from, address to, uint256 value) internal override {
+        if (from != address(0) && to != address(0)) {
+            uint256 fee = value / 100;
+            super._update(from, to, value - fee);
+            super._update(from, address(0), fee);
+        } else {
+            super._update(from, to, value);
+        }
+    }
+}
+
 contract SewCoreVaultProfileTest is Test {
     SewCoreVault internal vault;
     ModuleSnapshotRegistry internal registry;
@@ -59,7 +75,7 @@ contract SewCoreVaultProfileTest is Test {
         resolution = new DefaultResolutionModule(address(this), RESOLVER);
         releaseStrategy = new DefaultReleaseStrategy();
         token = new ERC20Mock('Sew test token', 'STT', address(this), 1_000_000 ether);
-        vault = new SewCoreVault(0, FEE, address(registry));
+        vault = new SewCoreVault(0, FEE, address(registry), address(token));
 
         vault.grantRole(vault.ROLE_ADMIN_CONTRACT(), address(this));
         vault.setMinDisputeEscrowValue(1);
@@ -82,6 +98,18 @@ contract SewCoreVaultProfileTest is Test {
         id = vault.createEscrow(address(token), SELLER, AMOUNT, _settings());
     }
 
+    function _vaultForToken(address supportedToken) internal returns (SewCoreVault testVault) {
+        testVault = new SewCoreVault(0, FEE, address(registry), supportedToken);
+        testVault.grantRole(testVault.ROLE_ADMIN_CONTRACT(), address(this));
+        testVault.setCreationPolicy(address(policy));
+        registry.registerEscrowContract(address(testVault));
+        registry.queueModule(address(testVault), BaseEscrow.ModuleType.RELEASE, address(releaseStrategy));
+        registry.queueModule(address(testVault), BaseEscrow.ModuleType.RESOLUTION, address(resolution));
+        vm.warp(block.timestamp + 8 days);
+        registry.activateModule(address(testVault), BaseEscrow.ModuleType.RELEASE);
+        registry.activateModule(address(testVault), BaseEscrow.ModuleType.RESOLUTION);
+    }
+
     function _settings() internal pure returns (EscrowSettings memory) {
         return EscrowSettings({
             customResolver: address(0),
@@ -93,6 +121,7 @@ contract SewCoreVaultProfileTest is Test {
     }
 
     function test_initial_configuration_is_explicit_and_observable() public {
+        assertEq(vault.supportedToken(), address(token));
         assertEq(vault.escrowFee(), 0);
         assertEq(vault.escrowFeeAddress(), FEE);
         assertEq(vault.yieldProtocolFeeBps(), 0);
@@ -136,6 +165,7 @@ contract SewCoreVaultProfileTest is Test {
         assertFalse(vault.hasRole(vault.ROLE_ADMIN_CONTRACT(), address(this)));
 
         uint256 existingEscrow = _create();
+        uint256 existingDisputableEscrow = _create();
         vm.expectRevert();
         vault.setEscrowFeeBps(50);
         vm.prank(GUARDIAN);
@@ -144,6 +174,9 @@ contract SewCoreVaultProfileTest is Test {
         vm.prank(BUYER);
         vm.expectRevert();
         vault.createEscrow(address(token), SELLER, AMOUNT, _settings());
+        vm.prank(BUYER);
+        vault.raiseDispute(existingDisputableEscrow);
+        assertEq(uint8(vault.getEscrowState(existingDisputableEscrow)), uint8(EscrowState.DISPUTED), 'pause preserves dispute access for existing escrows');
         vm.prank(BUYER);
         vault.release(existingEscrow);
         vm.prank(SELLER);
@@ -172,7 +205,7 @@ contract SewCoreVaultProfileTest is Test {
         EscrowCreationPolicy governedPolicy = new EscrowCreationPolicy(address(timelock));
         DefaultResolutionModule governedResolution = new DefaultResolutionModule(address(timelock), RESOLVER);
         DefaultReleaseStrategy governedRelease = new DefaultReleaseStrategy();
-        SewCoreVault governedVault = new SewCoreVault(0, FEE, address(governedRegistry));
+        SewCoreVault governedVault = new SewCoreVault(0, FEE, address(governedRegistry), address(token));
 
         assertTrue(governedRegistry.hasRole(governedRegistry.DEFAULT_ADMIN_ROLE(), address(timelock)));
         assertTrue(governedRegistry.hasRole(governedRegistry.ROLE_TIMELOCK(), address(timelock)));
@@ -306,30 +339,46 @@ contract SewCoreVaultProfileTest is Test {
         vm.prank(BUYER);
         vault.release(noFeeId);
         assertEq(vault.claimableBalances(noFeeId, SELLER), AMOUNT);
-        vault.setEscrowFeeBps(100);
-
         MockRevertingERC20 flaky = new MockRevertingERC20('Flaky', 'FLK', address(this), AMOUNT);
+        SewCoreVault flakyVault = _vaultForToken(address(flaky));
+        flakyVault.setEscrowFeeBps(100);
         flaky.transfer(BUYER, AMOUNT);
         vm.prank(BUYER);
-        flaky.approve(address(vault), AMOUNT);
+        flaky.approve(address(flakyVault), AMOUNT);
         EscrowSettings memory settings = _settings();
         vm.prank(BUYER);
-        uint256 id = vault.createEscrow(address(flaky), SELLER, AMOUNT, settings);
+        uint256 id = flakyVault.createEscrow(address(flaky), SELLER, AMOUNT, settings);
         vm.prank(BUYER);
-        vault.release(id);
+        flakyVault.release(id);
 
         uint256 net = AMOUNT - AMOUNT / 100;
         flaky.setShouldRevert(true);
         vm.prank(SELLER);
         vm.expectRevert();
-        vault.withdrawEscrow(id);
-        assertEq(vault.claimableBalances(id, SELLER), net, 'failed transfer restores entitlement');
-        assertEq(vault.totalClaimableAssets(address(flaky)), net);
-        assertEq(flaky.balanceOf(address(vault)), AMOUNT);
+        flakyVault.withdrawEscrow(id);
+        assertEq(flakyVault.claimableBalances(id, SELLER), net, 'failed transfer restores entitlement');
+        assertEq(flakyVault.totalClaimableAssets(address(flaky)), net);
+        assertEq(flaky.balanceOf(address(flakyVault)), AMOUNT);
         flaky.setShouldRevert(false);
         vm.prank(SELLER);
-        vault.withdrawEscrow(id);
+        flakyVault.withdrawEscrow(id);
         assertEq(flaky.balanceOf(SELLER), net);
+    }
+
+    function test_fee_on_transfer_token_is_rejected_without_creating_liabilities() public {
+        FeeOnTransferERC20 taxed = new FeeOnTransferERC20(BUYER, AMOUNT);
+        SewCoreVault taxVault = _vaultForToken(address(taxed));
+        vm.prank(BUYER);
+        taxed.approve(address(taxVault), AMOUNT);
+        uint256 buyerBalanceBefore = taxed.balanceOf(BUYER);
+
+        vm.prank(BUYER);
+        vm.expectRevert();
+        taxVault.createEscrow(address(taxed), SELLER, AMOUNT, _settings());
+
+        assertEq(taxed.balanceOf(BUYER), buyerBalanceBefore, 'reverted transfer restores the buyer balance');
+        assertEq(taxed.balanceOf(address(taxVault)), 0, 'reverted transfer leaves no tokens in custody');
+        assertEq(taxVault.totalHeldInEscrowPerToken(address(taxed)), 0, 'no principal liability is recorded');
     }
 
     function test_bilateral_cancel_refunds_sender_without_deployer() public {
@@ -382,6 +431,17 @@ contract SewCoreVaultProfileTest is Test {
         assertFalse(appealCall, 'appeal selector is absent from Sew core');
         (bool splitCall,) = address(vault).call(abi.encodeWithSignature('proposeSplit(uint256,uint256,uint256,uint64)', 0, 1, 1, 0));
         assertFalse(splitCall, 'split selector is absent from Sew core');
+
+        ERC20Mock unsupported = new ERC20Mock('Unsupported', 'NOPE', BUYER, AMOUNT);
+        vm.prank(BUYER);
+        vm.expectRevert(abi.encodeWithSelector(SewCoreVault.UnsupportedToken.selector, address(unsupported)));
+        vault.createEscrow(address(unsupported), SELLER, AMOUNT, _settings());
+
+        EscrowSettings memory customResolverSettings = _settings();
+        customResolverSettings.customResolver = address(releaseStrategy);
+        vm.prank(BUYER);
+        vm.expectRevert(SewCoreVault.CoreFeatureDisabled.selector);
+        vault.createEscrow(address(token), SELLER, AMOUNT, customResolverSettings);
     }
 
     function test_yield_opt_in_is_rejected() public {

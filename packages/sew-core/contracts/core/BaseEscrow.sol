@@ -469,7 +469,6 @@ abstract contract BaseEscrow is EscrowLifecycle {
 
     // slither-disable-next-line reentrancy-no-eth
     function raiseDispute(uint256 workflowId) external nonReentrant {
-        _requireNotPaused();
         _validateWorkflowId(workflowId);
         EscrowTransfer storage et = escrowTransfers[workflowId];
         ModuleSnapshot storage snap = moduleSnapshots[workflowId];

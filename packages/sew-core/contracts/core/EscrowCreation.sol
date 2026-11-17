@@ -34,7 +34,7 @@ abstract contract EscrowCreation is ReentrancyGuard, EscrowConfiguration {
         internal returns (uint256)
     {
         _requireNotPaused();
-        _validateProfileSettings(settings);
+        _validateProfileSettings(settings, token);
         uint256 workflowId = escrowTransfers.length;
         if (address(creationPolicy) == address(0)) revert ZeroCreationPolicy();
         IResolutionModule resolutionModule = _getResolutionModule(workflowId);
@@ -81,7 +81,10 @@ abstract contract EscrowCreation is ReentrancyGuard, EscrowConfiguration {
         return EscrowCreationLogic.resolveResolutionConfigVersion(resolutionModule, requestedVersion, customResolver, explicitSelection);
     }
 
-    function _validateProfileSettings(EscrowSettings memory settings) internal view virtual { settings; }
+    function _validateProfileSettings(EscrowSettings memory settings, address token) internal view virtual {
+        settings;
+        token;
+    }
 
     function _snapshotModulesForEscrow(uint256 workflowId, uint256 resolutionConfigVersion) internal {
         EscrowCreationLogic.snapshotModulesForEscrow(
