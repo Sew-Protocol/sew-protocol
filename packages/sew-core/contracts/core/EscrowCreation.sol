@@ -13,7 +13,7 @@ import '../types/EscrowTypes.sol';
 
 /// @notice Shared escrow creation implementation for all escrow products.
 abstract contract EscrowCreation is ReentrancyGuard, EscrowConfiguration {
-    error AccountingDeficit(address token, uint256 deficit);
+    error UnexpectedTokenReceipt(address token, uint256 expected, uint256 actual);
     error ResolutionConfigUnavailable(address resolutionModule, uint256 version);
     error ResolutionConfigWithCustomResolver(address customResolver);
     error BothAutoTimesSet(uint256 workflowId, uint64 releaseTime, uint64 cancelTime);
@@ -56,7 +56,7 @@ abstract contract EscrowCreation is ReentrancyGuard, EscrowConfiguration {
         uint256 balBefore = IERC20(token).balanceOf(address(this));
         _pullTokens(token, _msgSender(), amount);
         uint256 received = IERC20(token).balanceOf(address(this)) - balBefore;
-        if (received < amount) revert AccountingDeficit(token, amount - received);
+        if (received != amount) revert UnexpectedTokenReceipt(token, amount, received);
 
         escrowTransfers.push(EscrowTransfer({
             token: token, to: to, from: _msgSender(), amountAfterFee: result.amountAfterFee,

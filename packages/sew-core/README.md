@@ -54,7 +54,9 @@ The candidate uses a zero minimum dispute escrow value so the dispute threshold
 cannot make an otherwise valid small escrow undisputable. A separate minimum
 creation amount still applies. Creation accepts only the constructor-pinned
 token and rejects nonzero custom resolver overrides. While intake is paused,
-participants can still open disputes on existing escrows.
+participants can still open disputes on existing escrows. Creation also checks
+that the vault receives exactly the requested token amount; fee-on-transfer and
+bonus-transfer token behavior reverts instead of creating unaccounted custody.
 
 These changes produce a new executable candidate and require a new deterministic
 export, exact linked-bytecode qualification, local and Base Sepolia fork

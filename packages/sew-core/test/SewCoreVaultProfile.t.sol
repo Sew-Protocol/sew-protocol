@@ -53,6 +53,17 @@ contract FeeOnTransferERC20 is ERC20 {
     }
 }
 
+contract BonusTransferERC20 is ERC20 {
+    constructor(address initialAccount, uint256 initialBalance) ERC20('Bonus token', 'BONUS') {
+        _mint(initialAccount, initialBalance);
+    }
+
+    function _update(address from, address to, uint256 value) internal override {
+        super._update(from, to, value);
+        if (from != address(0) && to != address(0)) super._update(address(0), to, 1);
+    }
+}
+
 contract SewCoreVaultProfileTest is Test {
     SewCoreVault internal vault;
     ModuleSnapshotRegistry internal registry;
@@ -379,6 +390,23 @@ contract SewCoreVaultProfileTest is Test {
         assertEq(taxed.balanceOf(BUYER), buyerBalanceBefore, 'reverted transfer restores the buyer balance');
         assertEq(taxed.balanceOf(address(taxVault)), 0, 'reverted transfer leaves no tokens in custody');
         assertEq(taxVault.totalHeldInEscrowPerToken(address(taxed)), 0, 'no principal liability is recorded');
+    }
+
+    function test_bonus_transfer_token_is_rejected_without_creating_liabilities() public {
+        BonusTransferERC20 bonus = new BonusTransferERC20(address(this), 100_000 ether);
+        SewCoreVault bonusVault = _vaultForToken(address(bonus));
+        bonus.transfer(BUYER, AMOUNT);
+        vm.prank(BUYER);
+        bonus.approve(address(bonusVault), AMOUNT);
+
+        vm.expectRevert(abi.encodeWithSelector(
+            EscrowCreation.UnexpectedTokenReceipt.selector, address(bonus), AMOUNT, AMOUNT + 1
+        ));
+        vm.prank(BUYER);
+        bonusVault.createEscrow(address(bonus), SELLER, AMOUNT, _settings());
+
+        assertEq(bonusVault.getEscrowCount(), 0);
+        assertEq(bonusVault.totalHeldInEscrowPerToken(address(bonus)), 0);
     }
 
     function test_bilateral_cancel_refunds_sender_without_deployer() public {
