@@ -9,13 +9,12 @@
 Implementation changes for the listed findings are in progress across the
 custody, factory, snapshot, dispute, resolver, slashing, and CI paths. The latest
 GitHub run for `main` compiled successfully, passed lint and TypeScript checks,
-and ran 1,550 Foundry tests: 1,532 passed, 6 failed, and 12 were skipped. The
-failures are regressions in test expectations/fixtures for the new receipt,
-pause, absent-snapshot, and resolver-assignment behavior; update those tests and
-rerun before treating the fixes as qualified. CodeQL analysis and SARIF upload
-passed, but the job failed in its setup-node cache teardown because the
-configured pnpm cache path was absent. A local workflow edit removes that
-nonessential cache setting and is pending validation.
+and ran 1,551 Foundry cases: 1,539 passed, 0 failed, and 12 were skipped. The
+Sew Core source boundary and 13-test profile also passed. The run then failed in
+`deployables:validate`: its argument parser did not discard the `--` separator
+that pnpm forwards. The parser is fixed locally and the documented invocation
+passes direct validation; the CI rerun is pending. CodeQL, including setup-node
+cleanup, passed on the same revision.
 
 Earlier focused evidence includes 165 passing tests across affected groups,
 including explicit resolver-policy selection and timeout replacement stake
@@ -44,12 +43,12 @@ deployment artifact. No deployment artifact is accepted by this remediation.
 
 | Gate | Current state |
 |---|---|
-| Focused regressions for affected findings | The four affected core files (32 tests), Aave/unwind files (16 tests), resolver fixture (1 test), and six CI-failing regressions pass locally |
-| Full Foundry suite | Latest CI completed: 1,532 passed, 6 failed, 12 skipped; fixes are not yet covered by a rerun. Latest local full-suite attempt stalled compiling 143 files and was stopped; not qualified |
+| Focused regressions for affected findings | The four affected core files (32 tests), Aave/unwind files (16 tests), resolver fixture (1 test), and six prior CI regressions pass locally |
+| Full Foundry suite | CI passed: 1,539 passed, 0 failed, 12 skipped (1,551 total). Latest local full-suite attempt stalled compiling 143 files and was stopped |
 | Invariant directory | Passed; 12 invariants/test cases at 256 runs and 128,000 calls each |
 | Sew Core package build and focused profile tests | Passed; current measured runtime is under EIP-170 by 219 bytes |
 | TypeScript typecheck | Passed in latest CI |
-| Deployables export, validation, determinism, and manifest pin | Temporary deterministic export/validation passed; clean source pin and retained release bundle pending |
+| Deployables export, validation, determinism, and manifest pin | CI exported 13 Sew Core artifacts for source `9b34d7e4` (bundle root `1605dd5ae2b57c2882fc15c0e55adca031adc2b7f196bd1f9d0d53f3a3afd808`); validation CLI bug fixed locally, CI rerun pending |
 | Independent review of exact source revision and bundle root | Pending after fixes and clean pinned export |
 | Public deployment authorization | Not implied by source remediation |
 

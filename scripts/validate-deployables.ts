@@ -19,7 +19,12 @@ import { DEFAULT_EXPORT_DIR } from './_lib/deployables/export';
 import { DEFAULT_ALLOWLIST_PATH, loadAllowlist } from './_lib/deployables/allowlist';
 
 function main(): void {
-  const args = process.argv.slice(2);
+  const rawArgs = process.argv.slice(2);
+  // `pnpm run <script> -- ...` preserves the CLI separator in process.argv,
+  // unlike a direct `ts-node script ...` invocation. Match the exporter and
+  // ignore everything through that separator when it is present.
+  const separator = rawArgs.indexOf('--');
+  const args = separator >= 0 ? rawArgs.slice(separator + 1) : rawArgs;
   let allowlistPath = DEFAULT_ALLOWLIST_PATH;
   let exportDir = DEFAULT_EXPORT_DIR;
   const positional = args.filter((arg) => !arg.startsWith('-'));
