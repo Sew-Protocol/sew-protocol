@@ -68,4 +68,8 @@ abstract contract EscrowStorage {
     uint256 internal accumulatedPausedDuration;
     uint256 internal pauseCycles;
     uint256 internal lastUnpausedAt;
+
+    // Distinguishes an intentionally absent module from an uninitialized
+    // workflow so registry changes cannot affect existing escrows.
+    mapping(uint256 => bool) public moduleSnapshotInitialized;
 }

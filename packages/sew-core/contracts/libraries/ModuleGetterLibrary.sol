@@ -23,6 +23,7 @@ library ModuleGetterLibrary {
         uint256 workflowId,
         BaseEscrow.ModuleType moduleType,
         mapping(uint256 => ModuleSnapshot) storage moduleSnapshots,
+        mapping(uint256 => bool) storage moduleSnapshotInitialized,
         ModuleSnapshotRegistry moduleManagement,
         address escrowContract
     ) internal view returns (address moduleAddress) {
@@ -33,8 +34,9 @@ library ModuleGetterLibrary {
         else if (moduleType == BaseEscrow.ModuleType.CANCELLATION) snapshotModule = snapshot.cancellationStrategy;
         else if (moduleType == BaseEscrow.ModuleType.YIELD_GEN) snapshotModule = snapshot.yieldGenerationModule;
 
-        // If snapshot exists, return it
-        if (snapshotModule != address(0)) {
+        // A zero address is also a creation-time snapshot. Do not consult the
+        // mutable registry again after the workflow has been materialized.
+        if (moduleSnapshotInitialized[workflowId]) {
             return snapshotModule;
         }
 

@@ -70,6 +70,7 @@ contract ResolverStakingModule is IStakingModule, AccessControl, ReentrancyGuard
     error InsufficientBond(address resolver, uint256 effectiveBond, uint256 required);
     error InvalidTier(uint8 tier, uint8 maxTier);
     error ResolverHasPendingSlash(address resolver);
+    error StakeAlreadyLocked(address escrowContract, uint256 workflowId, address resolver);
 
     // ============ Constants ============
 
@@ -122,6 +123,10 @@ contract ResolverStakingModule is IStakingModule, AccessControl, ReentrancyGuard
     }
     mapping(address => BondComposition) public resolverBonds;
 
+    // Vindication liabilities are not custody-backed stake and never contribute
+    // to capacity, withdrawals, or the resolver's effective bond.
+    mapping(address => uint256) public vindicationReceivableUSD;
+
     // Stake status tracking
     mapping(address => StakeStatus) public stakeStatus;
 
@@ -169,6 +174,7 @@ contract ResolverStakingModule is IStakingModule, AccessControl, ReentrancyGuard
         uint256 effectiveBondUSD
     );
     event BondWithdrawn(address indexed resolver, uint256 stableAmount, uint256 sewAmount);
+    event VindicationReceivableRecorded(address indexed resolver, uint256 amountUSD, uint256 totalReceivableUSD);
     event UnbondRequested(
         address indexed resolver,
         uint256 stableAmount,
@@ -471,18 +477,6 @@ contract ResolverStakingModule is IStakingModule, AccessControl, ReentrancyGuard
         emit BondWithdrawn(resolver, stableAmount, sewAmount);
     }
 
-    /**
-     * @notice Emergency withdraw (admin only, for contract migration)
-     * @param to Address to send tokens to
-     */
-    function emergencyWithdraw(address to) external onlyRole(ROLE_TIMELOCK) {
-        // Note: Admin triggers this for a specific resolver, so we need to know WHICH resolver
-        // The current implementation is flawed as it uses _msgSender() which is the Admin/Timelock.
-        // This function as written in the codebase is effectively non-functional or mis-scoped.
-        // I will log this for the team's attention and revert to a safe state if necessary.
-        revert("EmergencyWithdraw implementation is mis-scoped; requires resolver parameter");
-    }
-
     // ============ Delegation Functions (Coverage) ============
 
     /**
@@ -607,6 +601,9 @@ contract ResolverStakingModule is IStakingModule, AccessControl, ReentrancyGuard
         address resolver,
         uint256 stakeRequired
     ) external onlyRole(ROLE_RESOLUTION_MODULE) {
+        if (lockedStakes[escrowContract][workflowId][resolver] != 0) {
+            revert StakeAlreadyLocked(escrowContract, workflowId, resolver);
+        }
         // Lock minimum stake for tier if not specified
         uint256 lockAmount = stakeRequired;
         if (lockAmount == 0) {
@@ -683,6 +680,9 @@ contract ResolverStakingModule is IStakingModule, AccessControl, ReentrancyGuard
         uint256 duration
     ) external onlyRole(ROLE_RESOLUTION_MODULE) {
         duration;
+        if (lockedStakes[escrowContract][workflowId][resolver] != 0) {
+            revert StakeAlreadyLocked(escrowContract, workflowId, resolver);
+        }
         BondComposition storage bond = resolverBonds[resolver];
         uint256 availableStake = bond.effectiveBondUSD - totalLockedStake[resolver];
         if (availableStake < amount) revert InsufficientAvailableStake(resolver, availableStake, amount);
@@ -1116,65 +1116,16 @@ contract ResolverStakingModule is IStakingModule, AccessControl, ReentrancyGuard
     }
 
     /**
-     * @notice Credit resolver's stake on vindication (protocol-backed liability, no token transfer)
-     * @dev Called by slashing module when a reversal slash is restored on vindication.
-     *      Increases the resolver's bond amounts proportionally to restore economic capacity.
-     *      No actual tokens are transferred — this represents a protocol liability.
-     * @param resolver Resolver to credit
-     * @param amount Amount to credit (in USD, 18 decimals)
+     * @notice Record a USD-denominated vindication liability without minting stake.
+     * @dev The receivable is intentionally excluded from bonded balances and capacity.
+     *      A future funded recovery path must transfer real assets before adding stake.
      */
-    function creditStakeForVindication(address resolver, uint256 amount) external onlyRole(ROLE_SLASHING_MODULE) {
-        if (amount == 0) return;
-
-        BondComposition storage bond = resolverBonds[resolver];
-
-        // Proportionally credit stable and SEW to match the slashed ratio
-        // If the resolver has no remaining bond, credit all as stable
-        uint256 totalBond = bond.effectiveBondUSD;
-        uint256 stableCredit;
-        uint256 sewCredit;
-
-        if (totalBond == 0) {
-            // No remaining bond — credit entirely as stable (protocol liability)
-            stableCredit = amount;
-        } else {
-            // Credit proportionally to existing composition
-            uint256 stableValueUSD = BondValuationLibrary.calculateEffectiveBondUSD(
-                bond.stableAmount,
-                0,
-                PRECISION,
-                SEW_HAIRCUT_BPS,
-                STABLE_DECIMALS,
-                SEW_DECIMALS
-            );
-
-            stableCredit = (amount * stableValueUSD) / totalBond;
-            sewCredit = amount - stableCredit;
-        }
-
-        // Convert stable value credit back to stable token units
-        // Since stable is USD-pegged (1:1 with 6 decimals), stableValueUSD ≈ bond.stableAmount in value
-        // We credit the proportional amount
-        if (stableCredit > 0) {
-            bond.stableAmount += stableCredit;
-        }
-        if (sewCredit > 0) {
-            bond.sewAmount += sewCredit;
-        }
-
-        // Recalculate effectiveBondUSD
-        bond.effectiveBondUSD = BondValuationLibrary.calculateEffectiveBondUSD(
-            bond.stableAmount,
-            bond.sewAmount,
-            PRECISION,
-            SEW_HAIRCUT_BPS,
-            STABLE_DECIMALS,
-            SEW_DECIMALS
-        );
-
-        bond.lastUpdated = block.timestamp;
-
-        emit StakeRestored(resolver, amount, 0, 'Vindication');
+    function recordVindicationReceivable(address resolver, uint256 amountUSD) external onlyRole(ROLE_SLASHING_MODULE) {
+        if (resolver == address(0)) revert ZeroAddress('resolver');
+        if (amountUSD == 0) return;
+        uint256 total = vindicationReceivableUSD[resolver] + amountUSD;
+        vindicationReceivableUSD[resolver] = total;
+        emit VindicationReceivableRecorded(resolver, amountUSD, total);
     }
 
     /**

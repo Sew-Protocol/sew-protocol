@@ -10,6 +10,24 @@ import "../../../packages/sew-core/contracts/core/BondCollector.sol";
 import "../../../packages/sew-core/contracts/modules/DefaultResolutionModule.sol";
 import "../../../contracts/mocks/ERC20Mock.sol";
 import "../../../packages/sew-core/contracts/libraries/SettingsValidationLibrary.sol";
+import "../../../packages/sew-core/contracts/interfaces/ICancellationStrategy.sol";
+
+contract ExposedModuleLookupEscrowVault is EscrowVault {
+    constructor(address registry) EscrowVault(0, address(0xFEE), registry) {}
+
+    function cancellationStrategyFor(uint256 workflowId) external view returns (address) {
+        return _getCancellationStrategy(workflowId);
+    }
+}
+
+contract TestCancellationStrategy is ICancellationStrategy {
+    function canCancel(uint256, address, EscrowTransfer calldata) external pure returns (bool) { return false; }
+    function canCancelUnilaterally(uint256, address, EscrowTransfer calldata) external pure returns (bool) { return false; }
+    function onCancelAttempt(uint256, address, bool) external pure {}
+    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
+        return interfaceId == type(ICancellationStrategy).interfaceId || interfaceId == type(IERC165).interfaceId;
+    }
+}
 
 contract SimpleReleaseStrategy is IReleaseStrategy {
     
@@ -25,10 +43,11 @@ contract SimpleReleaseStrategy is IReleaseStrategy {
 }
 
 contract ModuleSnapshotRaceConditionTest is Test {
-    EscrowVault public vault;
+    ExposedModuleLookupEscrowVault public vault;
     ModuleSnapshotRegistry public mm;
     SimpleReleaseStrategy public strategyA;
     SimpleReleaseStrategy public strategyB;
+    TestCancellationStrategy public cancellationStrategy;
     ERC20Mock public token;
 
     address public owner = address(this);
@@ -39,9 +58,10 @@ contract ModuleSnapshotRaceConditionTest is Test {
         mm = new ModuleSnapshotRegistry(owner);
         strategyA = new SimpleReleaseStrategy();
         strategyB = new SimpleReleaseStrategy();
+        cancellationStrategy = new TestCancellationStrategy();
         token = new ERC20Mock("Token", "TKN", owner, 1000e18);
 
-        vault = new EscrowVault(0,address(0xFEE),address(mm));
+        vault = new ExposedModuleLookupEscrowVault(address(mm));
 
         mm.registerEscrowContract(address(vault));
 
@@ -84,5 +104,23 @@ contract ModuleSnapshotRaceConditionTest is Test {
         // 5. Verify the original escrow remains bound to strategy A.
         (, snapRelease, , , , , , , , , , ) = vault.moduleSnapshots(wid);
         assertEq(snapRelease, address(strategyA));
+    }
+
+    function test_absent_module_snapshot_stays_absent_after_registry_update() public {
+        vm.startPrank(buyer);
+        token.mint(buyer, 100e18);
+        token.approve(address(vault), 100e18);
+        uint256 wid = vault.createEscrow(address(token), seller, 100e18, SettingsValidationLibrary.getDefaultSettings());
+        vm.stopPrank();
+
+        assertTrue(vault.moduleSnapshotInitialized(wid));
+        assertEq(vault.cancellationStrategyFor(wid), address(0));
+
+        mm.queueModule(address(vault), BaseEscrow.ModuleType.CANCELLATION, address(cancellationStrategy));
+        vm.warp(block.timestamp + 7 days + 1);
+        mm.activateModule(address(vault), BaseEscrow.ModuleType.CANCELLATION);
+
+        assertEq(mm.getModule(address(vault), BaseEscrow.ModuleType.CANCELLATION), address(cancellationStrategy));
+        assertEq(vault.cancellationStrategyFor(wid), address(0));
     }
 }

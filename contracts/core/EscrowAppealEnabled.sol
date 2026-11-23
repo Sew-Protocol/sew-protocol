@@ -9,7 +9,9 @@ import '../../packages/sew-core/contracts/libraries/EscrowEncodingLibrary.sol';
 import '../../packages/sew-core/contracts/libraries/DisputeEscalationLibrary.sol';
 import '../../packages/sew-core/contracts/libraries/EscrowDisputeLogic.sol';
 import '../../packages/sew-core/contracts/libraries/BondHandlingLibrary.sol';
+import '../../packages/sew-core/contracts/libraries/DisputeInitializationLibrary.sol';
 import '../../packages/sew-core/contracts/shared/interfaces/IIncentiveModule.sol';
+import '../../packages/sew-core/contracts/shared/interfaces/IResolutionModuleTimeout.sol';
 import '../../packages/sew-core/contracts/core/BondCollector.sol';
 import '../../packages/sew-core/contracts/arbitration/IKlerosArbitrableProxy.sol';
 import '../../packages/sew-core/contracts/modules/decentralized-resolution-module/interfaces/IKlerosHandoffResolutionModule.sol';
@@ -21,6 +23,33 @@ abstract contract EscrowAppealEnabled is EscrowOptionalSplits {
     error InvalidAppealRequestRole(uint8 role, address provided, address expected);
 
     function _supportsAppealInterface() internal pure override returns (bool) { return true; }
+
+    function _hasCommittedKlerosHandoff(uint256 workflowId) internal view override returns (bool committed) {
+        (committed,) = DisputeInitializationLibrary.committedKlerosHandoff(
+            address(_getResolutionModule(workflowId)), address(this), workflowId
+        );
+    }
+
+    function _prepareDisputeTimeout(
+        uint256 workflowId,
+        ExecutionSource source,
+        ModuleSnapshot storage snap
+    ) internal view override {
+        (bool committed, uint256 disputeId) = DisputeInitializationLibrary.committedKlerosHandoff(
+            address(_getResolutionModule(workflowId)), address(this), workflowId
+        );
+        if (!committed) {
+            super._prepareDisputeTimeout(workflowId, source, snap);
+            return;
+        }
+        if (source != ExecutionSource.GOVERNANCE) {
+            revert KlerosArbitrationPending(workflowId, disputeId);
+        }
+        IResolutionModule resolutionModule = _getResolutionModule(workflowId);
+        if (!resolutionModule.supportsInterface(type(IResolutionModuleTimeout).interfaceId)) {
+            revert KlerosArbitrationPending(workflowId, disputeId);
+        }
+    }
 
     /**
      * @notice Validate and prepare escalation, canceling any pending settlement
@@ -82,7 +111,9 @@ abstract contract EscrowAppealEnabled is EscrowOptionalSplits {
     function _appealDispute(uint256 workflowId, BaseEscrow.AppealRequest memory request)
         internal returns (bool success, address newDisputeResolver, uint8 newLevel)
     {
-        _requireNotPaused();
+        // Emergency pause gates new escrow intake only. Existing participants
+        // retain the right to seek a higher-level review while paused; the
+        // configured appeal deadline continues to run.
         address caller = _msgSender();
         if (request.operator != caller) revert InvalidAppealRequestRole(1, request.operator, caller);
         if (request.funder != caller) revert InvalidAppealRequestRole(2, request.funder, caller);

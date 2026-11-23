@@ -121,6 +121,11 @@ abstract contract DRMStorageBase is DecentralizedResolverStructs {
     // Stored as id + 1 so a valid external dispute id of zero is distinguishable.
     mapping(address => mapping(uint256 => uint256)) public klerosDisputeIdForWorkflow;
     mapping(address => mapping(uint256 => bytes32)) internal _klerosConfigRootForWorkflow;
+    // USD-18 exposure is retained for every workflow so assignments across
+    // appeals and timeout replacement lock the same coverage amount.
+    mapping(address => mapping(uint256 => uint256)) public workflowStakeExposureUSD;
+    mapping(address => mapping(uint256 => address)) public workflowStakeResolver;
+    mapping(address => mapping(uint256 => uint64)) public klerosHandoffCommittedAt;
 
     function _resolutionConfig(address escrowContract, uint256 workflowId)
         internal

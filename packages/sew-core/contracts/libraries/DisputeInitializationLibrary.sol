@@ -3,6 +3,8 @@ pragma solidity ^0.8.37;
 
 import '../shared/interfaces/IResolutionModule.sol';
 import '../interfaces/IResolver.sol';
+import '../types/EscrowTypes.sol';
+import '../modules/decentralized-resolution-module/interfaces/IKlerosHandoffResolutionModule.sol';
 import '@openzeppelin/contracts/utils/introspection/IERC165.sol';
 
 /**
@@ -10,6 +12,10 @@ import '@openzeppelin/contracts/utils/introspection/IERC165.sol';
  * @notice Library for dispute initialization logic
  */
 library DisputeInitializationLibrary {
+    error DisputeModuleInitializationFailed(address module, uint256 workflowId);
+    error InvalidAssignedResolver(uint256 workflowId, address resolver);
+    error UnauthorizedResolverModule(address caller, address expectedModule);
+    event DisputeResolverSynchronized(uint256 indexed workflowId, address indexed resolver);
     /**
      * @dev Initialize dispute in resolution module
      * @param disputeResolutionModule Dispute resolution module address
@@ -98,7 +104,7 @@ library DisputeInitializationLibrary {
             } catch {}
         }
 
-        return 0;
+        revert DisputeModuleInitializationFailed(disputeResolutionModule, workflowId);
     }
 
     /**
@@ -123,6 +129,66 @@ library DisputeInitializationLibrary {
             }
         } catch {
             // Not an IResolver contract
+        }
+    }
+
+    /**
+     * @dev Read back the resolver selected by a resolution module after initialization.
+     *      A config-bound workflow must have a nonzero assignment; legacy modules may
+     *      omit this view and retain the resolver supplied before initialization.
+     */
+    function synchronizeAssignedResolver(
+        address disputeResolutionModule,
+        uint256 workflowId,
+        bytes memory escrowData,
+        uint256 configVersion,
+        address currentResolver
+    ) public view returns (address assignedResolver) {
+        try IResolutionModule(disputeResolutionModule).getDisputeResolver(
+            workflowId, address(this), escrowData
+        ) returns (address resolver, uint8) {
+            if (resolver != address(0)) return resolver;
+            if (configVersion != 0) revert InvalidAssignedResolver(workflowId, resolver);
+        } catch {
+            if (configVersion != 0) revert InvalidAssignedResolver(workflowId, address(0));
+        }
+        return currentResolver;
+    }
+
+    /**
+     * @dev Apply an authenticated assignment transition to escrow storage. This public
+     *      library call runs by delegatecall, so the storage writes and event belong to
+     *      the escrow while the original resolution module remains msg.sender.
+     */
+    function updateDisputeResolverFromModule(
+        EscrowTransfer[] storage escrowTransfers,
+        mapping(uint256 => EscrowSettings) storage escrowSettings,
+        uint256 workflowId,
+        address resolver,
+        address expectedModule
+    ) public {
+        if (msg.sender != expectedModule) revert UnauthorizedResolverModule(msg.sender, expectedModule);
+        EscrowTransfer storage transfer = escrowTransfers[workflowId];
+        if (transfer.escrowState != EscrowState.DISPUTED) {
+            revert InvalidAssignedResolver(workflowId, resolver);
+        }
+        if (escrowSettings[workflowId].customResolver != address(0)) return;
+        transfer.disputeResolver = resolver;
+        emit DisputeResolverSynchronized(workflowId, resolver);
+    }
+
+    function committedKlerosHandoff(address module, address escrow, uint256 workflowId)
+        public
+        view
+        returns (bool committed, uint256 disputeId)
+    {
+        if (module == address(0)) return (false, 0);
+        try IKlerosHandoffResolutionModule(module).getCommittedKlerosDisputeId(escrow, workflowId)
+            returns (bool hasHandoff, uint256 id)
+        {
+            return (hasHandoff, id);
+        } catch {
+            return (false, 0);
         }
     }
 }

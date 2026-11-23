@@ -349,7 +349,7 @@ contract EscrowableERC20CoverageTest is Test {
     function test_factory_creates_valid_token() public {
         address newToken = factory.createEscrowableERC20(
             'Factory Token', 'FTK', FEE_BPS, feeAddress,
-             address(moduleManagement)
+            address(moduleManagement), address(this), buyer
         );
         assertNotEq(newToken, address(0));
         assertGt(newToken.code.length, 0);
@@ -358,28 +358,31 @@ contract EscrowableERC20CoverageTest is Test {
     function test_factory_token_has_initial_supply() public {
         address newToken = factory.createEscrowableERC20(
             'Factory Token', 'FTK', FEE_BPS, feeAddress,
-             address(moduleManagement)
+            address(moduleManagement), address(this), buyer
         );
         EscrowableERC20 t = EscrowableERC20(newToken);
         assertEq(t.totalSupply(), t.INITIAL_SUPPLY());
     }
 
-    function test_factory_mints_supply_to_caller() public {
+    function test_factory_hands_supply_and_roles_to_selected_recipients() public {
         vm.prank(buyer);
         address newToken = factory.createEscrowableERC20(
             'Factory Token', 'FTK', FEE_BPS, feeAddress,
-             address(moduleManagement)
+            address(moduleManagement), address(this), buyer
         );
         EscrowableERC20 t = EscrowableERC20(newToken);
-        // _mint targets _msgSender() inside constructor, which is the factory contract itself
-        assertEq(t.balanceOf(address(factory)), t.INITIAL_SUPPLY());
+        assertEq(t.balanceOf(buyer), t.INITIAL_SUPPLY());
+        assertTrue(t.hasRole(t.DEFAULT_ADMIN_ROLE(), address(this)));
+        assertTrue(t.hasRole(t.ROLE_TIMELOCK(), address(this)));
+        assertFalse(t.hasRole(t.DEFAULT_ADMIN_ROLE(), address(factory)));
+        assertFalse(t.hasRole(t.ROLE_TIMELOCK(), address(factory)));
     }
 
     function test_factory_revert_invalid_params() public {
         vm.expectRevert();
         factory.createEscrowableERC20(
             'T', 'T', FEE_BPS, address(0),  // zero fee address
-             address(moduleManagement)
+            address(moduleManagement), address(this), buyer
         );
     }
 

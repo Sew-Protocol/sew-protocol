@@ -152,15 +152,20 @@ environment still needs to bind it and assert the live interface and roles.
 | Base Sepolia ERC-20 test asset | external contract, not deployed by this package | use the operator-approved USDC test asset; independently refresh chain ID, code/runtime identity, decimals, pause/proxy implementation, balances and allowances immediately before run; establish exact-transfer behavior for deposit and withdrawal (fee-on-transfer/rebasing assets are unsupported) |
 | Governance proposer/executor identities | external signers/contracts | approve identities, threshold and actual post-handoff schedule/execute reachability |
 | Guardian, resolver, fee recipient | external identities | approve distinct roles and verify intended permissions on-chain |
-| Base Sepolia EVM code-size behavior | network rule | linked vault runtime must fit active rule; latest source candidate build is 23,586 bytes versus observed 24,576-byte EIP-170 limit, but live network acceptance remains unverified |
+| Base Sepolia EVM code-size behavior | network rule | the current unqualified working-copy build is 24,357 bytes against the 24,576-byte EIP-170 limit (219-byte margin); live network acceptance remains unverified |
 
 ## Artifact identity and current qualification status
 
-The latest local source build uses solc `0.8.37+commit.f401782d`, EVM
-`osaka`, optimizer 200 and `viaIR=true`; `SewCoreVault` runtime is 23,586
-bytes and initcode is 24,317 bytes. The pinned 0.1.2 bundle and moved 0.1.3
-candidate both pass manifest, link-reference, bytecode-hash, and deterministic
-re-export checks. The migration comparison shows all 13 ABIs and
+The prior pinned 0.1.2 qualification used solc `0.8.37+commit.f401782d`, EVM
+`osaka`, optimizer 200 and `viaIR=true`; its recorded `SewCoreVault` runtime is
+23,586 bytes and initcode is 24,317 bytes. The current remediation working copy
+uses the package Foundry profile with optimizer 1 and `viaIR=true`; its measured
+runtime is 24,357 bytes and initcode is 25,172 bytes. The lower optimizer run
+count favors deployment size and may increase execution gas; gas impact has not
+been measured. This dirty candidate has not been exported, deterministically
+reproduced, or independently qualified. The pinned 0.1.2 bundle and moved 0.1.3
+candidate both passed their historical manifest, link-reference, bytecode-hash,
+and deterministic re-export checks. The migration comparison shows all 13 ABIs and
 metadata-stripped runtime code unchanged; the four stateful deployment
 contracts have matching storage layouts. Full bytecode hashes differ where
 source/remapping metadata changed, and the local Timelock fixture FQN now uses

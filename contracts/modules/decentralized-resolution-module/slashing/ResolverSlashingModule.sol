@@ -43,6 +43,10 @@ contract ResolverSlashingModule is ISlashingModule, AccessControl, ReentrancyGua
     error CooldownNotPassed(uint256 availableAt, uint256 currentTime);
     error ZeroAmount();
     error SlashNotFound(uint256 slashId);
+    error ReversalSlashIdentityMismatch(uint256 slashId, address expectedEscrow, address actualEscrow, uint256 expectedWorkflow, uint256 actualWorkflow);
+    error SlashAppealUnresolved(uint256 slashId);
+    error AppealResolutionWindowOpen(uint256 slashId, uint256 deadline, uint256 currentTime);
+    error AppealResolutionWindowExpired(uint256 slashId, uint256 deadline, uint256 currentTime);
 
     // ============ Constants ============
 
@@ -119,8 +123,8 @@ contract ResolverSlashingModule is ISlashingModule, AccessControl, ReentrancyGua
     mapping(address => uint256) public frozenUntil; // resolver => timestamp
     mapping(address => uint256) public freezeUntil; // resolver => timestamp (for insufficient bond)
 
-    // Reversal slash by round: workflowId => round => slashId
-    mapping(uint256 => mapping(uint8 => uint256)) public reversalSlashByRound;
+    // Reversal slash by fully scoped workflow identity: escrow => workflow => round => slashId.
+    mapping(address => mapping(uint256 => mapping(uint8 => uint256))) public reversalSlashByRound;
 
     // Appeal bond custody: slashId => amount held in this contract pending resolveAppeal.
     // Non-zero only while a PENDING slash has an active (unresolved) appeal.
@@ -150,6 +154,8 @@ contract ResolverSlashingModule is ISlashingModule, AccessControl, ReentrancyGua
     // Explicit accounting for slashed funds retained in this module.
     // This tracks the currently unallocated stable amount from distribution policy.
     uint256 public retainedSlashReserves;
+    // Protocol's 30% share is held here as a funded, withdrawable liability.
+    uint256 public protocolSlashReserves;
 
     // ============ Events ============
 
@@ -179,6 +185,9 @@ contract ResolverSlashingModule is ISlashingModule, AccessControl, ReentrancyGua
 
     event SlashedSEWHandled(uint256 indexed workflowId, uint256 amount, bool supplyReduced);
     event SlashReservesUpdated(uint256 addedAmount, uint256 newTotal, uint256 indexed workflowId);
+    event ProtocolSlashReserveUpdated(uint256 addedAmount, uint256 newTotal, uint256 indexed workflowId);
+    event ProtocolSlashReserveWithdrawn(address indexed recipient, uint256 amount, uint256 remaining);
+    error ProtocolSlashReserveExceeded(uint256 requested, uint256 available);
     event UnavailabilityStatsUpdated(uint256 totalResolvers, uint256 unavailableCount, uint256 lastUpdate);
 
     // ============ Initialization ============
@@ -215,7 +224,8 @@ contract ResolverSlashingModule is ISlashingModule, AccessControl, ReentrancyGua
             maxSlashPerPeriod: MAX_SLASH_PER_PERIOD,
             slashPeriod: SLASH_PERIOD,
             appealWindow: 3 days,
-            appealBond: 100e18 // 100 USD
+            appealBond: 100e18, // 100 USD
+            appealResolutionTimeout: 7 days
         });
     }
 
@@ -276,6 +286,8 @@ contract ResolverSlashingModule is ISlashingModule, AccessControl, ReentrancyGua
         if (block.timestamp <= slashEvent.appealDeadline) {
             revert AppealWindowOpen(slashId, slashEvent.appealDeadline, block.timestamp);
         }
+        SlashAppeal storage appeal = slashAppeals[slashId];
+        if (appeal.slashId != 0 && !appeal.resolved) revert SlashAppealUnresolved(slashId);
 
         address resolver = slashEvent.resolver;
         uint256 slashAmount = slashEvent.amount;
@@ -363,6 +375,7 @@ contract ResolverSlashingModule is ISlashingModule, AccessControl, ReentrancyGua
             appellant: _msgSender(),
             appealBond: bondAmount,
             appealedAt: block.timestamp,
+            resolutionDeadline: block.timestamp + slashConfig.appealResolutionTimeout,
             reason: reason,
             evidence: evidence,
             resolved: false,
@@ -389,6 +402,9 @@ contract ResolverSlashingModule is ISlashingModule, AccessControl, ReentrancyGua
 
         if (appeal.resolved) revert AppealAlreadyResolved(slashId);
         if (slashEvent.status != SlashStatus.PENDING) revert SlashNotPending(slashId, slashEvent.status);
+        if (block.timestamp > appeal.resolutionDeadline) {
+            revert AppealResolutionWindowExpired(slashId, appeal.resolutionDeadline, block.timestamp);
+        }
 
         appeal.resolved = true;
         appeal.upheld = upheld;
@@ -416,6 +432,38 @@ contract ResolverSlashingModule is ISlashingModule, AccessControl, ReentrancyGua
             emit SlashReversed(slashId, slashEvent.resolver, slashEvent.amount);
             emit SlashAppealResolved(slashId, true, slashEvent.resolver, bondHeld);
         }
+    }
+
+    /**
+     * @notice Resolve an undecided appeal in the resolver's favor after its fixed deadline.
+     * @dev This prevents an accepted appeal from immobilizing resolver capital indefinitely.
+     *      Expiry cancels the slash and returns the appeal bond; no slash execution is possible.
+     */
+    function expireSlashAppeal(uint256 slashId) external override nonReentrant {
+        SlashAppeal storage appeal = slashAppeals[slashId];
+        SlashEvent storage slashEvent = slashEvents[slashId];
+        if (slashEvent.slashId == 0) revert SlashNotFound(slashId);
+        if (appeal.slashId == 0) revert SlashNotFound(slashId);
+        if (appeal.resolved) revert AppealAlreadyResolved(slashId);
+        if (slashEvent.status != SlashStatus.PENDING) revert SlashNotPending(slashId, slashEvent.status);
+        if (block.timestamp <= appeal.resolutionDeadline) {
+            revert AppealResolutionWindowOpen(slashId, appeal.resolutionDeadline, block.timestamp);
+        }
+
+        appeal.resolved = true;
+        appeal.upheld = true;
+        slashEvent.status = SlashStatus.REVERSED;
+        _clearPendingSlash(slashEvent.resolver);
+
+        uint256 bondHeld = appealBondsHeld[slashId];
+        if (bondHeld > 0) {
+            appealBondsHeld[slashId] = 0;
+            stableToken.safeTransfer(appeal.appellant, bondHeld);
+        }
+
+        emit SlashReversed(slashId, slashEvent.resolver, slashEvent.amount);
+        emit SlashAppealResolved(slashId, true, slashEvent.resolver, bondHeld);
+        emit SlashAppealExpiredInResolverFavor(slashId, slashEvent.resolver, bondHeld);
     }
 
     // ============ Automated Slashing (Called by Resolution Module) ============
@@ -611,7 +659,7 @@ contract ResolverSlashingModule is ISlashingModule, AccessControl, ReentrancyGua
         uint256 totalSlashed = resolverSlashed + seniorSlashed;
 
         // Track reversal slash by round for vindication checks
-        reversalSlashByRound[workflowId][priorRound] = slashId;
+        reversalSlashByRound[escrowContract][workflowId][priorRound] = slashId;
 
         // Mark as slashed
         workflowSlashed[escrowContract][workflowId][resolver] = true;
@@ -656,16 +704,26 @@ contract ResolverSlashingModule is ISlashingModule, AccessControl, ReentrancyGua
      */
     function restoreReversalSlashOnVindication(
         uint256 workflowId,
+        address escrowContract,
         bool currentIsRelease,
         uint8[] calldata priorDecisions
     ) external override onlyRole(ROLE_RESOLUTION_MODULE) returns (uint256 restoredCount) {
         restoredCount = 0;
 
         for (uint8 round = 0; round < priorDecisions.length; round++) {
-            uint256 slashId = reversalSlashByRound[workflowId][round];
+            uint256 slashId = reversalSlashByRound[escrowContract][workflowId][round];
             if (slashId == 0) continue;
 
             SlashEvent storage slashEvent = slashEvents[slashId];
+            if (slashEvent.escrowContract != escrowContract || slashEvent.workflowId != workflowId) {
+                revert ReversalSlashIdentityMismatch(
+                    slashId,
+                    escrowContract,
+                    slashEvent.escrowContract,
+                    workflowId,
+                    slashEvent.workflowId
+                );
+            }
 
             // Only Track 1 automated reversal slashes (immediately executed, no appeal window)
             if (
@@ -701,7 +759,7 @@ contract ResolverSlashingModule is ISlashingModule, AccessControl, ReentrancyGua
 
             // Credit resolver's stake via staking module
             if (address(stakingModule) != address(0)) {
-                stakingModule.creditStakeForVindication(slashEvent.resolver, restoreAmount);
+                stakingModule.recordVindicationReceivable(slashEvent.resolver, restoreAmount);
             }
 
             // Mark slash as reversed-with-credit
@@ -1055,6 +1113,12 @@ contract ResolverSlashingModule is ISlashingModule, AccessControl, ReentrancyGua
             distribution.toProtocol +
             distribution.toCounterParty +
             distribution.toSlashProposer;
+        if (distribution.toProtocol > 0) {
+            protocolSlashReserves += distribution.toProtocol;
+            emit ProtocolSlashReserveUpdated(
+                distribution.toProtocol, protocolSlashReserves, workflowId
+            );
+        }
         uint256 retained = amount > distributed ? amount - distributed : 0;
         if (retained > 0) {
             retainedSlashReserves += retained;
@@ -1071,6 +1135,17 @@ contract ResolverSlashingModule is ISlashingModule, AccessControl, ReentrancyGua
         _handleSlashedSEW(workflowId);
 
         return distribution;
+    }
+
+    /// @notice Pay a previously recorded, custody-backed protocol share to its approved recipient.
+    /// @dev Governance may withdraw only the explicitly accrued protocol liability.
+    function withdrawProtocolSlashReserve(address recipient, uint256 amount) external onlyRole(ROLE_TIMELOCK) {
+        if (recipient == address(0)) revert ZeroAddress('recipient');
+        uint256 available = protocolSlashReserves;
+        if (amount > available) revert ProtocolSlashReserveExceeded(amount, available);
+        protocolSlashReserves = available - amount;
+        stableToken.safeTransfer(recipient, amount);
+        emit ProtocolSlashReserveWithdrawn(recipient, amount, protocolSlashReserves);
     }
 
     /**
@@ -1295,6 +1370,13 @@ contract ResolverSlashingModule is ISlashingModule, AccessControl, ReentrancyGua
         uint256 old = slashConfig.appealBond;
         slashConfig.appealBond = bond;
         emit AppealBondUpdated(old, bond);
+    }
+
+    function setAppealResolutionTimeout(uint256 timeout) external override onlyRole(ROLE_TIMELOCK) {
+        require(timeout > 0, 'Appeal resolution timeout must be positive');
+        uint256 old = slashConfig.appealResolutionTimeout;
+        slashConfig.appealResolutionTimeout = timeout;
+        emit AppealResolutionTimeoutUpdated(old, timeout);
     }
 
     function fundInsurancePool(uint256 amount) external override {

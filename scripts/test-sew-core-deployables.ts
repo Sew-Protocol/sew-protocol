@@ -48,7 +48,7 @@ function main(): void {
   assert(first.manifest.build.profile === 'sew-core', 'manifest profile is not sew-core');
   assert(first.manifest.build.compiler.name === 'solc' && first.manifest.build.compiler.version.startsWith('0.8.37'), 'unexpected compiler identity');
   assert(first.manifest.build.settings.evmVersion === 'osaka', 'unexpected EVM version');
-  assert(first.manifest.build.settings.optimizerRuns === 200 && first.manifest.build.settings.viaIR, 'unexpected optimizer/viaIR settings');
+  assert(first.manifest.build.settings.optimizerRuns === 1 && first.manifest.build.settings.viaIR, 'unexpected optimizer/viaIR settings');
   assert(first.manifest.bundleRoot === second.manifest.bundleRoot, 'independent exports produced different bundle roots');
   assert(Object.keys(first.manifest.artifacts).length === allowlist.entries.length, 'export is not exact allowlist size');
   for (const entry of allowlist.entries) {

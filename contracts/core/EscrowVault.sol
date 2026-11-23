@@ -118,19 +118,19 @@ contract EscrowVault is EscrowAppealEnabled {
     }
 
     function _getYieldGenerationModule(uint256 workflowId) internal view override returns (IYieldModule) {
-        return IYieldModule(ModuleGetterLibrary.getModuleAddress(workflowId, ModuleType.YIELD_GEN, moduleSnapshots, moduleManagement, address(this)));
+        return IYieldModule(ModuleGetterLibrary.getModuleAddress(workflowId, ModuleType.YIELD_GEN, moduleSnapshots, moduleSnapshotInitialized, moduleManagement, address(this)));
     }
 
     function _getReleaseStrategy(uint256 workflowId) internal view override returns (IReleaseStrategy) {
-        return IReleaseStrategy(ModuleGetterLibrary.getModuleAddress(workflowId, ModuleType.RELEASE, moduleSnapshots, moduleManagement, address(this)));
+        return IReleaseStrategy(ModuleGetterLibrary.getModuleAddress(workflowId, ModuleType.RELEASE, moduleSnapshots, moduleSnapshotInitialized, moduleManagement, address(this)));
     }
 
     function _getCancellationStrategy(uint256 workflowId) internal view override returns (address) {
-        return ModuleGetterLibrary.getModuleAddress(workflowId, ModuleType.CANCELLATION, moduleSnapshots, moduleManagement, address(this));
+        return ModuleGetterLibrary.getModuleAddress(workflowId, ModuleType.CANCELLATION, moduleSnapshots, moduleSnapshotInitialized, moduleManagement, address(this));
     }
 
     function _getResolutionModule(uint256 workflowId) internal view override returns (IResolutionModule) {
-        address moduleAddr = ModuleGetterLibrary.getModuleAddress(workflowId, ModuleType.RESOLUTION, moduleSnapshots, moduleManagement, address(this));
+        address moduleAddr = ModuleGetterLibrary.getModuleAddress(workflowId, ModuleType.RESOLUTION, moduleSnapshots, moduleSnapshotInitialized, moduleManagement, address(this));
         return IResolutionModule(moduleAddr != address(0) ? moduleAddr : disputeResolutionModule);
     }
 

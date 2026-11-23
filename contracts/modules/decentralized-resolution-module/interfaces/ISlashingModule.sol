@@ -55,6 +55,7 @@ interface ISlashingModule {
         address appellant; // Who is appealing
         uint256 appealBond; // Bond posted for appeal
         uint256 appealedAt; // Timestamp of appeal
+        uint256 resolutionDeadline; // Fixed deadline for governance to resolve the appeal
         string reason; // Appeal reason
         bytes evidence; // Counter-evidence
         bool resolved; // Whether appeal is resolved
@@ -69,6 +70,7 @@ interface ISlashingModule {
         uint256 slashPeriod; // Period for max slash calculation
         uint256 appealWindow; // Time to appeal (seconds)
         uint256 appealBond; // Bond required to appeal
+        uint256 appealResolutionTimeout; // Time governance has to resolve an appeal
     }
 
     struct SlashDistribution {
@@ -119,6 +121,9 @@ interface ISlashingModule {
         address indexed resolver,
         uint256 bondReturned
     );
+
+    event SlashAppealExpiredInResolverFavor(uint256 indexed slashId, address indexed resolver, uint256 bondReturned);
+    event AppealResolutionTimeoutUpdated(uint256 oldTimeout, uint256 newTimeout);
 
     event SlashReversed(uint256 indexed slashId, address indexed resolver, uint256 amountRestored);
 
@@ -202,6 +207,9 @@ interface ISlashingModule {
      */
     function resolveAppeal(uint256 slashId, bool upheld) external;
 
+    /** @notice Expire an undecided appeal after its fixed resolution deadline, cancelling the slash. */
+    function expireSlashAppeal(uint256 slashId) external;
+
     // ============ Automated Slashing (called by DecentralizedResolutionModule) ============
 
     /**
@@ -245,6 +253,7 @@ interface ISlashingModule {
      */
     function restoreReversalSlashOnVindication(
         uint256 workflowId,
+        address escrowContract,
         bool currentIsRelease,
         uint8[] calldata priorDecisions
     ) external returns (uint256 restoredCount);
@@ -378,6 +387,7 @@ interface ISlashingModule {
      * @param bond Bond amount required to appeal
      */
     function setAppealBond(uint256 bond) external;
+    function setAppealResolutionTimeout(uint256 timeout) external;
 
     /**
      * @notice Fund insurance pool

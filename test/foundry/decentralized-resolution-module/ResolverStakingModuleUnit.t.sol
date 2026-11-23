@@ -63,6 +63,49 @@ contract ResolverStakingModuleUnitTest is Test {
         assertEq(staking.getEffectiveStake(resolver), info.availableStake);
     }
 
+    function test_vindicationReceivableDoesNotMintOrInflateStake() public {
+        _stakeStable(resolver, 1000);
+        (uint256 stableBefore,, uint256 effectiveBefore,,) = staking.getBondComposition(resolver);
+        uint256 receivableUSD = 100e18;
+
+        bytes32 slashRole = staking.ROLE_SLASHING_MODULE();
+        vm.prank(admin);
+        staking.grantRole(slashRole, admin);
+        vm.prank(admin);
+        staking.recordVindicationReceivable(resolver, receivableUSD);
+
+        (uint256 stableAfter,, uint256 effectiveAfter,,) = staking.getBondComposition(resolver);
+        assertEq(stableAfter, stableBefore, 'stable token custody accounting unchanged');
+        assertEq(effectiveAfter, effectiveBefore, 'unfunded receivable is not stake');
+        assertEq(staking.vindicationReceivableUSD(resolver), receivableUSD, 'receivable uses USD 18-decimal units');
+        assertEq(staking.getAvailableStake(resolver), effectiveBefore, 'capacity remains custody backed');
+        assertEq(stable.balanceOf(address(staking)), stableBefore, 'staking custody unchanged');
+    }
+
+    function test_activeAssignmentLockPreventsUnstakeUntilFinalization() public {
+        _stakeStable(resolver, 1000);
+        bytes32 resolutionRole = staking.ROLE_RESOLUTION_MODULE();
+        vm.prank(admin);
+        staking.grantRole(resolutionRole, admin);
+
+        uint256 requiredStake = 250e18;
+        vm.prank(admin);
+        staking.onResolverAssigned(7, address(0xE5C0), resolver, requiredStake);
+        assertEq(staking.totalLockedStake(resolver), requiredStake);
+        assertEq(staking.lockedStakes(address(0xE5C0), 7, resolver), requiredStake);
+
+        vm.prank(resolver);
+        vm.expectRevert(
+            abi.encodeWithSelector(ResolverStakingModule.StakeLockedInDisputes.selector, resolver, requiredStake)
+        );
+        staking.requestUnstake(1000e6);
+
+        vm.prank(admin);
+        staking.onResolutionFinalized(7, address(0xE5C0), resolver, true);
+        assertEq(staking.totalLockedStake(resolver), 0);
+        assertEq(staking.lockedStakes(address(0xE5C0), 7, resolver), 0);
+    }
+
     function test_stake_belowMinimumReverts() public {
         stable.mint(resolver, 10e6);
         vm.startPrank(resolver);

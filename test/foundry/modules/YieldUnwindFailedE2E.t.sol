@@ -5,6 +5,7 @@ import 'forge-std/Test.sol';
 import 'contracts/core/EscrowVault.sol';
 import '../../../packages/sew-core/contracts/core/BaseEscrow.sol';
 import '../../../packages/sew-core/contracts/core/ModuleSnapshotRegistry.sol';
+import '../../../packages/sew-core/contracts/core/EscrowYield.sol';
 import '../../../packages/sew-core/contracts/core/EscrowCreationPolicy.sol';
 import '../../../packages/sew-core/contracts/modules/DefaultReleaseStrategy.sol';
 import '../../../packages/sew-core/contracts/types/EscrowTypes.sol';
@@ -83,11 +84,9 @@ contract YieldUnwindFailedModule is IYieldModule {
  * @notice Escrow-level end-to-end tests for the tail branches of
  *         EscrowYield._handleYieldModuleUnwind:
  *
- *           1. unwindToEscrow reverts AND emergencyUnwind reverts -> the escrow emits
- *              YieldUnwindFailed, clears the module linkage, completes settlement as a
- *              CLAIMABLE-ONLY entitlement (the vault does NOT need to be funded at
- *              settlement time), and the beneficiary can withdraw once assets are
- *              recovered into the vault.
+ *           1. unwindToEscrow and emergencyUnwind both revert -> settlement reverts,
+ *              preserving the escrow's module linkage and recovery identity until a
+ *              later retry can actually recover the position.
  *           2. unwindToEscrow reverts and emergencyUnwind returns recovered < principal
  *              -> core reverts PartialRecoveryNotAllowed; the whole tx rolls back
  *              atomically (module token transfer + pos deletion included) and the
@@ -106,7 +105,7 @@ contract YieldUnwindFailedE2ETest is Test {
     uint256 internal constant AMOUNT = 1_000e18;
     uint256 internal constant YIELD = 123e18;
 
-    event YieldUnwindFailed(uint256 indexed workflowId, address indexed token, uint256 principal);
+
 
     function setUp() public {
         token = new ERC20Mock('Token', 'TKN', address(this), 0);
@@ -153,82 +152,61 @@ contract YieldUnwindFailedE2ETest is Test {
         assertEq(token.balanceOf(address(vault)), 0, 'escrow emptied by yield deposit');
     }
 
-    /// @dev Shared runner for the both-paths-fail branch (cancel or release). Proves the
-    ///      claimable-only architecture: the entitlement is created while the vault is
-    ///      UNFUNDED, a premature withdrawal reverts AND preserves the claim, then assets
-    ///      are recovered into the vault and the beneficiary pulls exactly the entitlement.
-    function _runBothFail_unfundedClaim_thenRecover(bool release) internal {
+    /// @dev If both unwind paths fail, settlement must preserve the position identity and
+    ///      create no claim. Once the module can recover the full position, retry the action.
+    function _runBothFail_preservesPosition_thenRetry(bool release) internal {
         uint256 wf = _openEscrow();
         module.setEmergencyReverts(true);
-
         address beneficiary = release ? SELLER : BUYER;
+        uint256 beneficiaryBalanceBefore = token.balanceOf(beneficiary);
 
         if (release) {
-            vm.expectEmit(true, true, true, true, address(vault));
-            emit YieldUnwindFailed(wf, address(token), AMOUNT);
             vm.prank(BUYER);
+            vm.expectRevert(abi.encodeWithSelector(
+                YieldUnwindUnavailable.selector, wf, address(token), address(module), AMOUNT
+            ));
             vault.release(wf);
         } else {
             vm.prank(BUYER);
             vault.senderCancel(wf);
-            vm.expectEmit(true, true, true, true, address(vault));
-            emit YieldUnwindFailed(wf, address(token), AMOUNT);
+            vm.prank(SELLER);
+            vm.expectRevert(abi.encodeWithSelector(
+                YieldUnwindUnavailable.selector, wf, address(token), address(module), AMOUNT
+            ));
+            vault.recipientCancel(wf);
+        }
+
+        assertEq(vault.v25YieldModules(wf), address(module), 'module linkage preserved');
+        assertEq(vault.v25YieldPrincipals(wf), AMOUNT, 'principal reference preserved');
+        assertEq(vault.claimableBalances(wf, beneficiary), 0, 'no unfunded claim created');
+        assertEq(vault.totalFeesPerToken(address(token)), 0, 'no fee on failed recovery');
+        assertEq(token.balanceOf(address(vault)), 0, 'vault remains unfunded');
+
+        module.setEmergencyReverts(false);
+        module.setRecoverAmount(AMOUNT);
+        if (release) {
+            vm.prank(BUYER);
+            vault.release(wf);
+        } else {
             vm.prank(SELLER);
             vault.recipientCancel(wf);
         }
 
-        // Both unwind paths failed, so the principal is stuck in the module. Linkage is
-        // still cleared so the escrow lifecycle is not permanently frozen.
-        assertEq(vault.v25YieldModules(wf), address(0), 'module linkage cleared');
-        assertEq(vault.v25YieldPrincipals(wf), 0, 'principal reference cleared');
-
-        // Beneficiary entitlement equals the remaining escrow balance (full principal).
-        // _creditClaimable skips its balance check because amount == principalExpected, so
-        // the claim is created even though the vault holds no tokens here.
-        uint256 claimable = vault.claimableBalances(wf, beneficiary);
-        assertEq(claimable, AMOUNT, 'claimable = remaining escrow balance');
-        assertEq(vault.totalFeesPerToken(address(token)), 0, 'both-fail branch incurs no fee');
-
-        // Vault is genuinely UNFUNDED — principal still sits in the module.
-        assertEq(token.balanceOf(address(vault)), 0, 'vault unfunded after both-fail settlement');
-
-        // Premature withdrawal while unfunded must revert AND preserve the claim (the
-        // revert rolls back the claimable=0 reset inside withdrawEscrow).
-        uint256 balBefore = token.balanceOf(beneficiary);
+        assertEq(vault.v25YieldModules(wf), address(0), 'linkage cleared only after recovery');
+        assertEq(vault.v25YieldPrincipals(wf), 0, 'position cleared only after recovery');
+        assertEq(vault.claimableBalances(wf, beneficiary), AMOUNT, 'claim equals recovered principal');
+        assertEq(token.balanceOf(address(vault)), AMOUNT, 'recovered principal is in vault');
         vm.prank(beneficiary);
-        vm.expectRevert(); // ERC20InsufficientBalance from the vault's safeTransfer
-        vault.withdrawEscrow(wf);
-        assertEq(vault.claimableBalances(wf, beneficiary), claimable, 'claim preserved on failed withdraw');
-        assertEq(token.balanceOf(beneficiary), balBefore, 'no tokens moved on failed withdraw');
-
-        // Admin recovers the stuck module funds back into the vault. Sweep the module's
-        // own balance rather than minting, so total principal across the system stays 1x.
-        vm.prank(address(module));
-        token.transfer(address(vault), AMOUNT);
-
-        // Now the beneficiary pulls exactly the entitlement.
-        vm.prank(beneficiary);
-        uint256 got = vault.withdrawEscrow(wf);
-        assertEq(got, claimable, 'withdrawn equals claimable');
-        assertEq(token.balanceOf(beneficiary), balBefore + got, 'beneficiary net position');
-        assertEq(vault.claimableBalances(wf, beneficiary), 0, 'no claimable remains after withdrawal');
-
-        // No second payout possible.
-        vm.prank(beneficiary);
-        vm.expectRevert();
-        vault.withdrawEscrow(wf);
+        assertEq(vault.withdrawEscrow(wf), AMOUNT);
+        assertEq(token.balanceOf(beneficiary), beneficiaryBalanceBefore + AMOUNT);
     }
 
-    /// @notice Both unwind paths fail during CANCEL. Settlement completes as claimable-only
-    ///         while unfunded; the sender pulls the full principal after recovery.
-    function test_bothPathsFail_emitsYieldUnwindFailed_andBeneficiaryClaimsRemaining() public {
-        _runBothFail_unfundedClaim_thenRecover(false);
+    function test_bothPathsFail_preservesPosition_andCanRetryCancelAfterRecovery() public {
+        _runBothFail_preservesPosition_thenRetry(false);
     }
 
-    /// @notice Both unwind paths fail during RELEASE. Same claimable-only chronology for
-    ///         the recipient.
-    function test_bothPathsFail_release_recipientClaimsAndWithdraws() public {
-        _runBothFail_unfundedClaim_thenRecover(true);
+    function test_bothPathsFail_preservesPosition_andCanRetryReleaseAfterRecovery() public {
+        _runBothFail_preservesPosition_thenRetry(true);
     }
 
     /// @notice emergencyUnwind returns less than the deposited principal. Core reverts

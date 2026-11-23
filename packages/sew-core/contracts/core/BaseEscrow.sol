@@ -54,10 +54,11 @@ import '../interfaces/IEscrowAppeal.sol';
 import '../interfaces/IEscrowSettlement.sol';
 import '../interfaces/IEscrowViews.sol';
 import '../shared/interfaces/IResolutionModule.sol';
+import '../shared/interfaces/IResolverAssignmentCallback.sol';
 import '../interfaces/IYieldModule.sol';
 import '../libraries/EscrowEncodingLibrary.sol';
 import '../arbitration/IKlerosArbitrableProxy.sol';
-import '../modules/decentralized-resolution-module/interfaces/IKlerosHandoffResolutionModule.sol';
+import '../shared/interfaces/IResolutionModuleTimeout.sol';
 import '../libraries/StateManagementLibrary.sol';
 import '../libraries/DisputeInitializationLibrary.sol';
 import '../libraries/DisputeRaiseLibrary.sol';
@@ -97,7 +98,6 @@ enum FailureReason {
 bytes4 constant SEL_FINALIZE_DISPUTE = IResolutionModule.finalizeDispute.selector;
 bytes4 constant SEL_RECORD_RESOLUTION = IResolutionModule.recordResolution.selector;
 bytes4 constant SEL_CLOSE_BY_MUTUAL_AGREEMENT = bytes4(keccak256("closeByMutualAgreement(uint256)"));
-bytes4 constant SEL_DECREMENT_RESOLVER = bytes4(keccak256("decrementResolverActiveDisputes(address)"));
 
 error InvalidWorkflowId(uint256 workflowId, uint256 maxWorkflowId);
 error TransferNotPending(uint256 workflowId, EscrowState currentStatus);
@@ -136,6 +136,9 @@ error ZeroAddress(uint8 which);
 error AccountingDeficit(address token, uint256 deficit);
 error ResolutionConfigUnavailable(address resolutionModule, uint256 version);
 error ResolutionConfigWithCustomResolver(address customResolver);
+error UnauthorizedResolverModule(address caller, address expectedModule);
+error InvalidAssignedResolver(uint256 workflowId, address resolver);
+error KlerosArbitrationPending(uint256 workflowId, uint256 disputeId);
 
 /// @notice Resolution mode for dispute handling
 enum ResolutionMode {
@@ -145,7 +148,7 @@ enum ResolutionMode {
 }
 
 
-abstract contract BaseEscrow is EscrowLifecycle {
+abstract contract BaseEscrow is EscrowLifecycle, IResolverAssignmentCallback {
     using SafeERC20 for IERC20;
 
     // Kept here as a source/API compatibility type; it has no storage impact.
@@ -202,6 +205,7 @@ abstract contract BaseEscrow is EscrowLifecycle {
         address indexed by,
         address indexed disputeResolver
     );
+    event DisputeResolverSynchronized(uint256 indexed workflowId, address indexed resolver);
 
     /// @notice Emitted when a time-based action is triggered (auto-release/cancel/settle)
     /// @param workflowId The escrow ID
@@ -312,6 +316,11 @@ abstract contract BaseEscrow is EscrowLifecycle {
             timeoutPolicy.pendingAutoCancelEnabled,
             disputeRaisedTimestamp[workflowId]
         );
+        if (
+            et.escrowState == EscrowState.DISPUTED &&
+            (actionType == ACTION_AUTO_CANCEL_DISPUTED || actionType == ACTION_DISPUTE_TIMEOUT) &&
+            _hasCommittedKlerosHandoff(workflowId)
+        ) return false;
         if (actionType == ACTION_NONE) return false;
 
         if (actionType == ACTION_EXECUTE_PENDING) {
@@ -331,7 +340,9 @@ abstract contract BaseEscrow is EscrowLifecycle {
             emit TimedActionTriggered(workflowId, ACTION_AUTO_CANCEL, source, caller);
             return true;
         } else if (actionType == ACTION_AUTO_CANCEL_DISPUTED) {
-            _finalizeDisputeInModule(workflowId);
+            _closeDisputeForTimeout(
+                workflowId, caller, disputeRaisedTimestamp[workflowId], snap.maxDisputeDuration
+            );
             _cancelAndRefund(workflowId);
             delete disputeRaisedTimestamp[workflowId];
             emit DisputeAutoCancelled(workflowId, escrowTransfers[workflowId].from,
@@ -342,7 +353,9 @@ abstract contract BaseEscrow is EscrowLifecycle {
         } else if (actionType == ACTION_DISPUTE_TIMEOUT) {
             address from = et.from;
             uint256 amt = et.amountAfterFee;
-            _finalizeDisputeInModule(workflowId);
+            _closeDisputeForTimeout(
+                workflowId, caller, disputeRaisedTimestamp[workflowId], snap.maxDisputeDuration
+            );
             _cancelAndRefund(workflowId);
             delete disputeRaisedTimestamp[workflowId];
             emit DisputeAutoCancelled(workflowId, from, amt, uint8(FailureReason.TIMEOUT));
@@ -453,13 +466,12 @@ abstract contract BaseEscrow is EscrowLifecycle {
             revert InvalidState(workflowId, uint8(EscrowState.DISPUTED), uint8(et.escrowState)); // Has pending settlement
         }
 
-        uint256 ts = disputeRaisedTimestamp[workflowId];
-        if (ts == 0 || block.timestamp < ts + snap.maxDisputeDuration) {
-            revert InvalidState(workflowId, uint8(EscrowState.DISPUTED), uint8(et.escrowState)); // Dispute timeout not exceeded
-        }
+        _prepareDisputeTimeout(workflowId, source, snap);
         address from = et.from;
         uint256 amt = et.amountAfterFee;
-        _finalizeDisputeInModule(workflowId);
+        _closeDisputeForTimeout(
+            workflowId, caller, disputeRaisedTimestamp[workflowId], snap.maxDisputeDuration
+        );
         _cancelAndRefund(workflowId);
         delete disputeRaisedTimestamp[workflowId];
         emit DisputeAutoCancelled(workflowId, from, amt, uint8(FailureReason.TIMEOUT));
@@ -514,21 +526,35 @@ abstract contract BaseEscrow is EscrowLifecycle {
         disputeRaisedTimestamp[workflowId] = block.timestamp;
 
         emit EscrowStateChanged(workflowId, EscrowState.PENDING, EscrowState.DISPUTED);
-        emit DisputeOpened(workflowId, _msgSender(), result.updatedResolver);
-
         if (result.updatedResolver != et.disputeResolver) {
             et.disputeResolver = result.updatedResolver;
         }
 
+        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(
+            et.token, et.from, et.to, et.amountAfterFee, escrowSettings[workflowId].releaseAddress
+        );
         uint256 configVersion = DisputeInitializationLibrary.initializeInModule(
             snap.resolutionModule,
             workflowId,
             et.disputeResolver,
             workflowResolutionConfigVersion[workflowId],
-            EscrowEncodingLibrary.encodeEscrowTransferData(et.token, et.from, et.to, et.amountAfterFee, escrowSettings[workflowId].releaseAddress)
+            escrowData
         );
         if (configVersion != 0 && configVersion != workflowResolutionConfigVersion[workflowId]) revert();
+        // A selected versioned policy may choose a resolver different from the
+        // global/default resolver observed before initialization. Read back the
+        // assignment so escrow settlement and the module share one authority.
+        if (snap.resolutionModule != address(0) && escrowSettings[workflowId].customResolver == address(0)) {
+            address assignedResolver = DisputeInitializationLibrary.synchronizeAssignedResolver(
+                snap.resolutionModule, workflowId, escrowData, configVersion, et.disputeResolver
+            );
+            if (assignedResolver != et.disputeResolver) {
+                et.disputeResolver = assignedResolver;
+                emit DisputeResolverSynchronized(workflowId, assignedResolver);
+            }
+        }
         DisputeInitializationLibrary.callResolverCallback(et.disputeResolver, workflowId);
+        emit DisputeOpened(workflowId, _msgSender(), et.disputeResolver);
 
         if (result.callIncentiveHook) {
             if (DisputeRaiseLibrary.callIncentiveModuleHook(
@@ -542,6 +568,19 @@ abstract contract BaseEscrow is EscrowLifecycle {
                 emit OperationFailure(3, workflowId, result.incentiveModule, IIncentiveModule.onDisputeOpened.selector, uint8(FailureReason.CALL_FAILED));
             }
         }
+    }
+
+    /// @notice Synchronize the escrow's settlement authority after an authenticated
+    ///         resolution-module assignment transition (such as timeout replacement).
+    function updateDisputeResolverFromResolutionModule(uint256 workflowId, address resolver) external override {
+        _validateWorkflowId(workflowId);
+        DisputeInitializationLibrary.updateDisputeResolverFromModule(
+            escrowTransfers,
+            escrowSettings,
+            workflowId,
+            resolver,
+            address(_getResolutionModule(workflowId))
+        );
     }
 
     /**
@@ -778,44 +817,58 @@ abstract contract BaseEscrow is EscrowLifecycle {
     // Terminal-state finalization used by the orchestration paths above.
     // =====================================================================
 
-    // DUAL-FINALITY NOTE (must decide before a closure root is introduced):
-    // the module has its own finality predicate (`DisputeStatus.Final`, set by
-    // finalizeDispute when the appeal window expires or MAX_ROUND is reached), but
-    // this call is best-effort and its failure is swallowed. The effective
-    // settlement finality today is the escrow-local `PendingSettlement.appealDeadline`
-    // checked in EscrowSettlement.executePendingSettlement. A PRF closure model needs
-    // a single, enforced finality predicate rather than two loosely coupled clocks.
+    // Module finalization is part of the terminal transition: a failure must roll
+    // back settlement so module state and escrow state cannot diverge.
     function _finalizeDisputeInModule(uint256 workflowId) internal override {
         IResolutionModule resolutionModule = _getResolutionModule(workflowId);
         if (address(resolutionModule) == address(0)) return;
-        (bool success, ) = address(resolutionModule).call(abi.encodeWithSelector(SEL_FINALIZE_DISPUTE, workflowId, address(this)));
+        (bool success, bytes memory returnData) = address(resolutionModule).call(
+            abi.encodeWithSelector(SEL_FINALIZE_DISPUTE, workflowId, address(this))
+        );
         if (!success) {
-            emit OperationFailure(1, workflowId, address(resolutionModule), SEL_FINALIZE_DISPUTE, 0);
+            assembly ("memory-safe") { revert(add(returnData, 32), mload(returnData)) }
         }
+    }
 
-        // Decrement the resolver's concurrent-dispute counter so capacity is freed.
-        // Separate call so modules that don't implement this function don't block finalization.
-        address resolver = escrowTransfers[workflowId].disputeResolver;
-        if (resolver != address(0)) {
-            (bool dSuccess, ) = address(resolutionModule).call(
-                abi.encodeWithSelector(SEL_DECREMENT_RESOLVER, resolver)
-            );
-            if (!dSuccess) {
-                emit OperationFailure(2, workflowId, address(resolutionModule), SEL_DECREMENT_RESOLVER, 0);
+    function _closeDisputeForTimeout(
+        uint256 workflowId,
+        address executor,
+        uint256 disputeRaisedAt,
+        uint256 maxDisputeDuration
+    ) internal {
+        IResolutionModule resolutionModule = _getResolutionModule(workflowId);
+        if (address(resolutionModule) == address(0)) return;
+        try resolutionModule.supportsInterface(type(IResolutionModuleTimeout).interfaceId) returns (bool supported) {
+            if (supported) {
+                IResolutionModuleTimeout(address(resolutionModule)).closeDisputeByTimeout(
+                    workflowId, address(this), executor, disputeRaisedAt, maxDisputeDuration
+                );
             }
+        } catch {
+            // A legacy resolution module without ERC-165 support has no
+            // capital-backed workflow lifecycle to close here.
         }
     }
 
     function _closeDisputeByMutualAgreement(uint256 workflowId) internal override {
         IResolutionModule resolutionModule = _getResolutionModule(workflowId);
         if (address(resolutionModule) != address(0)) {
-            (bool success, ) = address(resolutionModule).call(
-                abi.encodeWithSelector(SEL_CLOSE_BY_MUTUAL_AGREEMENT, workflowId)
-            );
-            success; // Ignore failure — module may not support mutual agreement closure
+            try resolutionModule.supportsInterface(type(IResolutionModuleTimeout).interfaceId) returns (bool supported) {
+                if (supported) {
+                    IResolutionModuleTimeout(address(resolutionModule)).closeDisputeByMutualAgreement(
+                        workflowId, address(this)
+                    );
+                } else {
+                    (bool success, ) = address(resolutionModule).call(
+                        abi.encodeWithSelector(SEL_CLOSE_BY_MUTUAL_AGREEMENT, workflowId)
+                    );
+                    success;
+                }
+            } catch {
+                // Older modules may not support ERC-165. They have no stake
+                // lifecycle; the escrow still settles the participants' split.
+            }
         }
-        // Finalize dispute and free resolver capacity (same as all other terminal paths)
-        _finalizeDisputeInModule(workflowId);
     }
 
 
@@ -961,6 +1014,23 @@ abstract contract BaseEscrow is EscrowLifecycle {
             return IResolutionModule(snap);
         }
         return IResolutionModule(disputeResolutionModule);
+    }
+
+    function _hasCommittedKlerosHandoff(uint256) internal view virtual returns (bool) {
+        return false;
+    }
+
+    function _prepareDisputeTimeout(
+        uint256 workflowId,
+        ExecutionSource,
+        ModuleSnapshot storage snap
+    ) internal view virtual {
+        uint256 ts = disputeRaisedTimestamp[workflowId];
+        if (ts == 0 || block.timestamp < ts + snap.maxDisputeDuration) {
+            revert InvalidState(
+                workflowId, uint8(EscrowState.DISPUTED), uint8(escrowTransfers[workflowId].escrowState)
+            );
+        }
     }
 
     // ResolutionOutcome enum removed - using version from EscrowTypes.sol

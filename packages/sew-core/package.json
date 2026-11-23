@@ -5,7 +5,7 @@
   "license": "Apache-2.0",
   "description": "In-tree Sew core source and release boundary",
   "scripts": {
-    "build": "forge build",
+    "build": "forge build --sizes",
     "source:inventory": "node ../../scripts/generate-sew-core-source-boundary.mjs",
     "source:check": "node ../../scripts/generate-sew-core-source-boundary.mjs --check && node ../../scripts/check-sew-core-boundary.mjs",
     "test:profile": "forge test --match-path test/SewCoreVaultProfile.t.sol",

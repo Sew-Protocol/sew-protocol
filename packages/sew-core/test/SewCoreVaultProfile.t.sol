@@ -8,6 +8,15 @@ import '../contracts/core/EscrowCreationPolicy.sol';
 import '../contracts/core/ModuleSnapshotRegistry.sol';
 import '../contracts/modules/DefaultResolutionModule.sol';
 import '../contracts/modules/DefaultReleaseStrategy.sol';
+import '../contracts/libraries/DisputeInitializationLibrary.sol';
+
+contract RejectingDisputeInitializationModule is DefaultResolutionModule {
+    constructor(address owner, address resolver) DefaultResolutionModule(owner, resolver) {}
+
+    function initializeDispute(uint256, address, address, bytes32) external pure override {
+        revert('initialization rejected');
+    }
+}
 import '../contracts/interfaces/IEscrowAppeal.sol';
 import '../contracts/types/EscrowTypes.sol';
 import '../contracts/types/YieldPresets.sol';
@@ -340,6 +349,20 @@ contract SewCoreVaultProfileTest is Test {
         vault.withdrawFees(address(token));
         assertEq(token.balanceOf(FEE), fee);
         assertEq(token.balanceOf(address(vault)), 0);
+    }
+
+    function test_dispute_opening_reverts_when_registered_module_rejects_both_initializers() public {
+        RejectingDisputeInitializationModule rejecting = new RejectingDisputeInitializationModule(address(this), RESOLVER);
+        registry.queueModule(address(vault), BaseEscrow.ModuleType.RESOLUTION, address(rejecting));
+        vm.warp(block.timestamp + 8 days);
+        registry.activateModule(address(vault), BaseEscrow.ModuleType.RESOLUTION);
+
+        uint256 id = _create();
+        vm.prank(BUYER);
+        vm.expectRevert(
+            abi.encodeWithSelector(DisputeInitializationLibrary.DisputeModuleInitializationFailed.selector, address(rejecting), id)
+        );
+        vault.raiseDispute(id);
     }
 
     function test_zero_fee_path_and_failed_transfer_recovery() public {

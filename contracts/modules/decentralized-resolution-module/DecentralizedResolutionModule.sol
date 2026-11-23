@@ -3,7 +3,9 @@ pragma solidity ^0.8.37;
 
 import '../../../packages/sew-core/contracts/shared/interfaces/IResolutionModule.sol';
 import '@openzeppelin/contracts/access/AccessControl.sol';
+import '@openzeppelin/contracts/access/IAccessControl.sol';
 import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
+import '@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol';
 import '../../../packages/sew-core/contracts/governance/SlowLaneQueueActivate.sol';
 import '../../../packages/sew-core/contracts/shared/interfaces/IIncentiveModule.sol';
 import './DRMStorageBase.sol';
@@ -12,6 +14,8 @@ import './interfaces/ISlashingModule.sol';
 import './analytics/ResolutionAnalytics.sol';
 import './libraries/EscalationCostLibrary.sol';
 import '../../../packages/sew-core/contracts/modules/decentralized-resolution-module/interfaces/IKlerosHandoffResolutionModule.sol';
+import '../../../packages/sew-core/contracts/shared/interfaces/IResolverAssignmentCallback.sol';
+import '../../../packages/sew-core/contracts/shared/interfaces/IResolutionModuleTimeout.sol';
 
 /**
  * @title DecentralizedResolutionModule
@@ -28,8 +32,12 @@ contract DecentralizedResolutionModule is
     ReentrancyGuard,
     IResolutionModule,
     IKlerosHandoffResolutionModule,
+    IResolutionModuleTimeout,
     DRMStorageBase
 {
+    // DR v3 permits up to 4x a resolver's effective USD bond per case.
+    // Lock one quarter of case exposure, rounded up, as assignment collateral.
+    uint256 private constant ASSIGNMENT_STAKE_DIVISOR = 4;
     // ============ Errors ============
     error NotRegisteredEscrowContract(address caller);
     error AlreadyInitialized(uint256 workflowId);
@@ -64,6 +72,11 @@ contract DecentralizedResolutionModule is
     error AlreadyPaused();
     error NotPaused();
     error InvalidResolutionConfigVersion(uint256 version);
+    error UnsupportedStakeExposureToken(address escrowToken, address requiredToken);
+    error UnsupportedStakeExposureDecimals(address token, uint8 decimals);
+    error KlerosHandoffInProgress(uint256 workflowId, uint256 disputeId);
+    error KlerosTimeoutNotReached(uint256 workflowId, uint256 availableAt, uint256 currentTime);
+    error KlerosTimeoutNotAuthorized(address executor);
 
     // ============ Events ============
     event DecisionSubmitted(uint256 indexed workflowId, uint8 round, address indexed resolver, ResolutionOutcome decision);
@@ -298,6 +311,7 @@ contract DecentralizedResolutionModule is
         bytes calldata
     ) external view override returns (bool authorized, uint8 role) {
         DisputeMetadata memory dm = disputeMetadata[escrowContract][workflowId];
+        if (dm.status != DisputeStatus.Open) return (false, 0);
         address currentResolver = dm.resolverAtRound[dm.currentRound];
         if (disputeResolver == currentResolver) return (true, dm.currentRound);
         ResolverRole rRole = resolverRoles[disputeResolver];
@@ -410,6 +424,7 @@ contract DecentralizedResolutionModule is
         }
         delete _preparedKlerosHandoffs[escrowContract][workflowId];
         klerosDisputeIdForWorkflow[escrowContract][workflowId] = klerosDisputeId + 1;
+        klerosHandoffCommittedAt[escrowContract][workflowId] = uint64(block.timestamp);
         _klerosConfigRootForWorkflow[escrowContract][workflowId] = klerosConfigRoot;
         return _executeEscalation(workflowId, escrowContract, escrowData, resolutionQuoteRoot);
     }
@@ -449,13 +464,40 @@ contract DecentralizedResolutionModule is
         DisputeMetadata storage dm = disputeMetadata[escrowContract][workflowId];
         uint8 toRound = quote.successorRound;
         address nextRes = quote.successorResolver;
+        bool externalArbitrationRound = toRound == MAX_ROUND;
+        if (nextRes == address(0)) revert ResolverInactive(nextRes);
+        ResolverCapacity storage nextCapacity = resolverCapacity[nextRes];
+        if (!externalArbitrationRound) {
+            if (!resolverActive[nextRes]) revert ResolverInactive(nextRes);
+            if (!nextCapacity.acceptsNewDisputes) revert ResolverNotAcceptingDisputes(nextRes);
+            if (nextCapacity.maxConcurrentDisputes > 0 &&
+                nextCapacity.currentDisputes >= nextCapacity.maxConcurrentDisputes) {
+                revert ResolverCapacityExceeded(
+                    nextRes, nextCapacity.currentDisputes, nextCapacity.maxConcurrentDisputes
+                );
+            }
+        }
         if (toRound == 1) _advanceRoundRobinCounterForWorkflow(escrowContract, workflowId, dm.categoryKey, true);
+
+        address priorResolver = dm.resolverAtRound[dm.currentRound];
+        if (!externalArbitrationRound && address(stakingModule) != address(0)) {
+            IStakingModule(stakingModule).onDisputeEscalated(workflowId, escrowContract, priorResolver);
+            IStakingModule(stakingModule).onResolverAssigned(
+                workflowId, escrowContract, nextRes, _requiredStakeForWorkflow(escrowContract, workflowId)
+            );
+        }
+        if (!externalArbitrationRound) {
+            _decrementActiveAssignment(priorResolver);
+            nextCapacity.currentDisputes++;
+            resolverActiveDisputes[nextRes]++;
+            workflowStakeResolver[escrowContract][workflowId] = nextRes;
+        }
 
         dm.currentRound = toRound;
         dm.resolverAtRound[toRound] = nextRes;
         dm.assignedAt = block.timestamp;
         dm.resolveBy = block.timestamp + _resolutionConfig(escrowContract, workflowId).resolveDeadlines[toRound];
-        resolverStats[nextRes].casesAssigned++;
+        if (!externalArbitrationRound) resolverStats[nextRes].casesAssigned++;
 
         emit ResolverAssigned(workflowId, nextRes, dm.categoryKey, toRound);
 
@@ -532,7 +574,9 @@ contract DecentralizedResolutionModule is
     function supportsInterface(
         bytes4 interfaceId
     ) public view virtual override(AccessControl, IERC165) returns (bool) {
-        return interfaceId == type(IResolutionModule).interfaceId || super.supportsInterface(interfaceId);
+        return interfaceId == type(IResolutionModule).interfaceId
+            || interfaceId == type(IResolutionModuleTimeout).interfaceId
+            || super.supportsInterface(interfaceId);
     }
 
     // ============ Escrow Contract Hooks ============
@@ -562,6 +606,11 @@ contract DecentralizedResolutionModule is
             if (capacity.currentDisputes >= capacity.maxConcurrentDisputes) {
                 revert ResolverCapacityExceeded(resolver, capacity.currentDisputes, capacity.maxConcurrentDisputes);
             }
+        }
+
+        workflowStakeResolver[escrowContract][workflowId] = resolver;
+        if (address(stakingModule) != address(0)) {
+            IStakingModule(stakingModule).onResolverAssigned(workflowId, escrowContract, resolver, 0);
         }
 
         capacity.currentDisputes++;
@@ -615,7 +664,7 @@ contract DecentralizedResolutionModule is
         address escrowContract,
         bytes calldata escrowData
     ) internal {
-        (, , , uint256 amountAfterFee, ) = abi.decode(
+        (address escrowToken, , , uint256 amountAfterFee, ) = abi.decode(
             escrowData, (address, address, address, uint256, address)
         );
 
@@ -637,11 +686,17 @@ contract DecentralizedResolutionModule is
         }
 
         if (stakingModule != address(0)) {
+            uint256 exposureUSD = _normalizeStakeExposure(escrowToken, amountAfterFee);
             uint256 maxEscrow = IStakingModule(stakingModule).getMaxEscrowPerCase(resolver);
-            if (amountAfterFee > maxEscrow) {
-                revert InsufficientResolverStake(resolver, amountAfterFee, maxEscrow);
+            if (exposureUSD > maxEscrow) {
+                revert InsufficientResolverStake(resolver, exposureUSD, maxEscrow);
             }
+            workflowStakeExposureUSD[escrowContract][workflowId] = exposureUSD;
+            IStakingModule(stakingModule).onResolverAssigned(
+                workflowId, escrowContract, resolver, _requiredStakeForExposure(exposureUSD)
+            );
         }
+        workflowStakeResolver[escrowContract][workflowId] = resolver;
 
         capacity.currentDisputes++;
         resolverActiveDisputes[resolver]++;
@@ -729,6 +784,7 @@ contract DecentralizedResolutionModule is
             }
             try ISlashingModule(slashingModule).restoreReversalSlashOnVindication(
                 workflowId,
+                escrowContract,
                 outcome == ResolutionOutcome.RELEASE,
                 priorDecisions
             ) {} catch {
@@ -808,6 +864,17 @@ contract DecentralizedResolutionModule is
 
         if (!canFinalize) revert CannotFinalizeYet(workflowId, 'Appeal window not expired or not final round');
 
+        address assignedStakeResolver = workflowStakeResolver[escrowContract][workflowId];
+        if (assignedStakeResolver == address(0)) assignedStakeResolver = dm.resolverAtRound[dm.currentRound];
+        if (address(stakingModule) != address(0)) {
+            IStakingModule(stakingModule).onResolutionFinalized(
+                workflowId, escrowContract, assignedStakeResolver, true
+            );
+        }
+
+        _decrementActiveAssignment(assignedStakeResolver);
+        delete workflowStakeResolver[escrowContract][workflowId];
+        _clearKlerosHandoff(escrowContract, workflowId);
         dm.status = DisputeStatus.Final;
         ResolutionOutcome finalDecision = dm.decisionAtRound[dm.currentRound];
         uint8 finalRound = dm.currentRound;
@@ -829,10 +896,34 @@ contract DecentralizedResolutionModule is
      * @param workflowId The escrow workflow ID
      */
     function closeByMutualAgreement(uint256 workflowId) external onlyEscrowContract {
-        DisputeMetadata storage dm = disputeMetadata[msg.sender][workflowId];
+        _closeDisputeByMutualAgreement(workflowId, msg.sender);
+    }
+
+    function closeDisputeByMutualAgreement(uint256 workflowId, address escrowContract)
+        external
+        override
+        onlyEscrowContract
+    {
+        if (escrowContract != msg.sender) revert NotRegisteredEscrowContract(msg.sender);
+        _closeDisputeByMutualAgreement(workflowId, escrowContract);
+    }
+
+    function _closeDisputeByMutualAgreement(uint256 workflowId, address escrowContract) internal {
+        DisputeMetadata storage dm = disputeMetadata[escrowContract][workflowId];
 
         // No-op if never disputed or already finalized
         if (dm.status == DisputeStatus.Final) return;
+
+        address activeResolver = workflowStakeResolver[escrowContract][workflowId];
+        if (activeResolver == address(0)) activeResolver = dm.resolverAtRound[dm.currentRound];
+        if (address(stakingModule) != address(0) && activeResolver != address(0)) {
+            IStakingModule(stakingModule).onResolutionFinalized(
+                workflowId, escrowContract, activeResolver, false
+            );
+        }
+        _decrementActiveAssignment(activeResolver);
+        delete workflowStakeResolver[escrowContract][workflowId];
+        _clearKlerosHandoff(escrowContract, workflowId);
 
         dm.status = DisputeStatus.Final;
         uint8 finalRound = dm.currentRound;
@@ -844,7 +935,76 @@ contract DecentralizedResolutionModule is
             }
         }
 
-        emit DisputeClosedByMutualAgreement(workflowId, msg.sender);
+        emit DisputeClosedByMutualAgreement(workflowId, escrowContract);
+    }
+
+    function closeDisputeByTimeout(
+        uint256 workflowId,
+        address escrowContract,
+        address executor,
+        uint256 disputeRaisedAt,
+        uint256 maxDisputeDuration
+    )
+        external
+        override
+        onlyEscrowContract
+    {
+        if (escrowContract != msg.sender) revert NotRegisteredEscrowContract(msg.sender);
+        DisputeMetadata storage dm = disputeMetadata[escrowContract][workflowId];
+        if (dm.status == DisputeStatus.Final) return;
+        // A committed Kleros handoff may follow a resolver decision, leaving DRM status
+        // Decided while external arbitration is active. Only the escrow's governed timeout
+        // recovery can close that state; ordinary timeout closure requires an open dispute.
+        bool committedKleros = klerosDisputeIdForWorkflow[escrowContract][workflowId] != 0;
+        if (committedKleros) {
+            if (!IAccessControl(escrowContract).hasRole(keccak256('ROLE_TIMELOCK'), executor)) {
+                revert KlerosTimeoutNotAuthorized(executor);
+            }
+            uint256 handoffAt = klerosHandoffCommittedAt[escrowContract][workflowId];
+            uint256 availableAt = handoffAt + maxDisputeDuration;
+            // BaseEscrow admits only ROLE_TIMELOCK for a committed handoff. The escrow
+            // is the only caller here, and this branch is reached only through that path.
+            if (maxDisputeDuration == 0 || block.timestamp < availableAt) {
+                revert KlerosTimeoutNotReached(workflowId, availableAt, block.timestamp);
+            }
+            if (dm.status != DisputeStatus.Open && dm.status != DisputeStatus.Decided) {
+                revert DisputeNotOpen(workflowId);
+            }
+        } else if (dm.status != DisputeStatus.Open) {
+            revert DisputeNotOpen(workflowId);
+        } else if (block.timestamp < disputeRaisedAt + maxDisputeDuration) {
+            revert DisputeNotTimedOut(workflowId, disputeRaisedAt + maxDisputeDuration);
+        }
+
+        address activeResolver = workflowStakeResolver[escrowContract][workflowId];
+        if (activeResolver == address(0)) activeResolver = dm.resolverAtRound[dm.currentRound];
+        if (address(stakingModule) != address(0) && activeResolver != address(0)) {
+            IStakingModule(stakingModule).onResolutionFinalized(
+                workflowId, escrowContract, activeResolver, false
+            );
+        }
+        _decrementActiveAssignment(activeResolver);
+        delete workflowStakeResolver[escrowContract][workflowId];
+        _clearKlerosHandoff(escrowContract, workflowId);
+        dm.status = DisputeStatus.Final;
+
+        if (escrowContract.code.length != 0) {
+            IResolverAssignmentCallback(escrowContract).updateDisputeResolverFromResolutionModule(
+                workflowId, address(0)
+            );
+        }
+    }
+
+    function _decrementActiveAssignment(address resolver) internal {
+        if (resolver == address(0)) return;
+        if (resolverActiveDisputes[resolver] > 0) resolverActiveDisputes[resolver]--;
+        if (resolverCapacity[resolver].currentDisputes > 0) resolverCapacity[resolver].currentDisputes--;
+    }
+
+    function _clearKlerosHandoff(address escrowContract, uint256 workflowId) internal {
+        delete klerosDisputeIdForWorkflow[escrowContract][workflowId];
+        delete klerosHandoffCommittedAt[escrowContract][workflowId];
+        delete _klerosConfigRootForWorkflow[escrowContract][workflowId];
     }
 
     function forceProgress(uint256 workflowId, address escrowContract) external nonReentrant {
@@ -854,6 +1014,10 @@ contract DecentralizedResolutionModule is
         DisputeMetadata storage dm = disputeMetadata[escrowContract][workflowId];
 
         if (block.timestamp < dm.resolveBy) revert DisputeNotTimedOut(workflowId, dm.resolveBy);
+        uint256 committedDisputeIdPlusOne = klerosDisputeIdForWorkflow[escrowContract][workflowId];
+        if (committedDisputeIdPlusOne != 0) {
+            revert KlerosHandoffInProgress(workflowId, committedDisputeIdPlusOne - 1);
+        }
         if (dm.status != DisputeStatus.Open) revert DisputeNotOpen(workflowId);
 
         uint8 currentRound = dm.currentRound;
@@ -889,25 +1053,26 @@ contract DecentralizedResolutionModule is
             // Decrement old resolver's capacity (they timed out and are being replaced)
             if (resolverActiveDisputes[timedOutResolver] > 0) resolverActiveDisputes[timedOutResolver]--;
             if (resolverCapacity[timedOutResolver].currentDisputes > 0) resolverCapacity[timedOutResolver].currentDisputes--;
-            if (resolverStats[timedOutResolver].casesAssigned > 0) resolverStats[timedOutResolver].casesAssigned--;
 
             // Increment new resolver's capacity
             resolverCapacity[newResolver].currentDisputes++;
             resolverActiveDisputes[newResolver]++;
             resolverStats[newResolver].casesAssigned++;
 
-            // Unlock old resolver's stake via staking module
+            // Transfer the active exposure lock and escrow settlement authority
+            // atomically with the module's timeout replacement.
             if (address(stakingModule) != address(0)) {
-                try IStakingModule(stakingModule).onDisputeEscalated(workflowId, escrowContract, timedOutResolver) {} catch {
-                    emit IncentiveModuleCallFailed(workflowId, 'onDisputeEscalated', 'FAILED');
-                }
+                IStakingModule(stakingModule).onDisputeEscalated(workflowId, escrowContract, timedOutResolver);
+                IStakingModule(stakingModule).onResolverAssigned(
+                    workflowId, escrowContract, newResolver, _requiredStakeForWorkflow(escrowContract, workflowId)
+                );
             }
+            workflowStakeResolver[escrowContract][workflowId] = newResolver;
 
-            // Lock new resolver's stake via staking module
-            if (address(stakingModule) != address(0)) {
-                try IStakingModule(stakingModule).onResolverAssigned(workflowId, escrowContract, newResolver, 0) {} catch {
-                    emit IncentiveModuleCallFailed(workflowId, 'onResolverAssigned', 'FAILED');
-                }
+            if (escrowContract.code.length != 0) {
+                IResolverAssignmentCallback(escrowContract).updateDisputeResolverFromResolutionModule(
+                    workflowId, newResolver
+                );
             }
 
             dm.resolverAtRound[currentRound] = newResolver;
@@ -921,8 +1086,44 @@ contract DecentralizedResolutionModule is
                 }
             }
         } else {
+            address assignedStakeResolver = workflowStakeResolver[escrowContract][workflowId];
+            if (assignedStakeResolver == address(0)) assignedStakeResolver = timedOutResolver;
+            _decrementActiveAssignment(assignedStakeResolver);
+            if (address(stakingModule) != address(0) && assignedStakeResolver != address(0)) {
+                IStakingModule(stakingModule).onResolutionFinalized(
+                    workflowId, escrowContract, assignedStakeResolver, false
+                );
+            }
+            delete workflowStakeResolver[escrowContract][workflowId];
+            if (escrowContract.code.length != 0) {
+                IResolverAssignmentCallback(escrowContract).updateDisputeResolverFromResolutionModule(
+                    workflowId, address(0)
+                );
+            }
             dm.status = DisputeStatus.Final;
         }
+    }
+
+    function _requiredStakeForWorkflow(address escrowContract, uint256 workflowId)
+        internal
+        view
+        returns (uint256)
+    {
+        return _requiredStakeForExposure(workflowStakeExposureUSD[escrowContract][workflowId]);
+    }
+
+    function _requiredStakeForExposure(uint256 exposureUSD) internal pure returns (uint256) {
+        if (exposureUSD == 0) return 0; // staking module applies the resolver-tier minimum
+        return exposureUSD / ASSIGNMENT_STAKE_DIVISOR
+            + (exposureUSD % ASSIGNMENT_STAKE_DIVISOR == 0 ? 0 : 1);
+    }
+
+    function _normalizeStakeExposure(address escrowToken, uint256 amount) internal view returns (uint256) {
+        address requiredToken = IStakingModule(stakingModule).getStakeToken();
+        if (escrowToken != requiredToken) revert UnsupportedStakeExposureToken(escrowToken, requiredToken);
+        uint8 tokenDecimals = IERC20Metadata(escrowToken).decimals();
+        if (tokenDecimals > 18) revert UnsupportedStakeExposureDecimals(escrowToken, tokenDecimals);
+        return amount * (10 ** (18 - tokenDecimals));
     }
 
     function selectResolverWithQuality(

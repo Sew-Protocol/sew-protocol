@@ -83,7 +83,6 @@ interface IStakingModule {
 
     event EmergencyPaused(address indexed by, string reason);
     event EmergencyUnpaused(address indexed by);
-    event EmergencyWithdrawal(address indexed resolver, uint256 amount, address indexed to);
 
     // ============ Core Staking Functions ============
 
@@ -108,12 +107,6 @@ interface IStakingModule {
      * @notice Complete unstake after time-lock period has passed
      */
     function completeUnstake() external;
-
-    /**
-     * @notice Emergency withdraw (only when paused, may incur penalty)
-     * @param to Address to send stake to
-     */
-    function emergencyWithdraw(address to) external;
 
     // ============ Delegation Functions ============
 
@@ -193,15 +186,8 @@ interface IStakingModule {
      */
     function unlockStake(uint256 workflowId, address escrowContract, address resolver) external;
 
-    /**
-     * @notice Credit resolver's stake on vindication (protocol-backed liability, no token transfer)
-     * @dev Called by slashing module when a reversal slash is restored on vindication.
-     *      Increases the resolver's bond amounts proportionally to restore economic capacity.
-     *      No actual tokens are transferred — this represents a protocol liability.
-     * @param resolver Resolver to credit
-     * @param amount Amount to credit (in USD, 18 decimals)
-     */
-    function creditStakeForVindication(address resolver, uint256 amount) external;
+    /// @notice Record a USD-denominated vindication receivable without increasing bonded stake.
+    function recordVindicationReceivable(address resolver, uint256 amountUSD) external;
 
     // ============ Query Functions ============
 

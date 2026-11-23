@@ -151,6 +151,7 @@ library EscrowCreationLogic {
     /// @notice Persist the module and timeout configuration observed at creation.
     function snapshotModulesForEscrow(
         mapping(uint256 => ModuleSnapshot) storage snapshots,
+        mapping(uint256 => bool) storage moduleSnapshotInitialized,
         mapping(uint256 => uint256) storage resolutionConfigVersions,
         mapping(uint256 => EscrowStorage.EscrowTimeoutPolicySnapshot) storage timeoutPolicies,
         mapping(uint256 => address) storage appealFeeRecipients,
@@ -180,6 +181,7 @@ library EscrowCreationLogic {
             maxDisputeDuration: timeoutConfig.maxDisputeDuration,
             appealWindowDuration: timeoutConfig.appealWindowDuration
         });
+        moduleSnapshotInitialized[workflowId] = true;
         if (resolutionConfigVersion != 0) {
             resolutionConfigVersions[workflowId] = resolutionConfigVersion;
             (bool ok, bytes memory data) = resolutionModule.staticcall(

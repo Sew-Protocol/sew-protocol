@@ -31,7 +31,8 @@ abstract contract EscrowConfiguration is AccessControl, EscrowStorage {
     event SystemResumed(uint256 timestamp);
 
     /// @notice Stop creation of new escrows during an incident.
-    /// @dev Existing escrow settlement, disputes, claims and withdrawals remain available.
+    /// @dev Existing escrow dispute, appeal, settlement, claim and withdrawal
+    ///      actions remain available. Appeal deadlines continue during a pause.
     ///      The guardian can only pause; governance timelock controls recovery.
     function pause(string calldata reason) external {
         if (!hasRole(ROLE_GUARDIAN, _msgSender()) && !hasRole(ROLE_TIMELOCK, _msgSender())) {

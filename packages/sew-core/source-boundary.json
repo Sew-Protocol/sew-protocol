@@ -3,9 +3,9 @@
   "generatedFrom": "packages/sew-core/deployables.allowlist.json",
   "method": "Recursive resolution of relative Solidity imports from local allowlist roots; direct importers outside that closure are listed. OpenZeppelin dependencies are excluded.",
   "summary": {
-    "localSoliditySources": 51,
-    "withOutsideDirectConsumers": 39,
-    "withoutOutsideDirectConsumers": 12,
+    "localSoliditySources": 53,
+    "withOutsideDirectConsumers": 43,
+    "withoutOutsideDirectConsumers": 10,
     "distinctOutsideContractConsumers": 25,
     "distinctOutsideTestConsumers": 128,
     "packageOwnedTestConsumers": 1
@@ -262,8 +262,10 @@
     {
       "path": "packages/sew-core/contracts/core/EscrowYield.sol",
       "canonicalOwner": "@sew/sew-core",
-      "consumerScope": "package-internal-source-only",
-      "directOutsideConsumers": []
+      "consumerScope": "used-outside-deployable-source-closure",
+      "directOutsideConsumers": [
+        "test/foundry/modules/YieldUnwindFailedE2E.t.sol"
+      ]
     },
     {
       "path": "packages/sew-core/contracts/core/ModuleSnapshotRegistry.sol",
@@ -385,7 +387,8 @@
       "consumerScope": "used-outside-deployable-source-closure",
       "directOutsideConsumers": [
         "contracts/modules/DefaultCancellationStrategy.sol",
-        "contracts/registry/ModuleRegistry.sol"
+        "contracts/registry/ModuleRegistry.sol",
+        "test/foundry/core/ModuleSnapshotRaceCondition.t.sol"
       ]
     },
     {
@@ -468,6 +471,7 @@
         "test/foundry/core/EscrowAccountingBugTests.t.sol",
         "test/foundry/core/EscrowCreationPolicy.t.sol",
         "test/foundry/core/ModuleManagementContract.t.sol",
+        "test/foundry/core/MutualSplit.t.sol",
         "test/foundry/core/ReleaseEscrowEdgeCases.t.sol",
         "test/foundry/core/YieldDosBug.t.sol",
         "test/foundry/modules/AaveYieldModule.t.sol",
@@ -511,8 +515,11 @@
     {
       "path": "packages/sew-core/contracts/libraries/DisputeInitializationLibrary.sol",
       "canonicalOwner": "@sew/sew-core",
-      "consumerScope": "package-internal-source-only",
-      "directOutsideConsumers": []
+      "consumerScope": "used-outside-deployable-source-closure",
+      "directOutsideConsumers": [
+        "contracts/core/EscrowAppealEnabled.sol",
+        "packages/sew-core/test/SewCoreVaultProfile.t.sol"
+      ]
     },
     {
       "path": "packages/sew-core/contracts/libraries/DisputeRaiseLibrary.sol",
@@ -797,6 +804,7 @@
         "contracts/modules/decentralized-resolution-module/DRMStorageBase.sol",
         "contracts/modules/decentralized-resolution-module/analytics/ResolutionAnalytics.sol",
         "contracts/modules/decentralized-resolution-module/libraries/EscalationCostLibrary.sol",
+        "test/foundry/core/AppealWindowEnforcement.t.sol",
         "test/foundry/core/BondCollector.t.sol",
         "test/foundry/core/ReentrancyProtection.t.sol",
         "test/foundry/core/RepeatAttackerIntegration.t.sol",
@@ -864,6 +872,23 @@
         "test/foundry/ops/OpsCoverage.t.sol",
         "test/foundry/registry/ModuleRegistry.t.sol",
         "test/foundry/registry/ModuleRegistryGaps.t.sol"
+      ]
+    },
+    {
+      "path": "packages/sew-core/contracts/shared/interfaces/IResolutionModuleTimeout.sol",
+      "canonicalOwner": "@sew/sew-core",
+      "consumerScope": "used-outside-deployable-source-closure",
+      "directOutsideConsumers": [
+        "contracts/core/EscrowAppealEnabled.sol",
+        "contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol"
+      ]
+    },
+    {
+      "path": "packages/sew-core/contracts/shared/interfaces/IResolverAssignmentCallback.sol",
+      "canonicalOwner": "@sew/sew-core",
+      "consumerScope": "used-outside-deployable-source-closure",
+      "directOutsideConsumers": [
+        "contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol"
       ]
     },
     {

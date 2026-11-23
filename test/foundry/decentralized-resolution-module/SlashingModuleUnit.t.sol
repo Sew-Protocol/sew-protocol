@@ -422,6 +422,36 @@ contract SlashingModuleUnitTest is Test {
         assertGt(ev.amount, 0, 'Should slash non-zero amount');
     }
 
+    function test_reversalVindicationIsScopedByEscrowAndWorkflow() public {
+        address escrowA = makeAddr('escrow-a');
+        address escrowB = makeAddr('escrow-b');
+        uint256 workflowId = 1;
+        uint8 priorRound = 0;
+
+        vm.prank(timelock);
+        slashingModule.setSlashPercentage(ISlashingModule.SlashReason.REVERSAL, 500);
+        vm.prank(resolutionModule);
+        uint256 slashA = slashingModule.slashForReversal(workflowId, escrowA, resolver1, priorRound);
+        vm.prank(resolutionModule);
+        uint256 slashB = slashingModule.slashForReversal(workflowId, escrowB, resolver2, priorRound);
+
+        assertEq(slashingModule.reversalSlashByRound(escrowA, workflowId, priorRound), slashA);
+        assertEq(slashingModule.reversalSlashByRound(escrowB, workflowId, priorRound), slashB);
+
+        uint8[] memory decisions = new uint8[](2);
+        decisions[0] = 1; // RELEASE at prior round
+        decisions[1] = 2; // reversed to CANCEL
+        vm.prank(resolutionModule);
+        slashingModule.restoreReversalSlashOnVindication(workflowId, escrowA, true, decisions);
+
+        ISlashingModule.SlashEvent memory eventA = slashingModule.getSlashEvent(slashA);
+        ISlashingModule.SlashEvent memory eventB = slashingModule.getSlashEvent(slashB);
+        assertEq(uint8(eventA.status), uint8(ISlashingModule.SlashStatus.REVERSED_WITH_CREDIT));
+        assertEq(uint8(eventB.status), uint8(ISlashingModule.SlashStatus.EXECUTED));
+        assertGt(stakingModule.vindicationReceivableUSD(resolver1), 0);
+        assertEq(stakingModule.vindicationReceivableUSD(resolver2), 0);
+    }
+
     // ============ Slash Configuration Tests ============
 
     function test_setSlashPercentage_Fraud() public {
@@ -531,6 +561,7 @@ contract SlashingModuleUnitTest is Test {
         uint8 timeoutType = 0; // TIMEOUT_ACCEPT — immediate execution
 
         uint256 retainedBefore = slashingModule.retainedSlashReserves();
+        uint256 protocolBefore = slashingModule.protocolSlashReserves();
         uint256 insuranceBefore = stableToken.balanceOf(address(insurancePool));
 
         vm.prank(resolutionModule);
@@ -543,6 +574,22 @@ contract SlashingModuleUnitTest is Test {
 
         uint256 retainedAfter = slashingModule.retainedSlashReserves();
         assertEq(retainedAfter, retainedBefore + expectedRetained, 'retained reserves should track residual 20%');
+
+        uint256 expectedProtocol = (insuranceDelta * 3) / 5; // 30% protocol share / 50% insurance share
+        uint256 protocolAfter = slashingModule.protocolSlashReserves();
+        assertEq(protocolAfter, protocolBefore + expectedProtocol, 'protocol share is a recorded liability');
+        assertGe(
+            stableToken.balanceOf(address(slashingModule)),
+            slashingModule.retainedSlashReserves() + protocolAfter,
+            'module custody covers all recorded slash liabilities'
+        );
+
+        address treasury = makeAddr('slash-protocol-treasury');
+        uint256 treasuryBefore = stableToken.balanceOf(treasury);
+        vm.prank(timelock);
+        slashingModule.withdrawProtocolSlashReserve(treasury, expectedProtocol);
+        assertEq(stableToken.balanceOf(treasury), treasuryBefore + expectedProtocol);
+        assertEq(slashingModule.protocolSlashReserves(), protocolBefore);
     }
 
     function test_slashForTimeout_MixedBond_BurnsSewAndTransfersStable() public {
@@ -660,6 +707,82 @@ contract SlashingModuleUnitTest is Test {
         assertEq(stableToken.balanceOf(address(slashingModule)), moduleBalBefore + 50e6, 'Module should hold bond');
         assertEq(stableToken.balanceOf(resolver1), resolverBalBefore - 50e6, 'Resolver paid bond');
         assertEq(slashingModule.appealBondsHeld(slashId), 50e6, 'Bond mapping records amount');
+    }
+
+    function test_unresolvedSlashAppealBlocksExecutionAfterContestDeadline() public {
+        vm.prank(timelock);
+        uint256 slashId = slashingModule.slashForFraud(1, address(this), resolver1, 'evidence');
+        vm.prank(resolver1);
+        slashingModule.appealSlash(slashId, 'appeal pending', 'counter-evidence');
+
+        ISlashingModule.SlashEvent memory event_ = slashingModule.getSlashEvent(slashId);
+        vm.warp(event_.appealDeadline + 1);
+        vm.prank(timelock);
+        vm.expectRevert(abi.encodeWithSelector(ResolverSlashingModule.SlashAppealUnresolved.selector, slashId));
+        slashingModule.executeSlash(slashId);
+
+        vm.prank(timelock);
+        slashingModule.resolveAppeal(slashId, true);
+        assertEq(uint8(slashingModule.getSlashEvent(slashId).status), uint8(ISlashingModule.SlashStatus.REVERSED));
+    }
+
+    function test_undecidedAppealExpiresInResolverFavorAndRefundsBond() public {
+        uint256 bond = 50e6;
+        vm.prank(timelock);
+        slashingModule.setAppealBond(bond);
+        stableToken.mint(resolver1, bond);
+        vm.prank(resolver1);
+        stableToken.approve(address(slashingModule), bond);
+
+        vm.prank(timelock);
+        uint256 slashId = slashingModule.slashForFraud(2, address(this), resolver1, 'evidence');
+        vm.prank(resolver1);
+        slashingModule.appealSlash(slashId, 'appeal pending', 'counter-evidence');
+        ISlashingModule.SlashAppeal memory appeal = slashingModule.getSlashAppeal(slashId);
+
+        vm.warp(appeal.resolutionDeadline);
+        vm.prank(timelock);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ResolverSlashingModule.AppealResolutionWindowOpen.selector,
+                slashId,
+                appeal.resolutionDeadline,
+                block.timestamp
+            )
+        );
+        slashingModule.expireSlashAppeal(slashId);
+
+        vm.warp(appeal.resolutionDeadline + 1);
+        vm.prank(timelock);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ResolverSlashingModule.AppealResolutionWindowExpired.selector,
+                slashId,
+                appeal.resolutionDeadline,
+                block.timestamp
+            )
+        );
+        slashingModule.resolveAppeal(slashId, false);
+
+        uint256 balanceBefore = stableToken.balanceOf(resolver1);
+        slashingModule.expireSlashAppeal(slashId);
+
+        assertEq(uint8(slashingModule.getSlashEvent(slashId).status), uint8(ISlashingModule.SlashStatus.REVERSED));
+        assertTrue(slashingModule.getSlashAppeal(slashId).resolved);
+        assertTrue(slashingModule.getSlashAppeal(slashId).upheld);
+        assertEq(stableToken.balanceOf(resolver1), balanceBefore + bond);
+        assertEq(slashingModule.appealBondsHeld(slashId), 0);
+        assertEq(slashingModule.pendingSlashCount(resolver1), 0);
+
+        vm.prank(timelock);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ResolverSlashingModule.SlashNotPending.selector,
+                slashId,
+                ISlashingModule.SlashStatus.REVERSED
+            )
+        );
+        slashingModule.executeSlash(slashId);
     }
 
     function test_appealSlash_RevertsOnDuplicateAppeal_AndDoesNotOverwriteBondOrMetadata() public {

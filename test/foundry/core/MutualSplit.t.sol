@@ -12,6 +12,49 @@ import "../../../packages/sew-core/contracts/core/EscrowCreationPolicy.sol";
 import "../../../packages/sew-core/contracts/core/BondCollector.sol";
 import "../../../packages/sew-core/contracts/core/ModuleSnapshotRegistry.sol";
 import "../../../packages/sew-core/contracts/libraries/SettingsValidationLibrary.sol";
+import "../../../packages/sew-core/contracts/interfaces/IYieldModule.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+contract PartialPrincipalRecoveryModule is IYieldModule {
+    mapping(address => mapping(uint256 => uint256)) private _principal;
+
+    function initializeYield(uint256 id, address token, uint256 amount, YieldPreset)
+        external returns (uint256 accepted)
+    {
+        require(IERC20(token).transferFrom(msg.sender, address(this), amount));
+        _principal[msg.sender][id] = amount;
+        return amount;
+    }
+
+    function unwindToEscrow(uint256 id, address token, uint256 expected)
+        external returns (uint256 principalOut, uint256 yieldOut)
+    {
+        require(_principal[msg.sender][id] == expected);
+        delete _principal[msg.sender][id];
+        principalOut = expected * 80 / 100;
+        require(IERC20(token).transfer(msg.sender, principalOut));
+    }
+
+    function emergencyUnwind(uint256, address, uint256) external pure returns (uint256) {
+        revert('recovery unavailable');
+    }
+
+    function previewPosition(uint256 id, address escrow)
+        external view returns (uint256 principal, uint256 currentValue, bool isActive)
+    {
+        principal = _principal[escrow][id];
+        currentValue = principal;
+        isActive = principal != 0;
+    }
+
+    function canHandle(address, YieldPreset, uint256) external pure returns (bool, bytes32) {
+        return (true, bytes32(0));
+    }
+
+    function getModuleInfo() external pure returns (string memory, string memory, bytes32) {
+        return ('PartialPrincipalRecoveryModule', '1.0.0', keccak256('partial-principal-test'));
+    }
+}
 
 /**
  * @title MutualSplitTest
@@ -280,6 +323,41 @@ contract MutualSplitTest is Test {
         assertEq(token.balanceOf(seller), sellerBalBefore);
         assertEq(vault.claimableBalances(wid, buyer), 600e18);
         assertEq(vault.claimableBalances(wid, seller), 400e18);
+    }
+
+    function test_acceptSplit_allocates_only_recovered_principal_after_yield_loss() public {
+        PartialPrincipalRecoveryModule partialModule = new PartialPrincipalRecoveryModule();
+        moduleManagement.registerEscrowContract(address(vault));
+        moduleManagement.queueModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN, address(partialModule));
+        vm.warp(block.timestamp + 8 days);
+        moduleManagement.activateModule(address(vault), BaseEscrow.ModuleType.YIELD_GEN);
+
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
+        settings.yieldPreset = YieldPreset.ENABLED;
+        token.mint(buyer, AMOUNT);
+        vm.startPrank(buyer);
+        token.approve(address(vault), AMOUNT);
+        uint256 wid = vault.createEscrow(address(token), seller, AMOUNT, settings);
+        vm.stopPrank();
+
+        vm.prank(buyer);
+        vault.proposeSplit(wid, 600e18, 400e18, 0);
+        vm.prank(seller);
+        vault.acceptSplit(wid);
+
+        uint256 recovered = AMOUNT * 80 / 100;
+        uint256 buyerRecovery = recovered * 60 / 100;
+        uint256 sellerRecovery = recovered - buyerRecovery;
+        assertEq(vault.claimableBalances(wid, buyer), buyerRecovery);
+        assertEq(vault.claimableBalances(wid, seller), sellerRecovery);
+        assertEq(vault.totalClaimableAssets(address(token)), recovered);
+        assertEq(token.balanceOf(address(vault)), recovered);
+
+        vm.prank(buyer);
+        vault.withdrawEscrow(wid);
+        vm.prank(seller);
+        vault.withdrawEscrow(wid);
+        assertEq(token.balanceOf(buyer) + token.balanceOf(seller), recovered);
     }
 
     function test_acceptSplit_HappyPath_DisputedState() public {

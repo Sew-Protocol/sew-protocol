@@ -15,6 +15,7 @@ contract CREATE2EscrowFactoryTest is Test {
 
     uint256 internal constant FEE_BPS = 100;
     address internal constant FEE_ADDR = address(0xFEE);
+    address internal constant ADMIN = address(0xA11CE);
 
     function setUp() public {
         factory = new CREATE2EscrowFactory();
@@ -24,53 +25,57 @@ contract CREATE2EscrowFactoryTest is Test {
     function test_predictedAddress_matchesDeployedAddress() public {
         bytes32 salt = keccak256('sew.create2.test.1');
         address predicted = factory.getDeploymentAddress(
-            FEE_BPS, FEE_ADDR,  address(registry), salt
+            FEE_BPS, FEE_ADDR, address(registry), ADMIN, salt
         );
         assertEq(predicted.code.length, 0, 'already deployed before deploy');
 
         EscrowVault deployed = factory.deployEscrow(
-            FEE_BPS, FEE_ADDR,  address(registry), salt
+            FEE_BPS, FEE_ADDR, address(registry), ADMIN, salt
         );
         assertEq(address(deployed), predicted, 'deployed != predicted');
         assertGt(address(deployed).code.length, 0, 'no code');
+        assertTrue(deployed.hasRole(deployed.DEFAULT_ADMIN_ROLE(), ADMIN));
+        assertTrue(deployed.hasRole(deployed.ROLE_TIMELOCK(), ADMIN));
+        assertFalse(deployed.hasRole(deployed.DEFAULT_ADMIN_ROLE(), address(factory)));
+        assertFalse(deployed.hasRole(deployed.ROLE_TIMELOCK(), address(factory)));
     }
 
     function test_isDeployed_agreesWithPrediction() public {
         bytes32 salt = keccak256('sew.create2.test.2');
         assertFalse(
-            factory.isDeployed(FEE_BPS, FEE_ADDR,  address(registry), salt),
+            factory.isDeployed(FEE_BPS, FEE_ADDR, address(registry), ADMIN, salt),
             'isDeployed before deploy'
         );
 
         address predicted = factory.getDeploymentAddress(
-            FEE_BPS, FEE_ADDR,  address(registry), salt
+            FEE_BPS, FEE_ADDR, address(registry), ADMIN, salt
         );
-        factory.deployEscrow(FEE_BPS, FEE_ADDR,  address(registry), salt);
+        factory.deployEscrow(FEE_BPS, FEE_ADDR, address(registry), ADMIN, salt);
 
         assertTrue(
-            factory.isDeployed(FEE_BPS, FEE_ADDR,  address(registry), salt),
+            factory.isDeployed(FEE_BPS, FEE_ADDR, address(registry), ADMIN, salt),
             'isDeployed after deploy'
         );
         assertEq(predicted, _deployedAddr(salt), 'prediction mismatch after deploy');
     }
 
     function _deployedAddr(bytes32 salt) internal view returns (address) {
-        return factory.getDeploymentAddress(FEE_BPS, FEE_ADDR,  address(registry), salt);
+        return factory.getDeploymentAddress(FEE_BPS, FEE_ADDR, address(registry), ADMIN, salt);
     }
 
     function test_sameSaltSameArgs_isDeterministic() public view {
         bytes32 salt = keccak256('sew.create2.determinism');
-        address a = factory.getDeploymentAddress(FEE_BPS, FEE_ADDR,  address(registry), salt);
-        address b = factory.getDeploymentAddress(FEE_BPS, FEE_ADDR,  address(registry), salt);
+        address a = factory.getDeploymentAddress(FEE_BPS, FEE_ADDR, address(registry), ADMIN, salt);
+        address b = factory.getDeploymentAddress(FEE_BPS, FEE_ADDR, address(registry), ADMIN, salt);
         assertEq(a, b, 'not deterministic');
     }
 
     function test_differentSalt_changesAddress() public view {
         address a = factory.getDeploymentAddress(
-            FEE_BPS, FEE_ADDR,  address(registry), keccak256('salt.a')
+            FEE_BPS, FEE_ADDR, address(registry), ADMIN, keccak256('salt.a')
         );
         address b = factory.getDeploymentAddress(
-            FEE_BPS, FEE_ADDR,  address(registry), keccak256('salt.b')
+            FEE_BPS, FEE_ADDR, address(registry), ADMIN, keccak256('salt.b')
         );
         assertNotEq(a, b, 'salt did not affect address');
     }
@@ -78,10 +83,10 @@ contract CREATE2EscrowFactoryTest is Test {
     function test_differentArgs_changesAddress() public view {
         bytes32 salt = keccak256('sew.create2.args');
         address a = factory.getDeploymentAddress(
-            FEE_BPS, FEE_ADDR,  address(registry), salt
+            FEE_BPS, FEE_ADDR, address(registry), ADMIN, salt
         );
         address b = factory.getDeploymentAddress(
-            FEE_BPS + 1, FEE_ADDR,  address(registry), salt
+            FEE_BPS + 1, FEE_ADDR, address(registry), ADMIN, salt
         );
         assertNotEq(a, b, 'args did not affect address');
     }
@@ -89,10 +94,10 @@ contract CREATE2EscrowFactoryTest is Test {
     function test_redeploySameSalt_revertsAlreadyDeployed() public {
         bytes32 salt = keccak256('sew.create2.redeploy');
         address predicted = factory.getDeploymentAddress(
-            FEE_BPS, FEE_ADDR,  address(registry), salt
+            FEE_BPS, FEE_ADDR, address(registry), ADMIN, salt
         );
-        factory.deployEscrow(FEE_BPS, FEE_ADDR,  address(registry), salt);
+        factory.deployEscrow(FEE_BPS, FEE_ADDR, address(registry), ADMIN, salt);
         vm.expectRevert(abi.encodeWithSelector(CREATE2EscrowFactory.AlreadyDeployed.selector, salt, predicted));
-        factory.deployEscrow(FEE_BPS, FEE_ADDR,  address(registry), salt);
+        factory.deployEscrow(FEE_BPS, FEE_ADDR, address(registry), ADMIN, salt);
     }
 }

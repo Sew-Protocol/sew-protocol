@@ -88,7 +88,7 @@ abstract contract EscrowCreation is ReentrancyGuard, EscrowConfiguration {
 
     function _snapshotModulesForEscrow(uint256 workflowId, uint256 resolutionConfigVersion) internal {
         EscrowCreationLogic.snapshotModulesForEscrow(
-            moduleSnapshots, workflowResolutionConfigVersion, timeoutPolicySnapshots,
+            moduleSnapshots, moduleSnapshotInitialized, workflowResolutionConfigVersion, timeoutPolicySnapshots,
             appealBondFeeRecipients, workflowId, address(_getResolutionModule(workflowId)),
             address(_getReleaseStrategy(workflowId)), _getCancellationStrategy(workflowId),
             address(_getYieldGenerationModule(workflowId)), resolutionConfigVersion,

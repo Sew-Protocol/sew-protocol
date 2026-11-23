@@ -128,24 +128,22 @@ abstract contract EscrowOptionalSplits is BaseEscrow {
         // The protocol yield fee (snapshotted at escrow creation) is charged first on gross
         // yield and credited to totalFeesPerToken; the remaining yield is split pro-rata so
         // conservation holds exactly: principalOut + yieldOut == principal + beneficiary + fee.
-        (, uint256 yieldOut) = _handleYieldModuleUnwind(workflowId, token, principal);
+        (uint256 principalOut, uint256 yieldOut) = _handleYieldModuleUnwind(workflowId, token, principal);
         uint256 feeAmount = _computeYieldProtocolFee(workflowId, token, yieldOut);
         uint256 yieldAfterFee = yieldOut - feeAmount;
 
         _updateEscrowBalance(token, principal, false);
 
-        if (yieldAfterFee == 0) {
-            if (buyerAmount > 0) _creditClaimable(workflowId, buyer, token, buyerAmount, buyerAmount);
-            if (sellerAmount > 0) _creditClaimable(workflowId, seller, token, sellerAmount, sellerAmount);
-        } else {
-            // Proportional yield split: buyer share = yieldAfterFee * buyerAmount / principal
-            uint256 yieldToBuyer = principal > 0 ? (yieldAfterFee * buyerAmount) / principal : 0;
-            uint256 yieldToSeller = yieldAfterFee - yieldToBuyer;
-            uint256 totalBuyer = buyerAmount + yieldToBuyer;
-            uint256 totalSeller = sellerAmount + yieldToSeller;
-            if (totalBuyer > 0) _creditClaimable(workflowId, buyer, token, totalBuyer, buyerAmount);
-            if (totalSeller > 0) _creditClaimable(workflowId, seller, token, totalSeller, sellerAmount);
-        }
+        // Apply the agreed ratio to what was actually recovered. A module may
+        // report principal loss; never create claims against nominal principal.
+        uint256 principalToBuyer = principal > 0 ? (principalOut * buyerAmount) / principal : 0;
+        uint256 principalToSeller = principalOut - principalToBuyer;
+        uint256 yieldToBuyer = principal > 0 ? (yieldAfterFee * buyerAmount) / principal : 0;
+        uint256 yieldToSeller = yieldAfterFee - yieldToBuyer;
+        uint256 totalBuyer = principalToBuyer + yieldToBuyer;
+        uint256 totalSeller = principalToSeller + yieldToSeller;
+        if (totalBuyer > 0) _creditClaimable(workflowId, buyer, token, totalBuyer, principalToBuyer);
+        if (totalSeller > 0) _creditClaimable(workflowId, seller, token, totalSeller, principalToSeller);
 
         emit SplitAccepted(workflowId, _msgSender(), buyerAmount, sellerAmount);
     }

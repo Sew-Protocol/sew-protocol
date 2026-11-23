@@ -9,14 +9,9 @@ import '../types/YieldPresets.sol';
 // creation and unwinding it on release/cancel. It declares no storage of its
 // own; EscrowStorage remains the sole state owner.
 error PartialRecoveryNotAllowed();
+error YieldUnwindUnavailable(uint256 workflowId, address token, address module, uint256 principal);
 
 abstract contract EscrowYield is EscrowCreation {
-    event YieldUnwindFailed(
-        uint256 indexed workflowId,
-        address indexed token,
-        uint256 principal
-    );
-
     /**
      * @notice Handle v2.5 yield module unwind on release/cancel
      * @dev If no module or no initialized yield, returns original amount
@@ -55,16 +50,10 @@ abstract contract EscrowYield is EscrowCreation {
                 // privileged incident actors; choosing the recovery path may waive yield fees.
                 return (recovered, 0);
             } catch {
-                // Both unwind paths failed — tokens are stuck in yield module.
-                // Complete the release lifecycle using the remaining escrow balance so
-                // the escrow is not permanently frozen; admin must recover tokens from
-                // the yield module.  Using yieldPrincipal here would inflate claimable
-                // when partial release occurred (yieldPrincipal > remaining amount).
-                // Settlement remains claimable-only; admin must recover assets separately.
-                emit YieldUnwindFailed(workflowId, token, yieldPrincipal);
-                delete v25YieldModules[workflowId];
-                delete v25YieldPrincipals[workflowId];
-                return (amount, 0);
+                // Preserve the escrow's recovery identity and unwind the entire
+                // settlement transaction. No ordinary claim may be created until
+                // the yield position has actually returned assets to this vault.
+                revert YieldUnwindUnavailable(workflowId, token, module, yieldPrincipal);
             }
         }
     }

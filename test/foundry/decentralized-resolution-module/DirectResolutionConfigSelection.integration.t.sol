@@ -193,6 +193,8 @@ contract DirectResolutionConfigSelectionIntegrationTest is Test, KlerosHandoffFi
         DecentralizedResolverStructs.DisputeMetadata memory metadata = drm.getDisputeMetadata(workflowId, address(vault));
         assertEq(drm.workflowResolutionConfigVersion(address(vault), workflowId), policyB);
         assertEq(metadata.resolverAtRound[0], RESOLVER);
+        (,,, address escrowResolver,,,,,,) = vault.escrowTransfers(workflowId);
+        assertEq(escrowResolver, metadata.resolverAtRound[0], 'escrow and selected policy resolver must match');
         assertEq(metadata.resolveBy, block.timestamp + 3 hours);
 
         vm.prank(RESOLVER);

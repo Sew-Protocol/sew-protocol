@@ -4,6 +4,24 @@ pragma solidity ^0.8.37;
 import '@openzeppelin/contracts/utils/Create2.sol';
 import './EscrowVault.sol';
 
+/// @dev Performs the role handoff in the same CREATE2 transaction. The deployer
+/// factory is removed before this constructor returns.
+contract FactoryEscrowVault is EscrowVault {
+    error InvalidInitialAdmin(address initialAdmin);
+
+    constructor(uint256 feeBps, address feeRecipient, address registry, address initialAdmin)
+        EscrowVault(feeBps, feeRecipient, registry)
+    {
+        if (initialAdmin == address(0) || initialAdmin == msg.sender || initialAdmin == address(this)) {
+            revert InvalidInitialAdmin(initialAdmin);
+        }
+        _grantRole(DEFAULT_ADMIN_ROLE, initialAdmin);
+        _grantRole(ROLE_TIMELOCK, initialAdmin);
+        _revokeRole(ROLE_TIMELOCK, msg.sender);
+        _revokeRole(DEFAULT_ADMIN_ROLE, msg.sender);
+    }
+}
+
 /**
  * @title CREATE2EscrowFactory
  * @notice Factory for deploying EscrowVault with deterministic addresses
@@ -14,7 +32,8 @@ contract CREATE2EscrowFactory {
         address indexed escrowVault,
         bytes32 salt,
         uint256 escrowFeeBps,
-        address feeAddress
+        address feeAddress,
+        address initialAdmin
     );
 
     error DeploymentFailed(bytes32 salt);
@@ -25,14 +44,16 @@ contract CREATE2EscrowFactory {
         uint256 escrowFeeBps,
         address feeAddress,
         address moduleManagementAddress,
+        address initialAdmin,
         bytes32 salt
     ) external view returns (address predictedAddress) {
         bytes memory bytecode = abi.encodePacked(
-            type(EscrowVault).creationCode,
+            type(FactoryEscrowVault).creationCode,
             abi.encode(
                 escrowFeeBps,
                 feeAddress,
-                moduleManagementAddress
+                moduleManagementAddress,
+                initialAdmin
             )
         );
         predictedAddress = Create2.computeAddress(salt, keccak256(bytecode));
@@ -43,16 +64,18 @@ contract CREATE2EscrowFactory {
         uint256 escrowFeeBps,
         address feeAddress,
         address moduleManagementAddress,
+        address initialAdmin,
         bytes32 salt
     ) external returns (EscrowVault escrowVault) {
         bytes memory constructorArgs = abi.encode(
             escrowFeeBps,
             feeAddress,
-            moduleManagementAddress
+            moduleManagementAddress,
+            initialAdmin
         );
 
         bytes memory bytecode = abi.encodePacked(
-            type(EscrowVault).creationCode,
+            type(FactoryEscrowVault).creationCode,
             constructorArgs
         );
 
@@ -73,7 +96,8 @@ contract CREATE2EscrowFactory {
             address(escrowVault),
             salt,
             escrowFeeBps,
-            feeAddress
+            feeAddress,
+            initialAdmin
         );
     }
 
@@ -82,12 +106,14 @@ contract CREATE2EscrowFactory {
         uint256 escrowFeeBps,
         address feeAddress,
         address moduleManagementAddress,
+        address initialAdmin,
         bytes32 salt
     ) external view returns (bool deployed) {
         address predictedAddress = this.getDeploymentAddress(
             escrowFeeBps,
             feeAddress,
             moduleManagementAddress,
+            initialAdmin,
             salt
         );
         deployed = predictedAddress.code.length > 0;
