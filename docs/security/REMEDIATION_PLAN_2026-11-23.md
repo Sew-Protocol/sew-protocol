@@ -10,11 +10,18 @@ Implementation changes for the listed findings are in progress across the
 custody, factory, snapshot, dispute, resolver, slashing, and CI paths. The latest
 GitHub run for `main` compiled successfully, passed lint and TypeScript checks,
 and ran 1,551 Foundry cases: 1,539 passed, 0 failed, and 12 were skipped. The
-Sew Core source boundary and 13-test profile also passed. The run then failed in
-`deployables:validate`: its argument parser did not discard the `--` separator
-that pnpm forwards. The parser is fixed locally and the documented invocation
-passes direct validation; the CI rerun is pending. CodeQL, including setup-node
-cleanup, passed on the same revision.
+Sew Core source boundary and 13-test profile also passed. That run then failed in
+`deployables:validate` because its parser did not discard the `--` separator pnpm
+forwards. The parser fix passed local direct validation. A CI rerun on `d8c45e77`
+passed: 1,539 Foundry tests passed, 0 failed, and 12 were skipped; the Sew Core
+profile and artifact validation passed; and CodeQL passed. It exported 13 Sew
+Core artifacts at bundle root
+`cf43ee7f061cd75ea0a215d8804d28120b8d9d17acc5e0805bf22f18f136bf7c`.
+
+The CI contract-size report measured SewCoreVault at 24,357 runtime bytes, 219
+bytes under EIP-170. A final F-17 hardening is being added to make the Sew Core
+artifact test fail if any allow-listed runtime exceeds EIP-170 or initcode exceeds
+EIP-3860. That assertion passes locally and awaits a CI run.
 
 Earlier focused evidence includes 165 passing tests across affected groups,
 including explicit resolver-policy selection and timeout replacement stake
@@ -48,7 +55,7 @@ deployment artifact. No deployment artifact is accepted by this remediation.
 | Invariant directory | Passed; 12 invariants/test cases at 256 runs and 128,000 calls each |
 | Sew Core package build and focused profile tests | Passed; current measured runtime is under EIP-170 by 219 bytes |
 | TypeScript typecheck | Passed in latest CI |
-| Deployables export, validation, determinism, and manifest pin | CI exported 13 Sew Core artifacts for source `9b34d7e4` (bundle root `1605dd5ae2b57c2882fc15c0e55adca031adc2b7f196bd1f9d0d53f3a3afd808`); validation CLI bug fixed locally, CI rerun pending |
+| Deployables export, validation, determinism, and manifest pin | CI on `d8c45e77` exported and validated 13 Sew Core artifacts (bundle root `cf43ee7f061cd75ea0a215d8804d28120b8d9d17acc5e0805bf22f18f136bf7c`); package-specific EIP-170/EIP-3860 enforcement is added locally and awaits CI |
 | Independent review of exact source revision and bundle root | Pending after fixes and clean pinned export |
 | Public deployment authorization | Not implied by source remediation |
 

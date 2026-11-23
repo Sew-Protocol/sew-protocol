@@ -13,6 +13,8 @@ const root = process.cwd();
 const outDir = path.resolve(process.env.SEW_FORGE_OUT_DIR ?? path.join(root, 'out'));
 const allowlist = loadAllowlist(path.join(root, 'packages/sew-core/deployables.allowlist.json'));
 const scratch: string[] = [];
+const EIP170_RUNTIME_LIMIT = 24_576;
+const EIP3860_INITCODE_LIMIT = 49_152;
 
 function tempdir(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sew-core-deployables-'));
@@ -33,11 +35,30 @@ function expectFqnRejection(dir: string): void {
   }
 }
 
+function bytecodeSize(value: unknown, label: string): number {
+  const bytecode = typeof value === 'string'
+    ? value
+    : value && typeof value === 'object' && 'object' in value
+      ? String((value as { object: unknown }).object)
+      : '';
+  const normalized = bytecode.startsWith('0x') ? bytecode.slice(2) : bytecode;
+  if (!normalized || normalized.length % 2 !== 0) throw new Error(`${label} is missing or malformed`);
+  return normalized.length / 2;
+}
+
 function main(): void {
   for (const entry of allowlist.entries) {
-    if (!fs.existsSync(path.join(outDir, `${entry.contractName}.sol`, `${entry.contractName}.json`))) {
+    const artifactPath = path.join(outDir, `${entry.contractName}.sol`, `${entry.contractName}.json`);
+    if (!fs.existsSync(artifactPath)) {
       throw new Error(`Missing Forge artifact for ${entry.contractName} in ${outDir}`);
     }
+    const artifact = JSON.parse(fs.readFileSync(artifactPath, 'utf8')) as Record<string, unknown>;
+    const runtimeSize = bytecodeSize(artifact.deployedBytecode, `${entry.contractName} runtime bytecode`);
+    const initcodeSize = bytecodeSize(artifact.bytecode, `${entry.contractName} initcode`);
+    assert(runtimeSize <= EIP170_RUNTIME_LIMIT,
+      `${entry.contractName} runtime is ${runtimeSize} bytes; EIP-170 limit is ${EIP170_RUNTIME_LIMIT}`);
+    assert(initcodeSize <= EIP3860_INITCODE_LIMIT,
+      `${entry.contractName} initcode is ${initcodeSize} bytes; EIP-3860 limit is ${EIP3860_INITCODE_LIMIT}`);
   }
   const a = tempdir();
   const b = tempdir();
@@ -82,7 +103,7 @@ function main(): void {
   fs.writeFileSync(path.join(a, 'manifest.json'), JSON.stringify(tampered, null, 2) + '\n');
   expectFqnRejection(a);
 
-  console.log(`sew-core artifact validation passed; bundleRoot=${first.manifest.bundleRoot}; dirty=${first.manifest.source.dirty}; source=${first.manifest.source.commit}`);
+  console.log(`sew-core artifact validation passed; runtime/initcode limits enforced for ${allowlist.entries.length} artifacts; bundleRoot=${first.manifest.bundleRoot}; dirty=${first.manifest.source.dirty}; source=${first.manifest.source.commit}`);
 }
 
 try {
