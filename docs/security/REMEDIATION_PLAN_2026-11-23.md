@@ -6,17 +6,33 @@
 
 ## Current evidence
 
-Implementation changes are present for the custody, factory, snapshot, dispute,
-resolver, slashing, and CI findings. Recorded focused suites pass 165 tests
-across the affected groups, including tests that prove an explicit policy can
-select a different resolver from the pre-initialization default and timeout
-replacement transfers the active staking lock. TypeScript typechecking passes.
-The invariant directory passes 12 tests at 256 runs and 128,000 handler calls
-per invariant.
-The full Foundry run and the 62-file core group were stopped after ten minutes
-without compiler output, so repository-wide qualification remains pending. The
-Sew Core profile suite (13 tests) and Kleros/resolver lifecycle suite (20 tests)
-passed after the latest base-contract refactor.
+Implementation changes for the listed findings are in progress across the
+custody, factory, snapshot, dispute, resolver, slashing, and CI paths. The latest
+GitHub run for `main` compiled successfully, passed lint and TypeScript checks,
+and ran 1,550 Foundry tests: 1,532 passed, 6 failed, and 12 were skipped. The
+failures are regressions in test expectations/fixtures for the new receipt,
+pause, absent-snapshot, and resolver-assignment behavior; update those tests and
+rerun before treating the fixes as qualified. CodeQL analysis and SARIF upload
+passed, but the job failed in its setup-node cache teardown because the
+configured pnpm cache path was absent. A local workflow edit removes that
+nonessential cache setting and is pending validation.
+
+Earlier focused evidence includes 165 passing tests across affected groups,
+including explicit resolver-policy selection and timeout replacement stake
+transfer. TypeScript typechecking passed. The invariant directory passed 12
+invariants at 256 runs and 128,000 handler calls per invariant. The full local
+Foundry run and 62-file core group were stopped after ten minutes without
+compiler output; repository-wide qualification remains pending. The Sew Core
+profile suite (13 tests) and Kleros/resolver lifecycle suite (20 tests) passed
+after the base-contract refactor.
+
+For F-05, current implementation work adds an escrow/workflow-keyed Aave
+recovery receipt: a failed settlement remains pending with its yield linkage;
+operator recovery records the funds returned; a settlement retry consumes the
+receipt before creating a claim. This path still needs targeted, multi-escrow
+qualification. Partial operator recovery now reverts atomically before a receipt
+is recorded, preserving the Aave position for a later full-recovery retry. The
+targeted both-failure, receipt-consumption, and partial-recovery tests pass.
 
 The current Sew Core working-copy build uses optimizer runs 1 and has a
 24,357-byte runtime, 219 bytes below EIP-170. This is a narrow margin; measure
@@ -28,13 +44,13 @@ deployment artifact. No deployment artifact is accepted by this remediation.
 
 | Gate | Current state |
 |---|---|
-| Focused regressions for affected findings | Passed for the listed suites; remaining edge cases are identified below |
-| Full Foundry suite | Pending; broad compilation did not return within ten minutes |
+| Focused regressions for affected findings | The four affected core files (32 tests), Aave/unwind files (16 tests), resolver fixture (1 test), and six CI-failing regressions pass locally |
+| Full Foundry suite | Latest CI completed: 1,532 passed, 6 failed, 12 skipped; fixes are not yet covered by a rerun. Latest local full-suite attempt stalled compiling 143 files and was stopped; not qualified |
 | Invariant directory | Passed; 12 invariants/test cases at 256 runs and 128,000 calls each |
 | Sew Core package build and focused profile tests | Passed; current measured runtime is under EIP-170 by 219 bytes |
-| TypeScript typecheck | Passed with the local TypeScript binary |
+| TypeScript typecheck | Passed in latest CI |
 | Deployables export, validation, determinism, and manifest pin | Temporary deterministic export/validation passed; clean source pin and retained release bundle pending |
-| Independent review of exact source revision and bundle root | Pending |
+| Independent review of exact source revision and bundle root | Pending after fixes and clean pinned export |
 | Public deployment authorization | Not implied by source remediation |
 
 ## Release boundary

@@ -265,18 +265,12 @@ The unwind sequence:
 
 **Edge case — dual unwind failure:**
 
-If both `unwindToEscrow` and `emergencyUnwind` fail entirely, the protocol does
-not freeze the escrow. Instead:
-
-- `YieldUnwindFailed` is emitted
-- Settlement proceeds using the original principal
-- The claimable entitlement is created for the beneficiary
-- The escrow reaches true finality (state transitions to terminal)
-- Tokens remain stranded in the yield module; admin recovery is required separately
-
-This means finality is preserved even if yield recovery fails. The beneficiary
-can withdraw their principal. Yield tokens require admin recovery via
-`GuardianOps.emergencyUnwindAavePosition` or equivalent.
+If both `unwindToEscrow` and `emergencyUnwind` fail, settlement reverts atomically.
+The escrow remains in its pre-settlement state, its yield-module linkage remains
+available for recovery, and no beneficiary claim is created. An authorized recovery
+operator can later return the full principal to the escrow, recording a receipt
+keyed by escrow and workflow. Settlement must then be retried; the receipt is
+consumed once before a claim is credited. Partial recovery is rejected atomically.
 
 ### Yield in split settlements
 

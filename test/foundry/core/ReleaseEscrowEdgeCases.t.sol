@@ -343,19 +343,22 @@ contract ReleaseEscrowEdgeCasesTest is Test {
         // Track balance before release
         uint256 totalHeldBefore = vault.totalHeldInEscrowPerToken(address(token));
 
-        // Release escrow - should still work (falls back to principal)
+        // Both unwind paths fail. Settlement must revert and preserve the recovery link.
         vm.prank(sender);
+        vm.expectRevert();
         vault.release(wid);
 
-        // Verify: Balance decremented by principal
-        uint256 totalHeldAfter = vault.totalHeldInEscrowPerToken(address(token));
-        assertEq(totalHeldBefore - totalHeldAfter, principal, "Balance should decrement by principal");
+        assertEq(vault.totalHeldInEscrowPerToken(address(token)), totalHeldBefore, "failed settlement preserves held accounting");
+        assertEq(vault.v25YieldModules(wid), address(mockYieldGen), "failed settlement preserves recovery module");
+        assertEq(vault.v25YieldPrincipals(wid), principal, "failed settlement preserves expected principal");
+        assertEq(vault.claimableBalances(wid, recipient), 0, "failed settlement creates no unfunded claim");
 
-        // When both unwind and emergencyUnwind revert, tokens are stuck in mock module
-        // Escrow doesn't have tokens to transfer - it sets amount as claimable
-        // Verify amount is claimable (not directly transferred)
-        uint256 claimable = vault.claimableBalances(wid, recipient);
-        assertGe(claimable, principal, "Amount should be claimable when escrow lacks tokens");
+        mockYieldGen.setRevert(false);
+        mockYieldGen.setEmergencyUnwindShouldRevert(false);
+        vm.prank(sender);
+        vault.release(wid);
+        assertEq(vault.v25YieldModules(wid), address(0), "linkage clears only after funds return");
+        assertEq(vault.claimableBalances(wid, recipient), principal, "claim matches recovered principal");
     }
 
     // ============ Test 7: Emergency Unwind Partial Recovery Rejection ============

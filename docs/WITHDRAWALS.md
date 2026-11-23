@@ -365,9 +365,10 @@ unavailable), the timelock can recover stranded funds directly from the module:
 Recovery is scoped: only the configured underlying tokens and their aTokens are registered
 in `recoverableAssets`, so the module cannot be drained of assets it never held for an
 escrow. This is a timelock-gated, guardian-protective last resort (not the normal path).
-The settlement flow itself always attempts `unwindToEscrow` → `emergencyUnwind` and only
-fails open with `YieldUnwindFailed` (in `EscrowYield`) if both are unavailable — manual
-recovery is never the default.
+The settlement flow attempts `unwindToEscrow` → `emergencyUnwind`; if both fail, the
+settlement reverts and preserves the workflow's yield linkage. An authorized operator can
+recover the named position into its escrow, recording a workflow-keyed receipt. The
+beneficiary receives no claim until settlement is retried and consumes that receipt.
 
 ---
 

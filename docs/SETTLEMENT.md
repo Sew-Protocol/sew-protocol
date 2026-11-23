@@ -340,10 +340,11 @@ before crediting any entitlement.
    module's `unwindToEscrow(escrowId, token, ...)` to pull principal + realized yield back
    into the escrow.
 2. If `unwindToEscrow` reverts, `emergencyUnwind` is attempted as a fallback.
-3. If both unwind paths fail, the escrow **fails open**: it emits `YieldUnwindFailed` and
-   clears the module linkage so settlement can complete from the remaining escrow balance.
-   The escrow is never permanently frozen — the admin must recover the stranded module
-   funds separately (via the module's `recoverTokens` / `recoverETH`).
+3. If both unwind paths fail, settlement reverts with `YieldUnwindUnavailable`. The escrow
+   keeps its module linkage and remains unsettled; no ordinary claim is created. An
+   authorized recovery operator may return the full principal to the escrow, producing a
+   receipt keyed by escrow and workflow. Retry settlement to consume the receipt and create
+   the backed claim. Partial recovery reverts atomically.
 4. The unwind returns `(amount, yield)` — the yield is the amount above the deposited
    principal. The module deletes the position on unwind, so the same yield cannot be
    unwound twice.
@@ -372,11 +373,11 @@ before crediting any entitlement.
 > carved out during `_computeYieldProtocolFee` before credit.
 
 **Emergency fallback:** On settlement, `_handleYieldModuleUnwind` first calls
-`unwindToEscrow`; if that reverts it attempts `IYieldModule.emergencyUnwind` as a last
-resort. If both fail, settlement proceeds from the remaining escrow balance (fail-open,
-`YieldUnwindFailed`), and the admin recovers the stranded module funds via
-`AaveYieldModule.recoverTokens` / `recoverETH` (timelock-gated, scoped to
-`recoverableAssets`).
+`unwindToEscrow`; if that reverts it attempts `IYieldModule.emergencyUnwind`. If both
+fail, settlement remains pending and reverts. Recovery is position-scoped through
+`emergencyUnwindForEscrow`, which routes funds to the owning escrow and records a keyed
+receipt. Generic token recovery does not create an escrow claim; retry settlement after
+the receipt has been funded.
 
 ---
 

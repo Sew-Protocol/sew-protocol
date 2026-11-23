@@ -238,7 +238,7 @@ contract GuardianPause is Test {
         assertEq(uint8(state), uint8(EscrowState.RELEASED));
     }
 
-    function test_PauseBlocksOpeningDisputesButKeepsSettlementAvailable() public {
+    function test_PauseAllowsDisputeAndSettlementForExistingEscrow() public {
         vm.prank(buyer);
         uint256 workflowId = vault.createEscrow(address(token), seller, 100e18, _getDefaultSettings());
 
@@ -246,11 +246,14 @@ contract GuardianPause is Test {
         vault.pause('Stop new exposure');
 
         vm.prank(buyer);
-        vm.expectRevert(bytes4(keccak256('EnforcedPause()')));
         vault.raiseDispute(workflowId);
+        assertEq(uint8(vault.getEscrowState(workflowId)), uint8(EscrowState.DISPUTED));
 
-        vm.prank(buyer);
-        vault.release(workflowId);
+        vm.prank(resolver);
+        vault.releaseAsDisputeResolver(workflowId, bytes32(0));
+        (, , uint256 appealDeadline, ) = vault.pendingSettlements(workflowId);
+        vm.warp(appealDeadline + 1);
+        vault.executePendingSettlement(workflowId);
         assertEq(uint8(vault.getEscrowState(workflowId)), uint8(EscrowState.RELEASED));
     }
 

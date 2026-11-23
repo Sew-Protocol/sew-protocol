@@ -28,6 +28,7 @@ contract MockAavePool {
     // Failure simulation
     bool public supplyFail;
     bool public withdrawFail;
+    uint256 public withdrawCap; // 0 = no cap; otherwise simulate partial liquidity
     uint256 public supplyFailAmount; // 0 = fail all, >0 = partial fail
 
     event Supply(
@@ -53,6 +54,10 @@ contract MockAavePool {
 
     function setWithdrawFail(bool _fail) external {
         withdrawFail = _fail;
+    }
+
+    function setWithdrawCap(uint256 cap) external {
+        withdrawCap = cap;
     }
 
     function setSupplyFailAmount(uint256 _amount) external {
@@ -139,6 +144,7 @@ contract MockAavePool {
         require(!withdrawFail, 'Withdraw failed');
 
         _accrueToNow(asset);
+        if (withdrawCap > 0 && amount > withdrawCap) amount = withdrawCap;
         MockAToken aTokenContract = MockAToken(tokenToAToken[asset]);
         uint256 currentIndex = getLiquidityIndex(asset);
 

@@ -172,7 +172,7 @@ contract ReleaseStrategyWiringTest is Test {
         assertEq(vault.productionReleaseStrategy(wid1), address(s2), "getter should use new snapshot");
     }
 
-    function test_releaseStrategy_snapshot_zero_means_follow_future_default() public {
+    function test_releaseStrategy_snapshot_zero_stays_absent_after_future_default() public {
         // No default set at creation time -> snapshot stays 0.
         uint256 wid0 = _createEscrow();
         assertEq(vault.snapReleaseStrategy(wid0), address(0), "snapshot should be zero when default unset");
@@ -185,8 +185,8 @@ contract ReleaseStrategyWiringTest is Test {
         assertEq(vault.snapReleaseStrategy(wid0), address(0), "snapshot remains zero");
         assertEq(
             vault.productionReleaseStrategy(wid0),
-            address(s1),
-            "getter follows current default when snapshot zero"
+            address(0),
+            "an absent creation-time module stays absent"
         );
     }
 

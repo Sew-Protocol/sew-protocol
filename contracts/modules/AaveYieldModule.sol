@@ -46,6 +46,12 @@ contract AaveYieldModule is IYieldModule, ERC165, AccessControl, SlowLaneQueueAc
         address aToken;              // aToken this position was created with (finding #5)
     }
 
+    struct RecoveryReceipt {
+        address token;
+        uint256 principal;
+        uint256 recovered;
+    }
+
     // ============ Storage ============
 
     // Aave pool reference
@@ -63,6 +69,9 @@ contract AaveYieldModule is IYieldModule, ERC165, AccessControl, SlowLaneQueueAc
 
     // Position tracking: (escrow => (escrowId => position))
     mapping(address escrow => mapping(uint256 escrowId => YieldPosition)) public positions;
+    // A recovery-operator unwind funds the escrow but retains workflow identity
+    // until the escrow retries settlement and consumes the receipt exactly once.
+    mapping(address escrow => mapping(uint256 escrowId => RecoveryReceipt)) public recoveryReceipts;
 
     // Token to aToken mapping (Aave V3 reserve configuration)
     // Must be set by owner before tokens can be deposited
@@ -106,6 +115,10 @@ contract AaveYieldModule is IYieldModule, ERC165, AccessControl, SlowLaneQueueAc
     event TokenConfigured(address indexed token, address indexed aToken);
     event MinDepositConfigured(address indexed token, uint256 minDeposit);
     event RecoveryOperatorSet(address indexed operator, bool allowed);
+    event EscrowRecoveryReceiptCreated(
+        address indexed escrow, uint256 indexed escrowId, address indexed token, uint256 principal, uint256 recovered
+    );
+    event EscrowRecoveryReceiptConsumed(address indexed escrow, uint256 indexed escrowId, uint256 recovered);
     event TokenDisabled(address token);
     event TokenCapConfigured(address indexed token, uint256 cap);
     event TokenCapLowered(address indexed token, uint256 newCap);
@@ -355,6 +368,7 @@ contract AaveYieldModule is IYieldModule, ERC165, AccessControl, SlowLaneQueueAc
         YieldPreset yieldMode
     ) external onlyEscrow returns (uint256 accepted) {
         require(amount > 0, "ZeroAmount");
+        require(recoveryReceipts[msg.sender][escrowId].recovered == 0, "RecoveryReceiptPending");
 
         // Guard against a second initialization silently overwriting an existing
         // (escrow, escrowId) position. Otherwise the aTokens already supplied for the
@@ -446,6 +460,19 @@ contract AaveYieldModule is IYieldModule, ERC165, AccessControl, SlowLaneQueueAc
         address token,
         uint256 principalExpected
     ) external returns (uint256 principalOut, uint256 yieldOut) {
+        RecoveryReceipt storage receipt = recoveryReceipts[msg.sender][escrowId];
+        if (receipt.recovered != 0) {
+            require(receipt.token == token, "TokenMismatch");
+            require(receipt.principal == principalExpected, "PrincipalMismatch");
+            // Emergency recovery is undifferentiated and fee-exempt. A partial
+            // receipt remains pending; it cannot be converted into a funded claim.
+            require(receipt.recovered >= receipt.principal, "PartialRecoveryNotAllowed");
+            uint256 recovered = receipt.recovered;
+            delete recoveryReceipts[msg.sender][escrowId];
+            emit EscrowRecoveryReceiptConsumed(msg.sender, escrowId, recovered);
+            return (recovered, 0);
+        }
+
         // Approval gates NEW deposits only; a revoked escrow may still close a position
         // it owns (ownership proven by the recorded position). (finding #3)
         require(
@@ -562,7 +589,15 @@ contract AaveYieldModule is IYieldModule, ERC165, AccessControl, SlowLaneQueueAc
         // Escrow approval gates NEW exposure only; recovery may proceed on existing
         // positions even after revokeEscrow. (finding #3)
         require(msg.sender == escrow || recoveryOperators[msg.sender], "UnauthorizedEscrow");
-        return _emergencyUnwind(escrow, escrowId, token, principalExpected);
+        require(recoveryReceipts[escrow][escrowId].recovered == 0, "RecoveryReceiptPending");
+        recovered = _emergencyUnwind(escrow, escrowId, token, principalExpected);
+        // Do not strand a partial receipt after _emergencyUnwind clears the Aave
+        // position. Reverting here rolls back the pool withdrawal and position deletion.
+        require(recovered >= principalExpected, "PartialRecoveryNotAllowed");
+        recoveryReceipts[escrow][escrowId] = RecoveryReceipt({
+            token: token, principal: principalExpected, recovered: recovered
+        });
+        emit EscrowRecoveryReceiptCreated(escrow, escrowId, token, principalExpected, recovered);
     }
 
     /**

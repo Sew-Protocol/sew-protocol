@@ -108,11 +108,13 @@ protocol yield fees. This is documented as policy in `IYieldModule.emergencyUnwi
 `EscrowYield._handleYieldModuleUnwind`. Recovery is a down-only remediation path, not a
 revenue path.
 
-**Partial recovery is rejected:** if `recovered < recorded principal`, `_handleYieldModuleUnwind`
-reverts `PartialRecoveryNotAllowed` and the settlement rolls back atomically. If **both** unwind
-paths fail (normal + emergency), the escrow completes a claimable-only settlement
-(`YieldUnwindFailed` emitted, linkage cleared) so the escrow is not permanently frozen; the
-beneficiary claims later when assets are recovered into the vault.
+**Partial recovery is rejected:** if `recovered < recorded principal`, both settlement-time
+unwind and operator recovery revert atomically. The Aave position and escrow linkage remain
+intact, and no partial recovery receipt is written. If both settlement-time unwind paths fail,
+settlement itself reverts with `YieldUnwindUnavailable`; no claim is created. An authorized
+operator may later recover the full principal into the escrow, creating a receipt keyed by
+escrow and workflow. Retrying settlement consumes that receipt exactly once before creating a
+claim. A receipt by itself is not a beneficiary claim.
 
 ## Governance (slow-lane asymmetry)
 

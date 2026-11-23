@@ -86,9 +86,15 @@ contract EscrowEdgeCasesTest is Test {
         vm.startPrank(buyer);
         feeToken.approve(address(vault), amount);
         
-        // Policy: Fee-on-transfer / deflationary tokens are rejected at creation time,
-        // because they create an accounting deficit (recorded > actual).
-        vm.expectRevert(abi.encodeWithSelector(AccountingDeficit.selector, address(feeToken), 10e18));
+        // Reject non-exact token receipts before recording escrow accounting.
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                bytes4(keccak256("UnexpectedTokenReceipt(address,uint256,uint256)")),
+                address(feeToken),
+                amount,
+                amount * 99 / 100
+            )
+        );
         vault.createEscrow(address(feeToken), seller, amount, EscrowSettings({
             customResolver: address(0),
             releaseAddress: address(0),

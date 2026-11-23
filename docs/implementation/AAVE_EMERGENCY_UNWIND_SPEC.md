@@ -81,11 +81,12 @@ function emergencyUnwindAavePosition(
 - ✅ Pool must be configured
 - ✅ Emits reason codes `6`, `7`, `8` for configuration issues
 
-#### 8. Non-Blocking
-- ✅ Uses try/catch
-- ✅ Never reverts (returns 0 on failure)
-- ✅ Emits events for all outcomes
-- ✅ Doesn't trap funds if unwind fails
+#### 8. Failure and Recovery Semantics
+- Settlement unwind failure reverts the settlement and preserves the escrow's yield linkage.
+- Position recovery is keyed to the owning escrow and workflow and sends assets only to that escrow.
+- Partial recovery reverts atomically; it cannot clear the position or create a partial receipt.
+- A full-recovery receipt is consumed only when settlement is retried; it is not itself a claim.
+- If Aave remains unavailable, the escrow remains unsettled until its position can be recovered.
 
 ### Event Structure
 
