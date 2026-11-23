@@ -29,6 +29,7 @@ contract DirectResolutionConfigSelectionIntegrationTest is Test, KlerosHandoffFi
     address internal constant SELLER = address(0xA11CE);
     address internal constant RESOLVER = address(0xBEEF);
     address internal constant SENIOR = address(0xCAFE);
+    address internal constant ALT_RESOLVER = address(0xD00D);
     address internal externalBackstop;
     address internal constant FEE_RECIPIENT = address(0xFEE);
     bytes32 internal constant DIRECT_CATEGORY = keccak256('direct-policy-category');
@@ -97,6 +98,10 @@ contract DirectResolutionConfigSelectionIntegrationTest is Test, KlerosHandoffFi
     }
 
     function _publishPolicyB() internal returns (uint256 version) {
+        return _publishPolicyBWithCategory(DIRECT_CATEGORY);
+    }
+
+    function _publishPolicyBWithCategory(bytes32 category) internal returns (uint256 version) {
         DecentralizedResolverStructs.ResolutionConfig memory config = drm.getResolutionConfig(1);
         config.resolveDeadlines[0] = 3 hours;
         config.appealWindows[0] = 1 hours;
@@ -110,7 +115,7 @@ contract DirectResolutionConfigSelectionIntegrationTest is Test, KlerosHandoffFi
         config.bondAssetFixed = true;
         config.externalResolver = externalBackstop;
         config.categoryKeys = new bytes32[](1);
-        config.categoryKeys[0] = DIRECT_CATEGORY;
+        config.categoryKeys[0] = category;
         config.categoryRouteBehavior = DecentralizedResolverStructs.CategoryRouteBehavior.CATEGORY_ONLY;
         drm.publishResolutionConfig(config);
         return 2;
@@ -223,6 +228,54 @@ contract DirectResolutionConfigSelectionIntegrationTest is Test, KlerosHandoffFi
         assertTrue(success);
         assertEq(resolver, externalBackstop);
         assertEq(level, 2);
+    }
+
+    function test_explicitPolicyResolverOverridesPreInitializationGlobalResolver() public {
+        vm.prank(SENIOR);
+        drm.appointResolver(ALT_RESOLVER, 'alternate', 'alternate policy resolver');
+
+        // Find a category whose versioned policy route selects the other live
+        // resolver from the global default route for this deterministic test block.
+        bytes32 routeBlockHash = block.number >= 256 ? blockhash(block.number - 256) : blockhash(0);
+        uint256 globalOffset = uint256(
+            keccak256(abi.encodePacked(routeBlockHash, bytes32(0), uint256(0)))
+        ) % 2;
+        bytes32 category;
+        for (uint256 i = 0; i < 256; i++) {
+            bytes32 candidate = keccak256(abi.encode('policy-category', i));
+            uint256 policyOffset = uint256(
+                keccak256(abi.encodePacked(routeBlockHash, candidate, uint256(0)))
+            ) % 2;
+            if (policyOffset != globalOffset) {
+                category = candidate;
+                break;
+            }
+        }
+        assertTrue(category != bytes32(0), 'test must find a policy route distinct from global');
+
+        uint256 policyB = _publishPolicyBWithCategory(category);
+        uint256 workflowId = _createVault(policyB);
+        vm.prank(address(vault));
+        drm.setEscrowCategory(workflowId, address(vault), category);
+        bytes memory escrowData = EscrowEncodingLibrary.encodeEscrowTransferData(
+            address(paymentToken), BUYER, SELLER, 100 ether, address(0)
+        );
+
+        // Before dispute initialization, the DRM has not yet bound policy B and
+        // reports its active global default assignment.
+        (address preInitializationResolver,) = drm.getDisputeResolver(workflowId, address(vault), escrowData);
+        assertTrue(preInitializationResolver != address(0));
+        vm.prank(BUYER);
+        vault.raiseDispute(workflowId);
+
+        DecentralizedResolverStructs.DisputeMetadata memory metadata =
+            drm.getDisputeMetadata(workflowId, address(vault));
+        (,,, address escrowResolver,,,,,,) = vault.escrowTransfers(workflowId);
+        assertTrue(
+            metadata.resolverAtRound[0] != preInitializationResolver,
+            'explicit category policy must select a different initial resolver'
+        );
+        assertEq(escrowResolver, metadata.resolverAtRound[0], 'escrow authority follows initialized policy');
     }
 
     function test_explicitDirectInvalidVersionsHaveParityAcrossProductsIncludingZero() public {

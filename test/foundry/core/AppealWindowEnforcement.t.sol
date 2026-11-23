@@ -420,6 +420,72 @@ contract AppealWindowEnforcementTest is Test {
         assertEq(resolutionModule.workflowStakeResolver(address(escrow), workflowId), address(0));
     }
 
+    function test_timeoutReplacementTransfersTheActiveStakeLock() public {
+        AppealTestUSDC stakeToken = new AppealTestUSDC();
+        ERC20Mock sew = new ERC20Mock('Stake SEW', 'sSEW', address(this), 0);
+        ResolverStakingModule staking = new ResolverStakingModule(address(this), address(stakeToken), address(sew));
+        staking.grantRole(staking.ROLE_TIMELOCK(), address(this));
+        staking.grantRole(staking.ROLE_RESOLUTION_MODULE(), address(resolutionModule));
+        staking.setResolutionModule(address(resolutionModule));
+        resolutionModule.setStakingModule(address(staking));
+
+        stakeToken.mint(resolver1, 1000e6);
+        stakeToken.mint(resolver2, 1000e6);
+        vm.startPrank(resolver1);
+        stakeToken.approve(address(staking), type(uint256).max);
+        staking.stake(1000e6);
+        vm.stopPrank();
+        vm.startPrank(resolver2);
+        stakeToken.approve(address(staking), type(uint256).max);
+        staking.stake(1000e6);
+        vm.stopPrank();
+
+        stakeToken.mint(buyer, 1000e6);
+        vm.startPrank(buyer);
+        stakeToken.approve(address(escrow), type(uint256).max);
+        uint256 workflowId = escrow.createEscrow(
+            address(stakeToken),
+            seller,
+            1000e6,
+            EscrowSettings({
+                customResolver: address(0),
+                releaseAddress: address(0),
+                yieldPreset: YieldPreset.OFF,
+                autoReleaseTime: 0,
+                autoCancelTime: 0
+            })
+        );
+        vm.stopPrank();
+
+        vm.prank(address(this));
+        resolutionModule.setEscrowCategory(workflowId, address(escrow), keccak256('USDC_CATEGORY'));
+        vm.prank(buyer);
+        escrow.raiseDispute(workflowId);
+        uint256 expectedLock = 247.5e18;
+        assertEq(staking.lockedStakes(address(escrow), workflowId, resolver1), expectedLock);
+
+        vm.prank(timelock);
+        resolutionModule.setResolverActive(resolver2, true);
+        DecentralizedResolverStructs.DisputeMetadata memory metadata =
+            resolutionModule.getDisputeMetadata(workflowId, address(escrow));
+        vm.warp(metadata.resolveBy);
+        resolutionModule.forceProgress(workflowId, address(escrow));
+
+        (,,, address escrowResolver,,,,,,) = escrow.escrowTransfers(workflowId);
+        assertEq(resolutionModule.workflowStakeResolver(address(escrow), workflowId), resolver2);
+        assertEq(staking.lockedStakes(address(escrow), workflowId, resolver1), 0);
+        assertEq(staking.lockedStakes(address(escrow), workflowId, resolver2), expectedLock);
+        assertEq(staking.totalLockedStake(resolver1), 0);
+        assertEq(staking.totalLockedStake(resolver2), expectedLock);
+        assertEq(escrowResolver, resolver2, 'timeout replacement synchronizes escrow authority');
+
+        vm.prank(resolver1);
+        vm.expectRevert();
+        escrow.releaseAsDisputeResolver(workflowId, bytes32(0));
+        vm.prank(resolver2);
+        escrow.releaseAsDisputeResolver(workflowId, bytes32(0));
+    }
+
     // ============ Test: Resolution at Final Round Executes Immediately ============
 
     function test_ResolutionAtFinalRound_ExecutesImmediately() public {
