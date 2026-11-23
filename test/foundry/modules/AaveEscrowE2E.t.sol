@@ -438,4 +438,51 @@ contract AaveEscrowE2ETest is Test {
         );
         assertGe(recovered, AMOUNT, 'full-principal recovery can be retried');
     }
+
+    function test_recoveryReceipts_isolateEscrowsSharingVaultAndToken() public {
+        uint256 first = _openFundedEscrow();
+        uint256 second = _openFundedEscrow();
+        assertEq(second, first + 1, 'fixture uses distinct workflow ids');
+
+        pool.setWithdrawFail(true);
+        for (uint256 wf = first; wf <= second; wf++) {
+            vm.prank(BUYER);
+            vault.senderCancel(wf);
+            vm.prank(SELLER);
+            vm.expectRevert();
+            vault.recipientCancel(wf);
+            assertEq(vault.v25YieldModules(wf), address(aaveModule), 'failed settlement keeps its own module link');
+            assertEq(vault.claimableBalances(wf, BUYER), 0, 'failed settlement creates no claim');
+        }
+
+        pool.setWithdrawFail(false);
+        address op = address(0xBEEF);
+        aaveModule.setRecoveryOperator(op, true);
+        vm.prank(op);
+        uint256 recoveredFirst = aaveModule.emergencyUnwindForEscrow(
+            address(vault), first, address(token), AMOUNT
+        );
+
+        (,, uint256 firstReceipt) = aaveModule.recoveryReceipts(address(vault), first);
+        (,, uint256 secondReceipt) = aaveModule.recoveryReceipts(address(vault), second);
+        assertEq(firstReceipt, recoveredFirst, 'recovery recorded for first workflow');
+        assertEq(secondReceipt, 0, 'no receipt for second workflow');
+        (, , bool firstActive) = aaveModule.previewPosition(first, address(vault));
+        (, , bool secondActive) = aaveModule.previewPosition(second, address(vault));
+        assertFalse(firstActive, 'first Aave position recovered');
+        assertTrue(secondActive, 'second Aave position remains live');
+
+        vm.prank(SELLER);
+        vault.recipientCancel(first);
+        assertEq(vault.claimableBalances(first, BUYER), recoveredFirst, 'first claim is backed by its recovery');
+        assertEq(vault.claimableBalances(second, BUYER), 0, 'first recovery cannot fund second workflow');
+        assertEq(vault.v25YieldModules(second), address(aaveModule), 'second workflow remains recoverable');
+
+        // The second escrow can settle only after its own Aave position is unwound.
+        vm.prank(SELLER);
+        vault.recipientCancel(second);
+        assertEq(vault.claimableBalances(second, BUYER), AMOUNT, 'second claim is backed by its own unwind');
+        assertEq(vault.totalClaimableAssets(address(token)), recoveredFirst + AMOUNT);
+        assertEq(token.balanceOf(address(vault)), recoveredFirst + AMOUNT, 'shared vault assets equal backed claims');
+    }
 }

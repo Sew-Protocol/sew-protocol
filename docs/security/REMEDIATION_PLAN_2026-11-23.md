@@ -6,57 +6,34 @@
 
 ## Current evidence
 
-Implementation changes for the listed findings are in progress across the
-custody, factory, snapshot, dispute, resolver, slashing, and CI paths. The latest
-GitHub run for `main` compiled successfully, passed lint and TypeScript checks,
-and ran 1,551 Foundry cases: 1,539 passed, 0 failed, and 12 were skipped. The
-Sew Core source boundary and 13-test profile also passed. That run then failed in
-`deployables:validate` because its parser did not discard the `--` separator pnpm
-forwards. The parser fix passed local direct validation. A CI rerun on `d8c45e77`
-passed: 1,539 Foundry tests passed, 0 failed, and 12 were skipped; the Sew Core
-profile and artifact validation passed; and CodeQL passed. It exported 13 Sew
-Core artifacts at bundle root
-`cf43ee7f061cd75ea0a215d8804d28120b8d9d17acc5e0805bf22f18f136bf7c`.
+The latest successful CI revision is `adb8f25f56c368ceec7ecbe6ce0150a72fc5fd6d`.
+It passed compile, lint, typecheck, CodeQL, all repository Foundry tests (1,539
+passed, 0 failed, 12 skipped), the Sew Core profile, and artifact integrity and
+determinism checks. The Sew Core export contains 13 artifacts at bundle root
+`bb81f4508e6b080e796e6491296b362d3f39aafdbdf96ca53934c3ee001ab5a0`.
 
-The CI contract-size report measured SewCoreVault at 24,357 runtime bytes, 219
-bytes under EIP-170. A final F-17 hardening is being added to make the Sew Core
-artifact test fail if any allow-listed runtime exceeds EIP-170 or initcode exceeds
-EIP-3860. That assertion passes locally and awaits a CI run.
+The SewCoreVault runtime is 24,357 bytes, 219 bytes below EIP-170; its initcode
+is 25,172 bytes, below the EIP-3860 limit. Sew Core artifact qualification now
+enforces both limits for every allow-listed artifact. The legacy full-protocol
+size report still identifies four non-Sew-Core contracts over EIP-170; they are
+outside this standalone Sew Core deployment graph and remain excluded from its
+allowlist.
 
-Earlier focused evidence includes 165 passing tests across affected groups,
-including explicit resolver-policy selection and timeout replacement stake
-transfer. TypeScript typechecking passed. The invariant directory passed 12
-invariants at 256 runs and 128,000 handler calls per invariant. The full local
-Foundry run and 62-file core group were stopped after ten minutes without
-compiler output; repository-wide qualification remains pending. The Sew Core
-profile suite (13 tests) and Kleros/resolver lifecycle suite (20 tests) passed
-after the base-contract refactor.
-
-For F-05, current implementation work adds an escrow/workflow-keyed Aave
-recovery receipt: a failed settlement remains pending with its yield linkage;
-operator recovery records the funds returned; a settlement retry consumes the
-receipt before creating a claim. This path still needs targeted, multi-escrow
-qualification. Partial operator recovery now reverts atomically before a receipt
-is recorded, preserving the Aave position for a later full-recovery retry. The
-targeted both-failure, receipt-consumption, and partial-recovery tests pass.
-
-The current Sew Core working-copy build uses optimizer runs 1 and has a
-24,357-byte runtime, 219 bytes below EIP-170. This is a narrow margin; measure
-gas impact and retain the size check in the release gate. The deterministic
-export check passed twice against the dirty working copy and produced bundle
-root `8fbc74bd1bf90cc80ff4c8fae66bbe1b5cd54a017e2142d90a925990af5746fb`.
-That root is local evidence only: it is not a clean source revision or a pinned
-deployment artifact. No deployment artifact is accepted by this remediation.
+For F-05, failed settlement preserves the escrow's yield linkage and creates no
+claim. Full operator recovery creates a workflow-keyed receipt, which settlement
+consumes once. Partial recovery reverts atomically and preserves the Aave
+position. New local coverage proves two escrows sharing a vault and token cannot
+use one another's recovery or claims; this added regression awaits CI.
 
 | Gate | Current state |
 |---|---|
-| Focused regressions for affected findings | The four affected core files (32 tests), Aave/unwind files (16 tests), resolver fixture (1 test), and six prior CI regressions pass locally |
-| Full Foundry suite | CI passed: 1,539 passed, 0 failed, 12 skipped (1,551 total). Latest local full-suite attempt stalled compiling 143 files and was stopped |
-| Invariant directory | Passed; 12 invariants/test cases at 256 runs and 128,000 calls each |
-| Sew Core package build and focused profile tests | Passed; current measured runtime is under EIP-170 by 219 bytes |
-| TypeScript typecheck | Passed in latest CI |
-| Deployables export, validation, determinism, and manifest pin | CI on `d8c45e77` exported and validated 13 Sew Core artifacts (bundle root `cf43ee7f061cd75ea0a215d8804d28120b8d9d17acc5e0805bf22f18f136bf7c`); package-specific EIP-170/EIP-3860 enforcement is added locally and awaits CI |
-| Independent review of exact source revision and bundle root | Pending after fixes and clean pinned export |
+| Focused regressions for affected findings | Prior affected suites pass; F-05 shared-vault recovery isolation regression also passes locally |
+| Full Foundry suite | CI passed on `adb8f25f`: 1,539 passed, 0 failed, 12 skipped (1,551 total); new regression awaits CI |
+| Invariant directory | Passed; 12 invariants/test cases at 256 runs and 128,000 handler calls each |
+| Sew Core package build and profile tests | Passed; runtime margin is 219 bytes, initcode margin is 23,980 bytes |
+| Runtime and initcode limits | Hard-gated for all 13 Sew Core artifacts; CI passed on `adb8f25f` |
+| TypeScript, CodeQL, artifact export, validation, and determinism | Passed on `adb8f25f`; clean-source bundle root recorded above |
+| Independent review of exact source revision and bundle root | Pending |
 | Public deployment authorization | Not implied by source remediation |
 
 ## Release boundary
