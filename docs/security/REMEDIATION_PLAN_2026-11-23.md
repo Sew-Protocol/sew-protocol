@@ -2,15 +2,16 @@
 
 **Date:** 2026-11-23
 **Scope:** Findings F-01 through F-17 in the source review supplied on 2026-11-23.
-**Status:** Remediation in progress; this document tracks intended gates and does not represent independent security acceptance.
+**Status:** Remediation implemented and CI-qualified on the recorded source revision; independent security acceptance remains pending.
 
 ## Current evidence
 
-The latest successful CI revision is `adb8f25f56c368ceec7ecbe6ce0150a72fc5fd6d`.
-It passed compile, lint, typecheck, CodeQL, all repository Foundry tests (1,539
-passed, 0 failed, 12 skipped), the Sew Core profile, and artifact integrity and
-determinism checks. The Sew Core export contains 13 artifacts at bundle root
-`bb81f4508e6b080e796e6491296b362d3f39aafdbdf96ca53934c3ee001ab5a0`.
+The latest successful source revision is `ad0aadcb2001b40081ed1286c4e405eb1b26f1e0`.
+CI and CodeQL passed. The full run passed 1,540 Foundry tests, failed 0, and
+skipped 12 across 150 suites. The Sew Core source boundary, 13-test profile,
+artifact validation, integrity checks, determinism checks, and runtime/initcode
+size gates also passed. The Sew Core export contains 13 artifacts at bundle root
+`56370b6e2cfdb6fb682c0213cede8eeaa944fd6d47f1acc7ba8165fd2c880bab`.
 
 The SewCoreVault runtime is 24,357 bytes, 219 bytes below EIP-170; its initcode
 is 25,172 bytes, below the EIP-3860 limit. Sew Core artifact qualification now
@@ -22,17 +23,17 @@ allowlist.
 For F-05, failed settlement preserves the escrow's yield linkage and creates no
 claim. Full operator recovery creates a workflow-keyed receipt, which settlement
 consumes once. Partial recovery reverts atomically and preserves the Aave
-position. New local coverage proves two escrows sharing a vault and token cannot
-use one another's recovery or claims; this added regression awaits CI.
+position. The shared-vault regression passed: two escrows using the same vault
+and token cannot use one another's recovery or claims.
 
 | Gate | Current state |
 |---|---|
-| Focused regressions for affected findings | Prior affected suites pass; F-05 shared-vault recovery isolation regression also passes locally |
-| Full Foundry suite | CI passed on `adb8f25f`: 1,539 passed, 0 failed, 12 skipped (1,551 total); new regression awaits CI |
+| Focused regressions for affected findings | Affected suites pass; F-05 shared-vault recovery isolation regression passes locally and in CI |
+| Full Foundry suite | CI passed on `ad0aadcb`: 1,540 passed, 0 failed, 12 skipped (1,552 total) |
 | Invariant directory | Passed; 12 invariants/test cases at 256 runs and 128,000 handler calls each |
-| Sew Core package build and profile tests | Passed; runtime margin is 219 bytes, initcode margin is 23,980 bytes |
-| Runtime and initcode limits | Hard-gated for all 13 Sew Core artifacts; CI passed on `adb8f25f` |
-| TypeScript, CodeQL, artifact export, validation, and determinism | Passed on `adb8f25f`; clean-source bundle root recorded above |
+| Sew Core package build and profile tests | Passed; runtime is 24,357 bytes (219-byte margin), initcode is 25,172 bytes (23,980-byte margin) |
+| Runtime and initcode limits | Hard-gated for all 13 Sew Core artifacts; CI passed on `ad0aadcb` |
+| TypeScript, CodeQL, artifact export, validation, and determinism | Passed on `ad0aadcb`; clean-source bundle root recorded above |
 | Independent review of exact source revision and bundle root | Pending |
 | Public deployment authorization | Not implied by source remediation |
 
