@@ -10,12 +10,12 @@ Implementation changes are present for the custody, factory, snapshot, dispute,
 resolver, slashing, and CI findings. Recorded focused suites pass 165 tests
 across the affected groups, including tests that prove an explicit policy can
 select a different resolver from the pre-initialization default and timeout
-replacement transfers the active staking lock. TypeScript typechecking passes,
-and the invariant
-directory passes 12 tests at 256 runs and 128,000 handler calls per invariant.
+replacement transfers the active staking lock. TypeScript typechecking passes.
+The invariant directory passes 12 tests at 256 runs and 128,000 handler calls
+per invariant.
 The full Foundry run and the 62-file core group were stopped after ten minutes
 without compiler output, so repository-wide qualification remains pending. The
-Sew Core profile suite (13 tests) and Kleros/resolver lifecycle suite (19 tests)
+Sew Core profile suite (13 tests) and Kleros/resolver lifecycle suite (20 tests)
 passed after the latest base-contract refactor.
 
 The current Sew Core working-copy build uses optimizer runs 1 and has a
