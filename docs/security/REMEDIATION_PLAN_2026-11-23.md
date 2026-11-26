@@ -207,6 +207,14 @@ be confused with the historical `ad0aadcb` evidence above:
   skipped (1,592 total), on the committed code revision including the final
   stale-assignment consistency check.
 - The exact tested code revision is `9290e814f8463207516b5a44271aedd36b74ac49`.
+- On the pushed source revision `3a192922b64a167eabcf1e27cd198922784b3078`,
+  the full-appeal allowlist (`@sew/deployables@0.2.0`) was built from a clean
+  checkout, exported twice, and validated. Both 20-artifact exports produced
+  bundle root
+  `e77639a6d390dfdc2ed8b1de42d5d64f12e87f776e853e4836e10c298fe28795` with
+  solc `0.8.37+commit.f401782d`, Osaka EVM, 200 optimizer runs, and `viaIR`.
+  This establishes reproducible local bundle identity, not independent
+  security review, network-specific size acceptance, or deployment readiness.
 - The 11 skipped tests and reasons were: `Phase0BaseSepoliaForkTest.setUp`
   (deployment artifact unavailable); `Phase1CoreJourneysBaseSepoliaForkTest.setUp`
   (deployment artifact unavailable); `SecurityAttackSimBaseSepoliaForkTest.setUp`
