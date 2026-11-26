@@ -63,6 +63,11 @@ jobs:
           pnpm --filter @sew/sew-core deployables:validate
           pnpm --filter @sew/sew-core test:artifacts
 
+      - name: Full-appeal artifact qualification
+        run: pnpm deployables:test:sew-full-appeal
+        env:
+          GIT_SHA: ${{ github.sha }}
+
       - name: Contract size check
         run: pnpm size:check
 

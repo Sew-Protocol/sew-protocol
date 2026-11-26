@@ -35,6 +35,7 @@
     "deployables:pack": "ts-node scripts/pack-deployables.ts",
     "deployables:test": "ts-node scripts/test-deployables.ts",
     "deployables:test:sew-core": "ts-node scripts/test-sew-core-deployables.ts",
+    "deployables:test:sew-full-appeal": "ts-node scripts/test-sew-full-appeal-deployables.ts",
     "deployables:all": "pnpm deployables:export && pnpm deployables:validate && pnpm deployables:test",
     "size:check": "hardhat compile && ts-node scripts/print-contract-sizes.ts"
   },
