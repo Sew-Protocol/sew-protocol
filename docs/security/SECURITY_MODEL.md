@@ -45,14 +45,13 @@ Each protected transfer is **independent**. If one fails, others are unaffected.
 
 ### Emergency Circuit-Breaker: Vault-Level Pause
 
-While the protocol emphasizes per-escrow isolation, a **vault-level pause mechanism** exists as an emergency circuit-breaker (similar to financial market circuit-breakers):
+The vault pause is an intake control, not a freeze on existing workflows:
 
-- **Activation**: Guardians can pause the vault in response to critical vulnerabilities
-- **Scope**: Blocks new escrow creation and pauses specific functions on existing escrows
-- **Rationale**: Provides rapid containment when zero-day vulnerabilities are discovered, preventing exploitation of additional escrows while preserving existing fund integrity
-- **Not isolation violation**: The pause is not a normal operation; it's an emergency containment measure to prevent mass exploitation
-- **Automatic expiration**: Pause cycles have maximum duration limits (`MAX_PAUSE_DURATION`, `MAX_PAUSE_CYCLES`) to prevent indefinite lockdown
-- **Documented recovery path**: Each pause documents what will restore normal operation
+- **Activation**: A guardian or the governance timelock can pause new escrow creation.
+- **Scope**: Existing disputes, appeals, settlements, claims, and withdrawals remain available. This lets participants continue protective and recovery actions for existing escrows.
+- **Deadlines**: Appeal and dispute deadlines continue to elapse while intake is paused.
+- **Recovery**: Only the governance timelock can resume creation. The pause does not expire automatically; governance must review the incident and explicitly unpause.
+- **Tests**: Pause behavior is covered by lifecycle tests. The full-suite run may skip tests gated by `RUN_PAUSE_TESTS=false`; see the current remediation record for exact skip identities.
 
 ### Forward-Only Evolution
 
@@ -142,11 +141,12 @@ Throughout escrow lifecycle, snapshot values are used instead of global defaults
 
 ### Can Be Paused
 
-In emergencies, the vault can be paused by guardians to prevent new escrow creation and temporarily disable certain functions. This is an **intentional circuit-breaker, not a design flaw**. Recovery requires:
+In emergencies, a guardian can stop new escrow creation. Existing users retain dispute, appeal, settlement, claim, and withdrawal paths. The pause has no automatic expiry and does not stop existing deadlines; recovery requires:
 
-1. Vulnerability remediation
-2. Time delay (7 days) for module updates
-3. Community consensus or governance approval
+1. Vulnerability remediation and governance review
+2. Timelock-authorized `unpause()`
+
+The governance timelock's configured delay applies to queued governance actions; it is not an automatic delay or expiry built into the vault pause itself.
 
 ### Per-Escrow Guarantees
 

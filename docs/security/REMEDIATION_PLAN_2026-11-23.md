@@ -92,15 +92,37 @@ Treat the reviewed `main` source and any modified working copy as separate candi
 4. Review storage layout, ABI, runtime bytecode, and deployment graph changes. Pin a new artifact candidate; do not silently reuse an earlier qualification or deployment approval.
 5. Obtain independent review of the exact source revision and bundle root. Only then reconsider deployment readiness.
 
-## Decisions required before implementation can be accepted
+## Implemented policy defaults and remaining qualification limits
 
-- Whether the DR v3 quarter-exposure lock formula and stable-token-only normalization are acceptable for production, including mixed-token bonds. Current implementation rejects unsupported exposure tokens.
-- The final pause/deadline semantics for appeals and disputes.
-- Whether factories remain supported deployment paths or are removed from supported interfaces.
-- The authority and eventual funding source for vindication receivables; receivables are currently non-redeemable and excluded from stake.
-- Whether seven days is the desired production appeal-resolution timeout. Current implementation uses this safe default and permits Timelock governance to change it for future appeals.
+The implementation now has explicit conservative defaults for the policy
+questions raised in the review:
 
-Until those choices are reflected in specifications and tests, affected capabilities should remain excluded from a public deployment profile.
+- **DR v3 case collateral:** lock 25% of normalized stable-token exposure for
+  the specific `(escrowContract, workflowId, resolver)` assignment. Only the
+  configured stable token is accepted for this USD-normalized calculation;
+  other tokens and tokens with more than 18 decimals are rejected. Assignment
+  slashes can consume free stake and then only the corresponding workflow lock,
+  preserving other assignments. Mixed-token exposure remains unsupported until
+  an explicit valuation and liquidation policy is specified and reviewed.
+- **Guardian pause:** pause stops new escrow intake only. Existing dispute,
+  appeal, settlement, claim, and withdrawal operations remain available, and
+  their deadlines continue to elapse. Only the governance timelock can unpause;
+  there is no automatic expiry. See `docs/security/SECURITY_MODEL.md`.
+- **Factories:** both factories remain supported. They accept explicit initial
+  authority/recipient inputs and hand off roles and supply atomically; factory
+  integration tests assert the factory retains neither.
+- **Vindication:** restored amounts are USD-denominated, non-redeemable
+  receivables excluded from stake and withdrawable balances. No redemption
+  path exists until a treasury source and funded settlement policy are
+  specified; do not represent a receivable as recovered collateral.
+- **Slash appeals:** the default governance resolution window is seven days.
+  Timelock changes affect new appeals only; an unresolved appeal expires in the
+  resolver's favor, cancels the slash, and returns its appeal bond.
+
+These code-level defaults do not independently authorize real-value DR v3 or
+full-appeal use. Mixed-token valuation, a funded vindication-receivable policy,
+exact production parameters, and independent profile qualification remain
+separate gates.
 
 ## Follow-up security work identified after F-17
 
@@ -182,9 +204,9 @@ be confused with the historical `ad0aadcb` evidence above:
   accounting, locked-stake slash semantics, exact yield allowances, payout
   policy snapshots, and incentive finalization consistency.
 - The full local Foundry run passed: 150 suites, 1,581 passed, 0 failed, and 11
-  skipped (1,592 total). A final stale-assignment consistency check was added
-  afterwards and its focused dispute-capacity suite passed 14/14; the entire
-  suite has not been rerun after that additional check.
+  skipped (1,592 total), on the committed code revision including the final
+  stale-assignment consistency check.
+- The exact tested code revision is `9290e814f8463207516b5a44271aedd36b74ac49`.
 - The 11 skipped tests and reasons were: `Phase0BaseSepoliaForkTest.setUp`
   (deployment artifact unavailable); `Phase1CoreJourneysBaseSepoliaForkTest.setUp`
   (deployment artifact unavailable); `SecurityAttackSimBaseSepoliaForkTest.setUp`
