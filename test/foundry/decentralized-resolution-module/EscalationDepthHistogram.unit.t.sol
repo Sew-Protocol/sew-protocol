@@ -45,6 +45,7 @@ contract EscalationDepthHistogramTest is Test {
         incentiveModule = new ResolverIncentiveModule(deployer, address(paymentLib));
         token = new ERC20Mock('Test Token', 'TEST', address(this), 0);
         incentiveModule.grantRole(incentiveModule.ROLE_TIMELOCK(), address(this));
+        incentiveModule.setResolutionModule(address(this));
         incentiveModule.registerEscrowContract(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         adminContract = new EscrowGovernanceTimelock(address(this));

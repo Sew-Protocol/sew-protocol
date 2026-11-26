@@ -430,10 +430,7 @@ contract DRv1FuzzTest is Test {
                 vm.prank(escrowContract);
                 resolutionModule.recordResolution(workflowId, escrowContract, seniorResolver, outcome2, 2 hours);
 
-                // Record reversal
-                vm.prank(escrowContract);
-                resolutionModule.recordReversal(workflowId, escrowContract, 0);
-
+                // Reversal accounting is recorded atomically with the round decision.
                 expectedReversals++;
             }
         }

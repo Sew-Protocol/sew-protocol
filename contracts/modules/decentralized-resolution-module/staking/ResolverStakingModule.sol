@@ -71,6 +71,12 @@ contract ResolverStakingModule is IStakingModule, AccessControl, ReentrancyGuard
     error InvalidTier(uint8 tier, uint8 maxTier);
     error ResolverHasPendingSlash(address resolver);
     error StakeAlreadyLocked(address escrowContract, uint256 workflowId, address resolver);
+    error StakeAssignmentAlreadyActive(address escrowContract, uint256 workflowId, address resolver);
+    error StakeAssignmentNotActive(address escrowContract, uint256 workflowId, address resolver);
+    error StakeAssignmentBackingDeficit(address resolver);
+    error ActiveResolutionAssignments(uint256 activeAssignments);
+    error PendingSlashingOperations(uint256 pendingOperations);
+    error ZeroModuleAddress();
 
     // ============ Constants ============
 
@@ -161,6 +167,12 @@ contract ResolverStakingModule is IStakingModule, AccessControl, ReentrancyGuard
     // Locked stake tracking (for active disputes)
     mapping(address => mapping(uint256 => mapping(address => uint256))) public lockedStakes; // escrowContract => workflowId => resolver => locked amount
     mapping(address => uint256) public totalLockedStake; // Total locked across all disputes
+
+    // Lifecycle assignment tracking is separate from the monetary lock so zero-value
+    // assignments are still single-use and module rotation can prove quiescence.
+    mapping(address => mapping(uint256 => mapping(address => bool))) public activeStakeAssignments;
+    uint256 public activeResolutionAssignments;
+    address public resolutionModule;
 
     // Slashing module reference (for freeze checks)
     address public slashingModule;
@@ -601,8 +613,8 @@ contract ResolverStakingModule is IStakingModule, AccessControl, ReentrancyGuard
         address resolver,
         uint256 stakeRequired
     ) external onlyRole(ROLE_RESOLUTION_MODULE) {
-        if (lockedStakes[escrowContract][workflowId][resolver] != 0) {
-            revert StakeAlreadyLocked(escrowContract, workflowId, resolver);
+        if (activeStakeAssignments[escrowContract][workflowId][resolver]) {
+            revert StakeAssignmentAlreadyActive(escrowContract, workflowId, resolver);
         }
         // Lock minimum stake for tier if not specified
         uint256 lockAmount = stakeRequired;
@@ -619,6 +631,8 @@ contract ResolverStakingModule is IStakingModule, AccessControl, ReentrancyGuard
         // Lock stake
         lockedStakes[escrowContract][workflowId][resolver] = lockAmount;
         totalLockedStake[resolver] += lockAmount;
+        activeStakeAssignments[escrowContract][workflowId][resolver] = true;
+        activeResolutionAssignments++;
 
         emit StakeLocked(resolver, lockAmount, workflowId, 'Assignment');
     }
@@ -636,6 +650,7 @@ contract ResolverStakingModule is IStakingModule, AccessControl, ReentrancyGuard
         bool outcome
     ) external onlyRole(ROLE_RESOLUTION_MODULE) {
         outcome;
+        _releaseAssignment(workflowId, escrowContract, resolver);
         uint256 lockedAmount = lockedStakes[escrowContract][workflowId][resolver];
 
         if (lockedAmount > 0) {
@@ -658,6 +673,7 @@ contract ResolverStakingModule is IStakingModule, AccessControl, ReentrancyGuard
         address escrowContract,
         address resolver
     ) external onlyRole(ROLE_RESOLUTION_MODULE) {
+        _releaseAssignment(workflowId, escrowContract, resolver);
         uint256 lockedAmount = lockedStakes[escrowContract][workflowId][resolver];
 
         if (lockedAmount > 0) {
@@ -691,6 +707,14 @@ contract ResolverStakingModule is IStakingModule, AccessControl, ReentrancyGuard
         totalLockedStake[resolver] += amount;
 
         emit StakeLocked(resolver, amount, workflowId, 'Manual lock');
+    }
+
+    function _releaseAssignment(uint256 workflowId, address escrowContract, address resolver) internal {
+        if (!activeStakeAssignments[escrowContract][workflowId][resolver]) {
+            revert StakeAssignmentNotActive(escrowContract, workflowId, resolver);
+        }
+        delete activeStakeAssignments[escrowContract][workflowId][resolver];
+        activeResolutionAssignments--;
     }
 
     /**
@@ -943,6 +967,46 @@ contract ResolverStakingModule is IStakingModule, AccessControl, ReentrancyGuard
         address resolver,
         uint256 amount
     ) external onlyRole(ROLE_SLASHING_MODULE) returns (uint256 stableSlashed, uint256 sewSlashed) {
+        uint256 freeStake = resolverBonds[resolver].effectiveBondUSD > totalLockedStake[resolver]
+            ? resolverBonds[resolver].effectiveBondUSD - totalLockedStake[resolver]
+            : 0;
+        if (amount > freeStake) amount = freeStake;
+        return _slashBond(resolver, amount);
+    }
+
+    function slashForAssignment(
+        address resolver,
+        uint256 amount,
+        address escrowContract,
+        uint256 workflowId
+    ) external onlyRole(ROLE_SLASHING_MODULE) returns (uint256 stableSlashed, uint256 sewSlashed) {
+        uint256 assignmentLock = lockedStakes[escrowContract][workflowId][resolver];
+        uint256 totalLocked = totalLockedStake[resolver];
+        uint256 effectiveBefore = resolverBonds[resolver].effectiveBondUSD;
+        uint256 freeBefore = effectiveBefore > totalLocked ? effectiveBefore - totalLocked : 0;
+        uint256 otherAssignmentsLocked = totalLocked - assignmentLock;
+        uint256 maxSlashable = effectiveBefore > otherAssignmentsLocked
+            ? effectiveBefore - otherAssignmentsLocked
+            : 0;
+        if (amount > maxSlashable) amount = maxSlashable;
+        (stableSlashed, sewSlashed) = _slashBond(resolver, amount);
+
+        // Free stake is consumed first. Reduce only this assignment's lock for
+        // any realized loss beyond free stake; preserve other workflow locks.
+        uint256 newEffectiveBond = resolverBonds[resolver].effectiveBondUSD;
+        uint256 realizedLoss = effectiveBefore - newEffectiveBond;
+        if (realizedLoss > freeBefore) {
+            uint256 reduction = realizedLoss - freeBefore;
+            if (reduction > assignmentLock) revert StakeAssignmentBackingDeficit(resolver);
+            lockedStakes[escrowContract][workflowId][resolver] = assignmentLock - reduction;
+            totalLockedStake[resolver] = totalLocked - reduction;
+        }
+    }
+
+    function _slashBond(
+        address resolver,
+        uint256 amount
+    ) internal returns (uint256 stableSlashed, uint256 sewSlashed) {
         BondComposition storage bond = resolverBonds[resolver];
 
         // Clamp amount to available bond (prevents underflow after multiple slashes)
@@ -1035,6 +1099,11 @@ contract ResolverStakingModule is IStakingModule, AccessControl, ReentrancyGuard
         address slashedFor
     ) external onlyRole(ROLE_SLASHING_MODULE) returns (uint256 stableSlashed, uint256 sewSlashed) {
         BondComposition storage bond = resolverBonds[senior];
+
+        uint256 freeStake = bond.effectiveBondUSD > totalLockedStake[senior]
+            ? bond.effectiveBondUSD - totalLockedStake[senior]
+            : 0;
+        if (amount > freeStake) amount = freeStake;
 
         // Clamp amount to available bond (prevents underflow after multiple slashes)
         if (amount > bond.effectiveBondUSD) {
@@ -1195,14 +1264,47 @@ contract ResolverStakingModule is IStakingModule, AccessControl, ReentrancyGuard
      * @notice Set resolution module address
      */
     function setResolutionModule(address module) external onlyRole(ROLE_TIMELOCK) {
+        if (module == address(0)) revert ZeroModuleAddress();
+        if (activeResolutionAssignments != 0) revert ActiveResolutionAssignments(activeResolutionAssignments);
+        address oldModule = resolutionModule;
+        if (oldModule == module) return;
+        if (oldModule != address(0)) _revokeRole(ROLE_RESOLUTION_MODULE, oldModule);
         _grantRole(ROLE_RESOLUTION_MODULE, module);
+        resolutionModule = module;
     }
 
     /**
      * @notice Set slashing module address
      */
     function setSlashingModule(address module) external onlyRole(ROLE_TIMELOCK) {
+        if (module == address(0)) revert ZeroModuleAddress();
+        address oldModule = slashingModule;
+        if (oldModule == module) return;
+        if (oldModule != address(0)) {
+            (bool ok, bytes memory result) = oldModule.staticcall(abi.encodeWithSignature("totalPendingSlashCount()"));
+            if (!ok || result.length != 32) revert PendingSlashingOperations(type(uint256).max);
+            uint256 pending = abi.decode(result, (uint256));
+            if (pending != 0) revert PendingSlashingOperations(pending);
+            _revokeRole(ROLE_SLASHING_MODULE, oldModule);
+        }
         slashingModule = module;
         _grantRole(ROLE_SLASHING_MODULE, module);
+    }
+
+    /// @notice Revoke a stale resolution-module role after active assignments are reconciled.
+    function revokeStaleResolutionModule(address module) external onlyRole(ROLE_TIMELOCK) {
+        if (activeResolutionAssignments != 0) revert ActiveResolutionAssignments(activeResolutionAssignments);
+        if (module == resolutionModule) revert ZeroModuleAddress();
+        _revokeRole(ROLE_RESOLUTION_MODULE, module);
+    }
+
+    /// @notice Revoke a stale slashing-module role after its pending operations are cleared.
+    function revokeStaleSlashingModule(address module) external onlyRole(ROLE_TIMELOCK) {
+        (bool ok, bytes memory result) = module.staticcall(abi.encodeWithSignature("totalPendingSlashCount()"));
+        if (!ok || result.length != 32) revert PendingSlashingOperations(type(uint256).max);
+        uint256 pending = abi.decode(result, (uint256));
+        if (pending != 0) revert PendingSlashingOperations(pending);
+        if (module == slashingModule) revert ZeroModuleAddress();
+        _revokeRole(ROLE_SLASHING_MODULE, module);
     }
 }

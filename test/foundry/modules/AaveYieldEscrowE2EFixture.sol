@@ -159,6 +159,8 @@ abstract contract AaveYieldEscrowE2EFixture is Test {
         // Incentive module wired into DRM
         vm.prank(timelock);
         resolutionModule.setIncentiveModule(address(incentiveModule));
+        vm.prank(timelock);
+        incentiveModule.setResolutionModule(address(resolutionModule));
 
         // Resolution module snapshotted for the vault (via governance timelock)
         adminContract.queueResolutionModule(address(escrow), address(resolutionModule));

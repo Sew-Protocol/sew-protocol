@@ -100,6 +100,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
         resolutionModule.registerEscrowContract(address(escrow));
         incentiveModule.registerEscrowContract(address(escrow));
         resolutionModule.setIncentiveModule(address(incentiveModule));
+        incentiveModule.setResolutionModule(address(resolutionModule));
         vm.stopPrank();
         
         // Register escrow with moduleManagement and grant role
@@ -373,7 +374,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
             workflowIds[i] = i;
             incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
                 i,
-                address(this),
+                address(escrow),
                 user1,
                 user1,
                 BOND_AMOUNT,
@@ -387,7 +388,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
             workflowIds[i] = i;
             incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
                 i,
-                address(this),
+                address(escrow),
                 user1,
                 user1,
                 BOND_AMOUNT,
@@ -401,7 +402,7 @@ contract EscalationDepthHistogramIntegrationTest is Test {
             workflowIds[i] = i;
             incentiveModule.recordAppealBond{value: BOND_AMOUNT}(
                 i,
-                address(this),
+                address(escrow),
                 user1,
                 user1,
                 BOND_AMOUNT,
@@ -419,8 +420,8 @@ contract EscalationDepthHistogramIntegrationTest is Test {
         uint256 actualRound2 = 0;
 
         for (uint256 i = 0; i < 100; i++) { // Scan reasonable range
-            if (incentiveModule.hasAppealBond(i, address(this), 1)) actualRound1++;
-            if (incentiveModule.hasAppealBond(i, address(this), 2)) actualRound2++;
+            if (incentiveModule.hasAppealBond(i, address(escrow), 1)) actualRound1++;
+            if (incentiveModule.hasAppealBond(i, address(escrow), 2)) actualRound2++;
         }
 
         // Verify histogram matches actual counts

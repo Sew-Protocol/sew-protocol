@@ -14,6 +14,12 @@ import '../../../contracts/admin/EscrowGovernanceTimelock.sol';
 import '../../../packages/sew-core/contracts/core/BondCollector.sol';
 import '../../../packages/sew-core/contracts/types/EscrowTypes.sol';
 
+contract FailingDisputeFinalizationHook {
+    function onDisputeFinalized(uint256, address, uint8, ResolutionOutcome) external pure {
+        revert('finalization hook failed');
+    }
+}
+
 /**
  * @title DisputeCapacityExhaustionTest
  * @notice Tests for resolver capacity enforcement and the capacity-counter decrement fix.
@@ -26,7 +32,7 @@ import '../../../packages/sew-core/contracts/types/EscrowTypes.sol';
  *   - The counter increments when a dispute is opened via the escrow
  *   - The counter decrements when a dispute is finalized via executePendingSettlement
  *   - Capacity is freed after finalization, allowing a new dispute to be opened
- *   - decrementResolverActiveDisputes is access-controlled
+ *   - Capacity cannot be released by an unkeyed external decrement
  */
 contract DisputeCapacityExhaustionTest is Test {
     // ─── Contracts ──────────────────────────────────────────────────────────────
@@ -203,40 +209,7 @@ contract DisputeCapacityExhaustionTest is Test {
         drm.initializeDispute(1, address(this), resolver1, bytes32(0));
     }
 
-    function test_DRM_DecrementReducesCounter() public {
-        vm.prank(timelock);
-        drm.setResolverCapacity(resolver1, 5, true);
-
-        // Open two disputes directly
-        drm.initializeDispute(1, address(this), resolver1, bytes32(0));
-        drm.initializeDispute(2, address(this), resolver1, bytes32(0));
-        assertEq(_currentDisputes(resolver1), 2);
-
-        // Decrement once
-        drm.decrementResolverActiveDisputes(resolver1);
-        assertEq(_currentDisputes(resolver1), 1);
-
-        // Decrement again
-        drm.decrementResolverActiveDisputes(resolver1);
-        assertEq(_currentDisputes(resolver1), 0);
-    }
-
-    function test_DRM_DecrementDoesNotUnderflow() public {
-        vm.prank(timelock);
-        drm.setResolverCapacity(resolver1, 5, true);
-
-        // Counter is 0, decrement should be a no-op
-        drm.decrementResolverActiveDisputes(resolver1);
-        assertEq(_currentDisputes(resolver1), 0);
-    }
-
-    function test_DRM_DecrementRevertsForNonEscrowContract() public {
-        vm.prank(makeAddr('unauthorized'));
-        vm.expectRevert();
-        drm.decrementResolverActiveDisputes(resolver1);
-    }
-
-    function test_DRM_CapacityFreedAllowsReuseAfterDecrement() public {
+    function test_DRM_CapacityFreedOnlyAfterFinalization() public {
         vm.prank(timelock);
         drm.setResolverCapacity(resolver1, 1, true);
 
@@ -244,13 +217,91 @@ contract DisputeCapacityExhaustionTest is Test {
         drm.initializeDispute(1, address(this), resolver1, bytes32(0));
         assertEq(_currentDisputes(resolver1), 1);
 
-        // Decrement (simulates finalization)
-        drm.decrementResolverActiveDisputes(resolver1);
+        // Capacity is released by a one-time, resolved workflow transition.
+        drm.recordResolution(1, address(this), resolver1, ResolutionOutcome.RELEASE, 1 days);
+        vm.warp(block.timestamp + 3 days);
+        drm.finalizeDispute(1, address(this));
         assertEq(_currentDisputes(resolver1), 0);
 
         // Can open a new dispute now
         drm.initializeDispute(2, address(this), resolver1, bytes32(0));
         assertEq(_currentDisputes(resolver1), 1);
+    }
+
+    function test_DRM_EscrowCannotMutateAnotherRegisteredEscrowBySuppliedAddress() public {
+        vm.prank(timelock);
+        drm.setResolverCapacity(resolver1, 5, true);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(DecentralizedResolutionModule.NotRegisteredEscrowContract.selector, address(this))
+        );
+        drm.initializeDispute(77, address(escrow), resolver1, bytes32(0));
+    }
+
+    function test_DRM_EscalationEntryPointsRequireTargetEscrowCaller() public {
+        bytes memory emptyData = '';
+        vm.expectRevert(
+            abi.encodeWithSelector(DecentralizedResolutionModule.NotRegisteredEscrowContract.selector, address(this))
+        );
+        drm.executeEscalation(1, address(escrow), emptyData);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(DecentralizedResolutionModule.NotRegisteredEscrowContract.selector, address(this))
+        );
+        drm.executeEscalationWithQuote(1, address(escrow), emptyData, bytes32(0));
+    }
+
+    function test_DRM_OnlyAssignedResolverCanRecordOneDecisionPerRound() public {
+        vm.prank(timelock);
+        drm.setResolverCapacity(resolver1, 5, true);
+        drm.initializeDispute(78, address(this), resolver1, bytes32(0));
+
+        address wrongResolver = makeAddr('wrongResolver');
+        vm.expectRevert(
+            abi.encodeWithSelector(DecentralizedResolutionModule.NotAuthorizedResolver.selector, wrongResolver)
+        );
+        drm.recordResolution(78, address(this), wrongResolver, ResolutionOutcome.RELEASE, 1 days);
+
+        drm.recordResolution(78, address(this), resolver1, ResolutionOutcome.RELEASE, 1 days);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                DecentralizedResolutionModule.DecisionAlreadyRecorded.selector,
+                address(this), 78, 0
+            )
+        );
+        drm.recordResolution(78, address(this), resolver1, ResolutionOutcome.CANCEL, 1 days);
+    }
+
+    function test_DRM_FinalDecisionCannotBeOverwritten() public {
+        vm.prank(timelock);
+        drm.setResolverCapacity(resolver1, 5, true);
+        drm.initializeDispute(79, address(this), resolver1, bytes32(0));
+        drm.recordResolution(79, address(this), resolver1, ResolutionOutcome.RELEASE, 1 days);
+        vm.warp(block.timestamp + 3 days);
+        drm.finalizeDispute(79, address(this));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(DecentralizedResolutionModule.AlreadyFinalized.selector, 79)
+        );
+        drm.recordResolution(79, address(this), resolver1, ResolutionOutcome.CANCEL, 1 days);
+    }
+
+    function test_DRM_FinalizationHookFailureRollsBackTerminalState() public {
+        uint256 wid = _createEscrow();
+        _openDispute(wid);
+        uint256 activeBefore = drm.activeDisputeCount();
+        FailingDisputeFinalizationHook failingHook = new FailingDisputeFinalizationHook();
+
+        vm.prank(timelock);
+        drm.setIncentiveModule(address(failingHook));
+
+        vm.prank(address(escrow));
+        vm.expectRevert(bytes('finalization hook failed'));
+        drm.closeDisputeByMutualAgreement(wid, address(escrow));
+
+        DecentralizedResolutionModule.DisputeMetadata memory dm = drm.getDisputeMetadata(wid, address(escrow));
+        assertEq(uint8(dm.status), uint8(DecentralizedResolverStructs.DisputeStatus.Open));
+        assertEq(drm.activeDisputeCount(), activeBefore);
     }
 
     // ============================================================

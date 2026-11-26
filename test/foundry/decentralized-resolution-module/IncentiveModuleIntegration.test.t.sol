@@ -140,6 +140,11 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
         vm.prank(timelock);
         incentiveModuleV2.registerEscrowContract(address(resolutionModule));
 
+        vm.prank(timelock);
+        incentiveModuleV1.setResolutionModule(address(resolutionModule));
+        vm.prank(timelock);
+        incentiveModuleV2.setResolutionModule(address(resolutionModule));
+
         // Set incentive module in resolution module
         vm.prank(timelock);
         resolutionModule.setIncentiveModule(address(incentiveModuleV1));
@@ -176,6 +181,17 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
         vm.startPrank(timelock);
         resolutionModule.setExternalResolver(address(proxy));
         vm.stopPrank();
+    }
+
+    function _recordResolution(
+        uint256 workflowId,
+        address escrowContract,
+        address resolver,
+        ResolutionOutcome outcome,
+        uint256 resolutionTime
+    ) internal {
+        vm.prank(escrowContract);
+        resolutionModule.recordResolution(workflowId, escrowContract, resolver, outcome, resolutionTime);
     }
 
     // ============ onDisputeOpened Integration Tests ============
@@ -294,8 +310,7 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
         vm.stopPrank();
 
         // EscrowDisputeLogic enforces "decision exists before appeal"
-        vm.prank(address(this));
-        resolutionModule.recordResolution(workflowId, address(escrow),
+        _recordResolution(workflowId, address(escrow),
             resolver1,
             // RELEASE → recipient wins, so sender (user1) can appeal
             ResolutionOutcome.RELEASE,
@@ -378,8 +393,7 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
         vm.stopPrank();
 
         // EscrowDisputeLogic enforces "decision exists before appeal"
-        vm.prank(address(this));
-        resolutionModule.recordResolution(workflowId, address(escrow),
+        _recordResolution(workflowId, address(escrow),
             resolver1,
             // RELEASE → recipient wins, so sender (user1) can appeal
             ResolutionOutcome.RELEASE,
@@ -403,7 +417,7 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
         vm.stopPrank();
 
         // Try to record again - should fail (bond already exists)
-        vm.prank(address(bondCollector));
+        vm.prank(address(escrow));
         vm.expectRevert('Bond already exists');
         incentiveModuleV2.recordAppealBond(
             workflowId,
@@ -463,8 +477,7 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
         vm.stopPrank();
 
         // Simulate decision at round 0 (CANCEL)
-        vm.prank(address(this));
-        resolutionModule.recordResolution(workflowId, address(escrow),
+        _recordResolution(workflowId, address(escrow),
             resolver1,
             ResolutionOutcome.CANCEL,
             1 days
@@ -487,18 +500,13 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
         vm.stopPrank();
 
         // Simulate decision at round 1 (RELEASE) - reversal!
-        vm.prank(address(this));
-        resolutionModule.recordResolution(workflowId, address(escrow),
+        _recordResolution(workflowId, address(escrow),
             seniorResolver,
             ResolutionOutcome.RELEASE,
             1 days
         );
 
-        // Record reversal - should trigger bond distribution
-        uint256 balanceBefore = user1.balance;
-        vm.prank(address(this));
-        resolutionModule.recordReversal(workflowId, address(escrow), 0);
-
+        // The round decision atomically records reversal and distributes its bond.
         // Verify bond was refunded (outcomeFlipped = true)
         ResolverIncentiveModule.AppealBondRecord memory bond = incentiveModuleV2.getAppealBond(
             workflowId,
@@ -507,6 +515,15 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
         );
         assertTrue(bond.distributed, 'Bond should be distributed');
         assertTrue(bond.refunded, 'Bond should be refunded');
+
+        vm.prank(address(escrow));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                DecentralizedResolutionModule.ReversalAlreadyProcessed.selector,
+                address(escrow), workflowId, 0
+            )
+        );
+        resolutionModule.recordReversal(workflowId, address(escrow), 0);
 
         // Note: In actual implementation, refund happens via transfer
         // This test verifies the state change
@@ -557,8 +574,7 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
         vm.stopPrank();
 
         // Simulate decision at round 0 (CANCEL)
-        vm.prank(address(this));
-        resolutionModule.recordResolution(workflowId, address(escrow),
+        _recordResolution(workflowId, address(escrow),
             resolver1,
             ResolutionOutcome.CANCEL,
             1 days
@@ -581,8 +597,7 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
         vm.stopPrank();
 
         // Simulate decision at round 1 (CANCEL) - same as round 0, appeal failed
-        vm.prank(address(this));
-        resolutionModule.recordResolution(workflowId, address(escrow),
+        _recordResolution(workflowId, address(escrow),
             seniorResolver,
             ResolutionOutcome.CANCEL,
             1 days
@@ -656,8 +671,7 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
         );
 
         // Round 0 decision: RELEASE => sender (user1) may appeal.
-        vm.prank(address(this));
-        resolutionModule.recordResolution(workflowId, address(escrow), resolver1, ResolutionOutcome.RELEASE, 1 days);
+        _recordResolution(workflowId, address(escrow), resolver1, ResolutionOutcome.RELEASE, 1 days);
 
         (uint256 bond1, ) = resolutionModule.getRequiredAppealBond(workflowId, address(escrow), 0, escrowData);
         vm.startPrank(user1);
@@ -666,8 +680,7 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
         vm.stopPrank();
 
         // Round 1 decision: RELEASE again => sender (user1) may appeal to round 2.
-        vm.prank(address(this));
-        resolutionModule.recordResolution(workflowId, address(escrow), seniorResolver, ResolutionOutcome.RELEASE, 1 days);
+        _recordResolution(workflowId, address(escrow), seniorResolver, ResolutionOutcome.RELEASE, 1 days);
 
         (uint256 bond2, ) = resolutionModule.getRequiredAppealBond(workflowId, address(escrow), 1, escrowData);
         vm.startPrank(user1);
@@ -729,15 +742,14 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
         // Record 3 resolvers at round 0
         vm.prank(address(this));
         try incentiveModuleV2.recordResolver(workflowId, address(escrow), resolver1, 0) {} catch {}
-        vm.prank(address(this));
+        vm.prank(address(resolutionModule));
         incentiveModuleV2.recordResolver(workflowId, address(escrow), resolver2, 0);
         address resolver3 = makeAddr('resolver3');
-        vm.prank(address(this));
+        vm.prank(address(resolutionModule));
         incentiveModuleV2.recordResolver(workflowId, address(escrow), resolver3, 0);
 
         // Simulate decision at round 0 (CANCEL) - required before appeal can be filed
-        vm.prank(address(this));
-        resolutionModule.recordResolution(workflowId, address(escrow),
+        _recordResolution(workflowId, address(escrow),
             resolver1,
             ResolutionOutcome.CANCEL,
             1 days
@@ -750,8 +762,7 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
         escrow.escalateDispute(workflowId);
         vm.stopPrank();
 
-        vm.prank(address(this));
-        resolutionModule.recordResolution(workflowId, address(escrow),
+        _recordResolution(workflowId, address(escrow),
             seniorResolver,
             ResolutionOutcome.CANCEL,
             1 days
@@ -805,7 +816,7 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
         token.mint(address(incentiveModuleV1), 100 ether);
 
         // Call distributePayments via interface
-        vm.prank(address(this));
+        vm.prank(address(escrow));
         incentiveModuleV1.distributePayments(workflowId, address(escrow), address(token), 50 ether);
 
         // Verify payments were calculated
@@ -859,8 +870,7 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
         escrow.raiseDispute(workflowId);
         vm.stopPrank();
 
-        vm.prank(address(this));
-        resolutionModule.recordResolution(workflowId, address(escrow), resolver1, ResolutionOutcome.CANCEL, 1 days);
+        _recordResolution(workflowId, address(escrow), resolver1, ResolutionOutcome.CANCEL, 1 days);
 
         (uint256 bondAmount, address bondToken) = resolutionModule.getRequiredAppealBond(
             workflowId,
@@ -916,8 +926,7 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
         uint256 wf1 = escrow.createEscrow(address(token), user2, 1000e18, EscrowSettings(address(0), address(0), YieldPreset.OFF, 0, 0));
         escrow.raiseDispute(wf1);
         vm.stopPrank();
-        vm.prank(address(this));
-        resolutionModule.recordResolution(wf1, address(escrow), resolver1, ResolutionOutcome.CANCEL, 1 days);
+        _recordResolution(wf1, address(escrow), resolver1, ResolutionOutcome.CANCEL, 1 days);
         (uint256 b1, address t1) = resolutionModule.getRequiredAppealBond(wf1, address(escrow), 0, abi.encode(address(token), user1, user2, 1000e18 - ((1000e18 * escrow.escrowFee()) / escrow.ESCROW_FEE_DENOMINATOR())));
         vm.startPrank(user2);
         token.approve(address(escrow), b1);
@@ -936,8 +945,7 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
         uint256 wf2 = escrow.createEscrow(address(token), user2, 1000e18, EscrowSettings(address(0), address(0), YieldPreset.OFF, 0, 0));
         escrow.raiseDispute(wf2);
         vm.stopPrank();
-        vm.prank(address(this));
-        resolutionModule.recordResolution(wf2, address(escrow), resolver1, ResolutionOutcome.CANCEL, 1 days);
+        _recordResolution(wf2, address(escrow), resolver1, ResolutionOutcome.CANCEL, 1 days);
         (uint256 b2, address t2) = resolutionModule.getRequiredAppealBond(wf2, address(escrow), 0, abi.encode(address(token), user1, user2, 1000e18 - ((1000e18 * escrow.escrowFee()) / escrow.ESCROW_FEE_DENOMINATOR())));
         vm.startPrank(user2);
         token.approve(address(escrow), b2 * 12 / 10); // account for escalation count scaling (10% per repeat)
@@ -973,8 +981,7 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
         uint256 wf = escrow.createEscrow(address(token), user2, 1000e18, EscrowSettings(address(0), address(0), YieldPreset.OFF, 0, 0));
         escrow.raiseDispute(wf);
         vm.stopPrank();
-        vm.prank(address(this));
-        resolutionModule.recordResolution(wf, address(escrow), resolver1, ResolutionOutcome.CANCEL, 1 days);
+        _recordResolution(wf, address(escrow), resolver1, ResolutionOutcome.CANCEL, 1 days);
 
         (uint256 bondAmount, address bondToken) = resolutionModule.getRequiredAppealBond(
             wf,
@@ -1021,8 +1028,7 @@ contract IncentiveModuleIntegrationTest is Test, KlerosHandoffFixture {
         uint256 wf = escrow.createEscrow(address(token), user2, 1000e18, EscrowSettings(address(0), address(0), YieldPreset.OFF, 0, 0));
         escrow.raiseDispute(wf);
         vm.stopPrank();
-        vm.prank(address(this));
-        resolutionModule.recordResolution(wf, address(escrow), resolver1, ResolutionOutcome.CANCEL, 1 days);
+        _recordResolution(wf, address(escrow), resolver1, ResolutionOutcome.CANCEL, 1 days);
 
         (uint256 bondAmount, address bondToken) = resolutionModule.getRequiredAppealBond(
             wf,

@@ -52,6 +52,7 @@ contract DRv2InvariantsTest is StdInvariant, Test {
         incentiveModuleV2.grantRole(ROLE_TIMELOCK, admin);
         resolutionModule.grantRole(ROLE_TIMELOCK, admin);
         incentiveModuleV2.registerEscrowContract(escrowContract);
+        incentiveModuleV2.setResolutionModule(escrowContract);
         resolutionModule.registerEscrowContract(escrowContract);
         resolutionModule.grantRole(ROLE_TIMELOCK, timelock);
         vm.stopPrank();
@@ -306,6 +307,7 @@ contract DRv2FuzzTest is Test {
         incentiveModuleV2.grantRole(ROLE_TIMELOCK, admin);
         resolutionModule.grantRole(ROLE_TIMELOCK, admin);
         incentiveModuleV2.registerEscrowContract(escrowContract);
+        incentiveModuleV2.setResolutionModule(escrowContract);
         resolutionModule.registerEscrowContract(escrowContract);
         resolutionModule.grantRole(ROLE_TIMELOCK, timelock);
         vm.stopPrank();

@@ -125,7 +125,14 @@ abstract contract DRMStorageBase is DecentralizedResolverStructs {
     // appeals and timeout replacement lock the same coverage amount.
     mapping(address => mapping(uint256 => uint256)) public workflowStakeExposureUSD;
     mapping(address => mapping(uint256 => address)) public workflowStakeResolver;
+    mapping(address => mapping(uint256 => mapping(uint8 => bool))) public reversalProcessed;
     mapping(address => mapping(uint256 => uint64)) public klerosHandoffCommittedAt;
+    uint256 public activeDisputeCount;
+    // Capacity is held by an exact active workflow assignment. This prevents
+    // duplicate or cross-workflow releases from decrementing aggregate counters.
+    mapping(address => mapping(uint256 => address)) public workflowCapacityResolver;
+    mapping(address => mapping(uint256 => uint8)) public workflowCapacityRound;
+    mapping(address => mapping(uint256 => bool)) public workflowCapacityAssignmentActive;
 
     function _resolutionConfig(address escrowContract, uint256 workflowId)
         internal

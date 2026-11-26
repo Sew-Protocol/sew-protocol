@@ -12,6 +12,8 @@ import "../../../packages/sew-core/contracts/core/EscrowCreationPolicy.sol";
 import "../../../packages/sew-core/contracts/interfaces/IYieldModule.sol";
 
 contract OverreportingModule is IYieldModule {
+    uint256 public observedAllowance;
+
     function initializeYield(
         uint256 /* escrowId */,
         address token,
@@ -19,6 +21,7 @@ contract OverreportingModule is IYieldModule {
         YieldPreset /* yieldMode */
     ) external override returns (uint256) {
         // Actually pull tokens so createEscrow succeeds
+        observedAllowance = IERC20(token).allowance(msg.sender, address(this));
         IERC20(token).transferFrom(msg.sender, address(this), amount);
         return amount;
     }
@@ -118,6 +121,9 @@ contract YieldDosBugTest is Test {
             autoCancelTime: 0
         }));
         vm.stopPrank();
+
+        assertEq(overreporter.observedAllowance(), 100 ether, 'module allowance must match this deposit');
+        assertEq(token.allowance(address(escrow), address(overreporter)), 0, 'residual allowance must be cleared');
 
         // 2. Try to release escrow
         // This SHOULD FAIL because the Vault tries to push 1000 ether of "yield" to YieldOps,

@@ -147,6 +147,7 @@ contract BondBehaviourCorrectionTest is Test {
         vm.prank(buyer);
         escrow.escalateDispute{value: 0}(WID);
         // Remove the bond before resolution — distributeAppealBond will fail
+        vm.prank(address(drm));
         v2.forfeitAppealBond(WID, address(escrow), 1, "consume");
         // recordResolution must revert because distributeAppealBond reverts
         vm.prank(address(escrow));
@@ -210,6 +211,7 @@ contract BondBehaviourCorrectionTest is Test {
         uint256 v2bal = token.balanceOf(address(v2));
         assertEq(v2bal, BOND, "V2 holds bond");
 
+        vm.prank(address(drm));
         v2.forfeitAppealBond(WID, address(this), 1, "test");
 
         assertEq(v2.forfeitedBondReserve(address(token)), BOND, "reserve = BOND");
@@ -222,6 +224,7 @@ contract BondBehaviourCorrectionTest is Test {
 
     function test_finalize_moves_to_reserve() public {
         _postDirectBond();
+        vm.prank(address(drm));
         v2.onDisputeFinalized(WID, address(this), 1, ResolutionOutcome.RELEASE);
         assertEq(v2.forfeitedBondReserve(address(token)), BOND, "reserve = BOND");
     }
@@ -232,7 +235,9 @@ contract BondBehaviourCorrectionTest is Test {
 
     function test_no_double_count_reserve_vs_claimable() public {
         _postDirectBond();
+        vm.prank(address(drm));
         v2.recordResolver(WID, address(this), resolver0, 0);
+        vm.prank(address(drm));
         v2.distributeAppealBond(WID, address(this), 0, false);
         assertEq(v2.getClaimablePayment(WID, address(this), resolver0), BOND, "claimable = BOND");
         assertEq(v2.forfeitedBondReserve(address(token)), 0, "reserve = 0");
@@ -245,6 +250,7 @@ contract BondBehaviourCorrectionTest is Test {
     function test_regular_claim_still_works() public {
         _postDirectBond();
         assertEq(v2.claimableBondRefunds(address(this), WID, buyer), 0, "empty before");
+        vm.prank(address(drm));
         v2.distributeAppealBond(WID, address(this), 0, true);
         assertEq(v2.claimableBondRefunds(address(this), WID, buyer), BOND, "claimable after");
 
@@ -344,6 +350,7 @@ contract BondBehaviourCorrectionTest is Test {
         token.mint(buyer, BOND);
         vm.prank(buyer);
         token.approve(address(v2), BOND);
+        vm.prank(address(this));
         v2.recordAppealBond(WID, address(this), buyer, buyer, BOND, address(token), 1);
     }
 }

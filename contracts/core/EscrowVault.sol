@@ -77,11 +77,11 @@ contract EscrowVault is EscrowAppealEnabled {
     }
     function _depositForYield(IYieldModule generationModule, uint256 workflowId, address token, uint256 amount) internal override {
         address m = address(generationModule);
-        if (IERC20(token).allowance(address(this), m) < amount) {
-            IERC20(token).safeIncreaseAllowance(m, type(uint256).max);
-        }
+        IERC20(token).forceApprove(m, 0);
+        IERC20(token).forceApprove(m, amount);
         uint256 b = IERC20(token).balanceOf(address(this));
         uint256 accepted = generationModule.initializeYield(workflowId, token, amount, YieldPreset.OFF);
+        IERC20(token).forceApprove(m, 0);
         if (b - IERC20(token).balanceOf(address(this)) < accepted) revert AccountingDeficit(token, amount);
         
         // Store v2.5 yield tracking data

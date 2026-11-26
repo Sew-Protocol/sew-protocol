@@ -279,15 +279,16 @@ contract BondLedgerDifferential is Test {
 
     function _runRefundScenario(Stack memory s) internal {
         _createAndDispute(s);
-        _resolve(s, r0, true);          // round 0 RELEASE
+        _resolve(s, true);              // round 0 RELEASE by the assigned resolver
         vm.prank(buyer);
         s.escrow.escalateDispute{value: 0}(WID);
-        _resolve(s, senior, false);      // round 1 CANCEL (flip → refund)
+        _resolve(s, false);             // round 1 CANCEL (flip → refund)
     }
 
     function _postDirectEthBond(Stack memory s) internal {
         // msg.sender = test contract (registered escrow); depositor = buyer (ETH rule)
-        vm.deal(address(this), BOND);
+        vm.deal(address(s.escrow), BOND);
+        vm.prank(address(s.escrow));
         s.incentive.recordAppealBond{value: BOND}(WID, address(s.escrow), buyer, buyer, BOND, address(0), 1);
     }
 
@@ -300,10 +301,10 @@ contract BondLedgerDifferential is Test {
 
     function _runFailedAppealScenario(Stack memory s) internal {
         _createAndDispute(s);
-        _resolve(s, r0, true);          // round 0 RELEASE
+        _resolve(s, true);              // round 0 RELEASE by the assigned resolver
         vm.prank(buyer);
         s.escrow.escalateDispute{value: 0}(WID);
-        _resolve(s, senior, true);       // round 1 RELEASE (same → resolver payout)
+        _resolve(s, true);              // round 1 RELEASE (same → resolver payout)
     }
 
     function _runOddSplitScenario(Stack memory s) internal {
@@ -312,10 +313,10 @@ contract BondLedgerDifferential is Test {
         // Record additional distinct resolvers at level 0 until there are three.
         _ensureThreeLevel0Resolvers(s);
 
-        _resolve(s, r0, true);
+        _resolve(s, true);
         vm.prank(buyer);
         s.escrow.escalateDispute{value: 0}(WID);
-        _resolve(s, senior, true);
+        _resolve(s, true);
     }
 
     function _ensureThreeLevel0Resolvers(Stack memory s) internal {
@@ -331,7 +332,7 @@ contract BondLedgerDifferential is Test {
         address[3] memory candidates = [r0, r1, r2];
         for (uint256 i = 0; i < 3; i++) {
             if (present[i]) continue;
-            vm.prank(address(s.escrow));
+            vm.prank(address(s.drm));
             s.incentive.recordResolver(WID, address(s.escrow), candidates[i], 0);
         }
     }
@@ -339,9 +340,10 @@ contract BondLedgerDifferential is Test {
     function _runForfeitScenario(Stack memory s) internal {
         _postDirectBond(s);
         if (s.bonded) {
+            vm.prank(address(s.drm));
             s.facade.forfeitAppealBondLedger(WID, address(s.escrow), 1, "test");
         } else {
-            vm.prank(address(s.escrow));
+            vm.prank(address(s.drm));
             s.incentive.forfeitAppealBond(WID, address(s.escrow), 1, "test");
         }
     }
@@ -356,7 +358,8 @@ contract BondLedgerDifferential is Test {
         s.token.mint(buyer, BOND);
         vm.prank(buyer);
         s.token.approve(address(s.incentive), BOND);
-        // msg.sender = test contract (registered escrow); depositor = buyer
+        // Bond posting is escrow authenticated; the DRM controls disposition.
+        vm.prank(address(s.escrow));
         s.incentive.recordAppealBond(WID, address(s.escrow), buyer, buyer, BOND, address(s.token), 1);
     }
 
@@ -504,7 +507,7 @@ contract BondLedgerDifferential is Test {
 
         vm.prank(timelock);
         s.drm.queueEscalationConfig(1, DecentralizedResolverStructs.EscalationConfig({
-            resolver: address(0), fee: 0, enabled: true
+            resolver: senior, fee: 0, enabled: true
         }));
         { (, uint64 eta2,) = s.drm.getPendingEscalationConfig(1); vm.warp(eta2 + 1); }
         vm.prank(timelock);
@@ -534,9 +537,10 @@ contract BondLedgerDifferential is Test {
         vm.stopPrank();
     }
 
-    function _resolve(Stack memory s, address by, bool isRelease) internal {
+    function _resolve(Stack memory s, bool isRelease) internal {
         ResolutionOutcome o = isRelease ? ResolutionOutcome.RELEASE : ResolutionOutcome.CANCEL;
+        (address assignedResolver,) = s.drm.getDisputeResolver(WID, address(s.escrow), bytes(""));
         vm.prank(address(s.escrow));
-        s.drm.recordResolution(WID, address(s.escrow), by, o, 100);
+        s.drm.recordResolution(WID, address(s.escrow), assignedResolver, o, 100);
     }
 }

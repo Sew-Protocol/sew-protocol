@@ -78,6 +78,7 @@ contract DirectResolutionConfigSelectionIntegrationTest is Test, KlerosHandoffFi
         incentive.registerEscrowContract(address(bondCollector));
         incentive.registerEscrowContract(address(drm));
         drm.setIncentiveModule(address(incentive));
+        incentive.setResolutionModule(address(drm));
 
         vault.setResolutionModule(address(drm));
         escrowToken.setResolutionModule(address(drm));

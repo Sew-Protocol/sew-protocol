@@ -470,6 +470,7 @@
         "contracts/registry/ModuleRegistry.sol",
         "test/foundry/core/EscrowAccountingBugTests.t.sol",
         "test/foundry/core/EscrowCreationPolicy.t.sol",
+        "test/foundry/core/EscrowableERC20Bugs.t.sol",
         "test/foundry/core/ModuleManagementContract.t.sol",
         "test/foundry/core/MutualSplit.t.sol",
         "test/foundry/core/ReleaseEscrowEdgeCases.t.sol",

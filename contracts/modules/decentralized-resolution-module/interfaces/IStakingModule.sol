@@ -186,6 +186,19 @@ interface IStakingModule {
      */
     function unlockStake(uint256 workflowId, address escrowContract, address resolver) external;
 
+    /// @notice Slash free stake and only the locked collateral assigned to this workflow.
+    function slashForAssignment(
+        address resolver,
+        uint256 amount,
+        address escrowContract,
+        uint256 workflowId
+    ) external returns (uint256 stableSlashed, uint256 sewSlashed);
+
+    function lockedStakes(address escrowContract, uint256 workflowId, address resolver)
+        external
+        view
+        returns (uint256);
+
     /// @notice Record a USD-denominated vindication receivable without increasing bonded stake.
     function recordVindicationReceivable(address resolver, uint256 amountUSD) external;
 

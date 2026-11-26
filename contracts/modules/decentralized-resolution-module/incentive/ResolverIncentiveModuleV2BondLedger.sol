@@ -48,7 +48,7 @@ contract ResolverIncentiveModuleV2BondLedger is ResolverIncentiveModule {
         uint256 amount,
         address token,
         uint8 round
-    ) external payable override onlyEscrowContract {
+    ) external payable override onlyEscrowContractFor(escrowContract) {
         require(depositor != address(0), 'Invalid depositor');
         require(escalatedBy != address(0), 'Invalid escalatedBy');
         require(amount > 0, 'Invalid amount');
@@ -92,7 +92,7 @@ contract ResolverIncentiveModuleV2BondLedger is ResolverIncentiveModule {
         address escrowContract,
         uint8 round,
         bool outcomeFlipped
-    ) external override nonReentrant onlyEscrowOrResolutionModule {
+    ) external override nonReentrant onlyResolutionModule {
         require(round < 2, 'Invalid round - no higher round');
         uint8 bondRound = round + 1;
         bytes32 bondId = _bondId(escrowContract, workflowId, bondRound);
@@ -150,7 +150,7 @@ contract ResolverIncentiveModuleV2BondLedger is ResolverIncentiveModule {
         address escrowContract,
         uint8 round,
         string calldata reason
-    ) external nonReentrant onlyEscrowContract {
+    ) external nonReentrant onlyResolutionModule {
         bytes32 bondId = _bondId(escrowContract, workflowId, round);
         IBondLedger.BondPosition memory pos = bondLedger.getBond(bondId);
         require(pos.principal > 0, 'No bond recorded');
@@ -172,7 +172,7 @@ contract ResolverIncentiveModuleV2BondLedger is ResolverIncentiveModule {
         address escrowContract,
         uint8 finalRound,
         ResolutionOutcome finalDecision
-    ) external override onlyEscrowOrResolutionModule {
+    ) external override onlyResolutionModule {
         for (uint8 round = 0; round <= finalRound; round++) {
             bytes32 bondId = _bondId(escrowContract, workflowId, round);
             if (!bondLedger.hasBond(bondId)) continue;

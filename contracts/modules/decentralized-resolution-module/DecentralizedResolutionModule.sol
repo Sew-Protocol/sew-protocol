@@ -58,6 +58,10 @@ contract DecentralizedResolutionModule is
     error InvalidDisputeTimeout(uint256 timeout, uint256 minTimeout, uint256 maxTimeout);
     error NotSeniorResolver(address caller);
     error NotAuthorizedResolver(address caller);
+    error DecisionAlreadyRecorded(address escrowContract, uint256 workflowId, uint8 round);
+    error ReversalAlreadyProcessed(address escrowContract, uint256 workflowId, uint8 round);
+    error ActiveDisputeCounterUnderflow();
+    error InvalidResolutionOutcome();
     error InvalidLevel(uint8 level, uint8 maxLevel);
     error WeightExceedsMaximum(uint256 weight, uint256 maxWeight);
     error InvalidAlpha(uint256 alphaBps, uint256 maxAlpha);
@@ -68,6 +72,7 @@ contract DecentralizedResolutionModule is
     error InvalidResolver(address resolver);
     error InvalidSeniorResolver(address resolver);
     error CannotRemoveResolver(address resolver, uint256 activeDisputes);
+    error ResolverAssignmentMismatch(address escrowContract, uint256 workflowId, uint8 round, address assigned, address current);
     error Unauthorized(address caller);
     error AlreadyPaused();
     error NotPaused();
@@ -90,6 +95,14 @@ contract DecentralizedResolutionModule is
     // ============ Modifiers ============
     modifier onlyEscrowContract() {
         if (!registeredEscrowContracts[_msgSender()]) revert NotRegisteredEscrowContract(_msgSender());
+        _;
+    }
+
+    modifier onlyEscrowContractFor(address escrowContract) {
+        address caller = _msgSender();
+        if (caller != escrowContract || !registeredEscrowContracts[caller]) {
+            revert NotRegisteredEscrowContract(caller);
+        }
         _;
     }
 
@@ -351,7 +364,7 @@ contract DecentralizedResolutionModule is
         uint256 workflowId,
         address escrowContract,
         bytes calldata escrowData
-    ) external override nonReentrant returns (bool success, address newResolver, uint8 newLevel) {
+    ) external override nonReentrant onlyEscrowContractFor(escrowContract) returns (bool success, address newResolver, uint8 newLevel) {
         return _executeEscalation(workflowId, escrowContract, escrowData, bytes32(0));
     }
 
@@ -368,7 +381,7 @@ contract DecentralizedResolutionModule is
         address escrowContract,
         bytes calldata escrowData,
         bytes32 expectedResolutionQuoteRoot
-    ) external override nonReentrant returns (bool success, address newResolver, uint8 newLevel) {
+    ) external override nonReentrant onlyEscrowContractFor(escrowContract) returns (bool success, address newResolver, uint8 newLevel) {
         return _executeEscalation(workflowId, escrowContract, escrowData, expectedResolutionQuoteRoot);
     }
 
@@ -378,8 +391,7 @@ contract DecentralizedResolutionModule is
         bytes calldata escrowData,
         bytes32 resolutionQuoteRoot,
         bytes32 klerosConfigRoot
-    ) external override nonReentrant onlyEscrowContract returns (bytes32 handoffRoot) {
-        if (escrowContract != _msgSender()) revert NotRegisteredEscrowContract(_msgSender());
+    ) external override nonReentrant onlyEscrowContractFor(escrowContract) returns (bytes32 handoffRoot) {
         IResolutionModule.ResolutionAppealQuote memory quote = _quoteAppealTransition(workflowId, escrowContract, escrowData);
         if (!quote.appealable || quote.successorRound != 2 || quote.resolutionQuoteRoot != resolutionQuoteRoot) {
             revert('Invalid Kleros handoff quote');
@@ -410,8 +422,7 @@ contract DecentralizedResolutionModule is
         bytes32 handoffRoot,
         bytes32 klerosConfigRoot,
         uint256 klerosDisputeId
-    ) external override nonReentrant onlyEscrowContract returns (bool success, address newResolver, uint8 newLevel) {
-        if (escrowContract != _msgSender()) revert NotRegisteredEscrowContract(_msgSender());
+    ) external override nonReentrant onlyEscrowContractFor(escrowContract) returns (bool success, address newResolver, uint8 newLevel) {
         PreparedKlerosHandoff memory prepared = _preparedKlerosHandoffs[escrowContract][workflowId];
         if (!prepared.exists || prepared.handoffRoot != handoffRoot || prepared.resolutionQuoteRoot != resolutionQuoteRoot
             || prepared.klerosConfigRoot != klerosConfigRoot) {
@@ -487,14 +498,14 @@ contract DecentralizedResolutionModule is
             );
         }
         if (!externalArbitrationRound) {
-            _decrementActiveAssignment(priorResolver);
-            nextCapacity.currentDisputes++;
-            resolverActiveDisputes[nextRes]++;
+            _releaseResolverCapacity(escrowContract, workflowId);
+            _assignResolverCapacity(escrowContract, workflowId, toRound, nextRes);
             workflowStakeResolver[escrowContract][workflowId] = nextRes;
         }
 
         dm.currentRound = toRound;
         dm.resolverAtRound[toRound] = nextRes;
+        dm.status = DisputeStatus.Open;
         dm.assignedAt = block.timestamp;
         dm.resolveBy = block.timestamp + _resolutionConfig(escrowContract, workflowId).resolveDeadlines[toRound];
         if (!externalArbitrationRound) resolverStats[nextRes].casesAssigned++;
@@ -502,9 +513,7 @@ contract DecentralizedResolutionModule is
         emit ResolverAssigned(workflowId, nextRes, dm.categoryKey, toRound);
 
         if (address(incentiveModule) != address(0)) {
-            try incentiveModule.onResolverAssigned(workflowId, escrowContract, nextRes, toRound) {} catch {
-                emit IncentiveModuleCallFailed(workflowId, 'onResolverAssigned', 'FAILED');
-            }
+            incentiveModule.onResolverAssigned(workflowId, escrowContract, nextRes, toRound);
         }
 
         return (true, nextRes, toRound);
@@ -585,7 +594,7 @@ contract DecentralizedResolutionModule is
         uint256 workflowId,
         address escrowContract,
         bytes32 categoryKey
-    ) external onlyEscrowContract {
+    ) external onlyEscrowContractFor(escrowContract) {
         escrowCategory[escrowContract][workflowId] = categoryKey;
         emit EscrowCategorySet(workflowId, escrowContract, categoryKey);
     }
@@ -595,7 +604,7 @@ contract DecentralizedResolutionModule is
         address escrowContract,
         address resolver,
         bytes32 categoryKey
-    ) external onlyEscrowContract {
+    ) external onlyEscrowContractFor(escrowContract) {
         DisputeMetadata storage dm = disputeMetadata[escrowContract][workflowId];
         if (dm.resolverAtRound[0] != address(0)) revert AlreadyInitialized(workflowId);
 
@@ -613,12 +622,12 @@ contract DecentralizedResolutionModule is
             IStakingModule(stakingModule).onResolverAssigned(workflowId, escrowContract, resolver, 0);
         }
 
-        capacity.currentDisputes++;
-        resolverActiveDisputes[resolver]++;
+        _assignResolverCapacity(escrowContract, workflowId, 0, resolver);
 
         dm.currentRound = 0;
         dm.status = DisputeStatus.Open;
         dm.resolverAtRound[0] = resolver;
+        activeDisputeCount++;
         dm.assignedAt = block.timestamp;
         dm.resolveBy = block.timestamp + _resolutionConfig(escrowContract, workflowId).resolveDeadlines[0];
         dm.categoryKey = categoryKey;
@@ -629,9 +638,7 @@ contract DecentralizedResolutionModule is
         emit ResolverAssigned(workflowId, resolver, categoryKey, 0);
 
         if (address(incentiveModule) != address(0)) {
-            try incentiveModule.onResolverAssigned(workflowId, escrowContract, resolver, 0) {} catch {
-                emit IncentiveModuleCallFailed(workflowId, 'onResolverAssigned', 'FAILED');
-            }
+            incentiveModule.onResolverAssigned(workflowId, escrowContract, resolver, 0);
         }
     }
 
@@ -639,7 +646,7 @@ contract DecentralizedResolutionModule is
         uint256 workflowId,
         address escrowContract,
         bytes calldata escrowData
-    ) external onlyEscrowContract {
+    ) external onlyEscrowContractFor(escrowContract) {
         _initializeDisputeWithCategory(workflowId, escrowContract, escrowData);
     }
 
@@ -649,7 +656,7 @@ contract DecentralizedResolutionModule is
         address escrowContract,
         bytes calldata escrowData,
         uint256 configVersion
-    ) external onlyEscrowContract {
+    ) external onlyEscrowContractFor(escrowContract) {
         // A workflow may open a dispute after its already-bound config is deprecated.
         // Deprecation blocks new selection, not the frozen workflow semantics.
         if (configVersion == 0 || configVersion > resolutionConfigCount) {
@@ -698,12 +705,12 @@ contract DecentralizedResolutionModule is
         }
         workflowStakeResolver[escrowContract][workflowId] = resolver;
 
-        capacity.currentDisputes++;
-        resolverActiveDisputes[resolver]++;
+        _assignResolverCapacity(escrowContract, workflowId, 0, resolver);
 
         dm.currentRound = 0;
         dm.status = DisputeStatus.Open;
         dm.resolverAtRound[0] = resolver;
+        activeDisputeCount++;
         dm.assignedAt = block.timestamp;
         dm.resolveBy = block.timestamp + _resolutionConfig(escrowContract, workflowId).resolveDeadlines[0];
         dm.categoryKey = cat;
@@ -714,15 +721,8 @@ contract DecentralizedResolutionModule is
         emit ResolverAssigned(workflowId, resolver, cat, 0);
 
         if (address(incentiveModule) != address(0)) {
-            try incentiveModule.onResolverAssigned(workflowId, escrowContract, resolver, 0) {} catch {
-                emit IncentiveModuleCallFailed(workflowId, 'onResolverAssigned', 'FAILED');
-            }
+            incentiveModule.onResolverAssigned(workflowId, escrowContract, resolver, 0);
         }
-    }
-
-    function decrementResolverActiveDisputes(address r) external onlyEscrowContract {
-        if (resolverActiveDisputes[r] > 0) resolverActiveDisputes[r]--;
-        if (resolverCapacity[r].currentDisputes > 0) resolverCapacity[r].currentDisputes--;
     }
 
     function recordResolution(
@@ -731,9 +731,16 @@ contract DecentralizedResolutionModule is
         address resolver,
         ResolutionOutcome outcome,
         uint256 resolutionTime
-    ) external onlyEscrowContract {
+    ) external onlyEscrowContractFor(escrowContract) {
         DisputeMetadata storage dm = disputeMetadata[escrowContract][workflowId];
         uint8 currentRound = dm.currentRound;
+
+        if (dm.status == DisputeStatus.Final) revert AlreadyFinalized(workflowId);
+        if (dm.status != DisputeStatus.Open) revert DecisionAlreadyRecorded(escrowContract, workflowId, currentRound);
+        if (resolver == address(0) || resolver != dm.resolverAtRound[currentRound]) {
+            revert NotAuthorizedResolver(resolver);
+        }
+        if (outcome == ResolutionOutcome.NONE) revert InvalidResolutionOutcome();
 
         dm.decisionAtRound[currentRound] = outcome;
         dm.decidedAtRound[currentRound] = block.timestamp;
@@ -744,8 +751,12 @@ contract DecentralizedResolutionModule is
         emit DecisionSubmitted(workflowId, currentRound, resolver, outcome);
 
         if (address(incentiveModule) != address(0)) {
-            try incentiveModule.onDecisionSubmitted(workflowId, escrowContract, resolver, currentRound, outcome, resolutionTime) {} catch {
-                emit IncentiveModuleCallFailed(workflowId, 'onDecisionSubmitted', 'FAILED');
+            // Decision telemetry is advisory. The authenticated decision and its
+            // finality must not depend on an optional analytics integration.
+            try incentiveModule.onDecisionSubmitted(
+                workflowId, escrowContract, resolver, currentRound, outcome, resolutionTime
+            ) {} catch (bytes memory reason) {
+                emit IncentiveModuleCallFailed(workflowId, 'onDecisionSubmitted', string(reason));
             }
         }
 
@@ -770,6 +781,7 @@ contract DecentralizedResolutionModule is
                         workflowId, escrowContract, priorRound, outcomeFlipped
                     );
                 }
+                if (outcomeFlipped) _recordReversalAnalytics(workflowId, escrowContract, priorRound);
             }
         }
 
@@ -782,27 +794,13 @@ contract DecentralizedResolutionModule is
             for (uint8 r = 0; r < currentRound + 1; r++) {
                 priorDecisions[r] = uint8(dm.decisionAtRound[r]);
             }
-            try ISlashingModule(slashingModule).restoreReversalSlashOnVindication(
+            ISlashingModule(slashingModule).restoreReversalSlashOnVindication(
                 workflowId,
                 escrowContract,
                 outcome == ResolutionOutcome.RELEASE,
                 priorDecisions
-            ) {} catch {
-                emit IncentiveModuleCallFailed(workflowId, 'restoreReversalSlashOnVindication', 'FAILED');
-            }
+            );
         }
-    }
-
-    function recordReversal(
-        uint256 workflowId,
-        address escrowContract,
-        uint8 priorRound
-    ) external override onlyEscrowContract {
-        // Note: appeal bond distribution is handled by recordResolution when the
-        // reversal is detected during a higher-round resolution. If this function
-        // is called independently (e.g., retrospective governance action), the
-        // caller must ensure distribution has already occurred.
-        _recordReversalAnalytics(workflowId, escrowContract, priorRound);
     }
 
     /// @dev Internal: record reversal analytics and execute automated slash.
@@ -820,34 +818,46 @@ contract DecentralizedResolutionModule is
             revert NoDecision(workflowId, dm.currentRound);
         }
 
-        if (dm.decisionAtRound[priorRound] != dm.decisionAtRound[dm.currentRound]) {
-            address priorResolver = dm.resolverAtRound[priorRound];
-            ResolutionAnalytics.recordReversal(
-                resolverStats[priorResolver],
-                priorResolver,
-                workflowId,
-                dm.decisionAtRound[priorRound],
-                dm.decisionAtRound[dm.currentRound],
-                priorRound,
-                dm.currentRound,
-                emaAlphaBps
-            );
+        if (reversalProcessed[escrowContract][workflowId][priorRound]) {
+            revert ReversalAlreadyProcessed(escrowContract, workflowId, priorRound);
+        }
+        if (dm.decisionAtRound[priorRound] == dm.decisionAtRound[dm.currentRound]) {
+            revert InvalidResolutionOutcome();
+        }
+        reversalProcessed[escrowContract][workflowId][priorRound] = true;
 
-            // Execute automated reversal slash via slashing module (Track 1)
-            if (slashingModule != address(0)) {
-                try ISlashingModule(slashingModule).slashForReversal(
-                    workflowId,
-                    escrowContract,
-                    priorResolver,
-                    priorRound
-                ) {} catch {
-                    emit IncentiveModuleCallFailed(workflowId, 'slashForReversal', 'FAILED');
-                }
-            }
+        address priorResolver = dm.resolverAtRound[priorRound];
+        ResolutionAnalytics.recordReversal(
+            resolverStats[priorResolver],
+            priorResolver,
+            workflowId,
+            dm.decisionAtRound[priorRound],
+            dm.decisionAtRound[dm.currentRound],
+            priorRound,
+            dm.currentRound,
+            emaAlphaBps
+        );
+
+        // Reversal slashing is part of this authenticated decision transition.
+        if (slashingModule != address(0)) {
+            ISlashingModule(slashingModule).slashForReversal(
+                workflowId,
+                escrowContract,
+                priorResolver,
+                priorRound
+            );
         }
     }
 
-    function finalizeDispute(uint256 workflowId, address escrowContract) external onlyEscrowContract {
+    function recordReversal(
+        uint256 workflowId,
+        address escrowContract,
+        uint8 priorRound
+    ) external override onlyEscrowContractFor(escrowContract) {
+        _recordReversalAnalytics(workflowId, escrowContract, priorRound);
+    }
+
+    function finalizeDispute(uint256 workflowId, address escrowContract) external onlyEscrowContractFor(escrowContract) {
         DisputeMetadata storage dm = disputeMetadata[escrowContract][workflowId];
 
         if (dm.status == DisputeStatus.Final) revert AlreadyFinalized(workflowId);
@@ -864,25 +874,23 @@ contract DecentralizedResolutionModule is
 
         if (!canFinalize) revert CannotFinalizeYet(workflowId, 'Appeal window not expired or not final round');
 
-        address assignedStakeResolver = workflowStakeResolver[escrowContract][workflowId];
-        if (assignedStakeResolver == address(0)) assignedStakeResolver = dm.resolverAtRound[dm.currentRound];
+        address assignedStakeResolver = _releaseResolverCapacity(escrowContract, workflowId);
+        if (assignedStakeResolver == address(0)) assignedStakeResolver = workflowStakeResolver[escrowContract][workflowId];
         if (address(stakingModule) != address(0)) {
             IStakingModule(stakingModule).onResolutionFinalized(
                 workflowId, escrowContract, assignedStakeResolver, true
             );
         }
 
-        _decrementActiveAssignment(assignedStakeResolver);
         delete workflowStakeResolver[escrowContract][workflowId];
         _clearKlerosHandoff(escrowContract, workflowId);
         dm.status = DisputeStatus.Final;
+        _decrementActiveDisputeCount();
         ResolutionOutcome finalDecision = dm.decisionAtRound[dm.currentRound];
         uint8 finalRound = dm.currentRound;
 
         if (address(incentiveModule) != address(0)) {
-            try incentiveModule.onDisputeFinalized(workflowId, escrowContract, finalRound, finalDecision) {} catch {
-                emit IncentiveModuleCallFailed(workflowId, 'onDisputeFinalized', 'FAILED');
-            }
+            incentiveModule.onDisputeFinalized(workflowId, escrowContract, finalRound, finalDecision);
         }
     }
 
@@ -902,37 +910,34 @@ contract DecentralizedResolutionModule is
     function closeDisputeByMutualAgreement(uint256 workflowId, address escrowContract)
         external
         override
-        onlyEscrowContract
+        onlyEscrowContractFor(escrowContract)
     {
-        if (escrowContract != msg.sender) revert NotRegisteredEscrowContract(msg.sender);
         _closeDisputeByMutualAgreement(workflowId, escrowContract);
     }
 
     function _closeDisputeByMutualAgreement(uint256 workflowId, address escrowContract) internal {
         DisputeMetadata storage dm = disputeMetadata[escrowContract][workflowId];
 
-        // No-op if never disputed or already finalized
-        if (dm.status == DisputeStatus.Final) return;
+        // No-op if never disputed or already finalized.
+        if (dm.resolverAtRound[0] == address(0) || dm.status == DisputeStatus.Final) return;
 
-        address activeResolver = workflowStakeResolver[escrowContract][workflowId];
-        if (activeResolver == address(0)) activeResolver = dm.resolverAtRound[dm.currentRound];
+        address activeResolver = _releaseResolverCapacity(escrowContract, workflowId);
+        if (activeResolver == address(0)) activeResolver = workflowStakeResolver[escrowContract][workflowId];
         if (address(stakingModule) != address(0) && activeResolver != address(0)) {
             IStakingModule(stakingModule).onResolutionFinalized(
                 workflowId, escrowContract, activeResolver, false
             );
         }
-        _decrementActiveAssignment(activeResolver);
         delete workflowStakeResolver[escrowContract][workflowId];
         _clearKlerosHandoff(escrowContract, workflowId);
 
         dm.status = DisputeStatus.Final;
+        _decrementActiveDisputeCount();
         uint8 finalRound = dm.currentRound;
 
         if (address(incentiveModule) != address(0)) {
-            // Pass ResolutionOutcome.NONE — no resolver decision was reached
-            try incentiveModule.onDisputeFinalized(workflowId, msg.sender, finalRound, ResolutionOutcome.NONE) {} catch {
-                emit IncentiveModuleCallFailed(workflowId, 'onDisputeFinalized', 'MUTUAL_SETTLEMENT');
-            }
+            // Pass ResolutionOutcome.NONE — no resolver decision was reached.
+            incentiveModule.onDisputeFinalized(workflowId, msg.sender, finalRound, ResolutionOutcome.NONE);
         }
 
         emit DisputeClosedByMutualAgreement(workflowId, escrowContract);
@@ -947,10 +952,10 @@ contract DecentralizedResolutionModule is
     )
         external
         override
-        onlyEscrowContract
+        onlyEscrowContractFor(escrowContract)
     {
-        if (escrowContract != msg.sender) revert NotRegisteredEscrowContract(msg.sender);
         DisputeMetadata storage dm = disputeMetadata[escrowContract][workflowId];
+        if (dm.resolverAtRound[0] == address(0)) revert DisputeNotOpen(workflowId);
         if (dm.status == DisputeStatus.Final) return;
         // A committed Kleros handoff may follow a resolver decision, leaving DRM status
         // Decided while external arbitration is active. Only the escrow's governed timeout
@@ -976,17 +981,22 @@ contract DecentralizedResolutionModule is
             revert DisputeNotTimedOut(workflowId, disputeRaisedAt + maxDisputeDuration);
         }
 
-        address activeResolver = workflowStakeResolver[escrowContract][workflowId];
-        if (activeResolver == address(0)) activeResolver = dm.resolverAtRound[dm.currentRound];
+        address activeResolver = _releaseResolverCapacity(escrowContract, workflowId);
+        if (activeResolver == address(0)) activeResolver = workflowStakeResolver[escrowContract][workflowId];
         if (address(stakingModule) != address(0) && activeResolver != address(0)) {
             IStakingModule(stakingModule).onResolutionFinalized(
                 workflowId, escrowContract, activeResolver, false
             );
         }
-        _decrementActiveAssignment(activeResolver);
         delete workflowStakeResolver[escrowContract][workflowId];
         _clearKlerosHandoff(escrowContract, workflowId);
+        if (address(incentiveModule) != address(0)) {
+            incentiveModule.onDisputeFinalized(
+                workflowId, escrowContract, dm.currentRound, ResolutionOutcome.NONE
+            );
+        }
         dm.status = DisputeStatus.Final;
+        _decrementActiveDisputeCount();
 
         if (escrowContract.code.length != 0) {
             IResolverAssignmentCallback(escrowContract).updateDisputeResolverFromResolutionModule(
@@ -995,10 +1005,35 @@ contract DecentralizedResolutionModule is
         }
     }
 
-    function _decrementActiveAssignment(address resolver) internal {
-        if (resolver == address(0)) return;
-        if (resolverActiveDisputes[resolver] > 0) resolverActiveDisputes[resolver]--;
-        if (resolverCapacity[resolver].currentDisputes > 0) resolverCapacity[resolver].currentDisputes--;
+    function _assignResolverCapacity(address escrowContract, uint256 workflowId, uint8 round, address resolver) internal {
+        if (resolver == address(0)) revert ResolverInactive(resolver);
+        if (workflowCapacityAssignmentActive[escrowContract][workflowId]) {
+            revert AlreadyInitialized(workflowId);
+        }
+        workflowCapacityResolver[escrowContract][workflowId] = resolver;
+        workflowCapacityRound[escrowContract][workflowId] = round;
+        workflowCapacityAssignmentActive[escrowContract][workflowId] = true;
+        resolverCapacity[resolver].currentDisputes++;
+        resolverActiveDisputes[resolver]++;
+    }
+
+    function _releaseResolverCapacity(address escrowContract, uint256 workflowId) internal returns (address resolver) {
+        if (!workflowCapacityAssignmentActive[escrowContract][workflowId]) return address(0);
+        resolver = workflowCapacityResolver[escrowContract][workflowId];
+        if (resolver == address(0)) revert ResolverInactive(resolver);
+        uint8 round = workflowCapacityRound[escrowContract][workflowId];
+        address currentResolver = disputeMetadata[escrowContract][workflowId].resolverAtRound[round];
+        if (currentResolver != resolver) {
+            revert ResolverAssignmentMismatch(escrowContract, workflowId, round, resolver, currentResolver);
+        }
+        delete workflowCapacityResolver[escrowContract][workflowId];
+        delete workflowCapacityRound[escrowContract][workflowId];
+        delete workflowCapacityAssignmentActive[escrowContract][workflowId];
+        if (resolverActiveDisputes[resolver] == 0 || resolverCapacity[resolver].currentDisputes == 0) {
+            revert ResolverCapacityExceeded(resolver, 0, 0);
+        }
+        resolverActiveDisputes[resolver]--;
+        resolverCapacity[resolver].currentDisputes--;
     }
 
     function _clearKlerosHandoff(address escrowContract, uint256 workflowId) internal {
@@ -1008,10 +1043,15 @@ contract DecentralizedResolutionModule is
     }
 
     function forceProgress(uint256 workflowId, address escrowContract) external nonReentrant {
-        if (!registeredEscrowContracts[_msgSender()] && !hasRole(ROLE_GUARDIAN, _msgSender()))
-            revert NotRegisteredEscrowContract(_msgSender());
+        if (!registeredEscrowContracts[escrowContract]) revert NotRegisteredEscrowContract(escrowContract);
+        // Permissionless liveness action: after the assigned resolver's deadline,
+        // any keeper may trigger the deterministic timeout transition for this
+        // explicitly registered escrow/workflow. The caller supplies no resolver,
+        // outcome, or other authority-bearing input.
 
         DisputeMetadata storage dm = disputeMetadata[escrowContract][workflowId];
+
+        if (dm.resolverAtRound[0] == address(0)) revert DisputeNotOpen(workflowId);
 
         if (block.timestamp < dm.resolveBy) revert DisputeNotTimedOut(workflowId, dm.resolveBy);
         uint256 committedDisputeIdPlusOne = klerosDisputeIdForWorkflow[escrowContract][workflowId];
@@ -1033,9 +1073,7 @@ contract DecentralizedResolutionModule is
         );
 
         if (address(incentiveModule) != address(0)) {
-            try incentiveModule.onResolverTimeout(workflowId, escrowContract, timedOutResolver, currentRound, 1) {} catch {
-                emit IncentiveModuleCallFailed(workflowId, 'onResolverTimeout', 'FAILED');
-            }
+            incentiveModule.onResolverTimeout(workflowId, escrowContract, timedOutResolver, currentRound, 1);
         }
 
         bytes32 category = dm.categoryKey;
@@ -1050,13 +1088,10 @@ contract DecentralizedResolutionModule is
         }
 
         if (newResolver != address(0) && newResolver != timedOutResolver) {
-            // Decrement old resolver's capacity (they timed out and are being replaced)
-            if (resolverActiveDisputes[timedOutResolver] > 0) resolverActiveDisputes[timedOutResolver]--;
-            if (resolverCapacity[timedOutResolver].currentDisputes > 0) resolverCapacity[timedOutResolver].currentDisputes--;
-
-            // Increment new resolver's capacity
-            resolverCapacity[newResolver].currentDisputes++;
-            resolverActiveDisputes[newResolver]++;
+            // Replace the exact workflow assignment; aggregate counters are
+            // changed only through the keyed, single-use assignment lifecycle.
+            _releaseResolverCapacity(escrowContract, workflowId);
+            _assignResolverCapacity(escrowContract, workflowId, currentRound, newResolver);
             resolverStats[newResolver].casesAssigned++;
 
             // Transfer the active exposure lock and escrow settlement authority
@@ -1081,14 +1116,12 @@ contract DecentralizedResolutionModule is
             emit ResolverAssigned(workflowId, newResolver, category, currentRound);
 
             if (address(incentiveModule) != address(0)) {
-                try incentiveModule.onResolverAssigned(workflowId, escrowContract, newResolver, currentRound) {} catch {
-                    emit IncentiveModuleCallFailed(workflowId, 'onResolverAssigned', 'FAILED');
-                }
+                incentiveModule.onResolverAssigned(workflowId, escrowContract, newResolver, currentRound);
             }
         } else {
-            address assignedStakeResolver = workflowStakeResolver[escrowContract][workflowId];
+            address assignedStakeResolver = _releaseResolverCapacity(escrowContract, workflowId);
+            if (assignedStakeResolver == address(0)) assignedStakeResolver = workflowStakeResolver[escrowContract][workflowId];
             if (assignedStakeResolver == address(0)) assignedStakeResolver = timedOutResolver;
-            _decrementActiveAssignment(assignedStakeResolver);
             if (address(stakingModule) != address(0) && assignedStakeResolver != address(0)) {
                 IStakingModule(stakingModule).onResolutionFinalized(
                     workflowId, escrowContract, assignedStakeResolver, false
@@ -1100,8 +1133,19 @@ contract DecentralizedResolutionModule is
                     workflowId, address(0)
                 );
             }
+            if (address(incentiveModule) != address(0)) {
+                incentiveModule.onDisputeFinalized(
+                    workflowId, escrowContract, currentRound, ResolutionOutcome.NONE
+                );
+            }
             dm.status = DisputeStatus.Final;
+            _decrementActiveDisputeCount();
         }
+    }
+
+    function _decrementActiveDisputeCount() internal {
+        if (activeDisputeCount == 0) revert ActiveDisputeCounterUnderflow();
+        activeDisputeCount--;
     }
 
     function _requiredStakeForWorkflow(address escrowContract, uint256 workflowId)

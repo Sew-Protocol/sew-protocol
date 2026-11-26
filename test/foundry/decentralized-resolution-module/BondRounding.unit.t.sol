@@ -48,6 +48,8 @@ contract BondRoundingTest is Test {
         // Register escrow contract
         vm.prank(timelock);
         incentiveModule.registerEscrowContract(address(escrow));
+        vm.prank(timelock);
+        incentiveModule.setResolutionModule(address(this));
     }
 
     /**
@@ -85,7 +87,7 @@ contract BondRoundingTest is Test {
         vm.prank(depositor);
         token.approve(address(incentiveModule), bondAmount);
 
-        vm.prank(address(this));
+        vm.prank(address(escrow));
         incentiveModule.recordAppealBond(workflowId, address(escrow), depositor, depositor, bondAmount, address(token), 1);
 
         // Record resolvers at round 0
@@ -128,7 +130,7 @@ contract BondRoundingTest is Test {
         vm.prank(depositor);
         token.approve(address(incentiveModule), bondAmount);
 
-        vm.prank(address(this));
+        vm.prank(address(escrow));
         incentiveModule.recordAppealBond(workflowId, address(escrow), depositor, depositor, bondAmount, address(token), 1);
 
         // Record resolvers at round 0
@@ -166,7 +168,7 @@ contract BondRoundingTest is Test {
         vm.prank(depositor);
         token.approve(address(incentiveModule), bondAmount);
 
-        vm.prank(address(this));
+        vm.prank(address(escrow));
         incentiveModule.recordAppealBond(workflowId, address(escrow), depositor, depositor, bondAmount, address(token), 1);
 
         // Record resolvers at round 0
@@ -200,7 +202,7 @@ contract BondRoundingTest is Test {
         vm.prank(depositor);
         token.approve(address(incentiveModule), bondAmount);
 
-        vm.prank(address(this));
+        vm.prank(address(escrow));
         incentiveModule.recordAppealBond(workflowId, address(escrow), depositor, depositor, bondAmount, address(token), 1);
 
         // Record resolver at round 0
@@ -237,7 +239,7 @@ contract BondRoundingTest is Test {
         vm.prank(depositor);
         token.approve(address(incentiveModule), bondAmount);
 
-        vm.prank(address(this));
+        vm.prank(address(escrow));
         incentiveModule.recordAppealBond(workflowId, address(escrow), depositor, depositor, bondAmount, address(token), 1);
 
         // Record resolvers

@@ -119,7 +119,6 @@ contract AppealWindowEnforcementTest is Test {
 
         // Register escrow contract in resolution module
         resolutionModule.registerEscrowContract(address(escrow));
-        resolutionModule.registerEscrowContract(address(this)); // Register self because we call setEscrowCategory
         klerosProxy.grantRole(klerosProxy.ROLE_TIMELOCK(), address(this));
         klerosProxy.registerKlerosHandoffEscrow(address(escrow));
 
@@ -131,6 +130,8 @@ contract AppealWindowEnforcementTest is Test {
         // Set incentive module in resolution module
         vm.prank(timelock);
         resolutionModule.setIncentiveModule(address(incentiveModule));
+        vm.prank(timelock);
+        incentiveModule.setResolutionModule(address(resolutionModule));
 
         // Set resolution module in escrow
         adminContract.queueResolutionModule(address(escrow), address(resolutionModule));
@@ -187,7 +188,7 @@ contract AppealWindowEnforcementTest is Test {
     function raiseDispute(uint256 workflowId) internal {
         // Set category before raising dispute (required for DecentralizedResolutionModule)
         bytes32 category = keccak256('TEST_CATEGORY');
-        vm.prank(address(this));
+        vm.prank(address(escrow));
         resolutionModule.setEscrowCategory(workflowId, address(escrow), category);
 
         // raiseDispute() automatically initializes the dispute via DisputeInitializationLibrary
@@ -377,7 +378,7 @@ contract AppealWindowEnforcementTest is Test {
         );
         vm.stopPrank();
 
-        vm.prank(address(this));
+        vm.prank(address(escrow));
         resolutionModule.setEscrowCategory(workflowId, address(escrow), keccak256('USDC_CATEGORY'));
         vm.prank(buyer);
         escrow.raiseDispute(workflowId);
@@ -457,7 +458,7 @@ contract AppealWindowEnforcementTest is Test {
         );
         vm.stopPrank();
 
-        vm.prank(address(this));
+        vm.prank(address(escrow));
         resolutionModule.setEscrowCategory(workflowId, address(escrow), keccak256('USDC_CATEGORY'));
         vm.prank(buyer);
         escrow.raiseDispute(workflowId);

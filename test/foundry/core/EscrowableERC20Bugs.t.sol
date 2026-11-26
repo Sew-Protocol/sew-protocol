@@ -2,6 +2,7 @@
 pragma solidity ^0.8.37;
 
 import "forge-std/Test.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../../../contracts/core/EscrowableERC20.sol";
 import "../../../packages/sew-core/contracts/modules/DefaultReleaseStrategy.sol";
 import "../../../packages/sew-core/contracts/modules/DefaultResolutionModule.sol";
@@ -13,6 +14,28 @@ import "../../../packages/sew-core/contracts/libraries/SettingsValidationLibrary
 import "../../../contracts/mocks/ERC20Mock.sol";
 import "../../../packages/sew-core/contracts/core/EscrowCreationPolicy.sol";
 import "../../../contracts/interfaces/IYieldGenerationModule.sol";
+import "../../../packages/sew-core/contracts/interfaces/IYieldModule.sol";
+
+contract AllowanceObservingYieldModule is IYieldModule {
+    uint256 public observedAllowance;
+
+    function initializeYield(uint256, address token, uint256 amount, YieldPreset) external override returns (uint256) {
+        observedAllowance = IERC20(token).allowance(msg.sender, address(this));
+        IERC20(token).transferFrom(msg.sender, address(this), amount);
+        return amount;
+    }
+    function unwindToEscrow(uint256, address token, uint256 principalExpected) external override returns (uint256, uint256) {
+        IERC20(token).transfer(msg.sender, principalExpected);
+        return (principalExpected, 0);
+    }
+    function emergencyUnwind(uint256, address token, uint256 principalExpected) external override returns (uint256) {
+        IERC20(token).transfer(msg.sender, principalExpected);
+        return principalExpected;
+    }
+    function previewPosition(uint256, address) external pure override returns (uint256, uint256, bool) { return (0, 0, false); }
+    function canHandle(address, YieldPreset, uint256) external pure override returns (bool, bytes32) { return (true, bytes32(0)); }
+    function getModuleInfo() external pure override returns (string memory, string memory, bytes32) { return ("AllowanceObserver", "1", bytes32(0)); }
+}
 
 contract SilentFailureModule is IYieldGenerationModule {
     function depositForYield(uint256, address, uint256, address) external pure override returns (bool success, uint256 yieldTokenBalance) {
@@ -46,6 +69,7 @@ contract EscrowableERC20BugsTest is Test {
     ModuleSnapshotRegistry public moduleManagement;
     EscrowGovernanceTimelock public adminContract;
     SilentFailureModule public silentModule;
+    AllowanceObservingYieldModule public allowanceModule;
 
     address public owner;
     address public feeAddress = address(0xFEE);
@@ -62,6 +86,7 @@ contract EscrowableERC20BugsTest is Test {
         adminContract = new EscrowGovernanceTimelock(owner);
         releaseStrategy = new DefaultReleaseStrategy();
         silentModule = new SilentFailureModule();
+        allowanceModule = new AllowanceObservingYieldModule();
 
         escrowToken = new EscrowableERC20("EscrowToken","ESC",0,feeAddress,address(moduleManagement));
         
@@ -97,6 +122,22 @@ contract EscrowableERC20BugsTest is Test {
         vm.expectRevert(); // AccountingDeficit
         escrowToken.createEscrow(address(escrowToken), user2, 100 ether, settings);
         vm.stopPrank();
+    }
+
+    function test_EscrowableERC20_YieldApprovalIsExactAndCleared() public {
+        moduleManagement.queueModule(address(escrowToken), BaseEscrow.ModuleType.YIELD_GEN, address(allowanceModule));
+        vm.warp(block.timestamp + 8 days);
+        moduleManagement.activateModule(address(escrowToken), BaseEscrow.ModuleType.YIELD_GEN);
+
+        vm.startPrank(user1);
+        escrowToken.approve(address(escrowToken), 100 ether);
+        EscrowSettings memory settings = SettingsValidationLibrary.getDefaultSettings();
+        settings.yieldPreset = YieldPreset.ENABLED;
+        escrowToken.createEscrow(address(escrowToken), user2, 100 ether, settings);
+        vm.stopPrank();
+
+        assertEq(allowanceModule.observedAllowance(), 100 ether);
+        assertEq(escrowToken.allowance(address(escrowToken), address(allowanceModule)), 0);
     }
 
     function test_EscrowableERC20_ReleaseFunction() public {

@@ -39,6 +39,7 @@ contract AppealBondDistributionFuzzTest is Test {
         bytes32 ROLE_TIMELOCK = incentiveModule.ROLE_TIMELOCK();
         incentiveModule.grantRole(ROLE_TIMELOCK, deployer);
         incentiveModule.registerEscrowContract(escrowContract);
+        incentiveModule.setResolutionModule(escrowContract);
 
         // Pre-generate resolver addresses
         resolverAddresses = new address[](MAX_RESOLVERS);

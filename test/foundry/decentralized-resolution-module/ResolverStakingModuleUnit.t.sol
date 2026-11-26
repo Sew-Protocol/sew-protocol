@@ -17,6 +17,11 @@ contract MockSEW is ERC20 {
     function mint(address to, uint256 amount) external { _mint(to, amount); }
 }
 
+contract MockPendingSlashSource {
+    uint256 public totalPendingSlashCount;
+    function setPending(uint256 count) external { totalPendingSlashCount = count; }
+}
+
 /// @notice Focused unit tests for ResolverStakingModule core lifecycle + views
 ///         (complements the existing invariant suite).
 contract ResolverStakingModuleUnitTest is Test {
@@ -104,6 +109,104 @@ contract ResolverStakingModuleUnitTest is Test {
         staking.onResolutionFinalized(7, address(0xE5C0), resolver, true);
         assertEq(staking.totalLockedStake(resolver), 0);
         assertEq(staking.lockedStakes(address(0xE5C0), 7, resolver), 0);
+    }
+
+    function test_zeroAmountAssignmentIsSingleUseAndBlocksModuleRotationUntilReleased() public {
+        vm.prank(admin);
+        staking.setMinimumStake(0, 0);
+        vm.prank(admin);
+        staking.setResolutionModule(address(this));
+
+        address workflowEscrow = address(0xE5C0);
+        staking.onResolverAssigned(8, workflowEscrow, resolver, 0);
+        assertTrue(staking.activeStakeAssignments(workflowEscrow, 8, resolver));
+        assertEq(staking.activeResolutionAssignments(), 1);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ResolverStakingModule.StakeAssignmentAlreadyActive.selector,
+                workflowEscrow, 8, resolver
+            )
+        );
+        staking.onResolverAssigned(8, workflowEscrow, resolver, 0);
+
+        vm.prank(admin);
+        vm.expectRevert(
+            abi.encodeWithSelector(ResolverStakingModule.ActiveResolutionAssignments.selector, 1)
+        );
+        staking.setResolutionModule(address(0xA11CE));
+
+        staking.onResolutionFinalized(8, workflowEscrow, resolver, true);
+        assertFalse(staking.activeStakeAssignments(workflowEscrow, 8, resolver));
+        assertEq(staking.activeResolutionAssignments(), 0);
+
+        vm.prank(admin);
+        staking.setResolutionModule(address(0xA11CE));
+        assertFalse(staking.hasRole(staking.ROLE_RESOLUTION_MODULE(), address(this)));
+        assertTrue(staking.hasRole(staking.ROLE_RESOLUTION_MODULE(), address(0xA11CE)));
+    }
+
+    function test_slashConsumesOnlyFreeAndTargetAssignmentStake() public {
+        _stakeStable(resolver, 1000);
+        bytes32 resolutionRole = staking.ROLE_RESOLUTION_MODULE();
+        bytes32 slashRole = staking.ROLE_SLASHING_MODULE();
+        vm.startPrank(admin);
+        staking.grantRole(resolutionRole, admin);
+        staking.grantRole(slashRole, admin);
+        staking.setSlashingModule(address(this));
+        staking.onResolverAssigned(1, address(0xE501), resolver, 250e18);
+        staking.onResolverAssigned(2, address(0xE502), resolver, 250e18);
+        vm.stopPrank();
+
+        vm.prank(admin);
+        staking.slashForAssignment(resolver, 900e18, address(0xE501), 1);
+
+        assertEq(staking.lockedStakes(address(0xE501), 1, resolver), 0, 'target assignment collateral can be slashed');
+        assertEq(staking.lockedStakes(address(0xE502), 2, resolver), 250e18, 'other assignment remains backed');
+        assertEq(staking.totalLockedStake(resolver), 250e18, 'aggregate lock retains other assignment');
+        ResolverStakingModule.StakeInfo memory info = staking.getStakeInfo(resolver);
+        assertGe(info.totalStake, info.lockedStake, 'slash cannot create an under-backed lock');
+    }
+
+    function test_unscopedSlashCannotConsumeAssignedCollateral() public {
+        _stakeStable(resolver, 1000);
+        bytes32 resolutionRole = staking.ROLE_RESOLUTION_MODULE();
+        bytes32 slashRole = staking.ROLE_SLASHING_MODULE();
+        vm.startPrank(admin);
+        staking.grantRole(resolutionRole, admin);
+        staking.grantRole(slashRole, admin);
+        staking.setSlashingModule(address(this));
+        staking.onResolverAssigned(3, address(0xE503), resolver, 250e18);
+        vm.stopPrank();
+
+        vm.prank(admin);
+        staking.slash(resolver, 900e18);
+
+        assertEq(staking.lockedStakes(address(0xE503), 3, resolver), 250e18);
+        ResolverStakingModule.StakeInfo memory info = staking.getStakeInfo(resolver);
+        assertGe(info.totalStake, info.lockedStake);
+    }
+
+    function test_slashingModuleRotationRequiresNoPendingSlashAndRevokesOldRole() public {
+        MockPendingSlashSource oldSlasher = new MockPendingSlashSource();
+        address nextSlasher = address(0x51A5);
+
+        vm.prank(admin);
+        staking.setSlashingModule(address(oldSlasher));
+        assertTrue(staking.hasRole(staking.ROLE_SLASHING_MODULE(), address(oldSlasher)));
+
+        oldSlasher.setPending(1);
+        vm.prank(admin);
+        vm.expectRevert(
+            abi.encodeWithSelector(ResolverStakingModule.PendingSlashingOperations.selector, 1)
+        );
+        staking.setSlashingModule(nextSlasher);
+
+        oldSlasher.setPending(0);
+        vm.prank(admin);
+        staking.setSlashingModule(nextSlasher);
+        assertFalse(staking.hasRole(staking.ROLE_SLASHING_MODULE(), address(oldSlasher)));
+        assertTrue(staking.hasRole(staking.ROLE_SLASHING_MODULE(), nextSlasher));
     }
 
     function test_stake_belowMinimumReverts() public {

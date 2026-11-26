@@ -88,7 +88,6 @@ contract RepeatAttackerIntegrationTest is Test {
         resolutionModule.grantRole(resolutionModule.ROLE_TIMELOCK(), address(this));
         resolutionModule.grantRole(resolutionModule.ROLE_TIMELOCK(), timelockAddr);
         resolutionModule.registerEscrowContract(address(escrow));
-        resolutionModule.registerEscrowContract(address(this));
 
         incentiveModule.grantRole(incentiveModule.ROLE_TIMELOCK(), address(this));
         incentiveModule.registerEscrowContract(address(escrow));
@@ -96,6 +95,7 @@ contract RepeatAttackerIntegrationTest is Test {
         incentiveModule.registerEscrowContract(address(resolutionModule));
 
         resolutionModule.setIncentiveModule(address(incentiveModule));
+        incentiveModule.setResolutionModule(address(resolutionModule));
 
         adminContract.queueResolutionModule(address(escrow), address(resolutionModule));
         vm.warp(block.timestamp + 7 days + 1);
@@ -131,6 +131,7 @@ contract RepeatAttackerIntegrationTest is Test {
     }
 
     function _setCategory(uint256 wid) internal {
+        vm.prank(address(escrow));
         resolutionModule.setEscrowCategory(wid, address(escrow), CATEGORY);
     }
 
@@ -463,6 +464,7 @@ contract RepeatAttackerIntegrationTest is Test {
         );
         vm.stopPrank();
 
+        vm.prank(address(escrow));
         resolutionModule.setEscrowCategory(widL, address(escrow), CATEGORY);
         vm.prank(legit);
         escrow.raiseDispute(widL);

@@ -48,6 +48,8 @@ error ZeroAddressField(string fieldName);
 error InvalidPercentage(uint256 percentage, uint256 maxPercentage);
 error InvalidWeight(uint8 level, uint256 weight);
 error InvalidPayoutToken(address expected, address actual);
+error MissingPaymentPolicySnapshot(address escrowContract, uint256 workflowId);
+error PaymentLibraryCodeChanged(address paymentLibrary, bytes32 expectedCodeHash, bytes32 actualCodeHash);
 
 /**
  * @title ResolverIncentiveModule
@@ -98,6 +100,7 @@ contract ResolverIncentiveModule is
     mapping(address => mapping(uint256 => uint256)) public disputeEscrowFees;
     mapping(address => mapping(uint256 => uint256)) public disputeEscalationFees;
     mapping(address => mapping(uint256 => bool)) public disputePaymentsDistributed;
+    mapping(address => mapping(uint256 => PaymentPolicySnapshot)) public paymentPolicySnapshots;
 
     // Pull pattern: claimable payments per resolver per dispute
     mapping(address => mapping(uint256 => mapping(address => uint256))) public claimablePayments;
@@ -219,15 +222,22 @@ contract ResolverIncentiveModule is
         bool exists;
     }
 
+    struct PaymentPolicySnapshot {
+        address libraryAddress;
+        bytes32 libraryCodeHash;
+        uint256 resolverSharePercentage;
+        Weights weights;
+        bool initialized;
+    }
+
     // ============ Modifiers ============
 
-    modifier onlyEscrowContract() {
-        address escrow = _msgSender();
-        if (!registeredEscrowContracts[escrow]) revert NotRegisteredEscrowContract(escrow);
-        // Check if escrow is paused
-        if (escrowRateLimits[escrow].paused) {
-            revert EscrowPaused(escrow);
+    modifier onlyEscrowContractFor(address escrowContract) {
+        address caller = _msgSender();
+        if (caller != escrowContract || !registeredEscrowContracts[caller]) {
+            revert NotRegisteredEscrowContract(caller);
         }
+        if (escrowRateLimits[caller].paused) revert EscrowPaused(caller);
         _;
     }
 
@@ -236,13 +246,8 @@ contract ResolverIncentiveModule is
 
     error NotResolutionModule(address caller);
 
-    /// @notice Allow calls from registered escrow contracts OR the authorised resolution module.
-    modifier onlyEscrowOrResolutionModule() {
-        if (!registeredEscrowContracts[_msgSender()]) {
-            if (_msgSender() != resolutionModule) {
-                revert NotResolutionModule(_msgSender());
-            }
-        }
+    modifier onlyResolutionModule() {
+        if (_msgSender() != resolutionModule) revert NotResolutionModule(_msgSender());
         _;
     }
 
@@ -301,13 +306,22 @@ contract ResolverIncentiveModule is
         address escrowContract,
         address resolver,
         uint8 level
-    ) external onlyEscrowContract {
+    ) external onlyResolutionModule {
         _recordResolver(workflowId, escrowContract, resolver, level);
     }
 
     function _recordResolver(uint256 workflowId, address escrowContract, address resolver, uint8 level) internal {
         if (resolver == address(0)) revert ZeroResolver();
         if (level > 2) revert InvalidLevel(level, 2);
+
+        PaymentPolicySnapshot storage policy = paymentPolicySnapshots[escrowContract][workflowId];
+        if (!policy.initialized) {
+            policy.libraryAddress = currentPaymentLibrary;
+            policy.libraryCodeHash = currentPaymentLibrary.codehash;
+            policy.resolverSharePercentage = resolverSharePercentage;
+            policy.weights = weights;
+            policy.initialized = true;
+        }
 
         // Prevent duplicate resolver recording (same resolver at any level)
         if (resolverRecorded[escrowContract][workflowId][resolver]) {
@@ -331,6 +345,14 @@ contract ResolverIncentiveModule is
         emit ResolverRecorded(workflowId, resolver, level, block.timestamp);
     }
 
+    function getPaymentPolicySnapshot(address escrowContract, uint256 workflowId)
+        external
+        view
+        returns (PaymentPolicySnapshot memory)
+    {
+        return paymentPolicySnapshots[escrowContract][workflowId];
+    }
+
     /**
      * @notice Record escrow fee for a dispute
      * @param workflowId The escrow transfer ID
@@ -348,7 +370,7 @@ contract ResolverIncentiveModule is
         address escrowContract,
         address token,
         uint256 amount
-    ) external onlyEscrowContract {
+    ) external onlyEscrowContractFor(escrowContract) {
         _recordEscrowFee(workflowId, escrowContract, token, amount);
     }
 
@@ -387,7 +409,7 @@ contract ResolverIncentiveModule is
         address escrowContract,
         address token,
         uint256 amount
-    ) external onlyEscrowContract {
+    ) external onlyEscrowContractFor(escrowContract) {
         _recordEscalationFee(workflowId, escrowContract, token, amount);
     }
 
@@ -435,7 +457,7 @@ contract ResolverIncentiveModule is
         uint256 amount,
         uint256 escrowFee,
         uint8 /* round */
-    ) external override onlyEscrowContract {
+    ) external override onlyEscrowContractFor(escrowContract) {
         _recordEscrowFee(workflowId, escrowContract, token, escrowFee);
     }
 
@@ -451,7 +473,7 @@ contract ResolverIncentiveModule is
         address escrowContract,
         address resolver,
         uint8 level
-    ) external override onlyEscrowOrResolutionModule {
+    ) external override onlyResolutionModule {
         _recordResolver(workflowId, escrowContract, resolver, level);
     }
 
@@ -466,7 +488,7 @@ contract ResolverIncentiveModule is
             uint8 round,
             ResolutionOutcome decision,
             uint256 responseTime
-        ) external override onlyEscrowContract {
+        ) external override onlyResolutionModule {
             // V1 doesn't need to track individual decisions
             // This hook is for V2+ appeal bond logic
         }
@@ -481,7 +503,7 @@ contract ResolverIncentiveModule is
             uint8 fromRound,
             uint8 toRound,
             address escalatedBy
-        ) external override onlyEscrowContract {
+        ) external override onlyEscrowContractFor(escrowContract) {
             // V1 tracks escalation fees via recordEscalationFee
             // This hook is for V2+ appeal bond logic
         }
@@ -501,7 +523,7 @@ contract ResolverIncentiveModule is
             address resolver,
             uint8 round,
             uint8 timeoutType
-        ) external override onlyEscrowContract {
+    ) external override onlyResolutionModule {
             // V1 doesn't track timeouts in incentive module
             // This hook is for V2+ appeal bond logic
         }
@@ -519,7 +541,7 @@ contract ResolverIncentiveModule is
         address escrowContract,
         address token,
         uint256 /* totalFees */
-    ) external virtual override onlyEscrowContract {
+    ) external virtual override onlyEscrowContractFor(escrowContract) {
         // Delegate to onDisputeResolved for backward compatibility
         // Note: totalFees parameter is ignored as fees are already recorded via recordEscrowFee/recordEscalationFee
         onDisputeResolved(workflowId, escrowContract, token);
@@ -541,7 +563,7 @@ contract ResolverIncentiveModule is
         uint256 workflowId,
         address escrowContract,
         address token
-    ) public nonReentrant onlyEscrowContract {
+    ) public nonReentrant onlyEscrowContractFor(escrowContract) {
         if (token == address(0)) revert ZeroToken();
         if (paymentsCalculated[escrowContract][workflowId]) revert PaymentsAlreadyCalculated(workflowId);
 
@@ -555,6 +577,12 @@ contract ResolverIncentiveModule is
         uint256 escrowFee = disputeEscrowFees[escrowContract][workflowId];
         uint256 escalationFees = disputeEscalationFees[escrowContract][workflowId];
         uint256 totalRecordedFees = escrowFee + escalationFees;
+        PaymentPolicySnapshot memory policy = paymentPolicySnapshots[escrowContract][workflowId];
+        if (!policy.initialized) revert MissingPaymentPolicySnapshot(escrowContract, workflowId);
+        bytes32 actualLibraryCodeHash = policy.libraryAddress.codehash;
+        if (actualLibraryCodeHash != policy.libraryCodeHash) {
+            revert PaymentLibraryCodeChanged(policy.libraryAddress, policy.libraryCodeHash, actualLibraryCodeHash);
+        }
 
         // Check for stale fee recording (fees recorded too long ago)
         uint256 feeRecordedAt = feeRecordedTimestamp[escrowContract][workflowId];
@@ -592,13 +620,13 @@ contract ResolverIncentiveModule is
         PaymentInput memory input = PaymentInput({
             escrowFee: escrowFee,
             escalationFees: escalationFees,
-            resolverSharePercentage: resolverSharePercentage,
+            resolverSharePercentage: policy.resolverSharePercentage,
             resolvers: resolvers,
-            weights: weights
+            weights: policy.weights
         });
 
         // Calculate payments (functional - pure library call)
-        PaymentOutput memory output = calculatePaymentsWithVersion(input);
+        PaymentOutput memory output = calculatePaymentsWithVersion(policy.libraryAddress, input);
 
         // ============ Bounds Checking ============
         // Validate payment calculation results
@@ -733,19 +761,20 @@ contract ResolverIncentiveModule is
      * @dev Detects library version and calls appropriate function
      */
     function calculatePaymentsWithVersion(
+        address paymentLibrary,
         PaymentInput memory input
     ) internal view returns (PaymentOutput memory) {
         // Get library version
-        string memory libVersion = IPaymentCalculationLibrary(currentPaymentLibrary).version();
+        string memory libVersion = IPaymentCalculationLibrary(paymentLibrary).version();
 
         // For V1, use standard interface
         // Future versions can add version-specific handling here
         if (keccak256(bytes(libVersion)) == keccak256(bytes('1.0.0'))) {
             // V1: Standard interface call
-            return IPaymentCalculationLibrary(currentPaymentLibrary).calculatePayments(input);
+            return IPaymentCalculationLibrary(paymentLibrary).calculatePayments(input);
         } else {
             // Unknown version - try standard interface (extensible input should handle it)
-            return IPaymentCalculationLibrary(currentPaymentLibrary).calculatePayments(input);
+            return IPaymentCalculationLibrary(paymentLibrary).calculatePayments(input);
         }
     }
 
@@ -1348,7 +1377,7 @@ contract ResolverIncentiveModule is
         uint256 amount,
         address token,
         uint8 round
-    ) external payable virtual override onlyEscrowContract {
+    ) external payable virtual override onlyEscrowContractFor(escrowContract) {
         require(depositor != address(0), 'Invalid depositor');
         require(escalatedBy != address(0), 'Invalid escalatedBy');
         require(amount > 0, 'Invalid amount');
@@ -1412,7 +1441,7 @@ contract ResolverIncentiveModule is
         address escrowContract,
         uint8 round,
         bool outcomeFlipped
-    ) external virtual override nonReentrant onlyEscrowOrResolutionModule {
+    ) external virtual override nonReentrant onlyResolutionModule {
         // Validate round bounds
         require(round < 2, 'Invalid round - no higher round');
 
@@ -1449,7 +1478,7 @@ contract ResolverIncentiveModule is
         address escrowContract,
         uint8 round,
         string calldata reason
-    ) external nonReentrant onlyEscrowContract {
+    ) external nonReentrant onlyResolutionModule {
         AppealBondRecord storage bond = appealBonds[escrowContract][workflowId][round];
         require(bond.amount > 0, 'No bond recorded');
         require(!bond.distributed, 'Bond already distributed');
@@ -1672,7 +1701,7 @@ contract ResolverIncentiveModule is
         address escrowContract,
         uint8 finalRound,
         ResolutionOutcome /* finalDecision */
-    ) external virtual override onlyEscrowOrResolutionModule {
+    ) external virtual override onlyResolutionModule {
         // Forfeit any outstanding bonds for rounds 0 to finalRound
         for (uint8 round = 0; round <= finalRound; round++) {
             AppealBondRecord storage bond = appealBonds[escrowContract][workflowId][round];

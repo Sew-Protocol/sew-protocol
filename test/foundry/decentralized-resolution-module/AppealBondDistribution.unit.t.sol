@@ -3,6 +3,7 @@ pragma solidity ^0.8.37;
 
 import 'forge-std/Test.sol';
 import '../../../contracts/modules/decentralized-resolution-module/incentive/ResolverIncentiveModule.sol';
+import '../../../contracts/modules/decentralized-resolution-module/interfaces/IPaymentCalculationLibrary.sol';
 import '../../../contracts/modules/decentralized-resolution-module/libraries/PaymentCalculationLibrary.sol';
 import '../../../packages/sew-core/contracts/modules/decentralized-resolution-module/DecentralizedResolverStructs.sol';
 import '../../../contracts/core/EscrowVault.sol';
@@ -45,6 +46,7 @@ contract AppealBondDistributionTest is Test {
         incentiveModule = new ResolverIncentiveModule(deployer, address(paymentLib));
         token = new ERC20Mock('Test Token', 'TEST', address(this), 0);
         incentiveModule.grantRole(incentiveModule.ROLE_TIMELOCK(), address(this));
+        incentiveModule.setResolutionModule(address(this));
         incentiveModule.registerEscrowContract(address(this));
         moduleManagement = new ModuleSnapshotRegistry(address(this));
         escrow = new EscrowVault(100,feeAddress,address(moduleManagement));
@@ -71,6 +73,78 @@ contract AppealBondDistributionTest is Test {
         // Record bond - incentive module will pull tokens from depositor
         vm.prank(address(this));
         incentiveModule.recordAppealBond(workflowId, address(this), depositor, depositor, BOND_AMOUNT, address(token), round);
+    }
+
+    function test_registeredEscrowCannotChooseAppealBondOutcome() public {
+        _recordBond(WORKFLOW_ID, 1);
+
+        vm.prank(address(escrow));
+        vm.expectRevert(
+            abi.encodeWithSelector(ResolverIncentiveModule.NotResolutionModule.selector, address(escrow))
+        );
+        incentiveModule.distributeAppealBond(WORKFLOW_ID, address(escrow), 0, true);
+    }
+
+    function test_registeredEscrowCannotRecordBondForAnotherEscrow() public {
+        vm.prank(depositor);
+        token.approve(address(incentiveModule), BOND_AMOUNT);
+
+        vm.prank(address(escrow));
+        vm.expectRevert(
+            abi.encodeWithSelector(NotRegisteredEscrowContract.selector, address(escrow))
+        );
+        incentiveModule.recordAppealBond(
+            WORKFLOW_ID, address(this), depositor, depositor, BOND_AMOUNT, address(token), 1
+        );
+    }
+
+    function test_registeredEscrowCannotForgeResolverAssignment() public {
+        vm.prank(address(escrow));
+        vm.expectRevert(
+            abi.encodeWithSelector(ResolverIncentiveModule.NotResolutionModule.selector, address(escrow))
+        );
+        incentiveModule.onResolverAssigned(WORKFLOW_ID, address(this), resolver1, 0);
+    }
+
+    function test_disputeUsesPaymentPolicySnapshottedAtFirstResolverAssignment() public {
+        uint256 workflowId = 91;
+        incentiveModule.recordResolver(workflowId, address(this), resolver1, 0);
+        incentiveModule.recordResolver(workflowId, address(this), resolver2, 1);
+        ResolverIncentiveModule.PaymentPolicySnapshot memory snapshot =
+            incentiveModule.getPaymentPolicySnapshot(address(this), workflowId);
+        assertTrue(snapshot.initialized);
+        assertEq(snapshot.libraryAddress, address(paymentLib));
+
+        Weights memory changedWeights = Weights({level0: 90000, level1: 1, level2: 1});
+        incentiveModule.queueWeights(changedWeights);
+        vm.warp(block.timestamp + 7 days + 1);
+        incentiveModule.activateWeights();
+        (uint256 activeLevel0,,) = incentiveModule.weights();
+        assertEq(activeLevel0, changedWeights.level0);
+
+        uint256 feeAmount = 100 ether;
+        incentiveModule.recordEscrowFee(workflowId, address(this), address(token), feeAmount);
+        token.mint(address(incentiveModule), feeAmount);
+
+        ResolverRecord[] memory resolvers = incentiveModule.getDisputeResolvers(workflowId, address(this));
+        PaymentInput memory expectedInput = PaymentInput({
+            escrowFee: feeAmount,
+            escalationFees: 0,
+            resolverSharePercentage: snapshot.resolverSharePercentage,
+            resolvers: resolvers,
+            weights: snapshot.weights
+        });
+        PaymentOutput memory expected = paymentLib.calculatePayments(expectedInput);
+
+        incentiveModule.onDisputeResolved(workflowId, address(this), address(token));
+        assertEq(
+            incentiveModule.getClaimablePayment(workflowId, address(this), resolver1),
+            expected.payments[0]
+        );
+        assertEq(
+            incentiveModule.getClaimablePayment(workflowId, address(this), resolver2),
+            expected.payments[1]
+        );
     }
 
     /**

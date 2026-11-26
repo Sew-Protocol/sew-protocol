@@ -4,6 +4,11 @@
 **Scope:** Findings F-01 through F-17 in the source review supplied on 2026-11-23.
 **Status:** Remediation implemented and CI-qualified on the recorded source revision; independent security acceptance remains pending.
 
+> **Working-copy update (2026-11-26):** The changes below are not yet committed,
+> CI-qualified, or independently reviewed. A local full-suite run completed
+> after assignment-scoped resolver-capacity accounting. Do not treat this
+> working copy as deployment qualified.
+
 > **Scope update (2026-11-25):** The F-01–F-17 qualification does not accept the full
 > Sew Protocol or full-appeal, DR v3, staking/slashing, or yield-enabled profiles.
 > A subsequent review identified additional authorization and accounting issues;
@@ -120,9 +125,11 @@ correct escrow, workflow, round, assignment, and authenticated adjudication.
    that it acts on a registered escrow's current workflow. A caller being
    registered must not grant authority to mutate another escrow's state.
 3. **Assignment-scoped capacity:** replace resolver-only decrement operations
-   with a single-use key for the exact `(escrowContract, workflowId, round,
-   resolver)` assignment. Reject duplicate release, stale assignment, and
-   cross-escrow release.
+   with a single-use record keyed by `(escrowContract, workflowId)` that stores
+   its assigned round and resolver. Reject duplicate assignment and release;
+   capacity counters change only through these keyed transitions. Implemented
+   in the current working copy; targeted capacity suite passes 14/14. Full-suite
+   qualification is in progress.
 4. **Authenticated bond disposition:** refunds, forfeitures, and resolver
    payouts must derive from a one-time DRM decision transition for that exact
    escrow/workflow/round. Do not accept caller-supplied `outcomeFlipped` or
@@ -163,6 +170,47 @@ release boundary.
 | DR v3 staking/slashing | On module rotation, revoke old roles or perform a verified migration; define whether locked collateral is slashable and ensure slash waterfall uses the intended slashable exposure; preserve funded, correctly denominated vindication accounting; qualify mixed-token exposure, liquidation priority, and the single-use stake lifecycle. |
 | Yield-backed settlement | Replace unlimited approvals with exact approvals and clear residual allowance; test compromised/replaced modules, shared-vault isolation, per-workflow recovery, and shortfall conservation. |
 | Incentive accounting | Snapshot payout weights and payment policy per dispute or round; make finalization hooks atomic or create a separately recoverable obligation so hook failure cannot silently leave finalized disputes unreconciled. |
+
+### Current working-copy status
+
+The following changes are present in the uncommitted working copy and must not
+be confused with the historical `ad0aadcb` evidence above:
+
+- P0-A escalation, escrow identity, resolver decision finality, bond disposition,
+  and assignment-scoped capacity protections have been implemented or tightened.
+- Profile-specific updates address stale staking roles, funded vindication
+  accounting, locked-stake slash semantics, exact yield allowances, payout
+  policy snapshots, and incentive finalization consistency.
+- The full local Foundry run passed: 150 suites, 1,581 passed, 0 failed, and 11
+  skipped (1,592 total). A final stale-assignment consistency check was added
+  afterwards and its focused dispute-capacity suite passed 14/14; the entire
+  suite has not been rerun after that additional check.
+- The 11 skipped tests and reasons were: `Phase0BaseSepoliaForkTest.setUp`
+  (deployment artifact unavailable); `Phase1CoreJourneysBaseSepoliaForkTest.setUp`
+  (deployment artifact unavailable); `SecurityAttackSimBaseSepoliaForkTest.setUp`
+  (Base Sepolia artifacts unavailable); `AaveYieldModuleForkTest.setUp`,
+  `AaveYieldModuleForkTestExpanded.setUp`, and
+  `AaveYieldModuleForkTestPinned.setUp` (Aave pool has no code without the Base
+  Sepolia fork); `AaveYieldModuleMainnetForkTest.setUp` (Aave pool has no code
+  without the Base mainnet fork); `EmergencyRecoveryProposalTest.setUp`,
+  `PauseLocking.setUp`, and `EscrowLifecycleTest.test_PauseUnpause_AccessControl`
+  (pause tests disabled by `RUN_PAUSE_TESTS=false`); and
+  `EscrowVaultAccountingTest.test_recovery_accounting` (placeholder test).
+  None is a P0-A acceptance test, but the fork-dependent behaviors remain
+  unqualified against live network state.
+- The focused dispute-capacity suite passed 14/14. Source-boundary generation
+  and checking, direct TypeScript typechecking, and the standalone Sew Core
+  size build also passed. SewCoreVault remains 24,357 runtime bytes, 219 below
+  EIP-170.
+- The full-protocol `forge build --sizes` remains blocked by oversized
+  non-Sew-Core contracts; this does not affect the separate Sew Core package
+  size gate. No new source-bound artifact export, CI run, independent review,
+  or deployment qualification has been completed for this working copy.
+
+The full-suite result, exact skipped identities and reasons, and package size
+are now recorded above. The final source revision and artifact root do not yet
+exist because the working copy is uncommitted and has not been exported. Any
+test required for a P0 acceptance claim must not be skipped.
 
 The standalone Sew Core candidate remains limited to its pinned 13-artifact
 bundle and supported deployment graph. Its 219-byte runtime margin is small:

@@ -53,6 +53,8 @@ contract ResolverIncentiveModuleComprehensiveTest is Test {
         // Setup Roles
         incentiveModule.grantRole(ROLE_TIMELOCK, timelock);
         incentiveModule.grantRole(ROLE_TIMELOCK, address(this));
+        vm.prank(timelock);
+        incentiveModule.setResolutionModule(escrow);
         incentiveModule.registerEscrowContract(escrow);
 
         // Deploy Mock Token
@@ -119,7 +121,7 @@ contract ResolverIncentiveModuleComprehensiveTest is Test {
 
     function test_RecordResolver_RevertUnauthorized() public {
         vm.prank(otherAccount);
-        vm.expectRevert(abi.encodeWithSignature("NotRegisteredEscrowContract(address)", otherAccount));
+        vm.expectRevert(abi.encodeWithSignature("NotResolutionModule(address)", otherAccount));
         incentiveModule.recordResolver(1, escrow, resolver, 0);
     }
 

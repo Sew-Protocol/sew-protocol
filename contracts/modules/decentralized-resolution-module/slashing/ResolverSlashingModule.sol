@@ -149,6 +149,7 @@ contract ResolverSlashingModule is ISlashingModule, AccessControl, ReentrancyGua
 
     // Efficient pending slash tracking
     mapping(address => uint256) public pendingSlashCount;
+    uint256 public totalPendingSlashCount;
     mapping(address => uint256) public juniorsPendingSlashCount;
 
     // Explicit accounting for slashed funds retained in this module.
@@ -299,7 +300,9 @@ contract ResolverSlashingModule is ISlashingModule, AccessControl, ReentrancyGua
         // Execute waterfall slash
         (uint256 resolverSlashed, uint256 seniorSlashed, address senior) = _executeWaterfallSlash(
             resolver,
-            slashAmount
+            slashAmount,
+            slashEvent.escrowContract,
+            slashEvent.workflowId
         );
 
         uint256 totalSlashed = resolverSlashed + seniorSlashed;
@@ -532,7 +535,9 @@ contract ResolverSlashingModule is ISlashingModule, AccessControl, ReentrancyGua
             // Execute waterfall slash immediately
             (uint256 resolverSlashed, uint256 seniorSlashed, address senior) = _executeWaterfallSlash(
                 resolver,
-                slashAmount
+                slashAmount,
+                escrowContract,
+                workflowId
             );
 
             uint256 totalSlashed = resolverSlashed + seniorSlashed;
@@ -653,7 +658,9 @@ contract ResolverSlashingModule is ISlashingModule, AccessControl, ReentrancyGua
         // Execute waterfall slash immediately
         (uint256 resolverSlashed, uint256 seniorSlashed, address senior) = _executeWaterfallSlash(
             resolver,
-            slashAmount
+            slashAmount,
+            escrowContract,
+            workflowId
         );
 
         uint256 totalSlashed = resolverSlashed + seniorSlashed;
@@ -859,7 +866,9 @@ contract ResolverSlashingModule is ISlashingModule, AccessControl, ReentrancyGua
      */
     function _executeWaterfallSlash(
         address resolver,
-        uint256 slashAmount
+        uint256 slashAmount,
+        address escrowContract,
+        uint256 workflowId
     ) internal returns (uint256 resolverSlashed, uint256 seniorSlashed, address senior) {
         // Get resolver's stake info
         IStakingModule.StakeInfo memory stakeInfo = stakingModule.getStakeInfo(resolver);
@@ -874,41 +883,23 @@ contract ResolverSlashingModule is ISlashingModule, AccessControl, ReentrancyGua
         }
 
         // Calculate waterfall
-        uint256 availableStake = stakeInfo.availableStake;
+        // Free stake plus this workflow's own lock is slashable. Other active
+        // assignments remain fully backed and cannot be consumed by this slash.
+        uint256 assignmentLock = stakingModule.lockedStakes(escrowContract, workflowId, resolver);
+        uint256 availableStake = stakeInfo.availableStake + assignmentLock;
 
-        if (slashAmount <= availableStake) {
-            // Resolver's stake covers the slash
-            resolverSlashed = slashAmount;
+        uint256 resolverTarget = slashAmount < availableStake ? slashAmount : availableStake;
+        resolverSlashed = _slashResolverStake(resolver, resolverTarget, escrowContract, workflowId);
+        uint256 remaining = slashAmount - resolverSlashed;
+
+        if (delegation.active && remaining > 0) {
+            senior = delegation.delegatee;
+            IStakingModule.StakeInfo memory seniorStake = stakingModule.getStakeInfo(senior);
+            seniorSlashed = remaining < seniorStake.availableStake ? remaining : seniorStake.availableStake;
+            if (seniorSlashed > 0) _slashSeniorCoverage(senior, seniorSlashed, resolver);
+        } else {
             seniorSlashed = 0;
             senior = address(0);
-
-            // Slash resolver's stake (via staking module)
-            _slashResolverStake(resolver, resolverSlashed);
-        } else {
-            // Resolver's stake exhausted, slash senior coverage
-            resolverSlashed = availableStake;
-            uint256 remaining = slashAmount - availableStake;
-
-            if (delegation.active && remaining > 0) {
-                // Slash from senior's coverage
-                senior = delegation.delegatee;
-                seniorSlashed = remaining;
-
-                // Slash resolver's remaining stake
-                if (resolverSlashed > 0) {
-                    _slashResolverStake(resolver, resolverSlashed);
-                }
-
-                // Slash senior's coverage
-                _slashSeniorCoverage(senior, seniorSlashed, resolver);
-            } else {
-                // No senior coverage, slash only what's available
-                if (resolverSlashed > 0) {
-                    _slashResolverStake(resolver, resolverSlashed);
-                }
-                seniorSlashed = 0;
-                senior = address(0);
-            }
         }
     }
 
@@ -917,6 +908,7 @@ contract ResolverSlashingModule is ISlashingModule, AccessControl, ReentrancyGua
      */
     function _recordPendingSlash(address resolver) internal {
         pendingSlashCount[resolver]++;
+        totalPendingSlashCount++;
         
         // Update senior if applicable
         IStakingModule.DelegationInfo memory delegation = _findDelegation(resolver);
@@ -931,6 +923,7 @@ contract ResolverSlashingModule is ISlashingModule, AccessControl, ReentrancyGua
     function _clearPendingSlash(address resolver) internal {
         if (pendingSlashCount[resolver] > 0) {
             pendingSlashCount[resolver]--;
+            totalPendingSlashCount--;
         }
         
         // Update senior if applicable
@@ -1055,15 +1048,26 @@ contract ResolverSlashingModule is ISlashingModule, AccessControl, ReentrancyGua
     /**
      * @notice Slash resolver's stake (real implementation)
      */
-    function _slashResolverStake(address resolver, uint256 amount) internal {
-        if (amount == 0) return;
+    function _slashResolverStake(
+        address resolver,
+        uint256 amount,
+        address escrowContract,
+        uint256 workflowId
+    ) internal returns (uint256 amountSlashedUSD) {
+        if (amount == 0) return 0;
 
-        // Call staking module to slash resolver's bond
-        (uint256 stableSlashed, uint256 sewSlashed) = stakingModule.slash(resolver, amount);
+        uint256 effectiveBefore = stakingModule.getStakeInfo(resolver).totalStake;
+
+        // Slash free stake and only collateral reserved for this workflow.
+        (uint256 stableSlashed, uint256 sewSlashed) = stakingModule.slashForAssignment(
+            resolver, amount, escrowContract, workflowId
+        );
 
         // Track amounts for distribution
         _currentSlashStableAmount += stableSlashed;
         _currentSlashSewAmount += sewSlashed;
+        uint256 effectiveAfter = stakingModule.getStakeInfo(resolver).totalStake;
+        amountSlashedUSD = effectiveBefore > effectiveAfter ? effectiveBefore - effectiveAfter : 0;
     }
 
     /**

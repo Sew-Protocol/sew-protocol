@@ -165,14 +165,13 @@ contract EscrowableERC20 is ERC20, BaseEscrow {
         uint256 amount
     ) internal override {
         address moduleAddress = address(generationModule);
-        uint256 currentAllowance = allowance(address(this), moduleAddress);
-        if (currentAllowance < amount) {
-            _approve(address(this), moduleAddress, type(uint256).max);
-        }
+        _approve(address(this), moduleAddress, 0);
+        _approve(address(this), moduleAddress, amount);
         
         uint256 balBefore = balanceOf(address(this));
         uint256 accepted = generationModule.initializeYield(workflowId, token, amount, YieldPreset.OFF);
         uint256 balAfter = balanceOf(address(this));
+        _approve(address(this), moduleAddress, 0);
 
         if (balBefore - balAfter < accepted) {
             revert AccountingDeficit(token, amount);
