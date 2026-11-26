@@ -37,7 +37,7 @@ jobs:
       - name: Setup Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: stable
+          version: v1.10.0
 
       - name: Fetch Foundry dependencies
         run: bash scripts/fetch-foundry-deps.sh
