@@ -4,10 +4,10 @@
 **Scope:** Findings F-01 through F-17 in the source review supplied on 2026-11-23.
 **Status:** Remediation implemented and CI-qualified on the recorded source revision; independent security acceptance remains pending.
 
-> **Working-copy update (2026-11-26):** The changes below are not yet committed,
-> CI-qualified, or independently reviewed. A local full-suite run completed
-> after assignment-scoped resolver-capacity accounting. Do not treat this
-> working copy as deployment qualified.
+> **Qualification update (2026-11-26):** P0-A and the listed profile-specific
+> remediations are committed and pushed. CI and CodeQL pass on source revision
+> `b6cf7017767f0ac7e7df89e4f3ad0e2c7f1f6229`. Independent security acceptance
+> and chain-specific deployment qualification remain pending.
 
 > **Scope update (2026-11-25):** The F-01–F-17 qualification does not accept the full
 > Sew Protocol or full-appeal, DR v3, staking/slashing, or yield-enabled profiles.
@@ -15,6 +15,17 @@
 > these are tracked separately below as P0-A and profile-specific follow-ups.
 
 ## Current evidence
+
+On `b6cf7017767f0ac7e7df89e4f3ad0e2c7f1f6229`, GitHub CI and CodeQL passed.
+CI passed lint, TypeScript, Hardhat/Forge compilation, the full Foundry suite,
+Sew Core scoped qualification, full-appeal artifact qualification, contract
+size checks, deployable export/validation, and deployable integrity and
+determinism checks. The full-appeal 20-artifact profile
+(`@sew/deployables@0.2.0`) reproduced bundle root
+`4a12afdd99f3cbecac4e3aeb3ca563348eb9ffc971f653b2ba1c520e756caf8f` from that
+clean source revision, using solc `0.8.37+commit.f401782d`, Osaka EVM, 200
+optimizer runs, and `viaIR`. This is source/artifact qualification evidence,
+not independent security acceptance or deployment approval.
 
 The latest successful source revision is `ad0aadcb2001b40081ed1286c4e405eb1b26f1e0`.
 CI and CodeQL passed. The full run passed 1,540 Foundry tests, failed 0, and
@@ -39,11 +50,11 @@ and token cannot use one another's recovery or claims.
 | Gate | Current state |
 |---|---|
 | Focused regressions for affected findings | Affected suites pass; F-05 shared-vault recovery isolation regression passes locally and in CI |
-| Full Foundry suite | CI passed on `ad0aadcb`: 1,540 passed, 0 failed, 12 skipped (1,552 total) |
+| Full Foundry suite | CI passed on `b6cf7017`; prior local run on the same remediation code: 1,581 passed, 0 failed, 11 skipped (1,592 total) |
 | Invariant directory | Passed; 12 invariants/test cases at 256 runs and 128,000 handler calls each |
 | Sew Core package build and profile tests | Passed; runtime is 24,357 bytes (219-byte margin), initcode is 25,172 bytes (23,980-byte margin) |
-| Runtime and initcode limits | Hard-gated for all 13 Sew Core artifacts; CI passed on `ad0aadcb` |
-| TypeScript, CodeQL, artifact export, validation, and determinism | Passed on `ad0aadcb`; clean-source bundle root recorded above |
+| Runtime and initcode limits | Hard-gated for all 13 Sew Core artifacts; CI passed on `b6cf7017` |
+| TypeScript, CodeQL, artifact export, validation, and determinism | Passed on `b6cf7017`; Sew Core and full-appeal roots recorded above |
 | Independent review of exact source revision and bundle root | Pending |
 | Public deployment authorization | Not implied by source remediation |
 
@@ -188,15 +199,15 @@ release boundary.
 
 | Profile | Required work before qualification |
 |---|---|
-| Full appeal | Complete P0-A, including cross-escrow and finality regressions; record every skipped test identity and reason, and do not skip a test needed for P0 acceptance. |
+| Full appeal | P0-A code remediation and artifact qualification are complete on `b6cf7017`; independent security review and any target-network deployment qualification remain pending. The 11 skipped-test identities/reasons are recorded below; none is a P0-A acceptance test. |
 | DR v3 staking/slashing | On module rotation, revoke old roles or perform a verified migration; define whether locked collateral is slashable and ensure slash waterfall uses the intended slashable exposure; preserve funded, correctly denominated vindication accounting; qualify mixed-token exposure, liquidation priority, and the single-use stake lifecycle. |
-| Yield-backed settlement | Replace unlimited approvals with exact approvals and clear residual allowance; test compromised/replaced modules, shared-vault isolation, per-workflow recovery, and shortfall conservation. |
-| Incentive accounting | Snapshot payout weights and payment policy per dispute or round; make finalization hooks atomic or create a separately recoverable obligation so hook failure cannot silently leave finalized disputes unreconciled. |
+| Yield-backed settlement | Exact approvals and residual allowance clearing, shared-vault isolation, per-workflow recovery, and shortfall conservation are implemented and tested. Add adversarial qualification for compromised or replaced yield modules before enabling this profile. |
+| Incentive accounting | Per-workflow payout policy snapshots and atomic required finalization hooks are implemented and covered by the passing full suite; retain this evidence in any future profile artifact qualification. |
 
-### Current working-copy status
+### P0-A and profile remediation evidence
 
-The following changes are present in the uncommitted working copy and must not
-be confused with the historical `ad0aadcb` evidence above:
+The following remediations are committed and pushed; the exact source revision
+and artifact qualification evidence are recorded here:
 
 - P0-A escalation, escrow identity, resolver decision finality, bond disposition,
   and assignment-scoped capacity protections have been implemented or tightened.
@@ -215,6 +226,10 @@ be confused with the historical `ad0aadcb` evidence above:
   solc `0.8.37+commit.f401782d`, Osaka EVM, 200 optimizer runs, and `viaIR`.
   This establishes reproducible local bundle identity, not independent
   security review, network-specific size acceptance, or deployment readiness.
+- Commit `b6cf7017767f0ac7e7df89e4f3ad0e2c7f1f6229` adds the source-bound
+  full-appeal CI qualification gate. Its CI run (`45888237415`) and CodeQL run
+  (`45888237309`) both passed. The 20-artifact full-appeal root for this exact
+  source is `4a12afdd99f3cbecac4e3aeb3ca563348eb9ffc971f653b2ba1c520e756caf8f`.
 - The 11 skipped tests and reasons were: `Phase0BaseSepoliaForkTest.setUp`
   (deployment artifact unavailable); `Phase1CoreJourneysBaseSepoliaForkTest.setUp`
   (deployment artifact unavailable); `SecurityAttackSimBaseSepoliaForkTest.setUp`
@@ -234,13 +249,12 @@ be confused with the historical `ad0aadcb` evidence above:
   EIP-170.
 - The full-protocol `forge build --sizes` remains blocked by oversized
   non-Sew-Core contracts; this does not affect the separate Sew Core package
-  size gate. No new source-bound artifact export, CI run, independent review,
-  or deployment qualification has been completed for this working copy.
+  size gate. Independent review and chain-specific deployment qualification
+  remain outstanding.
 
-The full-suite result, exact skipped identities and reasons, and package size
-are now recorded above. The final source revision and artifact root do not yet
-exist because the working copy is uncommitted and has not been exported. Any
-test required for a P0 acceptance claim must not be skipped.
+The full-suite result, exact skipped identities and reasons, package size,
+source revisions, and artifact roots are recorded above. Any test required for
+a P0 acceptance claim must not be skipped.
 
 The standalone Sew Core candidate remains limited to its pinned 13-artifact
 bundle and supported deployment graph. Its 219-byte runtime margin is small:
