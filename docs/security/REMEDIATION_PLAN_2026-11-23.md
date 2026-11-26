@@ -27,7 +27,8 @@ clean source revision, using solc `0.8.37+commit.f401782d`, Osaka EVM, 200
 optimizer runs, and `viaIR`. This is source/artifact qualification evidence,
 not independent security acceptance or deployment approval.
 
-The latest successful source revision is `ad0aadcb2001b40081ed1286c4e405eb1b26f1e0`.
+The earlier F-01–F-17 qualification baseline was source revision
+`ad0aadcb2001b40081ed1286c4e405eb1b26f1e0`.
 CI and CodeQL passed. The full run passed 1,540 Foundry tests, failed 0, and
 skipped 12 across 150 suites. The Sew Core source boundary, 13-test profile,
 artifact validation, integrity checks, determinism checks, and runtime/initcode
@@ -200,7 +201,7 @@ release boundary.
 | Profile | Required work before qualification |
 |---|---|
 | Full appeal | P0-A code remediation and artifact qualification are complete on `b6cf7017`; independent security review and any target-network deployment qualification remain pending. The 11 skipped-test identities/reasons are recorded below; none is a P0-A acceptance test. |
-| DR v3 staking/slashing | On module rotation, revoke old roles or perform a verified migration; define whether locked collateral is slashable and ensure slash waterfall uses the intended slashable exposure; preserve funded, correctly denominated vindication accounting; qualify mixed-token exposure, liquidation priority, and the single-use stake lifecycle. |
+| DR v3 staking/slashing | Role revocation on module rotation, slashable locked-stake treatment, funded vindication accounting, and the single-use stake lifecycle have code changes and regression coverage. Mixed-token valuation and liquidation policy remain unsupported; keep mixed-token DR v3 disabled until those policies are specified and independently qualified. |
 | Yield-backed settlement | Exact approvals and residual allowance clearing, shared-vault isolation, per-workflow recovery, and shortfall conservation are implemented and tested. Add adversarial qualification for compromised or replaced yield modules before enabling this profile. |
 | Incentive accounting | Per-workflow payout policy snapshots and atomic required finalization hooks are implemented and covered by the passing full suite; retain this evidence in any future profile artifact qualification. |
 
