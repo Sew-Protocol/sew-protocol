@@ -68,6 +68,23 @@ jobs:
         env:
           GIT_SHA: ${{ github.sha }}
 
+      - name: Export full-appeal review bundle
+        run: >-
+          pnpm deployables:export --
+          config/deployable-allowlist.sew-full-appeal.json
+          /tmp/sew-full-appeal-review
+          --out-dir out
+        env:
+          GIT_SHA: ${{ github.sha }}
+
+      - name: Upload full-appeal review bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: sew-full-appeal-${{ github.sha }}
+          path: /tmp/sew-full-appeal-review
+          if-no-files-found: error
+          retention-days: 90
+
       - name: Contract size check
         run: pnpm size:check
 
