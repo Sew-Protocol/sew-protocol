@@ -20,6 +20,10 @@ contract FailingDisputeFinalizationHook {
     }
 }
 
+contract ModuleRotationHookMock {
+    fallback() external {}
+}
+
 /**
  * @title DisputeCapacityExhaustionTest
  * @notice Tests for resolver capacity enforcement and the capacity-counter decrement fix.
@@ -302,6 +306,64 @@ contract DisputeCapacityExhaustionTest is Test {
         DecentralizedResolutionModule.DisputeMetadata memory dm = drm.getDisputeMetadata(wid, address(escrow));
         assertEq(uint8(dm.status), uint8(DecentralizedResolverStructs.DisputeStatus.Open));
         assertEq(drm.activeDisputeCount(), activeBefore);
+    }
+
+    function test_DRM_IncentiveModuleCannotRotateUntilDisputesAreTerminal() public {
+        ModuleRotationHookMock first = new ModuleRotationHookMock();
+        ModuleRotationHookMock second = new ModuleRotationHookMock();
+        vm.prank(timelock);
+        drm.setIncentiveModule(address(first));
+
+        vm.prank(timelock);
+        drm.setResolverCapacity(resolver1, 5, true);
+        drm.initializeDispute(801, address(this), resolver1, bytes32(0));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                DRMAdminFacet.ModuleRotationDuringActiveDisputes.selector,
+                uint256(1)
+            )
+        );
+        vm.prank(timelock);
+        drm.setIncentiveModule(address(second));
+        assertEq(address(drm.incentiveModule()), address(first));
+
+        drm.recordResolution(801, address(this), resolver1, ResolutionOutcome.RELEASE, 1 days);
+        vm.warp(block.timestamp + 4 days);
+        drm.finalizeDispute(801, address(this));
+
+        vm.prank(timelock);
+        drm.setIncentiveModule(address(second));
+        assertEq(address(drm.incentiveModule()), address(second));
+    }
+
+    function test_DRM_StakingModuleCannotRotateUntilAssignmentsAreTerminal() public {
+        ModuleRotationHookMock first = new ModuleRotationHookMock();
+        ModuleRotationHookMock second = new ModuleRotationHookMock();
+        vm.prank(timelock);
+        drm.setStakingModule(address(first));
+
+        vm.prank(timelock);
+        drm.setResolverCapacity(resolver1, 5, true);
+        drm.initializeDispute(802, address(this), resolver1, bytes32(0));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                DRMAdminFacet.ModuleRotationDuringActiveDisputes.selector,
+                uint256(1)
+            )
+        );
+        vm.prank(timelock);
+        drm.setStakingModule(address(second));
+        assertEq(drm.stakingModule(), address(first));
+
+        drm.recordResolution(802, address(this), resolver1, ResolutionOutcome.RELEASE, 1 days);
+        vm.warp(block.timestamp + 4 days);
+        drm.finalizeDispute(802, address(this));
+
+        vm.prank(timelock);
+        drm.setStakingModule(address(second));
+        assertEq(drm.stakingModule(), address(second));
     }
 
     // ============================================================

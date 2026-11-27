@@ -396,13 +396,17 @@ contract SlashingModuleUnitTest is Test {
 
     // ============ slashForReversal Tests ============
 
-    function test_slashForReversal_Disabled() public {
+    function test_slashForReversal_DisabledIsNoOp() public {
         uint256 workflowId = 1;
         uint8 priorRound = 0;
 
         vm.prank(resolutionModule);
-        vm.expectRevert(ResolverSlashingModule.ReversalSlashingNotEnabled.selector);
-        slashingModule.slashForReversal(workflowId, address(this), resolver1, priorRound);
+        assertEq(
+            slashingModule.slashForReversal(workflowId, address(this), resolver1, priorRound),
+            0,
+            'disabled reversal slashing must be a no-op'
+        );
+        assertEq(slashingModule.reversalSlashByRound(address(this), workflowId, priorRound), 0);
     }
 
     function test_slashForReversal_EnabledByGovernance() public {

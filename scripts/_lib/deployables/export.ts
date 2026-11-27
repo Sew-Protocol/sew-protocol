@@ -14,7 +14,7 @@ import type {
 import { readForgeArtifact } from './forge-artifact';
 import { loadAllowlist } from './allowlist';
 
-export const SOURCE_REPOSITORY = 'sew/sew-protocol';
+export const SOURCE_REPOSITORY = 'Sew-Protocol/sew-protocol';
 export const DEFAULT_OUT_DIR = path.resolve(process.cwd(), 'out');
 export const DEFAULT_EXPORT_DIR = path.resolve(process.cwd(), 'deployables');
 

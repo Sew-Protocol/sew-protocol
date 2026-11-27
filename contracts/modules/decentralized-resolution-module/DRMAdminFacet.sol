@@ -40,6 +40,7 @@ contract DRMAdminFacet is SlowLaneQueueActivate, AccessControl, ReentrancyGuard,
     error InvalidResolutionConfigVersion(uint256 version);
     error InvalidRoutingPolicy(bytes32 algorithmId, uint256 algorithmVersion);
     error InvalidRoutingMode(uint8 weightingMode, uint8 categoryRouteBehavior);
+    error ModuleRotationDuringActiveDisputes(uint256 activeDisputeCount);
 
     // ============ Events ============
     event AdminFacetUpdated(address indexed oldFacet, address indexed newFacet);
@@ -470,12 +471,18 @@ contract DRMAdminFacet is SlowLaneQueueActivate, AccessControl, ReentrancyGuard,
 
     function setIncentiveModule(address m) external onlyRole(ROLE_TIMELOCK) {
         address old = address(incentiveModule);
+        if (old != m && activeDisputeCount != 0) {
+            revert ModuleRotationDuringActiveDisputes(activeDisputeCount);
+        }
         incentiveModule = IIncentiveModule(m);
         emit IncentiveModuleUpdated(old, m);
     }
 
     function setStakingModule(address m) external onlyRole(ROLE_TIMELOCK) {
         address old = stakingModule;
+        if (old != m && activeDisputeCount != 0) {
+            revert ModuleRotationDuringActiveDisputes(activeDisputeCount);
+        }
         stakingModule = m;
         emit StakingModuleUpdated(old, m);
     }

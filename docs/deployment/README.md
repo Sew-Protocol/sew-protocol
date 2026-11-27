@@ -8,6 +8,7 @@ This folder contains deployment guides, release process notes, and network-speci
 - **Branching & release discipline**: `BRANCHING_AND_RELEASE_DISCIPLINE.md`
 - **Base Sepolia general deployment**: `BASE_SEPOLIA_DEPLOYMENT_GUIDE.md`
 - **IEO release process**: `ieo/IEO_RELEASE_GUIDE.md`
+- **Full-appeal capability boundary**: `sew-full-appeal-profile.md`
 
 ## Releases
 - `RELEASES.md`

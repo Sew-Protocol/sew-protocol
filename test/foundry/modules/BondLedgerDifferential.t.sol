@@ -94,6 +94,79 @@ contract BondLedgerDifferential is Test {
         assertTrue(s.ledger.getAuthoritativeCauseRoot(bondId) != bytes32(0));
     }
 
+    function test_twoEscrowsShareDRMAndBondLedgerWithoutCrossMutation() public {
+        ERC20Mock token = new ERC20Mock('Shared', 'SHR', address(this), 0);
+        token.mint(buyer, 2 * BOND);
+        PaymentCalculationLibrary library_ = new PaymentCalculationLibrary();
+        BondLedger ledger = new BondLedger(address(this));
+        ResolverIncentiveModuleV2BondLedger incentive = new ResolverIncentiveModuleV2BondLedger(
+            address(this), address(library_), address(ledger)
+        );
+        ledger.addAuthorizedCaller(address(incentive));
+
+        DecentralizedResolutionModule drm = new DecentralizedResolutionModule(address(this));
+        DRMAdminFacet facet = new DRMAdminFacet();
+        drm.setAdminFacet(address(facet));
+        drm.grantRole(drm.ROLE_TIMELOCK(), address(this));
+        drm.registerEscrowContract(address(this));
+        incentive.grantRole(incentive.ROLE_TIMELOCK(), address(this));
+        incentive.setResolutionModule(address(drm));
+        drm.setIncentiveModule(address(incentive));
+
+        ModuleSnapshotRegistry registryA = new ModuleSnapshotRegistry(address(this));
+        ModuleSnapshotRegistry registryB = new ModuleSnapshotRegistry(address(this));
+        EscrowVault escrowA = new EscrowVault(0, feeAddr, address(registryA));
+        EscrowVault escrowB = new EscrowVault(0, feeAddr, address(registryB));
+        drm.registerEscrowContract(address(escrowA));
+        drm.registerEscrowContract(address(escrowB));
+        incentive.registerEscrowContract(address(escrowA));
+        incentive.registerEscrowContract(address(escrowB));
+
+        vm.prank(buyer);
+        token.approve(address(incentive), 2 * BOND);
+        vm.prank(address(escrowA));
+        incentive.recordAppealBond(WID, address(escrowA), buyer, buyer, BOND, address(token), 1);
+        vm.prank(address(escrowB));
+        incentive.recordAppealBond(WID, address(escrowB), buyer, buyer, BOND, address(token), 1);
+
+        bytes32 bondA = keccak256(abi.encode(address(escrowA), WID, uint8(1)));
+        bytes32 bondB = keccak256(abi.encode(address(escrowB), WID, uint8(1)));
+        assertEq(ledger.getBond(bondA).principal, BOND);
+        assertEq(ledger.getBond(bondB).principal, BOND);
+
+        vm.expectRevert();
+        vm.prank(address(escrowA));
+        incentive.recordAppealBond(WID, address(escrowB), buyer, buyer, BOND, address(token), 1);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                DecentralizedResolutionModule.NotRegisteredEscrowContract.selector,
+                address(escrowA)
+            )
+        );
+        vm.prank(address(escrowA));
+        drm.recordResolution(WID, address(escrowB), r0, ResolutionOutcome.CANCEL, 1);
+
+        vm.expectRevert();
+        vm.prank(address(escrowA));
+        incentive.distributeAppealBond(WID, address(escrowB), 0, true);
+        assertEq(uint256(ledger.getBond(bondB).status), uint256(IBondLedger.BondStatus.PENDING));
+
+        vm.prank(address(drm));
+        incentive.recordResolver(WID, address(escrowB), r0, 0);
+        vm.prank(address(drm));
+        incentive.distributeAppealBond(WID, address(escrowA), 0, true);
+        vm.prank(address(drm));
+        incentive.distributeAppealBond(WID, address(escrowB), 0, false);
+
+        assertEq(uint256(ledger.getBond(bondA).status), uint256(IBondLedger.BondStatus.SETTLED));
+        assertEq(uint256(ledger.getBond(bondB).status), uint256(IBondLedger.BondStatus.SETTLED));
+        assertEq(ledger.getClaimable(bondA, buyer), BOND, 'escrow A refund remains isolated');
+        assertEq(ledger.getClaimable(bondB, r0), BOND, 'escrow B resolver payout remains isolated');
+        assertEq(ledger.getClaimable(bondA, r0), 0, 'escrow A has no escrow B payout');
+        assertEq(ledger.getClaimable(bondB, buyer), 0, 'escrow B has no escrow A refund');
+    }
+
     function test_diff_failedAppeal_resolverAllocations() public {
         Stack memory a = _deploy(false);
         Stack memory b = _deploy(true);

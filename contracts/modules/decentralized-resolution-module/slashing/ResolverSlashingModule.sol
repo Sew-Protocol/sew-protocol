@@ -38,7 +38,6 @@ contract ResolverSlashingModule is ISlashingModule, AccessControl, ReentrancyGua
     error AlreadyAppealed(uint256 slashId);
     error AppealAlreadyResolved(uint256 appealId);
     error FraudSlashingNotEnabled();
-    error ReversalSlashingNotEnabled();
     error InvalidBps(uint256 bps, uint256 maxBps);
     error CooldownNotPassed(uint256 availableAt, uint256 currentTime);
     error ZeroAmount();
@@ -607,9 +606,10 @@ contract ResolverSlashingModule is ISlashingModule, AccessControl, ReentrancyGua
         uint8 priorRound
     ) external override onlyRole(ROLE_RESOLUTION_MODULE) returns (uint256 slashId) {
         priorRound;
-        // Explicit launch gate: reversal slashing is disabled until governance enables
-        // a non-zero reversalSlashBps.
-        if (slashConfig.reversalSlashBps == 0) revert ReversalSlashingNotEnabled();
+        // Reversal slashing is an optional DR v3 policy. A zero penalty disables
+        // only the economic action; it must not block an otherwise valid appeal
+        // decision or its bond settlement in the calling DRM transaction.
+        if (slashConfig.reversalSlashBps == 0) return 0;
 
         // Reset tracking before slash
         _currentSlashStableAmount = 0;

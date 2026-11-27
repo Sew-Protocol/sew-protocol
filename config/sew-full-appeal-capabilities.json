@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "profile": "sew-full-appeal",
+  "packageName": "@sew/deployables",
+  "bundleVersion": "0.2.0",
+  "maxRuntimeBytes": 24576,
+  "capabilities": {
+    "internalResolverAppeals": true,
+    "bondLedgerCustody": true,
+    "externalArbitration": false,
+    "drV3Staking": false,
+    "drV3Slashing": false,
+    "yieldCustody": false,
+    "prfAdjudication": false
+  },
+  "excludedArtifacts": [
+    "KlerosArbitrableProxy",
+    "ResolverStakingModule",
+    "ResolverSlashingModule",
+    "InsurancePoolVault",
+    "AaveYieldModule",
+    "BondedPRFModule"
+  ],
+  "requiredPostDeployAssertions": [
+    { "target": "DecentralizedResolutionModule", "getter": "stakingModule()", "equalsZero": true },
+    { "target": "DecentralizedResolutionModule", "getter": "slashingModule()", "equalsZero": true },
+    { "target": "DecentralizedResolutionModule", "getter": "externalResolver()", "equalsZero": true },
+    { "target": "DecentralizedResolutionModule", "getter": "getResolutionConfig(activeResolutionConfigVersion)", "field": "externalResolver", "equalsZero": true },
+    { "target": "ModuleSnapshotRegistry", "getter": "getModule(escrow, YIELD_GEN)", "equalsZero": true },
+    { "target": "ModuleSnapshotRegistry", "getter": "getModule(escrow, RESOLUTION)", "equals": "DecentralizedResolutionModule" }
+  ]
+}

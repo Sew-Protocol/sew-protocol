@@ -4,10 +4,12 @@
 **Scope:** Findings F-01 through F-17 in the source review supplied on 2026-11-23.
 **Status:** Remediation implemented and CI-qualified on the recorded source revision; independent security acceptance remains pending.
 
-> **Qualification update (2026-11-26):** P0-A and the listed profile-specific
+> **Qualification update (2026-11-27):** P0-A and the listed profile-specific
 > remediations are committed and pushed. CI and CodeQL pass on source revision
-> `b6cf7017767f0ac7e7df89e4f3ad0e2c7f1f6229`. Independent security acceptance
-> and chain-specific deployment qualification remain pending.
+> `69ac7c7bbd809b26cf973fb9f1ed82ef7e8850bf`. The full-appeal 20-artifact bundle
+> root is `2dd69b86427e65549ed51c7e02165832eb18f6e7ea254e48a1db9641b8085fe4`.
+> Independent security acceptance and chain-specific deployment qualification
+> remain pending.
 
 > **Scope update (2026-11-25):** The F-01–F-17 qualification does not accept the full
 > Sew Protocol or full-appeal, DR v3, staking/slashing, or yield-enabled profiles.
@@ -16,13 +18,13 @@
 
 ## Current evidence
 
-On `b6cf7017767f0ac7e7df89e4f3ad0e2c7f1f6229`, GitHub CI and CodeQL passed.
+On `69ac7c7bbd809b26cf973fb9f1ed82ef7e8850bf`, GitHub CI and CodeQL passed.
 CI passed lint, TypeScript, Hardhat/Forge compilation, the full Foundry suite,
 Sew Core scoped qualification, full-appeal artifact qualification, contract
 size checks, deployable export/validation, and deployable integrity and
 determinism checks. The full-appeal 20-artifact profile
 (`@sew/deployables@0.2.0`) reproduced bundle root
-`4a12afdd99f3cbecac4e3aeb3ca563348eb9ffc971f653b2ba1c520e756caf8f` from that
+`2dd69b86427e65549ed51c7e02165832eb18f6e7ea254e48a1db9641b8085fe4` from that
 clean source revision, using solc `0.8.37+commit.f401782d`, Osaka EVM, 200
 optimizer runs, and `viaIR`. This is source/artifact qualification evidence,
 not independent security acceptance or deployment approval.
@@ -51,11 +53,11 @@ and token cannot use one another's recovery or claims.
 | Gate | Current state |
 |---|---|
 | Focused regressions for affected findings | Affected suites pass; F-05 shared-vault recovery isolation regression passes locally and in CI |
-| Full Foundry suite | CI passed on `b6cf7017`; prior local run on the same remediation code: 1,581 passed, 0 failed, 11 skipped (1,592 total) |
+| Full Foundry suite | CI passed on `69ac7c7b`; prior local run on the remediation code: 1,581 passed, 0 failed, 11 skipped (1,592 total) |
 | Invariant directory | Passed; 12 invariants/test cases at 256 runs and 128,000 handler calls each |
 | Sew Core package build and profile tests | Passed; runtime is 24,357 bytes (219-byte margin), initcode is 25,172 bytes (23,980-byte margin) |
-| Runtime and initcode limits | Hard-gated for all 13 Sew Core artifacts; CI passed on `b6cf7017` |
-| TypeScript, CodeQL, artifact export, validation, and determinism | Passed on `b6cf7017`; Sew Core and full-appeal roots recorded above |
+| Runtime and initcode limits | Hard-gated for all 13 Sew Core artifacts; CI passed on `69ac7c7b` |
+| TypeScript, CodeQL, artifact export, validation, and determinism | Passed on `69ac7c7b`; full-appeal root recorded above |
 | Independent review of exact source revision and bundle root | Pending |
 | Public deployment authorization | Not implied by source remediation |
 
@@ -146,8 +148,15 @@ independent security acceptance.
 
 ### P0-A — Authenticated dispute and bond transitions
 
-Treat full-appeal deployment as blocked until every transition is bound to the
-correct escrow, workflow, round, assignment, and authenticated adjudication.
+**Code status: remediated** in commits `18c0afade80e6df86fc9f16e39d274e7bd94776f`
+and `9290e814f8463207516b5a44271aedd36b74ac49`; current source and artifact
+candidate: `69ac7c7bbd809b26cf973fb9f1ed82ef7e8850bf`. The first commit adds
+the authorization and lifecycle guards; the second hardens the same DRM,
+incentive, and slashing paths. CI and CodeQL passed on the current candidate.
+This is code-remediation status, not independent security acceptance.
+
+The full-appeal profile remains blocked pending independent review and the
+multi-escrow/shared-ledger adversarial acceptance test below.
 
 1. **Escalation authority:** remove public transition authority from
    `executeEscalation()` and `executeEscalationWithQuote()`. Keep quote functions
@@ -162,8 +171,7 @@ correct escrow, workflow, round, assignment, and authenticated adjudication.
    with a single-use record keyed by `(escrowContract, workflowId)` that stores
    its assigned round and resolver. Reject duplicate assignment and release;
    capacity counters change only through these keyed transitions. Implemented
-   in the current working copy; targeted capacity suite passes 14/14. Full-suite
-   qualification is in progress.
+   and covered by focused capacity tests.
 4. **Authenticated bond disposition:** refunds, forfeitures, and resolver
    payouts must derive from a one-time DRM decision transition for that exact
    escrow/workflow/round. Do not accept caller-supplied `outcomeFlipped` or
@@ -193,6 +201,60 @@ caller is registered with a shared module.
   that profile. Sew Core's existing qualification does not substitute for these
   gates.
 
+**Remaining acceptance gap:** current tests cover cross-escrow spoofing with a
+registered test-contract stand-in and bond-ledger behavior in differential
+stacks. I did not find a single adversarial regression with two separately
+deployed escrow vaults sharing the same DRM and BondLedger. Add that test before
+calling the P0-A acceptance evidence complete. Independent security review of
+the exact source revision and artifact root also remains pending.
+
+### Finality → bond → slashing lifecycle review (2026-11-27)
+
+The current transition sequence is:
+
+1. Escalation authenticates the calling escrow, checks the current appeal quote,
+   advances the workflow round, transfers capacity/stake assignment, reopens
+   the decision state, and records the next resolver.
+2. `recordResolution` authenticates the escrow and assigned resolver, permits
+   one decision in the open round, and moves the round to `Decided`. On a higher
+   round it derives whether the outcome flipped from the stored prior decision
+   and settles that round's appeal bond through the DRM-only incentive adapter.
+   A bond-settlement failure reverts the decision transition atomically.
+3. A changed higher-round decision invokes the reversal-slashing hook in the same
+   transaction. At the default zero penalty, the hook is now a no-op and the
+   decision/bond transition proceeds. If governance enables reversal slashing,
+   the slash executes immediately although the new round may still be appealed.
+   A later vindication records a USD receivable and marks the slash
+   `REVERSED_WITH_CREDIT`; it does not restore funded stake.
+4. After the appeal window (or at the final round), `finalizeDispute` releases
+   the active resolver assignment, finalizes staking, sets DRM status to `Final`,
+   and calls incentive finalization to forfeit any still-pending appeal bonds.
+   These required hooks are in one EVM transaction: a revert rolls the entire
+   finalization back.
+5. A pending timeout/fraud slash follows a separate slash lifecycle: appeal
+   submission blocks execution; governance may resolve it, or expiry cancels
+   the slash in the resolver's favor. Rejected appeals leave a pending slash
+   eligible for execution after the contest window.
+
+The state machine has atomic decision-to-bond settlement and finalization-to-
+cleanup, but the review found a DR v3 liveness defect at the reversal-slash
+boundary: `recordResolution` calls `slashForReversal` whenever a later decision
+changes the prior outcome, while `ResolverSlashingModule.slashForReversal`
+reverts when `reversalSlashBps == 0` (the default). With the slashing module
+wired in and reversal slashing disabled, a valid changed decision therefore
+reverts atomically, including its appeal-bond settlement. Fix this by making
+the DRM skip the slash call when the configured penalty is zero, or by making
+the module return a no-op result for the disabled policy; add an integration
+test proving the changed decision and bond disposition succeed at zero bps.
+
+Separate DR v3 gates remain: the vindication receivable has no funded
+redemption path and must not count as stake or withdrawable collateral;
+mixed-token exposure is unsupported. If reversal slashing is enabled, immediate
+slashes make that receivable path operationally relevant when a later round
+vindicates a resolver. Keep DR v3 economic reliance blocked until the liveness
+defect, funding policy, mixed-token policy, and independent qualification are
+resolved.
+
 ### Profile-specific follow-up gates
 
 These issues should remain distinct from P0-A and from the standalone Sew Core
@@ -200,10 +262,43 @@ release boundary.
 
 | Profile | Required work before qualification |
 |---|---|
-| Full appeal | P0-A code remediation and artifact qualification are complete on `b6cf7017`; independent security review and any target-network deployment qualification remain pending. The 11 skipped-test identities/reasons are recorded below; none is a P0-A acceptance test. |
+| Full appeal | P0-A code remediation and artifact qualification are complete on `69ac7c7b`; independent security review and any target-network deployment qualification remain pending. The 11 skipped-test identities/reasons are recorded below; none is a P0-A acceptance test. |
 | DR v3 staking/slashing | Role revocation on module rotation, slashable locked-stake treatment, funded vindication accounting, and the single-use stake lifecycle have code changes and regression coverage. Mixed-token valuation and liquidation policy remain unsupported; keep mixed-token DR v3 disabled until those policies are specified and independently qualified. |
 | Yield-backed settlement | Exact approvals and residual allowance clearing, shared-vault isolation, per-workflow recovery, and shortfall conservation are implemented and tested. Add adversarial qualification for compromised or replaced yield modules before enabling this profile. |
 | Incentive accounting | Per-workflow payout policy snapshots and atomic required finalization hooks are implemented and covered by the passing full suite; retain this evidence in any future profile artifact qualification. |
+
+### Independent review follow-up (SA-02 through SA-06)
+
+The retained `sew-full-appeal` candidate remains unchanged. The following
+source and documentation updates create a new candidate and do not alter its
+recorded bundle root.
+
+| Finding | Current disposition |
+|---|---|
+| SA-02 — incentive module rotation during active appeals | Remediated in candidate `ae3d6f20` plus the current continuation: `setIncentiveModule` rejects a changed address while `activeDisputeCount != 0`. Focused test proves it is allowed again after terminal finalization. |
+| SA-03 — staking module rotation during active assignments | Remediated with the same active-dispute guard. Focused test proves rotation is blocked while assigned and allowed after finalization. The separate shared-ledger adversarial case now uses two actual escrow instances. |
+| SA-04 — profile dependency boundary | Documented and represented in `config/sew-full-appeal-capabilities.json`; qualification checks the allowlist exclusions and records exact post-deployment assertions. Deployment-runner consumption of those assertions remains required before activation. |
+| SA-05 — canonical source repository | Export provenance now names `Sew-Protocol/sew-protocol`, and Full Appeal qualification asserts it. Existing reviewed bundle manifests remain unchanged. New-candidate CI has not yet run. |
+| SA-06 — independent Solidity build | A separate CI job now checks out the exact source in a fresh job, rebuilds with pinned Foundry, exports the bundle, and compares the full bundle root to the primary job's artifact. This gate is implemented but awaits a passing CI run on the new candidate. |
+
+The Full Appeal qualification now hard-fails on any allowlisted artifact over
+EIP-170. The retained candidate's measured oversized runtimes are
+`EscrowVault` (37,764 bytes), `DecentralizedResolutionModule` (37,116 bytes),
+and `ResolverIncentiveModuleV2BondLedger` (27,097 bytes). FASA-04 refactoring
+of those three contracts remains incomplete; FASA-05's size gate is implemented
+and will reject this baseline until each runtime is at most 24,576 bytes.
+
+The zero-penalty reversal-slashing path now returns a no-op rather than reverting.
+The focused slashing regression and the two-escrow/shared-DRM/shared-BondLedger
+adversarial test pass. The Full Appeal bundle's prior root remains unchanged;
+the new candidate has a different source revision and must receive its own
+artifact root and CI/security review.
+
+Focused Foundry regressions pass for module rotation (2/2), disabled reversal
+slashing (1/1), and two deployed escrows sharing one DRM and BondLedger (1/1).
+These focused results do not replace the full Foundry suite, new-candidate CI,
+independent security review, or runtime assertion checks against deployed
+contracts.
 
 ### P0-A and profile remediation evidence
 

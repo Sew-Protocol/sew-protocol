@@ -100,3 +100,58 @@ jobs:
         run: pnpm deployables:test
         env:
           GIT_SHA: ${{ github.sha }}
+
+  independent-full-appeal-build:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout clean source revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm i --frozen-lockfile
+
+      - name: Setup Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.10.0
+
+      - name: Fetch Foundry dependencies
+        run: bash scripts/fetch-foundry-deps.sh
+
+      - name: Fresh Forge build
+        run: forge build --force
+
+      - name: Export independently rebuilt Full Appeal bundle
+        run: >-
+          pnpm deployables:export --
+          config/deployable-allowlist.sew-full-appeal.json
+          /tmp/sew-full-appeal-rebuilt
+          --out-dir out
+        env:
+          GIT_SHA: ${{ github.sha }}
+
+      - name: Download CI reference bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: sew-full-appeal-${{ github.sha }}
+          path: /tmp/sew-full-appeal-reference
+
+      - name: Compare independent build commitments
+        run: |
+          node -e 'const fs=require("fs"); const a=JSON.parse(fs.readFileSync("/tmp/sew-full-appeal-reference/manifest.json","utf8")); const b=JSON.parse(fs.readFileSync("/tmp/sew-full-appeal-rebuilt/manifest.json","utf8")); if (a.source.commit !== b.source.commit) throw new Error("source revisions differ"); if (a.bundleRoot !== b.bundleRoot) throw new Error(`bundle roots differ: ${a.bundleRoot} != ${b.bundleRoot}`); console.log(`independent clean-checkout build reproduced ${b.bundleRoot}`);'

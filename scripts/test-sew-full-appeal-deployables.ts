@@ -11,6 +11,17 @@ const root = process.cwd();
 const outDir = path.resolve(process.env.SEW_FORGE_OUT_DIR ?? path.join(root, 'out'));
 const allowlistPath = path.join(root, 'config/deployable-allowlist.sew-full-appeal.json');
 const allowlist = loadAllowlist(allowlistPath);
+const capabilities = JSON.parse(fs.readFileSync(
+  path.join(root, 'config/sew-full-appeal-capabilities.json'), 'utf8'
+)) as {
+  profile: string;
+  packageName: string;
+  bundleVersion: string;
+  maxRuntimeBytes: number;
+  capabilities: Record<string, boolean>;
+  excludedArtifacts: string[];
+  requiredPostDeployAssertions: Array<{ target: string; getter: string; equalsZero?: boolean; equals?: string; field?: string }>;
+};
 const scratch: string[] = [];
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -27,6 +38,32 @@ function main(): void {
   assert(allowlist.buildProfile === 'sew-full-appeal', 'allowlist profile is not sew-full-appeal');
   assert(allowlist.bundleVersion === '0.2.0', 'unexpected full-appeal bundle version');
   assert(allowlist.entries.length === 20, `expected 20 allowlisted artifacts; got ${allowlist.entries.length}`);
+  assert(capabilities.profile === allowlist.buildProfile, 'capability profile does not match allowlist');
+  assert(capabilities.packageName === allowlist.packageName, 'capability package does not match allowlist');
+  assert(capabilities.bundleVersion === allowlist.bundleVersion, 'capability bundle version does not match allowlist');
+  assert(capabilities.maxRuntimeBytes === 24_576, 'Full Appeal runtime limit must be EIP-170 (24,576 bytes)');
+  const artifactNames = new Set(allowlist.entries.map((entry) => entry.contractName));
+  for (const excluded of capabilities.excludedArtifacts) {
+    assert(!artifactNames.has(excluded), `excluded capability artifact is allowlisted: ${excluded}`);
+  }
+  assert(capabilities.capabilities.internalResolverAppeals, 'internal appeals must be enabled');
+  assert(capabilities.capabilities.bondLedgerCustody, 'BondLedger custody must be enabled');
+  for (const disabled of ['externalArbitration', 'drV3Staking', 'drV3Slashing', 'yieldCustody', 'prfAdjudication']) {
+    assert(capabilities.capabilities[disabled] === false, `${disabled} must remain disabled in Full Appeal`);
+  }
+  const runtimeChecks = new Set(capabilities.requiredPostDeployAssertions.map(
+    (item) => `${item.target}.${item.getter}.${item.field ?? ''}`
+  ));
+  for (const required of [
+    'DecentralizedResolutionModule.stakingModule().',
+    'DecentralizedResolutionModule.slashingModule().',
+    'DecentralizedResolutionModule.externalResolver().',
+    'DecentralizedResolutionModule.getResolutionConfig(activeResolutionConfigVersion).externalResolver',
+    'ModuleSnapshotRegistry.getModule(escrow, YIELD_GEN).',
+    'ModuleSnapshotRegistry.getModule(escrow, RESOLUTION).',
+  ]) {
+    assert(runtimeChecks.has(required), `missing required runtime capability assertion: ${required}`);
+  }
 
   for (const entry of allowlist.entries) {
     const artifactPath = path.join(outDir, `${entry.contractName}.sol`, `${entry.contractName}.json`);
@@ -41,6 +78,8 @@ function main(): void {
   validateDeployables({ allowlist, exportDir: secondDir });
 
   assert(first.manifest.build.profile === 'sew-full-appeal', 'manifest profile is not sew-full-appeal');
+  assert(first.manifest.source.repository === 'Sew-Protocol/sew-protocol',
+    'manifest source repository is not the canonical GitHub repository');
   assert(first.manifest.source.dirty === false, 'full-appeal bundle source is dirty or not commit-bound');
   assert(first.manifest.build.compiler.name === 'solc', 'unexpected compiler');
   assert(first.manifest.build.compiler.version.startsWith('0.8.37'), 'unexpected compiler version');
@@ -60,6 +99,10 @@ function main(): void {
     const secondArtifact = fs.readFileSync(path.join(secondDir, 'artifacts', `${entry.artifactName}.json`));
     assert(sha256HexOfBuffer(firstArtifact) === sha256HexOfBuffer(secondArtifact),
       `independent artifact bytes differ for ${entry.artifactName}`);
+    const exported = JSON.parse(firstArtifact.toString('utf8')) as { deployedBytecode: string };
+    const runtimeBytes = (exported.deployedBytecode.replace(/^0x/, '').length / 2);
+    assert(runtimeBytes <= capabilities.maxRuntimeBytes,
+      `${entry.artifactName} runtime is ${runtimeBytes} bytes; EIP-170 limit is ${capabilities.maxRuntimeBytes}`);
   }
 
   console.log(
