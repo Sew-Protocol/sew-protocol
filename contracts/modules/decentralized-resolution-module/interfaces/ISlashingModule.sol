@@ -232,6 +232,10 @@ interface ISlashingModule {
      * @param escrowContract Related escrow contract
      * @param resolver Resolver whose decision was reversed
      * @param priorRound Round at which decision was made
+     * @return slashId Nonzero only if this call creates a slash record. Zero means no new
+     *         slash was recorded (for example, disabled policy, circuit breaker, or exhausted cap).
+     *         Callers must not treat zero as proof of a slash; dispute and bond settlement are
+     *         governed by the adjudication result independently of this optional penalty.
      */
     function slashForReversal(
         uint256 workflowId,

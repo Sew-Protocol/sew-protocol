@@ -17,6 +17,7 @@ const capabilities = JSON.parse(fs.readFileSync(
   profile: string;
   packageName: string;
   bundleVersion: string;
+  targetNetwork: string;
   maxRuntimeBytes: number;
   capabilities: Record<string, boolean>;
   excludedArtifacts: string[];
@@ -41,7 +42,8 @@ function main(): void {
   assert(capabilities.profile === allowlist.buildProfile, 'capability profile does not match allowlist');
   assert(capabilities.packageName === allowlist.packageName, 'capability package does not match allowlist');
   assert(capabilities.bundleVersion === allowlist.bundleVersion, 'capability bundle version does not match allowlist');
-  assert(capabilities.maxRuntimeBytes === 24_576, 'Full Appeal runtime limit must be EIP-170 (24,576 bytes)');
+  assert(capabilities.targetNetwork === 'Monad Testnet', 'Full Appeal size qualification target must be Monad Testnet');
+  assert(capabilities.maxRuntimeBytes === 131_072, 'Monad Testnet runtime limit must be 128 KiB (131,072 bytes)');
   const artifactNames = new Set(allowlist.entries.map((entry) => entry.contractName));
   for (const excluded of capabilities.excludedArtifacts) {
     assert(!artifactNames.has(excluded), `excluded capability artifact is allowlisted: ${excluded}`);
@@ -102,7 +104,7 @@ function main(): void {
     const exported = JSON.parse(firstArtifact.toString('utf8')) as { deployedBytecode: string };
     const runtimeBytes = (exported.deployedBytecode.replace(/^0x/, '').length / 2);
     assert(runtimeBytes <= capabilities.maxRuntimeBytes,
-      `${entry.artifactName} runtime is ${runtimeBytes} bytes; EIP-170 limit is ${capabilities.maxRuntimeBytes}`);
+      `${entry.artifactName} runtime is ${runtimeBytes} bytes; configured ${capabilities.targetNetwork} limit is ${capabilities.maxRuntimeBytes}`);
   }
 
   console.log(

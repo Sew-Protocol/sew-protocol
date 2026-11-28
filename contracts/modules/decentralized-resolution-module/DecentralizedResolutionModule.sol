@@ -840,6 +840,9 @@ contract DecentralizedResolutionModule is
 
         // Reversal slashing is part of this authenticated decision transition.
         if (slashingModule != address(0)) {
+            // Intentionally ignore the optional slash ID: zero means no slash record
+            // was created, and is never evidence that a penalty executed. Adjudication
+            // and appeal-bond settlement are determined by the recorded round outcomes.
             ISlashingModule(slashingModule).slashForReversal(
                 workflowId,
                 escrowContract,

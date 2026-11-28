@@ -3,7 +3,7 @@
 **Profile:** `sew-full-appeal`
 
 **Artifact package:** `@sew/deployables@0.2.0`
-**Current reviewed bundle:** `2dd69b86427e65549ed51c7e02165832eb18f6e7ea254e48a1db9641b8085fe4`, source `69ac7c7bbd809b26cf973fb9f1ed82ef7e8850bf`.
+**Current remediation candidate:** the source revision and artifact root recorded in its export manifest (independent review pending).
 
 This profile covers the Sew escrow with internal resolver appeals and
 BondLedger-backed appeal-bond custody. The 20-artifact allowlist is the
@@ -47,11 +47,9 @@ deployed state.
 | Sew DR v3 | Staking, slashing, and collateralized resolver economics. |
 | Sew Yield | Yield-backed custody and recovery. |
 
-The retained Full Appeal candidate passed source-bound CI and artifact
-integrity qualification, but it is not deployable under EIP-170: its
-`EscrowVault`, `DecentralizedResolutionModule`, and
-`ResolverIncentiveModuleV2BondLedger` runtimes are 37,764, 37,116, and 27,097
-bytes respectively. The new qualification gate rejects any such oversized
-artifact. Contract refactoring and a passing size gate are required before a
-new candidate can be treated as deployable. The retained bundle remains
-immutable; remediation produces a new source revision and bundle root.
+This profile's current target is Monad Testnet, whose documented runtime limit
+is 128 KiB. Qualification checks each runtime against that target-specific
+limit; it does not claim EIP-170 compatibility. The older Base Sepolia bundle
+and its source-bound review remain a separate, immutable candidate and do not
+qualify this revision. A target-specific deployment profile, clean rebuild,
+independent security review, and deployment rehearsal are still required.

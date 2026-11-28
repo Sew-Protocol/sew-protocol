@@ -15,6 +15,8 @@ import '../../../packages/sew-core/contracts/core/BondCollector.sol';
 import '../../../packages/sew-core/contracts/types/EscrowTypes.sol';
 
 contract FailingDisputeFinalizationHook {
+    fallback() external {}
+
     function onDisputeFinalized(uint256, address, uint8, ResolutionOutcome) external pure {
         revert('finalization hook failed');
     }
@@ -291,13 +293,14 @@ contract DisputeCapacityExhaustionTest is Test {
     }
 
     function test_DRM_FinalizationHookFailureRollsBackTerminalState() public {
-        uint256 wid = _createEscrow();
-        _openDispute(wid);
-        uint256 activeBefore = drm.activeDisputeCount();
         FailingDisputeFinalizationHook failingHook = new FailingDisputeFinalizationHook();
 
         vm.prank(timelock);
         drm.setIncentiveModule(address(failingHook));
+
+        uint256 wid = _createEscrow();
+        _openDispute(wid);
+        uint256 activeBefore = drm.activeDisputeCount();
 
         vm.prank(address(escrow));
         vm.expectRevert(bytes('finalization hook failed'));

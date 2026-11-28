@@ -606,9 +606,10 @@ contract ResolverSlashingModule is ISlashingModule, AccessControl, ReentrancyGua
         uint8 priorRound
     ) external override onlyRole(ROLE_RESOLUTION_MODULE) returns (uint256 slashId) {
         priorRound;
-        // Reversal slashing is an optional DR v3 policy. A zero penalty disables
-        // only the economic action; it must not block an otherwise valid appeal
-        // decision or its bond settlement in the calling DRM transaction.
+        // Reversal slashing is an optional DR v3 policy. Zero is a sentinel meaning
+        // no slash record was created; callers must not treat it as slash evidence.
+        // Dispute finality and appeal-bond disposition are separate and must not be
+        // blocked by a disabled penalty.
         if (slashConfig.reversalSlashBps == 0) return 0;
 
         // Reset tracking before slash

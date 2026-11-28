@@ -1,0 +1,12 @@
+Working copy changes:
+[38;5;6mM config/sew-full-appeal-capabilities.json[39m
+[38;5;6mM contracts/modules/decentralized-resolution-module/DecentralizedResolutionModule.sol[39m
+[38;5;6mM contracts/modules/decentralized-resolution-module/interfaces/ISlashingModule.sol[39m
+[38;5;6mM contracts/modules/decentralized-resolution-module/slashing/ResolverSlashingModule.sol[39m
+[38;5;6mM docs/deployment/sew-full-appeal-profile.md[39m
+[38;5;6mM scripts/test-sew-full-appeal-deployables.ts[39m
+[38;5;6mM test/foundry/core/AppealAuthoritativePath.t.sol[39m
+[38;5;6mM test/foundry/decentralized-resolution-module/DisputeCapacityExhaustion.t.sol[39m
+[38;5;6mM test/foundry/decentralized-resolution-module/SlashingModuleUnit.t.sol[39m
+Working copy  (@) : [1m[38;5;13mvm[38;5;8mtnrpvq[39m [38;5;12mf1[38;5;8md10da1[39m [38;5;13mmain*[38;5;8m | [39mfix: clarify reversal slash sentinel and qualify Full Appeal for Monad[0m
+Parent commit (@-): [1m[38;5;5mzn[0m[38;5;8mlrxmpx[39m [1m[38;5;4m15[0m[38;5;8mbc5334[39m [38;5;5mmain@origin[38;5;8m | [39mfix: harden full appeal lifecycle and qualification

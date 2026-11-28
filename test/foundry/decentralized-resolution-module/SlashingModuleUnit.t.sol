@@ -396,7 +396,7 @@ contract SlashingModuleUnitTest is Test {
 
     // ============ slashForReversal Tests ============
 
-    function test_slashForReversal_DisabledIsNoOp() public {
+    function test_slashForReversal_DisabledReturnsNoSlashRecord() public {
         uint256 workflowId = 1;
         uint8 priorRound = 0;
 
@@ -407,6 +407,13 @@ contract SlashingModuleUnitTest is Test {
             'disabled reversal slashing must be a no-op'
         );
         assertEq(slashingModule.reversalSlashByRound(address(this), workflowId, priorRound), 0);
+        ISlashingModule.SlashEvent memory noSlash = slashingModule.getSlashEvent(1);
+        assertEq(noSlash.slashId, 0, 'zero ID means no slash record exists');
+        assertEq(noSlash.escrowContract, address(0), 'no reversal slash event is stored');
+        assertFalse(
+            slashingModule.workflowSlashed(address(this), workflowId, resolver1),
+            'disabled reversal penalty must not mark the workflow as slashed'
+        );
     }
 
     function test_slashForReversal_EnabledByGovernance() public {

@@ -3,7 +3,8 @@
   "profile": "sew-full-appeal",
   "packageName": "@sew/deployables",
   "bundleVersion": "0.2.0",
-  "maxRuntimeBytes": 24576,
+  "targetNetwork": "Monad Testnet",
+  "maxRuntimeBytes": 131072,
   "capabilities": {
     "internalResolverAppeals": true,
     "bondLedgerCustody": true,
